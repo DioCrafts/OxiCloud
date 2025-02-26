@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<info>
+	<id>files_external</id>
+	<name>External storage support</name>
+	<description>Mount external storage sources</description>
+	<licence>AGPL</licence>
+	<author>Robin Appelman, Michael Gapczynski</author>
+	<require>4.93</require>
+	<shipped>true</shipped>
+	<types>
+		<filesystem/>
+	</types>
+</info>

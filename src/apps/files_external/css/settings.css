@@ -1,0 +1,20 @@
+td.status > span {
+	display: inline-block;
+	height: 16px;
+	width: 16px;
+	vertical-align: text-bottom;
+}
+span.success {
+	background: #37ce02;
+	border-radius: 8px;
+}
+span.error {
+	background: #ce3702;
+}
+
+td.mountPoint, td.backend { width:10em; }
+td.remove>img { visibility:hidden; padding-top:0.8em; }
+tr:hover>td.remove>img { visibility:visible; cursor:pointer; }
+#addMountPoint>td { border:none; }
+#addMountPoint>td.applicable { visibility:hidden; }
+#selectBackend { margin-left:-10px; }

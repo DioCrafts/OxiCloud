@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<info>
+	<id>files_sharing</id>
+	<name>Share Files</name>
+	<description>File sharing between users</description>
+	<licence>AGPL</licence>
+	<author>Michael Gapczynski</author>
+	<require>4.93</require>
+	<shipped>true</shipped>
+	<default_enable/>
+	<types>
+		<filesystem/>
+	</types>
+	<public>
+		<files>public.php</files>
+		<webdav>public.php</webdav>
+	</public>
+</info>

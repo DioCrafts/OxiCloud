@@ -1,0 +1,208 @@
+use std::collections::HashMap;
+use rust_i18n::locale;
+
+pub fn get_translations() -> HashMap<&'static str, locale::Value> {
+    let mut translations = HashMap::new();
+    
+    translations.insert("%s shared »%s« with you", "%s ha compartit »%s« amb tu");
+    translations.insert("Couldn't send mail to following users: %s ", "No s'ha pogut enviar correu als usuaris següents: %s");
+    translations.insert("Turned on maintenance mode", "Activat el mode de manteniment");
+    translations.insert("Turned off maintenance mode", "Desactivat el mode de manteniment");
+    translations.insert("Updated database", "Actualitzada la base de dades");
+    translations.insert("Updating filecache, this may take really long...", "Actualitzant la memòria de cau del fitxers, això pot trigar molt...");
+    translations.insert("Updated filecache", "Actualitzada la memòria de cau dels fitxers");
+    translations.insert("... %d%% done ...", "... %d%% fet ...");
+    translations.insert("No image or file provided", "No s'han proporcionat imatges o fitxers");
+    translations.insert("Unknown filetype", "Tipus de fitxer desconegut");
+    translations.insert("Invalid image", "Imatge no vàlida");
+    translations.insert("No temporary profile picture available, try again", "No hi ha imatge temporal de perfil disponible, torneu a intentar-ho");
+    translations.insert("No crop data provided", "No heu proporcionat dades del retall");
+    translations.insert("Sunday", "Diumenge");
+    translations.insert("Monday", "Dilluns");
+    translations.insert("Tuesday", "Dimarts");
+    translations.insert("Wednesday", "Dimecres");
+    translations.insert("Thursday", "Dijous");
+    translations.insert("Friday", "Divendres");
+    translations.insert("Saturday", "Dissabte");
+    translations.insert("January", "Gener");
+    translations.insert("February", "Febrer");
+    translations.insert("March", "Març");
+    translations.insert("April", "Abril");
+    translations.insert("May", "Maig");
+    translations.insert("June", "Juny");
+    translations.insert("July", "Juliol");
+    translations.insert("August", "Agost");
+    translations.insert("September", "Setembre");
+    translations.insert("October", "Octubre");
+    translations.insert("November", "Novembre");
+    translations.insert("December", "Desembre");
+    translations.insert("Settings", "Configuració");
+    translations.insert("seconds ago", "segons enrere");
+    
+    let mut plural_forms = HashMap::new();
+    plural_forms.insert(1, "fa %n minut");
+    plural_forms.insert(2, "fa %n minuts");
+    translations.insert("_%n minute ago_::_%n minutes ago_", locale::Value::Plural(plural_forms.clone()));
+    
+    plural_forms.clear();
+    plural_forms.insert(1, "fa %n hora");
+    plural_forms.insert(2, "fa %n hores");
+    translations.insert("_%n hour ago_::_%n hours ago_", locale::Value::Plural(plural_forms.clone()));
+    
+    translations.insert("today", "avui");
+    translations.insert("yesterday", "ahir");
+    
+    plural_forms.clear();
+    plural_forms.insert(1, "fa %n dies");
+    plural_forms.insert(2, "fa %n dies");
+    translations.insert("_%n day ago_::_%n days ago_", locale::Value::Plural(plural_forms.clone()));
+    
+    translations.insert("last month", "el mes passat");
+    
+    plural_forms.clear();
+    plural_forms.insert(1, "fa %n mes");
+    plural_forms.insert(2, "fa %n mesos");
+    translations.insert("_%n month ago_::_%n months ago_", locale::Value::Plural(plural_forms.clone()));
+    
+    translations.insert("months ago", "mesos enrere");
+    translations.insert("last year", "l'any passat");
+    translations.insert("years ago", "anys enrere");
+    translations.insert("Choose", "Escull");
+    translations.insert("Error loading file picker template: {error}", "Error en carregar la plantilla de càrrega de fitxers: {error}");
+    translations.insert("Yes", "Sí");
+    translations.insert("No", "No");
+    translations.insert("Ok", "D'acord");
+    translations.insert("Error loading message template: {error}", "Error en carregar la plantilla de missatge: {error}");
+    
+    plural_forms.clear();
+    plural_forms.insert(1, "{count} conflicte de fitxer");
+    plural_forms.insert(2, "{count} conflictes de fitxer");
+    translations.insert("_{count} file conflict_::_{count} file conflicts_", locale::Value::Plural(plural_forms.clone()));
+    
+    translations.insert("One file conflict", "Un fitxer en conflicte");
+    translations.insert("Which files do you want to keep?", "Quin fitxer voleu conservar?");
+    translations.insert("If you select both versions, the copied file will have a number added to its name.", "Si seleccioneu les dues versions, el fitxer copiat tindrà un número afegit al seu nom.");
+    translations.insert("Cancel", "Cancel·la");
+    translations.insert("Continue", "Continua");
+    translations.insert("(all selected)", "(selecciona-ho tot)");
+    translations.insert("({count} selected)", "({count} seleccionats)");
+    translations.insert("Error loading file exists template", "Error en carregar la plantilla de fitxer existent");
+    translations.insert("Shared", "Compartit");
+    translations.insert("Share", "Comparteix");
+    translations.insert("Error", "Error");
+    translations.insert("Error while sharing", "Error en compartir");
+    translations.insert("Error while unsharing", "Error en deixar de compartir");
+    translations.insert("Error while changing permissions", "Error en canviar els permisos");
+    translations.insert("Shared with you and the group {group} by {owner}", "Compartit amb vos i amb el grup {group} per {owner}");
+    translations.insert("Shared with you by {owner}", "Compartit amb vos per {owner}");
+    translations.insert("Share with user or group …", "Comparteix amb usuari o grup...");
+    translations.insert("Share link", "Enllaç de compartició");
+    translations.insert("Password protect", "Protegir amb contrasenya");
+    translations.insert("Password", "Contrasenya");
+    translations.insert("Allow Public Upload", "Permet pujada pública");
+    translations.insert("Email link to person", "Enllaç per correu electrónic amb la persona");
+    translations.insert("Send", "Envia");
+    translations.insert("Set expiration date", "Estableix la data de venciment");
+    translations.insert("Expiration date", "Data de venciment");
+    translations.insert("Share via email:", "Comparteix per correu electrònic");
+    translations.insert("No people found", "No s'ha trobat ningú");
+    translations.insert("group", "grup");
+    translations.insert("Resharing is not allowed", "No es permet compartir de nou");
+    translations.insert("Shared in {item} with {user}", "Compartit en {item} amb {user}");
+    translations.insert("Unshare", "Deixa de compartir");
+    translations.insert("notify by email", "notifica per correu electrònic");
+    translations.insert("can edit", "pot editar");
+    translations.insert("access control", "control d'accés");
+    translations.insert("create", "crea");
+    translations.insert("update", "actualitza");
+    translations.insert("delete", "elimina");
+    translations.insert("share", "comparteix");
+    translations.insert("Password protected", "Protegeix amb contrasenya");
+    translations.insert("Error unsetting expiration date", "Error en eliminar la data de venciment");
+    translations.insert("Error setting expiration date", "Error en establir la data de venciment");
+    translations.insert("Sending ...", "Enviant...");
+    translations.insert("Email sent", "El correu electrónic s'ha enviat");
+    translations.insert("Warning", "Avís");
+    translations.insert("The object type is not specified.", "No s'ha especificat el tipus d'objecte.");
+    translations.insert("Enter new", "Escriu nou");
+    translations.insert("Delete", "Esborra");
+    translations.insert("Add", "Afegeix");
+    translations.insert("Edit tags", "Edita etiquetes");
+    translations.insert("Error loading dialog template: {error}", "Error en carregar la plantilla de diàleg: {error}");
+    translations.insert("No tags selected for deletion.", "No heu seleccionat les etiquetes a eliminar.");
+    translations.insert("The update was unsuccessful. Please report this issue to the <a href=\"https://github.com/owncloud/core/issues\" target=\"_blank\">ownCloud community</a>.", "L'actualització ha estat incorrecte. Comuniqueu aquest error a <a href=\"https://github.com/owncloud/core/issues\" target=\"_blank\">la comunitat ownCloud</a>.");
+    translations.insert("The update was successful. Redirecting you to ownCloud now.", "L'actualització ha estat correcte. Ara us redirigim a ownCloud.");
+    translations.insert("%s password reset", "restableix la contrasenya %s");
+    translations.insert("Use the following link to reset your password: {link}", "Useu l'enllaç següent per restablir la contrasenya: {link}");
+    translations.insert("The link to reset your password has been sent to your email.<br>If you do not receive it within a reasonable amount of time, check your spam/junk folders.<br>If it is not there ask your local administrator .", "L'enllaç per reiniciar la vostra contrasenya s'ha enviat al vostre correu.<br>Si no el rebeu en un temps raonable comproveu les carpetes de spam. <br>Si no és allà, pregunteu a l'administrador local.");
+    translations.insert("Request failed!<br>Did you make sure your email/username was right?", "La petició ha fallat!<br>Esteu segur que el correu/nom d'usuari és correcte?");
+    translations.insert("You will receive a link to reset your password via Email.", "Rebreu un enllaç al correu electrònic per reiniciar la contrasenya.");
+    translations.insert("Username", "Nom d'usuari");
+    translations.insert("Your files are encrypted. If you haven't enabled the recovery key, there will be no way to get your data back after your password is reset. If you are not sure what to do, please contact your administrator before you continue. Do you really want to continue?", "Els vostres fitxers estan encriptats. Si no heu habilitat la clau de recuperació no hi haurà manera de recuperar les dades després que reestabliu la contrasenya. Si sabeu què fer, contacteu amb l'administrador abans de continuar. Voleu continuar?");
+    translations.insert("Yes, I really want to reset my password now", "Sí, vull restablir ara la contrasenya");
+    translations.insert("Reset", "Estableix de nou");
+    translations.insert("Your password was reset", "La vostra contrasenya s'ha reinicialitzat");
+    translations.insert("To login page", "A la pàgina d'inici de sessió");
+    translations.insert("New password", "Contrasenya nova");
+    translations.insert("Reset password", "Reinicialitza la contrasenya");
+    translations.insert("Personal", "Personal");
+    translations.insert("Users", "Usuaris");
+    translations.insert("Apps", "Aplicacions");
+    translations.insert("Admin", "Administració");
+    translations.insert("Help", "Ajuda");
+    translations.insert("Error loading tags", "Error en carregar les etiquetes");
+    translations.insert("Tag already exists", "L'etiqueta ja existeix");
+    translations.insert("Error deleting tag(s)", "Error en eliminar etiqueta(s)");
+    translations.insert("Error tagging", "Error en etiquetar");
+    translations.insert("Error untagging", "Error en treure les etiquetes");
+    translations.insert("Error favoriting", "Error en posar a preferits");
+    translations.insert("Error unfavoriting", "Error en treure de preferits");
+    translations.insert("Access forbidden", "Accés prohibit");
+    translations.insert("Cloud not found", "No s'ha trobat el núvol");
+    translations.insert("Hey there,\n\njust letting you know that %s shared %s with you.\nView it: %s\n\n", "Ei,\n\nnomés fer-te saber que %s ha compartit %s amb tu.\nMira-ho a: %s\n\n");
+    translations.insert("The share will expire on %s.\n\n", "El compartit té venciment a %s.\n\n");
+    translations.insert("Cheers!", "Salut!");
+    translations.insert("Security Warning", "Avís de seguretat");
+    translations.insert("Your PHP version is vulnerable to the NULL Byte attack (CVE-2006-7243)", "La versió de PHP que useu és vulnerable a l'atac per NULL Byte (CVE-2006-7243)");
+    translations.insert("Please update your PHP installation to use %s securely.", "Actualitzeu la instal·lació de PHP per usar %s de forma segura.");
+    translations.insert("No secure random number generator is available, please enable the PHP OpenSSL extension.", "No està disponible el generador de nombres aleatoris segurs, habiliteu l'extensió de PHP OpenSSL.");
+    translations.insert("Without a secure random number generator an attacker may be able to predict password reset tokens and take over your account.", "Sense un generador de nombres aleatoris segurs un atacant podria predir els senyals per restablir la contrasenya i prendre-us el compte.");
+    translations.insert("Your data directory and files are probably accessible from the internet because the .htaccess file does not work.", "La carpeta de dades i els seus fitxers probablement són accessibles des d'internet perquè el fitxer .htaccess no funciona.");
+    translations.insert("For information how to properly configure your server, please see the <a href=\"%s\" target=\"_blank\">documentation</a>.", "Per informació de com configurar el servidor, comproveu la <a href=\"%s\" target=\"_blank\">documentació</a>.");
+    translations.insert("Create an <strong>admin account</strong>", "Crea un <strong>compte d'administrador</strong>");
+    translations.insert("Advanced", "Avançat");
+    translations.insert("Data folder", "Carpeta de dades");
+    translations.insert("Configure the database", "Configura la base de dades");
+    translations.insert("will be used", "s'usarà");
+    translations.insert("Database user", "Usuari de la base de dades");
+    translations.insert("Database password", "Contrasenya de la base de dades");
+    translations.insert("Database name", "Nom de la base de dades");
+    translations.insert("Database tablespace", "Espai de taula de la base de dades");
+    translations.insert("Database host", "Ordinador central de la base de dades");
+    translations.insert("Finish setup", "Acaba la configuració");
+    translations.insert("Finishing …", "Acabant...");
+    translations.insert("%s is available. Get more information on how to update.", "%s està disponible. Obtingueu més informació de com actualitzar.");
+    translations.insert("Log out", "Surt");
+    translations.insert("Automatic logon rejected!", "L'ha rebutjat l'acceditació automàtica!");
+    translations.insert("If you did not change your password recently, your account may be compromised!", "Se no heu canviat la contrasenya recentment el vostre compte pot estar compromès!");
+    translations.insert("Please change your password to secure your account again.", "Canvieu la contrasenya de nou per assegurar el vostre compte.");
+    translations.insert("Server side authentication failed!", "L'autenticació del servidor ha fallat!");
+    translations.insert("Please contact your administrator.", "Contacteu amb l'administrador.");
+    translations.insert("Lost your password?", "Heu perdut la contrasenya?");
+    translations.insert("remember", "recorda'm");
+    translations.insert("Log in", "Inici de sessió");
+    translations.insert("Alternative Logins", "Acreditacions alternatives");
+    translations.insert("Hey there,<br><br>just letting you know that %s shared »%s« with you.<br><a href=\"%s\">View it!</a><br><br>", "Ei,<br><br>només fer-te saber que %s ha compartit »%s« amb tu.<br><a href=\"%s\">Mira-ho!</a><br><br>");
+    translations.insert("The share will expire on %s.<br><br>", "El compartit té venciment a %s.<br><br>");
+    translations.insert("Updating ownCloud to version %s, this may take a while.", "S'està actualitzant ownCloud a la versió %s, pot trigar una estona.");
+    translations.insert("This ownCloud instance is currently being updated, which may take a while.", "Aquesta instància d'ownCloud s'està actualitzant i podria trigar una estona.");
+    translations.insert("Please reload this page after a short time to continue using ownCloud.", "Carregueu de nou aquesta pàgina d'aquí a poc temps per continuar usant ownCloud.");
+    translations.insert("Contact your system administrator if this message persists or appeared unexpectedly.", "Contacteu amb l'administrador del sistema si aquest missatge persisteix o apareix inesperadament.");
+    translations.insert("Thank you for your patience.", "Gràcies per la paciència.");
+    
+    translations
+}
+
+pub fn get_plural_forms() -> &'static str {
+    "nplurals=2; plural=(n != 1);"
+}
