@@ -1,0 +1,133 @@
+use std::collections::HashMap;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    pub static ref TRANSLATIONS: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert("%s shared »%s« with you", "%s kunhavigis "%s" kun vi");
+        m.insert("Sunday", "dimanĉo");
+        m.insert("Monday", "lundo");
+        m.insert("Tuesday", "mardo");
+        m.insert("Wednesday", "merkredo");
+        m.insert("Thursday", "ĵaŭdo");
+        m.insert("Friday", "vendredo");
+        m.insert("Saturday", "sabato");
+        m.insert("January", "Januaro");
+        m.insert("February", "Februaro");
+        m.insert("March", "Marto");
+        m.insert("April", "Aprilo");
+        m.insert("May", "Majo");
+        m.insert("June", "Junio");
+        m.insert("July", "Julio");
+        m.insert("August", "Aŭgusto");
+        m.insert("September", "Septembro");
+        m.insert("October", "Oktobro");
+        m.insert("November", "Novembro");
+        m.insert("December", "Decembro");
+        m.insert("Settings", "Agordo");
+        m.insert("seconds ago", "sekundoj antaŭe");
+        m.insert("today", "hodiaŭ");
+        m.insert("yesterday", "hieraŭ");
+        m.insert("last month", "lastamonate");
+        m.insert("months ago", "monatoj antaŭe");
+        m.insert("last year", "lastajare");
+        m.insert("years ago", "jaroj antaŭe");
+        m.insert("Choose", "Elekti");
+        m.insert("Yes", "Jes");
+        m.insert("No", "Ne");
+        m.insert("Ok", "Akcepti");
+        m.insert("Cancel", "Nuligi");
+        m.insert("Shared", "Dividita");
+        m.insert("Share", "Kunhavigi");
+        m.insert("Error", "Eraro");
+        m.insert("Error while sharing", "Eraro dum kunhavigo");
+        m.insert("Error while unsharing", "Eraro dum malkunhavigo");
+        m.insert("Error while changing permissions", "Eraro dum ŝanĝo de permesoj");
+        m.insert("Shared with you and the group {group} by {owner}", "Kunhavigita kun vi kaj la grupo {group} de {owner}");
+        m.insert("Shared with you by {owner}", "Kunhavigita kun vi de {owner}");
+        m.insert("Password protect", "Protekti per pasvorto");
+        m.insert("Password", "Pasvorto");
+        m.insert("Email link to person", "Retpoŝti la ligilon al ulo");
+        m.insert("Send", "Sendi");
+        m.insert("Set expiration date", "Agordi limdaton");
+        m.insert("Expiration date", "Limdato");
+        m.insert("Share via email:", "Kunhavigi per retpoŝto:");
+        m.insert("No people found", "Ne troviĝis gento");
+        m.insert("group", "grupo");
+        m.insert("Resharing is not allowed", "Rekunhavigo ne permesatas");
+        m.insert("Shared in {item} with {user}", "Kunhavigita en {item} kun {user}");
+        m.insert("Unshare", "Malkunhavigi");
+        m.insert("can edit", "povas redakti");
+        m.insert("access control", "alirkontrolo");
+        m.insert("create", "krei");
+        m.insert("update", "ĝisdatigi");
+        m.insert("delete", "forigi");
+        m.insert("share", "kunhavigi");
+        m.insert("Password protected", "Protektita per pasvorto");
+        m.insert("Error unsetting expiration date", "Eraro dum malagordado de limdato");
+        m.insert("Error setting expiration date", "Eraro dum agordado de limdato");
+        m.insert("Sending ...", "Sendante...");
+        m.insert("Email sent", "La retpoŝtaĵo sendiĝis");
+        m.insert("Warning", "Averto");
+        m.insert("The object type is not specified.", "Ne indikiĝis tipo de la objekto.");
+        m.insert("Delete", "Forigi");
+        m.insert("Add", "Aldoni");
+        m.insert("The update was unsuccessful. Please report this issue to the <a href=\"https://github.com/owncloud/core/issues\" target=\"_blank\">ownCloud community</a>.", "La ĝisdatigo estis malsukcese. Bonvolu raporti tiun problemon al la <a href=\"https://github.com/owncloud/core/issues\" target=\"_blank\">ownClouda komunumo</a>.");
+        m.insert("The update was successful. Redirecting you to ownCloud now.", "La ĝisdatigo estis sukcesa. Alidirektante nun al ownCloud.");
+        m.insert("Use the following link to reset your password: {link}", "Uzu la jenan ligilon por restarigi vian pasvorton: {link}");
+        m.insert("Request failed!<br>Did you make sure your email/username was right?", "La peto malsukcesis!<br />Ĉu vi certiĝis, ke via retpoŝto/uzantonomo ĝustas?");
+        m.insert("You will receive a link to reset your password via Email.", "Vi ricevos ligilon retpoŝte por rekomencigi vian pasvorton.");
+        m.insert("Username", "Uzantonomo");
+        m.insert("Yes, I really want to reset my password now", "Jes, mi vere volas restarigi mian pasvorton nun");
+        m.insert("Your password was reset", "Via pasvorto rekomencis");
+        m.insert("To login page", "Al la ensaluta paĝo");
+        m.insert("New password", "Nova pasvorto");
+        m.insert("Reset password", "Rekomenci la pasvorton");
+        m.insert("Personal", "Persona");
+        m.insert("Users", "Uzantoj");
+        m.insert("Apps", "Aplikaĵoj");
+        m.insert("Admin", "Administranto");
+        m.insert("Help", "Helpo");
+        m.insert("Access forbidden", "Aliro estas malpermesata");
+        m.insert("Cloud not found", "La nubo ne estas trovita");
+        m.insert("Security Warning", "Sekureca averto");
+        m.insert("Your PHP version is vulnerable to the NULL Byte attack (CVE-2006-7243)", "Via PHP versio estas sendefenda je la NULL bajto atako (CVE-2006-7243)");
+        m.insert("No secure random number generator is available, please enable the PHP OpenSSL extension.", "Ne disponeblas sekura generilo de hazardaj numeroj; bonvolu kapabligi la OpenSSL-kromaĵon por PHP.");
+        m.insert("Create an <strong>admin account</strong>", "Krei <strong>administran konton</strong>");
+        m.insert("Advanced", "Progresinta");
+        m.insert("Data folder", "Datuma dosierujo");
+        m.insert("Configure the database", "Agordi la datumbazon");
+        m.insert("will be used", "estos uzata");
+        m.insert("Database user", "Datumbaza uzanto");
+        m.insert("Database password", "Datumbaza pasvorto");
+        m.insert("Database name", "Datumbaza nomo");
+        m.insert("Database tablespace", "Datumbaza tabelospaco");
+        m.insert("Database host", "Datumbaza gastigo");
+        m.insert("Finish setup", "Fini la instalon");
+        m.insert("%s is available. Get more information on how to update.", "%s haveblas. Ekhavi pli da informo pri kiel ĝisdatigi.");
+        m.insert("Log out", "Elsaluti");
+        m.insert("Automatic logon rejected!", "La aŭtomata ensaluto malakceptiĝis!");
+        m.insert("If you did not change your password recently, your account may be compromised!", "Se vi ne ŝanĝis vian pasvorton lastatempe, via konto eble kompromitas!");
+        m.insert("Please change your password to secure your account again.", "Bonvolu ŝanĝi vian pasvorton por sekurigi vian konton ree.");
+        m.insert("Lost your password?", "Ĉu vi perdis vian pasvorton?");
+        m.insert("remember", "memori");
+        m.insert("Log in", "Ensaluti");
+        m.insert("Alternative Logins", "Alternativaj ensalutoj");
+        m.insert("Updating ownCloud to version %s, this may take a while.", "ownCloud ĝisdatiĝas al eldono %s, tio ĉi povas daŭri je iom da tempo.");
+        m
+    };
+
+    pub static ref PLURAL_FORMS: HashMap<&'static str, Vec<&'static str>> = {
+        let mut m = HashMap::new();
+        m.insert("_%n minute ago_::_%n minutes ago_", vec!["", ""]);
+        m.insert("_%n hour ago_::_%n hours ago_", vec!["", ""]);
+        m.insert("_%n day ago_::_%n days ago_", vec!["", ""]);
+        m.insert("_%n month ago_::_%n months ago_", vec!["", ""]);
+        m.insert("_{count} file conflict_::_{count} file conflicts_", vec!["", ""]);
+        m
+    };
+}
+
+pub fn get_plural_form() -> &'static str {
+    "nplurals=2; plural=(n != 1);"
+}

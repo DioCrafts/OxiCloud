@@ -1,0 +1,117 @@
+use std::collections::HashMap;
+use rust_i18n::t;
+
+pub fn initialize() -> HashMap<String, String> {
+    let mut translations = HashMap::new();
+    
+    translations.insert("Failed to clear the mappings.".to_string(), "Не удалось очистить соответствия.".to_string());
+    translations.insert("Failed to delete the server configuration".to_string(), "Не удалось удалить конфигурацию сервера".to_string());
+    translations.insert("The configuration is valid and the connection could be established!".to_string(), "Конфигурация правильная и подключение может быть установлено!".to_string());
+    translations.insert("The configuration is valid, but the Bind failed. Please check the server settings and credentials.".to_string(), "Конфигурация верна, но операция подключения завершилась неудачно. Пожалуйста, проверьте настройки сервера и учетные данные.".to_string());
+    translations.insert("The configuration is invalid. Please have a look at the logs for further details.".to_string(), "Конфигурация недействительна. Пожалуйста, просмотрите логи для уточнения деталей.".to_string());
+    translations.insert("No action specified".to_string(), "Действие не указано".to_string());
+    translations.insert("No configuration specified".to_string(), "Конфигурация не создана".to_string());
+    translations.insert("No data specified".to_string(), "Нет данных".to_string());
+    translations.insert(" Could not set configuration %s".to_string(), "Невозможно создать конфигурацию %s".to_string());
+    translations.insert("Deletion failed".to_string(), "Удаление не удалось".to_string());
+    translations.insert("Take over settings from recent server configuration?".to_string(), "Принять настройки из последней конфигурации сервера?".to_string());
+    translations.insert("Keep settings?".to_string(), "Сохранить настройки?".to_string());
+    translations.insert("Cannot add server configuration".to_string(), "Не получилось добавить конфигурацию сервера".to_string());
+    translations.insert("mappings cleared".to_string(), "Соответствия очищены".to_string());
+    translations.insert("Success".to_string(), "Успешно".to_string());
+    translations.insert("Error".to_string(), "Ошибка".to_string());
+    translations.insert("Select groups".to_string(), "Выберите группы".to_string());
+    translations.insert("Select object classes".to_string(), "Выберите объектные классы".to_string());
+    translations.insert("Select attributes".to_string(), "Выберите атрибуты".to_string());
+    translations.insert("Connection test succeeded".to_string(), "Проверка соединения удалась".to_string());
+    translations.insert("Connection test failed".to_string(), "Проверка соединения не удалась".to_string());
+    translations.insert("Do you really want to delete the current Server Configuration?".to_string(), "Вы действительно хотите удалить существующую конфигурацию сервера?".to_string());
+    translations.insert("Confirm Deletion".to_string(), "Подтверждение удаления".to_string());
+    translations.insert("_%s group found_::_%s groups found_".to_string(), "%s группа найдена|%s группы найдены|%s групп найдено".to_string());
+    translations.insert("_%s user found_::_%s users found_".to_string(), "%s пользователь найден|%s пользователя найдено|%s пользователей найдено".to_string());
+    translations.insert("Invalid Host".to_string(), "Неверный сервер".to_string());
+    translations.insert("Could not find the desired feature".to_string(), "Не могу найти требуемой функциональности".to_string());
+    translations.insert("Save".to_string(), "Сохранить".to_string());
+    translations.insert("Test Configuration".to_string(), "Проверить конфигурацию".to_string());
+    translations.insert("Help".to_string(), "Помощь".to_string());
+    translations.insert("Limit the access to %s to groups meeting this criteria:".to_string(), "Ограничить доступ к %s группам, удовлетворяющим этому критерию:".to_string());
+    translations.insert("only those object classes:".to_string(), "только эти объектные классы".to_string());
+    translations.insert("only from those groups:".to_string(), "только из этих групп".to_string());
+    translations.insert("Edit raw filter instead".to_string(), "Редактировать исходный фильтр".to_string());
+    translations.insert("Raw LDAP filter".to_string(), "Исходный LDAP фильтр".to_string());
+    translations.insert("The filter specifies which LDAP groups shall have access to the %s instance.".to_string(), "Этот фильтр определяет, какие LDAP группы должны иметь доступ к %s.".to_string());
+    translations.insert("groups found".to_string(), "групп найдено".to_string());
+    translations.insert("What attribute shall be used as login name:".to_string(), "Какой атрибут должен быть использован для логина:".to_string());
+    translations.insert("LDAP Username:".to_string(), "Имя пользователя LDAP".to_string());
+    translations.insert("LDAP Email Address:".to_string(), "LDAP адрес электронной почты:".to_string());
+    translations.insert("Other Attributes:".to_string(), "Другие атрибуты:".to_string());
+    translations.insert("Add Server Configuration".to_string(), "Добавить конфигурацию сервера".to_string());
+    translations.insert("Host".to_string(), "Сервер".to_string());
+    translations.insert("You can omit the protocol, except you require SSL. Then start with ldaps://".to_string(), "Можно опустить протокол, за исключением того, когда вам требуется SSL. Тогда начните с ldaps :/ /".to_string());
+    translations.insert("Port".to_string(), "Порт".to_string());
+    translations.insert("User DN".to_string(), "DN пользователя".to_string());
+    translations.insert("The DN of the client user with which the bind shall be done, e.g. uid=agent,dc=example,dc=com. For anonymous access, leave DN and Password empty.".to_string(), "DN пользователя, под которым выполняется подключение, например, uid=agent,dc=example,dc=com. Для анонимного доступа оставьте DN и пароль пустыми.".to_string());
+    translations.insert("Password".to_string(), "Пароль".to_string());
+    translations.insert("For anonymous access, leave DN and Password empty.".to_string(), "Для анонимного доступа оставьте DN и пароль пустыми.".to_string());
+    translations.insert("One Base DN per line".to_string(), "По одной базе поиска (Base DN) в строке.".to_string());
+    translations.insert("You can specify Base DN for users and groups in the Advanced tab".to_string(), "Вы можете задать Base DN для пользователей и групп на вкладке \"Расширенное\"".to_string());
+    translations.insert("Limit the access to %s to users meeting this criteria:".to_string(), "Ограничить доступ к %s пользователям, удовлетворяющим этому критерию:".to_string());
+    translations.insert("The filter specifies which LDAP users shall have access to the %s instance.".to_string(), "Этот фильтр указывает, какие пользователи LDAP должны иметь доступ к %s.".to_string());
+    translations.insert("users found".to_string(), "пользователей найдено".to_string());
+    translations.insert("Back".to_string(), "Назад".to_string());
+    translations.insert("Continue".to_string(), "Продолжить".to_string());
+    translations.insert("<b>Warning:</b> Apps user_ldap and user_webdavauth are incompatible. You may experience unexpected behavior. Please ask your system administrator to disable one of them.".to_string(), "<b>Предупреждение:</b> Приложения user_ldap и user_webdavauth несовместимы. Вы можете наблюдать некорректное поведение. Пожалуйста, попросите вашего системного администратора отключить одно из них.".to_string());
+    translations.insert("<b>Warning:</b> The PHP LDAP module is not installed, the backend will not work. Please ask your system administrator to install it.".to_string(), "<b>Внимание:</b> Модуль LDAP для PHP не установлен, бэкенд не будет работать. Пожалуйста, попросите вашего системного администратора его установить. ".to_string());
+    translations.insert("Connection Settings".to_string(), "Настройки подключения".to_string());
+    translations.insert("Configuration Active".to_string(), "Конфигурация активна".to_string());
+    translations.insert("When unchecked, this configuration will be skipped.".to_string(), "Когда галочка снята, эта конфигурация будет пропущена.".to_string());
+    translations.insert("User Login Filter".to_string(), "Фильтр учетных записей".to_string());
+    translations.insert("Defines the filter to apply, when login is attempted. %%uid replaces the username in the login action. Example: \"uid=%%uid\"".to_string(), "Определяет фильтр для применения при попытке входа. %%uid заменяет имя пользователя при входе в систему. Например: \"uid=%%uid\"".to_string());
+    translations.insert("Backup (Replica) Host".to_string(), "Адрес резервного сервера".to_string());
+    translations.insert("Give an optional backup host. It must be a replica of the main LDAP/AD server.".to_string(), "Укажите дополнительный резервный сервер. Он должен быть репликой главного LDAP/AD сервера.".to_string());
+    translations.insert("Backup (Replica) Port".to_string(), "Порт резервного сервера".to_string());
+    translations.insert("Disable Main Server".to_string(), "Отключить главный сервер".to_string());
+    translations.insert("Only connect to the replica server.".to_string(), "Подключаться только к серверу-реплике.".to_string());
+    translations.insert("Case insensitve LDAP server (Windows)".to_string(), "Нечувствительный к регистру сервер LDAP (Windows)".to_string());
+    translations.insert("Turn off SSL certificate validation.".to_string(), "Отключить проверку сертификата SSL.".to_string());
+    translations.insert("Not recommended, use it for testing only! If connection only works with this option, import the LDAP server's SSL certificate in your %s server.".to_string(), "Не рекомендуется, используйте только в режиме тестирования! Если соединение работает только с этой опцией, импортируйте на ваш %s сервер SSL-сертификат сервера LDAP.".to_string());
+    translations.insert("Cache Time-To-Live".to_string(), "Кэш времени жизни".to_string());
+    translations.insert("in seconds. A change empties the cache.".to_string(), "в секундах. Изменение очистит кэш.".to_string());
+    translations.insert("Directory Settings".to_string(), "Настройки каталога".to_string());
+    translations.insert("User Display Name Field".to_string(), "Поле отображаемого имени пользователя".to_string());
+    translations.insert("The LDAP attribute to use to generate the user's display name.".to_string(), "Атрибут LDAP, который используется для генерации отображаемого имени пользователя.".to_string());
+    translations.insert("Base User Tree".to_string(), "База пользовательского дерева".to_string());
+    translations.insert("One User Base DN per line".to_string(), "По одной базовому DN пользователей в строке.".to_string());
+    translations.insert("User Search Attributes".to_string(), "Атрибуты поиска пользоватетелей".to_string());
+    translations.insert("Optional; one attribute per line".to_string(), "Опционально; один атрибут в строке".to_string());
+    translations.insert("Group Display Name Field".to_string(), "Поле отображаемого имени группы".to_string());
+    translations.insert("The LDAP attribute to use to generate the groups's display name.".to_string(), "Атрибут LDAP, который используется для генерации отображаемого имени группы.".to_string());
+    translations.insert("Base Group Tree".to_string(), "База группового дерева".to_string());
+    translations.insert("One Group Base DN per line".to_string(), "По одной базовому DN групп в строке.".to_string());
+    translations.insert("Group Search Attributes".to_string(), "Атрибуты поиска для группы".to_string());
+    translations.insert("Group-Member association".to_string(), "Ассоциация Группа-Участник".to_string());
+    translations.insert("Special Attributes".to_string(), "Специальные атрибуты".to_string());
+    translations.insert("Quota Field".to_string(), "Поле квоты".to_string());
+    translations.insert("Quota Default".to_string(), "Квота по умолчанию".to_string());
+    translations.insert("in bytes".to_string(), "в байтах".to_string());
+    translations.insert("Email Field".to_string(), "Поле адреса электронной почты".to_string());
+    translations.insert("User Home Folder Naming Rule".to_string(), "Правило именования домашней папки пользователя".to_string());
+    translations.insert("Leave empty for user name (default). Otherwise, specify an LDAP/AD attribute.".to_string(), "Оставьте пустым для использования имени пользователя (по умолчанию). Иначе укажите атрибут LDAP/AD.".to_string());
+    translations.insert("Internal Username".to_string(), "Внутреннее имя пользователя".to_string());
+    translations.insert("By default the internal username will be created from the UUID attribute. It makes sure that the username is unique and characters do not need to be converted. The internal username has the restriction that only these characters are allowed: [ a-zA-Z0-9_.@- ].  Other characters are replaced with their ASCII correspondence or simply omitted. On collisions a number will be added/increased. The internal username is used to identify a user internally. It is also the default name for the user home folder. It is also a part of remote URLs, for instance for all *DAV services. With this setting, the default behavior can be overridden. To achieve a similar behavior as before ownCloud 5 enter the user display name attribute in the following field. Leave it empty for default behavior. Changes will have effect only on newly mapped (added) LDAP users.".to_string(), "По умолчанию внутреннее имя пользователя будет создано из атрибута UUID. Таким образом имя пользователя становится уникальным и не требует конвертации символов. Внутреннее имя пользователя может состоять только из следующих символов: [ a-zA-Z0-9_.@- ]. Остальные символы замещаются соответствиями из таблицы ASCII или же просто пропускаются. При совпадении к имени будет добавлено или увеличено число. Внутреннее имя пользователя используется для внутренней идентификации пользователя. Также оно является именем по умолчанию для папки пользователя в ownCloud. Оно также является частью URL, к примеру, для всех сервисов *DAV. С помощью данной настройки можно изменить поведение по умолчанию. Чтобы достичь поведения, как было до ownCloud 5, введите атрибут отображаемого имени пользователя в этом поле. Оставьте его пустым для режима по умолчанию. Изменения будут иметь эффект только для новых подключенных (добавленных) пользователей LDAP.".to_string());
+    translations.insert("Internal Username Attribute:".to_string(), "Атрибут для внутреннего имени:".to_string());
+    translations.insert("Override UUID detection".to_string(), "Переопределить нахождение UUID".to_string());
+    translations.insert("By default, the UUID attribute is automatically detected. The UUID attribute is used to doubtlessly identify LDAP users and groups. Also, the internal username will be created based on the UUID, if not specified otherwise above. You can override the setting and pass an attribute of your choice. You must make sure that the attribute of your choice can be fetched for both users and groups and it is unique. Leave it empty for default behavior. Changes will have effect only on newly mapped (added) LDAP users and groups.".to_string(), "По умолчанию ownCloud определяет атрибут UUID автоматически. Этот атрибут используется для того, чтобы достоверно индентифицировать пользователей и группы LDAP. Также на основании атрибута UUID создается внутреннее имя пользователя, если выше не указано иначе. Вы можете переопределить эту настройку и указать свой атрибут по выбору. Вы должны удостовериться, что выбранный вами атрибут может быть выбран для пользователей и групп, а также то, что он уникальный. Оставьте поле пустым для поведения по умолчанию. Изменения вступят в силу только для новых подключенных (добавленных) пользователей и групп LDAP.".to_string());
+    translations.insert("UUID Attribute for Users:".to_string(), "UUID-атрибуты для пользователей:".to_string());
+    translations.insert("UUID Attribute for Groups:".to_string(), "UUID-атрибуты для групп:".to_string());
+    translations.insert("Username-LDAP User Mapping".to_string(), "Соответствия Имя-Пользователь LDAP".to_string());
+    translations.insert("Usernames are used to store and assign (meta) data. In order to precisely identify and recognize users, each LDAP user will have a internal username. This requires a mapping from username to LDAP user. The created username is mapped to the UUID of the LDAP user. Additionally the DN is cached as well to reduce LDAP interaction, but it is not used for identification. If the DN changes, the changes will be found. The internal username is used all over. Clearing the mappings will have leftovers everywhere. Clearing the mappings is not configuration sensitive, it affects all LDAP configurations! Never clear the mappings in a production environment, only in a testing or experimental stage.".to_string(), "ownCloud использует имена пользователей для хранения и назначения метаданных. Для точной идентификации и распознавания пользователей, каждый пользователь LDAP будет иметь свое внутреннее имя пользователя. Это требует привязки имени пользователя ownCloud к пользователю LDAP. При создании имя пользователя назначается идентификатору UUID пользователя LDAP. Помимо этого кешируется различающееся имя (DN) для уменьшения числа обращений к LDAP, однако оно не используется для идентификации. Если различающееся имя было изменено, об этом станет известно ownCloud. Внутреннее имя ownCloud используется повсеместно в ownCloud. После сброса привязок в базе могут сохраниться остатки старой информации. Сброс привязок не привязан к конфигурации, он повлияет на все LDAP-подключения! Ни в коем случае не рекомендуется сбрасывать привязки, если система уже находится в эксплуатации, только на этапе тестирования.".to_string());
+    translations.insert("Clear Username-LDAP User Mapping".to_string(), "Очистить соответствия Имя-Пользователь LDAP".to_string());
+    translations.insert("Clear Groupname-LDAP Group Mapping".to_string(), "Очистить соответствия Группа-Группа LDAP".to_string());
+    
+    translations
+}
+
+pub fn get_plural_forms() -> &'static str {
+    "nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);"
+}

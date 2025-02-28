@@ -1,0 +1,128 @@
+use std::collections::HashMap;
+use once_cell::sync::Lazy;
+
+/// German (Switzerland) translations
+pub static DE_CH_TRANSLATIONS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+    let mut translations = HashMap::new();
+    
+    translations.insert("Unable to load list from App Store", "Die Liste der Anwendungen im Store konnte nicht geladen werden.");
+    translations.insert("Authentication error", "Authentifizierungs-Fehler");
+    translations.insert("Group already exists", "Die Gruppe existiert bereits");
+    translations.insert("Unable to add group", "Die Gruppe konnte nicht angelegt werden");
+    translations.insert("Email saved", "E-Mail-Adresse gespeichert");
+    translations.insert("Invalid email", "Ungültige E-Mail-Adresse");
+    translations.insert("Unable to delete group", "Die Gruppe konnte nicht gelöscht werden");
+    translations.insert("Unable to delete user", "Der Benutzer konnte nicht gelöscht werden");
+    translations.insert("Language changed", "Sprache geändert");
+    translations.insert("Invalid request", "Ungültige Anforderung");
+    translations.insert("Admins can't remove themself from the admin group", "Administratoren können sich nicht selbst aus der admin-Gruppe löschen");
+    translations.insert("Unable to add user to group %s", "Der Benutzer konnte nicht zur Gruppe %s hinzugefügt werden");
+    translations.insert("Unable to remove user from group %s", "Der Benutzer konnte nicht aus der Gruppe %s entfernt werden");
+    translations.insert("Couldn't update app.", "Die App konnte nicht aktualisiert werden.");
+    translations.insert("Update to {appversion}", "Update zu {appversion}");
+    translations.insert("Disable", "Deaktivieren");
+    translations.insert("Enable", "Aktivieren");
+    translations.insert("Please wait....", "Bitte warten....");
+    translations.insert("Error while disabling app", "Fehler während der Deaktivierung der Anwendung");
+    translations.insert("Error while enabling app", "Fehler während der Aktivierung der Anwendung");
+    translations.insert("Updating....", "Update...");
+    translations.insert("Error while updating app", "Es ist ein Fehler während des Updates aufgetreten");
+    translations.insert("Error", "Fehler");
+    translations.insert("Update", "Update durchführen");
+    translations.insert("Updated", "Aktualisiert");
+    translations.insert("Decrypting files... Please wait, this can take some time.", "Entschlüssel Dateien ... Bitte warten Sie, denn dieser Vorgang kann einige Zeit beanspruchen.");
+    translations.insert("Saving...", "Speichern...");
+    translations.insert("deleted", "gelöscht");
+    translations.insert("undo", "rückgängig machen");
+    translations.insert("Unable to remove user", "Der Benutzer konnte nicht entfernt werden.");
+    translations.insert("Groups", "Gruppen");
+    translations.insert("Group Admin", "Gruppenadministrator");
+    translations.insert("Delete", "Löschen");
+    translations.insert("add group", "Gruppe hinzufügen");
+    translations.insert("A valid username must be provided", "Es muss ein gültiger Benutzername angegeben werden");
+    translations.insert("Error creating user", "Beim Erstellen des Benutzers ist ein Fehler aufgetreten");
+    translations.insert("A valid password must be provided", "Es muss ein gültiges Passwort angegeben werden");
+    translations.insert("__language_name__", "Deutsch (Schweiz)");
+    translations.insert("Security Warning", "Sicherheitshinweis");
+    translations.insert("Your data directory and your files are probably accessible from the internet. The .htaccess file is not working. We strongly suggest that you configure your webserver in a way that the data directory is no longer accessible or you move the data directory outside the webserver document root.", "Ihr Datenverzeichnis und Ihre Dateien sind möglicher Weise aus dem Internet erreichbar. Die .htaccess-Datei funktioniert nicht. Wir raten Ihnen dringend, dass Sie Ihren Webserver dahingehend konfigurieren, dass Ihr Datenverzeichnis nicht länger aus dem Internet erreichbar ist, oder Sie verschieben das Datenverzeichnis ausserhalb des Wurzelverzeichnisses des Webservers.");
+    translations.insert("Setup Warning", "Einrichtungswarnung");
+    translations.insert("Your web server is not yet properly setup to allow files synchronization because the WebDAV interface seems to be broken.", "Ihr Web-Server ist noch nicht für eine Datei-Synchronisation konfiguriert, weil die WebDAV-Schnittstelle vermutlich defekt ist.");
+    translations.insert("Please double check the <a href=\"%s\">installation guides</a>.", "Bitte überprüfen Sie die <a href=\"%s\">Instalationsanleitungen</a>.");
+    translations.insert("Module 'fileinfo' missing", "Das Modul 'fileinfo' fehlt");
+    translations.insert("The PHP module 'fileinfo' is missing. We strongly recommend to enable this module to get best results with mime-type detection.", "Das PHP-Modul 'fileinfo' fehlt. Wir empfehlen Ihnen dieses Modul zu aktivieren, um die besten Resultate bei der Bestimmung der Dateitypen zu erzielen.");
+    translations.insert("Locale not working", "Die Lokalisierung funktioniert nicht");
+    translations.insert("System locale can't be set to %s. This means that there might be problems with certain characters in file names. We strongly suggest to install the required packages on your system to support %s.", "Die System-Ländereinstellung kann nicht auf %s geändert werden. Dies bedeutet, dass es Probleme mit bestimmten Zeichen in Dateinamen geben könnte. Wir empfehlen, die für %s benötigten Pakete auf ihrem System zu installieren.");
+    translations.insert("Internet connection not working", "Keine Internetverbindung");
+    translations.insert("This server has no working internet connection. This means that some of the features like mounting of external storage, notifications about updates or installation of 3rd party apps don´t work. Accessing files from remote and sending of notification emails might also not work. We suggest to enable internet connection for this server if you want to have all features.", "Dieser Server hat keine funktionierende Internetverbindung. Dies bedeutet das einige Funktionen wie z.B. das Einbinden von externen Speichern, Update-Benachrichtigungen oder die Installation von Drittanbieter-Apps nicht funktionieren. Der Fernzugriff auf Dateien und das Senden von Benachrichtigungsmails funktioniert eventuell ebenfalls nicht. Wir empfehlen die Internetverbindung für diesen Server zu aktivieren wenn Sie alle Funktionen nutzen wollen.");
+    translations.insert("Cron", "Cron");
+    translations.insert("Execute one task with each page loaded", "Eine Aufgabe bei jedem Laden der Seite ausführen");
+    translations.insert("Sharing", "Teilen");
+    translations.insert("Enable Share API", "Share-API aktivieren");
+    translations.insert("Allow apps to use the Share API", "Anwendungen erlauben, die Share-API zu benutzen");
+    translations.insert("Allow links", "Links erlauben");
+    translations.insert("Allow users to share items to the public with links", "Benutzern erlauben, Inhalte per öffentlichem Link zu teilen");
+    translations.insert("Allow public uploads", "Erlaube öffentliches hochladen");
+    translations.insert("Allow users to enable others to upload into their publicly shared folders", "Erlaubt Benutzern die Freigabe anderer Benutzer in ihren öffentlich freigegebene Ordner hochladen zu dürfen");
+    translations.insert("Allow resharing", "Erlaube Weiterverteilen");
+    translations.insert("Allow users to share items shared with them again", "Erlaubt Benutzern, mit ihnen geteilte Inhalte erneut zu teilen");
+    translations.insert("Allow users to share with anyone", "Erlaubt Benutzern, mit jedem zu teilen");
+    translations.insert("Allow users to only share with users in their groups", "Erlaubt Benutzern, nur mit Nutzern in ihrer Gruppe zu teilen");
+    translations.insert("Security", "Sicherheit");
+    translations.insert("Enforce HTTPS", "HTTPS erzwingen");
+    translations.insert("Forces the clients to connect to %s via an encrypted connection.", "Zwingt die Clients, sich über eine verschlüsselte Verbindung zu %s zu verbinden.");
+    translations.insert("Please connect to your %s via HTTPS to enable or disable the SSL enforcement.", "Bitte verbinden Sie sich zu Ihrem %s über HTTPS um die SSL-Erzwingung zu aktivieren oder zu deaktivieren.");
+    translations.insert("Log", "Log");
+    translations.insert("Log level", "Log-Level");
+    translations.insert("More", "Mehr");
+    translations.insert("Less", "Weniger");
+    translations.insert("Version", "Version");
+    translations.insert("Developed by the <a href=\"http://ownCloud.org/contact\" target=\"_blank\">ownCloud community</a>, the <a href=\"https://github.com/owncloud\" target=\"_blank\">source code</a> is licensed under the <a href=\"http://www.gnu.org/licenses/agpl-3.0.html\" target=\"_blank\"><abbr title=\"Affero General Public License\">AGPL</abbr></a>.", "Entwickelt von der <a href=\"http://ownCloud.org/contact\" target=\"_blank\">ownCloud-Community</a>. Der <a href=\"https://github.com/owncloud\" target=\"_blank\">Quellcode</a> ist unter der <a href=\"http://www.gnu.org/licenses/agpl-3.0.html\" target=\"_blank\"><abbr title=\"Affero General Public License\">AGPL</abbr></a> lizenziert.");
+    translations.insert("Add your App", "Fügen Sie Ihre Anwendung hinzu");
+    translations.insert("More Apps", "Weitere Anwendungen");
+    translations.insert("Select an App", "Wählen Sie eine Anwendung aus");
+    translations.insert("See application page at apps.owncloud.com", "Weitere Anwendungen finden Sie auf apps.owncloud.com");
+    translations.insert("<span class=\"licence\"></span>-licensed by <span class=\"author\"></span>", "<span class=\"licence\"></span>-lizenziert von <span class=\"author\"></span>");
+    translations.insert("User Documentation", "Dokumentation für Benutzer");
+    translations.insert("Administrator Documentation", "Dokumentation für Administratoren");
+    translations.insert("Online Documentation", "Online-Dokumentation");
+    translations.insert("Forum", "Forum");
+    translations.insert("Bugtracker", "Bugtracker");
+    translations.insert("Commercial Support", "Kommerzieller Support");
+    translations.insert("Get the apps to sync your files", "Installieren Sie die Anwendungen, um Ihre Dateien zu synchronisieren");
+    translations.insert("Show First Run Wizard again", "Den Einrichtungsassistenten erneut anzeigen");
+    translations.insert("You have used <strong>%s</strong> of the available <strong>%s</strong>", "Sie verwenden <strong>%s</strong> der verfügbaren <strong>%s</strong>");
+    translations.insert("Password", "Passwort");
+    translations.insert("Your password was changed", "Ihr Passwort wurde geändert.");
+    translations.insert("Unable to change your password", "Das Passwort konnte nicht geändert werden");
+    translations.insert("Current password", "Aktuelles Passwort");
+    translations.insert("New password", "Neues Passwort");
+    translations.insert("Change password", "Passwort ändern");
+    translations.insert("Email", "E-Mail");
+    translations.insert("Your email address", "Ihre E-Mail-Adresse");
+    translations.insert("Fill in an email address to enable password recovery", "Bitte tragen Sie eine E-Mail-Adresse ein, um die Passwort-Wiederherstellung zu aktivieren.");
+    translations.insert("Language", "Sprache");
+    translations.insert("Help translate", "Helfen Sie bei der Übersetzung");
+    translations.insert("WebDAV", "WebDAV");
+    translations.insert("Encryption", "Verschlüsselung");
+    translations.insert("The encryption app is no longer enabled, decrypt all your file", "Die Anwendung zur Verschlüsselung ist nicht länger aktiv, all Ihre Dateien werden entschlüsselt. ");
+    translations.insert("Log-in password", "Login-Passwort");
+    translations.insert("Decrypt all Files", "Alle Dateien entschlüsseln");
+    translations.insert("Login Name", "Loginname");
+    translations.insert("Create", "Erstellen");
+    translations.insert("Admin Recovery Password", "Admin-Passwort-Wiederherstellung");
+    translations.insert("Enter the recovery password in order to recover the users files during password change", "Geben Sie das Wiederherstellungspasswort ein, um die Benutzerdateien während Passwortänderung wiederherzustellen");
+    translations.insert("Default Storage", "Standard-Speicher");
+    translations.insert("Unlimited", "Unbegrenzt");
+    translations.insert("Other", "Andere");
+    translations.insert("Username", "Benutzername");
+    translations.insert("Storage", "Speicher");
+    translations.insert("set new password", "Neues Passwort setzen");
+    translations.insert("Default", "Standard");
+
+    translations
+});
+
+/// Returns the plural form string for German (Switzerland)
+pub fn get_plural_form() -> &'static str {
+    "nplurals=2; plural=(n != 1);"
+}

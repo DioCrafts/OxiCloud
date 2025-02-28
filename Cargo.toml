@@ -1,27 +1,13 @@
-
 [package]
-name = "nextcloud-rust"
+name = "Oxicloud"
 version = "0.1.0"
 edition = "2021"
-authors = ["Migrated from PHP"]
-description = "Rust port of Nextcloud"
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-actix-web = "4.3"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-sqlx = { version = "0.7", features = ["postgres", "runtime-tokio-native-tls", "macros"] }
-log = "0.4"
-env_logger = "0.10"
-thiserror = "1.0"
-anyhow = "1.0"
-async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-futures = "0.3"
+axum = { version = "0.6", features = ["multipart"] }
+tokio = { version = "1.28", features = ["full", "fs", "io-util", "rt-multi-thread"] }
+tokio-util = { version = "0.7", features = ["io"] }
+tower = "0.4"
+tower-http = { version = "0.4", features = ["fs"] }
 tracing = "0.1"
-dotenvy = "0.15"
-
-[dev-dependencies]
-tokio-test = "0.4"
-pretty_assertions = "1.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,0 +1,102 @@
+/* Estilos principales de OxiCloud */
+
+/* Estilos globales */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.container {
+    flex: 1;
+}
+
+footer {
+    margin-top: auto;
+}
+
+/* Barra de navegación */
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* Tarjetas */
+.card {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.card-header {
+    font-weight: bold;
+}
+
+/* Estilos para archivos */
+.file-icon {
+    font-size: 1.2rem;
+    width: 30px;
+    text-align: center;
+}
+
+.file-item {
+    transition: background-color 0.2s;
+}
+
+.file-item:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Estilos para la página de inicio */
+.storage-usage {
+    padding: 10px 0;
+}
+
+.progress {
+    height: 25px;
+    background-color: #e9ecef;
+    border-radius: 5px;
+}
+
+.progress-bar {
+    background-color: #0d6efd;
+    color: white;
+    font-weight: bold;
+    line-height: 25px;
+}
+
+/* Botones de acción rápida */
+.action-button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    border-radius: 5px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.action-button:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.action-button i {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+/* Animaciones */
+.animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Estilos responsivos */
+@media (max-width: 768px) {
+    .action-button {
+        margin-bottom: 15px;
+    }
+}

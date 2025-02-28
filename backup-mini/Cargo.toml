@@ -1,0 +1,45 @@
+[package]
+name = "oxicloud"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+actix-web = "4.9.0"
+actix-files = "0.6.6"
+# Templates
+tera = "1.20.0"
+# Base de datos
+sqlx = { version = "0.8.3", features = ["runtime-tokio-native-tls", "postgres", "macros"] }
+# Serialización/Deserialización
+serde = { version = "1.0.218", features = ["derive"] }
+serde_json = "1.0.139"
+# Autenticación
+jsonwebtoken = "9.3.1"
+argon2 = "0.5.3"
+# Manejo de archivos
+tokio = { version = "1.43.0", features = ["full"] }
+tokio-util = { version = "0.7.13", features = ["io"] }
+# Utilidades
+dotenvy = "0.15.7"
+chrono = { version = "0.4.40", features = ["serde"] }
+log = "0.4.26"
+env_logger = "0.11.6"
+anyhow = "1.0.96"
+thiserror = "2.0.11"
+uuid = { version = "1.15.1", features = ["v4", "serde"] }
+# Dependencias adicionales para solucionar errores
+futures = "0.3.31"
+humansize = "2.1.3"
+derive_more = { version = "2.0.1", features = ["full"] }
+toml = "0.8.20"
+# Multipart para formularios y subida de archivos
+actix-multipart = "0.7.2"
+
+# Para sanitización de nombres de archivo
+sanitize-filename = "0.6.0"
+
+# Para adivinación de tipos MIME
+mime_guess = "2.0.5"
+async-trait = "0.1.86"
+time = "0.3.37"

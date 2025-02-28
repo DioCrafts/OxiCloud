@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Registro{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-user-plus"></i> Crear cuenta
+            </div>
+            <div class="card-body">
+                <form method="post" action="/register">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nombre de usuario</label>
+                        <input type="text" class="form-control" id="username" name="username" required autofocus>
+                        <div class="form-text">Entre 3 y 20 caracteres, solo letras, números y guiones bajos.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Correo electrónico</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="display_name" class="form-label">Nombre para mostrar (opcional)</label>
+                        <input type="text" class="form-control" id="display_name" name="display_name">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text">Al menos 6 caracteres.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">Confirmar contraseña</label>
+                        <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Registrarme</button>
+                    </div>
+                </form>
+                <div class="mt-3 text-center">
+                    <p>¿Ya tienes una cuenta? <a href="/login">Iniciar sesión</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Panel de estadísticas -->
+    <div class="col-lg-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-chart-pie"></i> Uso de almacenamiento
+            </div>
+            <div class="card-body">
+                <div class="storage-usage">
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ data.usage_percent }}%;" 
+                             aria-valuenow="{{ data.usage_percent }}" aria-valuemin="0" aria-valuemax="100">
+                            {{ data.usage_percent | round(precision=1) }}%
+                        </div>
+                    </div>
+
+                    <div class="storage-details">
+                        <p><strong>Espacio utilizado:</strong> {{ data.used_space | format_size }}</p>
+                        {% if data.quota %}
+                            <p><strong>Cuota total:</strong> {{ data.quota | format_size }}</p>
+                            <p><strong>Espacio disponible:</strong> {{ (data.quota - data.used_space) | format_size }}</p>
+                        {% else %}
+                            <p><strong>Cuota total:</strong> Ilimitada</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-info-circle"></i> Información
+            </div>
+            <div class="card-body">
+                <p><strong>Archivos totales:</strong> {{ data.file_count }}</p>
+                <p><strong>Cuenta:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel de acciones rápidas -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-bolt"></i> Acciones rápidas
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <a href="/files" class="btn btn-outline-primary w-100 py-4">
+                            <i class="fas fa-folder-open fa-2x mb-2"></i><br>
+                            Mis archivos
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="/files?action=upload" class="btn btn-outline-success w-100 py-4">
+                            <i class="fas fa-upload fa-2x mb-2"></i><br>
+                            Subir archivos
+                        </a>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <a href="/files?action=create_folder" class="btn btn-outline-info w-100 py-4">
+                            <i class="fas fa-folder-plus fa-2x mb-2"></i><br>
+                            Nueva carpeta
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actividad reciente -->
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-history"></i> Actividad reciente
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Aún no hay actividades recientes para mostrar.
+                </div>
+                <!-- Aquí se mostraría la actividad reciente del usuario -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

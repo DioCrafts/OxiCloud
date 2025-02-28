@@ -1,0 +1,42 @@
+// Módulos generados automáticamente
+
+pub mod contacts;
+pub mod authentication;
+pub mod appframework;
+pub mod files;
+pub mod activity;
+
+pub mod json;
+pub mod userinterface;
+pub mod user;
+pub mod inavigationmanager;
+pub mod itagmanager;
+pub mod idbconnection;
+pub mod config;
+pub mod iusersession;
+pub mod iconfig;
+pub mod template;
+pub mod db;
+pub mod constants;
+pub mod util;
+pub mod groupinterface;
+pub mod share;
+pub mod image;
+pub mod response;
+pub mod ipreview;
+pub mod irequest;
+pub mod isession;
+pub mod icache;
+pub mod il10n;
+pub mod backgroundjob;
+pub mod contacts;
+pub mod icontainer;
+pub mod itags;
+pub mod app;
+pub mod iaddressbook;
+pub mod iurlgenerator;
+pub mod ihelper;
+pub mod iservercontainer;
+pub mod files;
+pub mod api;
+pub mod defaults;
