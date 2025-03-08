@@ -1,13 +1,17 @@
 [package]
-name = "Oxicloud"
+name = "oxicloud"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 axum = { version = "0.6", features = ["multipart"] }
-tokio = { version = "1.28", features = ["full", "fs", "io-util", "rt-multi-thread"] }
+tokio = { version = "1.28", features = ["full"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tower = "0.4"
-tower-http = { version = "0.4", features = ["fs"] }
+tower-http = { version = "0.4", features = ["fs", "compression-gzip", "trace", "cors"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+futures = "0.3"
+mime_guess = "2.0"

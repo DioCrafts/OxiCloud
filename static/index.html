@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OxiCloud - Almacenamiento Minimalista</title>
+    <style>
+        :root {
+            --primary: #0082c9;
+            --primary-light: #00a2f9;
+            --secondary: #333;
+            --bg-light: #f5f5f5;
+            --bg-dark: #fff;
+            --border: #ddd;
+            --success: #46ba61;
+            --danger: #e9322d;
+            --text: #222;
+            --text-light: #666;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            color: var(--text);
+            background-color: var(--bg-light);
+            line-height: 1.6;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            min-height: 100vh;
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            background-color: var(--bg-dark);
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo svg {
+            width: 32px;
+            height: 32px;
+            margin-right: 10px;
+            fill: var(--primary);
+        }
+        
+        .logo h1 {
+            font-size: 1.5rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: var(--text);
+            text-decoration: none;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-item:hover, .nav-item.active {
+            background-color: rgba(0, 130, 201, 0.1);
+            color: var(--primary);
+        }
+        
+        .nav-item svg {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+        
+        .storage-info {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: var(--bg-light);
+            border-radius: 5px;
+        }
+        
+        .storage-bar {
+            height: 6px;
+            background-color: var(--border);
+            border-radius: 3px;
+            margin: 0.5rem 0;
+            overflow: hidden;
+        }
+        
+        .storage-used {
+            height: 100%;
+            background-color: var(--primary);
+            width: 30%; /* Ajustar según uso real */
+        }
+        
+        .storage-text {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+        
+        /* Main Content */
+        .main {
+            padding: 2rem;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .header h2 {
+            color: var(--secondary);
+            font-weight: 500;
+        }
+        
+        .search-bar {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 0.5rem 1rem;
+            width: 300px;
+        }
+        
+        .search-bar input {
+            border: none;
+            background: none;
+            outline: none;
+            width: 100%;
+            margin-left: 0.5rem;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            border: none;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-light);
+        }
+        
+        .btn svg {
+            width: 16px;
+            height: 16px;
+            margin-right: 6px;
+        }
+        
+        .files-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .file-card {
+            background-color: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            padding: 1rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        
+        .file-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .file-icon {
+            font-size: 2.5rem;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        
+        .file-name {
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 0.5rem;
+        }
+        
+        .file-info {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+        
+        .file-actions {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            display: none;
+        }
+        
+        .file-card:hover .file-actions {
+            display: flex;
+        }
+        
+        .file-action {
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 3px;
+        }
+        
+        .file-action:hover {
+            background-color: var(--bg-light);
+            color: var(--primary);
+        }
+        
+        .file-action svg {
+            width: 16px;
+            height: 16px;
+        }
+        
+        /* Upload modal */
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
+        .modal-backdrop.show {
+            display: flex;
+        }
+        
+        .modal {
+            background-color: var(--bg-dark);
+            border-radius: 8px;
+            width: 500px;
+            max-width: 90%;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+        
+        .modal-body {
+            padding: 1.5rem;
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 5px;
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+            transition: border-color 0.2s;
+        }
+        
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+        }
+        
+        .upload-icon {
+            font-size: 2rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+        
+        .upload-text {
+            margin-bottom: 1rem;
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background-color: var(--bg-light);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .upload-btn:hover {
+            background-color: var(--border);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .modal-footer {
+            padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                display: none;
+            }
+            
+            .files-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <svg viewBox="0 0 24 24">
+                    <path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+                </svg>
+                <h1>OxiCloud</h1>
+            </div>
+            
+            <nav>
+                <a href="#" class="nav-item active">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+                    </svg>
+                    Archivos
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8.5 4.5a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1h-3v-3z"/>
+                    </svg>
+                    Recientes
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+                    </svg>
+                    Favoritos
+                </a>
+                <a href="#" class="nav-item">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M13.95 22L12 20.05 10.05 22a.5.5 0 0 1-.7-.7L11.3 19.3a1 1 0 0 0 0-1.4L9.35 16a.5.5 0 0 1 .7-.7L12 17.2l1.95-1.9a.5.5 0 0 1 .7.7l-1.95 1.9a1 1 0 0 0 0 1.4l1.95 1.9a.5.5 0 0 1-.7.7z M12 2a6 6 0 0 1 6 6c0 2.97-2.43 5.47-4 6.74V13h2a1 1 0 0 0 0-2h-8a1 1 0 0 0 0 2h2v1.74C8.43 13.47 6 10.97 6 8a6 6 0 0 1 6-6z"/>
+                    </svg>
+                    Papelera
+                </a>
+            </nav>
+            
+            <div class="storage-info">
+                <div>Almacenamiento</div>
+                <div class="storage-bar">
+                    <div class="storage-used"></div>
+                </div>
+                <div class="storage-text">300 MB de 1 GB usados</div>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <div class="header">
+                <h2>Mis Archivos</h2>
+                
+                <div class="search-bar">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path fill="currentColor" d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 0 0 1.48-5.34c-.47-2.78-2.79-5-5.59-5.34a6.505 6.505 0 0 0-7.27 7.27c.34 2.8 2.56 5.12 5.34 5.59a6.5 6.5 0 0 0 5.34-1.48l.27.28v.79l4.25 4.25c.41.41 1.08.41 1.49 0 .41-.41.41-1.08 0-1.49L15.5 14zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                    </svg>
+                    <input type="text" placeholder="Buscar archivos...">
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button class="btn btn-primary" id="uploadBtn">
+                    <svg viewBox="0 0 24 24" width="16" height="16">
+                        <path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                    </svg>
+                    Subir Archivo
+                </button>
+            </div>
+            
+            <div class="files-grid" id="filesContainer">
+                <!-- Files will be dynamically added here -->
+            </div>
+        </main>
+    </div>
+    
+    <!-- Upload Modal -->
+    <div class="modal-backdrop" id="uploadModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Subir archivo</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="modal-body">
+                    <div class="upload-area" id="dropArea">
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24" width="48" height="48">
+                                <path fill="currentColor" d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/>
+                            </svg>
+                        </div>
+                        <div class="upload-text">
+                            Arrastra y suelta archivos aquí o
+                        </div>
+                        <label class="upload-btn">
+                            Seleccionar archivo
+                            <input type="file" name="file" id="fileInput">
+                        </label>
+                        <div id="selectedFile" class="mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" id="cancelUpload">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Subir</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadModal = document.getElementById('uploadModal');
+        const closeModal = document.getElementById('closeModal');
+        const cancelUpload = document.getElementById('cancelUpload');
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFile = document.getElementById('selectedFile');
+        const filesContainer = document.getElementById('filesContainer');
+        
+        // Abrir el modal de subida
+        uploadBtn.addEventListener('click', () => {
+            uploadModal.classList.add('show');
+        });
+        
+        // Cerrar el modal
+        closeModal.addEventListener('click', closeUploadModal);
+        cancelUpload.addEventListener('click', closeUploadModal);
+        
+        function closeUploadModal() {
+            uploadModal.classList.remove('show');
+            fileInput.value = '';
+            selectedFile.textContent = '';
+        }
+        
+        // Prevenir que el modal se cierre al hacer clic en él
+        uploadModal.addEventListener('click', (e) => {
+            if (e.target === uploadModal) {
+                closeUploadModal();
+            }
+        });
+        
+        // Drag and drop funcionalidad
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            dropArea.classList.add('dragover');
+        }
+        
+        function unhighlight() {
+            dropArea.classList.remove('dragover');
+        }
+        
+        dropArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length > 0) {
+                fileInput.files = files;
+                displayFileName(files[0].name);
+            }
+        }
+        
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length > 0) {
+                displayFileName(fileInput.files[0].name);
+            }
+        });
+        
+        function displayFileName(name) {
+            selectedFile.textContent = `Archivo seleccionado: ${name}`;
+        }
+        
+        // Función para cargar los archivos
+        async function loadFiles() {
+            try {
+                const response = await fetch('/api/files');
+                if (!response.ok) throw new Error('Error al cargar archivos');
+                
+                const files = await response.json();
+                renderFiles(files);
+            } catch (error) {
+                console.error('Error:', error);
+                // Esta función simulará archivos para la demostración
+                renderDemoFiles();
+            }
+        }
+        
+        // Función para renderizar archivos de demostración
+        function renderDemoFiles() {
+            const demoFiles = [
+                { name: 'documento.pdf', size: 2500000, date: '2023-05-15T10:30:00' },
+                { name: 'imagen.jpg', size: 1200000, date: '2023-05-14T08:45:00' },
+                { name: 'hoja_de_calculo.xlsx', size: 890000, date: '2023-05-10T14:20:00' },
+                { name: 'presentacion.pptx', size: 3100000, date: '2023-05-05T16:15:00' },
+                { name: 'archivo.zip', size: 5600000, date: '2023-05-01T09:10:00' }
+            ];
+            
+            renderFiles(demoFiles);
+        }
+        
+        // Función para renderizar los archivos
+        function renderFiles(files) {
+            filesContainer.innerHTML = '';
+            
+            if (files.length === 0) {
+                filesContainer.innerHTML = '<p>No hay archivos.</p>';
+                return;
+            }
+            
+            files.forEach(file => {
+                const fileCard = document.createElement('div');
+                fileCard.className = 'file-card';
+                
+                // Determinar el icono según la extensión
+                const extension = file.name.split('.').pop().toLowerCase();
+                let icon = '📄';
+                
+                if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(extension)) {
+                    icon = '🖼️';
+                } else if (['mp4', 'avi', 'mov', 'webm'].includes(extension)) {
+                    icon = '🎬';
+                } else if (['mp3', 'wav', 'ogg'].includes(extension)) {
+                    icon = '🎵';
+                } else if (['pdf'].includes(extension)) {
+                    icon = '📕';
+                } else if (['doc', 'docx'].includes(extension)) {
+                    icon = '📝';
+                } else if (['xls', 'xlsx'].includes(extension)) {
+                    icon = '📊';
+                } else if (['ppt', 'pptx'].includes(extension)) {
+                    icon = '📊';
+                } else if (['zip', 'rar', '7z'].includes(extension)) {
+                    icon = '🗄️';
+                }
+                
+                // Formatear el tamaño
+                const sizeFormatted = formatSize(file.size || 0);
+                
+                // Formatear la fecha
+                const dateFormatted = formatDate(file.date || new Date().toISOString());
+                
+                fileCard.innerHTML = `
+                    <div class="file-icon">${icon}</div>
+                    <div class="file-name">${file.name}</div>
+                    <div class="file-info">${sizeFormatted} • ${dateFormatted}</div>
+                    <div class="file-actions">
+                        <button class="file-action download-btn" title="Descargar" data-filename="${file.name}">
+                            <svg viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                            </svg>
+                        </button>
+                        <button class="file-action delete-btn" title="Eliminar" data-filename="${file.name}">
+                            <svg viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                            </svg>
+                        </button>
+                    </div>
+                `;
+                
+                filesContainer.appendChild(fileCard);
+            });
+            
+            // Agregar event listeners a los botones
+            document.querySelectorAll('.download-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const filename = e.currentTarget.dataset.filename;
+                    window.location.href = `/files/${filename}`;
+                });
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const filename = e.currentTarget.dataset.filename;
+                    if (confirm(`¿Estás seguro de eliminar ${filename}?`)) {
+                        window.location.href = `/delete/${filename}`;
+                    }
+                });
+            });
+        }
+        
+        // Función para formatear el tamaño de archivo
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        // Función para formatear la fecha
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('es-ES', { 
+                year: 'numeric',
+                month: 'short', 
+                day: 'numeric'
+            });
+        }
+        
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            loadFiles();
+        });
+    </script>
+</body>
+</html>
