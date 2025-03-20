@@ -4,11 +4,13 @@ use axum::{
     Router,
     extract::{State, Query, Path},
     middleware,
+    Extension,
 };
 use tower_http::{
     compression::CompressionLayer, 
     trace::TraceLayer,
 };
+use crate::interfaces::middleware::auth::CurrentUser;
 use crate::common::config::AppConfig;
 use crate::interfaces::middleware::auth::auth_middleware;
 
@@ -18,6 +20,8 @@ use crate::application::services::folder_service::FolderService;
 use crate::application::services::file_service::FileService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
 use crate::application::services::batch_operations::BatchOperationService;
+use crate::application::services::sharing_service::SharingService;
+use crate::application::services::public_link_service::PublicLinkService;
 
 use crate::interfaces::api::handlers::folder_handler::FolderHandler;
 use crate::interfaces::api::handlers::file_handler::FileHandler;
@@ -25,6 +29,8 @@ use crate::interfaces::api::handlers::i18n_handler::I18nHandler;
 use crate::interfaces::api::handlers::batch_handler::{
     self, BatchHandlerState
 };
+use crate::interfaces::api::handlers::shared_file_handler::SharedFileHandler;
+use crate::interfaces::api::handlers::public_link_handler::PublicLinkHandler;
 use crate::application::dtos::pagination::PaginationRequestDto;
 
 /// Creates API routes for the application
@@ -32,6 +38,8 @@ pub fn create_api_routes(
     folder_service: Arc<FolderService>, 
     file_service: Arc<FileService>,
     i18n_service: Option<Arc<I18nApplicationService>>,
+    sharing_service: Option<Arc<SharingService>>,
+    public_link_service: Option<Arc<PublicLinkService>>,
 ) -> Router<Arc<crate::common::di::AppState>> {
     // Inicializar el servicio de operaciones por lotes
     let batch_service = Arc::new(BatchOperationService::default(
@@ -92,12 +100,13 @@ pub fn create_api_routes(
     let files_router = Router::new()
         .route("/", get(|
             State(service): State<Arc<FileService>>,
+            Extension(current_user): Extension<CurrentUser>,
             axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
         | async move {
             // Get folder_id from query parameter if present
             let folder_id = params.get("folder_id").map(|id| id.as_str());
             tracing::info!("API: Listando archivos con folder_id: {:?}", folder_id);
-            FileHandler::list_files(State(service), folder_id).await
+            FileHandler::list_files(State(service), Extension(current_user), folder_id).await
         }))
         .route("/upload", post(FileHandler::upload_file))
         .route("/{id}", get(FileHandler::download_file))
@@ -123,6 +132,48 @@ pub fn create_api_routes(
         .nest("/folders", folders_router)
         .nest("/files", files_router)
         .nest("/batch", batch_router);
+    
+    // Add sharing routes if the service is provided
+    if let Some(sharing_service) = sharing_service {
+        let sharing_router = Router::new()
+            // User-to-user sharing endpoints
+            .route("/", post(SharedFileHandler::share_file))
+            .route("/shared-with-me", get(SharedFileHandler::get_files_shared_with_me))
+            .route("/shared-by-me", get(SharedFileHandler::get_files_shared_by_me))
+            .route("/{file_id}/users", get(SharedFileHandler::get_users_with_access))
+            .route("/{file_id}/permission", put(SharedFileHandler::update_permission))
+            .route("/{file_id}/user/{user_id}", delete(SharedFileHandler::unshare_file))
+            .with_state(sharing_service);
+        
+        router = router.nest("/sharing", sharing_router);
+    }
+    
+    // Add public link routes if the service is provided
+    if let Some(public_link_service) = public_link_service.clone() {
+        let public_link_auth_router = Router::new()
+            // Endpoints requiring authentication
+            .route("/", post(PublicLinkHandler::create_public_link))
+            .route("/my-links", get(PublicLinkHandler::get_links_by_user))
+            .route("/{link_id}", get(PublicLinkHandler::get_public_link))
+            .route("/file/{file_id}", get(PublicLinkHandler::get_links_for_file))
+            .route("/{link_id}/permission", put(PublicLinkHandler::update_link_permission))
+            .route("/{link_id}/password", put(PublicLinkHandler::update_link_password))
+            .route("/{link_id}/expiration", put(PublicLinkHandler::update_link_expiration))
+            .route("/{link_id}", delete(PublicLinkHandler::delete_public_link))
+            .with_state(public_link_service.clone());
+        
+        router = router.nest("/public-links", public_link_auth_router);
+    }
+    
+    // Add public access endpoint (no auth required)
+    if let Some(public_link_service) = public_link_service {
+        let public_access_router = Router::new()
+            .route("/{link_id}", post(PublicLinkHandler::access_public_file))
+            .with_state(public_link_service);
+        
+        // Note: This route deliberately doesn't have auth middleware
+        router = router.nest("/public", public_access_router);
+    }
     
     // Add i18n routes if the service is provided
     if let Some(i18n_service) = i18n_service {

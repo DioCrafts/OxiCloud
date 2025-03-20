@@ -43,6 +43,8 @@ RUST_BACKTRACE=1 cargo run  # Run with full backtrace for better error diagnosti
 - **Error Messages**: Provide clear, actionable error messages that help diagnose the issue
 - **Immutability**: Prefer immutable data structures; use with_* methods to return modified copies rather than mutating in place
 - **Performance**: Implement caching with proper invalidation; use parallel processing for large file operations; optimize based on file sizes
+- **Auth & Security**: Follow JWT-based authentication; hash passwords with Argon2; implement proper CSRF protection
+- **File Operations**: Use appropriate strategies based on file size; implement proper concurrency for large files
 
 ## Project Structure
 OxiCloud is a NextCloud-like file storage system built in Rust with a focus on performance and security. It provides a clean REST API and web interface for file management using a layered architecture approach:

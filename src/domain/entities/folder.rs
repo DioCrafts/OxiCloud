@@ -35,6 +35,9 @@ pub struct Folder {
     /// Parent folder ID (None if it's a root folder)
     parent_id: Option<String>,
     
+    /// Owner user ID (None for system folders)
+    user_id: Option<String>,
+    
     /// Creation timestamp
     created_at: u64,
     
@@ -52,6 +55,7 @@ impl Default for Folder {
             storage_path: StoragePath::from_string("/"),
             path_string: "/".to_string(),
             parent_id: None,
+            user_id: None,
             created_at: 0,
             modified_at: 0,
         }
@@ -65,6 +69,7 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
+        user_id: Option<String>,
     ) -> FolderResult<Self> {
         // Validar nombre de carpeta
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -85,6 +90,7 @@ impl Folder {
             storage_path,
             path_string,
             parent_id,
+            user_id,
             created_at: now,
             modified_at: now,
         })
@@ -96,6 +102,7 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
+        user_id: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> FolderResult<Self> {
@@ -113,6 +120,7 @@ impl Folder {
             storage_path,
             path_string,
             parent_id,
+            user_id,
             created_at,
             modified_at,
         })
@@ -139,6 +147,10 @@ impl Folder {
         self.parent_id.as_deref()
     }
     
+    pub fn user_id(&self) -> Option<&str> {
+        self.user_id.as_deref()
+    }
+    
     pub fn created_at(&self) -> u64 {
         self.created_at
     }
@@ -154,6 +166,7 @@ impl Folder {
         name: String,
         path: String,
         parent_id: Option<String>,
+        user_id: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> Self {
@@ -167,6 +180,7 @@ impl Folder {
             storage_path,
             path_string: path,
             parent_id,
+            user_id,
             created_at,
             modified_at,
         }
@@ -202,6 +216,7 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id: self.parent_id.clone(),
+            user_id: self.user_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })
@@ -229,9 +244,29 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id,
+            user_id: self.user_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })
+    }
+    
+    /// Creates a new version of the folder with a different user owner
+    pub fn with_user_id(&self, new_user_id: Option<String>) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+            
+        Self {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            storage_path: self.storage_path.clone(),
+            path_string: self.path_string.clone(),
+            parent_id: self.parent_id.clone(),
+            user_id: new_user_id,
+            created_at: self.created_at,
+            modified_at: now,
+        }
     }
     
     /// Returns an absolute path for this folder
@@ -266,9 +301,12 @@ mod tests {
             "my_folder".to_string(),
             storage_path,
             None,
+            Some("user1".to_string()),
         );
         
         assert!(folder.is_ok());
+        let folder = folder.unwrap();
+        assert_eq!(folder.user_id(), Some("user1"));
     }
     
     #[test]
@@ -278,6 +316,7 @@ mod tests {
             "123".to_string(),
             "folder/with/slash".to_string(), // Nombre inválido
             storage_path,
+            None,
             None,
         );
         
@@ -296,6 +335,7 @@ mod tests {
             "old_name".to_string(),
             storage_path,
             None,
+            Some("user1".to_string()),
         ).unwrap();
         
         let renamed = folder.with_name("new_name".to_string());
@@ -303,5 +343,22 @@ mod tests {
         let renamed = renamed.unwrap();
         assert_eq!(renamed.name(), "new_name");
         assert_eq!(renamed.id(), "123"); // El ID no cambia
+        assert_eq!(renamed.user_id(), Some("user1")); // El usuario no cambia
+    }
+    
+    #[test]
+    fn test_folder_with_user_id() {
+        let storage_path = StoragePath::from_string("/test/folder");
+        let folder = Folder::new(
+            "123".to_string(),
+            "my_folder".to_string(),
+            storage_path,
+            None,
+            Some("user1".to_string()),
+        ).unwrap();
+        
+        let transferred = folder.with_user_id(Some("user2".to_string()));
+        assert_eq!(transferred.user_id(), Some("user2"));
+        assert_eq!(transferred.id(), "123"); // El ID no cambia
     }
 }

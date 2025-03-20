@@ -125,6 +125,17 @@ impl DomainError {
         }
     }
     
+    /// Crea un error de autorización (no autorizado)
+    pub fn Unauthorized<S: Into<String>>(message: S) -> Self {
+        Self {
+            kind: ErrorKind::AccessDenied,
+            entity_type: "Authorization",
+            entity_id: None,
+            message: message.into(),
+            source: None,
+        }
+    }
+    
     /// Crea un error de validación
     pub fn validation_error<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {

@@ -60,60 +60,86 @@ impl IntoResponse for AuthError {
     }
 }
 
-// Middleware de autenticación simplificado - solo valida si existe un token
+// Middleware de autenticación que verifica el token JWT
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
-    // En una primera etapa, simplemente verificar si hay un token, sin validarlo
+    // Verificar si hay un token 
     if let Some(token_str) = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer ")) {
         
-        // Crear un usuario ficticio para pruebas (esto se reemplazará con la validación real)
-        let current_user = CurrentUser {
-            id: "test-user-id".to_string(),
-            username: "test-user".to_string(),
-            email: "test@example.com".to_string(),
-            role: "user".to_string(),
-        };
+        // Aquí deberías validar el token JWT y extraer la información del usuario
+        // En una implementación real, necesitaríamos verificar la firma, expiración, etc.
         
-        // Añadir usuario a la request
-        request.extensions_mut().insert(current_user);
-        return Ok(next.run(request).await);
+        // Por ahora, usaremos un enfoque simplificado para desarrollo
+        // TODO: Implementar validación JWT completa
+        if let Some(auth_service) = &state.auth_service {
+            match auth_service.auth_service.validate_token(token_str) {
+                Ok(claims) => {
+                    // Construir el usuario a partir de las claims del token
+                    let current_user = CurrentUser {
+                        id: claims.sub,
+                        username: claims.username,
+                        email: claims.email,
+                        role: claims.role,
+                    };
+                    
+                    // Añadir usuario a la request
+                    request.extensions_mut().insert(current_user);
+                    return Ok(next.run(request).await);
+                },
+                Err(e) => {
+                    tracing::warn!("Error validando token: {}", e);
+                    return Err(AuthError::InvalidToken(e.to_string()));
+                }
+            }
+        } else {
+            // Fallback para entornos de desarrollo sin servicio de autenticación
+            let current_user = CurrentUser {
+                id: "test-user-id".to_string(),
+                username: "test-user".to_string(),
+                email: "test@example.com".to_string(),
+                role: "user".to_string(),
+            };
+            
+            // Añadir usuario a la request
+            request.extensions_mut().insert(current_user);
+            return Ok(next.run(request).await);
+        }
     }
     
     // Si no hay token, devolver error de token no proporcionado
     Err(AuthError::TokenNotProvided)
 }
 
-// Middleware simplificado para verificar roles de administrador
+// Middleware para verificar roles de administrador
 pub async fn require_admin(
     headers: HeaderMap,
     mut request: Request,
     next: Next,
 ) -> Response {
-    // Implementación simplificada que verifica si hay un token de admin
-    if let Some(auth_value) = headers.get(header::AUTHORIZATION) {
-        if let Ok(auth_str) = auth_value.to_str() {
-            if auth_str.contains("admin") {
-                // Autorizado como admin
-                let current_user = CurrentUser {
-                    id: "admin-user-id".to_string(),
-                    username: "admin".to_string(),
-                    email: "admin@example.com".to_string(),
-                    role: "admin".to_string(),
-                };
-                request.extensions_mut().insert(current_user);
-                return next.run(request).await;
-            }
+    // Verificar si el usuario ya está autenticado (desde middleware anterior)
+    if let Some(current_user) = request.extensions().get::<CurrentUser>() {
+        // Verificar si el usuario tiene rol de administrador
+        if current_user.role == "admin" {
+            // Autorizado como admin
+            return next.run(request).await;
+        } else {
+            // Usuario autenticado pero no es admin
+            let error = AuthError::AccessDenied(format!(
+                "El usuario {} no tiene permisos de administrador", current_user.username
+            ));
+            return error.into_response();
         }
     }
     
-    // Acceso denegado
-    let error = AuthError::AccessDenied("Se requiere rol de administrador".to_string());
+    // Si llegamos aquí, no hay usuario autenticado en el contexto
+    // Esto no debería ocurrir si auth_middleware se ejecuta antes que este middleware
+    let error = AuthError::TokenNotProvided;
     error.into_response()
 }

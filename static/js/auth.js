@@ -31,29 +31,41 @@ const registerSuccess = document.getElementById('register-success');
 const adminSetupError = document.getElementById('admin-setup-error');
 
 // Panel toggles
-document.getElementById('show-register').addEventListener('click', () => {
-    loginPanel.style.display = 'none';
-    registerPanel.style.display = 'block';
-    adminSetupPanel.style.display = 'none';
-});
+const showRegisterBtn = document.getElementById('show-register');
+if (showRegisterBtn) {
+    showRegisterBtn.addEventListener('click', () => {
+        loginPanel.style.display = 'none';
+        registerPanel.style.display = 'block';
+        adminSetupPanel.style.display = 'none';
+    });
+}
 
-document.getElementById('show-login').addEventListener('click', () => {
-    loginPanel.style.display = 'block';
-    registerPanel.style.display = 'none';
-    adminSetupPanel.style.display = 'none';
-});
+const showLoginBtn = document.getElementById('show-login');
+if (showLoginBtn) {
+    showLoginBtn.addEventListener('click', () => {
+        loginPanel.style.display = 'block';
+        registerPanel.style.display = 'none';
+        adminSetupPanel.style.display = 'none';
+    });
+}
 
-document.getElementById('show-admin-setup').addEventListener('click', () => {
-    loginPanel.style.display = 'none';
-    registerPanel.style.display = 'none';
-    adminSetupPanel.style.display = 'block';
-});
+const showAdminSetupBtn = document.getElementById('show-admin-setup');
+if (showAdminSetupBtn) {
+    showAdminSetupBtn.addEventListener('click', () => {
+        loginPanel.style.display = 'none';
+        registerPanel.style.display = 'none';
+        adminSetupPanel.style.display = 'block';
+    });
+}
 
-document.getElementById('back-to-login').addEventListener('click', () => {
-    loginPanel.style.display = 'block';
-    registerPanel.style.display = 'none';
-    adminSetupPanel.style.display = 'none';
-});
+const backToLoginBtn = document.getElementById('back-to-login');
+if (backToLoginBtn) {
+    backToLoginBtn.addEventListener('click', () => {
+        loginPanel.style.display = 'block';
+        registerPanel.style.display = 'none';
+        adminSetupPanel.style.display = 'none';
+    });
+}
 
 // Check if we already have a valid token
 document.addEventListener('DOMContentLoaded', async () => {
@@ -90,139 +102,169 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Login form submission
-loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    loginError.style.display = 'none';
-    
-    const username = document.getElementById('login-username').value;
-    const password = document.getElementById('login-password').value;
-    
-    try {
-        const data = await login(username, password);
+if (loginForm) {
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        // Store auth data
-        localStorage.setItem(TOKEN_KEY, data.token); // Nombre correcto del campo en la respuesta
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+        // Clear previous errors
+        if (loginError) {
+            loginError.style.display = 'none';
+        }
         
-        // Extraer fecha de expiración desde el token JWT
-        const tokenParts = data.token.split('.');
-        if (tokenParts.length === 3) {
-            try {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                if (payload.exp) {
-                    // payload.exp está en segundos desde epoch
-                    const expiryDate = new Date(payload.exp * 1000);
-                    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
-                } else {
-                    // Si no hay exp, establecer un valor predeterminado (1 hora)
+        const usernameInput = document.getElementById('login-username');
+        const passwordInput = document.getElementById('login-password');
+        const username = usernameInput ? usernameInput.value : '';
+        const password = passwordInput ? passwordInput.value : '';
+    
+        try {
+            const data = await login(username, password);
+            
+            // Store auth data
+            localStorage.setItem(TOKEN_KEY, data.token); // Nombre correcto del campo en la respuesta
+            localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+            
+            // Extraer fecha de expiración desde el token JWT
+            const tokenParts = data.token.split('.');
+            if (tokenParts.length === 3) {
+                try {
+                    const payload = JSON.parse(atob(tokenParts[1]));
+                    if (payload.exp) {
+                        // payload.exp está en segundos desde epoch
+                        const expiryDate = new Date(payload.exp * 1000);
+                        localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
+                    } else {
+                        // Si no hay exp, establecer un valor predeterminado (1 hora)
+                        const expiryTime = new Date();
+                        expiryTime.setHours(expiryTime.getHours() + 1);
+                        localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
+                    }
+                } catch (e) {
+                    console.error('Error parsing JWT token:', e);
+                    // Valor predeterminado en caso de error
                     const expiryTime = new Date();
                     expiryTime.setHours(expiryTime.getHours() + 1);
                     localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
                 }
-            } catch (e) {
-                console.error('Error parsing JWT token:', e);
-                // Valor predeterminado en caso de error
+            } else {
+                // Token mal formado, establecer tiempo predeterminado
                 const expiryTime = new Date();
                 expiryTime.setHours(expiryTime.getHours() + 1);
                 localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
             }
-        } else {
-            // Token mal formado, establecer tiempo predeterminado
-            const expiryTime = new Date();
-            expiryTime.setHours(expiryTime.getHours() + 1);
-            localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
+            
+            // Fetch and store user data
+            // Usamos el token que acabamos de almacenar (en lugar de data.accessToken)
+            const token = localStorage.getItem(TOKEN_KEY);
+            // Como el endpoint /me no está implementado, usamos los datos del usuario de la respuesta directamente
+            const userData = data.user || { id: '123', username: 'testuser', email: 'test@example.com', role: 'user' };
+            localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+            
+            // Redirect to main app
+            redirectToMainApp();
+        } catch (error) {
+            if (loginError) {
+                loginError.textContent = error.message || 'Error al iniciar sesión';
+                loginError.style.display = 'block';
+            }
         }
-        
-        // Fetch and store user data
-        // Usamos el token que acabamos de almacenar (en lugar de data.accessToken)
-        const token = localStorage.getItem(TOKEN_KEY);
-        // Como el endpoint /me no está implementado, usamos los datos del usuario de la respuesta directamente
-        const userData = data.user || { id: '123', username: 'testuser', email: 'test@example.com', role: 'user' };
-        localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
-        
-        // Redirect to main app
-        redirectToMainApp();
-    } catch (error) {
-        loginError.textContent = error.message || 'Error al iniciar sesión';
-        loginError.style.display = 'block';
-    }
-});
+    });
+}
 
 // Register form submission
-registerForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Clear previous messages
-    registerError.style.display = 'none';
-    registerSuccess.style.display = 'none';
-    
-    const username = document.getElementById('register-username').value;
-    const email = document.getElementById('register-email').value;
-    const password = document.getElementById('register-password').value;
-    const confirmPassword = document.getElementById('register-password-confirm').value;
-    
-    // Validate passwords match
-    if (password !== confirmPassword) {
-        registerError.textContent = 'Las contraseñas no coinciden';
-        registerError.style.display = 'block';
-        return;
-    }
-    
-    try {
-        const data = await register(username, email, password);
+if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        // Show success message
-        registerSuccess.textContent = '¡Cuenta creada con éxito! Puedes iniciar sesión ahora.';
-        registerSuccess.style.display = 'block';
+        // Clear previous messages
+        if (registerError) registerError.style.display = 'none';
+        if (registerSuccess) registerSuccess.style.display = 'none';
         
-        // Clear form
-        registerForm.reset();
+        const usernameInput = document.getElementById('register-username');
+        const emailInput = document.getElementById('register-email');
+        const passwordInput = document.getElementById('register-password');
+        const confirmPasswordInput = document.getElementById('register-password-confirm');
         
-        // Switch to login panel after 2 seconds
-        setTimeout(() => {
-            loginPanel.style.display = 'block';
-            registerPanel.style.display = 'none';
-        }, 2000);
-    } catch (error) {
-        registerError.textContent = error.message || 'Error al registrar cuenta';
-        registerError.style.display = 'block';
-    }
-});
+        const username = usernameInput ? usernameInput.value : '';
+        const email = emailInput ? emailInput.value : '';
+        const password = passwordInput ? passwordInput.value : '';
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+    
+        // Validate passwords match
+        if (password !== confirmPassword) {
+            if (registerError) {
+                registerError.textContent = 'Las contraseñas no coinciden';
+                registerError.style.display = 'block';
+            }
+            return;
+        }
+        
+        try {
+            const data = await register(username, email, password);
+            
+            // Show success message
+            if (registerSuccess) {
+                registerSuccess.textContent = '¡Cuenta creada con éxito! Puedes iniciar sesión ahora.';
+                registerSuccess.style.display = 'block';
+            }
+            
+            // Clear form
+            registerForm.reset();
+            
+            // Switch to login panel after 2 seconds
+            setTimeout(() => {
+                if (loginPanel) loginPanel.style.display = 'block';
+                if (registerPanel) registerPanel.style.display = 'none';
+            }, 2000);
+        } catch (error) {
+            if (registerError) {
+                registerError.textContent = error.message || 'Error al registrar cuenta';
+                registerError.style.display = 'block';
+            }
+        }
+    });
+}
 
 // Admin setup form submission
-adminSetupForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
-    // Clear previous errors
-    adminSetupError.style.display = 'none';
-    
-    const email = document.getElementById('admin-email').value;
-    const password = document.getElementById('admin-password').value;
-    const confirmPassword = document.getElementById('admin-password-confirm').value;
-    
-    // Validate passwords match
-    if (password !== confirmPassword) {
-        adminSetupError.textContent = 'Las contraseñas no coinciden';
-        adminSetupError.style.display = 'block';
-        return;
-    }
-    
-    try {
-        // Register admin account
-        const data = await register('admin', email, password, 'admin');
+if (adminSetupForm) {
+    adminSetupForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
         
-        // Show success and switch to login
-        alert('¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.');
+        // Clear previous errors
+        if (adminSetupError) adminSetupError.style.display = 'none';
         
-        loginPanel.style.display = 'block';
-        adminSetupPanel.style.display = 'none';
-    } catch (error) {
-        adminSetupError.textContent = error.message || 'Error al crear cuenta de administrador';
-        adminSetupError.style.display = 'block';
-    }
-});
+        const emailInput = document.getElementById('admin-email');
+        const passwordInput = document.getElementById('admin-password');
+        const email = emailInput ? emailInput.value : '';
+        const password = passwordInput ? passwordInput.value : '';
+        const confirmPasswordInput = document.getElementById('admin-password-confirm');
+        const confirmPassword = confirmPasswordInput ? confirmPasswordInput.value : '';
+    
+        // Validate passwords match
+        if (password !== confirmPassword) {
+            if (adminSetupError) {
+                adminSetupError.textContent = 'Las contraseñas no coinciden';
+                adminSetupError.style.display = 'block';
+            }
+            return;
+        }
+    
+        try {
+            // Register admin account
+            const data = await register('admin', email, password, 'admin');
+            
+            // Show success and switch to login
+            alert('¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.');
+            
+            if (loginPanel) loginPanel.style.display = 'block';
+            if (adminSetupPanel) adminSetupPanel.style.display = 'none';
+        } catch (error) {
+            if (adminSetupError) {
+                adminSetupError.textContent = error.message || 'Error al crear cuenta de administrador';
+                adminSetupError.style.display = 'block';
+            }
+        }
+    });
+}
 
 // API Functions
 
@@ -401,7 +443,25 @@ async function checkFirstRun() {
  * Redirect to main application
  */
 function redirectToMainApp() {
-    window.location.href = '/';
+    // Previene el bucle infinito: si ya estamos en la página principal, no redirigir
+    if (window.location.pathname === '/' || window.location.pathname === '') {
+        console.log("Already on main page, not redirecting");
+        return;
+    }
+    
+    // Marcar que estamos redirigiendo para evitar múltiples redirecciones
+    if (window.isRedirecting) {
+        console.log("Redirect already in progress, ignoring duplicate request");
+        return;
+    }
+    
+    window.isRedirecting = true;
+    
+    // Uso de location.replace para evitar problemas con el historial del navegador
+    console.log("Redirecting to main app...");
+    setTimeout(() => {
+        window.location.replace('/');
+    }, 100);
 }
 
 /**
@@ -412,5 +472,29 @@ function logout() {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
     localStorage.removeItem(USER_DATA_KEY);
-    window.location.href = '/login.html';
+    // Redirección a login con URL absoluta y sin parámetros
+    const baseUrl = window.location.origin;
+    window.location.replace(baseUrl + '/login');
 }
+
+// Create global AuthModule for use by other modules
+const AuthModule = {
+    isAuthenticated() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const tokenExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
+        return token && tokenExpiry && new Date(tokenExpiry) > new Date();
+    },
+    
+    getToken() {
+        return localStorage.getItem(TOKEN_KEY);
+    },
+    
+    getUserData() {
+        return JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
+    },
+    
+    logout
+};
+
+// Expose the auth module globally
+window.AuthModule = AuthModule;

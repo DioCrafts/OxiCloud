@@ -14,6 +14,18 @@
     <!-- Scripts -->
     <script src="/js/i18n.js"></script>
     <script src="/js/auth.js" defer></script>
+    
+    <!-- Fix URL issues -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if we have any query parameters that could cause problems
+            if (window.location.search || window.location.hash || (window.location.pathname !== '/login' && window.location.pathname !== '/login/')) {
+                // Clean up the URL by redirecting to the clean /login URL
+                const baseUrl = window.location.origin;
+                window.history.replaceState({}, document.title, baseUrl + '/login');
+            }
+        });
+    </script>
 </head>
 <body>
     <div class="auth-container">

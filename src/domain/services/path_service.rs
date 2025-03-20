@@ -320,6 +320,15 @@ impl StorageMediator for PathService {
         
         Ok(())
     }
+    
+    async fn get_file_owner(&self, file_id: &str) -> StorageMediatorResult<Option<String>> {
+        // PathService doesn't have direct access to file repository
+        // This is a simplified implementation that should be overridden by actual implementations
+        tracing::debug!("File owner lookup requested for ID: {} in PathService", file_id);
+        
+        // Returns None to indicate no specific owner for this base implementation
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

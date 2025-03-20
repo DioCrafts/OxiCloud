@@ -39,7 +39,7 @@ pub type FolderRepositoryResult<T> = Result<T, FolderRepositoryError>;
 #[async_trait]
 pub trait FolderRepository: Send + Sync + 'static {
     /// Creates a new folder
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> FolderRepositoryResult<Folder>;
+    async fn create_folder(&self, name: String, parent_id: Option<String>, user_id: Option<String>) -> FolderRepositoryResult<Folder>;
     
     /// Gets a folder by its ID
     async fn get_folder_by_id(&self, id: &str) -> FolderRepositoryResult<Folder>;
@@ -49,6 +49,9 @@ pub trait FolderRepository: Send + Sync + 'static {
     
     /// Lists all folders in a parent folder (use with caution for large directories)
     async fn list_folders(&self, parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>>;
+    
+    /// Lists folders for a specific user
+    async fn list_folders_by_user(&self, user_id: &str, parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>>;
     
     /// Lists folders in a parent folder with pagination support
     /// 
@@ -60,6 +63,16 @@ pub trait FolderRepository: Send + Sync + 'static {
         &self, 
         parent_id: Option<&str>, 
         offset: usize, 
+        limit: usize,
+        include_total: bool
+    ) -> FolderRepositoryResult<(Vec<Folder>, Option<usize>)>;
+    
+    /// Lists folders for a specific user with pagination
+    async fn list_folders_by_user_paginated(
+        &self,
+        user_id: &str,
+        parent_id: Option<&str>,
+        offset: usize,
         limit: usize,
         include_total: bool
     ) -> FolderRepositoryResult<(Vec<Folder>, Option<usize>)>;
@@ -78,6 +91,12 @@ pub trait FolderRepository: Send + Sync + 'static {
     
     /// Gets the storage path for a folder
     async fn get_folder_storage_path(&self, id: &str) -> FolderRepositoryResult<StoragePath>;
+    
+    /// Updates the owner of a folder
+    async fn update_folder_owner(&self, id: &str, user_id: Option<String>) -> FolderRepositoryResult<Folder>;
+    
+    /// Checks if a user has access to a folder
+    async fn check_folder_access(&self, folder_id: &str, user_id: &str) -> FolderRepositoryResult<bool>;
     
     /// Legacy method - checks if a folder exists at the given PathBuf path
     #[deprecated(note = "Use folder_exists_at_storage_path instead")]

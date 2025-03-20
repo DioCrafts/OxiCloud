@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.8.1", features = ["multipart", "http1", "tokio"] }
+axum = { version = "0.8.1", features = ["multipart", "http1", "tokio", "macros"] }
 tokio = { version = "1.44.1", features = ["full"] }
 tokio-util = { version = "0.7.14", features = ["io", "codec"] }
 tokio-stream = { version = "0.1.15", features = ["fs"] }

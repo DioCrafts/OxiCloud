@@ -41,6 +41,9 @@ pub struct File {
     /// Parent folder ID
     folder_id: Option<String>,
     
+    /// Owner user ID (None for system files)
+    user_id: Option<String>,
+    
     /// Creation timestamp
     created_at: u64,
     
@@ -60,6 +63,7 @@ impl Default for File {
             size: 0,
             mime_type: "application/octet-stream".to_string(),
             folder_id: None,
+            user_id: None,
             created_at: 0,
             modified_at: 0,
         }
@@ -75,6 +79,7 @@ impl File {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
     ) -> FileResult<Self> {
         // Validar nombre de archivo
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -97,6 +102,7 @@ impl File {
             size,
             mime_type,
             folder_id,
+            user_id,
             created_at: now,
             modified_at: now,
         })
@@ -110,6 +116,7 @@ impl File {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> FileResult<Self> {
@@ -129,6 +136,7 @@ impl File {
             size,
             mime_type,
             folder_id,
+            user_id,
             created_at,
             modified_at,
         })
@@ -163,6 +171,10 @@ impl File {
         self.folder_id.as_deref()
     }
     
+    pub fn user_id(&self) -> Option<&str> {
+        self.user_id.as_deref()
+    }
+    
     pub fn created_at(&self) -> u64 {
         self.created_at
     }
@@ -180,6 +192,7 @@ impl File {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> Self {
@@ -195,6 +208,7 @@ impl File {
             size,
             mime_type,
             folder_id,
+            user_id,
             created_at,
             modified_at,
         }
@@ -233,6 +247,7 @@ impl File {
             size: self.size,
             mime_type: self.mime_type.clone(),
             folder_id: self.folder_id.clone(),
+            user_id: self.user_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })
@@ -262,6 +277,7 @@ impl File {
             size: self.size,
             mime_type: self.mime_type.clone(),
             folder_id,
+            user_id: self.user_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })
@@ -283,6 +299,28 @@ impl File {
             size: new_size,
             mime_type: self.mime_type.clone(),
             folder_id: self.folder_id.clone(),
+            user_id: self.user_id.clone(),
+            created_at: self.created_at,
+            modified_at: now,
+        }
+    }
+    
+    /// Crea una nueva versión del archivo con un usuario propietario diferente
+    pub fn with_user_id(&self, new_user_id: Option<String>) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+            
+        Self {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            storage_path: self.storage_path.clone(),
+            path_string: self.path_string.clone(),
+            size: self.size,
+            mime_type: self.mime_type.clone(),
+            folder_id: self.folder_id.clone(),
+            user_id: new_user_id,
             created_at: self.created_at,
             modified_at: now,
         }
@@ -303,9 +341,12 @@ mod tests {
             100,
             "text/plain".to_string(),
             None,
+            Some("user1".to_string()),
         );
         
         assert!(file.is_ok());
+        let file = file.unwrap();
+        assert_eq!(file.user_id(), Some("user1"));
     }
     
     #[test]
@@ -317,6 +358,7 @@ mod tests {
             storage_path,
             100,
             "text/plain".to_string(),
+            None,
             None,
         );
         
@@ -337,6 +379,7 @@ mod tests {
             100,
             "text/plain".to_string(),
             None,
+            Some("user1".to_string()),
         ).unwrap();
         
         let renamed = file.with_name("newname.txt".to_string());
@@ -344,5 +387,24 @@ mod tests {
         let renamed = renamed.unwrap();
         assert_eq!(renamed.name(), "newname.txt");
         assert_eq!(renamed.id(), "123"); // El ID no cambia
+        assert_eq!(renamed.user_id(), Some("user1")); // El usuario no cambia
+    }
+    
+    #[test]
+    fn test_file_with_user_id() {
+        let storage_path = StoragePath::from_string("/test/file.txt");
+        let file = File::new(
+            "123".to_string(),
+            "file.txt".to_string(),
+            storage_path,
+            100,
+            "text/plain".to_string(),
+            None,
+            Some("user1".to_string()),
+        ).unwrap();
+        
+        let transferred = file.with_user_id(Some("user2".to_string()));
+        assert_eq!(transferred.user_id(), Some("user2"));
+        assert_eq!(transferred.id(), "123"); // El ID no cambia
     }
 }

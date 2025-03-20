@@ -37,6 +37,12 @@ const ui = {
                 <div class="context-menu-item" id="move-file-option">
                     <i class="fas fa-exchange-alt"></i> <span data-i18n="actions.move">Mover a...</span>
                 </div>
+                <div class="context-menu-item" id="share-file-option">
+                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Compartir</span>
+                </div>
+                <div class="context-menu-item" id="public-link-option">
+                    <i class="fas fa-link"></i> <span data-i18n="actions.create_link">Crear enlace público</span>
+                </div>
                 <div class="context-menu-item" id="delete-file-option">
                     <i class="fas fa-trash"></i> <span data-i18n="actions.delete">Eliminar</span>
                 </div>

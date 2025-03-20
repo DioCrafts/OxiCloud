@@ -79,6 +79,7 @@ impl FileFsWriteRepository {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
         created_at: Option<u64>,
         modified_at: Option<u64>,
     ) -> FileRepositoryResult<File> {
@@ -91,6 +92,7 @@ impl FileFsWriteRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
                 created,
                 modified,
             )
@@ -103,6 +105,7 @@ impl FileFsWriteRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
             )
             .map_err(|e| crate::domain::repositories::file_repository::FileRepositoryError::Other(e.to_string()))
         }
@@ -124,6 +127,7 @@ impl FileWritePort for FileFsWriteRepository {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<File, DomainError> {
         // Generate a unique ID for the file
         let file_id = uuid::Uuid::new_v4().to_string();
@@ -172,6 +176,7 @@ impl FileWritePort for FileFsWriteRepository {
             size, 
             content_type, 
             folder_id,
+            user_id,
             None,
             None,
         ).await

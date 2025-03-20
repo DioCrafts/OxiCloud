@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="refresh" content="0;url=/login">
+    <title>Redireccionando...</title>
+    <script>
+        // Redirección inmediata a la página de login correcta con URL absoluta
+        const baseUrl = window.location.origin;
+        window.location.replace(baseUrl + '/login');
+    </script>
+</head>
+<body>
+    <p>Redireccionando a la página de login. Por favor espere...</p>
+    <p>Si no es redireccionado automáticamente, <a href="/login">haga clic aquí</a>.</p>
+</body>
+</html>

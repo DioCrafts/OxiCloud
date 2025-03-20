@@ -22,6 +22,9 @@ pub struct FileDto {
     /// Parent folder ID
     pub folder_id: Option<String>,
     
+    /// Owner user ID
+    pub user_id: Option<String>,
+    
     /// Creation timestamp
     pub created_at: u64,
     
@@ -38,6 +41,7 @@ impl From<File> for FileDto {
             size: file.size(),
             mime_type: file.mime_type().to_string(),
             folder_id: file.folder_id().map(String::from),
+            user_id: file.user_id().map(String::from),
             created_at: file.created_at(),
             modified_at: file.modified_at(),
         }
@@ -57,6 +61,7 @@ impl From<FileDto> for File {
             dto.size,
             dto.mime_type,
             dto.folder_id,
+            dto.user_id,
             dto.created_at,
             dto.modified_at
         )
@@ -73,6 +78,7 @@ impl FileDto {
             size: 0,
             mime_type: "application/octet-stream".to_string(),
             folder_id: None,
+            user_id: None,
             created_at: 0,
             modified_at: 0,
         }

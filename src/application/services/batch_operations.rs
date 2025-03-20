@@ -595,7 +595,8 @@ impl BatchOperationService {
                 
                 let dto = crate::application::dtos::folder_dto::CreateFolderDto {
                     name: name.clone(),
-                    parent_id: parent_id.clone()
+                    parent_id: parent_id.clone(),
+                    user_id: None // Default to None, should be updated to include user ID
                 };
                 let create_result = folder_service.create_folder(dto).await;
                 

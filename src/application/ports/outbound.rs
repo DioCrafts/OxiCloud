@@ -34,6 +34,7 @@ pub trait FileStoragePort: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<File, DomainError>;
     
     /// Obtiene un archivo por su ID
@@ -62,7 +63,7 @@ pub trait FileStoragePort: Send + Sync + 'static {
 #[async_trait]
 pub trait FolderStoragePort: Send + Sync + 'static {
     /// Crea una nueva carpeta
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError>;
+    async fn create_folder(&self, name: String, parent_id: Option<String>, user_id: Option<String>) -> Result<Folder, DomainError>;
     
     /// Obtiene una carpeta por su ID
     async fn get_folder(&self, id: &str) -> Result<Folder, DomainError>;

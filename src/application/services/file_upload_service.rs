@@ -33,8 +33,9 @@ impl FileUploadUseCase for FileUploadService {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
-        let file = self.file_repository.save_file(name, folder_id, content_type, content).await?;
+        let file = self.file_repository.save_file(name, folder_id, content_type, content, user_id).await?;
         Ok(FileDto::from(file))
     }
 }

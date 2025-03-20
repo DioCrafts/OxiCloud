@@ -94,6 +94,9 @@ pub trait StorageMediator: Send + Sync + 'static {
     
     /// Crea un directorio si no existe
     async fn ensure_storage_directory(&self, storage_path: &StoragePath) -> StorageMediatorResult<()>;
+    
+    /// Obtiene el propietario de un archivo por su ID
+    async fn get_file_owner(&self, file_id: &str) -> StorageMediatorResult<Option<String>>;
 }
 
 /// Implementación concreta del mediador de almacenamiento
@@ -136,7 +139,7 @@ pub struct FolderRepositoryStub {}
 
 #[async_trait]
 impl FolderRepository for FolderRepositoryStub {
-    async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<Folder, FolderRepositoryError> {
+    async fn create_folder(&self, _name: String, _parent_id: Option<String>, _user_id: Option<String>) -> Result<Folder, FolderRepositoryError> {
         Err(FolderRepositoryError::Other("Stub repository".to_string()))
     }
     
@@ -180,6 +183,29 @@ impl FolderRepository for FolderRepositoryStub {
     
     async fn get_folder_storage_path(&self, _id: &str) -> Result<StoragePath, FolderRepositoryError> {
         Ok(StoragePath::root())
+    }
+    
+    async fn list_folders_by_user(&self, _user_id: &str, _parent_id: Option<&str>) -> Result<Vec<Folder>, FolderRepositoryError> {
+        Ok(Vec::new())
+    }
+    
+    async fn list_folders_by_user_paginated(
+        &self,
+        _user_id: &str,
+        _parent_id: Option<&str>,
+        _offset: usize,
+        _limit: usize,
+        _include_total: bool
+    ) -> Result<(Vec<Folder>, Option<usize>), FolderRepositoryError> {
+        Ok((Vec::new(), Some(0)))
+    }
+    
+    async fn update_folder_owner(&self, _id: &str, _user_id: Option<String>) -> Result<Folder, FolderRepositoryError> {
+        Err(FolderRepositoryError::Other("Stub repository".to_string()))
+    }
+    
+    async fn check_folder_access(&self, _folder_id: &str, _user_id: &str) -> Result<bool, FolderRepositoryError> {
+        Ok(false)
     }
     
     // Legacy methods
@@ -255,6 +281,11 @@ impl StorageMediator for StubStorageMediator {
     
     async fn ensure_storage_directory(&self, _storage_path: &StoragePath) -> StorageMediatorResult<()> {
         Ok(())
+    }
+    
+    async fn get_file_owner(&self, _file_id: &str) -> StorageMediatorResult<Option<String>> {
+        // Return no owner for stub implementation
+        Ok(None)
     }
 }
 
@@ -368,5 +399,17 @@ impl StorageMediator for FileSystemStorageMediator {
         }
         
         Ok(())
+    }
+    
+    async fn get_file_owner(&self, file_id: &str) -> StorageMediatorResult<Option<String>> {
+        // For now, we need to implement a basic lookup to the user_files repository
+        // In a full implementation, we would have access to the UserFilesRepository
+        // For now, we'll return None to indicate no specific owner
+        // This will be enhanced later when we have proper access to the user_files repository
+        
+        tracing::debug!("File owner lookup requested for ID: {}", file_id);
+        
+        // Return no owner yet - in production, this would query the UserFilesRepository
+        Ok(None)
     }
 }

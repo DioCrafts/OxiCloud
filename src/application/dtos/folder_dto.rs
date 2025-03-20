@@ -9,6 +9,9 @@ pub struct CreateFolderDto {
     
     /// Parent folder ID (None for root level)
     pub parent_id: Option<String>,
+    
+    /// Owner user ID (None for system folders)
+    pub user_id: Option<String>,
 }
 
 /// DTO for folder rename requests
@@ -40,6 +43,9 @@ pub struct FolderDto {
     /// Parent folder ID
     pub parent_id: Option<String>,
     
+    /// Owner user ID
+    pub user_id: Option<String>,
+    
     /// Creation timestamp
     pub created_at: u64,
     
@@ -59,6 +65,7 @@ impl From<Folder> for FolderDto {
             name: folder.name().to_string(),
             path: folder.path_string().to_string(),
             parent_id: folder.parent_id().map(String::from),
+            user_id: folder.user_id().map(String::from),
             created_at: folder.created_at(),
             modified_at: folder.modified_at(),
             is_root,
@@ -76,6 +83,7 @@ impl From<FolderDto> for Folder {
             dto.name,
             dto.path,
             dto.parent_id,
+            dto.user_id,
             dto.created_at,
             dto.modified_at
         )
@@ -90,6 +98,7 @@ impl FolderDto {
             name: "stub-folder".to_string(),
             path: "/stub/path".to_string(),
             parent_id: None,
+            user_id: None,
             created_at: 0,
             modified_at: 0,
             is_root: true,

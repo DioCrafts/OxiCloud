@@ -19,7 +19,9 @@
     "move_to": "Mover a",
     "delete": "Eliminar",
     "cancel": "Cancelar",
-    "confirm": "Confirmar"
+    "confirm": "Confirmar",
+    "share": "Compartir",
+    "create_link": "Crear enlace público"
   },
   "files": {
     "name": "Nombre",
@@ -47,7 +49,16 @@
     "root": "Raíz",
     "delete_confirmation": "¿Estás seguro de que quieres eliminar",
     "and_contents": "y todo su contenido",
-    "no_undo": "Esta acción no se puede deshacer"
+    "no_undo": "Esta acción no se puede deshacer",
+    "share_file": "Compartir archivo",
+    "public_link": "Crear enlace público",
+    "file": "Archivo",
+    "user_email": "Email del usuario",
+    "permission": "Permiso",
+    "users_with_access": "Usuarios con acceso",
+    "password": "Contraseña (Opcional)",
+    "expiration": "Expiración (Opcional)",
+    "existing_links": "Enlaces públicos existentes"
   },
   "dropzone": {
     "drag_files": "Arrastra archivos aquí o haz clic para seleccionar",

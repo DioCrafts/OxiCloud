@@ -61,6 +61,7 @@ impl FileFsReadRepository {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
         created_at: Option<u64>,
         modified_at: Option<u64>,
     ) -> FileRepositoryResult<File> {
@@ -73,6 +74,7 @@ impl FileFsReadRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
                 created,
                 modified,
             )
@@ -85,6 +87,7 @@ impl FileFsReadRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
             )
             .map_err(|e| crate::domain::repositories::file_repository::FileRepositoryError::Other(e.to_string()))
         }
@@ -143,6 +146,7 @@ impl FileFsReadRepository {
             size,
             mime_type,
             folder_id,
+            None, // user_id is None for files loaded directly from filesystem
             Some(created_at),
             Some(modified_at),
         ).await?;

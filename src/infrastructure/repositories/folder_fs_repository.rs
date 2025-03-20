@@ -134,6 +134,7 @@ impl FolderFsRepository {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
+        user_id: Option<String>,
         created_at: Option<u64>,
         modified_at: Option<u64>,
     ) -> FolderRepositoryResult<Folder> {
@@ -144,6 +145,7 @@ impl FolderFsRepository {
                 name, 
                 storage_path, 
                 parent_id,
+                user_id,
                 created,
                 modified,
             )
@@ -153,6 +155,7 @@ impl FolderFsRepository {
                 name, 
                 storage_path, 
                 parent_id,
+                user_id,
             )
         };
         
@@ -242,8 +245,8 @@ impl Clone for FolderFsRepository {
 
 #[async_trait]
 impl FolderStoragePort for FolderFsRepository {
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError> {
-        FolderRepository::create_folder(self, name, parent_id).await.map_err(DomainError::from)
+    async fn create_folder(&self, name: String, parent_id: Option<String>, user_id: Option<String>) -> Result<Folder, DomainError> {
+        FolderRepository::create_folder(self, name, parent_id, user_id).await.map_err(DomainError::from)
     }
     
     async fn get_folder(&self, id: &str) -> Result<Folder, DomainError> {
@@ -293,7 +296,7 @@ impl FolderStoragePort for FolderFsRepository {
 
 #[async_trait]
 impl FolderRepository for FolderFsRepository {
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> FolderRepositoryResult<Folder> {
+    async fn create_folder(&self, name: String, parent_id: Option<String>, user_id: Option<String>) -> FolderRepositoryResult<Folder> {
         // Get the parent folder path (if any)
         let parent_storage_path = match &parent_id {
             Some(id) => {
@@ -335,6 +338,7 @@ impl FolderRepository for FolderFsRepository {
             name,
             folder_storage_path,
             parent_id,
+            user_id,
             None,
             None,
         ).await?;
@@ -390,6 +394,7 @@ impl FolderRepository for FolderFsRepository {
             name,
             storage_path,
             parent_id,
+            None, // user_id is None for folders loaded from filesystem
             Some(created_at),
             Some(modified_at),
         ).await?;
@@ -437,6 +442,7 @@ impl FolderRepository for FolderFsRepository {
             name,
             storage_path.clone(),
             parent_id,
+            None, // user_id is None for folders loaded from filesystem
             Some(created_at),
             Some(modified_at),
         ).await?;
@@ -945,6 +951,83 @@ impl FolderRepository for FolderFsRepository {
             .map_err(FolderRepositoryError::from)?;
         
         Ok(storage_path)
+    }
+    
+    async fn list_folders_by_user(&self, user_id: &str, parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>> {
+        // Get all folders in the parent
+        let all_folders = FolderRepository::list_folders(self, parent_id).await?;
+        
+        // Filter folders by user_id
+        let user_folders = all_folders.into_iter()
+            .filter(|folder| folder.user_id() == Some(user_id) || folder.user_id().is_none())
+            .collect();
+            
+        Ok(user_folders)
+    }
+    
+    async fn list_folders_by_user_paginated(
+        &self, 
+        user_id: &str,
+        parent_id: Option<&str>,
+        offset: usize,
+        limit: usize,
+        include_total: bool
+    ) -> FolderRepositoryResult<(Vec<Folder>, Option<usize>)> {
+        // First get all folders 
+        let (all_folders, _total) = FolderRepository::list_folders_paginated(self, parent_id, 0, usize::MAX, include_total).await?;
+        
+        // Filter by user_id
+        let user_folders: Vec<Folder> = all_folders.into_iter()
+            .filter(|folder| folder.user_id() == Some(user_id) || folder.user_id().is_none())
+            .collect();
+            
+        // Calculate new total if requested
+        let user_total = if include_total {
+            Some(user_folders.len())
+        } else {
+            None
+        };
+        
+        // Apply pagination
+        let paginated_folders = user_folders.into_iter()
+            .skip(offset)
+            .take(limit)
+            .collect();
+            
+        Ok((paginated_folders, user_total))
+    }
+    
+    async fn update_folder_owner(&self, id: &str, user_id: Option<String>) -> FolderRepositoryResult<Folder> {
+        // Get the original folder
+        let original_folder = self.get_folder_by_id(id).await?;
+        
+        // If user_id is the same, return the original folder
+        if original_folder.user_id().map(|s| s.to_string()) == user_id.as_ref().map(|s| s.to_string()) {
+            return Ok(original_folder);
+        }
+        
+        // Create a new folder with updated user_id
+        let updated_folder = original_folder.with_user_id(user_id);
+        
+        // Note: In a filesystem repository, we don't need to update anything on disk
+        // since user_id is only stored in the entity
+        
+        tracing::info!("Updated folder owner: ID={}, New owner={:?}", id, updated_folder.user_id());
+        Ok(updated_folder)
+    }
+    
+    async fn check_folder_access(&self, folder_id: &str, user_id: &str) -> FolderRepositoryResult<bool> {
+        // Get the folder
+        let folder = match self.get_folder_by_id(folder_id).await {
+            Ok(f) => f,
+            Err(FolderRepositoryError::NotFound(_)) => return Ok(false),
+            Err(e) => return Err(e),
+        };
+        
+        // Check if the folder has no user_id (public) or matches the given user_id
+        let has_access = folder.user_id().is_none() || folder.user_id() == Some(user_id);
+        
+        Ok(has_access)
     }
     
     // Legacy method implementations

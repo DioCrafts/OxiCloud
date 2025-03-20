@@ -18,9 +18,19 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Cache opened');
-        return cache.addAll(ASSETS_TO_CACHE);
+        // Try to cache each resource individually to prevent complete failure
+        return Promise.allSettled(
+          ASSETS_TO_CACHE.map(url => 
+            cache.add(url).catch(error => {
+              console.warn(`Failed to cache ${url}:`, error);
+            })
+          )
+        );
       })
       .then(() => self.skipWaiting()) // Activate immediately
+      .catch(error => {
+        console.error('Service worker installation failed:', error);
+      })
   );
 });
 

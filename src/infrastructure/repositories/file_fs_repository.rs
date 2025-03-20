@@ -204,6 +204,7 @@ impl FileFsRepository {
         size: u64,
         mime_type: String,
         folder_id: Option<String>,
+        user_id: Option<String>,
         created_at: Option<u64>,
         modified_at: Option<u64>,
     ) -> FileRepositoryResult<File> {
@@ -216,6 +217,7 @@ impl FileFsRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
                 created,
                 modified,
             )
@@ -228,6 +230,7 @@ impl FileFsRepository {
                 size, 
                 mime_type, 
                 folder_id,
+                user_id,
             )
             .map_err(|e| FileRepositoryError::Other(e.to_string()))
         }
@@ -384,8 +387,9 @@ impl FileStoragePort for FileFsRepository {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<File, DomainError> {
-        self.save_file_from_bytes(name, folder_id, content_type, content)
+        self.save_file_from_bytes(name, folder_id, content_type, content, user_id)
             .await
             .with_context(|| "Failed to save file")
     }
@@ -444,6 +448,7 @@ impl FileRepository for FileFsRepository {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> FileRepositoryResult<File>
     {
         // Get the folder path from the mediator
@@ -633,6 +638,7 @@ impl FileRepository for FileFsRepository {
             size,
             mime_type,
             folder_id,
+            user_id,
             Some(created_at),
             Some(modified_at),
         ).await?;
@@ -657,6 +663,7 @@ impl FileRepository for FileFsRepository {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> FileRepositoryResult<File>
     {
         // Get the folder path from the mediator
@@ -759,6 +766,7 @@ impl FileRepository for FileFsRepository {
             size,
             mime_type,
             folder_id,
+            user_id,
             Some(created_at),
             Some(modified_at),
         ).await?;
@@ -810,6 +818,16 @@ impl FileRepository for FileFsRepository {
             .first_or_octet_stream()
             .to_string();
         
+        // Check if there's a user associated with this file in the database
+        let user_id = match self.storage_mediator.get_file_owner(id).await {
+            Ok(Some(owner_id)) => Some(owner_id),
+            Ok(None) => None,
+            Err(e) => {
+                tracing::warn!("Error getting file owner: {}", e);
+                None
+            }
+        };
+        
         // Create file entity
         let file = self.create_file_entity(
             id.to_string(),
@@ -818,6 +836,7 @@ impl FileRepository for FileFsRepository {
             size,
             mime_type,
             folder_id,
+            user_id,
             Some(created_at),
             Some(modified_at),
         ).await?;
@@ -923,6 +942,7 @@ impl FileRepository for FileFsRepository {
                         size,
                         mime_type,
                         folder_id.map(String::from),
+                        None, // user_id - agregando el parámetro faltante
                         created_at,
                         modified_at,
                     ) {
@@ -1228,5 +1248,65 @@ impl FileRepository for FileFsRepository {
             .map_err(FileRepositoryError::from)?;
         
         Ok(storage_path)
+    }
+    
+    async fn update_file_owner(&self, id: &str, user_id: Option<String>) -> FileRepositoryResult<File> {
+        // Get the original file
+        let file = self.get_file_by_id(id).await?;
+        
+        // Create a new version with the updated user_id
+        let updated_file = file.with_user_id(user_id);
+        
+        // Note: In a full implementation, this would also update the user_files_repository
+        
+        Ok(updated_file)
+    }
+    
+    async fn check_file_access(&self, file_id: &str, user_id: &str) -> FileRepositoryResult<bool> {
+        tracing::debug!("Checking if user {} has access to file {}", user_id, file_id);
+        
+        // Get the file to check its user_id
+        match self.get_file_by_id(file_id).await {
+            Ok(file) => {
+                // If file has user_id directly, check if it matches
+                if let Some(file_user_id) = file.user_id() {
+                    return Ok(file_user_id == user_id);
+                } else {
+                    // For files without user_id in the entity, assume access is granted for now
+                    // In a complete implementation, this would check the user_files database table
+                    tracing::debug!("File {} has no user_id, assuming access for user {}", file_id, user_id);
+                    return Ok(true);
+                }
+            },
+            Err(e) => {
+                tracing::error!("Error checking file access: {}", e);
+                return Err(e);
+            }
+        }
+    }
+    
+    async fn list_files_by_user(&self, user_id: &str, folder_id: Option<&str>) -> FileRepositoryResult<Vec<File>> {
+        tracing::info!("Listing files for user {} in folder {:?}", user_id, folder_id);
+        
+        // First, get all files in the specified folder
+        let all_files = FileRepository::list_files(self, folder_id).await?;
+        
+        // Filter files to only include those owned by the user
+        let mut user_files = Vec::new();
+        
+        for file in all_files {
+            // Check if file has user_id directly or from the user_files mapping
+            let has_access = match file.user_id() {
+                Some(file_user_id) => file_user_id == user_id,
+                None => self.check_file_access(file.id(), user_id).await.unwrap_or(false),
+            };
+            
+            if has_access {
+                user_files.push(file);
+            }
+        }
+        
+        tracing::info!("Found {} files belonging to user {}", user_files.len(), user_id);
+        Ok(user_files)
     }
 }

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OxiCloud - Public File Access</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <style>
+        body {
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .public-file-container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 2rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        .file-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            color: #0d6efd;
+        }
+        .password-form {
+            padding: 2rem;
+        }
+        .file-view {
+            padding: 2rem;
+            text-align: center;
+        }
+        .file-actions {
+            margin-top: 2rem;
+        }
+        .brand {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+            justify-content: center;
+        }
+        .brand img {
+            height: 40px;
+            margin-right: 10px;
+        }
+        .brand h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="public-file-container">
+        <div class="brand">
+            <img src="/oxicloud-logo.svg" alt="OxiCloud Logo">
+            <h1>OxiCloud</h1>
+        </div>
+        
+        <div class="card">
+            <div id="passwordSection" class="password-form">
+                <h2 class="text-center mb-4">Protected File</h2>
+                <p class="text-center">This file is password protected. Please enter the password to access it.</p>
+                <div class="mb-3">
+                    <label for="filePassword" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="filePassword" placeholder="Enter password">
+                </div>
+                <button id="submitPassword" class="btn btn-primary w-100">Access File</button>
+                <div id="passwordError" class="text-danger mt-2 text-center" style="display: none;"></div>
+            </div>
+            
+            <div id="fileSection" class="file-view" style="display: none;">
+                <div class="file-icon">
+                    <i class="bi bi-file-earmark"></i>
+                </div>
+                <h3 id="fileName">Filename.pdf</h3>
+                <p id="fileInfo" class="text-muted">PDF Document • 2.5 MB</p>
+                <div class="file-actions">
+                    <a id="downloadButton" href="#" class="btn btn-primary">
+                        <i class="bi bi-download me-2"></i>Download
+                    </a>
+                    <a id="viewButton" href="#" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-eye me-2"></i>View
+                    </a>
+                </div>
+            </div>
+            
+            <div id="errorSection" class="text-center p-5" style="display: none;">
+                <div class="file-icon text-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                </div>
+                <h3>Error Accessing File</h3>
+                <p id="errorMessage" class="text-muted">This file is no longer available or the link has expired.</p>
+            </div>
+        </div>
+        
+        <p class="text-center text-muted mt-4">
+            Powered by OxiCloud. <a href="/">Sign in</a> to access your files.
+        </p>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Extract link ID from URL query parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            let linkId = urlParams.get('id');
+            
+            // Check if we have a valid link ID
+            if (!linkId) {
+                showError('Invalid link. The file could not be found.');
+                return;
+            }
+            
+            if (!linkId || linkId === '__TOKEN_PLACEHOLDER__') {
+                showError('Invalid link. The file could not be found.');
+                return;
+            }
+            
+            // Check if the file needs a password
+            checkFile(linkId);
+            
+            // Password submit handler
+            document.getElementById('submitPassword').addEventListener('click', function() {
+                const password = document.getElementById('filePassword').value;
+                accessFile(linkId, password);
+            });
+            
+            // Enter key in password field
+            document.getElementById('filePassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const password = document.getElementById('filePassword').value;
+                    accessFile(linkId, password);
+                }
+            });
+        });
+        
+        /**
+         * Check if the file needs a password
+         * @param {string} linkId - The public link ID
+         */
+        async function checkFile(linkId) {
+            try {
+                const response = await fetch(`/api/public/${linkId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(null) // No password yet
+                });
+                
+                if (response.status === 401) {
+                    // File needs password
+                    document.getElementById('passwordSection').style.display = 'block';
+                    document.getElementById('fileSection').style.display = 'none';
+                    document.getElementById('errorSection').style.display = 'none';
+                    return;
+                }
+                
+                if (!response.ok) {
+                    // Other error (expired, not found, etc.)
+                    const error = await response.json();
+                    showError(error.error || 'Error accessing file');
+                    return;
+                }
+                
+                // No password needed, show file
+                const data = await response.json();
+                showFile(data);
+            } catch (error) {
+                console.error('Error checking file:', error);
+                showError('Error connecting to server');
+            }
+        }
+        
+        /**
+         * Access file with password
+         * @param {string} linkId - The public link ID
+         * @param {string} password - The password
+         */
+        async function accessFile(linkId, password) {
+            try {
+                const response = await fetch(`/api/public/${linkId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password
+                    })
+                });
+                
+                if (response.status === 401) {
+                    // Invalid password
+                    document.getElementById('passwordError').textContent = 'Invalid password';
+                    document.getElementById('passwordError').style.display = 'block';
+                    return;
+                }
+                
+                if (!response.ok) {
+                    // Other error
+                    const error = await response.json();
+                    showError(error.error || 'Error accessing file');
+                    return;
+                }
+                
+                // Password correct, show file
+                const data = await response.json();
+                showFile(data);
+            } catch (error) {
+                console.error('Error accessing file:', error);
+                showError('Error connecting to server');
+            }
+        }
+        
+        /**
+         * Show file information and download options
+         * @param {Object} fileData - The file data
+         */
+        function showFile(fileData) {
+            document.getElementById('passwordSection').style.display = 'none';
+            document.getElementById('fileSection').style.display = 'block';
+            document.getElementById('errorSection').style.display = 'none';
+            
+            // Update file information
+            document.getElementById('fileName').textContent = fileData.name;
+            document.getElementById('fileInfo').textContent = `${getFileTypeLabel(fileData.mime_type)} • ${formatFileSize(fileData.size)}`;
+            
+            // Update file icon
+            const iconElement = document.querySelector('.file-icon i');
+            iconElement.className = `bi ${getFileIcon(fileData.mime_type)}`;
+            
+            // Update download button
+            const downloadButton = document.getElementById('downloadButton');
+            downloadButton.href = fileData.download_url;
+            
+            // Update view button
+            const viewButton = document.getElementById('viewButton');
+            if (canViewInBrowser(fileData.mime_type)) {
+                viewButton.href = fileData.view_url || fileData.download_url;
+                viewButton.setAttribute('target', '_blank');
+                viewButton.style.display = 'inline-block';
+            } else {
+                viewButton.style.display = 'none';
+            }
+        }
+        
+        /**
+         * Show error message
+         * @param {string} message - The error message
+         */
+        function showError(message) {
+            document.getElementById('passwordSection').style.display = 'none';
+            document.getElementById('fileSection').style.display = 'none';
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+        
+        /**
+         * Get file type label from MIME type
+         * @param {string} mimeType - The MIME type
+         * @returns {string} The file type label
+         */
+        function getFileTypeLabel(mimeType) {
+            if (!mimeType) return 'Unknown File';
+            
+            if (mimeType.startsWith('image/')) {
+                return 'Image';
+            } else if (mimeType.startsWith('video/')) {
+                return 'Video';
+            } else if (mimeType.startsWith('audio/')) {
+                return 'Audio';
+            } else if (mimeType === 'application/pdf') {
+                return 'PDF Document';
+            } else if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) {
+                return 'Spreadsheet';
+            } else if (mimeType.includes('word') || mimeType.includes('document')) {
+                return 'Document';
+            } else if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
+                return 'Presentation';
+            } else if (mimeType === 'text/plain') {
+                return 'Text File';
+            } else if (mimeType === 'application/json') {
+                return 'JSON File';
+            } else if (mimeType === 'text/html') {
+                return 'HTML File';
+            } else if (mimeType === 'text/csv') {
+                return 'CSV File';
+            }
+            
+            return 'File';
+        }
+        
+        /**
+         * Get file icon based on MIME type
+         * @param {string} mimeType - The MIME type
+         * @returns {string} The Bootstrap icon class
+         */
+        function getFileIcon(mimeType) {
+            if (!mimeType) return 'bi-file-earmark';
+            
+            if (mimeType.startsWith('image/')) {
+                return 'bi-file-earmark-image';
+            } else if (mimeType.startsWith('video/')) {
+                return 'bi-file-earmark-play';
+            } else if (mimeType.startsWith('audio/')) {
+                return 'bi-file-earmark-music';
+            } else if (mimeType === 'application/pdf') {
+                return 'bi-file-earmark-pdf';
+            } else if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) {
+                return 'bi-file-earmark-spreadsheet';
+            } else if (mimeType.includes('word') || mimeType.includes('document')) {
+                return 'bi-file-earmark-word';
+            } else if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
+                return 'bi-file-earmark-slides';
+            } else if (mimeType === 'text/plain') {
+                return 'bi-file-earmark-text';
+            } else if (mimeType === 'application/json') {
+                return 'bi-file-earmark-code';
+            } else if (mimeType === 'text/html') {
+                return 'bi-file-earmark-code';
+            } else if (mimeType === 'text/csv') {
+                return 'bi-file-earmark-spreadsheet';
+            }
+            
+            return 'bi-file-earmark';
+        }
+        
+        /**
+         * Format file size in human-readable format
+         * @param {number} bytes - The file size in bytes
+         * @returns {string} Formatted file size
+         */
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+        
+        /**
+         * Check if file can be viewed in browser
+         * @param {string} mimeType - The MIME type
+         * @returns {boolean} True if file can be viewed in browser
+         */
+        function canViewInBrowser(mimeType) {
+            const viewableTypes = [
+                'image/',
+                'text/',
+                'application/pdf',
+                'video/'
+            ];
+            
+            return viewableTypes.some(type => mimeType.startsWith(type));
+        }
+    </script>
+</body>
+</html>

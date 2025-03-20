@@ -92,7 +92,7 @@ impl FolderUseCase for FolderService {
         }
         
         // Crear la carpeta
-        let folder = self.folder_storage.create_folder(dto.name, dto.parent_id)
+        let folder = self.folder_storage.create_folder(dto.name, dto.parent_id, dto.user_id)
             .await
             .with_context(|| "Failed to create folder")?;
         

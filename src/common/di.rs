@@ -17,6 +17,8 @@ use crate::application::services::folder_service::FolderService;
 use crate::application::services::file_service::FileService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
 use crate::application::services::storage_mediator::{StorageMediator, FileSystemStorageMediator};
+use crate::application::services::sharing_service::SharingService;
+use crate::application::services::public_link_service::PublicLinkService;
 use crate::application::ports::inbound::{FileUseCase, FolderUseCase, UseCaseFactory};
 use crate::application::ports::outbound::{FileStoragePort, FolderStoragePort};
 use crate::application::ports::file_ports::{FileUploadUseCase, FileRetrievalUseCase, FileManagementUseCase, FileUseCaseFactory};
@@ -34,6 +36,7 @@ pub struct AppServiceFactory {
     storage_path: PathBuf,
     locales_path: PathBuf,
     config: AppConfig,
+    db_pool: Option<Arc<PgPool>>,
 }
 
 impl AppServiceFactory {
@@ -44,6 +47,7 @@ impl AppServiceFactory {
             storage_path,
             locales_path,
             config: AppConfig::default(),
+            db_pool: None,
         }
     }
     
@@ -54,7 +58,15 @@ impl AppServiceFactory {
             storage_path,
             locales_path,
             config,
+            db_pool: None,
         }
+    }
+    
+    /// Crea una nueva fábrica de servicios con base de datos
+    #[allow(dead_code)]
+    pub fn with_database(mut self, db_pool: Arc<PgPool>) -> Self {
+        self.db_pool = Some(db_pool);
+        self
     }
     
     /// Inicializa los servicios base del sistema
@@ -211,6 +223,33 @@ impl AppServiceFactory {
             repos.i18n_repository.clone()
         ));
         
+        // Sharing services are created only if database pool is available
+        let (sharing_service, public_link_service) = if let Some(db_pool) = self.db_pool.as_ref() {
+            // Create repositories for sharing features
+            use crate::domain::repositories::shared_file_repository::SharedFileRepository;
+            use crate::domain::repositories::public_link_repository::PublicLinkRepository;
+            use crate::infrastructure::repositories::pg::shared_file_pg_repository::SharedFilePgRepository;
+            use crate::infrastructure::repositories::pg::public_link_pg_repository::PublicLinkPgRepository;
+            
+            let shared_file_repo = Arc::new(SharedFilePgRepository::new(db_pool.clone())) as Arc<dyn SharedFileRepository>;
+            let public_link_repo = Arc::new(PublicLinkPgRepository::new(db_pool.clone())) as Arc<dyn PublicLinkRepository>;
+            
+            // Create services
+            let sharing_svc = Arc::new(SharingService::new(
+                shared_file_repo,
+                repos.file_repository.clone(),
+            ));
+            
+            let public_link_svc = Arc::new(PublicLinkService::new(
+                public_link_repo,
+                repos.file_repository.clone(),
+            ));
+            
+            (Some(sharing_svc), Some(public_link_svc))
+        } else {
+            (None, None)
+        };
+        
         ApplicationServices {
             folder_service,
             file_service,
@@ -219,6 +258,8 @@ impl AppServiceFactory {
             file_management_service,
             file_use_case_factory,
             i18n_service,
+            sharing_service,
+            public_link_service,
         }
     }
 }
@@ -255,6 +296,8 @@ pub struct ApplicationServices {
     pub file_management_service: Arc<dyn FileManagementUseCase>,
     pub file_use_case_factory: Arc<dyn FileUseCaseFactory>,
     pub i18n_service: Arc<I18nApplicationService>,
+    pub sharing_service: Option<Arc<SharingService>>,
+    pub public_link_service: Option<Arc<PublicLinkService>>,
 }
 
 /// Contenedor para servicios de autenticación
@@ -356,6 +399,10 @@ impl Default for AppState {
             async fn ensure_storage_directory(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<(), crate::application::services::storage_mediator::StorageMediatorError> {
                 Ok(())
             }
+            
+            async fn get_file_owner(&self, _file_id: &str) -> Result<Option<String>, crate::application::services::storage_mediator::StorageMediatorError> {
+                Ok(None)
+            }
         }
         
         struct DummyFileReadPort;
@@ -388,6 +435,7 @@ impl Default for AppState {
                 _folder_id: Option<String>,
                 _content_type: String,
                 _content: Vec<u8>,
+                _user_id: Option<String>,
             ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
                 Ok(crate::domain::entities::file::File::default())
             }
@@ -410,6 +458,7 @@ impl Default for AppState {
                 _folder_id: Option<String>,
                 _content_type: String,
                 _content: Vec<u8>,
+                _user_id: Option<String>,
             ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
                 Ok(crate::domain::entities::file::File::default())
             }
@@ -447,7 +496,7 @@ impl Default for AppState {
         struct DummyFolderStoragePort;
         #[async_trait::async_trait]
         impl crate::application::ports::outbound::FolderStoragePort for DummyFolderStoragePort {
-            async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
+            async fn create_folder(&self, _name: String, _parent_id: Option<String>, _user_id: Option<String>) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
                 Ok(crate::domain::entities::folder::Folder::default())
             }
             
@@ -580,6 +629,7 @@ impl Default for AppState {
                 _folder_id: Option<String>,
                 _content_type: String,
                 _content: Vec<u8>,
+                _user_id: Option<String>,
             ) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
                 Ok(crate::application::dtos::file_dto::FileDto::default())
             }
@@ -620,6 +670,7 @@ impl Default for AppState {
                 _folder_id: Option<String>,
                 _content_type: String,
                 _content: Vec<u8>,
+                _user_id: Option<String>,
             ) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
                 Ok(crate::application::dtos::file_dto::FileDto::default())
             }
@@ -730,13 +781,25 @@ impl Default for AppState {
             file_management_service,
             file_use_case_factory,
             i18n_service: Arc::new(DummyI18nApplicationService::dummy()),
+            sharing_service: None,
+            public_link_service: None,
         };
         
         // Return a minimal app state
         Self {
             core: core_services,
             repositories: repository_services,
-            applications: application_services,
+            applications: ApplicationServices {
+                folder_service: application_services.folder_service,
+                file_service: application_services.file_service,
+                file_upload_service: application_services.file_upload_service,
+                file_retrieval_service: application_services.file_retrieval_service,
+                file_management_service: application_services.file_management_service,
+                file_use_case_factory: application_services.file_use_case_factory,
+                i18n_service: application_services.i18n_service,
+                sharing_service: None,
+                public_link_service: None,
+            },
             db_pool: None,
             auth_service: None,
         }

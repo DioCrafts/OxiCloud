@@ -91,6 +91,7 @@ impl FileService {
                 _folder_id: Option<String>,
                 _content_type: String,
                 _content: Vec<u8>,
+                _user_id: Option<String>,
             ) -> Result<FileDto, DomainError> {
                 Ok(FileDto::empty())
             }
@@ -131,11 +132,50 @@ impl FileService {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> FileServiceResult<FileDto>
     {
-        let file = self.file_repository.save_file(name, folder_id, content_type, content).await
+        // Pass the user_id to the repository to associate the file with the user
+        let file = self.file_repository.save_file(name, folder_id, content_type, content, user_id).await
             .map_err(FileServiceError::from)?;
         Ok(FileDto::from(file))
+    }
+    
+    /// List files for a specific user
+    pub async fn list_files_by_user(&self, user_id: &str, folder_id: Option<&str>) -> FileServiceResult<Vec<FileDto>> {
+        tracing::info!("Listing files for user {} in folder {:?}", user_id, folder_id);
+        
+        // Get all files in the folder
+        let all_files = self.file_repository.list_files(folder_id).await
+            .map_err(FileServiceError::from)?;
+        
+        // Filter files by user_id
+        let user_files = all_files.into_iter()
+            .filter(|file| file.user_id() == Some(user_id) || file.user_id().is_none())
+            .collect::<Vec<_>>();
+            
+        Ok(user_files.into_iter().map(FileDto::from).collect())
+    }
+    
+    /// Check if a user has access to a specific file
+    pub async fn check_file_access(&self, file_id: &str, user_id: &str) -> bool {
+        // Try to get the file first to make sure it exists
+        match self.file_repository.get_file(file_id).await {
+            Ok(file) => {
+                // If the file has no user_id (legacy file), allow access
+                if let Some(file_user_id) = file.user_id() {
+                    // Only allow access if the file belongs to this user
+                    return file_user_id == user_id;
+                } else {
+                    // For files without an owner, assume access is allowed
+                    return true;
+                }
+            },
+            Err(e) => {
+                tracing::error!("Error getting file for access check: {}", e);
+                return false;
+            }
+        }
     }
     
     /// Gets a file by ID
@@ -196,8 +236,9 @@ impl FileUseCase for FileService {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
-        FileService::upload_file_from_bytes(self, name, folder_id, content_type, content).await
+        FileService::upload_file_from_bytes(self, name, folder_id, content_type, content, user_id).await
             .map_err(DomainError::from)
     }
     

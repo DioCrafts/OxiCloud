@@ -51,6 +51,26 @@ const contextMenus = {
             }
             window.ui.closeFileContextMenu();
         });
+        
+        // Share file option
+        if (document.getElementById('share-file-option')) {
+            document.getElementById('share-file-option').addEventListener('click', () => {
+                if (window.app.contextMenuTargetFile && window.SharingModule) {
+                    window.SharingModule.openShareModal(window.app.contextMenuTargetFile);
+                }
+                window.ui.closeFileContextMenu();
+            });
+        }
+        
+        // Create public link option
+        if (document.getElementById('public-link-option')) {
+            document.getElementById('public-link-option').addEventListener('click', () => {
+                if (window.app.contextMenuTargetFile && window.SharingModule) {
+                    window.SharingModule.openPublicLinkModal(window.app.contextMenuTargetFile);
+                }
+                window.ui.closeFileContextMenu();
+            });
+        }
 
         // Rename dialog events
         const renameCancelBtn = document.getElementById('rename-cancel-btn');
@@ -248,6 +268,64 @@ const contextMenus = {
             }
         } catch (error) {
             console.error('Error loading folders:', error);
+        }
+    },
+    
+    /**
+     * Add a menu item to a context menu
+     * @param {string} menuType - 'file' or 'folder'
+     * @param {string} label - Text label for the menu item
+     * @param {string} iconClass - FontAwesome icon class
+     * @param {string} id - HTML id for the menu item
+     * @param {Function} callback - Function to call when clicked
+     */
+    addMenuItem(menuType, label, iconClass, id, callback) {
+        // Determine which menu to add to
+        const menuId = menuType === 'file' ? 'file-context-menu' : 'folder-context-menu';
+        const menu = document.getElementById(menuId);
+        
+        if (!menu) {
+            console.error(`Menu ${menuId} not found`);
+            return;
+        }
+        
+        // Check if item already exists
+        if (document.getElementById(id)) {
+            console.warn(`Menu item with id ${id} already exists`);
+            return;
+        }
+        
+        // Create menu item
+        const menuItem = document.createElement('div');
+        menuItem.className = 'context-menu-item';
+        menuItem.id = id;
+        menuItem.innerHTML = `<i class="${iconClass}"></i> <span>${label}</span>`;
+        
+        // Add click handler
+        menuItem.addEventListener('click', () => {
+            // Get the target item
+            const targetItem = menuType === 'file' 
+                ? window.app.contextMenuTargetFile 
+                : window.app.contextMenuTargetFolder;
+            
+            if (targetItem && typeof callback === 'function') {
+                callback(targetItem);
+            }
+            
+            // Close the menu
+            if (menuType === 'file') {
+                window.ui.closeFileContextMenu();
+            } else {
+                window.ui.closeContextMenu();
+            }
+        });
+        
+        // Add to menu (before the delete option)
+        const deleteOption = menu.querySelector(`#delete-${menuType}-option`);
+        if (deleteOption) {
+            menu.insertBefore(menuItem, deleteOption);
+        } else {
+            menu.appendChild(menuItem);
         }
     }
 };

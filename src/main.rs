@@ -235,6 +235,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         file_management_service: Arc::new(application::services::file_management_service::FileManagementService::default_stub()),
         file_use_case_factory: Arc::new(application::services::file_use_case_factory::AppFileUseCaseFactory::default_stub()),
         i18n_service: i18n_service.clone(),
+        sharing_service: None,  // Will be initialized later if database is available
+        public_link_service: None,  // Will be initialized later if database is available
     };
     
     // Create the AppState without Arc first
@@ -259,7 +261,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = Arc::new(app_state);
 
     // Build application router
-    let api_routes = create_api_routes(folder_service, file_service, Some(i18n_service));
+    let api_routes = create_api_routes(
+        folder_service, 
+        file_service, 
+        Some(i18n_service),
+        app_state.applications.sharing_service.clone(),
+        app_state.applications.public_link_service.clone()
+    );
     let web_routes = create_web_routes();
     
     // Build the app router
@@ -354,7 +362,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             let response = if _method == "OPTIONS" {
                                 // Responder a las peticiones preflight para CORS
                                 "HTTP/1.1 204 No Content\r\nAccess-Control-Allow-Origin: *\r\nAccess-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: Content-Type, Authorization\r\nAccess-Control-Max-Age: 86400\r\n\r\n".to_string()
-                            } else if path == "/login" || path == "/login/" {
+                            } else if path == "/login" || path == "/login/" || path.starts_with("/login?") {
                                 // Servir la página de login
                                 let login_html = include_str!("../static/login.html");
                                 let content_length = login_html.len();
@@ -366,7 +374,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "/css/style.css" => {
                                         let css = include_str!("../static/css/style.css");
                                         let content_length = css.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: text/css\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving CSS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: text/css\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, css)
                                     },
                                     "/css/auth.css" => {
@@ -377,13 +386,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                                 "/* Error loading auth.css */".to_string()
                                             });
                                         let content_length = css.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: text/css\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving CSS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: text/css\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, css)
                                     },
+                                    // Try to match any CSS file in the static/css directory
                                     _ => {
-                                        // Archivo CSS no encontrado
-                                        tracing::debug!("CSS file not found: {}", path);
-                                        "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot Found".to_string()
+                                        let file_name = path.trim_start_matches("/css/");
+                                        let file_path = format!("/home/torrefacto/OxiCloud/static/css/{}", file_name);
+                                        
+                                        match std::fs::read_to_string(&file_path) {
+                                            Ok(css) => {
+                                                let content_length = css.len();
+                                                tracing::info!("Serving dynamic CSS file: {}, size: {}", path, content_length);
+                                                format!("HTTP/1.1 200 OK\r\nContent-Type: text/css\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
+                                                        content_length, css)
+                                            },
+                                            Err(_) => {
+                                                // Archivo CSS no encontrado
+                                                tracing::debug!("CSS file not found: {}", path);
+                                                "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot Found".to_string()
+                                            }
+                                        }
                                     }
                                 }
                             } else if path.starts_with("/js/") {
@@ -392,83 +416,119 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     "/js/auth.js" => {
                                         let js = include_str!("../static/js/auth.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/i18n.js" => {
                                         let js = include_str!("../static/js/i18n.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/app.js" => {
                                         let js = include_str!("../static/js/app.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/languageSelector.js" => {
                                         let js = include_str!("../static/js/languageSelector.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/fileRenderer.js" => {
                                         let js = include_str!("../static/js/fileRenderer.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/contextMenus.js" => {
                                         let js = include_str!("../static/js/contextMenus.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/fileOperations.js" => {
                                         let js = include_str!("../static/js/fileOperations.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
                                     "/js/ui.js" => {
                                         let js = include_str!("../static/js/ui.js");
                                         let content_length = js.len();
-                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                                 content_length, js)
                                     },
+                                    "/js/sharing.js" => {
+                                        let js = include_str!("../static/js/sharing.js");
+                                        let content_length = js.len();
+                                        tracing::info!("Serving JS file: {}, size: {}", path, content_length);
+                                        format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
+                                                content_length, js)
+                                    },
+                                    // Try to match any JS file in the static/js directory
                                     _ => {
-                                        // Archivo JS no encontrado
-                                        tracing::debug!("JS file not found: {}", path);
-                                        "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot Found".to_string()
+                                        let file_name = path.trim_start_matches("/js/");
+                                        let file_path = format!("/home/torrefacto/OxiCloud/static/js/{}", file_name);
+                                        
+                                        match std::fs::read_to_string(&file_path) {
+                                            Ok(js) => {
+                                                let content_length = js.len();
+                                                tracing::info!("Serving dynamic JS file: {}, size: {}", path, content_length);
+                                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
+                                                        content_length, js)
+                                            },
+                                            Err(_) => {
+                                                // Archivo JS no encontrado
+                                                tracing::debug!("JS file not found: {}", path);
+                                                "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot Found".to_string()
+                                            }
+                                        }
                                     }
                                 }
                             } else if path == "/favicon.ico" {
-                                // Servir el favicon (lo omitimos para simplificar)
-                                "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\nContent-Length: 9\r\n\r\nNot Found".to_string()
+                                // Servir el favicon si existe
+                                // For binary files like favicon.ico, we need to handle them with a 
+                                // simpler approach to avoid encoding issues - return a 204 No Content
+                                // This avoids browser console errors while not causing binary data issues
+                                "HTTP/1.1 204 No Content\r\nContent-Type: image/x-icon\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: 0\r\n\r\n".to_string()
                             } else if path == "/locales/en.json" || path == "/static/locales/en.json" {
                                 // Servir las traducciones en inglés
                                 let en_json = include_str!("../static/locales/en.json");
                                 let content_length = en_json.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                tracing::info!("Serving translation file: {}, size: {}", path, content_length);
+                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, en_json)
                             } else if path == "/locales/es.json" || path == "/static/locales/es.json" {
                                 // Servir las traducciones en español
                                 let es_json = include_str!("../static/locales/es.json");
                                 let content_length = es_json.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                tracing::info!("Serving translation file: {}, size: {}", path, content_length);
+                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, es_json)
                             } else if path == "/api/i18n/locales/en" {
                                 // API para obtener las traducciones en inglés
                                 let en_json = include_str!("../static/locales/en.json");
                                 let content_length = en_json.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                tracing::info!("Serving API translation file: {}, size: {}", path, content_length);
+                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, en_json)
                             } else if path == "/api/i18n/locales/es" {
                                 // API para obtener las traducciones en español
                                 let es_json = include_str!("../static/locales/es.json");
                                 let content_length = es_json.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                tracing::info!("Serving API translation file: {}, size: {}", path, content_length);
+                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: max-age=3600\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, es_json)
                             } else if path == "/api/auth/login" && _method == "POST" {
                                 // API de login (mock simple para pruebas)
@@ -535,67 +595,95 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, response_body)
                             } else if path.starts_with("/api/folders") {
-                                // Actually list folders from the storage directory
-                                let folders = std::fs::read_dir("./storage")
-                                    .unwrap_or_else(|_| std::fs::read_dir("./").unwrap())
-                                    .filter_map(Result::ok)
-                                    .filter(|entry| {
-                                        entry.path().is_dir() && 
-                                        !entry.file_name().to_string_lossy().starts_with(".")
-                                    })
-                                    .map(|entry| {
-                                        let name = entry.file_name().to_string_lossy().to_string();
-                                        let id = format!("folder-{}", name.replace(" ", "-"));
-                                        
-                                        format!(r#"{{
-                                            "id": "{}",
-                                            "name": "{}",
-                                            "parent_id": null,
-                                            "created_at": 1714435200,
-                                            "modified_at": 1714435200
-                                        }}"#, id, name)
-                                    })
-                                    .collect::<Vec<String>>()
-                                    .join(",");
+                                // Check for authorization header
+                                let auth_header = request.lines()
+                                    .find(|line| line.starts_with("Authorization:"))
+                                    .unwrap_or("");
                                 
-                                let response_body = format!("[{}]", folders);
+                                // For simplicity, we're not fully validating the token
+                                // but just checking it's there
+                                let is_authenticated = auth_header.contains("Bearer ");
                                 
-                                let content_length = response_body.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
-                                        content_length, response_body)
+                                if !is_authenticated && _method != "OPTIONS" {
+                                    // Return 401 Unauthorized if no valid token
+                                    "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: 48\r\n\r\n{\"error\": \"Authentication required\", \"code\": 401}".to_string()
+                                } else {
+                                    // Actually list folders from the storage directory
+                                    let folders = std::fs::read_dir("./storage")
+                                        .unwrap_or_else(|_| std::fs::read_dir("./").unwrap())
+                                        .filter_map(Result::ok)
+                                        .filter(|entry| {
+                                            entry.path().is_dir() && 
+                                            !entry.file_name().to_string_lossy().starts_with(".")
+                                        })
+                                        .map(|entry| {
+                                            let name = entry.file_name().to_string_lossy().to_string();
+                                            let id = format!("folder-{}", name.replace(" ", "-"));
+                                            
+                                            format!(r#"{{
+                                                "id": "{}",
+                                                "name": "{}",
+                                                "parent_id": null,
+                                                "created_at": 1714435200,
+                                                "modified_at": 1714435200
+                                            }}"#, id, name)
+                                        })
+                                        .collect::<Vec<String>>()
+                                        .join(",");
+                                    
+                                    let response_body = format!("[{}]", folders);
+                                    
+                                    let content_length = response_body.len();
+                                    format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                            content_length, response_body)
+                                }
                             } else if path == "/api/files" {
-                                // Actually list files from the storage directory
-                                let files = std::fs::read_dir("./storage")
-                                    .unwrap_or_else(|_| std::fs::read_dir("./").unwrap())
-                                    .filter_map(Result::ok)
-                                    .filter(|entry| {
-                                        entry.path().is_file() && 
-                                        !entry.file_name().to_string_lossy().starts_with(".")
-                                    })
-                                    .map(|entry| {
-                                        let path = entry.path();
-                                        let name = entry.file_name().to_string_lossy().to_string();
-                                        let id = format!("file-{}", name.replace(" ", "-").replace(",", ""));
-                                        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-                                        
-                                        format!(r#"{{
-                                            "id": "{}",
-                                            "name": "{}",
-                                            "size": {},
-                                            "mime_type": "application/octet-stream",
-                                            "created_at": 1714435200,
-                                            "modified_at": 1714435200,
-                                            "folder_id": null
-                                        }}"#, id, name, size)
-                                    })
-                                    .collect::<Vec<String>>()
-                                    .join(",");
+                                // Check for authorization header
+                                let auth_header = request.lines()
+                                    .find(|line| line.starts_with("Authorization:"))
+                                    .unwrap_or("");
                                 
-                                let response_body = format!("[{}]", files);
+                                // For simplicity, we're not fully validating the token
+                                // but just checking it's there
+                                let is_authenticated = auth_header.contains("Bearer ");
                                 
-                                let content_length = response_body.len();
-                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
-                                        content_length, response_body)
+                                if !is_authenticated && _method != "OPTIONS" {
+                                    // Return 401 Unauthorized if no valid token
+                                    "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: 48\r\n\r\n{\"error\": \"Authentication required\", \"code\": 401}".to_string()
+                                } else {
+                                    // Actually list files from the storage directory
+                                    let files = std::fs::read_dir("./storage")
+                                        .unwrap_or_else(|_| std::fs::read_dir("./").unwrap())
+                                        .filter_map(Result::ok)
+                                        .filter(|entry| {
+                                            entry.path().is_file() && 
+                                            !entry.file_name().to_string_lossy().starts_with(".")
+                                        })
+                                        .map(|entry| {
+                                            let path = entry.path();
+                                            let name = entry.file_name().to_string_lossy().to_string();
+                                            let id = format!("file-{}", name.replace(" ", "-").replace(",", ""));
+                                            let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                                            
+                                            format!(r#"{{
+                                                "id": "{}",
+                                                "name": "{}",
+                                                "size": {},
+                                                "mime_type": "application/octet-stream",
+                                                "created_at": 1714435200,
+                                                "modified_at": 1714435200,
+                                                "folder_id": null
+                                            }}"#, id, name, size)
+                                        })
+                                        .collect::<Vec<String>>()
+                                        .join(",");
+                                    
+                                    let response_body = format!("[{}]", files);
+                                    
+                                    let content_length = response_body.len();
+                                    format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                            content_length, response_body)
+                                }
                             } else if path == "/api/files/upload" && _method == "POST" {
                                 // Mock API endpoint for file uploads
                                 let response_body = r#"{
@@ -617,6 +705,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 let content_length = index_html.len();
                                 format!("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {}\r\n\r\n{}", 
                                         content_length, index_html)
+                            } else if path == "/sw.js" {
+                                // Servir el Service Worker
+                                let sw_js = include_str!("../static/sw.js");
+                                let content_length = sw_js.len();
+                                format!("HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {}\r\n\r\n{}", 
+                                        content_length, sw_js)
+                            } else if path.starts_with("/api/public-links/file/") {
+                                // Check for authorization header
+                                let auth_header = request.lines()
+                                    .find(|line| line.starts_with("Authorization:"))
+                                    .unwrap_or("");
+                                
+                                // For simplicity, we're not fully validating the token
+                                // but just checking it's there
+                                let is_authenticated = auth_header.contains("Bearer ");
+                                
+                                if !is_authenticated && _method != "OPTIONS" {
+                                    // Return 401 Unauthorized if no valid token
+                                    "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: 48\r\n\r\n{\"error\": \"Authentication required\", \"code\": 401}".to_string()
+                                } else {
+                                    // Mock response for public links
+                                    let file_id = path.strip_prefix("/api/public-links/file/").unwrap_or("");
+                                    tracing::debug!("Public links request for file_id: {}", file_id);
+                                    
+                                    // Mock empty array for now - this would be replaced with actual data in a real implementation
+                                    let response_body = "[]";
+                                    
+                                    let content_length = response_body.len();
+                                    format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                            content_length, response_body)
+                                }
+                            } else if path.starts_with("/api/sharing/") && path.ends_with("/users") {
+                                // Check for authorization header
+                                let auth_header = request.lines()
+                                    .find(|line| line.starts_with("Authorization:"))
+                                    .unwrap_or("");
+                                
+                                // For simplicity, we're not fully validating the token
+                                // but just checking it's there
+                                let is_authenticated = auth_header.contains("Bearer ");
+                                
+                                if !is_authenticated && _method != "OPTIONS" {
+                                    // Return 401 Unauthorized if no valid token
+                                    "HTTP/1.1 401 Unauthorized\r\nContent-Type: application/json\r\nContent-Length: 48\r\n\r\n{\"error\": \"Authentication required\", \"code\": 401}".to_string()
+                                } else {
+                                    // Mock response for shared users
+                                    // Extract file_id from path
+                                    let file_id = path.strip_prefix("/api/sharing/")
+                                        .unwrap_or("")
+                                        .strip_suffix("/users")
+                                        .unwrap_or("");
+                                    
+                                    tracing::debug!("Shared users request for file_id: {}", file_id);
+                                    
+                                    // Mock empty array for now - this would be replaced with actual data in a real implementation
+                                    let response_body = "[]";
+                                    
+                                    let content_length = response_body.len();
+                                    format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: {}\r\n\r\n{}", 
+                                            content_length, response_body)
+                                }
                             } else {
                                 // Cualquier otra ruta, 404
                                 tracing::debug!("Route not found: {}", path);

@@ -33,6 +33,7 @@ pub trait FileWritePort: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<File, DomainError>;
     
     /// Mueve un archivo a otra carpeta

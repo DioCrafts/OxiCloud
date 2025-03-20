@@ -19,7 +19,9 @@
     "move_to": "Move to",
     "delete": "Delete",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "share": "Share",
+    "create_link": "Create public link"
   },
   "files": {
     "name": "Name",
@@ -47,7 +49,16 @@
     "root": "Root",
     "delete_confirmation": "Are you sure you want to delete",
     "and_contents": "and all its contents",
-    "no_undo": "This action cannot be undone"
+    "no_undo": "This action cannot be undone",
+    "share_file": "Share File",
+    "public_link": "Create Public Link",
+    "file": "File",
+    "user_email": "User Email",
+    "permission": "Permission",
+    "users_with_access": "Users with access",
+    "password": "Password (Optional)",
+    "expiration": "Expiration (Optional)",
+    "existing_links": "Existing Public Links"
   },
   "dropzone": {
     "drag_files": "Drag files here or click to select",

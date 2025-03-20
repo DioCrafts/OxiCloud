@@ -52,6 +52,7 @@ pub trait FileRepository: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> FileRepositoryResult<File>;
     
     /// Saves a file with a specific ID
@@ -63,6 +64,7 @@ pub trait FileRepository: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> FileRepositoryResult<File>;
     
     /// Gets a file by its ID
@@ -70,6 +72,9 @@ pub trait FileRepository: Send + Sync + 'static {
     
     /// Lists files in a folder
     async fn list_files(&self, folder_id: Option<&str>) -> FileRepositoryResult<Vec<File>>;
+    
+    /// Lists files for a specific user
+    async fn list_files_by_user(&self, user_id: &str, folder_id: Option<&str>) -> FileRepositoryResult<Vec<File>>;
     
     /// Deletes a file
     async fn delete_file(&self, id: &str) -> FileRepositoryResult<()>;
@@ -90,4 +95,10 @@ pub trait FileRepository: Send + Sync + 'static {
     
     /// Gets the storage path for a file
     async fn get_file_path(&self, id: &str) -> FileRepositoryResult<StoragePath>;
+    
+    /// Updates the owner of a file
+    async fn update_file_owner(&self, id: &str, user_id: Option<String>) -> FileRepositoryResult<File>;
+    
+    /// Checks if a user has access to a file
+    async fn check_file_access(&self, file_id: &str, user_id: &str) -> FileRepositoryResult<bool>;
 }

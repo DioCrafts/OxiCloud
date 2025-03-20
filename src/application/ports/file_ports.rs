@@ -16,6 +16,7 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 }
 

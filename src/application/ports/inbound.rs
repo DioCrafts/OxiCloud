@@ -2,9 +2,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use chrono::{DateTime, Utc};
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::{CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto};
+use crate::application::dtos::shared_file_dto::{SharedFileDto, UserAccessDto};
+use crate::application::dtos::public_link_dto::{PublicLinkDto, PublicFileAccessDto};
 use crate::common::errors::DomainError;
 
 /// Puerto primario para operaciones de archivos
@@ -17,6 +20,7 @@ pub trait FileUseCase: Send + Sync + 'static {
         folder_id: Option<String>,
         content_type: String,
         content: Vec<u8>,
+        user_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
     
     /// Obtiene un archivo por su ID
@@ -70,8 +74,138 @@ pub trait FolderUseCase: Send + Sync + 'static {
     async fn delete_folder(&self, id: &str) -> Result<(), DomainError>;
 }
 
+/// Puerto primario para operaciones de compartición con usuarios
+#[async_trait]
+pub trait SharedFileUseCase: Send + Sync + 'static {
+    /// Comparte un archivo con un usuario
+    async fn share_file_with_user(
+        &self,
+        file_id: String,
+        owner_id: String,
+        user_id: String,
+        permission: String,
+    ) -> Result<SharedFileDto, DomainError>;
+    
+    /// Actualiza el nivel de permiso de un archivo compartido
+    async fn update_permission(
+        &self,
+        file_id: String,
+        owner_id: String,
+        user_id: String,
+        permission: String,
+    ) -> Result<SharedFileDto, DomainError>;
+    
+    /// Deja de compartir un archivo con un usuario
+    async fn unshare_file(
+        &self,
+        file_id: String,
+        owner_id: String,
+        user_id: String,
+    ) -> Result<(), DomainError>;
+    
+    /// Obtiene todos los archivos compartidos con un usuario
+    async fn get_files_shared_with_user(
+        &self,
+        user_id: String,
+    ) -> Result<Vec<SharedFileDto>, DomainError>;
+    
+    /// Obtiene todos los usuarios con acceso a un archivo
+    async fn get_users_with_access(
+        &self,
+        file_id: String,
+        owner_id: String,
+    ) -> Result<Vec<UserAccessDto>, DomainError>;
+    
+    /// Obtiene todos los archivos que un usuario ha compartido
+    async fn get_files_shared_by_user(
+        &self,
+        owner_id: String,
+    ) -> Result<Vec<SharedFileDto>, DomainError>;
+    
+    /// Verifica si un usuario tiene acceso a un archivo
+    async fn check_user_has_access(
+        &self,
+        file_id: String,
+        user_id: String,
+    ) -> Result<Option<String>, DomainError>;
+}
+
+/// Puerto primario para operaciones con enlaces públicos
+#[async_trait]
+pub trait PublicLinkUseCase: Send + Sync + 'static {
+    /// Crea un nuevo enlace público para un archivo
+    async fn create_public_link(
+        &self,
+        file_id: String,
+        owner_id: String,
+        permission: String,
+        password: Option<String>,
+        expires_at: Option<DateTime<Utc>>,
+    ) -> Result<PublicLinkDto, DomainError>;
+    
+    /// Obtiene información de un enlace público
+    async fn get_public_link(
+        &self,
+        link_id: String,
+        owner_id: Option<String>,
+    ) -> Result<PublicLinkDto, DomainError>;
+    
+    /// Actualiza los permisos de un enlace público
+    async fn update_link_permission(
+        &self,
+        link_id: String,
+        owner_id: String,
+        permission: String,
+    ) -> Result<PublicLinkDto, DomainError>;
+    
+    /// Actualiza la contraseña de un enlace público
+    async fn update_link_password(
+        &self,
+        link_id: String,
+        owner_id: String,
+        password: Option<String>,
+    ) -> Result<PublicLinkDto, DomainError>;
+    
+    /// Actualiza la fecha de caducidad de un enlace público
+    async fn update_link_expiration(
+        &self,
+        link_id: String,
+        owner_id: String,
+        expires_at: Option<DateTime<Utc>>,
+    ) -> Result<PublicLinkDto, DomainError>;
+    
+    /// Elimina un enlace público
+    async fn delete_public_link(
+        &self,
+        link_id: String,
+        owner_id: String,
+    ) -> Result<(), DomainError>;
+    
+    /// Obtiene todos los enlaces públicos para un archivo
+    async fn get_links_for_file(
+        &self,
+        file_id: String,
+        owner_id: String,
+    ) -> Result<Vec<PublicLinkDto>, DomainError>;
+    
+    /// Obtiene todos los enlaces públicos creados por un usuario
+    async fn get_links_by_user(
+        &self,
+        owner_id: String,
+    ) -> Result<Vec<PublicLinkDto>, DomainError>;
+    
+    /// Accede a un archivo a través de un enlace público
+    async fn access_public_file(
+        &self,
+        link_id: String,
+        password: Option<String>,
+    ) -> Result<PublicFileAccessDto, DomainError>;
+}
+
 /// Factory para crear implementaciones de casos de uso
 pub trait UseCaseFactory {
     fn create_file_use_case(&self) -> Arc<dyn FileUseCase>;
     fn create_folder_use_case(&self) -> Arc<dyn FolderUseCase>;
+    fn create_shared_file_use_case(&self) -> Arc<dyn SharedFileUseCase>;
+    fn create_public_link_use_case(&self) -> Arc<dyn PublicLinkUseCase>;
 }
