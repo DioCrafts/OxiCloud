@@ -5,11 +5,14 @@
     align-items: center;
     justify-content: center;
     height: 100vh;
+    width: 100%;
     background-color: #f5f7fa;
 }
 
 .auth-panel {
     width: 400px;
+    max-width: 90%;
+    margin: 0 auto;
     background-color: white;
     border-radius: 10px;
     box-shadow: 0 5px 20px rgba(0,0,0,0.1);

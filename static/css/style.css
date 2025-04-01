@@ -1504,48 +1504,6 @@ header {
     margin-left: 10px;
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 60px;
-        padding: 15px 10px;
-    }
-
-    .app-name, .storage-title, .storage-info {
-        display: none;
-    }
-
-    .nav-item {
-        justify-content: center;
-        padding: 12px 0;
-    }
-
-    .nav-item i {
-        margin-right: 0;
-    }
-
-    .nav-item span {
-        display: none;
-    }
-    
-    /* Responsive styles for shared page */
-    .shared-filters {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    
-    .shared-list thead th:nth-child(4),
-    .shared-list thead th:nth-child(5),
-    .shared-list tbody td:nth-child(4),
-    .shared-list tbody td:nth-child(5) {
-        display: none;
-    }
-    
-    .dialog-content {
-        width: 95%;
-    }
-}
-
 /* Folder selection for move dialog */
 .folder-select-item {
     padding: 8px 10px;
@@ -1638,4 +1596,179 @@ header {
 .btn-danger {
     background-color: #f44336;
     color: white;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 60px;
+        padding: 15px 10px;
+    }
+
+    .app-name, .storage-title, .storage-info {
+        display: none;
+    }
+
+    .nav-item {
+        justify-content: center;
+        padding: 12px 0;
+    }
+
+    .nav-item i {
+        margin-right: 0;
+    }
+
+    .nav-item span {
+        display: none;
+    }
+
+    /* Responsive styles for shared page */
+    .shared-filters {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .shared-list thead th:nth-child(4),
+    .shared-list thead th:nth-child(5),
+    .shared-list tbody td:nth-child(4),
+    .shared-list tbody td:nth-child(5) {
+        display: none;
+    }
+
+    .dialog-content {
+        width: 95%;
+    }
+}
+
+/* Estilos específicos para la página Shared */
+.page-description {
+    color: #718096;
+    font-size: 16px;
+    margin-top: -15px;
+    margin-bottom: 25px;
+}
+
+/* Mejoras para los filtros en la página Shared */
+.shared-filters {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+    gap: 15px;
+    background-color: white;
+    border-radius: 10px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-group label {
+    font-size: 14px;
+    color: #4a5568;
+    font-weight: 500;
+}
+
+.filter-group select {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background-color: white;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.search-box {
+    display: flex;
+    gap: 10px;
+}
+
+.search-box input {
+    padding: 8px 15px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 250px;
+}
+
+/* Mejoras en la tabla de elementos compartidos */
+.shared-list-container {
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow: hidden;
+    margin-bottom: 25px;
+}
+
+.shared-list {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.shared-list thead th {
+    padding: 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #2d3748;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e6ed;
+}
+
+.shared-list tbody td {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: middle;
+}
+
+/* Estado vacío mejorado */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    text-align: center;
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 20px;
+    color: #ffc107;
+}
+
+.empty-state h3 {
+    font-size: 18px;
+    color: #2d3748;
+    margin-bottom: 10px;
+}
+
+.empty-state p {
+    color: #718096;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.button.primary {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    background-color: #ff5e3a;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    transition: background-color 0.2s;
+}
+
+.button.primary:hover {
+    background-color: #e64a29;
 }
