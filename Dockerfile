@@ -1,37 +1,46 @@
-# Stage 1: Cache dependencies
-FROM rust:1.85-alpine AS cacher
+# Stage 1: Build the application
+FROM rust:1.85-alpine AS builder
+ARG alpine_mirror=""
+ARG cargo_mirror=""
 WORKDIR /app
-RUN apk --no-cache update && \
+RUN if test -n "${alpine_mirror}"; \
+    then \
+        echo "Using alpine mirror ${alpine_mirror}" &&\
+        sed -i "s#https\?://dl-cdn.alpinelinux.org/alpine#${alpine_mirror}#g" /etc/apk/repositories; \
+    fi && \
+    if test -n "${cargo_mirror}"; \
+    then \
+        echo "Using cargo mirror ${cargo_mirror}" && mkdir -p .cargo && \
+        echo -e "[source.crates-io]\nreplace-with = \"mirror\"\n[source.mirror]\nregistry=\"${cargo_mirror}\"" >> .cargo/config.toml; \
+    fi && \
+    apk --no-cache update && \
     apk --no-cache upgrade && \
     apk add --no-cache musl-dev openssl-dev pkgconfig postgresql-dev
 COPY Cargo.toml Cargo.lock ./
 # Create a minimal project to download and cache dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
-    cargo build --release && \
-    rm -rf src target/release/deps/oxicloud*
+    cargo build --release 
 
-# Stage 2: Build the application
-FROM rust:1.85-alpine AS builder
-WORKDIR /app
-RUN apk --no-cache update && \
-    apk --no-cache upgrade && \
-    apk add --no-cache musl-dev openssl-dev pkgconfig postgresql-dev
-# Copy cached dependencies
-COPY --from=cacher /app/target target
-COPY --from=cacher /usr/local/cargo /usr/local/cargo
 # Copy ALL files needed for compilation, including static files
 COPY src src
 COPY static static
 COPY db db
-COPY Cargo.toml Cargo.lock ./
-# Build with all optimizations
-RUN cargo build --release
 
-# Stage 3: Create minimal final image
+# Build with all optimizations
+RUN touch src/main.rs && \
+    cargo build --release
+
+# Stage 2: Create minimal final image
 FROM alpine:3.21.3
+ARG alpine_mirror
 # Install only necessary runtime dependencies and update packages
-RUN apk --no-cache update && \
+RUN if test -n "${alpine_mirror}"; \
+    then \
+        echo "Using alpine mirror ${alpine_mirror}" &&\
+        sed -i "s#https\?://dl-cdn.alpinelinux.org/alpine#${alpine_mirror}#g" /etc/apk/repositories; \
+    fi && \
+    apk --no-cache update && \
     apk --no-cache upgrade && \
     apk add --no-cache libgcc openssl ca-certificates libpq tzdata
 
@@ -42,11 +51,7 @@ COPY --from=builder /app/target/release/oxicloud /usr/local/bin/
 COPY static /app/static
 COPY db /app/db
 
-# Create storage directory with proper permissions
-RUN mkdir -p /app/storage && chmod 777 /app/storage
-
-# Set proper permissions
-RUN chmod +x /usr/local/bin/oxicloud
+VOLUME ["/app/storage"]
 
 # Set working directory
 WORKDIR /app
