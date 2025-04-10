@@ -391,13 +391,34 @@ impl FolderRepository for FolderFsRepository {
         ).await?;
         
         // Ensure ID mapping is persisted - this is critical for later retrieval
-        let save_result = self.id_mapping_service.save_changes().await;
+        // Attempt to save changes and retry if necessary
+        let mut save_result = self.id_mapping_service.save_changes().await;
+        
+        // Si hay un error, intentamos un segundo intento con mensaje explícito
         if let Err(e) = &save_result {
-            tracing::error!("Failed to save ID mapping for folder {}: {}", id, e);
+            tracing::error!("Failed to save ID mapping for folder {}: {} - will retry", id, e);
+            
+            // Esperar un poco antes de reintentar
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            
+            // Reintentar guardado
+            save_result = self.id_mapping_service.save_changes().await;
+            
+            match &save_result {
+                Ok(_) => {
+                    tracing::info!("Successfully saved ID mapping for folder on retry: {} -> path: {} (name: {})", 
+                        id, folder_storage_path.to_string(), name);
+                },
+                Err(e) => {
+                    tracing::error!("Failed to save ID mapping for folder on retry {}: {}", id, e);
+                }
+            }
         } else {
             tracing::info!("Successfully saved ID mapping for folder ID: {} -> path: {} (name: {})", 
                 id, folder_storage_path.to_string(), name);
         }
+        
+        // Propagate error if both attempts failed
         save_result?;
         
         tracing::debug!("Created folder with ID: {}", folder.id());
@@ -610,8 +631,36 @@ impl FolderRepository for FolderFsRepository {
         }
         
         // Persist any new ID mappings that were created
-        if let Err(e) = self.id_mapping_service.save_changes().await {
-            tracing::error!("Failed to save ID mappings: {}", e);
+        if !folders.is_empty() {
+            // Attempt to save changes with retry
+            let mut save_result = self.id_mapping_service.save_changes().await;
+            
+            // Si hay un error, intentamos un segundo intento con mensaje explícito
+            if let Err(e) = &save_result {
+                tracing::error!("Failed to save ID mappings in list_folders: {} - will retry", e);
+                
+                // Esperar un poco antes de reintentar
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                
+                // Reintentar guardado
+                save_result = self.id_mapping_service.save_changes().await;
+                
+                match &save_result {
+                    Ok(_) => {
+                        tracing::info!("Successfully saved ID mappings in list_folders on retry");
+                    },
+                    Err(e) => {
+                        tracing::error!("Failed to save ID mappings in list_folders on retry: {}", e);
+                    }
+                }
+            } else {
+                tracing::info!("Successfully saved ID mappings in list_folders");
+            }
+            
+            // Log error but don't propagate since this is not critical for listing
+            if let Err(e) = save_result {
+                tracing::error!("Failed to save ID mappings after retries: {}", e);
+            }
         }
         
         tracing::info!("Found {} folders in parent {:?}", folders.len(), parent_id);

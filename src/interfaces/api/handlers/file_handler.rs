@@ -87,47 +87,119 @@ impl FileHandler {
         
         tracing::info!("Processing file upload request");
         
-        while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        // More robust multipart field processing
+        let mut field_count = 0;
+        
+        // Process fields until we get None (end of form data)
+        loop {
+            // Handle errors from next_field() explicitly
+            let field_result = match multipart.next_field().await {
+                Ok(maybe_field) => maybe_field,
+                Err(err) => {
+                    tracing::error!("Error reading next multipart field: {}", err);
+                    break;
+                }
+            };
+            
+            // If we got None, we're done processing the form
+            let field = match field_result {
+                Some(field) => field,
+                None => break,
+            };
+            
+            field_count += 1;
             let name = field.name().unwrap_or("").to_string();
-            tracing::info!("Multipart field received: {}", name);
+            tracing::info!("Multipart field #{} received: '{}'", field_count, name);
             
             if name == "file" {
                 let filename = field.file_name().unwrap_or("unnamed").to_string();
                 let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
-                tracing::info!("File received: {} ({})", filename, content_type);
+                tracing::info!("File received: '{}' (type: {})", filename, content_type);
                 
-                let bytes = field.bytes().await.unwrap_or_default();
-                tracing::info!("File size: {} bytes", bytes.len());
-                
-                file_part = Some((filename, content_type, bytes));
+                match field.bytes().await {
+                    Ok(bytes) => {
+                        let size = bytes.len();
+                        tracing::info!("Successfully read file '{}' ({} bytes)", filename, size);
+                        if size == 0 {
+                            tracing::warn!("Warning: File '{}' has zero bytes", filename);
+                        }
+                        file_part = Some((filename, content_type, bytes));
+                    },
+                    Err(e) => {
+                        tracing::error!("Failed to read file bytes: {}", e);
+                    }
+                }
             } else if name == "folder_id" {
-                let folder_id_value = field.text().await.unwrap_or_default();
-                tracing::info!("folder_id received: {}", folder_id_value);
-                
-                if !folder_id_value.is_empty() {
-                    folder_id = Some(folder_id_value);
+                match field.text().await {
+                    Ok(folder_id_value) => {
+                        tracing::info!("folder_id received: '{}'", folder_id_value);
+                        
+                        if !folder_id_value.is_empty() {
+                            folder_id = Some(folder_id_value);
+                            tracing::info!("Using folder_id: '{}'", folder_id.as_ref().unwrap());
+                        } else {
+                            tracing::info!("Empty folder_id received, will use root folder");
+                        }
+                    },
+                    Err(e) => {
+                        tracing::error!("Failed to read folder_id: {}", e);
+                    }
+                }
+            } else {
+                tracing::warn!("Received unknown field: '{}'", name);
+                match field.text().await {
+                    Ok(value) => tracing::debug!("Field '{}' value: '{}'", name, value),
+                    Err(_) => tracing::debug!("Could not read field '{}' as text", name)
                 }
             }
         }
         
+        tracing::info!("Multipart processing completed. Got {} fields total", field_count);
+        
         // Check if file was provided
         if let Some((filename, content_type, data)) = file_part {
-            tracing::info!("Uploading file '{}' to folder_id: {:?}", filename, folder_id);
+            tracing::info!("Preparing to upload file '{}' ({} bytes) to folder_id: {:?}", 
+                filename, data.len(), folder_id);
             
             // Use the proper file service to handle the upload
-            match service.upload_file_from_bytes(filename.clone(), folder_id.clone(), content_type.clone(), data.to_vec()).await {
+            let upload_result = service
+                .upload_file_from_bytes(filename.clone(), folder_id.clone(), content_type.clone(), data.to_vec())
+                .await;
+                
+            match upload_result {
                 Ok(file) => {
-                    tracing::info!("File uploaded successfully: {} (ID: {})", filename, file.id);
+                    tracing::info!("File uploaded successfully: '{}' (ID: {})", filename, file.id);
                     
                     // Log additional debugging information
                     tracing::info!("Created file details: folder_id={:?}, size={}, path={}",
                         file.folder_id, file.size, file.path);
+                    
+                    // Log folder ID information if present
+                    if let Some(folder_id) = &file.folder_id {
+                        tracing::info!("Archivo guardado en carpeta ID: {}", folder_id);
+                    }
                     
                     // Return success response with file information
                     (StatusCode::CREATED, Json(file)).into_response()
                 },
                 Err(err) => {
                     tracing::error!("Error uploading file '{}' through service: {}", filename, err);
+                    
+                    // Additional error details
+                    match &err {
+                        FileServiceError::NotFound(id) => {
+                            tracing::error!("Not found error detail: {}", id);
+                        },
+                        FileServiceError::AccessError(msg) => {
+                            tracing::error!("Access error detail: {}", msg);
+                        },
+                        FileServiceError::InternalError(msg) => {
+                            tracing::error!("Internal error detail: {}", msg);
+                        },
+                        _ => {
+                            tracing::error!("Other error type: {:?}", err);
+                        }
+                    };
                     
                     // Return error response
                     let status = match &err {
@@ -137,15 +209,17 @@ impl FileHandler {
                     };
                     
                     (status, Json(serde_json::json!({
-                        "error": format!("Error uploading file: {}", err)
+                        "error": format!("Error uploading file: {}", err),
+                        "error_type": format!("{:?}", err)
                     }))).into_response()
                 }
             }
         } else {
-            tracing::error!("Error: No file provided in request");
+            tracing::error!("Error: No file provided in request or file processing failed");
             
             (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-                "error": "No file provided"
+                "error": "No file provided or file processing failed",
+                "fields_received": field_count
             }))).into_response()
         }
     }

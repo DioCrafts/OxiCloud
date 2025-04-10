@@ -66,7 +66,16 @@ function initApp() {
         try {
             // Create inline viewer if not already created and if the class exists
             if (typeof InlineViewer !== 'undefined') {
-                window.inlineViewer = new InlineViewer();
+                // Wait for the DOM to be fully ready before initializing
+                if (document.readyState === 'complete') {
+                    window.inlineViewer = new InlineViewer();
+                } else {
+                    // If DOM is not ready, wait for it
+                    console.log('DOM not ready, will initialize viewer when ready');
+                    document.addEventListener('DOMContentLoaded', () => {
+                        window.inlineViewer = new InlineViewer();
+                    });
+                }
             } else {
                 console.warn('InlineViewer class is not defined, skipping initialization');
             }
@@ -485,7 +494,9 @@ async function loadFiles() {
         });
         
         // Add filtered folders to the view
+        console.log(`Displaying ${visibleFolders.length} folders in the current view`);
         visibleFolders.forEach(folder => {
+            console.log(`Adding folder to view: ${folder.name} (${folder.id})`);
             ui.addFolderToView(folder);
         });
         
@@ -514,8 +525,17 @@ async function loadFiles() {
                 const fileList = Array.isArray(files) ? files : [];
                 console.log(`Processing ${fileList.length} files`);
                 
+                console.log(`Procesando ${fileList.length} archivos en la carpeta actual (ID: ${app.currentPath || 'raíz'})`);
                 fileList.forEach(file => {
-                    console.log(`Adding file to view: ${file.name} (${file.id})`);
+                    console.log(`Añadiendo archivo a la vista: ${file.name} (ID: ${file.id})`);
+                    console.log(`  - Detalles: tamaño=${file.size}, mime=${file.mime_type}, path=${file.path}`);
+                    
+                    // Verificar que esté en la carpeta correcta
+                    if (file.folder_id !== app.currentPath && app.currentPath && file.folder_id) {
+                        console.warn(`¡ADVERTENCIA! El archivo ${file.name} tiene folder_id=${file.folder_id} pero estamos mostrando la carpeta ${app.currentPath}`);
+                    }
+                    
+                    // Añadir a la vista
                     ui.addFileToView(file);
                 });
             } else {

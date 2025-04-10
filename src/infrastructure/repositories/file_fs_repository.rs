@@ -862,14 +862,31 @@ impl FileRepository for FileFsRepository {
             Some(modified_at),
         ).await?;
         
-        // Ensure ID mapping is persisted - this is critical for later retrieval
-        let save_result = self.id_mapping_service.save_changes().await;
-        if let Err(e) = &save_result {
-            tracing::error!("Failed to save ID mapping for file {}: {}", id, e);
+        // Ensure ID mapping is persisted immediately - this is critical for later retrieval
+        tracing::info!("Saving ID mapping for file immediately: {} -> path: {}", id, path_string);
+        
+        // Perform sync save without delays 
+        if let Err(e) = self.id_mapping_service.save_changes().await {
+            // En caso de error, intentamos inmediatamente un segundo intento
+            tracing::error!("Failed to save ID mapping for file {}: {} - trying immediately again", id, e);
+            
+            // Inmediatamente reintentar guardado sin esperar
+            let retry_result = self.id_mapping_service.save_changes().await;
+            
+            // Log result of retry but don't wait
+            match &retry_result {
+                Ok(_) => {
+                    tracing::info!("Successfully saved ID mapping for file on retry: {} -> path: {}", 
+                        id, path_string);
+                },
+                Err(e) => {
+                    tracing::error!("Failed to save ID mapping for file on retry {}: {} - proceeding anyway", id, e);
+                    // Continue anyway to avoid blocking the request
+                }
+            }
         } else {
             tracing::info!("Successfully saved ID mapping for file ID: {} -> path: {}", id, path_string);
         }
-        save_result?;
         
         // Invalidate any directory cache entries for the parent folders
         // to ensure directory listings show the new file
@@ -1156,7 +1173,36 @@ impl FileRepository for FileFsRepository {
         };
         
         // Get the absolute folder path
-        let abs_folder_path = self.resolve_storage_path(&folder_storage_path);
+        let mut abs_folder_path = self.resolve_storage_path(&folder_storage_path);
+        
+        // Fix potential double path issue or similar path problems
+        let abs_path_str = abs_folder_path.to_string_lossy().to_string();
+        
+        // Fix potential double storage path
+        if abs_path_str.contains("./storage/./storage") {
+            // Correct the path by removing the duplicate
+            let corrected_path = abs_path_str.replace("./storage/./storage", "./storage");
+            tracing::warn!("Fixed double storage path: {} -> {}", abs_path_str, corrected_path);
+            abs_folder_path = PathBuf::from(corrected_path);
+        }
+        
+        // Fix redundant path components (e.g., double slashes)
+        if abs_path_str.contains("//") || abs_path_str.contains("/./") {
+            // Normalize the path
+            let path_buf = if let Ok(canonical) = std::fs::canonicalize(&abs_folder_path) {
+                canonical
+            } else {
+                // Fall back to a string replacement approach if canonicalize fails
+                let normalized = abs_path_str
+                    .replace("//", "/")
+                    .replace("/./", "/");
+                PathBuf::from(normalized)
+            };
+            
+            tracing::warn!("Normalized path: {} -> {}", abs_path_str, path_buf.display());
+            abs_folder_path = path_buf;
+        }
+        
         tracing::info!("Absolute folder path: {:?}", abs_folder_path);
         
         // Check if the directory exists
@@ -1254,8 +1300,34 @@ impl FileRepository for FileFsRepository {
         
         // Persist any new ID mappings that were created
         if !files_result.is_empty() {
-            if let Err(e) = self.id_mapping_service.save_changes().await {
-                tracing::error!("Error saving ID mappings: {}", e);
+            // Attempt to save changes with retry
+            let mut save_result = self.id_mapping_service.save_changes().await;
+            
+            // Si hay un error, intentamos un segundo intento con mensaje explícito
+            if let Err(e) = &save_result {
+                tracing::error!("Failed to save ID mappings in list_files: {} - will retry", e);
+                
+                // Esperar un poco antes de reintentar
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                
+                // Reintentar guardado
+                save_result = self.id_mapping_service.save_changes().await;
+                
+                match &save_result {
+                    Ok(_) => {
+                        tracing::info!("Successfully saved ID mappings in list_files on retry");
+                    },
+                    Err(e) => {
+                        tracing::error!("Failed to save ID mappings in list_files on retry: {}", e);
+                    }
+                }
+            } else {
+                tracing::info!("Successfully saved ID mappings in list_files");
+            }
+            
+            // Log error but don't propagate since this is not critical for listing
+            if let Err(e) = save_result {
+                tracing::error!("Failed to save ID mappings after retries: {}", e);
             }
         }
         

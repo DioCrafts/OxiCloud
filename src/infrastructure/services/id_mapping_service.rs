@@ -169,13 +169,59 @@ impl IdMappingService {
             }
         }
         
-        // Devolver un mapa vacío si el archivo no existe y crear el archivo
-        tracing::info!("No existing ID map found, creating new empty map");
-        let empty_map = IdMap {
+        // Si estamos cargando el mapa de carpetas, asegurarnos de que la carpeta de usuario esté mapeada
+        let is_folder_map = map_path.to_string_lossy().contains("folder_ids.json");
+        let mut empty_map = IdMap {
             path_to_id: HashMap::new(),
             id_to_path: HashMap::new(),
             version: 1, // Iniciar con versión 1
         };
+        
+        // Inicializar automáticamente con la carpeta del usuario si es el mapa de carpetas
+        if is_folder_map {
+            // Obtener el usuario actual del sistema
+            tracing::info!("Initializing folder map for user");
+            
+            // Usar el hostname o un nombre predeterminado, evitando referencias específicas a usuarios
+            let username = match std::env::var("HOSTNAME") {
+                Ok(name) => name,
+                Err(_) => {
+                    // Generar un nombre basado en la fecha/hora para ser único pero consistente
+                    let current_time = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
+                    
+                    format!("oxicloud_{}", current_time % 10000)
+                }
+            };
+            
+            tracing::info!("Detected username: {}", username);
+            
+            // Crear una carpeta de usuario predeterminada con un ID generado con uuid
+            let user_folder_name = format!("Mi Carpeta - {}", username);
+            let user_folder_path = format!("/{}", user_folder_name);
+            let user_folder_id = Uuid::new_v4().to_string();
+            
+            // Añadir el mapeo para la carpeta del usuario
+            empty_map.path_to_id.insert(user_folder_path.clone(), user_folder_id.clone());
+            empty_map.id_to_path.insert(user_folder_id, user_folder_path);
+            
+            tracing::info!("Added default user folder mapping for '{}' to ID map", user_folder_name);
+            
+            // Asegurar que la carpeta física exista en el sistema de archivos
+            if let Some(parent_dir) = map_path.parent() {
+                let storage_path = parent_dir.to_path_buf();
+                let user_folder_path = storage_path.join(user_folder_name);
+                
+                tracing::info!("Creating user folder at {}", user_folder_path.display());
+                if let Err(e) = fs::create_dir_all(&user_folder_path).await {
+                    tracing::error!("Failed to create user folder: {}", e);
+                }
+            }
+        }
+        
+        tracing::info!("No existing ID map found, creating new map with {} entries", empty_map.path_to_id.len());
         
         // Ensure directory exists
         if let Some(parent) = map_path.parent() {
@@ -224,7 +270,7 @@ impl IdMappingService {
             let pending = *self.pending_save.read().await;
             if pending {
                 map.version += 1;
-                tracing::debug!("Incrementing ID map version to {}", map.version);
+                tracing::info!("Incrementing ID map version to {} for {}", map.version, self.map_path.display());
             }
             
             // Use serde with reasonably safe defaults
@@ -232,23 +278,154 @@ impl IdMappingService {
                 .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to serialize ID map to JSON: {}", e)))?
         };
         
-        // Escribir a un archivo temporal primero para evitar corrupción
-        let temp_path = self.map_path.with_extension("json.tmp");
-        fs::write(&temp_path, &json).await
-            .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to write temporary ID map to {}: {}", temp_path.display(), e)))?;
+        tracing::info!("Saving ID map with length {} bytes to {}", json.len(), self.map_path.display());
         
-        // Realizar el rename atómico
-        fs::rename(&temp_path, &self.map_path).await
-            .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to rename temporary ID map to {}: {}", self.map_path.display(), e)))?;
+        // Enfoque más robusto: intentar guardar directamente si hay problemas con archivos temporales
+        // Intentar primero con archivo temporal
+        let temp_filename = format!("{}.{}.tmp", Uuid::new_v4(), std::process::id());
+        let temp_path = if let Some(parent) = self.map_path.parent() {
+            parent.join(temp_filename)
+        } else {
+            PathBuf::from(temp_filename)
+        };
         
-        // Resetear flag de pendientes
-        {
-            let mut pending = self.pending_save.write().await;
-            *pending = false;
+        // Asegurarse de que el directorio padre exista
+        if let Some(parent) = self.map_path.parent() {
+            if !parent.exists() {
+                if let Err(e) = fs::create_dir_all(parent).await {
+                    tracing::warn!("Failed to create parent directory for ID map: {}", e);
+                }
+            }
         }
         
-        tracing::info!("Saved ID map successfully to {}", self.map_path.display());
-        Ok(())
+        // Intentar escribir al archivo temporal
+        tracing::debug!("Writing temporary ID map to {}", temp_path.display());
+        let temp_write_result = fs::write(&temp_path, &json).await;
+        
+        if let Err(e) = &temp_write_result {
+            tracing::warn!("Failed to write temporary ID map to {}: {}. Will try direct write.", temp_path.display(), e);
+            
+            // Si falla, intentar escritura directa
+            let direct_write_result = fs::write(&self.map_path, &json).await
+                .map_err(|e| DomainError::internal_error("IdMapping", 
+                    format!("Failed to write ID map directly to {}: {}", self.map_path.display(), e)));
+                    
+            // Explícitamente sincronizamos el directorio para garantizar que los cambios se escriban en disco
+            if direct_write_result.is_ok() {
+                // Intentar sincronizar el directorio si es posible
+                if let Some(parent) = self.map_path.parent() {
+                    // Clonamos el path para evitar problemas de borrowing
+                    let parent_path = parent.to_path_buf();
+                    
+                    // Solo podemos hacer esto en sistemas Unix/Linux
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::FileExt;
+                        // Esto debe ejecutarse en un bloque blocking para evitar bloquear el runtime de tokio
+                        match tokio::task::spawn_blocking(move || {
+                            if let Ok(dir) = std::fs::File::open(&parent_path) {
+                                if let Err(e) = dir.sync_all() {
+                                    tracing::warn!("Failed to fsync directory after writing ID map: {}", e);
+                                } else {
+                                    tracing::debug!("Successfully synced directory after direct write");
+                                }
+                            }
+                        }).await {
+                            Ok(_) => {},
+                            Err(e) => tracing::warn!("Failed to run fsync task: {}", e),
+                        }
+                    }
+                }
+            }
+            
+            return direct_write_result;
+        }
+        
+        // Intentar el rename atómico
+        tracing::debug!("Renaming temporary file {} to {}", temp_path.display(), self.map_path.display());
+        let result = match fs::rename(&temp_path, &self.map_path).await {
+            Ok(_) => {
+                // Éxito con el método atómico
+                tracing::info!("Successfully renamed temporary ID map to {}", self.map_path.display());
+                
+                // Intentar sincronizar el directorio si es posible
+                if let Some(parent) = self.map_path.parent() {
+                    // Clonamos el path para evitar problemas de borrowing
+                    let parent_path = parent.to_path_buf();
+                    
+                    // Solo podemos hacer esto en sistemas Unix/Linux
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::FileExt;
+                        // Esto debe ejecutarse en un bloque blocking para evitar bloquear el runtime de tokio
+                        match tokio::task::spawn_blocking(move || {
+                            if let Ok(dir) = std::fs::File::open(&parent_path) {
+                                if let Err(e) = dir.sync_all() {
+                                    tracing::warn!("Failed to fsync directory after renaming ID map: {}", e);
+                                } else {
+                                    tracing::debug!("Successfully synced directory after rename");
+                                }
+                            }
+                        }).await {
+                            Ok(_) => {},
+                            Err(e) => tracing::warn!("Failed to run fsync task: {}", e),
+                        }
+                    }
+                }
+                
+                Ok(())
+            },
+            Err(e) => {
+                tracing::warn!("Failed to rename temporary ID map to {}: {}. Will try direct write.", self.map_path.display(), e);
+                
+                // Intentar eliminar el archivo temporal fallido
+                let _ = fs::remove_file(&temp_path).await;
+                
+                // Si falla el rename, intentar escritura directa
+                let direct_write_result = fs::write(&self.map_path, &json).await
+                    .map_err(|e| DomainError::internal_error("IdMapping", 
+                        format!("Failed to write ID map directly to {}: {}", self.map_path.display(), e)));
+                
+                // Intentar sincronizar el directorio si la escritura directa tuvo éxito    
+                if direct_write_result.is_ok() {
+                    // Intentar sincronizar el directorio si es posible
+                    if let Some(parent) = self.map_path.parent() {
+                        // Clonamos el path para evitar problemas de borrowing
+                        let parent_path = parent.to_path_buf();
+                        
+                        // Solo podemos hacer esto en sistemas Unix/Linux
+                        #[cfg(unix)]
+                        {
+                            use std::os::unix::fs::FileExt;
+                            // Esto debe ejecutarse en un bloque blocking para evitar bloquear el runtime de tokio
+                            match tokio::task::spawn_blocking(move || {
+                                if let Ok(dir) = std::fs::File::open(&parent_path) {
+                                    if let Err(e) = dir.sync_all() {
+                                        tracing::warn!("Failed to fsync directory after direct write of ID map: {}", e);
+                                    } else {
+                                        tracing::debug!("Successfully synced directory after direct write fallback");
+                                    }
+                                }
+                            }).await {
+                                Ok(_) => {},
+                                Err(e) => tracing::warn!("Failed to run fsync task: {}", e),
+                            }
+                        }
+                    }
+                }
+                
+                direct_write_result
+            }
+        };
+        
+        // Resetear flag de pendientes independientemente del resultado
+        if result.is_ok() {
+            let mut pending = self.pending_save.write().await;
+            *pending = false;
+            tracing::info!("Reset pending save flag after successful save to {}", self.map_path.display());
+        }
+        
+        result
     }
     
     /// Genera un ID único
@@ -391,28 +568,55 @@ impl IdMappingService {
     
     /// Guarda cambios pendientes al disco
     pub async fn save_pending_changes(&self) -> Result<(), IdMappingError> {
-        // Verificar si hay cambios pendientes
+        // Verificar si hay cambios pendientes - rápido check sin esperar
         {
             let pending = self.pending_save.read().await;
             if !*pending {
+                tracing::debug!("No pending changes to save for ID map: {}", self.map_path.display());
                 return Ok(());
             }
         }
         
-        // Implementar debounce para agrupación de guardados
+        // Guardar inmediatamente de forma síncrona
+        tracing::info!("Saving ID map changes immediately for: {}", self.map_path.display());
+        
+        // Guardar directamente con manejo rápido de errores
+        let save_result = self.save_id_map().await;
+        if let Err(ref e) = save_result {
+            tracing::error!("Failed to save ID map to {}: {}", self.map_path.display(), e);
+        } else {
+            tracing::info!("ID map changes saved successfully for: {}", self.map_path.display());
+        }
+        
+        // Lanzar guardado asíncrono en background sin esperar
         let map_path = self.map_path.clone();
         let self_clone = self.clone();
         
         tokio::spawn(async move {
-            // Esperar un poco para permitir la agrupación de operaciones
-            time::sleep(Duration::from_millis(SAVE_DEBOUNCE_MS)).await;
+            // Verificar si hay nuevos cambios pendientes periodicamente sin bloquear
+            time::sleep(Duration::from_millis(SAVE_DEBOUNCE_MS/2)).await;
             
-            if let Err(e) = self_clone.save_id_map().await {
-                tracing::error!("Failed to save ID map to {}: {}", map_path.display(), e);
+            // Verificar si todavía hay cambios pendientes
+            let pending = self_clone.pending_save.read().await;
+            if *pending {
+                tracing::debug!("Background check: still have pending changes, saving in background: {}", map_path.display());
+                if let Err(e) = self_clone.save_id_map().await {
+                    tracing::warn!("Background save failed for ID map {}: {}", map_path.display(), e);
+                } else {
+                    tracing::debug!("Background save completed successfully for {}", map_path.display());
+                }
             }
         });
         
-        Ok(())
+        // Devolver el resultado del guardado principal sin esperar por el asíncrono
+        // Convertir el tipo de resultado para coincidir con la firma del método
+        match save_result {
+            Ok(()) => Ok(()),
+            Err(e) => Err(IdMappingError::IoError(std::io::Error::new(
+                std::io::ErrorKind::Other, 
+                format!("Failed to save ID map: {}", e)
+            )))
+        }
     }
 }
 

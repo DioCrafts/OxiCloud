@@ -239,7 +239,9 @@ pub fn create_api_routes(
                 }
             }
         }))
+        // Multiple upload endpoints to ensure backward compatibility
         .route("/upload", post(FileHandler::upload_file))
+        .route("/", post(FileHandler::upload_file)) // Allow POST directly to /api/files
         .route("/{id}", get(FileHandler::download_file))
         .with_state(file_service.clone());
     

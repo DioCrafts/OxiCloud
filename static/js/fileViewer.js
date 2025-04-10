@@ -73,19 +73,33 @@ class FileViewer {
     viewerContent.appendChild(toolbar);
     this.viewerContainer.appendChild(viewerContent);
     
-    // Add to the document
+    // Store the created container as a class property so we can add it later if needed
+    this._preparedContainer = this.viewerContainer;
+    
+    // Add to the document if body is available, otherwise set up a listener
     if (document.body) {
       console.log('Adding viewer container to body');
       document.body.appendChild(this.viewerContainer);
     } else {
       console.warn('Document body not ready, will add viewer later');
-      // Try to add it after document is ready
-      setTimeout(() => {
+      
+      // Set up a MutationObserver to detect when body becomes available
+      const observer = new MutationObserver((mutations, obs) => {
         if (document.body) {
-          console.log('Adding viewer container to body (delayed)');
-          document.body.appendChild(this.viewerContainer);
-        } else {
-          console.error('Document body still not available after delay');
+          console.log('Body detected, adding viewer container');
+          document.body.appendChild(this._preparedContainer);
+          obs.disconnect(); // Stop observing once we've added the container
+        }
+      });
+      
+      // Observe changes to the document to detect when body is added
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      
+      // Also set a fallback timeout
+      setTimeout(() => {
+        if (document.body && !document.getElementById('file-viewer-container')) {
+          console.log('Adding viewer container to body (via timeout)');
+          document.body.appendChild(this._preparedContainer);
         }
       }, 500);
     }

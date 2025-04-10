@@ -37,10 +37,33 @@ class InlineViewer {
       </div>
     `;
     
-    // Add to document
-    document.body.appendChild(modal);
+    // Check if document.body exists before appending
+    if (document.body) {
+      document.body.appendChild(modal);
+    } else {
+      console.warn('Document body not ready, waiting to append viewer');
+      // Try to add it after a short delay
+      setTimeout(() => {
+        if (document.body) {
+          document.body.appendChild(modal);
+          
+          // Re-add event listeners since we're appending the modal late
+          this.setupEventListeners(modal);
+        } else {
+          console.error('Document body still not available after delay');
+        }
+      }, 100);
+      return; // Exit the function to avoid adding event listeners to a non-existent modal
+    }
     
     // Add event listeners
+    this.setupEventListeners(modal);
+    
+    console.log('Inline viewer initialized');
+  }
+  
+  // Separate method for event listeners so they can be re-added if needed
+  setupEventListeners(modal) {
     modal.querySelector('.inline-viewer-close').addEventListener('click', () => {
       this.closeViewer();
     });
@@ -77,8 +100,6 @@ class InlineViewer {
         this.closeViewer();
       }
     });
-    
-    console.log('Inline viewer initialized');
   }
   
   openFile(file) {

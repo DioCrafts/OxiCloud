@@ -1,5 +1,9 @@
 {
-  "path_to_id": {},
-  "id_to_path": {},
-  "version": 0
+  "path_to_id": {
+    "/Mi Carpeta - torrefacto": "69c84d28-5c99-4263-94e0-e18e391204a0"
+  },
+  "id_to_path": {
+    "69c84d28-5c99-4263-94e0-e18e391204a0": "/Mi Carpeta - torrefacto"
+  },
+  "version": 1
 }

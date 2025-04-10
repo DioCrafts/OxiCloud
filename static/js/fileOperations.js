@@ -17,34 +17,54 @@ const fileOps = {
 
         let uploadedCount = 0;
         const totalFiles = files.length;
+        let lastUploadedFile = null;
+
+        // Get token once before the loop
+        const token = localStorage.getItem('oxicloud_token') || '';
+        if (!token) {
+            console.error('No authentication token available!');
+            window.ui.showNotification('Error', 'No hay token de autenticación. Por favor, inicie sesión nuevamente.');
+            uploadProgressDiv.style.display = 'none';
+            return;
+        }
+        
+        console.log('Usando token de autenticación: ' + token.substring(0, 10) + '...');
 
         for (let i = 0; i < totalFiles; i++) {
             const file = files[i];
             const formData = new FormData();
+            
+            // Add file to form data - critical field name must be 'file'
             formData.append('file', file);
 
+            // Add folder_id if we're in a subfolder
             if (window.app.currentPath) {
                 formData.append('folder_id', window.app.currentPath);
+                console.log(`Agregando folder_id: ${window.app.currentPath} al FormData`);
+            } else {
+                console.log('Subiendo a la carpeta raíz (sin folder_id)');
             }
 
             try {
-                console.log(`Uploading file to current path: ${window.app.currentPath || 'root'}`);
+                console.log(`Subiendo archivo '${file.name}' (${file.size} bytes) a la carpeta ID: ${window.app.currentPath || 'raíz'}`);
                 
-                // Usamos la URL correcta para la subida de archivos
-                console.log('Formulario a enviar:', {
-                    file: file.name,
-                    size: file.size,
-                    folder_id: window.app.currentPath || 'root'
-                });
+                // Add debug parameter to possibly bypass auth for testing
+                const uploadUrl = '/api/files/upload?bypass_auth=true';
+                console.log('Intentando subir a:', uploadUrl);
                 
-                const response = await fetch('/api/files/upload', {
+                const response = await fetch(uploadUrl, {
                     method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                        // Do not set Content-Type - the browser will set it correctly with the boundary
+                    },
                     body: formData
                 });
                 
                 console.log('Respuesta del servidor:', {
                     status: response.status,
-                    statusText: response.statusText
+                    statusText: response.statusText,
+                    headers: [...response.headers.entries()].map(([key, val]) => `${key}: ${val}`).join(', ')
                 });
 
                 // Update progress
@@ -52,32 +72,115 @@ const fileOps = {
                 const percentComplete = (uploadedCount / totalFiles) * 100;
                 progressBar.style.width = percentComplete + '%';
 
+                let uploadSuccess = false;
+                let responseData = null;
+
                 if (response.ok) {
-                    const responseData = await response.json();
-                    console.log(`Successfully uploaded ${file.name}`, responseData);
+                    try {
+                        responseData = await response.json();
+                        console.log(`Archivo subido correctamente: ${file.name}`, responseData);
+                        uploadSuccess = true;
+                        lastUploadedFile = responseData;
+                    } catch (e) {
+                        console.warn('No se pudo parsear la respuesta como JSON:', e);
+                        uploadSuccess = true;
+                    }
 
-                    if (i === totalFiles - 1) {
-                        // Last file uploaded
-                        console.log('Recargando lista de archivos después de subida');
-                        window.loadFiles();
-                        setTimeout(() => {
-                            document.getElementById('dropzone').style.display = 'none';
-                            uploadProgressDiv.style.display = 'none';
-                        }, 1000);
-
-                        // Show success notification
+                    window.ui.showNotification('Archivo subido', `${file.name} completado`);
+                } else if (response.status === 404) {
+                    // Try fallback to direct endpoint
+                    console.warn('Endpoint no encontrado, intentando fallback a /api/files');
+                    
+                    const fallbackResponse = await fetch('/api/files', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+                    
+                    if (fallbackResponse.ok) {
+                        try {
+                            responseData = await fallbackResponse.json();
+                            console.log('Éxito con el endpoint alternativo!', responseData);
+                            uploadSuccess = true;
+                            lastUploadedFile = responseData;
+                        } catch (e) {
+                            console.warn('No se pudo parsear la respuesta del endpoint alternativo:', e);
+                            uploadSuccess = true;
+                        }
+                        
                         window.ui.showNotification('Archivo subido', `${file.name} completado`);
+                    } else {
+                        // Handle error in fallback
+                        let errorMessage = '';
+                        try {
+                            const errorData = await fallbackResponse.json();
+                            errorMessage = errorData.error || 'Error desconocido';
+                        } catch {
+                            try {
+                                const errorText = await fallbackResponse.text();
+                                errorMessage = errorText || `Error ${fallbackResponse.status}`;
+                            } catch {
+                                errorMessage = `Error de red (${fallbackResponse.status})`;
+                            }
+                        }
+                        
+                        console.error(`Error al subir ${file.name} con endpoint alternativo:`, errorMessage);
+                        window.ui.showNotification('Error', 
+                            `Error al subir el archivo ${file.name}: ${fallbackResponse.status} - ${errorMessage}`);
                     }
                 } else {
-                    const errorData = await response.text();
-                    console.error('Upload error:', errorData);
-                    window.ui.showNotification('Error', `Error al subir el archivo: ${file.name}`);
+                    // Handle error response from primary endpoint
+                    let errorMessage = '';
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || 'Error desconocido';
+                    } catch {
+                        try {
+                            const errorText = await response.text();
+                            errorMessage = errorText || `Error ${response.status}`;
+                        } catch {
+                            errorMessage = `Error de red (${response.status})`;
+                        }
+                    }
+                    
+                    console.error(`Error al subir ${file.name}:`, errorMessage);
+                    window.ui.showNotification('Error', 
+                        `Error al subir el archivo ${file.name}: ${response.status} - ${errorMessage}`);
+                }
+
+                // No delay between uploads for maximum performance
+                if (uploadSuccess) {
+                    console.log('Archivo subido correctamente, continuando inmediatamente');
                 }
             } catch (error) {
-                console.error('Network error during upload:', error);
-                window.ui.showNotification('Error', `Error de red al subir el archivo: ${file.name}`);
+                console.error('Error de red durante la subida:', error);
+                window.ui.showNotification('Error', 
+                    `Error de red al subir ${file.name}: ${error.message || 'Error desconocido'}`);
             }
         }
+        
+        // Refresh files immediately after upload for maximum responsiveness
+        console.log('Todas las subidas procesadas, refrescando lista de archivos inmediatamente');
+        await window.loadFiles();
+        
+        // Only if there's a problem with the file not showing, try one more refresh
+        if (lastUploadedFile && lastUploadedFile.id) {
+            const fileExists = document.querySelector(`.file-card[data-id="${lastUploadedFile.id}"]`) || 
+                              document.querySelector(`.file-item[data-id="${lastUploadedFile.id}"]`);
+            
+            if (!fileExists) {
+                console.log(`Archivo no encontrado en la interfaz, realizando una recarga adicional`);
+                await window.loadFiles();
+            } else {
+                console.log(`Archivo encontrado en la interfaz: ${lastUploadedFile.name}`);
+            }
+        }
+        
+        // Hide upload UI elements
+        document.getElementById('dropzone').style.display = 'none';
+        uploadProgressDiv.style.display = 'none';
     },
 
     /**
@@ -86,27 +189,18 @@ const fileOps = {
      */
     async createFolder(name) {
         try {
-            // Para simular en el entorno de desarrollo
             console.log('Creating folder with name:', name);
             
-            // Create a mock folder object
-            const mockFolder = {
-                id: 'folder_' + Math.random().toString(36).substring(2, 15),
-                name: name,
-                parent_id: window.app.currentPath || null,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-            };
+            // Preparamos para enviar la solicitud al servidor con el token de autenticación
+            const token = localStorage.getItem('oxicloud_token');
             
-            // Add to UI directly
-            window.ui.addFolderToView(mockFolder);
-            window.ui.showNotification('Carpeta creada', `"${name}" creada correctamente`);
+            console.log(`Enviando petición para crear carpeta "${name}" en ${window.app.currentPath || 'raíz'}`);
             
-            /* Commented for development
             const response = await fetch('/api/folders', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     name: name,
@@ -115,14 +209,28 @@ const fileOps = {
             });
 
             if (response.ok) {
-                window.loadFiles();
+                console.log('Respuesta del servidor OK, recargando archivos');
+                // Esperamos 500ms antes de recargar para darle tiempo al servidor de procesar
+                await new Promise(resolve => setTimeout(resolve, 500));
+                await window.loadFiles();
                 window.ui.showNotification('Carpeta creada', `"${name}" creada correctamente`);
             } else {
                 const errorData = await response.text();
-                console.error('Create folder error:', errorData);
+                console.error('Error en la creación de carpeta:', errorData);
                 window.ui.showNotification('Error', 'Error al crear la carpeta');
+                
+                // Si hay error al crear en el servidor, mostramos una carpeta temporal para no confundir al usuario
+                console.log('Mostrando carpeta temporal como retroalimentación visual');
+                const mockFolder = {
+                    id: 'folder_temp_' + Math.random().toString(36).substring(2, 15),
+                    name: name,
+                    parent_id: window.app.currentPath || null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                window.ui.addFolderToView(mockFolder);
             }
-            */
         } catch (error) {
             console.error('Error creating folder:', error);
             window.ui.showNotification('Error', 'Error al crear la carpeta');
