@@ -4,60 +4,154 @@ name: Docker Hub Release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (optional)'
+        required: false
+        default: '0.1.0-rc1'
 
 jobs:
-  # Build and publish Docker image
-  build-and-push:
-    name: Build and Push Docker Image
+  # Preparar matrices de compilación
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Aumentado a 2 horas para dar más tiempo a la compilación
-    
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      version: ${{ steps.get-version.outputs.version }}
     steps:
-      - name: Checkout code
+      - id: set-matrix
+        run: echo "matrix={\"arch\":[\"amd64\",\"arm64\"]}" >> $GITHUB_OUTPUT
+      
+      - id: get-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+  # Compilar por separado para cada arquitectura
+  build:
+    needs: prepare
+    strategy:
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false
+    runs-on: ${{ matrix.arch == 'arm64' && 'arm64' || 'ubuntu-latest' }}
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Set up Docker Buildx for efficient builds
+      # Configurar Docker
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login to Docker Hub
-      - name: Login to Docker Hub
+      # Login a DockerHub
+      - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for Docker
-      - name: Extract metadata (tags, labels) for Docker
+      # Cargar caché de dependencias de Rust
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ matrix.arch }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-${{ matrix.arch }}-
+      
+      # Extraer metadatos
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/oxicloud
-          # Generate Docker tags based on release tag, commit SHA, and latest
+          flavor: |
+            latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=sha
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/') }}
+            type=raw,value=${{ needs.prepare.outputs.version }}
+            type=raw,value=sha-${{ github.sha }}
 
-      # Build and push Docker image
-      - name: Build and push Docker image
+      # Construir y publicar imagen para esta arquitectura específica
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
+          platforms: linux/${{ matrix.arch }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # Caché eliminado para evitar problemas de expiración de token
-          platforms: linux/amd64,linux/arm64
-          # Build args if needed
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ needs.prepare.outputs.version }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ secrets.DOCKERHUB_USERNAME }}/oxicloud,push-by-digest=true,name-canonical=true
+          
+      # Guardar el digest para el paso de manifiesto
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+          echo ${{ matrix.arch }} > "/tmp/digests/${digest#sha256:}"
+
+      # Subir los digests para el siguiente trabajo
+      - name: Upload digest
+        uses: actions/upload-artifact@v3
+        with:
+          name: digests-${{ matrix.arch }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Crear manifiesto multi-arquitectura
+  merge:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v3
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push manifest lists
+        working-directory: /tmp/digests
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          SHA_TAG="sha-${{ github.sha }}"
+          
+          # Crear la lista de digest para la manifestación
+          DIGEST_ARGS=""
+          for digest_file in $(ls -1); do
+            ARCH=$(cat "$digest_file")
+            DIGEST_ARGS="$DIGEST_ARGS ${{ secrets.DOCKERHUB_USERNAME }}/oxicloud@sha256:$digest_file"
+          done
+          
+          # Crear los manifiestos para version específica y sha
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/oxicloud:${VERSION} ${DIGEST_ARGS}
+          docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/oxicloud:${SHA_TAG} ${DIGEST_ARGS}
+          
+          # Si es una versión de lanzamiento, también etiquetar como latest
+          if [[ "${VERSION}" != *"-"* ]]; then
+            docker buildx imagetools create -t ${{ secrets.DOCKERHUB_USERNAME }}/oxicloud:latest ${DIGEST_ARGS}
+          fi
 
       # Post successful build notification
       - name: Post Success Notification
-        if: success()
         run: |
-          echo "🚢 Docker image for version ${{ github.ref_name }} has been successfully pushed to Docker Hub!"
+          echo "🚢 Docker multi-arch image for version ${{ needs.prepare.outputs.version }} has been successfully pushed to Docker Hub!"

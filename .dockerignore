@@ -1,0 +1,43 @@
+# Archivos y directorios de Git
+.git
+.github
+.gitignore
+
+# Archivos de respaldo y temporales
+**/*.rs.bk
+**/*.swp
+**/*~
+**/._*
+
+# Archivos de configuración de desarrollo
+.vscode/
+.idea/
+.DS_Store
+
+# Directorios de compilación y dependencias
+target/
+**/*.o
+**/*.so
+**/*.out
+
+# Logs y datos de test
+*.log
+tests/
+test-data/
+
+# Documentación específica del desarrollo
+README.md
+CONTRIBUTING.md
+docs/
+doc/images/
+*.md
+!README.md
+
+# Archivos de configuración específicos del entorno
+**/*.env.local
+**/*.env.development
+
+# Evitar copiar Dockerfiles
+Dockerfile*
+docker-compose*
+rootless-compose.yml
