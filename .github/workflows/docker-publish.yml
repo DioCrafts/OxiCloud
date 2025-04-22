@@ -10,6 +10,7 @@ jobs:
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
+    timeout-minutes: 120  # Aumentado a 2 horas para dar más tiempo a la compilación
     
     steps:
       - name: Checkout code
@@ -49,8 +50,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Caché eliminado para evitar problemas de expiración de token
           platforms: linux/amd64,linux/arm64
           # Build args if needed
           build-args: |
