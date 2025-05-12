@@ -7,8 +7,8 @@ COPY Cargo.toml Cargo.lock ./
 # Create a minimal project to download and cache dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
-    cargo build --release && \
-	@@ -13,41 +22,68 @@ RUN mkdir -p src && \
+    cargo build --release 
+
 # Stage 2: Build the application
 FROM rust:1.85-alpine AS builder
 WORKDIR /app
