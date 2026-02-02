@@ -16,39 +16,30 @@ use crate::common::config::AppConfig;
 
 /// Implementación de repositorio para operaciones de lectura de archivos
 pub struct FileFsReadRepository {
-    root_path: PathBuf,
     metadata_manager: Arc<FileMetadataManager>,
     path_resolver: Arc<FilePathResolver>,
-    config: AppConfig,
-    parallel_processor: Option<Arc<ParallelFileProcessor>>,
 }
 
 impl FileFsReadRepository {
     /// Crea un nuevo repositorio de lectura de archivos
     pub fn new(
-        root_path: PathBuf,
+        _root_path: PathBuf,
         metadata_manager: Arc<FileMetadataManager>,
         path_resolver: Arc<FilePathResolver>,
-        config: AppConfig,
-        parallel_processor: Option<Arc<ParallelFileProcessor>>,
+        _config: AppConfig,
+        _parallel_processor: Option<Arc<ParallelFileProcessor>>,
     ) -> Self {
         Self {
-            root_path,
             metadata_manager,
             path_resolver,
-            config,
-            parallel_processor,
         }
     }
     
     /// Crea un stub para pruebas
     pub fn default_stub() -> Self {
         Self {
-            root_path: PathBuf::from("./storage"),
             metadata_manager: Arc::new(FileMetadataManager::default()),
             path_resolver: Arc::new(FilePathResolver::default_stub()),
-            config: AppConfig::default(),
-            parallel_processor: None,
         }
     }
     

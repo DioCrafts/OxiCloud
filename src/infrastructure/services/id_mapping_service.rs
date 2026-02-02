@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 use std::collections::HashMap;
-use std::time::Duration;
 use tokio::sync::{RwLock, Mutex};
 use tokio::fs;
 use tokio::time;
@@ -29,7 +28,6 @@ pub enum IdMappingError {
     SerializationError(#[from] serde_json::Error),
     
     #[error("Other error: {0}")]
-    #[allow(dead_code)]
     Other(String),
 }
 
@@ -68,9 +66,6 @@ struct IdMap {
     id_to_path: HashMap<String, String>, // Campo para búsqueda bidireccional eficiente
     version: u32, // Versión para detectar cambios
 }
-
-/// Constantes para configuración
-const SAVE_DEBOUNCE_MS: u64 = 0; // Sin debounce para garantizar guardado inmediato
 
 /// Servicio para gestionar mapeos entre rutas y IDs únicos
 pub struct IdMappingService {
@@ -490,7 +485,6 @@ impl IdMappingPort for IdMappingService {
 /// Synchronous helper for contexts where we can't use async
 impl IdMappingService {
     /// Create a new service synchronously (only for stubs and initialization)
-    #[allow(dead_code)]
     pub fn new_sync(map_path: PathBuf) -> Self {
         // Create a minimal implementation for initialization purposes
         Self {

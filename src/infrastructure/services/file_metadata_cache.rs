@@ -47,14 +47,12 @@ pub struct FileMetadata {
     /// Ruta absoluta del archivo
     pub path: PathBuf,
     /// Si el archivo existe físicamente
-    #[allow(dead_code)]
     pub exists: bool,
     /// Tipo de entrada (archivo, directorio)
     pub entry_type: CacheEntryType,
     /// Tamaño en bytes (para archivos)
     pub size: Option<u64>,
     /// Tipo MIME (para archivos)
-    #[allow(dead_code)]
     pub mime_type: Option<String>,
     /// Timestamp de creación (UNIX epoch seconds)
     pub created_at: Option<u64>,
@@ -259,7 +257,6 @@ impl FileMetadataCache {
     }
     
     /// Verifica si un archivo existe
-    #[allow(dead_code)]
     pub async fn exists(&self, path: &Path) -> Option<bool> {
         if let Some(metadata) = self.get_metadata(path).await {
             return Some(metadata.exists);
@@ -269,7 +266,6 @@ impl FileMetadataCache {
     }
     
     /// Verifica si un path es un directorio
-    #[allow(dead_code)]
     pub async fn is_dir(&self, path: &Path) -> Option<bool> {
         if let Some(metadata) = self.get_metadata(path).await {
             return Some(metadata.entry_type == CacheEntryType::Directory);
@@ -288,7 +284,6 @@ impl FileMetadataCache {
     }
     
     /// Obtiene el tamaño de un archivo
-    #[allow(dead_code)]
     pub async fn get_size(&self, path: &Path) -> Option<u64> {
         if let Some(metadata) = self.get_metadata(path).await {
             return metadata.size;
@@ -298,7 +293,6 @@ impl FileMetadataCache {
     }
     
     /// Obtiene el tipo MIME de un archivo
-    #[allow(dead_code)]
     pub async fn get_mime_type(&self, path: &Path) -> Option<String> {
         if let Some(metadata) = self.get_metadata(path).await {
             return metadata.mime_type;

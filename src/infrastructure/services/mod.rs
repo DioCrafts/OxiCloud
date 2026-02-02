@@ -8,3 +8,6 @@ pub mod compression_service;
 pub mod buffer_pool;
 pub mod trash_cleanup_service;
 pub mod zip_service;
+pub mod path_service;
+pub mod password_hasher;
+pub mod jwt_service;

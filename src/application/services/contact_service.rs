@@ -9,12 +9,11 @@ use crate::application::dtos::address_book_dto::{
 };
 use crate::application::dtos::contact_dto::{
     ContactDto, CreateContactDto, UpdateContactDto, CreateContactVCardDto,
-    ContactGroupDto, CreateContactGroupDto, UpdateContactGroupDto, GroupMembershipDto,
-    EmailDto, PhoneDto, AddressDto
+    ContactGroupDto, CreateContactGroupDto, UpdateContactGroupDto, GroupMembershipDto
 };
 use crate::application::ports::carddav_ports::{AddressBookUseCase, ContactUseCase};
 use crate::application::ports::storage_ports::StorageUseCase;
-use crate::common::errors::{DomainError, ErrorContext};
+use crate::common::errors::DomainError;
 use crate::domain::entities::contact::{AddressBook, Contact, ContactGroup, Email, Phone, Address};
 use crate::domain::repositories::address_book_repository::AddressBookRepository;
 use crate::domain::repositories::contact_repository::{ContactRepository, ContactGroupRepository};

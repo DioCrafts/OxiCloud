@@ -301,7 +301,6 @@ impl IdMappingOptimizer {
     }
     
     /// Precargar un conjunto de rutas para obtener sus IDs en batch
-    #[allow(dead_code)]
     pub async fn preload_paths(&self, paths: Vec<StoragePath>) -> Result<(), IdMappingError> {
         // Solo proceder si hay rutas para cargar
         if paths.is_empty() {
@@ -342,7 +341,6 @@ impl IdMappingOptimizer {
     }
     
     /// Precargar un conjunto de IDs para obtener sus rutas en batch
-    #[allow(dead_code)]
     pub async fn preload_ids(&self, ids: Vec<String>) -> Result<(), IdMappingError> {
         // Solo proceder si hay IDs para cargar
         if ids.is_empty() {

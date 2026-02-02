@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use tokio::task;
 use crate::common::errors::DomainError;
 use crate::application::ports::auth_ports::UserStoragePort;
-use crate::domain::repositories::file_repository::FileRepository;
+use crate::application::ports::outbound::FileStoragePort;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use tracing::{info, error, debug};
 
@@ -14,14 +14,14 @@ use tracing::{info, error, debug};
  * is using and updating this information in the user records.
  */
 pub struct StorageUsageService {
-    file_repository: Arc<dyn FileRepository>,
+    file_repository: Arc<dyn FileStoragePort>,
     user_repository: Arc<dyn UserStoragePort>,
 }
 
 impl StorageUsageService {
     /// Creates a new storage usage service
     pub fn new(
-        file_repository: Arc<dyn FileRepository>,
+        file_repository: Arc<dyn FileStoragePort>,
         user_repository: Arc<dyn UserStoragePort>,
     ) -> Self {
         Self {
@@ -90,7 +90,7 @@ impl StorageUsageService {
     async fn calculate_folder_size(&self, folder_id: &str) -> Result<i64, DomainError> {
         // Implementation with explicit boxing to handle recursion in async functions
         async fn inner_calculate_size(
-            repo: Arc<dyn FileRepository>,
+            repo: Arc<dyn FileStoragePort>,
             folder_id: &str,
         ) -> Result<i64, DomainError> {
             let mut total_size: i64 = 0;

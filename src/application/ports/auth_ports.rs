@@ -3,6 +3,66 @@ use crate::domain::entities::user::User;
 use crate::domain::entities::session::Session;
 use crate::common::errors::DomainError;
 
+// ============================================================================
+// Cryptography Ports - Extracted from Domain to maintain Clean Architecture
+// ============================================================================
+
+/// Port for password hashing operations.
+/// 
+/// This trait abstracts cryptographic password operations, allowing the domain
+/// layer to remain independent of specific hashing implementations (argon2, bcrypt, etc.)
+pub trait PasswordHasherPort: Send + Sync + 'static {
+    /// Hash a plain text password
+    fn hash_password(&self, password: &str) -> Result<String, DomainError>;
+    
+    /// Verify a plain text password against a hash
+    fn verify_password(&self, password: &str, hash: &str) -> Result<bool, DomainError>;
+}
+
+/// Claims contained in a JWT token
+#[derive(Debug, Clone)]
+pub struct TokenClaims {
+    /// Subject identifier (user ID)
+    pub sub: String,
+    /// Expiration timestamp (seconds since Unix epoch)
+    pub exp: i64,
+    /// Issued at timestamp (seconds since Unix epoch)
+    pub iat: i64,
+    /// JWT unique ID
+    pub jti: String,
+    /// Username
+    pub username: String,
+    /// User email
+    pub email: String,
+    /// User role
+    pub role: String,
+}
+
+/// Port for JWT token operations.
+/// 
+/// This trait abstracts token generation and validation, allowing the domain
+/// layer to remain independent of specific JWT implementations.
+pub trait TokenServicePort: Send + Sync + 'static {
+    /// Generate an access token for a user
+    fn generate_access_token(&self, user: &User) -> Result<String, DomainError>;
+    
+    /// Validate a token and extract its claims
+    fn validate_token(&self, token: &str) -> Result<TokenClaims, DomainError>;
+    
+    /// Generate a refresh token
+    fn generate_refresh_token(&self) -> String;
+    
+    /// Get refresh token expiry in seconds
+    fn refresh_token_expiry_secs(&self) -> i64;
+    
+    /// Get refresh token expiry in days
+    fn refresh_token_expiry_days(&self) -> i64;
+}
+
+// ============================================================================
+// Storage Ports
+// ============================================================================
+
 #[async_trait]
 pub trait UserStoragePort: Send + Sync + 'static {
     /// Crea un nuevo usuario 

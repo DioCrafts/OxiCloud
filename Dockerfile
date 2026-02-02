@@ -1,5 +1,5 @@
 # Stage 1: Cache dependencies
-FROM rust:1.85-alpine AS cacher
+FROM rust:1.93.0-alpine3.23 AS cacher
 WORKDIR /app
 RUN apk --no-cache upgrade && \
     apk add --no-cache musl-dev pkgconfig postgresql-dev gcc perl make
@@ -10,7 +10,7 @@ RUN mkdir -p src && \
     cargo build --release && \
     rm -rf src target/release/deps/oxicloud*
 # Stage 2: Build the application
-FROM rust:1.85-alpine AS builder
+FROM rust:1.93.0-alpine3.23 AS builder
 WORKDIR /app
 RUN apk --no-cache upgrade && \
     apk add --no-cache musl-dev pkgconfig postgresql-dev gcc perl make

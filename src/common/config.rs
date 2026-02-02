@@ -33,7 +33,6 @@ pub struct TimeoutConfig {
     /// Timeout para adquisición de locks (ms)
     pub lock_acquisition_ms: u64,
     /// Timeout para operaciones de red (ms)
-    #[allow(dead_code)]
     pub network_operation_ms: u64,
 }
 
@@ -80,7 +79,6 @@ impl TimeoutConfig {
     }
 
     /// Obtiene un Duration para operaciones de red
-    #[allow(dead_code)]
     pub fn network_timeout(&self) -> Duration {
         Duration::from_millis(self.network_operation_ms)
     }
@@ -92,7 +90,6 @@ pub struct ResourceConfig {
     /// Umbral en MB para considerar un archivo como grande
     pub large_file_threshold_mb: u64,
     /// Umbral de entradas para considerar un directorio como grande
-    #[allow(dead_code)]
     pub large_dir_threshold_entries: usize,
     /// Tamaño de chunk para procesamiento de archivos grandes (bytes)
     pub chunk_size_bytes: usize,
@@ -133,7 +130,6 @@ impl ResourceConfig {
     }
 
     /// Determina si un directorio es considerado grande
-    #[allow(dead_code)]
     pub fn is_large_directory(&self, entry_count: usize) -> bool {
         entry_count >= self.large_dir_threshold_entries
     }
@@ -170,7 +166,6 @@ pub struct ConcurrencyConfig {
     /// Máximo de tareas de archivo concurrentes
     pub max_concurrent_files: usize,
     /// Máximo de tareas de directorio concurrentes
-    #[allow(dead_code)]
     pub max_concurrent_dirs: usize,
     /// Máximo de operaciones de IO concurrentes
     pub max_concurrent_io: usize,
@@ -451,7 +446,6 @@ impl AppConfig {
 }
 
 /// Obtenemos una configuración global por defecto
-#[allow(dead_code)]
 pub fn default_config() -> AppConfig {
     AppConfig::default()
 }

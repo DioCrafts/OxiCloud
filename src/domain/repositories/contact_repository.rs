@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sqlx::types::Uuid;
+use uuid::Uuid;
 use std::result::Result;
 
 use crate::common::errors::DomainError;

@@ -1,8 +1,7 @@
-use serde::{Serialize, Deserialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Session {
     pub id: String,
     pub user_id: String,

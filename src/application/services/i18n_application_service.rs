@@ -51,7 +51,6 @@ impl I18nApplicationService {
     }
     
     /// Load translations for all available locales
-    #[allow(dead_code)]
     pub async fn load_all_translations(&self) -> Vec<(Locale, I18nResult<()>)> {
         let locales = self.i18n_service.available_locales().await;
         let mut results = Vec::new();
@@ -70,7 +69,6 @@ impl I18nApplicationService {
     }
     
     /// Check if a locale is supported
-    #[allow(dead_code)]
     pub async fn is_supported(&self, locale: Locale) -> bool {
         self.i18n_service.is_supported(locale).await
     }

@@ -58,7 +58,6 @@ impl HttpCache {
     }
     
     /// Crea una nueva instancia con un tiempo de vida especificado
-    #[allow(dead_code)]
     pub fn with_max_age(max_age: u64) -> Self {
         Self {
             cache: Arc::new(Mutex::new(HashMap::with_capacity(100))),
@@ -163,20 +162,6 @@ impl HttpCache {
         None
     }
     
-    /// Calcula el ETag para una respuesta
-    #[allow(dead_code)]
-    fn calculate_etag<T: Serialize>(&self, response: &T) -> EntityTag {
-        // Serializar la respuesta
-        let json = serde_json::to_string(response).unwrap_or_default();
-        
-        // Calcular hash
-        let mut hasher = DefaultHasher::new();
-        json.hash(&mut hasher);
-        let hash = hasher.finish();
-        
-        format!("\"{}\"", hash)
-    }
-    
     /// Genera un ETag simple para un bloque de bytes
     fn calculate_etag_for_bytes(&self, bytes: &[u8]) -> EntityTag {
         // Calcular hash
@@ -189,7 +174,6 @@ impl HttpCache {
 }
 
 /// Middleware de caché HTTP
-#[allow(dead_code)]
 pub async fn cache_middleware<T>(
     cache: HttpCache,
     cache_key: &str,
@@ -328,7 +312,6 @@ pub struct HttpCacheLayer {
 
 impl HttpCacheLayer {
     /// Crea una nueva capa de caché
-    #[allow(dead_code)]
     pub fn new(cache: HttpCache) -> Self {
         Self {
             cache,
@@ -337,7 +320,6 @@ impl HttpCacheLayer {
     }
     
     /// Establece el tiempo de vida máximo
-    #[allow(dead_code)]
     pub fn with_max_age(mut self, max_age: u64) -> Self {
         self.max_age = Some(max_age);
         self

@@ -422,22 +422,6 @@ impl ParallelFileProcessor {
         info!("Successfully wrote file of {}MB in parallel with optimized Bytes", file_size / (1024 * 1024));
         Ok(())
     }
-    
-    /// Writes a chunk to a file at a specific position
-    #[allow(dead_code)]
-    async fn write_chunk_optimized(
-        file: &mut File, 
-        offset: u64, 
-        data: Bytes
-    ) -> Result<(), std::io::Error> {
-        // Prepare writing at the correct position
-        file.seek(SeekFrom::Start(offset)).await?;
-        
-        // Write data without additional copies
-        file.write_all(&data).await?;
-        
-        Ok(())
-    }
 }
 
 #[cfg(test)]

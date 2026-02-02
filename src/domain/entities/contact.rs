@@ -1,8 +1,7 @@
 use chrono::{DateTime, NaiveDate, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::types::Uuid;
+use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct AddressBook {
     pub id: Uuid,
     pub name: String,
@@ -29,21 +28,21 @@ impl Default for AddressBook {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Email {
     pub email: String,
     pub r#type: String, // home, work, other
     pub is_primary: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Phone {
     pub number: String,
     pub r#type: String, // mobile, home, work, fax, other
     pub is_primary: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Address {
     pub street: Option<String>,
     pub city: Option<String>,
@@ -54,7 +53,7 @@ pub struct Address {
     pub is_primary: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Contact {
     pub id: Uuid,
     pub address_book_id: Uuid,
@@ -105,7 +104,7 @@ impl Default for Contact {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ContactGroup {
     pub id: Uuid,
     pub address_book_id: Uuid,

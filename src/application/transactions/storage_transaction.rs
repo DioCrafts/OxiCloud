@@ -37,7 +37,6 @@ impl StorageTransaction {
     }
     
     /// Añade una operación sin rollback (para limpieza o logging)
-    #[allow(dead_code)]
     pub fn add_finalizer<F>(&mut self, finalizer: F)
     where
         F: Future<Output = Result<(), DomainError>> + Send + 'static,

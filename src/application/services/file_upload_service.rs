@@ -48,14 +48,6 @@ impl FileUploadService {
         self.storage_usage_service = Some(storage_usage_service);
         self
     }
-    
-    /// Crea un stub para pruebas
-    pub fn default_stub() -> Self {
-        Self {
-            file_repository: Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub()),
-            storage_usage_service: None,
-        }
-    }
 }
 
 #[async_trait]

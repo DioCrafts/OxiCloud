@@ -8,7 +8,6 @@ use tokio::sync::RwLock;
 
 /// Representación de metadatos en caché
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct CachedMetadata {
     /// Si el archivo o directorio existe
     pub exists: bool,
@@ -23,7 +22,6 @@ pub struct CachedMetadata {
 }
 
 /// Estructura para gestionar la caché de metadatos de archivos y directorios
-#[allow(dead_code)]
 pub struct StorageCacheManager {
     /// Caché de existencia y metadatos
     cache: RwLock<HashMap<PathBuf, CachedMetadata>>,
@@ -37,7 +35,6 @@ pub struct StorageCacheManager {
 
 impl StorageCacheManager {
     /// Crea una nueva instancia del gestor de caché
-    #[allow(dead_code)]
     pub fn new(file_ttl_ms: u64, dir_ttl_ms: u64, max_entries: usize) -> Self {
         Self {
             cache: RwLock::new(HashMap::with_capacity(max_entries)),
@@ -48,7 +45,6 @@ impl StorageCacheManager {
     }
     
     /// Crea una instancia por defecto del gestor de caché
-    #[allow(dead_code)]
     pub fn default() -> Self {
         Self::new(
             60_000,    // 1 minuto para archivos
@@ -58,7 +54,6 @@ impl StorageCacheManager {
     }
     
     /// Verifica si un archivo o directorio existe en caché
-    #[allow(dead_code)]
     pub async fn check_exists(&self, path: &PathBuf, _is_dir: bool) -> Result<bool, ()> {
         // Intentar obtener de la caché
         if let Some(metadata) = self.get_cached_metadata(path).await {
@@ -70,7 +65,6 @@ impl StorageCacheManager {
     }
     
     /// Obtiene los metadatos de un path desde la caché
-    #[allow(dead_code)]
     async fn get_cached_metadata(&self, path: &PathBuf) -> Option<CachedMetadata> {
         let cache = self.cache.read().await;
         
@@ -85,7 +79,6 @@ impl StorageCacheManager {
     }
     
     /// Actualiza la caché con los metadatos de un path
-    #[allow(dead_code)]
     pub async fn update_cache(&self, path: &PathBuf, exists: bool, size: Option<u64>, 
                              created_at: Option<u64>, modified_at: Option<u64>, is_dir: bool) {
         let mut cache = self.cache.write().await;
@@ -115,7 +108,6 @@ impl StorageCacheManager {
     }
     
     /// Elimina entradas aleatorias de la caché cuando está llena
-    #[allow(dead_code)]
     async fn evict_entries(&self, cache: &mut HashMap<PathBuf, CachedMetadata>, count: usize) {
         // Obtener las entradas más antiguas para eliminar
         let mut entries: Vec<_> = cache.keys().cloned().collect();
@@ -136,7 +128,6 @@ impl StorageCacheManager {
     }
     
     /// Inicia una tarea de limpieza periódica
-    #[allow(dead_code)]
     pub fn start_cleanup_task(cache_manager: Arc<Self>) -> BoxFuture<'static, ()> {
         Box::pin(async move {
             let interval = Duration::from_secs(60); // Ejecutar cada minuto
@@ -170,14 +161,12 @@ impl StorageCacheManager {
     }
     
     /// Invalida una entrada específica de la caché
-    #[allow(dead_code)]
     pub async fn invalidate(&self, path: &PathBuf) {
         let mut cache = self.cache.write().await;
         cache.remove(path);
     }
     
     /// Invalida todas las entradas de la caché relacionadas con una carpeta
-    #[allow(dead_code)]
     pub async fn invalidate_folder(&self, folder_path: &PathBuf) {
         let mut cache = self.cache.write().await;
         
@@ -204,7 +193,6 @@ impl StorageCacheManager {
     }
     
     /// Obtiene el número actual de entradas en la caché
-    #[allow(dead_code)]
     pub async fn cache_size(&self) -> usize {
         let cache = self.cache.read().await;
         cache.len()

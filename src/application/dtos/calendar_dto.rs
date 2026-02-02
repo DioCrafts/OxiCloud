@@ -1,6 +1,5 @@
 use serde::{Serialize, Deserialize};
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use std::collections::HashMap;
 use crate::domain::entities::calendar::Calendar;
 use crate::domain::entities::calendar_event::CalendarEvent;

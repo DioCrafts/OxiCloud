@@ -1,12 +1,11 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{PgPool, query, query_as, Row, types::Uuid};
+use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
 
 use crate::domain::entities::calendar::Calendar;
 use crate::domain::repositories::calendar_repository::{CalendarRepository, CalendarRepositoryResult};
-use crate::common::errors::{DomainError, ErrorContext};
-use sqlx::Transaction;
+use crate::common::errors::DomainError;
 
 pub struct CalendarPgRepository {
     pool: Arc<PgPool>,

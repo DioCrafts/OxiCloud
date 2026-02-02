@@ -10,7 +10,8 @@ use crate::domain::entities::folder::{Folder, FolderError};
 use crate::domain::repositories::folder_repository::{
     FolderRepository, FolderRepositoryError, FolderRepositoryResult
 };
-use crate::domain::services::path_service::{StoragePath, PathService};
+use crate::domain::services::path_service::StoragePath;
+use crate::infrastructure::services::path_service::PathService;
 // use crate::application::ports::outbound::IdMappingPort;
 use crate::infrastructure::services::id_mapping_service::{IdMappingService, IdMappingError};
 use crate::application::services::storage_mediator::StorageMediator;
@@ -51,7 +52,6 @@ impl FolderFsRepository {
     
     /// Creates a stub repository for initialization purposes
     /// This is used temporarily during dependency injection setup
-    #[allow(dead_code)]
     pub fn new_stub() -> Self {
         let root_path = PathBuf::from("/tmp");
         let path_service = Arc::new(PathService::new(root_path.clone()));

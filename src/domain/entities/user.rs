@@ -1,7 +1,3 @@
-use serde::{Serialize, Deserialize};
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
-use argon2::password_hash::SaltString;
-use rand_core::OsRng;
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
@@ -22,7 +18,7 @@ pub enum UserError {
 
 pub type UserResult<T> = Result<T, UserError>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 // We'll handle conversion manually for now until the type is properly set up in the database
 pub enum UserRole {
     Admin,
@@ -38,12 +34,11 @@ impl std::fmt::Display for UserRole {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct User {
     id: String,
     username: String, 
     email: String,
-    #[serde(skip_serializing)]
     password_hash: String,
     role: UserRole,
     storage_quota_bytes: i64,
@@ -55,10 +50,22 @@ pub struct User {
 }
 
 impl User {
+    /// Create a new user with a pre-hashed password.
+    /// 
+    /// The password hashing should be done externally using PasswordHasherPort
+    /// to maintain clean architecture and keep cryptographic dependencies
+    /// out of the domain layer.
+    /// 
+    /// # Arguments
+    /// * `username` - User's username (3-32 characters)
+    /// * `email` - User's email address
+    /// * `password_hash` - Pre-hashed password (from PasswordHasherPort)
+    /// * `role` - User's role
+    /// * `storage_quota_bytes` - Storage quota in bytes
     pub fn new(
         username: String,
         email: String, 
-        password: String,
+        password_hash: String,
         role: UserRole,
         storage_quota_bytes: i64,
     ) -> UserResult<Self> {
@@ -75,18 +82,11 @@ impl User {
             )));
         }
         
-        if password.len() < 8 {
+        if password_hash.is_empty() {
             return Err(UserError::InvalidPassword(format!(
-                "Password debe tener al menos 8 caracteres"
+                "Password hash no puede estar vacío"
             )));
         }
-        
-        // Generar hash con Argon2id (recomendado para 2023+)
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        let password_hash = argon2.hash_password(password.as_bytes(), &salt)
-            .map_err(|e| UserError::ValidationError(format!("Error al generar hash: {}", e)))?
-            .to_string();
         
         let now = Utc::now();
         
@@ -179,30 +179,13 @@ impl User {
         &self.password_hash
     }
     
-    // Verificación de password
-    pub fn verify_password(&self, password: &str) -> UserResult<bool> {
-        let parsed_hash = PasswordHash::new(&self.password_hash)
-            .map_err(|e| UserError::AuthenticationError(format!("Error al procesar hash: {}", e)))?;
-        
-        Ok(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok())
-    }
-    
-    // Cambiar contraseña
-    pub fn update_password(&mut self, new_password: String) -> UserResult<()> {
-        if new_password.len() < 8 {
-            return Err(UserError::InvalidPassword(format!(
-                "Password debe tener al menos 8 caracteres"
-            )));
-        }
-        
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-        self.password_hash = argon2.hash_password(new_password.as_bytes(), &salt)
-            .map_err(|e| UserError::ValidationError(format!("Error al generar hash: {}", e)))?
-            .to_string();
-        
+    /// Update the password hash.
+    /// 
+    /// The new password should be hashed externally using PasswordHasherPort
+    /// before calling this method.
+    pub fn update_password_hash(&mut self, new_hash: String) {
+        self.password_hash = new_hash;
         self.updated_at = Utc::now();
-        Ok(())
     }
     
     // Actualizar uso de almacenamiento

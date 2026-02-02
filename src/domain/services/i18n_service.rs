@@ -61,6 +61,5 @@ pub trait I18nService: Send + Sync + 'static {
     async fn available_locales(&self) -> Vec<Locale>;
     
     /// Check if a locale is supported
-    #[allow(dead_code)]
     async fn is_supported(&self, locale: Locale) -> bool;
 }

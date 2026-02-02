@@ -48,7 +48,6 @@ impl CalDavAdapter {
         let mut in_sync_collection = false;
         let mut in_prop = false;
         let mut in_filter = false;
-        let mut in_time_range = false;
         let mut start_time: Option<DateTime<Utc>> = None;
         let mut end_time: Option<DateTime<Utc>> = None;
         let mut props = Vec::new();
@@ -68,8 +67,6 @@ impl CalDavAdapter {
                         s if s == "prop" || s.ends_with(":prop") => in_prop = true,
                         s if s == "filter" || s.ends_with(":filter") => in_filter = true,
                         s if s == "time-range" || s.ends_with(":time-range") => {
-                            in_time_range = true;
-                            
                             // Parse time-range attributes
                             for attr in e.attributes() {
                                 if let Ok(attr) = attr {
@@ -106,7 +103,7 @@ impl CalDavAdapter {
                     }
                 },
                 Ok(Event::Text(e)) => {
-                    let text = e.unescape().unwrap_or_default();
+                    let text = e.decode().unwrap_or_default();
                     
                     // Check if we're in sync-token element
                     if in_sync_collection && !in_prop && !in_filter {
@@ -128,7 +125,7 @@ impl CalDavAdapter {
                         s if s == "sync-collection" || s.ends_with(":sync-collection") => in_sync_collection = false,
                         s if s == "prop" || s.ends_with(":prop") => in_prop = false,
                         s if s == "filter" || s.ends_with(":filter") => in_filter = false,
-                        s if s == "time-range" || s.ends_with(":time-range") => in_time_range = false,
+                        s if s == "time-range" || s.ends_with(":time-range") => { /* time-range end, attributes already parsed */ },
                         _ => ()
                     }
                 },
@@ -771,7 +768,7 @@ impl CalDavAdapter {
                     }
                 },
                 Ok(Event::Text(e)) => {
-                    let text = e.unescape().unwrap_or_default();
+                    let text = e.decode().unwrap_or_default();
                     
                     if in_displayname {
                         displayname = text.to_string();

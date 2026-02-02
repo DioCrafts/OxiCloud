@@ -29,13 +29,12 @@ struct TrashedItemEntry {
 pub struct TrashFsRepository {
     trash_dir: PathBuf,
     trash_index_path: PathBuf,
-    id_mapping_service: Arc<dyn IdMappingPort>,
 }
 
 impl TrashFsRepository {
     pub fn new(
         storage_root: impl AsRef<Path>,
-        id_mapping_service: Arc<dyn IdMappingPort>,
+        _id_mapping_service: Arc<dyn IdMappingPort>,
     ) -> Self {
         let trash_dir = storage_root.as_ref().join(".trash");
         let trash_index_path = trash_dir.join("trash_index.json");
@@ -43,7 +42,6 @@ impl TrashFsRepository {
         Self {
             trash_dir,
             trash_index_path,
-            id_mapping_service,
         }
     }
     
@@ -223,14 +221,6 @@ impl TrashFsRepository {
             trashed_at: item.trashed_at.to_rfc3339(),
             deletion_date: item.deletion_date.to_rfc3339(),
         }
-    }
-    
-    /// Obtiene la ruta de un elemento en la papelera
-    fn get_trash_path_for_item(&self, user_id: &Uuid, item_id: &Uuid) -> PathBuf {
-        self.trash_dir
-            .join("files")
-            .join(user_id.to_string())
-            .join(item_id.to_string())
     }
 }
 

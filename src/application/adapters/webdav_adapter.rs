@@ -685,7 +685,7 @@ impl WebDavAdapter {
                 },
                 Ok(Event::Text(e)) => {
                     if current_prop.is_some() {
-                        current_text.push_str(&e.unescape().unwrap_or_default());
+                        current_text.push_str(&e.decode().unwrap_or_default());
                     }
                 },
                 Ok(Event::End(ref e)) => {
@@ -879,7 +879,7 @@ impl WebDavAdapter {
                 },
                 Ok(Event::Text(e)) => {
                     if in_owner {
-                        owner_text.push_str(&e.unescape().unwrap_or_default());
+                        owner_text.push_str(&e.decode().unwrap_or_default());
                     }
                 },
                 Ok(Event::End(ref e)) => {

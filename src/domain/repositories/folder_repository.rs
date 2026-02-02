@@ -5,7 +5,6 @@ use crate::common::errors::DomainError;
 
 /// Error types for folder repository operations
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
 pub enum FolderRepositoryError {
     #[error("Folder not found: {0}")]
     NotFound(String),
@@ -84,12 +83,10 @@ pub trait FolderRepository: Send + Sync + 'static {
     
     /// Legacy method - checks if a folder exists at the given PathBuf path
     #[deprecated(note = "Use folder_exists_at_storage_path instead")]
-    #[allow(dead_code)]
     async fn folder_exists(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<bool>;
     
     /// Legacy method - gets a folder by its PathBuf path
     #[deprecated(note = "Use get_folder_by_storage_path instead")]
-    #[allow(dead_code)]
     async fn get_folder_by_path(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<Folder>;
     
     /// Moves a folder to trash

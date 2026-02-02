@@ -5,7 +5,6 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use std::sync::Arc;
 use serde_json::json;
 
 use crate::common::di::AppState;

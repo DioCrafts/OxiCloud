@@ -1,4 +1,3 @@
-use serde::{Serialize, Deserialize};
 use crate::domain::services::path_service::StoragePath;
 
 /// Error in the creation or manipulation of folder entities
@@ -8,7 +7,6 @@ pub enum FolderError {
     InvalidFolderName(String),
     
     #[error("Validation error: {0}")]
-    #[allow(dead_code)]
     ValidationError(String),
 }
 
@@ -16,7 +14,7 @@ pub enum FolderError {
 pub type FolderResult<T> = Result<T, FolderError>;
 
 /// Represents a folder entity in the domain
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Folder {
     /// Unique identifier for the folder
     id: String,
@@ -25,11 +23,9 @@ pub struct Folder {
     name: String,
     
     /// Path to the folder in the domain model
-    #[serde(skip_serializing, skip_deserializing)]
     storage_path: StoragePath,
     
-    /// String representation of the path (for serialization compatibility)
-    #[serde(rename = "path")]
+    /// String representation of the path (for API compatibility)
     path_string: String,
     
     /// Parent folder ID (None if it's a root folder)
@@ -235,7 +231,6 @@ impl Folder {
     }
     
     /// Returns an absolute path for this folder
-    #[allow(dead_code)]
     pub fn get_absolute_path<P: AsRef<std::path::Path>>(&self, root_path: P) -> std::path::PathBuf {
         let mut result = std::path::PathBuf::from(root_path.as_ref());
         

@@ -12,7 +12,7 @@ use crate::application::dtos::user_dto::{
     LoginDto, RegisterDto, UserDto, ChangePasswordDto, RefreshTokenDto, AuthResponseDto
 };
 use crate::interfaces::middleware::auth::CurrentUser;
-use crate::common::errors::AppError;
+use crate::interfaces::errors::AppError;
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
     Router::new()

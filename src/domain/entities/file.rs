@@ -1,4 +1,3 @@
-use serde::{Serialize, Deserialize};
 use crate::domain::services::path_service::StoragePath;
 
 /**
@@ -15,7 +14,6 @@ pub enum FileError {
     
     /// Occurs when validation fails for any file entity attribute.
     #[error("Validation error: {0}")]
-    #[allow(dead_code)]
     ValidationError(String),
 }
 
@@ -36,7 +34,7 @@ pub type FileResult<T> = Result<T, FileError>;
  * This entity maintains both physical storage information and logical metadata about files,
  * serving as the bridge between the storage system and the application.
  */
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct File {
     /// Unique identifier for the file - used throughout the system for file operations
     id: String,
@@ -44,12 +42,10 @@ pub struct File {
     /// Name of the file including extension
     name: String,
     
-    /// Path to the file in the domain model - not serialized as it contains internal representation
-    #[serde(skip_serializing, skip_deserializing)]
+    /// Path to the file in the domain model
     storage_path: StoragePath,
     
-    /// String representation of the path for serialization and API compatibility
-    #[serde(rename = "path")]
+    /// String representation of the path for API compatibility
     path_string: String,
     
     /// Size of the file in bytes
@@ -253,7 +249,6 @@ impl File {
     // Methods to create new versions of the file (immutable)
     
     /// Creates a new version of the file with updated name
-    #[allow(dead_code)]
     pub fn with_name(&self, new_name: String) -> FileResult<Self> {
         // Validate file name
         if new_name.is_empty() || new_name.contains('/') || new_name.contains('\\') {
@@ -318,7 +313,6 @@ impl File {
     }
     
     /// Creates a new version of the file with updated size
-    #[allow(dead_code)]
     pub fn with_size(&self, new_size: u64) -> Self {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

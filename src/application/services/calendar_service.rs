@@ -1,14 +1,12 @@
 use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 use crate::application::dtos::calendar_dto::{
     CalendarDto, CalendarEventDto, CreateCalendarDto, UpdateCalendarDto,
     CreateEventDto, UpdateEventDto, CreateEventICalDto
 };
 use crate::application::ports::calendar_ports::{CalendarStoragePort, CalendarUseCase};
-use crate::interfaces::middleware::auth::CurrentUser;
 use crate::common::errors::{DomainError, ErrorKind};
 
 pub struct CalendarService {

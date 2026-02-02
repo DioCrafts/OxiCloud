@@ -1,8 +1,7 @@
 use std::sync::Arc;
 use crate::domain::entities::user::{User, UserRole};
 use crate::domain::entities::session::Session;
-use crate::domain::services::auth_service::AuthService;
-use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort};
+use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort};
 use crate::application::dtos::user_dto::{UserDto, RegisterDto, LoginDto, AuthResponseDto, ChangePasswordDto, RefreshTokenDto};
 use crate::application::dtos::folder_dto::CreateFolderDto;
 use crate::application::ports::inbound::FolderUseCase;
@@ -11,7 +10,8 @@ use crate::common::errors::{DomainError, ErrorKind};
 pub struct AuthApplicationService {
     user_storage: Arc<dyn UserStoragePort>,
     session_storage: Arc<dyn SessionStoragePort>,
-    auth_service: Arc<AuthService>,
+    password_hasher: Arc<dyn PasswordHasherPort>,
+    token_service: Arc<dyn TokenServicePort>,
     folder_service: Option<Arc<dyn FolderUseCase>>,
 }
 
@@ -19,12 +19,14 @@ impl AuthApplicationService {
     pub fn new(
         user_storage: Arc<dyn UserStoragePort>,
         session_storage: Arc<dyn SessionStoragePort>,
-        auth_service: Arc<AuthService>,
+        password_hasher: Arc<dyn PasswordHasherPort>,
+        token_service: Arc<dyn TokenServicePort>,
     ) -> Self {
         Self {
             user_storage,
             session_storage,
-            auth_service,
+            password_hasher,
+            token_service,
             folder_service: None,
         }
     }
@@ -127,11 +129,23 @@ impl AuthApplicationService {
             1024 * 1024 * 1024 // 1GB para usuarios normales
         };
         
-        // Crear usuario
+        // Validar longitud de password antes de hashear
+        if dto.password.len() < 8 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                "Password debe tener al menos 8 caracteres"
+            ));
+        }
+        
+        // Hashear el password usando el servicio de infraestructura
+        let password_hash = self.password_hasher.hash_password(&dto.password)?;
+        
+        // Crear usuario con el hash pre-generado
         let user = User::new(
             dto.username.clone(),
             dto.email,
-            dto.password,
+            password_hash,
             role,
             quota,
         ).map_err(|e| DomainError::new(
@@ -203,13 +217,8 @@ impl AuthApplicationService {
             ));
         }
         
-        // Verificar contraseña
-        let is_valid = user.verify_password(&dto.password)
-            .map_err(|_| DomainError::new(
-                ErrorKind::AccessDenied,
-                "Auth",
-                "Credenciales inválidas"
-            ))?;
+        // Verificar contraseña usando el hasher inyectado
+        let is_valid = self.password_hasher.verify_password(&dto.password, user.password_hash())?;
             
         if !is_valid {
             return Err(DomainError::new(
@@ -223,11 +232,10 @@ impl AuthApplicationService {
         user.register_login();
         self.user_storage.update_user(user.clone()).await?;
         
-        // Generar tokens
-        let access_token = self.auth_service.generate_access_token(&user)
-            .map_err(DomainError::from)?;
+        // Generar tokens usando el servicio de tokens inyectado
+        let access_token = self.token_service.generate_access_token(&user)?;
         
-        let refresh_token = self.auth_service.generate_refresh_token();
+        let refresh_token = self.token_service.generate_refresh_token();
         
         // Guardar sesión
         let session = Session::new(
@@ -235,7 +243,7 @@ impl AuthApplicationService {
             refresh_token.clone(),
             None, // IP (se puede añadir desde la capa HTTP)
             None, // User-Agent (se puede añadir desde la capa HTTP)
-            self.auth_service.refresh_token_expiry_days(),
+            self.token_service.refresh_token_expiry_days(),
         );
         
         self.session_storage.create_session(session).await?;
@@ -246,7 +254,7 @@ impl AuthApplicationService {
             access_token,
             refresh_token,
             token_type: "Bearer".to_string(),
-            expires_in: self.auth_service.refresh_token_expiry_secs(),
+            expires_in: self.token_service.refresh_token_expiry_secs(),
         })
     }
     
@@ -283,10 +291,9 @@ impl AuthApplicationService {
         self.session_storage.revoke_session(session.id()).await?;
         
         // Generar nuevos tokens
-        let access_token = self.auth_service.generate_access_token(&user)
-            .map_err(DomainError::from)?;
+        let access_token = self.token_service.generate_access_token(&user)?;
         
-        let new_refresh_token = self.auth_service.generate_refresh_token();
+        let new_refresh_token = self.token_service.generate_refresh_token();
         
         // Crear nueva sesión
         let new_session = Session::new(
@@ -294,7 +301,7 @@ impl AuthApplicationService {
             new_refresh_token.clone(),
             None,
             None,
-            self.auth_service.refresh_token_expiry_days(),
+            self.token_service.refresh_token_expiry_days(),
         );
         
         self.session_storage.create_session(new_session).await?;
@@ -304,7 +311,7 @@ impl AuthApplicationService {
             access_token,
             refresh_token: new_refresh_token,
             token_type: "Bearer".to_string(),
-            expires_in: self.auth_service.refresh_token_expiry_secs(),
+            expires_in: self.token_service.refresh_token_expiry_secs(),
         })
     }
     
@@ -342,13 +349,8 @@ impl AuthApplicationService {
         // Obtener usuario
         let mut user = self.user_storage.get_user_by_id(user_id).await?;
         
-        // Verificar contraseña actual
-        let is_valid = user.verify_password(&dto.current_password)
-            .map_err(|_| DomainError::new(
-                ErrorKind::AccessDenied,
-                "Auth",
-                "Contraseña actual incorrecta"
-            ))?;
+        // Verificar contraseña actual usando el hasher inyectado
+        let is_valid = self.password_hasher.verify_password(&dto.current_password, user.password_hash())?;
             
         if !is_valid {
             return Err(DomainError::new(
@@ -358,13 +360,18 @@ impl AuthApplicationService {
             ));
         }
         
-        // Actualizar contraseña
-        user.update_password(dto.new_password.clone())
-            .map_err(|e| DomainError::new(
+        // Validar nueva contraseña
+        if dto.new_password.len() < 8 {
+            return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "User",
-                format!("Error al cambiar contraseña: {}", e)
-            ))?;
+                "Password debe tener al menos 8 caracteres"
+            ));
+        }
+        
+        // Hashear nueva contraseña y actualizar usuario
+        let new_hash = self.password_hasher.hash_password(&dto.new_password)?;
+        user.update_password_hash(new_hash);
         
         // Guardar usuario actualizado
         self.user_storage.update_user(user).await?;

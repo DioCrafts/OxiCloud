@@ -30,16 +30,12 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 ///
 /// @author OxiCloud Development Team
 
-/// Common utilities, configuration, and error handling
-mod common;
-/// Core domain model, entities, and business rules
-mod domain;
-/// Application services, use cases, and DTOs
-mod application;
-/// Technical implementations of repositories and services
-mod infrastructure;
-/// External interfaces like API endpoints and web controllers
-mod interfaces;
+// Use the library crate instead of redefining modules
+use oxicloud::application;
+use oxicloud::common;
+use oxicloud::domain;
+use oxicloud::infrastructure;
+use oxicloud::interfaces;
 
 use application::services::folder_service::FolderService;
 use application::services::file_service::FileService;
@@ -47,7 +43,7 @@ use application::services::i18n_application_service::I18nApplicationService;
 use application::services::storage_mediator::FileSystemStorageMediator;
 use application::services::share_service::ShareService;
 use application::services::favorites_service::FavoritesService;
-use domain::services::path_service::PathService;
+use infrastructure::services::path_service::PathService;
 use infrastructure::repositories::folder_fs_repository::FolderFsRepository;
 use infrastructure::repositories::file_fs_repository::FileFsRepository;
 use infrastructure::repositories::parallel_file_processor::ParallelFileProcessor;
@@ -245,11 +241,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         async fn save_file_with_id(
             &self,
-            id: String,
-            name: String,
-            folder_id: Option<String>,
-            content_type: String,
-            content: Vec<u8>,
+            _id: String,
+            _name: String,
+            _folder_id: Option<String>,
+            _content_type: String,
+            _content: Vec<u8>,
         ) -> domain::repositories::file_repository::FileRepositoryResult<domain::entities::file::File> {
             Err(domain::repositories::file_repository::FileRepositoryError::Other("Not implemented".to_string()))
         }
@@ -452,11 +448,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| domain::repositories::folder_repository::FolderRepositoryError::Other(format!("{}", e)))
         }
         
-        async fn folder_exists(&self, path: &std::path::PathBuf) -> domain::repositories::folder_repository::FolderRepositoryResult<bool> {
+        async fn folder_exists(&self, _path: &std::path::PathBuf) -> domain::repositories::folder_repository::FolderRepositoryResult<bool> {
             Err(domain::repositories::folder_repository::FolderRepositoryError::Other("Not implemented".to_string()))
         }
         
-        async fn get_folder_by_path(&self, path: &std::path::PathBuf) -> domain::repositories::folder_repository::FolderRepositoryResult<domain::entities::folder::Folder> {
+        async fn get_folder_by_path(&self, _path: &std::path::PathBuf) -> domain::repositories::folder_repository::FolderRepositoryResult<domain::entities::folder::Folder> {
             Err(domain::repositories::folder_repository::FolderRepositoryError::Other("Not implemented".to_string()))
         }
         
@@ -468,7 +464,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| domain::repositories::folder_repository::FolderRepositoryError::Other(format!("{}", e)))
         }
         
-        async fn restore_from_trash(&self, folder_id: &str, original_path: &str) -> domain::repositories::folder_repository::FolderRepositoryResult<()> {
+        async fn restore_from_trash(&self, _folder_id: &str, original_path: &str) -> domain::repositories::folder_repository::FolderRepositoryResult<()> {
             // Convert the original_path to a StoragePath for the repository
             use crate::domain::services::path_service::StoragePath;
             let storage_path = StoragePath::from_string(original_path);
@@ -557,7 +553,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let core_services = common::di::CoreServices {
         path_service: path_service.clone(),
         cache_manager: Arc::new(infrastructure::services::cache_manager::StorageCacheManager::default()),
-        id_mapping_service: base_id_mapping_service.clone(), // We keep using the folder ID mapping service for core services
+        id_mapping_service: base_id_mapping_service.clone(),
+        file_id_mapping_service: file_id_mapping_service.clone(),
+        id_mapping_optimizer: id_mapping_optimizer.clone(),
         config: config.clone(),
     };
     
@@ -588,6 +586,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         storage_mediator: storage_mediator_stub,
         metadata_manager,
         path_resolver: path_resolver_stub,
+        metadata_cache: metadata_cache.clone(),
         trash_repository: trash_repository.clone().map(|repo| {
             // Convert Arc<TrashFsRepository> to Arc<dyn TrashRepository>
             let repo: Arc<dyn crate::domain::repositories::trash_repository::TrashRepository> = repo;
@@ -666,12 +665,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let contact_service: Option<Arc<dyn application::ports::storage_ports::StorageUseCase>> = None;
 
     let application_services = common::di::ApplicationServices {
+        // Concrete types for backward compatibility with handlers
+        folder_service_concrete: folder_service.clone(),
+        file_service_concrete: file_service.clone(),
+        // Trait objects for abstraction
         folder_service: folder_service.clone(),
         file_service: file_service.clone(),
-        file_upload_service: Arc::new(application::services::file_upload_service::FileUploadService::default_stub()),
-        file_retrieval_service: Arc::new(application::services::file_retrieval_service::FileRetrievalService::default_stub()),
-        file_management_service: Arc::new(application::services::file_management_service::FileManagementService::default_stub()),
-        file_use_case_factory: Arc::new(application::services::file_use_case_factory::AppFileUseCaseFactory::default_stub()),
+        file_upload_service: Arc::new(application::services::file_upload_service::FileUploadService::new(
+            Arc::new(infrastructure::repositories::FileFsWriteRepository::default_stub())
+        )),
+        file_retrieval_service: Arc::new(application::services::file_retrieval_service::FileRetrievalService::new(
+            Arc::new(infrastructure::repositories::FileFsReadRepository::default_stub())
+        )),
+        file_management_service: Arc::new(application::services::file_management_service::FileManagementService::new(
+            Arc::new(infrastructure::repositories::FileFsWriteRepository::default_stub())
+        )),
+        file_use_case_factory: Arc::new(application::services::file_use_case_factory::AppFileUseCaseFactory::new(
+            Arc::new(infrastructure::repositories::FileFsReadRepository::default_stub()),
+            Arc::new(infrastructure::repositories::FileFsWriteRepository::default_stub())
+        )),
         i18n_service: i18n_service.clone(),
         trash_service: trash_service.clone(),
         search_service: search_service.clone(),

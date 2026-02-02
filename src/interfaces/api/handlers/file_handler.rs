@@ -7,10 +7,6 @@ use axum::{
 };
 use serde::Deserialize;
 use std::collections::HashMap;
-use futures::Stream;
-// use futures::StreamExt;
-use std::task::{Context, Poll};
-use std::pin::Pin;
 
 use crate::application::services::file_service::{FileService, FileServiceError};
 use crate::infrastructure::services::compression_service::{
@@ -45,35 +41,6 @@ type GlobalState = AppState;
  * delegating business logic to the application services.
  */
 pub struct FileHandler;
-
-// Simpler approach to make streams Unpin - use Pin<Box<dyn Stream>> directly
-struct BoxedStream<T> {
-    inner: Pin<Box<dyn Stream<Item = T> + Send + 'static>>,
-}
-
-impl<T> Stream for BoxedStream<T> {
-    type Item = T;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // Accessing the field directly is safe because BoxedStream is not a structural pinning type
-        unsafe { self.get_unchecked_mut().inner.as_mut().poll_next(cx) }
-    }
-}
-
-// This is safe because BoxedStream's inner field is already Pin<Box<dyn Stream>>
-impl<T> Unpin for BoxedStream<T> {}
-
-impl<T> BoxedStream<T> {
-    #[allow(dead_code)]
-    fn new<S>(stream: S) -> Self
-    where
-        S: Stream<Item = T> + Send + 'static,
-    {
-        BoxedStream {
-            inner: Box::pin(stream),
-        }
-    }
-}
 
 impl FileHandler {
     /// Uploads a file

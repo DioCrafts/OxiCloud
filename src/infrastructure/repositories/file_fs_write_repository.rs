@@ -16,43 +16,34 @@ use crate::infrastructure::services::file_system_utils::FileSystemUtils;
 
 /// Implementación de repositorio para operaciones de escritura de archivos
 pub struct FileFsWriteRepository {
-    root_path: PathBuf,
     metadata_manager: Arc<FileMetadataManager>,
     path_resolver: Arc<FilePathResolver>,
-    storage_mediator: Arc<dyn StorageMediator>,
     config: AppConfig,
-    parallel_processor: Option<Arc<ParallelFileProcessor>>,
 }
 
 impl FileFsWriteRepository {
     /// Crea un nuevo repositorio de escritura de archivos
     pub fn new(
-        root_path: PathBuf,
+        _root_path: PathBuf,
         metadata_manager: Arc<FileMetadataManager>,
         path_resolver: Arc<FilePathResolver>,
-        storage_mediator: Arc<dyn StorageMediator>,
+        _storage_mediator: Arc<dyn StorageMediator>,
         config: AppConfig,
-        parallel_processor: Option<Arc<ParallelFileProcessor>>,
+        _parallel_processor: Option<Arc<ParallelFileProcessor>>,
     ) -> Self {
         Self {
-            root_path,
             metadata_manager,
             path_resolver,
-            storage_mediator,
             config,
-            parallel_processor,
         }
     }
     
     /// Crea un stub para pruebas
     pub fn default_stub() -> Self {
         Self {
-            root_path: PathBuf::from("./storage"),
             metadata_manager: Arc::new(FileMetadataManager::default()),
             path_resolver: Arc::new(FilePathResolver::default_stub()),
-            storage_mediator: Arc::new(crate::application::services::storage_mediator::FileSystemStorageMediator::new_stub()),
             config: AppConfig::default(),
-            parallel_processor: None,
         }
     }
     
@@ -107,13 +98,6 @@ impl FileFsWriteRepository {
             )
             .map_err(|e| crate::domain::repositories::file_repository::FileRepositoryError::Other(e.to_string()))
         }
-    }
-    
-    /// Elimina un archivo de forma no bloqueante
-    async fn delete_file_non_blocking(&self, _abs_path: PathBuf) -> FileRepositoryResult<()> {
-        // Implementación real debe eliminar el archivo
-        // Por ahora, devolvemos OK
-        Ok(())
     }
 }
 

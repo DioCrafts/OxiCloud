@@ -3,20 +3,29 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use sqlx::PgPool;
 
-use crate::domain::services::auth_service::AuthService;
 use crate::application::services::auth_application_service::AuthApplicationService;
 
-use crate::domain::services::path_service::PathService;
+use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::repositories::folder_fs_repository::FolderFsRepository;
 use crate::infrastructure::repositories::file_fs_repository::FileFsRepository;
 use crate::infrastructure::repositories::trash_fs_repository::TrashFsRepository;
+use crate::infrastructure::repositories::share_fs_repository::ShareFsRepository;
+use crate::infrastructure::repositories::parallel_file_processor::ParallelFileProcessor;
 use crate::infrastructure::services::file_system_i18n_service::FileSystemI18nService;
 use crate::infrastructure::services::id_mapping_service::IdMappingService;
+use crate::infrastructure::services::id_mapping_optimizer::IdMappingOptimizer;
 use crate::infrastructure::services::cache_manager::StorageCacheManager;
 use crate::infrastructure::services::file_metadata_cache::FileMetadataCache;
+use crate::infrastructure::services::buffer_pool::BufferPool;
+use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 use crate::application::services::folder_service::FolderService;
 use crate::application::services::file_service::FileService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
+use crate::application::services::trash_service::TrashService;
+use crate::application::services::search_service::SearchService;
+use crate::application::services::share_service::ShareService;
+use crate::application::services::favorites_service::FavoritesService;
+use crate::application::services::recent_service::RecentService;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::storage_mediator::{StorageMediator, FileSystemStorageMediator};
 use crate::application::ports::inbound::{FileUseCase, FolderUseCase, SearchUseCase};
@@ -28,11 +37,14 @@ use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::infrastructure::repositories::{FileMetadataManager, FilePathResolver, FileFsReadRepository, FileFsWriteRepository};
 use crate::application::services::{FileUploadService, FileRetrievalService, FileManagementService, AppFileUseCaseFactory};
 use crate::common::errors::DomainError;
+use crate::common::adapters::{DomainFileRepoAdapter, DomainFolderRepoAdapter};
 use crate::domain::services::i18n_service::I18nService;
 use crate::common::config::AppConfig;
 
 /// Fábrica para los diferentes componentes de la aplicación
-#[allow(dead_code)]
+/// 
+/// Esta fábrica centraliza la creación de todos los servicios de la aplicación,
+/// garantizando el orden correcto de inicialización y resolviendo dependencias circulares.
 pub struct AppServiceFactory {
     storage_path: PathBuf,
     locales_path: PathBuf,
@@ -41,7 +53,6 @@ pub struct AppServiceFactory {
 
 impl AppServiceFactory {
     /// Crea una nueva fábrica de servicios
-    #[allow(dead_code)]
     pub fn new(storage_path: PathBuf, locales_path: PathBuf) -> Self {
         Self {
             storage_path,
@@ -51,7 +62,6 @@ impl AppServiceFactory {
     }
     
     /// Crea una nueva fábrica de servicios con configuración personalizada
-    #[allow(dead_code)]
     pub fn with_config(storage_path: PathBuf, locales_path: PathBuf, config: AppConfig) -> Self {
         Self {
             storage_path,
@@ -60,17 +70,25 @@ impl AppServiceFactory {
         }
     }
     
+    /// Obtiene la configuración
+    pub fn config(&self) -> &AppConfig {
+        &self.config
+    }
+    
+    /// Obtiene la ruta de almacenamiento
+    pub fn storage_path(&self) -> &PathBuf {
+        &self.storage_path
+    }
+    
     /// Inicializa los servicios base del sistema
-    #[allow(dead_code)]
     pub async fn create_core_services(&self) -> Result<CoreServices, DomainError> {
         // Path service
         let path_service = Arc::new(PathService::new(self.storage_path.clone()));
         
         // Cache manager
-        // TTL values in milliseconds and max entries for cache
-        let file_ttl_ms = 60_000; // 1 minute for files
-        let dir_ttl_ms = 120_000; // 2 minutes for directories
-        let max_entries = 10_000; // Maximum cache entries
+        let file_ttl_ms = self.config.cache.file_ttl_ms;
+        let dir_ttl_ms = self.config.cache.directory_ttl_ms;
+        let max_entries = self.config.cache.max_entries;
         let cache_manager = Arc::new(StorageCacheManager::new(file_ttl_ms, dir_ttl_ms, max_entries));
         
         // Iniciar tarea de limpieza de caché en segundo plano
@@ -79,22 +97,39 @@ impl AppServiceFactory {
             StorageCacheManager::start_cleanup_task(cache_manager_clone).await;
         });
         
-        // ID mapping service
-        let id_mapping_path = self.storage_path.join("folder_ids.json");
-        let id_mapping_service = Arc::new(
-            IdMappingService::new(id_mapping_path).await?
+        // ID mapping service para carpetas
+        let folder_id_mapping_path = self.storage_path.join("folder_ids.json");
+        let folder_id_mapping_service = Arc::new(
+            IdMappingService::new(folder_id_mapping_path).await?
         );
+        
+        // ID mapping service para archivos
+        let file_id_mapping_path = self.storage_path.join("file_ids.json");
+        let file_id_mapping_service = Arc::new(
+            IdMappingService::new(file_id_mapping_path).await?
+        );
+        
+        // Optimizer con batch processing y caching
+        let id_mapping_optimizer = Arc::new(
+            IdMappingOptimizer::new(folder_id_mapping_service.clone())
+        );
+        
+        // Iniciar tarea de limpieza del optimizer
+        IdMappingOptimizer::start_cleanup_task(id_mapping_optimizer.clone());
+        
+        tracing::info!("Core services initialized: path service, cache manager, ID mapping");
         
         Ok(CoreServices {
             path_service,
             cache_manager,
-            id_mapping_service,
+            id_mapping_service: folder_id_mapping_service,
+            file_id_mapping_service,
+            id_mapping_optimizer,
             config: self.config.clone(),
         })
     }
     
-    /// Inicializa los servicios de repositorio utilizando el patrón Builder mejorado
-    #[allow(dead_code)]
+    /// Inicializa los servicios de repositorio
     pub fn create_repository_services(&self, core: &CoreServices) -> RepositoryServices {
         // Storage mediator - con inicialización diferida para folder repository
         let folder_repository_holder = Arc::new(RwLock::new(None));
@@ -102,7 +137,7 @@ impl AppServiceFactory {
         let storage_mediator = Arc::new(FileSystemStorageMediator::new_with_lazy_folder(
             folder_repository_holder.clone(),
             core.path_service.clone(),
-            core.id_mapping_service.clone()
+            core.id_mapping_optimizer.clone()
         ));
         
         // Folder repository
@@ -113,7 +148,7 @@ impl AppServiceFactory {
             core.path_service.clone(),
         ));
         
-        // Actualizar el holder para el mediador una vez que el repository está creado
+        // Actualizar el holder para el mediador
         if let Ok(mut holder) = folder_repository_holder.write() {
             *holder = Some(folder_repository.clone());
         }
@@ -122,6 +157,22 @@ impl AppServiceFactory {
         let metadata_cache = Arc::new(
             FileMetadataCache::default_with_config(core.config.clone())
         );
+        
+        // Iniciar tarea de limpieza de metadata cache
+        let cache_clone = metadata_cache.clone();
+        tokio::spawn(async move {
+            FileMetadataCache::start_cleanup_task(cache_clone).await;
+        });
+        
+        // Buffer pool para optimización de memoria
+        let buffer_pool = BufferPool::new(256 * 1024, 50, 120); // 256KB buffers, 50 max, 2 min TTL
+        BufferPool::start_cleaner(buffer_pool.clone());
+        
+        // Parallel file processor
+        let parallel_processor = Arc::new(ParallelFileProcessor::new_with_buffer_pool(
+            core.config.clone(),
+            buffer_pool.clone()
+        ));
         
         // Componentes refactorizados
         let metadata_manager = Arc::new(FileMetadataManager::new(
@@ -141,7 +192,7 @@ impl AppServiceFactory {
             metadata_manager.clone(),
             path_resolver.clone(),
             core.config.clone(),
-            None // processor will be added later if needed
+            Some(parallel_processor.clone())
         ));
         
         let file_write_repository = Arc::new(FileFsWriteRepository::new(
@@ -150,16 +201,17 @@ impl AppServiceFactory {
             path_resolver.clone(),
             storage_mediator.clone(),
             core.config.clone(),
-            None // processor will be added later if needed
+            Some(parallel_processor.clone())
         ));
         
-        // Legacy file repository - mantenido por compatibilidad
-        let file_repository = Arc::new(FileFsRepository::new(
+        // File repository con procesamiento paralelo
+        let file_repository = Arc::new(FileFsRepository::new_with_processor(
             self.storage_path.clone(), 
             storage_mediator.clone(),
-            core.id_mapping_service.clone(),
+            core.file_id_mapping_service.clone(),
             core.path_service.clone(),
-            metadata_cache,
+            metadata_cache.clone(),
+            parallel_processor
         ));
         
         // I18n repository
@@ -177,6 +229,8 @@ impl AppServiceFactory {
             None
         };
         
+        tracing::info!("Repository services initialized with parallel processing and buffer pool");
+        
         RepositoryServices {
             folder_repository,
             file_repository,
@@ -186,24 +240,23 @@ impl AppServiceFactory {
             storage_mediator,
             metadata_manager,
             path_resolver,
+            metadata_cache,
             trash_repository,
         }
     }
     
     /// Inicializa los servicios de aplicación
-    #[allow(dead_code)]
     pub fn create_application_services(&self, repos: &RepositoryServices) -> ApplicationServices {
         // Servicios principales
         let folder_service = Arc::new(FolderService::new(
             repos.folder_repository.clone()
         ));
         
-        // Antiguo servicio único
         let file_service = Arc::new(FileService::new(
             repos.file_repository.clone()
         ));
         
-        // Nuevos servicios refactorizados
+        // Servicios refactorizados
         let file_upload_service = Arc::new(FileUploadService::new(
             repos.file_write_repository.clone()
         ));
@@ -225,13 +278,21 @@ impl AppServiceFactory {
             repos.i18n_repository.clone()
         ));
         
-        // Servicio de papelera (deshabilitado temporalmente)
-        let trash_service = None; // La función de papelera está deshabilitada por defecto
+        // Search service con caché
+        let search_service: Option<Arc<dyn SearchUseCase>> = Some(Arc::new(SearchService::new(
+            repos.file_repository.clone(),
+            repos.folder_repository.clone(),
+            300, // Cache TTL in seconds (5 minutes)
+            1000, // Maximum cache entries
+        )));
         
-        // Servicio de búsqueda (deshabilitado por defecto)
-        let search_service = None; // La función de búsqueda se activa según la configuración
+        tracing::info!("Application services initialized");
         
         ApplicationServices {
+            // Tipos concretos para handlers que los necesitan
+            folder_service_concrete: folder_service.clone(),
+            file_service_concrete: file_service.clone(),
+            // Traits para abstracción
             folder_service,
             file_service,
             file_upload_service,
@@ -239,27 +300,132 @@ impl AppServiceFactory {
             file_management_service,
             file_use_case_factory,
             i18n_service,
-            trash_service,
+            trash_service: None, // Se configura después con create_trash_service
             search_service,
-            share_service: None, // No share service by default
-            favorites_service: None, // No favorites service by default
-            recent_service: None // No recent service by default
+            share_service: None, // Se configura después con create_share_service
+            favorites_service: None, // Se configura después con create_favorites_service
+            recent_service: None, // Se configura después con create_recent_service
+        }
+    }
+    
+    /// Crea el servicio de papelera
+    pub async fn create_trash_service(
+        &self,
+        repos: &RepositoryServices,
+    ) -> Option<Arc<dyn TrashUseCase>> {
+        if !self.config.features.enable_trash {
+            tracing::info!("Trash service is disabled in configuration");
+            return None;
+        }
+        
+        let trash_repo = repos.trash_repository.as_ref()?;
+        
+        // Crear adaptadores
+        let file_repo_adapter = Arc::new(DomainFileRepoAdapter::new(repos.file_repository.clone()));
+        let folder_repo_adapter = Arc::new(DomainFolderRepoAdapter::new(repos.folder_repository.clone()));
+        
+        let service = Arc::new(TrashService::new(
+            trash_repo.clone(),
+            file_repo_adapter,
+            folder_repo_adapter,
+            self.config.storage.trash_retention_days,
+        ));
+        
+        // Inicializar servicio de limpieza
+        let cleanup_service = TrashCleanupService::new(
+            service.clone(),
+            trash_repo.clone(),
+            24, // Run cleanup every 24 hours
+        );
+        
+        cleanup_service.start_cleanup_job().await;
+        tracing::info!("Trash service initialized with daily cleanup schedule");
+        
+        Some(service as Arc<dyn TrashUseCase>)
+    }
+    
+    /// Crea el servicio de compartición
+    pub fn create_share_service(
+        &self,
+        repos: &RepositoryServices,
+    ) -> Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>> {
+        if !self.config.features.enable_file_sharing {
+            tracing::info!("File sharing service is disabled in configuration");
+            return None;
+        }
+        
+        let share_repository = Arc::new(ShareFsRepository::new(
+            Arc::new(self.config.clone())
+        ));
+        
+        let service = Arc::new(ShareService::new(
+            Arc::new(self.config.clone()),
+            share_repository,
+            repos.file_repository.clone(),
+            repos.folder_repository.clone()
+        ));
+        
+        tracing::info!("File sharing service initialized");
+        Some(service)
+    }
+    
+    /// Crea el servicio de favoritos (requiere base de datos)
+    pub fn create_favorites_service(
+        &self,
+        db_pool: &Arc<PgPool>,
+    ) -> Arc<dyn FavoritesUseCase> {
+        let service = Arc::new(FavoritesService::new(db_pool.clone()));
+        tracing::info!("Favorites service initialized");
+        service
+    }
+    
+    /// Crea el servicio de elementos recientes (requiere base de datos)
+    pub fn create_recent_service(
+        &self,
+        db_pool: &Arc<PgPool>,
+    ) -> Arc<dyn RecentItemsUseCase> {
+        let service = Arc::new(RecentService::new(
+            db_pool.clone(),
+            50 // Maximum recent items per user
+        ));
+        tracing::info!("Recent items service initialized");
+        service
+    }
+    
+    /// Precarga traducciones
+    pub async fn preload_translations(&self, i18n_service: &I18nApplicationService) {
+        use crate::domain::services::i18n_service::Locale;
+        
+        if let Err(e) = i18n_service.load_translations(Locale::English).await {
+            tracing::warn!("Failed to load English translations: {}", e);
+        }
+        if let Err(e) = i18n_service.load_translations(Locale::Spanish).await {
+            tracing::warn!("Failed to load Spanish translations: {}", e);
+        }
+        tracing::info!("Translations preloaded");
+    }
+    
+    /// Precarga directorios en caché
+    pub async fn preload_cache(&self, metadata_cache: &FileMetadataCache) {
+        tracing::info!("Preloading common directories to warm up cache...");
+        if let Ok(count) = metadata_cache.preload_directory(&self.storage_path, true, 1).await {
+            tracing::info!("Preloaded {} directory entries into cache", count);
         }
     }
 }
 
 /// Contenedor para servicios base
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct CoreServices {
     pub path_service: Arc<PathService>,
     pub cache_manager: Arc<StorageCacheManager>,
     pub id_mapping_service: Arc<dyn crate::application::ports::outbound::IdMappingPort>,
+    pub file_id_mapping_service: Arc<IdMappingService>,
+    pub id_mapping_optimizer: Arc<IdMappingOptimizer>,
     pub config: AppConfig,
 }
 
 /// Contenedor para servicios de repositorio
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct RepositoryServices {
     pub folder_repository: Arc<dyn FolderStoragePort>,
@@ -270,13 +436,17 @@ pub struct RepositoryServices {
     pub storage_mediator: Arc<dyn StorageMediator>,
     pub metadata_manager: Arc<FileMetadataManager>,
     pub path_resolver: Arc<FilePathResolver>,
+    pub metadata_cache: Arc<FileMetadataCache>,
     pub trash_repository: Option<Arc<dyn crate::domain::repositories::trash_repository::TrashRepository>>,
 }
 
 /// Contenedor para servicios de aplicación
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct ApplicationServices {
+    // Tipos concretos para compatibilidad con handlers existentes
+    pub folder_service_concrete: Arc<FolderService>,
+    pub file_service_concrete: Arc<FileService>,
+    // Traits para abstracción
     pub folder_service: Arc<dyn FolderUseCase>,
     pub file_service: Arc<dyn FileUseCase>,
     pub file_upload_service: Arc<dyn FileUploadUseCase>,
@@ -292,10 +462,9 @@ pub struct ApplicationServices {
 }
 
 /// Contenedor para servicios de autenticación
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct AuthServices {
-    pub auth_service: Arc<AuthService>,
+    pub token_service: Arc<dyn crate::application::ports::auth_ports::TokenServicePort>,
     pub auth_application_service: Arc<AuthApplicationService>,
 }
 
@@ -323,7 +492,7 @@ impl Default for AppState {
         
         let config = crate::common::config::AppConfig::default();
         let path_service = Arc::new(
-            crate::domain::services::path_service::PathService::new(
+            crate::infrastructure::services::path_service::PathService::new(
                 std::path::PathBuf::from("./storage")
             )
         );
@@ -758,13 +927,22 @@ impl Default for AppState {
         let file_management_service = Arc::new(DummyFileManagementUseCase) as Arc<dyn crate::application::ports::file_ports::FileManagementUseCase>;
         let file_use_case_factory = Arc::new(DummyFileUseCaseFactory) as Arc<dyn crate::application::ports::file_ports::FileUseCaseFactory>;
         
+        // Create dummy ID mapping service for files
+        let dummy_file_id_mapping = Arc::new(IdMappingService::dummy());
+        let dummy_id_optimizer = Arc::new(IdMappingOptimizer::new(dummy_file_id_mapping.clone()));
+        
         // This creates the core services needed for basic functionality
         let core_services = CoreServices {
             path_service: path_service.clone(),
             cache_manager: Arc::new(crate::infrastructure::services::cache_manager::StorageCacheManager::default()),
             id_mapping_service: id_mapping_service.clone(),
+            file_id_mapping_service: dummy_file_id_mapping,
+            id_mapping_optimizer: dummy_id_optimizer,
             config: config.clone(),
         };
+        
+        // Create dummy metadata cache
+        let dummy_metadata_cache = Arc::new(FileMetadataCache::default_with_config(config.clone()));
         
         // Create empty repository implementations
         let repository_services = RepositoryServices {
@@ -780,6 +958,7 @@ impl Default for AppState {
                 storage_mediator.clone(),
                 id_mapping_service.clone()
             )),
+            metadata_cache: dummy_metadata_cache,
             trash_repository: None, // No trash repository in minimal mode
         };
         
@@ -798,9 +977,17 @@ impl Default for AppState {
                 Ok(())
             }
         }
+        
+        // Create dummy concrete services for compatibility
+        let dummy_folder_storage = Arc::new(DummyFolderStoragePort) as Arc<dyn crate::application::ports::outbound::FolderStoragePort>;
+        let dummy_file_storage = Arc::new(DummyFileStoragePort) as Arc<dyn crate::application::ports::outbound::FileStoragePort>;
+        let folder_service_concrete = Arc::new(FolderService::new(dummy_folder_storage));
+        let file_service_concrete = Arc::new(FileService::new(dummy_file_storage));
 
         // Create application services
         let application_services = ApplicationServices {
+            folder_service_concrete: folder_service_concrete.clone(),
+            file_service_concrete: file_service_concrete.clone(),
             folder_service,
             file_service,
             file_upload_service,

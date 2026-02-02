@@ -16,13 +16,6 @@ impl FileManagementService {
     pub fn new(file_repository: Arc<dyn FileWritePort>) -> Self {
         Self { file_repository }
     }
-    
-    /// Creates a stub for testing
-    pub fn default_stub() -> Self {
-        Self {
-            file_repository: Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub())
-        }
-    }
 }
 
 #[async_trait]

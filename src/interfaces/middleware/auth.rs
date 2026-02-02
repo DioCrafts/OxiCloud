@@ -9,14 +9,8 @@ use axum::{
 
 use crate::common::di::AppState;
 
-// Extensión para almacenar datos del usuario autenticado
-#[derive(Clone, Debug)]
-pub struct CurrentUser {
-    pub id: String,
-    pub username: String,
-    pub email: String,
-    pub role: String,
-}
+// Re-export CurrentUser from application layer for use in handlers
+pub use crate::application::dtos::user_dto::CurrentUser;
 
 // Estructura para usar en extractores de Axum
 #[derive(Clone, Debug)]

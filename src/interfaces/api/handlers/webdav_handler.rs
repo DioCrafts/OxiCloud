@@ -22,7 +22,7 @@ use crate::common::di::AppState;
 use crate::application::adapters::webdav_adapter::{WebDavAdapter, PropFindRequest, LockInfo, LockScope, LockType};
 use crate::interfaces::middleware::auth::CurrentUser;
 use crate::application::dtos::folder_dto::FolderDto;
-use crate::common::errors::AppError;
+use crate::interfaces::errors::AppError;
 
 // Create a custom DAV header since it's not in the standard headers
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");

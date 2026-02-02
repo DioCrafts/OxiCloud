@@ -66,3 +66,12 @@ pub struct ChangePasswordDto {
 pub struct RefreshTokenDto {
     pub refresh_token: String,
 }
+
+/// Datos del usuario autenticado actual (para uso en servicios de application)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CurrentUser {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub role: String,
+}

@@ -9,11 +9,9 @@ use tracing::debug;
 pub const DEFAULT_BUFFER_SIZE: usize = 64 * 1024; // 64KB
 
 /// Número máximo por defecto de buffers en el pool
-#[allow(dead_code)]
 pub const DEFAULT_MAX_BUFFERS: usize = 100;
 
 /// Tiempo de vida por defecto de un buffer inactivo (en segundos)
-#[allow(dead_code)]
 pub const DEFAULT_BUFFER_TTL: u64 = 60;
 
 /// Buffer pooling para optimizar operaciones de lectura/escritura
@@ -83,7 +81,6 @@ impl BufferPool {
     }
     
     /// Crea un pool con configuración por defecto
-    #[allow(dead_code)]
     pub fn default() -> Arc<Self> {
         Self::new(
             DEFAULT_BUFFER_SIZE,
@@ -282,7 +279,6 @@ impl BorrowedBuffer {
     }
     
     /// Obtiene una referencia a los datos utilizados
-    #[allow(dead_code)]
     pub fn as_slice(&self) -> &[u8] {
         &self.buffer[..self.used_size]
     }
@@ -302,7 +298,6 @@ impl BorrowedBuffer {
     }
     
     /// Copia datos a este buffer y actualiza el tamaño usado
-    #[allow(dead_code)]
     pub fn copy_from_slice(&mut self, data: &[u8]) -> usize {
         let copy_size = min(data.len(), self.buffer.len());
         self.buffer[..copy_size].copy_from_slice(&data[..copy_size]);
@@ -311,7 +306,6 @@ impl BorrowedBuffer {
     }
     
     /// Impide que el buffer se devuelva al pool al destruirse
-    #[allow(dead_code)]
     pub fn do_not_return(mut self) -> Self {
         self.return_to_pool = false;
         self
@@ -323,7 +317,6 @@ impl BorrowedBuffer {
     }
     
     /// Obtiene el tamaño usado del buffer
-    #[allow(dead_code)]
     pub fn used_size(&self) -> usize {
         self.used_size
     }

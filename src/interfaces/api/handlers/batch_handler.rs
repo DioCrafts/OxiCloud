@@ -39,7 +39,6 @@ pub struct BatchFolderOperationRequest {
     pub recursive: bool,
     /// ID de la carpeta destino (opcional)
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[allow(dead_code)]
     pub target_folder_id: Option<String>,
 }
 

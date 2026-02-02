@@ -48,14 +48,12 @@ pub trait CompressionService: Send + Sync {
     async fn decompress_data(&self, compressed_data: &[u8]) -> io::Result<Vec<u8>>;
     
     /// Comprime un stream de datos
-    #[allow(dead_code)]
     fn compress_stream<S>(&self, stream: S, level: CompressionLevel) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where
         S: Stream<Item = io::Result<Bytes>> + Send + 'static + Unpin;
     
     /// Descomprime un stream de datos
-    #[allow(dead_code)]
     fn decompress_stream<S>(&self, compressed_stream: S) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where

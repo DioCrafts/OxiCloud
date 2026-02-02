@@ -50,7 +50,7 @@ pub fn create_api_routes(
 ) -> Router<crate::common::di::AppState> {
     // Create a simplified AppState for the trash view
     // Setup required components for repository construction
-    let path_service = Arc::new(crate::domain::services::path_service::PathService::new(std::path::PathBuf::from("./storage")));
+    let path_service = Arc::new(crate::infrastructure::services::path_service::PathService::new(std::path::PathBuf::from("./storage")));
     let storage_mediator = Arc::new(crate::application::services::storage_mediator::FileSystemStorageMediator::new_stub());
     let id_mapping_service = Arc::new(crate::infrastructure::services::id_mapping_service::IdMappingService::dummy());
     let path_resolver = Arc::new(crate::infrastructure::repositories::file_path_resolver::FilePathResolver::new(
@@ -79,11 +79,17 @@ pub fn create_api_routes(
         path_service.clone(),
     ));
     
+    // Create concrete id_mapping_service for optimizer
+    let id_mapping_service_concrete = Arc::new(crate::infrastructure::services::id_mapping_service::IdMappingService::dummy());
+    let id_mapping_optimizer = Arc::new(crate::infrastructure::services::id_mapping_optimizer::IdMappingOptimizer::new(id_mapping_service_concrete.clone()));
+    
     let mut app_state = crate::common::di::AppState {
         core: crate::common::di::CoreServices {
             path_service: path_service.clone(),
             cache_manager: Arc::new(crate::infrastructure::services::cache_manager::StorageCacheManager::default()),
             id_mapping_service: id_mapping_service.clone(),
+            file_id_mapping_service: id_mapping_service_concrete.clone(),
+            id_mapping_optimizer: id_mapping_optimizer.clone(),
             config: crate::common::config::AppConfig::default(),
         },
         repositories: crate::common::di::RepositoryServices {
@@ -95,16 +101,28 @@ pub fn create_api_routes(
             storage_mediator: storage_mediator.clone(),
             metadata_manager: Arc::new(crate::infrastructure::repositories::FileMetadataManager::default()),
             path_resolver: path_resolver.clone(),
+            metadata_cache: metadata_cache.clone(),
             trash_repository: None, // This is OK to be None since we use the trash_service directly
         },
         storage_usage_service: None,
         applications: crate::common::di::ApplicationServices {
+            folder_service_concrete: folder_service.clone(),
+            file_service_concrete: file_service.clone(),
             folder_service: folder_service.clone(),
             file_service: file_service.clone(),
-            file_upload_service: Arc::new(crate::application::services::file_upload_service::FileUploadService::default_stub()),
-            file_retrieval_service: Arc::new(crate::application::services::file_retrieval_service::FileRetrievalService::default_stub()),
-            file_management_service: Arc::new(crate::application::services::file_management_service::FileManagementService::default_stub()),
-            file_use_case_factory: Arc::new(crate::application::services::file_use_case_factory::AppFileUseCaseFactory::default_stub()),
+            file_upload_service: Arc::new(crate::application::services::file_upload_service::FileUploadService::new(
+                Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub())
+            )),
+            file_retrieval_service: Arc::new(crate::application::services::file_retrieval_service::FileRetrievalService::new(
+                Arc::new(crate::infrastructure::repositories::FileFsReadRepository::default_stub())
+            )),
+            file_management_service: Arc::new(crate::application::services::file_management_service::FileManagementService::new(
+                Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub())
+            )),
+            file_use_case_factory: Arc::new(crate::application::services::file_use_case_factory::AppFileUseCaseFactory::new(
+                Arc::new(crate::infrastructure::repositories::FileFsReadRepository::default_stub()),
+                Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub())
+            )),
             i18n_service: i18n_service.clone().unwrap_or_else(|| 
                 Arc::new(crate::application::services::i18n_application_service::I18nApplicationService::dummy())
             ),

@@ -1,12 +1,11 @@
 use std::sync::Arc;
-use thiserror::Error;
 use futures::{future::join_all, Future};
 use tokio::sync::Semaphore;
-use tracing::{info, error};
+use tracing::info;
+use thiserror::Error;
 
 use crate::application::services::file_service::FileService;
 use crate::application::services::folder_service::FolderService;
-use crate::domain::services::path_service::StoragePath;
 use crate::common::errors::DomainError;
 use crate::common::config::AppConfig;
 use crate::application::ports::inbound::FolderUseCase;
@@ -15,7 +14,6 @@ use crate::application::dtos::folder_dto::FolderDto;
 
 /// Errores específicos para operaciones por lotes
 #[derive(Debug, Error)]
-#[allow(dead_code)]
 pub enum BatchOperationError {
     #[error("Error de dominio: {0}")]
     Domain(#[from] DomainError),
@@ -57,52 +55,6 @@ pub struct BatchStats {
     pub execution_time_ms: u128,
     /// Concurrencia máxima alcanzada
     pub max_concurrency: usize,
-}
-
-/// Tipo de entidad para operaciones por lotes
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum EntityType {
-    File,
-    Folder,
-}
-
-/// Tipo de operación por lotes
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum BatchOperationType {
-    Create,
-    Read,
-    Update,
-    Delete,
-    Copy,
-    Move,
-}
-
-/// Identificador para una entidad (ID o ruta)
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub enum EntityIdentifier {
-    Id(String),
-    Path(StoragePath),
-}
-
-impl EntityIdentifier {
-    #[allow(dead_code)]
-    pub fn as_id(&self) -> Option<&str> {
-        match self {
-            EntityIdentifier::Id(id) => Some(id),
-            _ => None,
-        }
-    }
-    
-    #[allow(dead_code)]
-    pub fn as_path(&self) -> Option<&StoragePath> {
-        match self {
-            EntityIdentifier::Path(path) => Some(path),
-            _ => None,
-        }
-    }
 }
 
 /// Servicio de operaciones por lotes
@@ -494,7 +446,6 @@ impl BatchOperationService {
     }
     
     /// Operación genérica de lote para cualquier tipo de función asíncrona
-    #[allow(dead_code)]
     pub async fn generic_batch_operation<T, F, Fut>(
         &self,
         items: Vec<T>,

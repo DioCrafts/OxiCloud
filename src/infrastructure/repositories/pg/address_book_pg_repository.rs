@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::domain::entities::contact::AddressBook;
 use crate::domain::repositories::address_book_repository::{AddressBookRepository, AddressBookRepositoryResult};
-use crate::common::errors::{DomainError, ErrorContext};
+use crate::common::errors::DomainError;
 
 pub struct AddressBookPgRepository {
     pool: Arc<PgPool>,
@@ -14,11 +14,6 @@ pub struct AddressBookPgRepository {
 impl AddressBookPgRepository {
     pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
-    }
-    
-    // Método auxiliar para mapear errores SQL
-    fn map_error<T>(err: sqlx::Error) -> Result<T, DomainError> {
-        Err(DomainError::database_error(err.to_string()))
     }
 }
 

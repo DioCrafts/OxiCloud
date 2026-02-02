@@ -23,14 +23,6 @@ impl AppFileUseCaseFactory {
             file_write_repository,
         }
     }
-    
-    /// Crea un stub para pruebas
-    pub fn default_stub() -> Self {
-        Self {
-            file_read_repository: Arc::new(crate::infrastructure::repositories::FileFsReadRepository::default_stub()),
-            file_write_repository: Arc::new(crate::infrastructure::repositories::FileFsWriteRepository::default_stub()),
-        }
-    }
 }
 
 impl FileUseCaseFactory for AppFileUseCaseFactory {

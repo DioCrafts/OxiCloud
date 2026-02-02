@@ -22,7 +22,8 @@ use crate::application::services::storage_mediator::StorageMediator;
 // use crate::application::ports::outbound::IdMappingPort;
 use crate::infrastructure::services::id_mapping_service::IdMappingError;
 use crate::infrastructure::services::file_metadata_cache::{FileMetadataCache, CacheEntryType};
-use crate::domain::services::path_service::{StoragePath, PathService};
+use crate::domain::services::path_service::StoragePath;
+use crate::infrastructure::services::path_service::PathService;
 use crate::common::errors::DomainError;
 use crate::common::config::AppConfig;
 use crate::application::ports::outbound::FileStoragePort;
@@ -63,7 +64,6 @@ pub struct FileFsRepository {
 
 impl FileFsRepository {
     /// Creates a new filesystem-based file repository
-    #[allow(dead_code)]
     pub fn new(
         root_path: PathBuf, 
         storage_mediator: Arc<dyn StorageMediator>,
@@ -386,14 +386,6 @@ impl From<IdMappingError> for FileRepositoryError {
             IdMappingError::Timeout(msg) => FileRepositoryError::Timeout(msg),
             _ => FileRepositoryError::Other(err.to_string()),
         }
-    }
-}
-
-// Add Timeout variant to FileRepositoryError
-impl FileRepositoryError {
-    #[allow(dead_code)]
-    fn timeout(message: impl Into<String>) -> Self {
-        FileRepositoryError::Timeout(message.into())
     }
 }
 

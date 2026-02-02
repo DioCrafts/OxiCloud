@@ -12,7 +12,6 @@ use bytes::Bytes;
  * operations, providing detailed context for error handling across the application.
  */
 #[derive(Debug, thiserror::Error)]
-#[allow(dead_code)]
 pub enum FileRepositoryError {
     /// Returned when a requested file cannot be found by ID or path
     #[error("File not found: {0}")]
@@ -109,7 +108,6 @@ pub trait FileRepository: Send + Sync + 'static {
      * @param content Binary data of the file
      * @return The created File entity on success, error otherwise
      */
-    #[allow(dead_code)]
     async fn save_file_with_id(
         &self,
         id: String,
@@ -152,7 +150,6 @@ pub trait FileRepository: Send + Sync + 'static {
      * @param id The unique identifier of the file to delete
      * @return Success or error
      */
-    #[allow(dead_code)]
     async fn delete_file_entry(&self, id: &str) -> FileRepositoryResult<()>;
     
     /**

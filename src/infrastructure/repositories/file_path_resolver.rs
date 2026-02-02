@@ -2,7 +2,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use async_trait::async_trait;
 
-use crate::domain::services::path_service::{PathService, StoragePath};
+use crate::domain::services::path_service::StoragePath;
+use crate::infrastructure::services::path_service::PathService;
 use crate::application::services::storage_mediator::StorageMediator;
 // use crate::application::ports::outbound::IdMappingPort;
 use crate::domain::repositories::file_repository::FileRepositoryError;

@@ -7,8 +7,8 @@ use thiserror::Error;
 use crate::domain::entities::folder::Folder;
 use crate::domain::repositories::folder_repository::{FolderRepository, FolderRepositoryError};
 use crate::domain::repositories::file_repository::FileRepositoryError;
-use crate::domain::services::path_service::{PathService, StoragePath};
-use crate::application::ports::outbound::IdMappingPort;
+use crate::domain::services::path_service::StoragePath;
+use crate::application::ports::outbound::{IdMappingPort, StoragePort};
 
 /// Errores específicos del mediador de almacenamiento
 #[derive(Debug, Error)]
@@ -99,12 +99,12 @@ pub trait StorageMediator: Send + Sync + 'static {
 /// Implementación concreta del mediador de almacenamiento
 pub struct FileSystemStorageMediator {
     pub folder_repository: Arc<dyn FolderRepository>,
-    pub path_service: Arc<PathService>,
+    pub path_service: Arc<dyn StoragePort>,
     pub id_mapping: Arc<dyn IdMappingPort>,
 }
 
 impl FileSystemStorageMediator {
-    pub fn new(folder_repository: Arc<dyn FolderRepository>, path_service: Arc<PathService>, id_mapping: Arc<dyn IdMappingPort>) -> Self {
+    pub fn new(folder_repository: Arc<dyn FolderRepository>, path_service: Arc<dyn StoragePort>, id_mapping: Arc<dyn IdMappingPort>) -> Self {
         Self { folder_repository, path_service, id_mapping }
     }
     
@@ -116,7 +116,7 @@ impl FileSystemStorageMediator {
     /// Overload para implementar inicialización diferida con repository placeholder
     pub fn new_with_lazy_folder(
         _folder_repository: Arc<RwLock<Option<Arc<dyn FolderRepository>>>>,
-        path_service: Arc<PathService>,
+        path_service: Arc<dyn StoragePort>,
         id_mapping: Arc<dyn IdMappingPort>
     ) -> Self {
         // Create temporary stub repository
@@ -208,16 +208,18 @@ impl FolderRepository for FolderRepositoryStub {
 }
 
 /// Stub implementation for initialization dependency issues
-pub struct StubStorageMediator {
-    #[allow(dead_code)]
-    _path_service: Arc<PathService>,
-}
+/// This is a minimal stub that doesn't require any infrastructure dependencies
+pub struct StubStorageMediator;
 
 impl StubStorageMediator {
     pub fn new() -> Self {
-        let root_path = PathBuf::from("/tmp");
-        let path_service = Arc::new(PathService::new(root_path));
-        Self { _path_service: path_service }
+        Self
+    }
+}
+
+impl Default for StubStorageMediator {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
