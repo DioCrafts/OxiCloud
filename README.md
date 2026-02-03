@@ -62,13 +62,13 @@ OxiCloud uses Clean Architecture with four layers:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Interfaces    │ API routes, handlers  │
+│  Interfaces    │ API routes, handlers   │
 ├─────────────────────────────────────────┤
-│  Application   │ Use cases, services   │
+│  Application   │ Use cases, services    │
 ├─────────────────────────────────────────┤
-│  Domain        │ Business logic        │
+│  Domain        │ Business logic         │
 ├─────────────────────────────────────────┤
-│  Infrastructure│ Database, filesystem  │
+│  Infrastructure│ Database, filesystem   │
 └─────────────────────────────────────────┘
 ```
 
