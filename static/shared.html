@@ -44,11 +44,11 @@
         </div>
 
         <div class="storage-container">
-            <div class="storage-title">Almacenamiento</div>
+            <div class="storage-title" data-i18n="storage.title">Storage</div>
             <div class="storage-bar">
                 <div class="storage-fill"></div>
             </div>
-            <div class="storage-info">56% usado (5.6GB / 10GB)</div>
+            <div class="storage-info" data-i18n="storage.calculating">Calculating...</div>
         </div>
     </div>
 
@@ -59,18 +59,15 @@
             <div class="search-container">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" id="shared-search" data-i18n-placeholder="actions.search" placeholder="Search shared items...">
-                <button id="shared-search-btn" class="search-button"><i class="fas fa-search"></i></button>
+                <button id="shared-search-btn" class="search-button" data-i18n-title="actions.search_btn" title="Search">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
 
             <div class="user-controls">
-                <div id="language-selector" class="language-selector">
-                    <select id="language-selector-dropdown">
-                        <option value="en">English</option>
-                        <option value="es">Español</option>
-                    </select>
-                </div>
-                <div class="user-avatar">MR</div>
-                <div id="logout-btn" class="logout-btn" title="Cerrar sesión">
+                <div id="language-selector"></div>
+                <div class="user-avatar" id="user-avatar">AD</div>
+                <div id="logout-btn" class="logout-btn" data-i18n-title="actions.logout" title="Log out">
                     <i class="fas fa-sign-out-alt"></i>
                 </div>
             </div>

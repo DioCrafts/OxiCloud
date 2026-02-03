@@ -17,6 +17,7 @@
     <!-- Scripts -->
     <script src="/js/i18n.js"></script>
     <script src="/js/languageSelector.js"></script>
+    <script src="/js/modal.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/contextMenus.js"></script>
     <script src="/js/fileOperations.js"></script>
@@ -79,11 +80,11 @@
         </div>
 
         <div class="storage-container">
-            <div class="storage-title">Almacenamiento</div>
+            <div class="storage-title" data-i18n="storage.title">Storage</div>
             <div class="storage-bar">
                 <div class="storage-fill"></div>
             </div>
-            <div class="storage-info">Calculando...</div>
+            <div class="storage-info" data-i18n="storage.calculating">Calculating...</div>
         </div>
     </div>
 
@@ -93,14 +94,16 @@
         <div class="top-bar">
             <div class="search-container">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" data-i18n-placeholder="actions.search" placeholder="Buscar archivos, carpetas...">
-                <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
+                <input type="text" id="search-input" data-i18n-placeholder="actions.search" placeholder="Buscar archivos, carpetas...">
+                <button id="search-button" class="search-button" data-i18n-title="actions.search_btn" title="Search">
+                    <i class="fas fa-search"></i>
+                </button>
             </div>
 
             <div class="user-controls">
-                <div id="language-selector" class="language-selector">ES</div>
-                <div class="user-avatar">MR</div>
-                <div id="logout-btn" class="logout-btn" title="Cerrar sesión">
+                <div id="language-selector"></div>
+                <div class="user-avatar" id="user-avatar">AD</div>
+                <div id="logout-btn" class="logout-btn" data-i18n-title="actions.logout" title="Log out">
                     <i class="fas fa-sign-out-alt"></i>
                 </div>
             </div>
@@ -112,10 +115,12 @@
             <div class="actions-bar">
                 <div class="action-buttons">
                     <button class="btn btn-primary" id="upload-btn">
-                        <i class="fas fa-upload" style="margin-right: 5px;"></i> <span data-i18n="actions.upload">Subir</span>
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span data-i18n="actions.upload">Subir</span>
                     </button>
                     <button class="btn btn-secondary" id="new-folder-btn">
-                        <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">Nueva carpeta</span>
+                        <i class="fas fa-folder-plus"></i>
+                        <span data-i18n="actions.new_folder">Nueva carpeta</span>
                     </button>
                 </div>
 
@@ -161,6 +166,29 @@
                     </div>
                     <!-- Files will be populated here in list view -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Modal (for New Folder, Rename, etc.) -->
+    <div id="input-modal" class="modal-overlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <div class="modal-icon">
+                    <i id="modal-icon" class="fas fa-folder-plus"></i>
+                </div>
+                <h3 id="modal-title" data-i18n="dialogs.new_folder_title">Nueva carpeta</h3>
+                <button class="modal-close-btn" id="modal-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <label id="modal-label" for="modal-input" data-i18n="dialogs.folder_name">Nombre de la carpeta</label>
+                <input type="text" id="modal-input" class="modal-input" placeholder="" autocomplete="off">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="modal-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
+                <button class="btn btn-primary" id="modal-confirm-btn" data-i18n="actions.confirm">Crear</button>
             </div>
         </div>
     </div>

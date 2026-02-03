@@ -31,6 +31,7 @@ use crate::application::ports::recent_ports::RecentItemsUseCase;
 use crate::interfaces::api::handlers::folder_handler::FolderHandler;
 use crate::interfaces::api::handlers::file_handler::FileHandler;
 use crate::interfaces::api::handlers::i18n_handler::I18nHandler;
+use crate::interfaces::api::handlers::chunked_upload_handler::ChunkedUploadHandler;
 // Eliminamos la importación de ShareHandler ya que ahora usamos directamente el servicio
 use crate::interfaces::api::handlers::batch_handler::{
     self, BatchHandlerState
@@ -83,13 +84,54 @@ pub fn create_api_routes(
     let id_mapping_service_concrete = Arc::new(crate::infrastructure::services::id_mapping_service::IdMappingService::dummy());
     let id_mapping_optimizer = Arc::new(crate::infrastructure::services::id_mapping_optimizer::IdMappingOptimizer::new(id_mapping_service_concrete.clone()));
     
+    // Create dummy thumbnail service for routes
+    let thumbnail_service = Arc::new(
+        crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
+            &std::path::PathBuf::from("./storage"),
+            100,
+            10 * 1024 * 1024,
+        )
+    );
+    
+    // Create dummy write-behind cache for routes
+    let write_behind_cache = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
+    
+    // Create dummy chunked upload service for routes
+    let chunked_upload_service = Arc::new(
+        crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
+            std::path::PathBuf::from("./storage/.uploads")
+        )
+    );
+    
+    // Create dummy image transcode service for routes
+    let image_transcode_service = Arc::new(
+        crate::infrastructure::services::image_transcode_service::ImageTranscodeService::new(
+            &std::path::PathBuf::from("./storage"),
+            100,
+            10 * 1024 * 1024,
+        )
+    );
+    
+    // Create dummy dedup service for routes
+    let dedup_service = Arc::new(
+        crate::infrastructure::services::dedup_service::DedupService::new(
+            &std::path::PathBuf::from("./storage")
+        )
+    );
+    
     let mut app_state = crate::common::di::AppState {
         core: crate::common::di::CoreServices {
             path_service: path_service.clone(),
             cache_manager: Arc::new(crate::infrastructure::services::cache_manager::StorageCacheManager::default()),
+            file_content_cache: Arc::new(crate::infrastructure::services::file_content_cache::FileContentCache::default()),
             id_mapping_service: id_mapping_service.clone(),
             file_id_mapping_service: id_mapping_service_concrete.clone(),
             id_mapping_optimizer: id_mapping_optimizer.clone(),
+            thumbnail_service: thumbnail_service.clone(),
+            write_behind_cache: write_behind_cache.clone(),
+            chunked_upload_service: chunked_upload_service.clone(),
+            image_transcode_service: image_transcode_service.clone(),
+            dedup_service: dedup_service.clone(),
             config: crate::common::config::AppConfig::default(),
         },
         repositories: crate::common::di::RepositoryServices {
@@ -239,13 +281,13 @@ pub fn create_api_routes(
     // Create file routes for basic operations and trash-enabled delete
     let basic_file_router = Router::new()
         .route("/", get(|
-            State(service): State<Arc<FileService>>,
+            State(state): State<AppState>,
             axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
         | async move {
             // Get folder_id from query parameter if present
             let folder_id = params.get("folder_id").map(|id| id.as_str());
             tracing::info!("API: Listando archivos con folder_id: {:?}", folder_id);
-            // Pass the service directly to the handler
+            let service = &state.applications.file_service_concrete;
             match service.list_files(folder_id).await {
                 Ok(files) => {
                     tracing::info!("Found {} files", files.len());
@@ -259,9 +301,58 @@ pub fn create_api_routes(
                 }
             }
         }))
-        .route("/upload", post(FileHandler::upload_file))
+        .route("/upload", post(|
+            State(state): State<AppState>,
+            multipart: axum::extract::Multipart,
+        | async move {
+            use crate::infrastructure::services::thumbnail_service::ThumbnailService;
+            
+            // Use the new upload handler with write-behind cache
+            let response = FileHandler::upload_file_with_cache(
+                State(state.clone()), 
+                multipart
+            ).await;
+            
+            // Try to extract file info for thumbnail generation
+            if let Ok(body_bytes) = axum::body::to_bytes(response.into_response().into_body(), 10 * 1024).await {
+                if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
+                    if let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
+                        file_info.get("id").and_then(|v| v.as_str()),
+                        file_info.get("mime_type").and_then(|v| v.as_str()),
+                        file_info.get("path").and_then(|v| v.as_str())
+                    ) {
+                        // Generate thumbnails for images in background
+                        if ThumbnailService::is_supported_image(mime_type) {
+                            let file_id = file_id.to_string();
+                            let file_path_rel = file_path_str.to_string();
+                            let thumbnail_service = state.core.thumbnail_service.clone();
+                            let path_service = state.core.path_service.clone();
+                            
+                            tokio::spawn(async move {
+                                let file_path = path_service.get_root_path().join(&file_path_rel);
+                                tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
+                                thumbnail_service.generate_all_sizes_background(file_id, file_path);
+                            });
+                        }
+                        
+                        // Return the response
+                        return axum::http::Response::builder()
+                            .status(axum::http::StatusCode::CREATED)
+                            .header(axum::http::header::CONTENT_TYPE, "application/json")
+                            .header(axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                            .body(axum::body::Body::from(body_bytes))
+                            .unwrap()
+                            .into_response();
+                    }
+                }
+            }
+            
+            // Fallback for errors
+            (axum::http::StatusCode::INTERNAL_SERVER_ERROR, "Upload processing error").into_response()
+        }))
         .route("/{id}", get(FileHandler::download_file))
-        .with_state(file_service.clone());
+        .route("/{id}/thumbnail/{size}", get(FileHandler::get_thumbnail))
+        .with_state(app_state.clone());
     
     // Let's create a router for file operations with trash support
     let file_operations_router = Router::new()
@@ -379,10 +470,31 @@ pub fn create_api_routes(
     } else {
         Router::new()
     };
+    
+    // Create routes for chunked uploads (large files >10MB)
+    let chunked_upload_router = Router::new()
+        .route("/", post(ChunkedUploadHandler::create_upload))
+        .route("/{upload_id}", axum::routing::patch(ChunkedUploadHandler::upload_chunk))
+        .route("/{upload_id}", axum::routing::head(ChunkedUploadHandler::get_upload_status))
+        .route("/{upload_id}/complete", post(ChunkedUploadHandler::complete_upload))
+        .route("/{upload_id}", delete(ChunkedUploadHandler::cancel_upload))
+        .with_state(Arc::new(app_state.clone()));
+
+    // Create routes for deduplication endpoints
+    let dedup_router = Router::new()
+        .route("/check/{hash}", get(super::handlers::dedup_handler::DedupHandler::check_hash))
+        .route("/upload", post(super::handlers::dedup_handler::DedupHandler::upload_with_dedup))
+        .route("/stats", get(super::handlers::dedup_handler::DedupHandler::get_stats))
+        .route("/blob/{hash}", get(super::handlers::dedup_handler::DedupHandler::get_blob))
+        .route("/blob/{hash}", delete(super::handlers::dedup_handler::DedupHandler::remove_reference))
+        .route("/recalculate", post(super::handlers::dedup_handler::DedupHandler::recalculate_stats))
+        .with_state(app_state.clone());
 
     let mut router = Router::new()
         .nest("/folders", folders_router)
         .nest("/files", files_router)
+        .nest("/uploads", chunked_upload_router)
+        .nest("/dedup", dedup_router)
         .nest("/batch", batch_router)
         .nest("/search", search_router)
         .nest("/shares", share_router)

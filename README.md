@@ -13,111 +13,114 @@
 
 </div>
 
-## A lightweight, Rust-powered alternative to NextCloud
+## A fast, simple alternative to NextCloud
 
-I built OxiCloud because I wanted a simpler, faster file storage solution than existing options. After struggling with NextCloud's performance on my home server, I decided to create something that prioritizes speed and simplicity while still being robust enough for daily use.
+NextCloud was too slow on my home server. So I built OxiCloud: a file storage system written in Rust that runs on minimal hardware and stays out of your way.
 
 ![OxiCloud Dashboard](doc/images/Captura%20de%20pantalla%202025-03-23%20230739.png)
 
-*OxiCloud's straightforward interface for file and folder management*
+## Why OxiCloud?
 
-## ✨ What makes OxiCloud different?
+| Feature | What you get |
+|---------|--------------|
+| **Low resources** | Runs on 512MB RAM. No PHP, no bloat. |
+| **Fast** | Rust with LTO optimization. Sub-second responses. |
+| **Clean UI** | Works on desktop and mobile. No clutter. |
+| **Easy setup** | One binary, one database, done. |
+| **Multi-language** | English and Spanish out of the box. |
 
-- **Lightweight**: Minimal resource requirements compared to PHP-based alternatives
-- **Responsive UI**: Clean, fast interface that works well on both desktop and mobile
-- **Rust Performance**: Built with Rust for memory safety and speed
-- **Optimized Binary**: Uses Link Time Optimization (LTO) for maximum performance
-- **Simple Setup**: Get running with minimal configuration
-- **Multilingual**: Full support for English and Spanish interfaces
+## Quick Start
 
-## 🛠️ Getting Started
-
-### Prerequisites
-- Rust 1.70+ and Cargo
-- PostgreSQL 13+ database
-- 512MB RAM minimum (1GB+ recommended)
-
-### Installation
+You need Rust 1.70+, Cargo, and PostgreSQL 13+.
 
 ```bash
-# Clone the repository
 git clone https://github.com/DioCrafts/oxicloud.git
 cd oxicloud
 
-# Configure your database (create .env file with your PostgreSQL connection)
+# Set up your database connection
 echo "DATABASE_URL=postgres://username:password@localhost/oxicloud" > .env
 
-# Build the project
+# Build and run
 cargo build --release
-
-# Run database migrations
 cargo run --bin migrate --features migrations
-
-# Run the server
 cargo run --release
 ```
 
-The server will be available at `http://localhost:8085`
+Open `http://localhost:8085` in your browser.
 
-## 🧩 Technical Implementation
-
-OxiCloud follows Clean Architecture principles with clear separation of concerns:
-
-- **Domain Layer**: Core business logic and entities
-- **Application Layer**: Use cases and application services
-- **Infrastructure Layer**: External systems and implementations
-- **Interfaces Layer**: API and web controllers
-
-The architecture makes it easy to extend functionality or swap components without affecting the core system.
-
-## 🚧 Development
+### Docker (alternative)
 
 ```bash
-# Core development workflow
-cargo build                 # Build the project
-cargo run                   # Run the project locally
-cargo check                 # Quick check for compilation errors
-
-# Optimized builds
-cargo build --release       # Build with full optimization (LTO enabled)
-cargo run --release         # Run optimized build
-
-# Testing
-cargo test                  # Run all tests
-cargo test <test_name>      # Run a specific test
-cargo bench                 # Run benchmarks with optimized settings
-
-# Code quality
-cargo clippy                # Run linter
-cargo fmt                   # Format code
-
-# Debugging
-RUST_LOG=debug cargo run    # Run with detailed logging
+docker compose up -d
 ```
 
-## 🗺️ Roadmap
+That's it. The app runs on port 8086.
 
-I'm actively working on improving OxiCloud with features that I need personally:
+## Architecture
 
-- User authentication and multi-user support (in progress)
-- File sharing with simple links
-- WebDAV support for desktop integration
-- Basic file versioning
-- Simple mobile-friendly web interface enhancements
-- Trash bin functionality (in progress)
+OxiCloud uses Clean Architecture with four layers:
 
-See [TODO-LIST.md](TODO-LIST.md) for my current development priorities.
+```
+┌─────────────────────────────────────────┐
+│  Interfaces    │ API routes, handlers  │
+├─────────────────────────────────────────┤
+│  Application   │ Use cases, services   │
+├─────────────────────────────────────────┤
+│  Domain        │ Business logic        │
+├─────────────────────────────────────────┤
+│  Infrastructure│ Database, filesystem  │
+└─────────────────────────────────────────┘
+```
 
-## 🤝 Contributing
+Each layer only talks to the one below it. You can swap out the database or add new API endpoints without touching business logic.
 
-Contributions are welcome! The project is still in early stages, so there's lots of room for improvement.
+## Development
 
-Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed information on how to contribute to OxiCloud. All contributors are expected to follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+```bash
+cargo build                 # Build
+cargo run                   # Run locally
+cargo test                  # Run tests
+cargo clippy                # Lint
+cargo fmt                   # Format
 
-## 📜 License
+# For debugging
+RUST_LOG=debug cargo run
+```
 
-OxiCloud is available under the [MIT License](LICENSE). See the [LICENSE](LICENSE) file for more information.
+## Current Features
+
+- File upload, download, and organization
+- Folder management with drag-and-drop
+- Trash bin with restore functionality
+- User authentication with JWT
+- Personal folders per user
+- File deduplication
+- Write-behind cache for fast uploads
+- Search across files and folders
+- Favorites and recent files
+- Responsive grid/list views
+
+## What's Next
+
+I'm working on these when I have time:
+
+- File sharing via links
+- WebDAV for desktop sync
+- Basic versioning
+- Mobile app improvements
+
+Check [TODO-LIST.md](TODO-LIST.md) for the full list.
+
+## Contributing
+
+The project is early stage. There's plenty to improve.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-Built by a developer who just wanted better file storage. Feedback and contributions welcome!
+Questions? Open an issue. Want to help? PRs welcome.

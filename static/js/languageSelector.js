@@ -1,16 +1,17 @@
 /**
  * Language Selector Component for OxiCloud
+ * Custom styled dropdown with flags
  */
 
-// Language codes and names
+// Language codes, names, and flag emojis
 const languages = [
-    { code: 'en', name: 'English' },
-    { code: 'es', name: 'Español' },
-    { code: 'zh', name: '中文' }
+    { code: 'en', name: 'English', flag: '🇬🇧' },
+    { code: 'es', name: 'Español', flag: '🇪🇸' },
+    { code: 'zh', name: '中文', flag: '🇨🇳' }
 ];
 
 /**
- * Creates and initializes a language selector component
+ * Creates and initializes a custom language selector component
  * @param {string} containerId - ID of the container element
  */
 function createLanguageSelector(containerId = 'language-selector') {
@@ -23,45 +24,157 @@ function createLanguageSelector(containerId = 'language-selector') {
         document.body.appendChild(container);
     }
     
-    // Create dropdown
-    const select = document.createElement('select');
-    select.className = 'language-select';
-    select.setAttribute('aria-label', 'Select language');
+    // Ensure container has the right class
+    container.className = 'language-selector';
     
-    // Add options
+    // Get current language
+    const currentLocale = window.i18n ? window.i18n.getCurrentLocale() : 'en';
+    const currentLang = languages.find(l => l.code === currentLocale) || languages[0];
+    
+    // Create toggle button
+    const toggle = document.createElement('div');
+    toggle.className = 'language-selector-toggle';
+    toggle.setAttribute('role', 'button');
+    toggle.setAttribute('aria-haspopup', 'listbox');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('tabindex', '0');
+    toggle.innerHTML = `
+        <i class="fas fa-globe"></i>
+        <span class="lang-code">${currentLang.code.toUpperCase()}</span>
+        <i class="fas fa-chevron-down dropdown-arrow"></i>
+    `;
+    
+    // Create dropdown menu
+    const dropdown = document.createElement('div');
+    dropdown.className = 'language-selector-dropdown';
+    dropdown.setAttribute('role', 'listbox');
+    
+    // Add language options
     languages.forEach(lang => {
-        const option = document.createElement('option');
-        option.value = lang.code;
-        option.textContent = lang.name;
-        select.appendChild(option);
+        const option = document.createElement('div');
+        option.className = `language-option${lang.code === currentLocale ? ' active' : ''}`;
+        option.setAttribute('role', 'option');
+        option.setAttribute('data-lang', lang.code);
+        option.setAttribute('aria-selected', lang.code === currentLocale);
+        option.innerHTML = `
+            <span class="lang-flag">${lang.flag}</span>
+            <span class="lang-name">${lang.name}</span>
+            <i class="fas fa-check lang-check"></i>
+        `;
+        
+        option.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await selectLanguage(lang.code, container);
+        });
+        
+        dropdown.appendChild(option);
     });
     
-    // Set current language
-    const currentLocale = window.i18n ? window.i18n.getCurrentLocale() : 'en';
-    select.value = currentLocale;
+    // Clear and build container
+    container.innerHTML = '';
+    container.appendChild(toggle);
+    container.appendChild(dropdown);
     
-    // Add change event
-    select.addEventListener('change', async (e) => {
-        const locale = e.target.value;
-        if (window.i18n) {
-            await window.i18n.setLocale(locale);
+    // Toggle dropdown on click
+    toggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown(container);
+    });
+    
+    // Keyboard support
+    toggle.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleDropdown(container);
+        } else if (e.key === 'Escape') {
+            closeDropdown(container);
         }
     });
     
-    // Add to container
-    container.innerHTML = '';
-    container.appendChild(select);
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) {
+            closeDropdown(container);
+        }
+    });
     
-    // Add event listener for locale changes
+    // Listen for locale changes from i18n system
     window.addEventListener('localeChanged', (e) => {
-        select.value = e.detail.locale;
+        updateSelectedLanguage(e.detail.locale, container);
     });
     
     return container;
 }
 
+/**
+ * Toggle dropdown open/closed
+ */
+function toggleDropdown(container) {
+    const isOpen = container.classList.contains('open');
+    if (isOpen) {
+        closeDropdown(container);
+    } else {
+        openDropdown(container);
+    }
+}
+
+/**
+ * Open dropdown
+ */
+function openDropdown(container) {
+    container.classList.add('open');
+    const toggle = container.querySelector('.language-selector-toggle');
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', 'true');
+    }
+}
+
+/**
+ * Close dropdown
+ */
+function closeDropdown(container) {
+    container.classList.remove('open');
+    const toggle = container.querySelector('.language-selector-toggle');
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', 'false');
+    }
+}
+
+/**
+ * Select a language
+ */
+async function selectLanguage(langCode, container) {
+    // Update i18n if available
+    if (window.i18n) {
+        await window.i18n.setLocale(langCode);
+    }
+    
+    updateSelectedLanguage(langCode, container);
+    closeDropdown(container);
+}
+
+/**
+ * Update the UI to reflect selected language
+ */
+function updateSelectedLanguage(langCode, container) {
+    const lang = languages.find(l => l.code === langCode) || languages[0];
+    
+    // Update toggle button text
+    const langCodeSpan = container.querySelector('.lang-code');
+    if (langCodeSpan) {
+        langCodeSpan.textContent = lang.code.toUpperCase();
+    }
+    
+    // Update active state on options
+    const options = container.querySelectorAll('.language-option');
+    options.forEach(option => {
+        const isActive = option.getAttribute('data-lang') === langCode;
+        option.classList.toggle('active', isActive);
+        option.setAttribute('aria-selected', isActive);
+    });
+}
+
 // Create language selector when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Create language selector
     createLanguageSelector();
 });

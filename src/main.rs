@@ -239,6 +239,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .map_err(|e| domain::repositories::file_repository::FileRepositoryError::Other(format!("{}", e)))
         }
         
+        async fn save_file_from_stream(
+            &self,
+            name: String,
+            folder_id: Option<String>,
+            content_type: String,
+            stream: std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>,
+        ) -> domain::repositories::file_repository::FileRepositoryResult<domain::entities::file::File> {
+            self.repo.save_file_from_stream(name, folder_id, content_type, stream)
+                .await
+                .map_err(|e| domain::repositories::file_repository::FileRepositoryError::Other(format!("{}", e)))
+        }
+        
         async fn save_file_with_id(
             &self,
             _id: String,
@@ -280,6 +292,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         
         async fn get_file_stream(&self, id: &str) -> domain::repositories::file_repository::FileRepositoryResult<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>> {
             self.repo.get_file_stream(id)
+                .await
+                .map_err(|e| domain::repositories::file_repository::FileRepositoryError::Other(format!("{}", e)))
+        }
+        
+        async fn get_file_range_stream(
+            &self,
+            id: &str,
+            start: u64,
+            end: Option<u64>,
+        ) -> domain::repositories::file_repository::FileRepositoryResult<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>> {
+            self.repo.get_file_range_stream(id, start, end)
+                .await
+                .map_err(|e| domain::repositories::file_repository::FileRepositoryError::Other(format!("{}", e)))
+        }
+        
+        async fn get_file_mmap(&self, id: &str) -> domain::repositories::file_repository::FileRepositoryResult<bytes::Bytes> {
+            self.repo.get_file_mmap(id)
                 .await
                 .map_err(|e| domain::repositories::file_repository::FileRepositoryError::Other(format!("{}", e)))
         }
@@ -549,13 +578,60 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
     
+    // Create thumbnail service
+    let thumbnail_service = Arc::new(
+        infrastructure::services::thumbnail_service::ThumbnailService::new(
+            &storage_path,
+            5000,  // max 5000 thumbnails en cache
+            100 * 1024 * 1024,  // max 100MB de cache
+        )
+    );
+    // Note: thumbnail directories will be initialized when first used
+    
+    // Create write-behind cache for zero-latency small file uploads
+    let write_behind_cache = infrastructure::services::write_behind_cache::WriteBehindCache::new();
+    
+    // Create chunked upload service for large file uploads (>10MB)
+    let chunked_upload_service = Arc::new(
+        infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
+            storage_path.join(".uploads")
+        )
+    );
+    
+    // Create image transcode service for automatic WebP conversion
+    let image_transcode_service = Arc::new(
+        infrastructure::services::image_transcode_service::ImageTranscodeService::new(
+            &storage_path,
+            2000,  // max 2000 transcoded images in cache
+            50 * 1024 * 1024,  // max 50MB memory cache
+        )
+    );
+    // Initialize transcode service directories
+    if let Err(e) = image_transcode_service.initialize().await {
+        tracing::warn!("Failed to initialize image transcode service: {}", e);
+    }
+    
+    // Create deduplication service for content-addressable storage
+    let dedup_service = Arc::new(
+        infrastructure::services::dedup_service::DedupService::new(&storage_path)
+    );
+    if let Err(e) = dedup_service.initialize().await {
+        tracing::warn!("Failed to initialize dedup service: {}", e);
+    }
+    
     // Create AppState for DI container
     let core_services = common::di::CoreServices {
         path_service: path_service.clone(),
         cache_manager: Arc::new(infrastructure::services::cache_manager::StorageCacheManager::default()),
+        file_content_cache: Arc::new(infrastructure::services::file_content_cache::FileContentCache::default()),
         id_mapping_service: base_id_mapping_service.clone(),
         file_id_mapping_service: file_id_mapping_service.clone(),
         id_mapping_optimizer: id_mapping_optimizer.clone(),
+        thumbnail_service: thumbnail_service.clone(),
+        write_behind_cache: write_behind_cache.clone(),
+        chunked_upload_service: chunked_upload_service.clone(),
+        image_transcode_service: image_transcode_service.clone(),
+        dedup_service: dedup_service.clone(),
         config: config.clone(),
     };
     
@@ -754,7 +830,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Add auth routes if auth is enabled
     if config.features.enable_auth && auth_services.is_some() {
-        // Create auth routes with app state
+        // Create auth routes with app state (no middleware needed - handlers extract token directly)
         let auth_router = auth_routes().with_state(app_state.clone());
         
         // Add auth routes at /api/auth

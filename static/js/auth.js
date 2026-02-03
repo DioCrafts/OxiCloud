@@ -15,9 +15,189 @@ const TOKEN_KEY = 'oxicloud_token';
 const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
 const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
 const USER_DATA_KEY = 'oxicloud_user';
+const LOCALE_KEY = 'oxicloud-locale';
+const FIRST_RUN_KEY = 'oxicloud_first_run_completed';
+
+// Language selector texts (used before i18n is loaded)
+const LANGUAGE_TEXTS = {
+    en: {
+        title: 'Welcome to OxiCloud',
+        subtitle: 'Please select your language',
+        continue: 'Continue'
+    },
+    es: {
+        title: 'Bienvenido a OxiCloud',
+        subtitle: 'Por favor, selecciona tu idioma',
+        continue: 'Continuar'
+    },
+    zh: {
+        title: '欢迎使用 OxiCloud',
+        subtitle: '请选择您的语言',
+        continue: '继续'
+    }
+};
+
+// Check if this is a first run (no locale saved)
+function isFirstRun() {
+    return !localStorage.getItem(LOCALE_KEY);
+}
+
+// Check system status from the server
+async function checkSystemStatus() {
+    try {
+        const response = await fetch('/api/auth/status');
+        if (!response.ok) {
+            console.warn('Could not check system status, assuming initialized');
+            return { initialized: true, admin_count: 1, registration_allowed: true };
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error checking system status:', error);
+        return { initialized: true, admin_count: 1, registration_allowed: true };
+    }
+}
+
+// Initialize language selector panel
+function initLanguageSelector() {
+    const languagePanel = document.getElementById('language-panel');
+    const languageOptions = document.querySelectorAll('.language-option');
+    const continueBtn = document.getElementById('language-continue');
+    let selectedLanguage = null;
+    
+    if (!languagePanel) return;
+    
+    // Handle language option clicks
+    languageOptions.forEach(option => {
+        option.addEventListener('click', () => {
+            // Remove selected class from all options
+            languageOptions.forEach(opt => opt.classList.remove('selected'));
+            // Add selected class to clicked option
+            option.classList.add('selected');
+            // Check the radio button
+            option.querySelector('input[type="radio"]').checked = true;
+            // Store selected language
+            selectedLanguage = option.getAttribute('data-lang');
+            // Enable continue button
+            continueBtn.disabled = false;
+            
+            // Update UI texts based on selected language
+            updateLanguagePanelTexts(selectedLanguage);
+        });
+    });
+    
+    // Handle continue button click
+    continueBtn.addEventListener('click', async () => {
+        if (!selectedLanguage) return;
+        
+        // Save locale preference
+        localStorage.setItem(LOCALE_KEY, selectedLanguage);
+        localStorage.setItem(FIRST_RUN_KEY, 'true');
+        
+        // Update i18n if available
+        if (window.i18n && window.i18n.setLocale) {
+            await window.i18n.setLocale(selectedLanguage);
+        }
+        
+        // Hide language panel
+        languagePanel.style.display = 'none';
+        
+        // Check system status to determine which panel to show
+        const systemStatus = await checkSystemStatus();
+        console.log('System status after language selection:', systemStatus);
+        
+        if (!systemStatus.initialized) {
+            // No admin exists - show admin setup
+            console.log('No admin exists, showing admin setup panel');
+            document.getElementById('login-panel').style.display = 'none';
+            document.getElementById('register-panel').style.display = 'none';
+            document.getElementById('admin-setup-panel').style.display = 'block';
+            
+            // Hide the "Already set up? Sign in" link
+            const backToLoginLink = document.getElementById('back-to-login');
+            if (backToLoginLink) {
+                backToLoginLink.parentElement.style.display = 'none';
+            }
+        } else {
+            // Admin exists - show login panel
+            document.getElementById('login-panel').style.display = 'block';
+        }
+        
+        // Translate the page with new locale
+        if (window.i18n && window.i18n.translatePage) {
+            window.i18n.translatePage();
+        }
+    });
+}
+
+// Update language panel texts based on selected language
+function updateLanguagePanelTexts(lang) {
+    const texts = LANGUAGE_TEXTS[lang] || LANGUAGE_TEXTS.en;
+    const titleEl = document.getElementById('language-title');
+    const subtitleEl = document.getElementById('language-subtitle');
+    const continueBtn = document.getElementById('language-continue');
+    
+    if (titleEl) titleEl.textContent = texts.title;
+    if (subtitleEl) subtitleEl.textContent = texts.subtitle;
+    if (continueBtn) continueBtn.textContent = texts.continue;
+}
+
+// Show appropriate panel based on system status and first run
+async function showInitialPanel() {
+    const languagePanel = document.getElementById('language-panel');
+    const loginPanel = document.getElementById('login-panel');
+    const adminSetupPanel = document.getElementById('admin-setup-panel');
+    const registerPanel = document.getElementById('register-panel');
+    
+    if (!languagePanel || !loginPanel) return;
+    
+    // ALWAYS check if this is user's first run (language selection) FIRST
+    // Language selection should happen before anything else
+    if (isFirstRun()) {
+        // First run - show language selector first
+        // After language is selected, the continue button handler will check system status
+        console.log('First run - showing language selector');
+        languagePanel.style.display = 'block';
+        loginPanel.style.display = 'none';
+        registerPanel.style.display = 'none';
+        adminSetupPanel.style.display = 'none';
+        return;
+    }
+    
+    // Language already selected - now check system status
+    const systemStatus = await checkSystemStatus();
+    console.log('System status:', systemStatus);
+    
+    if (!systemStatus.initialized) {
+        // No admin exists - this is a fresh install, show admin setup
+        console.log('Fresh install detected - showing admin setup');
+        languagePanel.style.display = 'none';
+        loginPanel.style.display = 'none';
+        registerPanel.style.display = 'none';
+        adminSetupPanel.style.display = 'block';
+        
+        // Hide the "Already set up? Sign in" link since there's no admin yet
+        const backToLoginLink = document.getElementById('back-to-login');
+        if (backToLoginLink) {
+            backToLoginLink.parentElement.style.display = 'none';
+        }
+        return;
+    }
+    
+    // System is initialized - show login panel
+    languagePanel.style.display = 'none';
+    loginPanel.style.display = 'block';
+    registerPanel.style.display = 'none';
+    adminSetupPanel.style.display = 'none';
+    
+    // Hide the admin setup link if admin already exists
+    const showAdminSetupLink = document.getElementById('show-admin-setup');
+    if (showAdminSetupLink && systemStatus.admin_count > 0) {
+        showAdminSetupLink.parentElement.style.display = 'none';
+    }
+}
 
 // DOM elements
-let loginPanel, registerPanel, adminSetupPanel;
+let loginPanel, registerPanel, adminSetupPanel, languagePanel;
 let loginForm, registerForm, adminSetupForm;
 let loginError, registerError, registerSuccess, adminSetupError;
 
@@ -29,6 +209,7 @@ function initLoginElements() {
         return false;
     }
     
+    languagePanel = document.getElementById('language-panel');
     loginPanel = document.getElementById('login-panel');
     registerPanel = document.getElementById('register-panel');
     adminSetupPanel = document.getElementById('admin-setup-panel');
@@ -41,6 +222,9 @@ function initLoginElements() {
     registerError = document.getElementById('register-error');
     registerSuccess = document.getElementById('register-success');
     adminSetupError = document.getElementById('admin-setup-error');
+    
+    // Initialize language selector
+    initLanguageSelector();
 
     // Panel toggles
     document.getElementById('show-register').addEventListener('click', () => {
@@ -137,6 +321,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     authInitialized = true;
+    
+    // Show appropriate panel (language selector on first run, login otherwise, or admin setup if no admin)
+    // This is async so we call it and let it run
+    showInitialPanel().then(() => {
+        console.log('Initial panel shown based on system status');
+    }).catch(err => {
+        console.error('Error showing initial panel:', err);
+    });
     
     // Siempre limpiar los contadores al cargar la página de login
     // para asegurar que no quedamos atrapados en un bucle
@@ -308,7 +500,8 @@ if (isLoginPage && registerForm) {
     
     // Validate passwords match
     if (password !== confirmPassword) {
-        registerError.textContent = 'Las contraseñas no coinciden';
+        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Las contraseñas no coinciden';
+        registerError.textContent = errorMsg;
         registerError.style.display = 'block';
         return;
     }
@@ -317,7 +510,8 @@ if (isLoginPage && registerForm) {
         const data = await register(username, email, password);
         
         // Show success message
-        registerSuccess.textContent = '¡Cuenta creada con éxito! Puedes iniciar sesión ahora.';
+        const successMsg = window.i18n ? window.i18n.t('auth.account_success') : '¡Cuenta creada con éxito! Puedes iniciar sesión ahora.';
+        registerSuccess.textContent = successMsg;
         registerSuccess.style.display = 'block';
         
         // Clear form
@@ -329,7 +523,8 @@ if (isLoginPage && registerForm) {
             registerPanel.style.display = 'none';
         }, 2000);
     } catch (error) {
-        registerError.textContent = error.message || 'Error al registrar cuenta';
+        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error al registrar cuenta';
+        registerError.textContent = error.message || errorMsg;
         registerError.style.display = 'block';
     }
 });
@@ -340,8 +535,10 @@ if (isLoginPage && adminSetupForm) {
     adminSetupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
-    // Clear previous errors
+    // Clear previous errors/success messages
     adminSetupError.style.display = 'none';
+    const adminSetupSuccess = document.getElementById('admin-setup-success');
+    if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
     
     const email = document.getElementById('admin-email').value;
     const password = document.getElementById('admin-password').value;
@@ -349,7 +546,8 @@ if (isLoginPage && adminSetupForm) {
     
     // Validate passwords match
     if (password !== confirmPassword) {
-        adminSetupError.textContent = 'Las contraseñas no coinciden';
+        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Las contraseñas no coinciden';
+        adminSetupError.textContent = errorMsg;
         adminSetupError.style.display = 'block';
         return;
     }
@@ -358,13 +556,24 @@ if (isLoginPage && adminSetupForm) {
         // Register admin account
         const data = await register('admin', email, password, 'admin');
         
-        // Show success and switch to login
-        alert('¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.');
+        // Show success message in the GUI instead of alert
+        const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : '¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.';
         
-        loginPanel.style.display = 'block';
-        adminSetupPanel.style.display = 'none';
+        if (adminSetupSuccess) {
+            adminSetupSuccess.textContent = successMsg;
+            adminSetupSuccess.style.display = 'block';
+        }
+        
+        // Wait 2 seconds then switch to login panel
+        setTimeout(() => {
+            loginPanel.style.display = 'block';
+            adminSetupPanel.style.display = 'none';
+            if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
+        }, 2000);
+        
     } catch (error) {
-        adminSetupError.textContent = error.message || 'Error al crear cuenta de administrador';
+        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error al crear cuenta de administrador';
+        adminSetupError.textContent = error.message || errorMsg;
         adminSetupError.style.display = 'block';
     }
 });

@@ -27,7 +27,7 @@ ENV DATABASE_URL="postgres://postgres:postgres@postgres/oxicloud"
 RUN cargo build --release
 
 # Stage 3: Create minimal final image
-FROM alpine:3.21.3
+FROM alpine:3.23.3
 # Install only necessary runtime dependencies and update packages
 RUN apk --no-cache upgrade && \
     apk add --no-cache libgcc ca-certificates libpq tzdata

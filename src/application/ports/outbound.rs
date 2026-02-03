@@ -36,6 +36,16 @@ pub trait FileStoragePort: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<File, DomainError>;
     
+    /// Guarda un archivo desde stream (streaming upload)
+    /// Escribe chunks directamente al disco sin acumular en memoria
+    async fn save_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    ) -> Result<File, DomainError>;
+    
     /// Obtiene un archivo por su ID
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
     
@@ -51,6 +61,17 @@ pub trait FileStoragePort: Send + Sync + 'static {
     /// Obtiene contenido de archivo como stream
     async fn get_file_stream(&self, id: &str) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
     
+    /// Obtiene un rango de contenido como stream (para HTTP Range Requests)
+    async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
+    
+    /// Memory-maps archivo para acceso zero-copy (ideal para 10-100MB)
+    async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError>;
+    
     /// Mueve un archivo a otra carpeta
     async fn move_file(&self, file_id: &str, target_folder_id: Option<String>) -> Result<File, DomainError>;
     
@@ -62,6 +83,24 @@ pub trait FileStoragePort: Send + Sync + 'static {
     
     /// Actualiza el contenido de un archivo existente
     async fn update_file_content(&self, file_id: &str, content: Vec<u8>) -> Result<(), DomainError>;
+    
+    /// Registra metadatos de archivo SIN escribir contenido a disco (write-behind)
+    /// 
+    /// Este método:
+    /// 1. Genera ID único para el archivo
+    /// 2. Calcula la ruta de destino
+    /// 3. Registra el mapping ID->path
+    /// 4. Devuelve File entity con path real (pero archivo no existe aún)
+    /// 
+    /// El contenido se escribe posteriormente via WriteBehindCache
+    /// Beneficio: Respuesta ~0ms para uploads pequeños
+    async fn register_file_deferred(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        size: u64,
+    ) -> Result<(File, PathBuf), DomainError>;
 }
 
 /// Puerto secundario para persistencia de carpetas

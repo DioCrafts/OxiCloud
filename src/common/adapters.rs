@@ -38,6 +38,18 @@ impl FileRepository for DomainFileRepoAdapter {
             .map_err(|e| FileRepositoryError::Other(format!("{}", e)))
     }
     
+    async fn save_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        stream: std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>,
+    ) -> FileRepositoryResult<File> {
+        self.repo.save_file_from_stream(name, folder_id, content_type, stream)
+            .await
+            .map_err(|e| FileRepositoryError::Other(format!("{}", e)))
+    }
+    
     async fn save_file_with_id(
         &self,
         _id: String,
@@ -79,6 +91,23 @@ impl FileRepository for DomainFileRepoAdapter {
     
     async fn get_file_stream(&self, id: &str) -> FileRepositoryResult<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>> {
         self.repo.get_file_stream(id)
+            .await
+            .map_err(|e| FileRepositoryError::Other(format!("{}", e)))
+    }
+    
+    async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> FileRepositoryResult<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>> {
+        self.repo.get_file_range_stream(id, start, end)
+            .await
+            .map_err(|e| FileRepositoryError::Other(format!("{}", e)))
+    }
+    
+    async fn get_file_mmap(&self, id: &str) -> FileRepositoryResult<bytes::Bytes> {
+        self.repo.get_file_mmap(id)
             .await
             .map_err(|e| FileRepositoryError::Other(format!("{}", e)))
     }

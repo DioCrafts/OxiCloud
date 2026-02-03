@@ -26,7 +26,10 @@
     "copy": "复制",
     "notify": "通知",
     "send": "发送",
-    "clear_recent": "清除最近"
+    "clear_recent": "清除最近",
+    "logout": "退出登录",
+    "create": "创建",
+    "search_btn": "搜索"
   },
   "share": {
     "dialogTitle": "共享链接",
@@ -130,6 +133,10 @@
   "dialogs": {
     "rename_folder": "重命名文件夹",
     "new_name": "新名称",
+    "new_folder_title": "新建文件夹",
+    "folder_name": "文件夹名称",
+    "folder_placeholder": "我的文件夹",
+    "rename_title": "重命名",
     "move_file": "移动文件",
     "select_destination": "选择目标文件夹",
     "root": "根目录",
@@ -207,7 +214,16 @@
     "admin_email": "管理员电子邮件",
     "admin_password": "管理员密码",
     "create_admin": "创建管理员",
-    "back_to_login": "已设置完成？"
+    "back_to_login": "已设置完成？",
+    "admin_success": "管理员账号创建成功！您现在可以登录。",
+    "account_success": "账号创建成功！您现在可以登录。",
+    "passwords_mismatch": "密码不匹配",
+    "admin_create_error": "创建管理员账号时出错"
+  },
+  "storage": {
+    "title": "存储空间",
+    "calculating": "计算中...",
+    "used": "{{percentage}}% 已使用 ({{used}} / {{total}})"
   },
   "viewer": {
     "unsupported_file": "无法预览此文件类型。",
@@ -215,5 +231,28 @@
     "zoom_in": "放大",
     "zoom_out": "缩小",
     "zoom_reset": "重置缩放"
+  },
+  "language_selector": {
+    "title": "欢迎使用 OxiCloud",
+    "subtitle": "请选择您的语言",
+    "continue": "继续",
+    "languages": {
+      "en": "English",
+      "es": "Español",
+      "zh": "中文"
+    }
+  },
+  "favorites": {
+    "empty_state": "还没有收藏",
+    "empty_hint": "为文件或文件夹添加星标以将其添加到收藏夹",
+    "add": "添加到收藏夹",
+    "remove": "从收藏夹移除"
+  },
+  "recent": {
+    "title": "最近",
+    "clear": "清除最近",
+    "accessed": "访问于",
+    "empty_state": "没有最近文件",
+    "empty_hint": "您打开的文件将显示在这里"
   }
 }

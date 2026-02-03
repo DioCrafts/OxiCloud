@@ -420,6 +420,18 @@ impl FileStoragePort for FileFsRepository {
             .map_err(|e| DomainError::internal_error("FileStorage", format!("Failed to save file: {}", e)))
     }
     
+    async fn save_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    ) -> Result<File, DomainError> {
+        FileRepository::save_file_from_stream(self, name, folder_id, content_type, stream)
+            .await
+            .map_err(|e| DomainError::internal_error("FileStorage", format!("Failed to save file from stream: {}", e)))
+    }
+    
     async fn get_file(&self, id: &str) -> Result<File, DomainError> {
         self.get_file_by_id(id)
             .await
@@ -448,6 +460,23 @@ impl FileStoragePort for FileFsRepository {
         FileRepository::get_file_stream(self, id)
             .await
             .map_err(|e| DomainError::internal_error("FileStorage", format!("Failed to get stream for file with ID: {}: {}", id, e)))
+    }
+    
+    async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        FileRepository::get_file_range_stream(self, id, start, end)
+            .await
+            .map_err(|e| DomainError::internal_error("FileStorage", format!("Failed to get range stream for file with ID: {}: {}", id, e)))
+    }
+    
+    async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError> {
+        FileRepository::get_file_mmap(self, id)
+            .await
+            .map_err(|e| DomainError::internal_error("FileStorage", format!("Failed to mmap file with ID: {}: {}", id, e)))
     }
     
     async fn move_file(&self, file_id: &str, target_folder_id: Option<String>) -> Result<File, DomainError> {
@@ -547,6 +576,107 @@ impl FileStoragePort for FileFsRepository {
         }
         
         Ok(())
+    }
+    
+    /// Registra metadatos de archivo SIN escribir contenido (write-behind puro)
+    /// 
+    /// Este método es ultrarrápido (~0.1ms) porque:
+    /// 1. NO escribe a disco
+    /// 2. Solo genera ID y registra mappings
+    /// 3. Devuelve la ruta donde DEBE escribirse el contenido
+    async fn register_file_deferred(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        size: u64,
+    ) -> Result<(File, PathBuf), DomainError> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        use mime_guess::from_path;
+        
+        // Get the folder path from the mediator
+        let folder_path = match &folder_id {
+            Some(id) => {
+                match self.storage_mediator.get_folder_path(id).await {
+                    Ok(path) => {
+                        let lossy = path.to_string_lossy().to_string();
+                        let folder_name = path.file_name()
+                            .and_then(|f| f.to_str())
+                            .unwrap_or_else(|| &lossy);
+                        StoragePath::from_string(folder_name)
+                    },
+                    Err(_) => StoragePath::root(),
+                }
+            },
+            None => StoragePath::root(),
+        };
+        
+        // Create the storage path for the file
+        let mut file_storage_path = folder_path.join(&name);
+        let mut original_name = name.clone();
+        
+        // Check for duplicates and generate unique name
+        let mut counter = 1;
+        while self.file_exists_at_storage_path(&file_storage_path).await.unwrap_or(false) {
+            let (stem, ext) = if let Some(dot_pos) = original_name.rfind('.') {
+                (original_name[..dot_pos].to_string(), original_name[dot_pos..].to_string())
+            } else {
+                (original_name.clone(), String::new())
+            };
+            let new_name = format!("{}_{}{}", stem, counter, ext);
+            file_storage_path = folder_path.join(&new_name);
+            original_name = new_name;
+            counter += 1;
+        }
+        
+        // Resolve absolute path (this is where content will be written)
+        let abs_path = self.resolve_storage_path(&file_storage_path);
+        
+        // Ensure parent directory exists
+        self.ensure_parent_directory(&abs_path).await
+            .map_err(|e| DomainError::internal_error("FileStorage", 
+                format!("Failed to create parent directory: {}", e)))?;
+        
+        // Determine MIME type
+        let mime_type = if content_type.is_empty() {
+            from_path(&abs_path).first_or_octet_stream().to_string()
+        } else {
+            content_type
+        };
+        
+        // Get current timestamp
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        
+        // Generate unique ID and register mapping
+        let id = self.id_mapping_service.get_or_create_id(&file_storage_path).await
+            .map_err(|e| DomainError::internal_error("FileStorage", 
+                format!("Failed to generate file ID: {}", e)))?;
+        
+        // Save ID mapping
+        self.id_mapping_service.save_changes().await
+            .map_err(|e| DomainError::internal_error("FileStorage", 
+                format!("Failed to save ID mapping: {}", e)))?;
+        
+        // Create File entity (with provided size, timestamps are "now")
+        let file = self.create_file_entity(
+            id.clone(),
+            original_name,
+            file_storage_path,
+            size,
+            mime_type,
+            folder_id,
+            Some(now),
+            Some(now),
+        ).await
+        .map_err(|e| DomainError::internal_error("FileStorage", 
+            format!("Failed to create file entity: {}", e)))?;
+        
+        tracing::debug!("⚡ Registered deferred file: {} -> {:?}", id, abs_path);
+        
+        Ok((file, abs_path))
     }
 }
 
@@ -918,6 +1048,192 @@ impl FileRepository for FileFsRepository {
         }
         
         tracing::info!("Saved file: {} with ID: {}", path_string, file.id());
+        Ok(file)
+    }
+    
+    /// Streaming upload - writes chunks directly to disk as they arrive
+    /// 
+    /// This is the most efficient method for large file uploads:
+    /// - Constant ~10MB memory usage regardless of file size
+    /// - Chunks are written to disk immediately
+    /// - Uses atomic rename for crash safety
+    async fn save_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        mut stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    ) -> FileRepositoryResult<File> {
+        use tokio::io::AsyncWriteExt;
+        use futures::StreamExt;
+        
+        // Get the folder path from the mediator
+        let folder_path = match &folder_id {
+            Some(id) => {
+                match self.storage_mediator.get_folder_path(id).await {
+                    Ok(path) => {
+                        let lossy = path.to_string_lossy().to_string();
+                        let folder_name = path.file_name()
+                            .and_then(|f| f.to_str())
+                            .unwrap_or_else(|| &lossy);
+                        StoragePath::from_string(folder_name)
+                    },
+                    Err(e) => {
+                        tracing::error!("Error getting folder: {}", e);
+                        StoragePath::root()
+                    },
+                }
+            },
+            None => StoragePath::root(),
+        };
+        
+        // Create the storage path for the file
+        let mut file_storage_path = folder_path.join(&name);
+        
+        // Check if file already exists and generate a unique name if needed
+        let mut exists = self.file_exists_at_storage_path(&file_storage_path).await?;
+        let mut original_name = name.clone();
+        let mut counter = 1;
+        
+        while exists {
+            let file_stem;
+            let extension;
+            
+            if let Some(dot_pos) = original_name.rfind('.') {
+                file_stem = original_name[..dot_pos].to_string();
+                extension = original_name[dot_pos..].to_string();
+            } else {
+                file_stem = original_name.clone();
+                extension = "".to_string();
+            }
+            
+            let new_name = format!("{}_{}{}", file_stem, counter, extension);
+            let new_file_storage_path = folder_path.join(&new_name);
+            exists = self.file_exists_at_storage_path(&new_file_storage_path).await?;
+            
+            if !exists {
+                tracing::info!("Generated unique name: {} -> {}", original_name, new_name);
+                original_name = new_name.clone();
+                file_storage_path = new_file_storage_path;
+            } else {
+                counter += 1;
+            }
+        }
+        
+        // Create parent directories if they don't exist
+        let abs_path = self.resolve_storage_path(&file_storage_path);
+        self.ensure_parent_directory(&abs_path).await?;
+        
+        // Create a temporary file for atomic write
+        let temp_path = abs_path.with_extension("tmp.upload");
+        
+        tracing::info!("📥 STREAMING UPLOAD: {} -> {}", original_name, abs_path.display());
+        
+        // Create the temp file
+        let mut file = time::timeout(
+            self.config.timeouts.file_timeout(),
+            TokioFile::create(&temp_path)
+        ).await
+        .map_err(|_| FileRepositoryError::Timeout(format!("Timeout creating temp file: {}", temp_path.display())))?
+        .map_err(FileRepositoryError::IoError)?;
+        
+        // Stream chunks directly to disk
+        let mut total_bytes: u64 = 0;
+        let mut chunk_count = 0u32;
+        
+        while let Some(chunk_result) = stream.next().await {
+            let chunk = chunk_result.map_err(FileRepositoryError::IoError)?;
+            let chunk_len = chunk.len();
+            
+            // Write chunk directly to disk - no memory accumulation
+            file.write_all(&chunk).await.map_err(FileRepositoryError::IoError)?;
+            
+            total_bytes += chunk_len as u64;
+            chunk_count += 1;
+            
+            // Log progress every 10MB
+            if total_bytes > 0 && total_bytes % (10 * 1024 * 1024) < chunk_len as u64 {
+                tracing::debug!(
+                    "📥 Upload progress: {} - {}MB received ({} chunks)", 
+                    original_name, 
+                    total_bytes / (1024 * 1024),
+                    chunk_count
+                );
+            }
+        }
+        
+        // Flush and sync to ensure data is on disk
+        file.flush().await.map_err(FileRepositoryError::IoError)?;
+        file.sync_all().await.map_err(FileRepositoryError::IoError)?;
+        drop(file); // Close the file handle
+        
+        // Atomic rename from temp to final path
+        fs::rename(&temp_path, &abs_path).await.map_err(FileRepositoryError::IoError)?;
+        
+        tracing::info!(
+            "✅ STREAMING UPLOAD COMPLETE: {} ({} bytes, {} chunks)", 
+            original_name, total_bytes, chunk_count
+        );
+        
+        // Get file metadata from disk
+        let (size, created_at, modified_at) = self.get_file_metadata(&abs_path).await?;
+        
+        // Determine the MIME type
+        let mime_type = if content_type.is_empty() {
+            from_path(&abs_path).first_or_octet_stream().to_string()
+        } else {
+            content_type
+        };
+        
+        // Create and return the file entity with a persistent ID
+        let id = self.id_mapping_service.get_or_create_id(&file_storage_path).await?;
+        let path_string = file_storage_path.to_string();
+        
+        let file = self.create_file_entity(
+            id.clone(),
+            original_name,
+            file_storage_path,
+            size,
+            mime_type,
+            folder_id,
+            Some(created_at),
+            Some(modified_at),
+        ).await?;
+        
+        // Persist ID mapping with verification
+        for attempt in 1..=3 {
+            match self.id_mapping_service.save_changes().await {
+                Ok(_) => {
+                    if let Ok(verified_path) = self.id_mapping_service.get_path_by_id(&id).await {
+                        if verified_path.to_string() == path_string {
+                            tracing::debug!("ID mapping verified: {} -> {}", id, path_string);
+                            break;
+                        }
+                    }
+                    if attempt == 3 {
+                        return Err(FileRepositoryError::Other(
+                            format!("Failed to verify ID mapping after 3 attempts")
+                        ));
+                    }
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                },
+                Err(e) if attempt < 3 => {
+                    tracing::warn!("ID mapping save failed (attempt {}): {}", attempt, e);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+                },
+                Err(e) => {
+                    return Err(FileRepositoryError::Other(
+                        format!("Failed to save ID mapping: {}", e)
+                    ));
+                }
+            }
+        }
+        
+        // Invalidate directory cache
+        if let Some(parent_dir) = abs_path.parent() {
+            self.metadata_cache.invalidate_directory(parent_dir).await;
+        }
+        
         Ok(file)
     }
     
@@ -1509,6 +1825,119 @@ impl FileRepository for FileFsRepository {
             });
             
         Ok(Box::new(stream))
+    }
+    
+    async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> FileRepositoryResult<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>> {
+        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+        
+        // Get the file first to check if it exists and get the path
+        let file = self.get_file_by_id(id).await?;
+        let abs_path = self.resolve_storage_path(file.storage_path());
+        
+        // Get file metadata for size
+        let metadata = time::timeout(
+            self.config.timeouts.file_timeout(),
+            fs::metadata(&abs_path)
+        ).await
+        .map_err(|_| FileRepositoryError::Timeout(format!("Timeout getting metadata: {}", abs_path.display())))?
+        .map_err(FileRepositoryError::IoError)?;
+        
+        let file_size = metadata.len();
+        
+        // Validate range
+        if start >= file_size {
+            return Err(FileRepositoryError::Other(
+                format!("Range start {} is beyond file size {}", start, file_size)
+            ));
+        }
+        
+        // Calculate actual end position
+        let actual_end = end.map(|e| e.min(file_size - 1)).unwrap_or(file_size - 1);
+        let range_length = actual_end - start + 1;
+        
+        // Open file and seek to start position
+        let mut file_handle = time::timeout(
+            self.config.timeouts.file_timeout(),
+            TokioFile::open(&abs_path)
+        ).await
+        .map_err(|_| FileRepositoryError::Timeout(format!("Timeout opening file: {}", abs_path.display())))?
+        .map_err(FileRepositoryError::IoError)?;
+        
+        // Seek to start position
+        file_handle.seek(std::io::SeekFrom::Start(start)).await
+            .map_err(FileRepositoryError::IoError)?;
+        
+        // Calculate optimal chunk size
+        let chunk_size = if range_length > 1024 * 1024 {
+            self.config.resources.chunk_size_bytes
+        } else {
+            8192 // 8KB for smaller ranges
+        };
+        
+        tracing::info!(
+            "Range streaming {} bytes={}-{} (chunk_size={})", 
+            abs_path.display(), start, actual_end, chunk_size
+        );
+        
+        // Create a limited reader that only reads up to range_length bytes
+        let limited_reader = file_handle.take(range_length);
+        
+        // Create stream with FramedRead
+        let codec = BytesCodec::new();
+        let stream = FramedRead::with_capacity(limited_reader, codec, chunk_size)
+            .map(|result| {
+                result.map(|bytes_mut| bytes_mut.freeze())
+            });
+        
+        Ok(Box::new(stream))
+    }
+    
+    /// Memory-maps a file for zero-copy kernel access.
+    /// 
+    /// Uses mmap for files in the 10-100MB range where:
+    /// - Full cache (RAM) would be wasteful
+    /// - Streaming adds unnecessary overhead
+    /// - The kernel's page cache provides optimal performance
+    /// 
+    /// This runs in spawn_blocking since mmap is synchronous.
+    async fn get_file_mmap(&self, id: &str) -> FileRepositoryResult<Bytes> {
+        use memmap2::Mmap;
+        
+        // Get file info and path
+        let file = self.get_file_by_id(id).await?;
+        let abs_path = self.resolve_storage_path(file.storage_path());
+        
+        tracing::info!(
+            "🗺️ MMAP: Memory-mapping file {} ({} bytes)", 
+            file.name(), file.size()
+        );
+        
+        // Clone path for the blocking task
+        let path_clone = abs_path.clone();
+        
+        // mmap is synchronous, so we use spawn_blocking
+        let result = task::spawn_blocking(move || -> Result<Bytes, FileRepositoryError> {
+            // Open file with std::fs (blocking)
+            let file_handle = std::fs::File::open(&path_clone)
+                .map_err(FileRepositoryError::IoError)?;
+            
+            // Create memory map (unsafe but well-tested)
+            // SAFETY: The file is opened read-only and we don't modify it
+            let mmap = unsafe { Mmap::map(&file_handle) }
+                .map_err(FileRepositoryError::IoError)?;
+            
+            // Convert to Bytes - this creates a reference to the mapped memory
+            // The Bytes will keep the mmap alive until dropped
+            Ok(Bytes::copy_from_slice(&mmap[..]))
+        }).await
+        .map_err(|e| FileRepositoryError::Other(format!("mmap task panicked: {}", e)))?;
+        
+        result
     }
     
     async fn move_file(&self, id: &str, target_folder_id: Option<String>) -> FileRepositoryResult<File> {

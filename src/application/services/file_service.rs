@@ -191,6 +191,46 @@ impl FileService {
         Ok(FileDto::from(file))
     }
     
+    /// Uploads a file using streaming - writes directly to disk without memory accumulation
+    /// 
+    /// This is the preferred method for large file uploads:
+    /// - Constant memory usage (~10MB) regardless of file size
+    /// - Better handling of slow connections
+    /// - Atomic writes with crash safety
+    pub async fn upload_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        stream: std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>,
+    ) -> FileServiceResult<FileDto>
+    {
+        let file = self.file_repository.save_file_from_stream(name, folder_id, content_type, stream).await
+            .map_err(FileServiceError::from)?;
+        Ok(FileDto::from(file))
+    }
+    
+    /// Registers a file for write-behind upload (ZERO LATENCY)
+    /// 
+    /// This method:
+    /// 1. Creates file metadata and ID (~0.1ms)
+    /// 2. Returns immediately WITHOUT writing content to disk
+    /// 3. Caller must use WriteBehindCache to write content asynchronously
+    /// 
+    /// Returns: (FileDto, PathBuf) where PathBuf is where content should be written
+    pub async fn register_file_deferred(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        size: u64,
+    ) -> FileServiceResult<(FileDto, std::path::PathBuf)>
+    {
+        let (file, path) = self.file_repository.register_file_deferred(name, folder_id, content_type, size).await
+            .map_err(FileServiceError::from)?;
+        Ok((FileDto::from(file), path))
+    }
+    
     /// Gets a file by ID
     pub async fn get_file(&self, id: &str) -> FileServiceResult<FileDto> {
         let file = self.file_repository.get_file(id).await
@@ -290,6 +330,32 @@ impl FileService {
     /// Gets file content as stream - better for large files
     pub async fn get_file_stream(&self, id: &str) -> FileServiceResult<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>> {
         self.file_repository.get_file_stream(id).await
+            .map_err(FileServiceError::from)
+    }
+    
+    /// Gets a range of file content as stream - for HTTP Range Requests
+    /// 
+    /// Supports:
+    /// - Video seeking
+    /// - Resumable downloads  
+    /// - Parallel chunk downloads
+    pub async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> FileServiceResult<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>> {
+        self.file_repository.get_file_range_stream(id, start, end).await
+            .map_err(FileServiceError::from)
+    }
+    
+    /// Memory-maps a file for zero-copy access (optimal for 10-100MB files)
+    /// 
+    /// Uses kernel mmap for files where:
+    /// - Full RAM cache would be wasteful
+    /// - Streaming adds unnecessary chunking overhead
+    pub async fn get_file_mmap(&self, id: &str) -> FileServiceResult<Bytes> {
+        self.file_repository.get_file_mmap(id).await
             .map_err(FileServiceError::from)
     }
     

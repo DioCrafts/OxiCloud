@@ -74,7 +74,7 @@ pub async fn get_auth_user(req: &Request<Body>) -> Result<AuthUser, AuthError> {
 
 // Middleware de autenticación simplificado - solo valida si existe un token
 pub async fn auth_middleware(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut request: Request,
     next: Next,
@@ -117,20 +117,68 @@ pub async fn auth_middleware(
             return Ok(next.run(request).await);
         }
         
-        // Process normal token
+        // Process normal token - try to validate it using JWT service
         tracing::info!("Processing token: {}", token_str.chars().take(8).collect::<String>() + "...");
         
-        // For regular tokens, create a test user (this will be replaced with real validation)
-        let current_user = CurrentUser {
-            id: "test-user-id".to_string(),
-            username: "test-user".to_string(),
-            email: "test@example.com".to_string(),
-            role: "user".to_string(),
-        };
+        // Try to get the token service and validate the token
+        if let Some(auth_service) = state.auth_service.as_ref() {
+            let token_service = &auth_service.token_service;
+            match token_service.validate_token(token_str) {
+                Ok(claims) => {
+                    tracing::info!("Token validated successfully for user: {}", claims.username);
+                    let current_user = CurrentUser {
+                        id: claims.sub,
+                        username: claims.username,
+                        email: claims.email,
+                        role: claims.role,
+                    };
+                    request.extensions_mut().insert(current_user);
+                    return Ok(next.run(request).await);
+                },
+                Err(e) => {
+                    tracing::warn!("Token validation failed: {}", e);
+                    return Err(AuthError::InvalidToken(format!("Token inválido: {}", e)));
+                }
+            }
+        }
         
-        // Añadir usuario a la request
-        request.extensions_mut().insert(current_user);
-        return Ok(next.run(request).await);
+        // Fallback: if no auth service available, use token claims from parsing JWT manually
+        // Try to decode the token manually using jsonwebtoken
+        use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+        
+        // Try with default secret (from environment or config)
+        let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "oxicloud_secret_key_please_change_in_production".to_string());
+        
+        #[derive(serde::Deserialize)]
+        struct Claims {
+            sub: String,
+            username: String,
+            email: String,
+            role: String,
+        }
+        
+        let validation = Validation::new(Algorithm::HS256);
+        match decode::<Claims>(
+            token_str,
+            &DecodingKey::from_secret(jwt_secret.as_bytes()),
+            &validation
+        ) {
+            Ok(token_data) => {
+                tracing::info!("Token decoded successfully for user: {}", token_data.claims.username);
+                let current_user = CurrentUser {
+                    id: token_data.claims.sub,
+                    username: token_data.claims.username,
+                    email: token_data.claims.email,
+                    role: token_data.claims.role,
+                };
+                request.extensions_mut().insert(current_user);
+                return Ok(next.run(request).await);
+            },
+            Err(e) => {
+                tracing::warn!("Fallback token decode failed: {}", e);
+                return Err(AuthError::InvalidToken(format!("Token inválido: {}", e)));
+            }
+        }
     }
     
     // Si hay un indicador para evitar redirección, permitir el acceso sin token

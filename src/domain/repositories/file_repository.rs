@@ -96,6 +96,32 @@ pub trait FileRepository: Send + Sync + 'static {
     ) -> FileRepositoryResult<File>;
     
     /**
+     * Creates and saves a new file from a stream of bytes.
+     * 
+     * STREAMING UPLOAD: Writes chunks directly to disk as they arrive,
+     * avoiding memory accumulation for large files. This is the preferred
+     * method for handling uploads of any size.
+     * 
+     * Benefits:
+     * - Constant memory usage regardless of file size
+     * - Faster time-to-first-byte for large files
+     * - Better handling of slow network connections
+     * 
+     * @param name The filename with extension
+     * @param folder_id Optional ID of parent folder, None for root
+     * @param content_type MIME type of the file
+     * @param stream Async stream of byte chunks
+     * @return A File entity with generated metadata on success, error otherwise
+     */
+    async fn save_file_from_stream(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    ) -> FileRepositoryResult<File>;
+    
+    /**
      * Saves a file with a predetermined ID.
      * 
      * Similar to save_file_from_bytes but allows specifying the ID,
@@ -173,6 +199,41 @@ pub trait FileRepository: Send + Sync + 'static {
      */
     #[allow(clippy::type_complexity)]
     async fn get_file_stream(&self, id: &str) -> FileRepositoryResult<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>;
+    
+    /**
+     * Retrieves a range of file content as an asynchronous stream.
+     * 
+     * Used for HTTP Range Requests to support:
+     * - Video seeking
+     * - Resumable downloads
+     * - Parallel chunk downloads
+     * 
+     * @param id The unique identifier of the file
+     * @param start Starting byte position (inclusive)
+     * @param end Ending byte position (inclusive), None means until EOF
+     * @return A stream that yields chunks of file data for the specified range
+     */
+    #[allow(clippy::type_complexity)]
+    async fn get_file_range_stream(
+        &self, 
+        id: &str, 
+        start: u64, 
+        end: Option<u64>
+    ) -> FileRepositoryResult<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>;
+    
+    /**
+     * Memory-maps a file for zero-copy access.
+     * 
+     * Uses memory-mapped I/O for efficient reading of medium-sized files (10-100MB).
+     * The kernel handles page faults and caching, providing near-zero-copy performance.
+     * 
+     * IMPORTANT: This is synchronous I/O wrapped in spawn_blocking.
+     * Best for files that will be read sequentially in full.
+     * 
+     * @param id The unique identifier of the file
+     * @return Bytes containing the memory-mapped file content
+     */
+    async fn get_file_mmap(&self, id: &str) -> FileRepositoryResult<Bytes>;
     
     /**
      * Moves a file to a different folder.

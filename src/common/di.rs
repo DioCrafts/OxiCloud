@@ -16,6 +16,7 @@ use crate::infrastructure::services::id_mapping_service::IdMappingService;
 use crate::infrastructure::services::id_mapping_optimizer::IdMappingOptimizer;
 use crate::infrastructure::services::cache_manager::StorageCacheManager;
 use crate::infrastructure::services::file_metadata_cache::FileMetadataCache;
+use crate::infrastructure::services::file_content_cache::{FileContentCache, FileContentCacheConfig, SharedFileContentCache};
 use crate::infrastructure::services::buffer_pool::BufferPool;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 use crate::application::services::folder_service::FolderService;
@@ -97,6 +98,14 @@ impl AppServiceFactory {
             StorageCacheManager::start_cleanup_task(cache_manager_clone).await;
         });
         
+        // File content cache for ultra-fast file serving (hot files in RAM)
+        let file_content_cache = Arc::new(FileContentCache::new(FileContentCacheConfig {
+            max_file_size: 10 * 1024 * 1024,    // 10MB max per file
+            max_total_size: 512 * 1024 * 1024,  // 512MB total cache
+            max_entries: 10000,                  // Up to 10k files
+        }));
+        tracing::info!("FileContentCache initialized: max 10MB/file, 512MB total, 10k entries");
+        
         // ID mapping service para carpetas
         let folder_id_mapping_path = self.storage_path.join("folder_ids.json");
         let folder_id_mapping_service = Arc::new(
@@ -117,14 +126,56 @@ impl AppServiceFactory {
         // Iniciar tarea de limpieza del optimizer
         IdMappingOptimizer::start_cleanup_task(id_mapping_optimizer.clone());
         
-        tracing::info!("Core services initialized: path service, cache manager, ID mapping");
+        // Thumbnail service para generación de miniaturas
+        let thumbnail_service = Arc::new(
+            crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
+                &self.storage_path,
+                5000,  // max 5000 thumbnails en cache
+                100 * 1024 * 1024,  // max 100MB de cache
+            )
+        );
+        // Inicializar directorios de thumbnails
+        thumbnail_service.initialize().await?;
+        
+        // Write-behind cache para uploads instantáneos de archivos pequeños
+        let write_behind_cache = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
+        
+        // Chunked upload service para archivos grandes (>10MB)
+        let chunked_temp_dir = std::path::PathBuf::from(&self.storage_path).join(".uploads");
+        let chunked_upload_service = Arc::new(
+            crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(chunked_temp_dir)
+        );
+        
+        // Image transcoding service para conversión automática a WebP
+        let image_transcode_service = Arc::new(
+            crate::infrastructure::services::image_transcode_service::ImageTranscodeService::new(
+                &self.storage_path,
+                2000,  // max 2000 imágenes transcodificadas en cache
+                50 * 1024 * 1024,  // max 50MB de cache en memoria
+            )
+        );
+        image_transcode_service.initialize().await?;
+        
+        // Deduplication service para eliminar archivos duplicados
+        let dedup_service = Arc::new(
+            crate::infrastructure::services::dedup_service::DedupService::new(&self.storage_path)
+        );
+        dedup_service.initialize().await?;
+        
+        tracing::info!("Core services initialized: path service, cache manager, file content cache, ID mapping, thumbnails, write-behind cache, chunked upload, image transcode, dedup");
         
         Ok(CoreServices {
             path_service,
             cache_manager,
+            file_content_cache,
             id_mapping_service: folder_id_mapping_service,
             file_id_mapping_service,
             id_mapping_optimizer,
+            thumbnail_service,
+            write_behind_cache,
+            chunked_upload_service,
+            image_transcode_service,
+            dedup_service,
             config: self.config.clone(),
         })
     }
@@ -419,9 +470,15 @@ impl AppServiceFactory {
 pub struct CoreServices {
     pub path_service: Arc<PathService>,
     pub cache_manager: Arc<StorageCacheManager>,
+    pub file_content_cache: SharedFileContentCache,
     pub id_mapping_service: Arc<dyn crate::application::ports::outbound::IdMappingPort>,
     pub file_id_mapping_service: Arc<IdMappingService>,
     pub id_mapping_optimizer: Arc<IdMappingOptimizer>,
+    pub thumbnail_service: Arc<crate::infrastructure::services::thumbnail_service::ThumbnailService>,
+    pub write_behind_cache: Arc<crate::infrastructure::services::write_behind_cache::WriteBehindCache>,
+    pub chunked_upload_service: Arc<crate::infrastructure::services::chunked_upload_service::ChunkedUploadService>,
+    pub image_transcode_service: Arc<crate::infrastructure::services::image_transcode_service::ImageTranscodeService>,
+    pub dedup_service: Arc<crate::infrastructure::services::dedup_service::DedupService>,
     pub config: AppConfig,
 }
 
@@ -634,6 +691,16 @@ impl Default for AppState {
                 Ok(crate::domain::entities::file::File::default())
             }
             
+            async fn save_file_from_stream(
+                &self,
+                _name: String,
+                _folder_id: Option<String>,
+                _content_type: String,
+                _stream: std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>,
+            ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
+                Ok(crate::domain::entities::file::File::default())
+            }
+            
             async fn get_file(&self, _id: &str) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
                 Ok(crate::domain::entities::file::File::default())
             }
@@ -655,6 +722,20 @@ impl Default for AppState {
                 Ok(Box::new(empty_stream))
             }
             
+            async fn get_file_range_stream(
+                &self, 
+                _id: &str, 
+                _start: u64, 
+                _end: Option<u64>
+            ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
+                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
+                Ok(Box::new(empty_stream))
+            }
+            
+            async fn get_file_mmap(&self, _id: &str) -> Result<bytes::Bytes, crate::common::errors::DomainError> {
+                Ok(bytes::Bytes::new())
+            }
+            
             async fn move_file(&self, _file_id: &str, _target_folder_id: Option<String>) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
                 Ok(crate::domain::entities::file::File::default())
             }
@@ -669,6 +750,16 @@ impl Default for AppState {
             
             async fn update_file_content(&self, _file_id: &str, _content: Vec<u8>) -> Result<(), crate::common::errors::DomainError> {
                 Ok(())
+            }
+            
+            async fn register_file_deferred(
+                &self,
+                _name: String,
+                _folder_id: Option<String>,
+                _content_type: String,
+                _size: u64,
+            ) -> Result<(crate::domain::entities::file::File, std::path::PathBuf), crate::common::errors::DomainError> {
+                Ok((crate::domain::entities::file::File::default(), std::path::PathBuf::from("/tmp/dummy")))
             }
         }
         
@@ -931,13 +1022,57 @@ impl Default for AppState {
         let dummy_file_id_mapping = Arc::new(IdMappingService::dummy());
         let dummy_id_optimizer = Arc::new(IdMappingOptimizer::new(dummy_file_id_mapping.clone()));
         
+        // Create file content cache for stub
+        let file_content_cache = Arc::new(FileContentCache::new(FileContentCacheConfig::default()));
+        
+        // Create dummy thumbnail service
+        let dummy_thumbnail_service = Arc::new(
+            crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
+                &std::path::PathBuf::from("./storage"),
+                100,
+                10 * 1024 * 1024,
+            )
+        );
+        
+        // Create dummy write-behind cache
+        let dummy_write_behind_cache = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
+        
+        // Create dummy chunked upload service
+        let dummy_chunked_upload_service = Arc::new(
+            crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
+                std::path::PathBuf::from("./storage/.uploads")
+            )
+        );
+        
+        // Create dummy image transcode service
+        let dummy_image_transcode_service = Arc::new(
+            crate::infrastructure::services::image_transcode_service::ImageTranscodeService::new(
+                &std::path::PathBuf::from("./storage"),
+                100,
+                10 * 1024 * 1024,
+            )
+        );
+        
+        // Create dummy dedup service
+        let dummy_dedup_service = Arc::new(
+            crate::infrastructure::services::dedup_service::DedupService::new(
+                &std::path::PathBuf::from("./storage")
+            )
+        );
+        
         // This creates the core services needed for basic functionality
         let core_services = CoreServices {
             path_service: path_service.clone(),
             cache_manager: Arc::new(crate::infrastructure::services::cache_manager::StorageCacheManager::default()),
+            file_content_cache,
             id_mapping_service: id_mapping_service.clone(),
             file_id_mapping_service: dummy_file_id_mapping,
             id_mapping_optimizer: dummy_id_optimizer,
+            thumbnail_service: dummy_thumbnail_service,
+            write_behind_cache: dummy_write_behind_cache,
+            chunked_upload_service: dummy_chunked_upload_service,
+            image_transcode_service: dummy_image_transcode_service,
+            dedup_service: dummy_dedup_service,
             config: config.clone(),
         };
         

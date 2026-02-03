@@ -10,6 +10,8 @@ pub mod favorites_handler;
 pub mod recent_handler;
 pub mod webdav_handler;
 pub mod caldav_handler;
+pub mod chunked_upload_handler;
+pub mod dedup_handler;
 
 /// Tipo de resultado para controladores de API
 pub type ApiResult<T> = Result<T, (axum::http::StatusCode, String)>;

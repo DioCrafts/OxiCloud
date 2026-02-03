@@ -1,5 +1,5 @@
 # Stage 1: Builder – compile the application
-FROM rust:1.82-alpine AS builder
+FROM rust:1.93.0-alpine3.23 AS builder
 
 # Install build dependencies
 RUN apk add --no-cache musl-dev pkgconfig openssl-dev postgresql-dev
@@ -29,7 +29,7 @@ RUN cargo build --release && \
     strip target/release/oxicloud
 
 # Stage 2: Runtime – only include what is necessary to run the app
-FROM alpine:3.21.3
+FROM alpine:3.23
 
 # Install runtime dependencies and clean up cache
 RUN apk add --no-cache libgcc openssl ca-certificates tzdata && \

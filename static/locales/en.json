@@ -26,7 +26,10 @@
     "copy": "Copy",
     "notify": "Notify",
     "send": "Send",
-    "clear_recent": "Clear recent"
+    "clear_recent": "Clear recent",
+    "logout": "Log out",
+    "create": "Create",
+    "search_btn": "Search"
   },
   "share": {
     "dialogTitle": "Share Link",
@@ -168,6 +171,10 @@
   "dialogs": {
     "rename_folder": "Rename folder",
     "new_name": "New name",
+    "new_folder_title": "New folder",
+    "folder_name": "Folder name",
+    "folder_placeholder": "My folder",
+    "rename_title": "Rename",
     "move_file": "Move file",
     "select_destination": "Select destination folder",
     "root": "Root",
@@ -245,7 +252,16 @@
     "admin_email": "Admin email",
     "admin_password": "Admin password",
     "create_admin": "Create administrator",
-    "back_to_login": "Already set up?"
+    "back_to_login": "Already set up?",
+    "admin_success": "Administrator account created successfully! You can now sign in.",
+    "account_success": "Account created successfully! You can now sign in.",
+    "passwords_mismatch": "Passwords do not match",
+    "admin_create_error": "Error creating administrator account"
+  },
+  "storage": {
+    "title": "Storage",
+    "calculating": "Calculating...",
+    "used": "{{percentage}}% used ({{used}} / {{total}})"
   },
   "viewer": {
     "unsupported_file": "This file type cannot be previewed.",
@@ -253,5 +269,28 @@
     "zoom_in": "Zoom in",
     "zoom_out": "Zoom out",
     "zoom_reset": "Reset zoom"
+  },
+  "language_selector": {
+    "title": "Welcome to OxiCloud",
+    "subtitle": "Please select your language",
+    "continue": "Continue",
+    "languages": {
+      "en": "English",
+      "es": "Español",
+      "zh": "中文"
+    }
+  },
+  "favorites": {
+    "empty_state": "No favorites yet",
+    "empty_hint": "Star files or folders to add them to your favorites",
+    "add": "Add to favorites",
+    "remove": "Remove from favorites"
+  },
+  "recent": {
+    "title": "Recent",
+    "clear": "Clear recent",
+    "accessed": "Accessed",
+    "empty_state": "No recent files",
+    "empty_hint": "Files you open will appear here"
   }
 }

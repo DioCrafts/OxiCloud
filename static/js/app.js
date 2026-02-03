@@ -181,8 +181,8 @@ function setupEventListeners() {
     });
     
     // New folder button
-    elements.newFolderBtn.addEventListener('click', () => {
-        const folderName = prompt(window.i18n ? window.i18n.t('dialogs.new_name') : 'Nombre de la carpeta:');
+    elements.newFolderBtn.addEventListener('click', async () => {
+        const folderName = await window.Modal.promptNewFolder();
         if (folderName) {
             fileOps.createFolder(folderName);
         }
@@ -256,7 +256,7 @@ function setupEventListeners() {
                 elements.actionsBar.innerHTML = `
                     <div class="action-buttons">
                         <button class="btn btn-danger" id="empty-trash-btn">
-                            <i class="fas fa-trash" style="margin-right: 5px;"></i> 
+                            <i class="fas fa-trash-alt"></i>
                             <span>${window.i18n ? window.i18n.t('trash.empty_trash') : 'Vaciar papelera'}</span>
                         </button>
                     </div>
@@ -330,8 +330,8 @@ function setupEventListeners() {
                     }
                 });
                 
-                document.getElementById('new-folder-btn').addEventListener('click', () => {
-                    const folderName = prompt(window.i18n ? window.i18n.t('dialogs.new_name') : 'Nombre de la carpeta:');
+                document.getElementById('new-folder-btn').addEventListener('click', async () => {
+                    const folderName = await window.Modal.promptNewFolder();
                     if (folderName) {
                         fileOps.createFolder(folderName);
                     }
@@ -899,8 +899,8 @@ function switchToFilesView() {
         }
     });
     
-    document.getElementById('new-folder-btn').addEventListener('click', () => {
-        const folderName = prompt(window.i18n ? window.i18n.t('dialogs.new_name') : 'Nombre de la carpeta:');
+    document.getElementById('new-folder-btn').addEventListener('click', async () => {
+        const folderName = await window.Modal.promptNewFolder();
         if (folderName) {
             fileOps.createFolder(folderName);
         }
@@ -1137,6 +1137,59 @@ window.switchToFavoritesView = switchToFavoritesView;
 window.switchToRecentFilesView = switchToRecentFilesView;
 
 /**
+ * Fetch updated user data from the server (including storage usage)
+ * This calls the /api/auth/me endpoint which also triggers storage recalculation
+ */
+async function refreshUserData() {
+    const TOKEN_KEY = 'oxicloud_token';
+    const USER_DATA_KEY = 'oxicloud_user';
+    
+    const token = localStorage.getItem(TOKEN_KEY);
+    console.log('refreshUserData called, token:', token ? token.substring(0, 20) + '...' : 'null');
+    
+    if (!token || token === 'mock_token_emergency_bypass' || token === 'emergency_token') {
+        console.log('No valid token, skipping user data refresh');
+        return null;
+    }
+    
+    try {
+        console.log('Fetching /api/auth/me...');
+        const response = await fetch('/api/auth/me', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log('/api/auth/me response status:', response.status);
+        
+        if (!response.ok) {
+            console.warn('Failed to fetch user data:', response.status);
+            return null;
+        }
+        
+        const userData = await response.json();
+        console.log('Refreshed user data from server:', userData);
+        console.log('Storage from server: used=', userData.storage_used_bytes, 'quota=', userData.storage_quota_bytes);
+        
+        // Update local storage with fresh data
+        localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+        
+        // Update storage display with actual values
+        updateStorageUsageDisplay(userData);
+        
+        return userData;
+    } catch (error) {
+        console.error('Error refreshing user data:', error);
+        return null;
+    }
+}
+
+// Expose refreshUserData globally
+window.refreshUserData = refreshUserData;
+
+/**
  * Check if user is authenticated and load user's home folder
  */
 function checkAuthentication() {
@@ -1192,6 +1245,22 @@ function checkAuthentication() {
             if (userAvatar) {
                 userAvatar.textContent = userInitials;
             }
+            
+            // Show cached storage first, then try to refresh from server
+            updateStorageUsageDisplay(userData);
+            
+            // Try to get updated storage from server (if we have a real token)
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (token && token !== 'mock_token_emergency_bypass' && token !== 'emergency_token') {
+                console.log('Bypass mode: Attempting to refresh storage from server...');
+                refreshUserData().then(freshData => {
+                    if (freshData) {
+                        console.log('Bypass mode: Storage updated from server');
+                    }
+                }).catch(err => {
+                    console.warn('Bypass mode: Could not refresh user data:', err);
+                });
+            }
         }
         
         // Reset all counters to prevent loops
@@ -1238,8 +1307,18 @@ function checkAuthentication() {
                 userAvatar.textContent = userInitials;
             }
             
-            // Update storage usage information
+            // Update storage usage information with cached data first (for fast display)
             updateStorageUsageDisplay(userData);
+            
+            // Then refresh user data from server in the background to get updated storage
+            // This triggers the backend to recalculate storage and returns fresh data
+            refreshUserData().then(freshData => {
+                if (freshData) {
+                    console.log('Storage usage updated from server');
+                }
+            }).catch(err => {
+                console.warn('Could not refresh user data:', err);
+            });
             
             // Find and load the user's home folder
             findUserHomeFolder(userData.username);
@@ -1506,7 +1585,19 @@ function updateStorageUsageDisplay(userData) {
     }
     
     if (storageInfo) {
-        storageInfo.textContent = `${usagePercentage}% usado (${usedFormatted} / ${quotaFormatted})`;
+        // Remove data-i18n attribute to prevent i18n from overwriting our value
+        storageInfo.removeAttribute('data-i18n');
+        
+        // Use i18n if available
+        if (window.i18n && window.i18n.t) {
+            storageInfo.textContent = window.i18n.t('storage.used', {
+                percentage: usagePercentage,
+                used: usedFormatted,
+                total: quotaFormatted
+            });
+        } else {
+            storageInfo.textContent = `${usagePercentage}% used (${usedFormatted} / ${quotaFormatted})`;
+        }
     }
     
     console.log(`Updated storage display: ${usagePercentage}% (${usedFormatted} / ${quotaFormatted})`);

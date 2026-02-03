@@ -145,7 +145,10 @@
     "copy": "Copiar",
     "notify": "Notificar",
     "send": "Enviar",
-    "clear_recent": "Limpiar recientes"
+    "clear_recent": "Limpiar recientes",
+    "logout": "Cerrar sesión",
+    "create": "Crear",
+    "search_btn": "Buscar"
   },
   "files": {
     "name": "Nombre",
@@ -168,6 +171,10 @@
   "dialogs": {
     "rename_folder": "Renombrar carpeta",
     "new_name": "Nuevo nombre",
+    "new_folder_title": "Nueva carpeta",
+    "folder_name": "Nombre de la carpeta",
+    "folder_placeholder": "Mi carpeta",
+    "rename_title": "Renombrar",
     "move_file": "Mover archivo",
     "select_destination": "Selecciona la carpeta destino",
     "root": "Raíz",
@@ -245,7 +252,16 @@
     "admin_email": "Email administrador",
     "admin_password": "Contraseña administrador",
     "create_admin": "Crear administrador",
-    "back_to_login": "¿Ya está configurado?"
+    "back_to_login": "¿Ya está configurado?",
+    "admin_success": "¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.",
+    "account_success": "¡Cuenta creada con éxito! Ahora puedes iniciar sesión.",
+    "passwords_mismatch": "Las contraseñas no coinciden",
+    "admin_create_error": "Error al crear cuenta de administrador"
+  },
+  "storage": {
+    "title": "Almacenamiento",
+    "calculating": "Calculando...",
+    "used": "{{percentage}}% usado ({{used}} / {{total}})"
   },
   "viewer": {
     "unsupported_file": "Este tipo de archivo no se puede previsualizar.",
@@ -253,5 +269,28 @@
     "zoom_in": "Acercar",
     "zoom_out": "Alejar",
     "zoom_reset": "Restablecer zoom"
+  },
+  "language_selector": {
+    "title": "Bienvenido a OxiCloud",
+    "subtitle": "Por favor, selecciona tu idioma",
+    "continue": "Continuar",
+    "languages": {
+      "en": "English",
+      "es": "Español",
+      "zh": "中文"
+    }
+  },
+  "favorites": {
+    "empty_state": "Aún no hay favoritos",
+    "empty_hint": "Marca archivos o carpetas con estrella para añadirlos a favoritos",
+    "add": "Añadir a favoritos",
+    "remove": "Quitar de favoritos"
+  },
+  "recent": {
+    "title": "Recientes",
+    "clear": "Limpiar recientes",
+    "accessed": "Accedido",
+    "empty_state": "No hay archivos recientes",
+    "empty_hint": "Los archivos que abras aparecerán aquí"
   }
 }

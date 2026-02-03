@@ -2,7 +2,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     routing::{post, get, put},
-    extract::{State, Json, Extension},
+    extract::{State, Json},
     http::{StatusCode, HeaderMap, header},
     response::IntoResponse,
 };
@@ -11,17 +11,25 @@ use crate::common::di::AppState;
 use crate::application::dtos::user_dto::{
     LoginDto, RegisterDto, UserDto, ChangePasswordDto, RefreshTokenDto, AuthResponseDto
 };
-use crate::interfaces::middleware::auth::CurrentUser;
 use crate::interfaces::errors::AppError;
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
-    Router::new()
+    // Rutas que NO requieren autenticación
+    let public_routes = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
         .route("/refresh", post(refresh_token))
+        .route("/status", get(get_system_status));
+    
+    // Rutas que SÍ requieren autenticación - usamos route_layer para aplicar middleware
+    // El middleware usará el state que se pase con .with_state() desde main.rs
+    let protected_routes = Router::new()
         .route("/me", get(get_current_user))
         .route("/change-password", put(change_password))
-        .route("/logout", post(logout))
+        .route("/logout", post(logout));
+    
+    // Combinar rutas públicas y protegidas
+    public_routes.merge(protected_routes)
 }
 
 async fn register(
@@ -265,69 +273,123 @@ async fn refresh_token(
 
 async fn get_current_user(
     State(state): State<Arc<AppState>>,
-    Extension(current_user): Extension<CurrentUser>,
+    headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     // Normal process for all users
     let auth_service = state.auth_service.as_ref()
         .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
     
-    // Primero, intentamos actualizar las estadísticas de uso de almacenamiento
-    // Si existe el servicio de uso de almacenamiento
+    // Extraer y validar el token directamente
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
+    
+    // Validar el token y obtener claims
+    let claims = auth_service.token_service.validate_token(token)
+        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+    
+    let user_id = claims.sub;
+    
+    // Primero, actualizar las estadísticas de uso de almacenamiento
+    // IMPORTANTE: Esperamos el cálculo para devolver datos actualizados
     if let Some(storage_usage_service) = state.storage_usage_service.as_ref() {
-        // Actualizamos el uso de almacenamiento en segundo plano
-        // No bloqueamos la respuesta con esta actualización
-        let user_id = current_user.id.clone();
-        let storage_service = storage_usage_service.clone();
-        
-        // Ejecutar asincronamente para no retrasar la respuesta
-        tokio::spawn(async move {
-            match storage_service.update_user_storage_usage(&user_id).await {
-                Ok(usage) => {
-                    tracing::info!("Updated storage usage for user {}: {} bytes", user_id, usage);
-                },
-                Err(e) => {
-                    tracing::warn!("Failed to update storage usage for user {}: {}", user_id, e);
-                }
+        // Calcular storage de forma síncrona (esperamos el resultado)
+        match storage_usage_service.update_user_storage_usage(&user_id).await {
+            Ok(usage) => {
+                tracing::info!("Updated storage usage for user {}: {} bytes", user_id, usage);
+            },
+            Err(e) => {
+                // Solo log de warning, no fallar la petición completa
+                tracing::warn!("Failed to update storage usage for user {}: {}", user_id, e);
             }
-        });
+        }
     }
     
-    // Obtener los datos del usuario (que puede tener valores de almacenamiento desactualizados)
-    let user = auth_service.auth_application_service.get_user_by_id(&current_user.id).await?;
+    // Ahora obtener los datos del usuario CON el almacenamiento actualizado
+    let user = auth_service.auth_application_service.get_user_by_id(&user_id).await?;
     
     Ok((StatusCode::OK, Json(user)))
 }
 
 async fn change_password(
     State(state): State<Arc<AppState>>,
-    Extension(current_user): Extension<CurrentUser>,
+    headers: HeaderMap,
     Json(dto): Json<ChangePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state.auth_service.as_ref()
         .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
     
-    auth_service.auth_application_service.change_password(&current_user.id, dto).await?;
+    // Extraer y validar el token directamente
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
+    
+    // Validar el token y obtener claims
+    let claims = auth_service.token_service.validate_token(token)
+        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+    
+    auth_service.auth_application_service.change_password(&claims.sub, dto).await?;
     
     Ok(StatusCode::OK)
 }
 
 async fn logout(
     State(state): State<Arc<AppState>>,
-    Extension(current_user): Extension<CurrentUser>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state.auth_service.as_ref()
         .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
     
-    // Extract refresh token from request
-    let refresh_token = headers
+    // Extraer y validar el token directamente
+    let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Token de refresco no encontrado"))?;
+        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
     
-    auth_service.auth_application_service.logout(&current_user.id, refresh_token).await?;
+    // Validar el token y obtener claims
+    let claims = auth_service.token_service.validate_token(token)
+        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+    
+    // Use access token for logout (we don't have refresh token in headers)
+    auth_service.auth_application_service.logout(&claims.sub, token).await?;
     
     Ok(StatusCode::OK)
 }
 
+/// Get system status - returns whether admin is configured
+/// This is a public endpoint used to determine if setup is needed
+#[derive(serde::Serialize)]
+struct SystemStatus {
+    /// Whether the system has been set up with an admin
+    initialized: bool,
+    /// Number of admin users in the system
+    admin_count: i64,
+    /// Whether registration is allowed (only if admin exists)
+    registration_allowed: bool,
+}
+
+async fn get_system_status(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+    
+    // Count admin users to determine if system is initialized
+    let admin_count = auth_service.auth_application_service.count_admin_users().await
+        .unwrap_or(0);
+    
+    let status = SystemStatus {
+        initialized: admin_count > 0,
+        admin_count,
+        registration_allowed: admin_count > 0, // Only allow registration if admin exists
+    };
+    
+    tracing::info!("System status check: initialized={}, admin_count={}", status.initialized, status.admin_count);
+    
+    Ok((StatusCode::OK, Json(status)))
+}

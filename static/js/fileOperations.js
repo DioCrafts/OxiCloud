@@ -21,20 +21,26 @@ const fileOps = {
         for (let i = 0; i < totalFiles; i++) {
             const file = files[i];
             const formData = new FormData();
+            
+            // IMPORTANT: folder_id MUST be added BEFORE file for multipart processing
+            // The backend reads fields in order, and needs folder_id before processing the file
+            const targetFolderId = window.app.currentPath || window.app.userHomeFolderId;
+            
+            if (targetFolderId) {
+                formData.append('folder_id', targetFolderId);
+            }
+            
+            // Add the file AFTER folder_id
             formData.append('file', file);
 
-            if (window.app.currentPath) {
-                formData.append('folder_id', window.app.currentPath);
-            }
-
             try {
-                console.log(`Uploading file to current path: ${window.app.currentPath || 'root'}`);
+                console.log(`Uploading file to folder: ${targetFolderId || 'root'}`);
                 
                 // Usamos la URL correcta para la subida de archivos
                 console.log('Formulario a enviar:', {
                     file: file.name,
                     size: file.size,
-                    folder_id: window.app.currentPath || 'root'
+                    folder_id: targetFolderId || 'root'
                 });
                 
                 const response = await fetch('/api/files/upload', {
@@ -62,63 +68,29 @@ const fileOps = {
                     const responseData = await response.json();
                     console.log(`Successfully uploaded ${file.name}`, responseData);
                     
-                    // Agregar el archivo a la vista inmediatamente para mostrar retroalimentación instantánea
-                    // Esto permite que el usuario vea el archivo aunque el refresco posterior falle
-                    if (window.ui && window.ui.addFileToView) {
-                        console.log('Añadiendo archivo subido directamente a la vista:', responseData);
-                        window.ui.addFileToView(responseData);
-                        window.ui.updateFileIcons();
-                    }
+                    // Show success notification immediately
+                    window.ui.showNotification('Archivo subido', `${file.name} completado`);
 
                     if (i === totalFiles - 1) {
-                        // Last file uploaded
-                        console.log('Recargando lista de archivos después de subida');
+                        // Last file uploaded - wait and reload once
+                        console.log('Último archivo subido, esperando antes de recargar...');
                         
+                        // Wait for backend to persist
+                        await new Promise(resolve => setTimeout(resolve, 800));
+                        
+                        // Single reload with force refresh
                         try {
-                            // Esperar 1500ms para asegurar que los mapeos de ID se guarden
-                            // Tiempo aumentado significativamente para permitir al backend completar persistencia
-                            await new Promise(resolve => setTimeout(resolve, 1500));
-                            
-                            // Forzar recarga de archivos con parámetro de bypass de caché
-                            const timestamp = new Date().getTime();
-                            const filesUrl = `/api/files?t=${timestamp}&folder_id=${window.app.currentPath || ''}`;
-                            
-                            console.log(`Recargando lista de archivos desde: ${filesUrl}`);
-                            const filesResponse = await fetch(filesUrl, {
-                                cache: 'no-store',
-                                headers: {
-                                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                                    'Pragma': 'no-cache'
-                                }
-                            });
-                            
-                            if (filesResponse.ok) {
-                                const files = await filesResponse.json();
-                                console.log(`Recarga de archivos completada, obtenidos ${files.length} archivos`);
-                            }
-                            
-                            // Esperar un momento más antes de la recarga final
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                            
-                            // Hacer una única recarga final forzando refresco completo
                             await window.loadFiles({forceRefresh: true});
-                            
-                            // Asegurarse de que no haya recargas adicionales o duplicados
                         } catch (reloadError) {
-                            console.error("Error durante recarga de archivos:", reloadError);
-                            // Intentar recargar lista de nuevo en caso de error
-                            await window.loadFiles({forceRefresh: true});
-                            // Segundo intento con retraso y forzando refresco
-                            setTimeout(() => window.loadFiles({forceRefresh: true}), 500);
+                            console.error("Error recargando archivos:", reloadError);
                         }
                         
+                        // Hide upload UI
                         setTimeout(() => {
-                            document.getElementById('dropzone').style.display = 'none';
+                            const dropzone = document.getElementById('dropzone');
+                            if (dropzone) dropzone.style.display = 'none';
                             uploadProgressDiv.style.display = 'none';
-                        }, 1000);
-
-                        // Show success notification
-                        window.ui.showNotification('Archivo subido', `${file.name} completado`);
+                        }, 500);
                     }
                 } else {
                     const errorData = await response.text();
