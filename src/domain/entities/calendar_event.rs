@@ -11,31 +11,11 @@
 
 use uuid::Uuid;
 use chrono::{DateTime, Utc, Duration, TimeZone};
-use thiserror::Error;
 
 use crate::common::errors::{Result, DomainError, ErrorKind};
 
-/**
- * Error types specific to calendar event operations.
- */
-#[derive(Error, Debug)]
-pub enum CalendarEventError {
-    /// Error when event summary/title is invalid
-    #[error("Invalid event summary: {0}")]
-    InvalidSummary(String),
-    
-    /// Error when event dates are invalid
-    #[error("Invalid event dates: {0}")]
-    InvalidDates(String),
-    
-    /// Error when recurrence rule is invalid
-    #[error("Invalid recurrence rule: {0}")]
-    InvalidRecurrence(String),
-    
-    /// Error when iCalendar data is invalid
-    #[error("Invalid iCalendar data: {0}")]
-    InvalidICalData(String),
-}
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::CalendarEventError;
 
 /**
  * CalendarEvent entity.

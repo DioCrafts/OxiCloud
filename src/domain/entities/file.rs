@@ -1,28 +1,7 @@
 use crate::domain::services::path_service::StoragePath;
 
-/**
- * Represents errors that can occur during file entity operations.
- * 
- * This enum encapsulates various error conditions that may arise when creating,
- * validating, or manipulating file entities in the domain model.
- */
-#[derive(Debug, thiserror::Error)]
-pub enum FileError {
-    /// Occurs when a file name contains invalid characters or is empty.
-    #[error("Invalid file name: {0}")]
-    InvalidFileName(String),
-    
-    /// Occurs when validation fails for any file entity attribute.
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-}
-
-/**
- * Type alias for results of file entity operations.
- * 
- * Provides a convenient way to return either a successful value or a FileError.
- */
-pub type FileResult<T> = Result<T, FileError>;
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::{FileError, FileResult};
 
 /**
  * Represents a file in the system's domain model.

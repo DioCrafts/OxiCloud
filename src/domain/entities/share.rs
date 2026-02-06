@@ -1,6 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
-use thiserror::Error;
 use uuid::Uuid;
+
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::ShareError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Share {
@@ -27,16 +29,6 @@ pub struct SharePermissions {
 pub enum ShareItemType {
     File,
     Folder,
-}
-
-#[derive(Debug, Error)]
-pub enum ShareError {
-    #[error("Invalid token: {0}")]
-    InvalidToken(String),
-    #[error("Invalid expiration date: {0}")]
-    InvalidExpiration(String),
-    #[error("Validation error: {0}")]
-    ValidationError(String),
 }
 
 impl Share {

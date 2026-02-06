@@ -1,22 +1,8 @@
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, thiserror::Error)]
-pub enum UserError {
-    #[error("Username inválido: {0}")]
-    InvalidUsername(String),
-    
-    #[error("Password inválido: {0}")]
-    InvalidPassword(String),
-    
-    #[error("Error en la validación: {0}")]
-    ValidationError(String),
-    
-    #[error("Error en la autenticación: {0}")]
-    AuthenticationError(String),
-}
-
-pub type UserResult<T> = Result<T, UserError>;
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::{UserError, UserResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 // We'll handle conversion manually for now until the type is properly set up in the database

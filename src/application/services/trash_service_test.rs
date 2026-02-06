@@ -8,9 +8,10 @@ use crate::common::errors::{Result, DomainError};
 use crate::domain::entities::file::File;
 use crate::domain::entities::folder::Folder;
 use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
-use crate::domain::repositories::file_repository::{FileRepository, FileRepositoryResult};
-use crate::domain::repositories::folder_repository::{FolderRepository, FolderRepositoryResult};
+use crate::domain::repositories::file_repository::{FileRepository, FileRepositoryResult, FileRepositoryError};
+use crate::domain::repositories::folder_repository::{FolderRepository, FolderRepositoryResult, FolderRepositoryError};
 use crate::domain::repositories::trash_repository::TrashRepository;
+use crate::domain::services::path_service::StoragePath;
 use crate::application::services::trash_service::TrashService;
 
 // Mock repositories for testing
@@ -103,12 +104,11 @@ impl MockFileRepository {
 
     fn add_test_file(&self, id: &str, name: &str, path: &str) {
         let file = File::new(
-            Uuid::parse_str(id).unwrap(),
+            id.to_string(),
             name.to_string(),
-            path.to_string(),
-            "text/plain".to_string(),
+            StoragePath::from_string(path),
             100,
-            Uuid::new_v4(),
+            "text/plain".to_string(),
             None,
         ).unwrap();
         
@@ -124,7 +124,7 @@ impl FileRepository for MockFileRepository {
         if let Some(file) = files.get(id) {
             Ok(file.clone())
         } else {
-            Err("File not found".into())
+            Err(FileRepositoryError::NotFound(id.to_string()))
         }
     }
 
@@ -136,7 +136,7 @@ impl FileRepository for MockFileRepository {
             trashed.insert(id.to_string(), file);
             Ok(())
         } else {
-            Err("File not found".into())
+            Err(FileRepositoryError::NotFound(id.to_string()))
         }
     }
 
@@ -148,7 +148,7 @@ impl FileRepository for MockFileRepository {
             files.insert(id.to_string(), file);
             Ok(())
         } else {
-            Err("File not found in trash".into())
+            Err(FileRepositoryError::NotFound(format!("File {} not found in trash", id)))
         }
     }
 
@@ -157,7 +157,7 @@ impl FileRepository for MockFileRepository {
         if trashed.remove(id).is_some() {
             Ok(())
         } else {
-            Err("File not found in trash".into())
+            Err(FileRepositoryError::NotFound(format!("File {} not found in trash", id)))
         }
     }
 
@@ -185,9 +185,9 @@ impl MockFolderRepository {
 
     fn add_test_folder(&self, id: &str, name: &str, path: &str) {
         let folder = Folder::new(
-            Uuid::parse_str(id).unwrap(),
+            id.to_string(),
             name.to_string(),
-            path.to_string(),
+            StoragePath::from_string(path),
             None,
         ).unwrap();
         
@@ -203,7 +203,7 @@ impl FolderRepository for MockFolderRepository {
         if let Some(folder) = folders.get(id) {
             Ok(folder.clone())
         } else {
-            Err("Folder not found".into())
+            Err(FolderRepositoryError::NotFound(id.to_string()))
         }
     }
 
@@ -215,7 +215,7 @@ impl FolderRepository for MockFolderRepository {
             trashed.insert(id.to_string(), folder);
             Ok(())
         } else {
-            Err("Folder not found".into())
+            Err(FolderRepositoryError::NotFound(id.to_string()))
         }
     }
 
@@ -227,7 +227,7 @@ impl FolderRepository for MockFolderRepository {
             folders.insert(id.to_string(), folder);
             Ok(())
         } else {
-            Err("Folder not found in trash".into())
+            Err(FolderRepositoryError::NotFound(format!("Folder {} not found in trash", id)))
         }
     }
 
@@ -236,7 +236,7 @@ impl FolderRepository for MockFolderRepository {
         if trashed.remove(id).is_some() {
             Ok(())
         } else {
-            Err("Folder not found in trash".into())
+            Err(FolderRepositoryError::NotFound(format!("Folder {} not found in trash", id)))
         }
     }
 

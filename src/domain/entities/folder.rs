@@ -1,17 +1,7 @@
 use crate::domain::services::path_service::StoragePath;
 
-/// Error in the creation or manipulation of folder entities
-#[derive(Debug, thiserror::Error)]
-pub enum FolderError {
-    #[error("Invalid folder name: {0}")]
-    InvalidFolderName(String),
-    
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-}
-
-/// Result type for folder entity operations
-pub type FolderResult<T> = Result<T, FolderError>;
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::{FolderError, FolderResult};
 
 /// Represents a folder entity in the domain
 #[derive(Debug, Clone, PartialEq, Eq)]

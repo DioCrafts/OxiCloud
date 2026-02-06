@@ -495,7 +495,7 @@ mod tests {
             let mut shares = self.shares.lock().unwrap();
             
             if !shares.contains_key(&share.id) {
-                return Err(DomainError::NotFound(format!("Share with ID {} not found for update", share.id)));
+                return Err(DomainError::not_found("Share", &share.id));
             }
             
             shares.insert(share.id.clone(), share.clone());
@@ -509,7 +509,7 @@ mod tests {
             
             // Find the share to get the token
             let share = shares.get(id)
-                .ok_or_else(|| DomainError::NotFound(format!("Share with ID {} not found for deletion", id)))?;
+                .ok_or_else(|| DomainError::not_found("Share", id))?;
             
             // Remove token mapping
             tokens.remove(&share.token);

@@ -11,27 +11,11 @@
 
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
-use thiserror::Error;
 
 use crate::common::errors::{Result, DomainError, ErrorKind};
 
-/**
- * Error types specific to calendar operations.
- */
-#[derive(Error, Debug)]
-pub enum CalendarError {
-    /// Error when calendar name is invalid
-    #[error("Invalid calendar name: {0}")]
-    InvalidName(String),
-    
-    /// Error when color code is invalid
-    #[error("Invalid color code: {0}")]
-    InvalidColor(String),
-    
-    /// Error when owner ID is invalid
-    #[error("Invalid owner ID: {0}")]
-    InvalidOwnerId(String),
-}
+// Re-exportar errores de entidad desde el módulo centralizado
+pub use super::entity_errors::CalendarError;
 
 /**
  * Calendar entity.
