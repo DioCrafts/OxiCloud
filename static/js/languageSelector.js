@@ -7,7 +7,8 @@
 const languages = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
     { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'zh', name: '中文', flag: '🇨🇳' }
+    { code: 'zh', name: '中文', flag: '🇨🇳' },
+    { code: 'fa', name: 'فارسی', flag: '🦁' }
 ];
 
 /**

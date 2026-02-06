@@ -12,7 +12,7 @@ let currentLocale =
     'en';
 
 // Supported locales
-const supportedLocales = ['en', 'es', 'zh'];
+const supportedLocales = ['en', 'es', 'zh', 'fa'];
 
 // Fallback to English if locale is not supported
 if (!supportedLocales.includes(currentLocale)) {
