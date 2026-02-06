@@ -1,7 +1,10 @@
 //! Errores de la aplicación
 //!
-//! Este módulo re-exporta los errores del dominio y define utilidades
-//! para conversión de errores de infraestructura.
+//! Este módulo re-exporta los errores del dominio para compatibilidad.
+//! Las conversiones de errores de infraestructura (sqlx, serde_json, etc.)
+//! se encuentran en infrastructure/adapters/error_adapters.rs, siguiendo
+//! los principios de Clean Architecture donde el dominio no debe conocer
+//! detalles de infraestructura.
 
 // Re-exportar errores del dominio para compatibilidad
 pub use crate::domain::errors::{DomainError, ErrorKind, Result};
@@ -9,24 +12,10 @@ pub use crate::domain::errors::{DomainError, ErrorKind, Result};
 // Re-exportar AppError desde interfaces para compatibilidad hacia atrás
 // NOTA: El lugar canónico de AppError es ahora crate::interfaces::errors
 
-// Macro para convertir errores específicos de infraestructura a DomainError
-#[macro_export]
-macro_rules! impl_from_error {
-    ($error_type:ty, $entity_type:expr) => {
-        impl From<$error_type> for crate::domain::errors::DomainError {
-            fn from(err: $error_type) -> Self {
-                crate::domain::errors::DomainError {
-                    kind: crate::domain::errors::ErrorKind::InternalError,
-                    entity_type: $entity_type,
-                    entity_id: None,
-                    message: format!("{}", err),
-                    source: Some(Box::new(err)),
-                }
-            }
-        }
-    };
-}
-
-// Implementaciones para errores de infraestructura (sqlx, serde_json)
-impl_from_error!(serde_json::Error, "Serialization");
-impl_from_error!(sqlx::Error, "Database");
+// Las conversiones de errores de infraestructura se han movido a:
+// crate::infrastructure::adapters::error_adapters
+//
+// Para convertir errores de infraestructura a DomainError, use:
+// - El trait IntoDomainError para conversiones explícitas con contexto
+// - O maneje los errores en los repositorios/servicios de infraestructura
+//   usando map_err() con DomainError::internal_error() o métodos similares
