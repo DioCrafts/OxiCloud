@@ -27,7 +27,7 @@ NextCloud was too slow on my home server. So I built OxiCloud: a file storage sy
 | **Fast** | Rust with LTO optimization. Sub-second responses. |
 | **Clean UI** | Works on desktop and mobile. No clutter. |
 | **Easy setup** | One binary, one database, done. |
-| **Multi-language** | English and Spanish out of the box. |
+| **Multi-language** | English, Spanish and Persian out of the box. |
 
 ## Quick Start
 
