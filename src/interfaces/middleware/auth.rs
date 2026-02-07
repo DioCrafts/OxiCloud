@@ -1,10 +1,9 @@
 use std::sync::Arc;
 use axum::{
-    extract::{State, Request},
-    http::{StatusCode, HeaderMap, header},
+    extract::{State, Request, FromRequestParts},
+    http::{StatusCode, HeaderMap, header, request::Parts},
     middleware::Next,
     response::{Response, IntoResponse},
-    body::Body,
 };
 
 use crate::common::di::AppState;
@@ -17,6 +16,51 @@ pub use crate::application::dtos::user_dto::CurrentUser;
 pub struct AuthUser {
     pub id: String,
     pub username: String,
+}
+
+/// Extractor reutilizable que obtiene el user_id del usuario autenticado.
+/// Se extrae automáticamente del `CurrentUser` insertado por el auth middleware.
+///
+/// Uso en handlers:
+/// ```rust
+/// async fn my_handler(CurrentUserId(user_id): CurrentUserId) -> impl IntoResponse { ... }
+/// ```
+#[derive(Clone, Debug)]
+pub struct CurrentUserId(pub String);
+
+// Implementar FromRequestParts para AuthUser — permite usar `auth_user: AuthUser` en handlers
+impl<S> FromRequestParts<S> for AuthUser
+where
+    S: Send + Sync,
+{
+    type Rejection = AuthError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<CurrentUser>()
+            .map(|cu| AuthUser {
+                id: cu.id.clone(),
+                username: cu.username.clone(),
+            })
+            .ok_or(AuthError::UserNotFound)
+    }
+}
+
+// Implementar FromRequestParts para CurrentUserId — extractor ligero solo para el user_id
+impl<S> FromRequestParts<S> for CurrentUserId
+where
+    S: Send + Sync,
+{
+    type Rejection = AuthError;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        parts
+            .extensions
+            .get::<CurrentUser>()
+            .map(|cu| CurrentUserId(cu.id.clone()))
+            .ok_or(AuthError::UserNotFound)
+    }
 }
 
 // Error para las operaciones de autenticación
@@ -54,22 +98,6 @@ impl IntoResponse for AuthError {
 
         (status, body).into_response()
     }
-}
-
-// Implementamos el extractor para AuthUser
-// Use a function instead of an extractor for now
-// We'll use this directly in handlers until we solve the extractor lifetime issues
-pub async fn get_auth_user(req: &Request<Body>) -> Result<AuthUser, AuthError> {
-    // Get the current user from extensions
-    if let Some(current_user) = req.extensions().get::<CurrentUser>() {
-        return Ok(AuthUser {
-            id: current_user.id.clone(),
-            username: current_user.username.clone(),
-        });
-    }
-
-    // Return error if user not found
-    Err(AuthError::UserNotFound)
 }
 
 // Middleware de autenticación simplificado - solo valida si existe un token

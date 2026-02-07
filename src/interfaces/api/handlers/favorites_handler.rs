@@ -8,13 +8,14 @@ use axum::{
 use tracing::{error, info};
 
 use crate::application::ports::favorites_ports::FavoritesUseCase;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Handler for favorite-related API endpoints
 pub async fn get_favorites(
     State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    auth_user: AuthUser,
 ) -> impl IntoResponse {
-    // For demo purposes, we're using a fixed user ID
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     match favorites_service.get_favorites(user_id).await {
         Ok(favorites) => {
@@ -36,10 +37,10 @@ pub async fn get_favorites(
 /// Add an item to user's favorites
 pub async fn add_favorite(
     State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    // For demo purposes, we're using a fixed user ID
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     // Validate item_type
     if item_type != "file" && item_type != "folder" {
@@ -76,10 +77,10 @@ pub async fn add_favorite(
 /// Remove an item from user's favorites
 pub async fn remove_favorite(
     State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    // For demo purposes, we're using a fixed user ID
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     match favorites_service.remove_from_favorites(user_id, &item_id, &item_type).await {
         Ok(removed) => {

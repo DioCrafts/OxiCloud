@@ -16,6 +16,7 @@ use crate::infrastructure::services::compression_service::{
     CompressionService, GzipCompressionService, CompressionLevel
 };
 use crate::common::di::AppState;
+use crate::interfaces::middleware::auth::CurrentUserId;
 
 /**
  * Type aliases for dependency injection state.
@@ -1068,6 +1069,7 @@ impl FileHandler {
     /// 3. Decrement dedup reference count for the content hash
     pub async fn delete_file(
         State(state): State<GlobalState>,
+        CurrentUserId(user_id): CurrentUserId,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
         let dedup_service = &state.core.dedup_service;
@@ -1097,12 +1099,12 @@ impl FileHandler {
             
             // Debug logs to track trash components
             tracing::debug!("Trash service type: {}", std::any::type_name_of_val(&*trash_service));
-            let default_user_id = "00000000-0000-0000-0000-000000000000".to_string();
-            tracing::info!("Using default user ID: {}", default_user_id);
+            // User ID extracted from authenticated token via CurrentUserId
+            tracing::info!("Using authenticated user ID: {}", user_id);
             
             // Try to move to trash first - add more detailed logging
             tracing::info!("About to call trash_service.move_to_trash with id={}, type=file", id);
-            match trash_service.move_to_trash(&id, "file", &default_user_id).await {
+            match trash_service.move_to_trash(&id, "file", &user_id).await {
                 Ok(_) => {
                     tracing::info!("File successfully moved to trash: {}", id);
                     

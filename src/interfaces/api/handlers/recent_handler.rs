@@ -9,6 +9,7 @@ use serde::Deserialize;
 use tracing::{error, info};
 
 use crate::application::ports::recent_ports::RecentItemsUseCase;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Parámetros de consulta para obtener elementos recientes
 #[derive(Deserialize)]
@@ -20,10 +21,10 @@ pub struct GetRecentParams {
 /// Obtener elementos recientes del usuario
 pub async fn get_recent_items(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    auth_user: AuthUser,
     Query(params): Query<GetRecentParams>,
 ) -> impl IntoResponse {
-    // Para pruebas, usando ID de usuario fijo
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     match recent_service.get_recent_items(user_id, params.limit).await {
         Ok(items) => {
@@ -45,10 +46,10 @@ pub async fn get_recent_items(
 /// Registrar acceso a un elemento
 pub async fn record_item_access(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    // Para pruebas, usando ID de usuario fijo
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     // Validar tipo de elemento
     if item_type != "file" && item_type != "folder" {
@@ -85,10 +86,10 @@ pub async fn record_item_access(
 /// Eliminar un elemento de recientes
 pub async fn remove_from_recent(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    // Para pruebas, usando ID de usuario fijo
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     match recent_service.remove_from_recent(user_id, &item_id, &item_type).await {
         Ok(removed) => {
@@ -125,9 +126,9 @@ pub async fn remove_from_recent(
 /// Limpiar todos los elementos recientes
 pub async fn clear_recent_items(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    auth_user: AuthUser,
 ) -> impl IntoResponse {
-    // Para pruebas, usando ID de usuario fijo
-    let user_id = "00000000-0000-0000-0000-000000000000";
+    let user_id = &auth_user.id;
     
     match recent_service.clear_recent_items(user_id).await {
         Ok(_) => {

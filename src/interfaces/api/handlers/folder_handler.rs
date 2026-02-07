@@ -174,7 +174,7 @@ impl FolderHandler {
     /// Deletes a folder with trash functionality
     pub async fn delete_folder_with_trash(
         State(state): State<GlobalAppState>,
-        _auth_user: AuthUser,
+        auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
         // Check if trash service is available
@@ -182,7 +182,7 @@ impl FolderHandler {
             tracing::info!("Moving folder to trash: {}", id);
             
             // Try to move to trash first
-            match trash_service.move_to_trash(&id, "folder", &"00000000-0000-0000-0000-000000000000".to_string()).await {
+            match trash_service.move_to_trash(&id, "folder", &auth_user.id).await {
                 Ok(_) => {
                     tracing::info!("Folder successfully moved to trash: {}", id);
                     return StatusCode::NO_CONTENT.into_response();

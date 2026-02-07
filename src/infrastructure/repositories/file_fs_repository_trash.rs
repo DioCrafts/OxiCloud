@@ -26,9 +26,10 @@ impl FileFsRepository {
             debug!("User-specific trash directory: {}", user_trash_dir.display());
             user_trash_dir
         } else {
-            // Use a default user directory if not specified
-            let default_dir = base_trash_dir.join("00000000-0000-0000-0000-000000000000");
-            debug!("Default user trash directory: {}", default_dir.display());
+            // No user ID provided - this should not happen in production
+            tracing::warn!("No user_id provided for trash directory, this indicates a bug");
+            let default_dir = base_trash_dir.join("unknown-user");
+            debug!("Fallback user trash directory: {}", default_dir.display());
             default_dir
         }
     }
@@ -38,7 +39,7 @@ impl FileFsRepository {
         debug!("Creating trash file path for file ID: {}", file_id);
         
         // Get the trash directory for the default user
-        let user_trash_dir = self.get_user_trash_dir(Some("00000000-0000-0000-0000-000000000000"));
+        let user_trash_dir = self.get_user_trash_dir(None);
         
         // Ensure the user's trash directory exists
         debug!("Ensuring user trash directory exists: {}", user_trash_dir.display());

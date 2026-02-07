@@ -72,13 +72,38 @@ impl TrashService {
         }
     }
 
-    /// Validates user permissions over an item
+    /// Validates that the given user owns the trashed item.
+    /// Returns an error if the item does not exist or belongs to a different user.
     #[instrument(skip(self))]
-    async fn validate_user_ownership(&self, _item_id: &str, _user_id: &str) -> Result<()> {
-        // Here we would implement permission validation
-        // For now, we simply return Ok since we don't have a complete
-        // implementation of user permissions
-        Ok(())
+    async fn validate_user_ownership(&self, item_id: &str, user_id: &str) -> Result<()> {
+        let item_uuid = Uuid::parse_str(item_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid item ID: {}", e)))?;
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+
+        match self.trash_repository.get_trash_item(&item_uuid, &user_uuid).await? {
+            Some(item) => {
+                if item.user_id != user_uuid {
+                    error!(
+                        "User {} attempted to access trash item {} owned by {}",
+                        user_id, item_id, item.user_id
+                    );
+                    return Err(DomainError::access_denied(
+                        "TrashItem",
+                        "You do not have permission to access this trash item",
+                    ));
+                }
+                Ok(())
+            }
+            None => {
+                // Item not found for this user — treat as authorization error
+                // to avoid leaking existence information
+                Err(DomainError::not_found(
+                    "TrashItem",
+                    format!("{} (user: {})", item_id, user_id),
+                ))
+            }
+        }
     }
 }
 

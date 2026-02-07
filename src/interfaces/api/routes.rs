@@ -15,6 +15,7 @@ use tower_http::{
 use serde_json::json;
 use crate::common::config::AppConfig;
 use crate::common::di::AppState;
+use crate::interfaces::middleware::auth::CurrentUserId;
 
 use crate::interfaces::middleware::cache::{HttpCache, start_cache_cleanup_task};
 
@@ -248,14 +249,14 @@ pub fn create_api_routes(
     let folders_ops_router = Router::new()
         .route("/{id}", delete(|
             State(state): State<AppState>,
+            CurrentUserId(user_id): CurrentUserId,
             Path(id): Path<String>
         | async move {
             // Try to use trash service if available
             if let Some(trash_service) = &state.trash_service {
                 tracing::info!("Moving folder to trash: {}", id);
-                let default_user = "default".to_string();
                 
-                match trash_service.move_to_trash(&id, "folder", &default_user).await {
+                match trash_service.move_to_trash(&id, "folder", &user_id).await {
                     Ok(_) => {
                         tracing::info!("Folder successfully moved to trash: {}", id);
                         return StatusCode::NO_CONTENT.into_response();
@@ -360,10 +361,11 @@ pub fn create_api_routes(
         // Uses the correct URL pattern
         .route("/{id}", delete(|
             State(state): State<AppState>, 
+            CurrentUserId(user_id): CurrentUserId,
             Path(id): Path<String>
         | async move {
             tracing::info!("File delete route called explicitly for ID: {}", id);
-            FileHandler::delete_file(State(state), Path(id)).await
+            FileHandler::delete_file(State(state), CurrentUserId(user_id), Path(id)).await
         }))
         .route("/{id}/move", put(|
             State(state): State<AppState>,
@@ -518,19 +520,20 @@ pub fn create_api_routes(
             // Get all trash items
             .route("/", get(|
                 State(state): State<AppState>, 
+                CurrentUserId(user_id): CurrentUserId,
                 Query(params): Query<HashMap<String, String>>
             | async move {
                 tracing::info!("Getting trash items");
                 // Use a valid UUID for the default user or from query params
-                let default_user = params.get("userId")
-                    .unwrap_or(&"00000000-0000-0000-0000-000000000000".to_string())
-                    .to_string();
+                let effective_user = params.get("userId")
+                    .cloned()
+                    .unwrap_or(user_id);
                     
-                tracing::info!("Using user ID: {}", default_user);
+                tracing::info!("Using user ID: {}", effective_user);
                 // Get the trash service directly
                 if let Some(trash_service) = &state.trash_service {
                     // Get trash items for default user
-                    match trash_service.get_trash_items(&default_user).await {
+                    match trash_service.get_trash_items(&effective_user).await {
                         Ok(items) => {
                             tracing::info!("Found {} items in trash", items.len());
                             let response_data = serde_json::json!(items);
@@ -554,13 +557,13 @@ pub fn create_api_routes(
             // Move file to trash
             .route("/files/{id}", delete(|
                 State(state): State<AppState>,
+                CurrentUserId(user_id): CurrentUserId,
                 Path(id): Path<String>
             | async move {
                 tracing::info!("Moving file to trash: {}", id);
-                let default_user = "00000000-0000-0000-0000-000000000000".to_string();
                 
                 if let Some(trash_service) = &state.trash_service {
-                    match trash_service.move_to_trash(&id, "file", &default_user).await {
+                    match trash_service.move_to_trash(&id, "file", &user_id).await {
                         Ok(_) => {
                             tracing::info!("File moved to trash successfully");
                             (StatusCode::OK, Json(json!({
@@ -585,13 +588,13 @@ pub fn create_api_routes(
             // Move folder to trash
             .route("/folders/{id}", delete(|
                 State(state): State<AppState>,
+                CurrentUserId(user_id): CurrentUserId,
                 Path(id): Path<String>
             | async move {
                 tracing::info!("Moving folder to trash: {}", id);
-                let default_user = "00000000-0000-0000-0000-000000000000".to_string();
                 
                 if let Some(trash_service) = &state.trash_service {
-                    match trash_service.move_to_trash(&id, "folder", &default_user).await {
+                    match trash_service.move_to_trash(&id, "folder", &user_id).await {
                         Ok(_) => {
                             tracing::info!("Folder moved to trash successfully");
                             (StatusCode::OK, Json(json!({
@@ -616,13 +619,13 @@ pub fn create_api_routes(
             // Restore item from trash
             .route("/{id}/restore", post(|
                 State(state): State<AppState>,
+                CurrentUserId(user_id): CurrentUserId,
                 Path(id): Path<String>
             | async move {
                 tracing::info!("Restoring item from trash: {}", id);
-                let default_user = "00000000-0000-0000-0000-000000000000".to_string();
                 
                 if let Some(trash_service) = &state.trash_service {
-                    match trash_service.restore_item(&id, &default_user).await {
+                    match trash_service.restore_item(&id, &user_id).await {
                         Ok(_) => {
                             tracing::info!("Item restored from trash successfully");
                             (StatusCode::OK, Json(json!({
@@ -658,13 +661,13 @@ pub fn create_api_routes(
             // Permanently delete an item from trash
             .route("/{id}", delete(|
                 State(state): State<AppState>,
+                CurrentUserId(user_id): CurrentUserId,
                 Path(id): Path<String>
             | async move {
                 tracing::info!("Permanently deleting item from trash: {}", id);
-                let default_user = "00000000-0000-0000-0000-000000000000".to_string();
                 
                 if let Some(trash_service) = &state.trash_service {
-                    match trash_service.delete_permanently(&id, &default_user).await {
+                    match trash_service.delete_permanently(&id, &user_id).await {
                         Ok(_) => {
                             tracing::info!("Item permanently deleted successfully");
                             (StatusCode::OK, Json(json!({
@@ -699,13 +702,13 @@ pub fn create_api_routes(
             }))
             // Empty trash
             .route("/empty", delete(|
-                State(state): State<AppState>
+                State(state): State<AppState>,
+                CurrentUserId(user_id): CurrentUserId,
             | async move {
                 tracing::info!("Emptying trash");
-                let default_user = "00000000-0000-0000-0000-000000000000".to_string();
                 
                 if let Some(trash_service) = &state.trash_service {
-                    match trash_service.empty_trash(&default_user).await {
+                    match trash_service.empty_trash(&user_id).await {
                         Ok(_) => {
                             tracing::info!("Trash emptied successfully");
                             (StatusCode::OK, Json(json!({
