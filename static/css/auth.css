@@ -60,6 +60,10 @@
 .auth-form {
     width: 100%;
     text-align: left;
+
+    [dir='rtl'] & {
+        text-align: right;
+    }
 }
 
 .auth-input-group {
