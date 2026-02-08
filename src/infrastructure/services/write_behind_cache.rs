@@ -19,6 +19,10 @@ use tokio::sync::{RwLock, mpsc};
 use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use bytes::Bytes;
+use async_trait::async_trait;
+
+use crate::application::ports::cache_ports::{WriteBehindCachePort, WriteBehindStatsDto};
+use crate::domain::errors::DomainError;
 
 /// Maximum size for write-behind cache (files larger bypass cache)
 const WRITE_BEHIND_MAX_SIZE: usize = 1024 * 1024; // 1MB
@@ -360,6 +364,56 @@ impl WriteBehindCache {
                 tracing::warn!("Forcing flush of stale pending file: {}", file_id);
                 let _ = self.flush_tx.try_send(FlushCommand::FlushFile(file_id));
             }
+        }
+    }
+}
+
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+#[async_trait]
+impl WriteBehindCachePort for WriteBehindCache {
+    fn is_eligible_size(&self, size: usize) -> bool {
+        WriteBehindCache::is_eligible(size)
+    }
+
+    async fn put_pending(
+        &self,
+        file_id: String,
+        content: Bytes,
+        target_path: PathBuf,
+    ) -> Result<bool, DomainError> {
+        self.put_pending(file_id, content, target_path).await.map_err(DomainError::from)
+    }
+
+    async fn get_pending(&self, file_id: &str) -> Option<Bytes> {
+        self.get_pending(file_id).await
+    }
+
+    async fn is_pending(&self, file_id: &str) -> bool {
+        self.is_pending(file_id).await
+    }
+
+    async fn force_flush(&self, file_id: &str) -> Result<(), DomainError> {
+        self.force_flush(file_id).await.map_err(DomainError::from)
+    }
+
+    async fn flush_all(&self) -> Result<(), DomainError> {
+        self.flush_all().await.map_err(DomainError::from)
+    }
+
+    async fn shutdown(&self) -> Result<(), DomainError> {
+        self.shutdown().await.map_err(DomainError::from)
+    }
+
+    async fn get_stats(&self) -> WriteBehindStatsDto {
+        let stats = self.get_stats().await;
+        WriteBehindStatsDto {
+            pending_count: stats.pending_count,
+            pending_bytes: stats.pending_bytes,
+            total_writes: stats.total_writes,
+            total_bytes_written: stats.total_bytes_written,
+            cache_hits: stats.cache_hits,
+            avg_flush_time_us: stats.avg_flush_time_us,
         }
     }
 }

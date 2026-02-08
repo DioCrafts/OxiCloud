@@ -213,6 +213,34 @@ pub struct CacheStats {
 /// Thread-safe wrapper for sharing across handlers
 pub type SharedFileContentCache = Arc<FileContentCache>;
 
+// ─── ContentCachePort implementation ─────────────────────────
+
+use async_trait::async_trait;
+use crate::application::ports::cache_ports::ContentCachePort;
+
+#[async_trait]
+impl ContentCachePort for FileContentCache {
+    fn should_cache(&self, size: usize) -> bool {
+        FileContentCache::should_cache(self, size)
+    }
+
+    async fn get(&self, file_id: &str) -> Option<(Bytes, String, String)> {
+        FileContentCache::get(self, file_id).await
+    }
+
+    async fn put(&self, file_id: String, content: Bytes, etag: String, content_type: String) {
+        FileContentCache::put(self, file_id, content, etag, content_type).await
+    }
+
+    async fn invalidate(&self, file_id: &str) {
+        FileContentCache::invalidate(self, file_id).await
+    }
+
+    async fn clear(&self) {
+        FileContentCache::clear(self).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

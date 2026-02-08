@@ -58,12 +58,12 @@ impl ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
 
         // Check if user is owner
-        if address_book.owner_id == user_id {
+        if address_book.owner_id() == user_id {
             return Ok(address_book);
         }
 
         // Check if address book is public
-        if address_book.is_public {
+        if address_book.is_public() {
             return Ok(address_book);
         }
 
@@ -84,7 +84,7 @@ impl ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
 
         // Owner always has write access
-        if address_book.owner_id == user_id {
+        if address_book.owner_id() == user_id {
             return Ok(address_book);
         }
 
@@ -132,41 +132,41 @@ impl ContactStorageAdapter {
     fn generate_vcard(contact: &Contact) -> String {
         let mut vcard = String::from("BEGIN:VCARD\nVERSION:3.0\n");
         
-        if let Some(ref full_name) = contact.full_name {
+        if let Some(full_name) = contact.full_name() {
             vcard.push_str(&format!("FN:{}\n", full_name));
         }
         
-        if contact.first_name.is_some() || contact.last_name.is_some() {
-            let last = contact.last_name.as_deref().unwrap_or("");
-            let first = contact.first_name.as_deref().unwrap_or("");
+        if contact.first_name().is_some() || contact.last_name().is_some() {
+            let last = contact.last_name().unwrap_or("");
+            let first = contact.first_name().unwrap_or("");
             vcard.push_str(&format!("N:{};{};;;\n", last, first));
         }
         
-        if let Some(ref nickname) = contact.nickname {
+        if let Some(nickname) = contact.nickname() {
             vcard.push_str(&format!("NICKNAME:{}\n", nickname));
         }
         
-        for email in &contact.email {
+        for email in contact.email() {
             vcard.push_str(&format!("EMAIL;TYPE={}:{}\n", email.r#type.to_uppercase(), email.email));
         }
         
-        for phone in &contact.phone {
+        for phone in contact.phone() {
             vcard.push_str(&format!("TEL;TYPE={}:{}\n", phone.r#type.to_uppercase(), phone.number));
         }
         
-        if let Some(ref org) = contact.organization {
+        if let Some(org) = contact.organization() {
             vcard.push_str(&format!("ORG:{}\n", org));
         }
         
-        if let Some(ref title) = contact.title {
+        if let Some(title) = contact.title() {
             vcard.push_str(&format!("TITLE:{}\n", title));
         }
         
-        if let Some(ref notes) = contact.notes {
+        if let Some(notes) = contact.notes() {
             vcard.push_str(&format!("NOTE:{}\n", notes));
         }
         
-        vcard.push_str(&format!("UID:{}\n", contact.uid));
+        vcard.push_str(&format!("UID:{}\n", contact.uid()));
         vcard.push_str("END:VCARD\n");
         
         vcard
@@ -176,16 +176,13 @@ impl ContactStorageAdapter {
 #[async_trait]
 impl AddressBookUseCase for ContactStorageAdapter {
     async fn create_address_book(&self, dto: CreateAddressBookDto) -> Result<AddressBookDto, DomainError> {
-        let address_book = AddressBook {
-            id: Uuid::new_v4(),
-            name: dto.name,
-            owner_id: dto.owner_id,
-            description: dto.description,
-            color: dto.color,
-            is_public: dto.is_public.unwrap_or(false),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        };
+        let address_book = AddressBook::new(
+            dto.name,
+            dto.owner_id,
+            dto.description,
+            dto.color,
+            dto.is_public.unwrap_or(false),
+        );
 
         let created = self.address_book_repository.create_address_book(address_book).await?;
         Ok(AddressBookDto::from(created))
@@ -198,18 +195,18 @@ impl AddressBookUseCase for ContactStorageAdapter {
         let mut address_book = self.check_write_access(&uuid, &update.user_id).await?;
         
         if let Some(name) = update.name {
-            address_book.name = name;
+            address_book.set_name(name);
         }
         if let Some(description) = update.description {
-            address_book.description = Some(description);
+            address_book.set_description(Some(description));
         }
         if let Some(color) = update.color {
-            address_book.color = Some(color);
+            address_book.set_color(Some(color));
         }
         if let Some(is_public) = update.is_public {
-            address_book.is_public = is_public;
+            address_book.set_is_public(is_public);
         }
-        address_book.updated_at = chrono::Utc::now();
+        address_book.set_updated_at(chrono::Utc::now());
 
         let updated = self.address_book_repository.update_address_book(address_book).await?;
         Ok(AddressBookDto::from(updated))
@@ -224,7 +221,7 @@ impl AddressBookUseCase for ContactStorageAdapter {
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
         
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can delete address book"));
         }
 
@@ -261,7 +258,7 @@ impl AddressBookUseCase for ContactStorageAdapter {
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
         
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can share"));
         }
 
@@ -277,7 +274,7 @@ impl AddressBookUseCase for ContactStorageAdapter {
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
         
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can unshare"));
         }
 
@@ -293,7 +290,7 @@ impl AddressBookUseCase for ContactStorageAdapter {
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
         
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can view shares"));
         }
 
@@ -309,34 +306,35 @@ impl ContactUseCase for ContactStorageAdapter {
         // Check write access
         self.check_write_access(&address_book_id, &dto.user_id).await?;
 
-        let contact = Contact {
-            id: Uuid::new_v4(),
+        let now = chrono::Utc::now();
+        let mut contact = Contact::from_raw(
+            Uuid::new_v4(),
             address_book_id,
-            uid: format!("{}@oxicloud", Uuid::new_v4()),
-            full_name: dto.full_name,
-            first_name: dto.first_name,
-            last_name: dto.last_name,
-            nickname: dto.nickname,
-            email: dto.email.into_iter().map(Self::dto_to_email).collect(),
-            phone: dto.phone.into_iter().map(Self::dto_to_phone).collect(),
-            address: dto.address.into_iter().map(Self::dto_to_address).collect(),
-            organization: dto.organization,
-            title: dto.title,
-            notes: dto.notes,
-            photo_url: dto.photo_url,
-            birthday: dto.birthday,
-            anniversary: dto.anniversary,
-            vcard: String::new(),
-            etag: Uuid::new_v4().to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        };
+            format!("{}@oxicloud", Uuid::new_v4()),
+            dto.full_name,
+            dto.first_name,
+            dto.last_name,
+            dto.nickname,
+            dto.email.into_iter().map(Self::dto_to_email).collect(),
+            dto.phone.into_iter().map(Self::dto_to_phone).collect(),
+            dto.address.into_iter().map(Self::dto_to_address).collect(),
+            dto.organization,
+            dto.title,
+            dto.notes,
+            dto.photo_url,
+            dto.birthday,
+            dto.anniversary,
+            String::new(),
+            Uuid::new_v4().to_string(),
+            now,
+            now,
+        );
 
         // Generate vCard
-        let mut contact_with_vcard = contact;
-        contact_with_vcard.vcard = Self::generate_vcard(&contact_with_vcard);
+        let vcard = Self::generate_vcard(&contact);
+        contact.set_vcard(vcard);
 
-        let created = self.contact_repository.create_contact(contact_with_vcard).await?;
+        let created = self.contact_repository.create_contact(contact).await?;
         Ok(ContactDto::from(created))
     }
 
@@ -347,28 +345,29 @@ impl ContactUseCase for ContactStorageAdapter {
         self.check_write_access(&address_book_id, &dto.user_id).await?;
 
         // Parse vCard - for now, create a basic contact with the raw vCard
-        let contact = Contact {
-            id: Uuid::new_v4(),
+        let now = chrono::Utc::now();
+        let contact = Contact::from_raw(
+            Uuid::new_v4(),
             address_book_id,
-            uid: format!("{}@oxicloud", Uuid::new_v4()),
-            full_name: Some("Imported Contact".to_string()),
-            first_name: None,
-            last_name: None,
-            nickname: None,
-            email: Vec::new(),
-            phone: Vec::new(),
-            address: Vec::new(),
-            organization: None,
-            title: None,
-            notes: None,
-            photo_url: None,
-            birthday: None,
-            anniversary: None,
-            vcard: dto.vcard,
-            etag: Uuid::new_v4().to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        };
+            format!("{}@oxicloud", Uuid::new_v4()),
+            Some("Imported Contact".to_string()),
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            dto.vcard,
+            Uuid::new_v4().to_string(),
+            now,
+            now,
+        );
 
         let created = self.contact_repository.create_contact(contact).await?;
         Ok(ContactDto::from(created))
@@ -383,51 +382,52 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
         
         // Check write access to the address book
-        self.check_write_access(&contact.address_book_id, &update.user_id).await?;
+        self.check_write_access(contact.address_book_id(), &update.user_id).await?;
 
         if let Some(full_name) = update.full_name {
-            contact.full_name = Some(full_name);
+            contact.set_full_name(Some(full_name));
         }
         if let Some(first_name) = update.first_name {
-            contact.first_name = Some(first_name);
+            contact.set_first_name(Some(first_name));
         }
         if let Some(last_name) = update.last_name {
-            contact.last_name = Some(last_name);
+            contact.set_last_name(Some(last_name));
         }
         if let Some(nickname) = update.nickname {
-            contact.nickname = Some(nickname);
+            contact.set_nickname(Some(nickname));
         }
         if let Some(emails) = update.email {
-            contact.email = emails.into_iter().map(Self::dto_to_email).collect();
+            contact.set_email(emails.into_iter().map(Self::dto_to_email).collect());
         }
         if let Some(phones) = update.phone {
-            contact.phone = phones.into_iter().map(Self::dto_to_phone).collect();
+            contact.set_phone(phones.into_iter().map(Self::dto_to_phone).collect());
         }
         if let Some(addresses) = update.address {
-            contact.address = addresses.into_iter().map(Self::dto_to_address).collect();
+            contact.set_address(addresses.into_iter().map(Self::dto_to_address).collect());
         }
         if let Some(organization) = update.organization {
-            contact.organization = Some(organization);
+            contact.set_organization(Some(organization));
         }
         if let Some(title) = update.title {
-            contact.title = Some(title);
+            contact.set_title(Some(title));
         }
         if let Some(notes) = update.notes {
-            contact.notes = Some(notes);
+            contact.set_notes(Some(notes));
         }
         if let Some(photo_url) = update.photo_url {
-            contact.photo_url = Some(photo_url);
+            contact.set_photo_url(Some(photo_url));
         }
         if let Some(birthday) = update.birthday {
-            contact.birthday = Some(birthday);
+            contact.set_birthday(Some(birthday));
         }
         if let Some(anniversary) = update.anniversary {
-            contact.anniversary = Some(anniversary);
+            contact.set_anniversary(Some(anniversary));
         }
 
-        contact.updated_at = chrono::Utc::now();
-        contact.etag = Uuid::new_v4().to_string();
-        contact.vcard = Self::generate_vcard(&contact);
+        contact.set_updated_at(chrono::Utc::now());
+        contact.set_etag(Uuid::new_v4().to_string());
+        let vcard = Self::generate_vcard(&contact);
+        contact.set_vcard(vcard);
 
         let updated = self.contact_repository.update_contact(contact).await?;
         Ok(ContactDto::from(updated))
@@ -442,7 +442,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
         
         // Check write access
-        self.check_write_access(&contact.address_book_id, user_id).await?;
+        self.check_write_access(contact.address_book_id(), user_id).await?;
 
         self.contact_repository.delete_contact(&uuid).await
     }
@@ -456,7 +456,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
         
         // Check read access
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
         Ok(ContactDto::from(contact))
     }
@@ -487,13 +487,10 @@ impl ContactUseCase for ContactStorageAdapter {
         // Check write access
         self.check_write_access(&address_book_id, &dto.user_id).await?;
 
-        let group = ContactGroup {
-            id: Uuid::new_v4(),
+        let group = ContactGroup::new(
             address_book_id,
-            name: dto.name,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        };
+            dto.name,
+        );
 
         let created = self.group_repository.create_group(group).await?;
         Ok(ContactGroupDto::from(created))
@@ -508,10 +505,10 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check write access
-        self.check_write_access(&group.address_book_id, &update.user_id).await?;
+        self.check_write_access(group.address_book_id(), &update.user_id).await?;
 
-        group.name = update.name;
-        group.updated_at = chrono::Utc::now();
+        group.set_name(update.name);
+        group.set_updated_at(chrono::Utc::now());
 
         let updated = self.group_repository.update_group(group).await?;
         Ok(ContactGroupDto::from(updated))
@@ -526,7 +523,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check write access
-        self.check_write_access(&group.address_book_id, user_id).await?;
+        self.check_write_access(group.address_book_id(), user_id).await?;
 
         self.group_repository.delete_group(&uuid).await
     }
@@ -540,7 +537,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check read access
-        self.check_address_book_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id).await?;
 
         Ok(ContactGroupDto::from(group))
     }
@@ -565,7 +562,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check write access
-        self.check_write_access(&group.address_book_id, user_id).await?;
+        self.check_write_access(group.address_book_id(), user_id).await?;
 
         self.group_repository.add_contact_to_group(&group_id, &contact_id).await
     }
@@ -580,7 +577,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check write access
-        self.check_write_access(&group.address_book_id, user_id).await?;
+        self.check_write_access(group.address_book_id(), user_id).await?;
 
         self.group_repository.remove_contact_from_group(&group_id, &contact_id).await
     }
@@ -594,7 +591,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
         
         // Check read access
-        self.check_address_book_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id).await?;
 
         let contacts = self.group_repository.get_contacts_in_group(&uuid).await?;
         Ok(contacts.into_iter().map(ContactDto::from).collect())
@@ -609,7 +606,7 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
         
         // Check read access
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
         let groups = self.group_repository.get_groups_for_contact(&uuid).await?;
         Ok(groups.into_iter().map(ContactGroupDto::from).collect())
@@ -624,9 +621,9 @@ impl ContactUseCase for ContactStorageAdapter {
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
         
         // Check read access
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
-        Ok(contact.vcard)
+        Ok(contact.vcard().to_string())
     }
 
     async fn get_contacts_as_vcards(&self, address_book_id: &str, user_id: &str) -> Result<Vec<(String, String)>, DomainError> {
@@ -639,7 +636,7 @@ impl ContactUseCase for ContactStorageAdapter {
         
         Ok(contacts
             .into_iter()
-            .map(|c| (c.id.to_string(), c.vcard))
+            .map(|c| (c.id().to_string(), c.vcard().to_string()))
             .collect())
     }
 }

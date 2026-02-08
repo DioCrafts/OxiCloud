@@ -9,7 +9,7 @@ use axum::{
 
 use crate::common::di::AppState;
 use crate::application::dtos::user_dto::{
-    LoginDto, RegisterDto, UserDto, ChangePasswordDto, RefreshTokenDto, AuthResponseDto
+    LoginDto, RegisterDto, ChangePasswordDto, RefreshTokenDto
 };
 use crate::interfaces::errors::AppError;
 
@@ -50,29 +50,6 @@ async fn register(
             return Err(AppError::internal_error("Servicio de autenticación no configurado"));
         }
     };
-    
-    // Create a temporary mock response for testing
-    // This is a fallback solution to bypass database issues 
-    if cfg!(debug_assertions) && dto.username == "test" {
-        tracing::info!("Using test registration, bypassing database");
-        
-        // Create a mock user response
-        let now = chrono::Utc::now();
-        let mock_user = UserDto {
-            id: "test-user-id".to_string(),
-            username: dto.username.clone(),
-            email: dto.email.clone(),
-            role: "user".to_string(),
-            active: true,
-            storage_quota_bytes: 1024 * 1024 * 1024, // 1GB
-            storage_used_bytes: 0,
-            created_at: now,
-            updated_at: now,
-            last_login_at: None,
-        };
-        
-        return Ok((StatusCode::CREATED, Json(mock_user)));
-    }
     
     // Check if this is a fresh install
     tracing::info!("New user registration detected, checking if it's a fresh install");
@@ -153,8 +130,6 @@ async fn login(
     // Add detailed logging for debugging
     tracing::info!("Login attempt for user: {}", dto.username);
     
-    // Normal login process
-    
     // Verify auth service exists 
     let auth_service = match state.auth_service.as_ref() {
         Some(service) => {
@@ -166,35 +141,6 @@ async fn login(
             return Err(AppError::internal_error("Servicio de autenticación no configurado"));
         }
     };
-    
-    // Create a temporary mock response for testing
-    // This is a fallback solution to bypass database issues
-    if cfg!(debug_assertions) && dto.username == "test" && dto.password == "test" {
-        tracing::info!("Using test credentials, bypassing database");
-        
-        // Create a mock response
-        let now = chrono::Utc::now();
-        let mock_response = AuthResponseDto {
-            user: UserDto {
-                id: "test-user-id".to_string(),
-                username: dto.username.clone(),
-                email: format!("{}@example.com", dto.username),
-                role: "user".to_string(),
-                active: true,
-                storage_quota_bytes: 1024 * 1024 * 1024, // 1GB
-                storage_used_bytes: 0,
-                created_at: now,
-                updated_at: now,
-                last_login_at: None,
-            },
-            access_token: "mock_access_token".to_string(),
-            refresh_token: "mock_refresh_token".to_string(),
-            token_type: "Bearer".to_string(),
-            expires_in: 3600,
-        };
-        
-        return Ok((StatusCode::OK, Json(mock_response)));
-    }
     
     // Try the normal login process
     match auth_service.auth_application_service.login(dto.clone()).await {
@@ -226,38 +172,7 @@ async fn refresh_token(
     // Check if this refresh token is being used too frequently
     
     // Log the refresh attempt for debugging
-    tracing::info!("Token refresh requested with refresh token: {}", 
-        dto.refresh_token.chars().take(8).collect::<String>() + "...");
-    
-    // Handle test/mock tokens with simplified response
-    if dto.refresh_token.contains("mock") || dto.refresh_token == "mock_refresh_token" {
-        tracing::info!("Mock refresh token detected, returning simplified response");
-        
-        // Create a mock response that will work with our frontend
-        let now = chrono::Utc::now();
-        let mock_user = UserDto {
-            id: "test-user-id".to_string(),
-            username: "test".to_string(),
-            email: "test@example.com".to_string(),
-            role: "user".to_string(),
-            active: true,
-            storage_quota_bytes: 1024 * 1024 * 1024, // 1GB
-            storage_used_bytes: 0,
-            created_at: now,
-            updated_at: now,
-            last_login_at: None,
-        };
-        
-        let auth_response = AuthResponseDto {
-            user: mock_user,
-            access_token: "mock_access_token_new".to_string(),
-            refresh_token: "mock_refresh_token_new".to_string(),
-            token_type: "Bearer".to_string(),
-            expires_in: 86400 * 30, // 30 days
-        };
-        
-        return Ok((StatusCode::OK, Json(auth_response)));
-    }
+    tracing::info!("Token refresh requested");
     
     // Normal process for real tokens
     let auth_service = state.auth_service.as_ref()

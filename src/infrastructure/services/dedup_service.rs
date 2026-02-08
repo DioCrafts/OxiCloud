@@ -5,7 +5,7 @@
 //! to the same physical blob.
 //!
 //! Architecture:
-//! ```
+//! ```text
 //! ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 //! │ User Files      │────▶│ Dedup Index     │────▶│ Blob Store      │
 //! │ (references)    │     │ (hash→metadata) │     │ (actual data)   │
@@ -26,6 +26,15 @@ use tokio::sync::RwLock;
 use sha2::{Sha256, Digest};
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
+use async_trait::async_trait;
+
+use crate::application::ports::dedup_ports::{
+    DedupPort,
+    BlobMetadataDto,
+    DedupResultDto,
+    DedupStatsDto,
+};
+use crate::domain::errors::{DomainError, ErrorKind};
 
 /// Chunk size for streaming hash calculation (256KB)
 const HASH_CHUNK_SIZE: usize = 256 * 1024;
@@ -664,6 +673,120 @@ impl DedupService {
     }
 }
 
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+/// Convert infra DedupResult to port DedupResultDto.
+impl From<DedupResult> for DedupResultDto {
+    fn from(result: DedupResult) -> Self {
+        match result {
+            DedupResult::NewBlob { hash, size, blob_path } => {
+                DedupResultDto::NewBlob { hash, size, blob_path }
+            }
+            DedupResult::ExistingBlob { hash, size, blob_path, saved_bytes } => {
+                DedupResultDto::ExistingBlob { hash, size, blob_path, saved_bytes }
+            }
+        }
+    }
+}
+
+/// Convert infra BlobMetadata to port BlobMetadataDto.
+impl From<BlobMetadata> for BlobMetadataDto {
+    fn from(m: BlobMetadata) -> Self {
+        BlobMetadataDto {
+            hash: m.hash,
+            size: m.size,
+            ref_count: m.ref_count,
+            content_type: m.content_type,
+        }
+    }
+}
+
+/// Convert infra DedupStats to port DedupStatsDto.
+impl From<DedupStats> for DedupStatsDto {
+    fn from(s: DedupStats) -> Self {
+        DedupStatsDto {
+            total_blobs: s.total_blobs,
+            total_bytes_stored: s.total_bytes_stored,
+            total_bytes_referenced: s.total_bytes_referenced,
+            bytes_saved: s.bytes_saved,
+            dedup_hits: s.dedup_hits,
+            dedup_ratio: s.dedup_ratio,
+        }
+    }
+}
+
+#[async_trait]
+impl DedupPort for DedupService {
+    async fn store_bytes(
+        &self,
+        content: &[u8],
+        content_type: Option<String>,
+    ) -> Result<DedupResultDto, DomainError> {
+        self.store_bytes(content, content_type).await
+            .map(Into::into)
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Dedup", e))
+    }
+
+    async fn store_from_file(
+        &self,
+        source_path: &Path,
+        content_type: Option<String>,
+    ) -> Result<DedupResultDto, DomainError> {
+        self.store_from_file(source_path, content_type).await
+            .map(Into::into)
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Dedup", e))
+    }
+
+    async fn blob_exists(&self, hash: &str) -> bool {
+        self.blob_exists(hash).await
+    }
+
+    async fn get_blob_metadata(&self, hash: &str) -> Option<BlobMetadataDto> {
+        self.get_blob_metadata(hash).await.map(Into::into)
+    }
+
+    async fn read_blob(&self, hash: &str) -> Result<Vec<u8>, DomainError> {
+        self.read_blob(hash).await
+            .map_err(|e| DomainError::new(ErrorKind::NotFound, "Blob", e))
+    }
+
+    async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError> {
+        self.read_blob_bytes(hash).await
+            .map_err(|e| DomainError::new(ErrorKind::NotFound, "Blob", e))
+    }
+
+    async fn add_reference(&self, hash: &str) -> Result<(), DomainError> {
+        self.add_reference(hash).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Blob", e))
+    }
+
+    async fn remove_reference(&self, hash: &str) -> Result<bool, DomainError> {
+        self.remove_reference(hash).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Blob", e))
+    }
+
+    fn hash_bytes(&self, content: &[u8]) -> String {
+        DedupService::hash_bytes(content)
+    }
+
+    async fn hash_file(&self, path: &Path) -> Result<String, DomainError> {
+        DedupService::hash_file(path).await.map_err(DomainError::from)
+    }
+
+    async fn get_stats(&self) -> DedupStatsDto {
+        self.get_stats().await.into()
+    }
+
+    async fn flush(&self) -> Result<(), DomainError> {
+        self.flush().await.map_err(DomainError::from)
+    }
+
+    async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
+        self.verify_integrity().await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Dedup", e))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -675,7 +798,8 @@ mod tests {
         let service = DedupService::new(temp_dir.path());
         service.initialize().await.unwrap();
         
-        let content = b"Hello, World! This is test content.";
+        // Content must be >= MIN_DEDUP_SIZE (4096 bytes) for dedup to kick in
+        let content = &b"Hello, World! This is test content for dedup. ".repeat(100);
         
         // First store
         let result1 = service.store_bytes(content, None).await.unwrap();
@@ -698,7 +822,8 @@ mod tests {
         let service = DedupService::new(temp_dir.path());
         service.initialize().await.unwrap();
         
-        let content = b"Test content for reference counting";
+        // Content must be >= MIN_DEDUP_SIZE (4096 bytes) for dedup to kick in
+        let content = &b"Test content for reference counting. ".repeat(120);
         
         // Store twice
         let result1 = service.store_bytes(content, None).await.unwrap();

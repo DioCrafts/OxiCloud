@@ -5,7 +5,6 @@ pub mod contact_service;
 pub mod favorites_service;
 pub mod file_management_service;
 pub mod file_retrieval_service;
-pub mod file_service;
 pub mod file_upload_service;
 pub mod file_use_case_factory;
 pub mod folder_service;

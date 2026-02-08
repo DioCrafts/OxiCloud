@@ -1,14 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::RwLock;
 use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::entities::folder::Folder;
-use crate::domain::repositories::folder_repository::{FolderRepository, FolderRepositoryError};
-use crate::domain::repositories::file_repository::FileRepositoryError;
 use crate::domain::services::path_service::StoragePath;
-use crate::application::ports::outbound::{IdMappingPort, StoragePort};
+use crate::application::ports::outbound::{IdMappingPort, StoragePort, FolderStoragePort};
 
 /// Errores específicos del mediador de almacenamiento
 #[derive(Debug, Error)]
@@ -30,30 +27,6 @@ pub enum StorageMediatorError {
     
     #[error("Error de dominio: {0}")]
     DomainError(#[from] crate::common::errors::DomainError),
-}
-
-impl From<FolderRepositoryError> for StorageMediatorError {
-    fn from(err: FolderRepositoryError) -> Self {
-        match err {
-            FolderRepositoryError::NotFound(id) => StorageMediatorError::NotFound(id),
-            FolderRepositoryError::AlreadyExists(path) => StorageMediatorError::AlreadyExists(path),
-            FolderRepositoryError::InvalidPath(path) => StorageMediatorError::InvalidPath(path),
-            FolderRepositoryError::IoError(e) => StorageMediatorError::AccessError(e.to_string()),
-            _ => StorageMediatorError::InternalError(err.to_string()),
-        }
-    }
-}
-
-impl From<FileRepositoryError> for StorageMediatorError {
-    fn from(err: FileRepositoryError) -> Self {
-        match err {
-            FileRepositoryError::NotFound(id) => StorageMediatorError::NotFound(id),
-            FileRepositoryError::AlreadyExists(path) => StorageMediatorError::AlreadyExists(path),
-            FileRepositoryError::InvalidPath(path) => StorageMediatorError::InvalidPath(path),
-            FileRepositoryError::IoError(e) => StorageMediatorError::AccessError(e.to_string()),
-            _ => StorageMediatorError::InternalError(err.to_string()),
-        }
-    }
 }
 
 /// Tipo de resultado para las operaciones del mediador
@@ -98,112 +71,19 @@ pub trait StorageMediator: Send + Sync + 'static {
 
 /// Implementación concreta del mediador de almacenamiento
 pub struct FileSystemStorageMediator {
-    pub folder_repository: Arc<dyn FolderRepository>,
+    pub folder_storage_port: Arc<dyn FolderStoragePort>,
     pub path_service: Arc<dyn StoragePort>,
     pub id_mapping: Arc<dyn IdMappingPort>,
 }
 
 impl FileSystemStorageMediator {
-    pub fn new(folder_repository: Arc<dyn FolderRepository>, path_service: Arc<dyn StoragePort>, id_mapping: Arc<dyn IdMappingPort>) -> Self {
-        Self { folder_repository, path_service, id_mapping }
+    pub fn new(folder_storage_port: Arc<dyn FolderStoragePort>, path_service: Arc<dyn StoragePort>, id_mapping: Arc<dyn IdMappingPort>) -> Self {
+        Self { folder_storage_port, path_service, id_mapping }
     }
     
     /// Creates a stub implementation for initialization bootstrapping
     pub fn new_stub() -> StubStorageMediator {
         StubStorageMediator::new()
-    }
-    
-    /// Overload para implementar inicialización diferida con repository placeholder
-    pub fn new_with_lazy_folder(
-        _folder_repository: Arc<RwLock<Option<Arc<dyn FolderRepository>>>>,
-        path_service: Arc<dyn StoragePort>,
-        id_mapping: Arc<dyn IdMappingPort>
-    ) -> Self {
-        // Create temporary stub repository
-        let temp_repo = Arc::new(FolderRepositoryStub {});
-        
-        Self {
-            folder_repository: temp_repo, 
-            path_service,
-            id_mapping,
-        }
-    }
-}
-
-/// Stub repository for initialization
-#[derive(Debug)]
-pub struct FolderRepositoryStub {}
-
-#[async_trait]
-impl FolderRepository for FolderRepositoryStub {
-    async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn get_folder_by_id(&self, _id: &str) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn get_folder_by_storage_path(&self, _storage_path: &StoragePath) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<Folder>, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn list_folders_paginated(
-        &self, 
-        _parent_id: Option<&str>, 
-        _offset: usize, 
-        _limit: usize,
-        _include_total: bool
-    ) -> Result<(Vec<Folder>, Option<usize>), FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn delete_folder(&self, _id: &str) -> Result<(), FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    async fn folder_exists_at_storage_path(&self, _storage_path: &StoragePath) -> Result<bool, FolderRepositoryError> {
-        Ok(false)
-    }
-    
-    async fn get_folder_storage_path(&self, _id: &str) -> Result<StoragePath, FolderRepositoryError> {
-        Ok(StoragePath::root())
-    }
-    
-    // Legacy methods
-    #[allow(deprecated)]
-    async fn folder_exists(&self, _path: &std::path::PathBuf) -> Result<bool, FolderRepositoryError> {
-        Ok(false)
-    }
-    
-    #[allow(deprecated)]
-    async fn get_folder_by_path(&self, _path: &std::path::PathBuf) -> Result<Folder, FolderRepositoryError> {
-        Err(FolderRepositoryError::Other("Stub repository".to_string()))
-    }
-    
-    // Trash functionality stubs
-    async fn move_to_trash(&self, _folder_id: &str) -> Result<(), FolderRepositoryError> {
-        Err(FolderRepositoryError::OperationNotSupported("Trash feature temporarily disabled".to_string()))
-    }
-    
-    async fn restore_from_trash(&self, _folder_id: &str, _original_path: &str) -> Result<(), FolderRepositoryError> {
-        Err(FolderRepositoryError::OperationNotSupported("Trash feature temporarily disabled".to_string()))
-    }
-    
-    async fn delete_folder_permanently(&self, _folder_id: &str) -> Result<(), FolderRepositoryError> {
-        Err(FolderRepositoryError::OperationNotSupported("Trash feature temporarily disabled".to_string()))
     }
 }
 
@@ -276,7 +156,7 @@ impl StorageMediator for StubStorageMediator {
 #[async_trait]
 impl StorageMediator for FileSystemStorageMediator {
     async fn get_folder_path(&self, folder_id: &str) -> StorageMediatorResult<PathBuf> {
-        let folder = self.folder_repository.get_folder_by_id(folder_id).await
+        let folder = self.folder_storage_port.get_folder(folder_id).await
             .map_err(StorageMediatorError::from)?;
         
         // Need to get the path from folder ID
@@ -289,7 +169,7 @@ impl StorageMediator for FileSystemStorageMediator {
     }
     
     async fn get_folder_storage_path(&self, folder_id: &str) -> StorageMediatorResult<StoragePath> {
-        let folder = self.folder_repository.get_folder_by_id(folder_id).await
+        let folder = self.folder_storage_port.get_folder(folder_id).await
             .map_err(StorageMediatorError::from)?;
         
         // Get path by folder ID - will already be a StoragePath
@@ -300,7 +180,7 @@ impl StorageMediator for FileSystemStorageMediator {
     }
     
     async fn get_folder(&self, folder_id: &str) -> StorageMediatorResult<Folder> {
-        let folder = self.folder_repository.get_folder_by_id(folder_id).await
+        let folder = self.folder_storage_port.get_folder(folder_id).await
             .map_err(StorageMediatorError::from)?;
         
         Ok(folder)

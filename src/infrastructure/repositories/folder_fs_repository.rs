@@ -4,18 +4,17 @@ use std::time::Duration;
 use async_trait::async_trait;
 use tokio::fs;
 use tokio::time::timeout;
-use tracing::instrument;
 
 use crate::domain::entities::folder::{Folder, FolderError};
-use crate::domain::repositories::folder_repository::{
-    FolderRepository, FolderRepositoryError, FolderRepositoryResult
+use crate::infrastructure::repositories::repository_errors::{
+    FolderRepositoryError, FolderRepositoryResult
 };
 use crate::domain::services::path_service::StoragePath;
 use crate::infrastructure::services::path_service::PathService;
 // use crate::application::ports::outbound::IdMappingPort;
 use crate::infrastructure::services::id_mapping_service::{IdMappingService, IdMappingError};
 use crate::application::services::storage_mediator::StorageMediator;
-use crate::application::ports::outbound::FolderStoragePort;
+use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::common::errors::DomainError;
 
 // To be able to use streams in the list_folders function
@@ -88,7 +87,7 @@ impl FolderFsRepository {
         
         match read_dir_result {
             Ok(result) => {
-                let mut entries = result.map_err(FolderRepositoryError::IoError)?;
+                let mut entries = result.map_err(|e| FolderRepositoryError::StorageError(e.to_string()))?;
                 let mut count = 0;
                 
                 // Count entries manually
@@ -111,20 +110,22 @@ impl FolderFsRepository {
         self.path_service.resolve_path(storage_path)
     }
     
-    /// Resolves a legacy PathBuf to an absolute filesystem path
-    fn resolve_legacy_path(&self, relative_path: &std::path::Path) -> PathBuf {
-        self.storage_mediator.resolve_path(relative_path)
-    }
-    
     /// Returns a reference to the ID mapping service
     pub fn id_mapping_service(&self) -> &Arc<dyn crate::application::ports::outbound::IdMappingPort> {
         &self.id_mapping_service
+    }
+
+    /// Gets the storage path for a folder by its ID (internal helper)
+    async fn _get_folder_storage_path(&self, id: &str) -> FolderRepositoryResult<StoragePath> {
+        let storage_path = self.id_mapping_service.get_path_by_id(id).await
+            .map_err(FolderRepositoryError::from)?;
+        Ok(storage_path)
     }
     
     /// Gets a folder path from the ID mapping service
     pub async fn get_mapped_folder_path(&self, folder_id: &str) -> FolderRepositoryResult<String> {
         let storage_path = self.id_mapping_service.get_path_by_id(folder_id).await
-            .map_err(|e| FolderRepositoryError::MappingError(format!("Failed to get folder path: {}", e)))?;
+            .map_err(|e| FolderRepositoryError::StorageError(format!("Failed to get folder path: {}", e)))?;
         Ok(storage_path.to_string())
     }
     
@@ -132,13 +133,13 @@ impl FolderFsRepository {
     pub async fn update_mapped_folder_path(&self, folder_id: &str, new_path: &PathBuf) -> FolderRepositoryResult<()> {
         let storage_path = StoragePath::from_string(&new_path.to_string_lossy().to_string());
         self.id_mapping_service.update_path(folder_id, &storage_path).await
-            .map_err(|e| FolderRepositoryError::MappingError(format!("Failed to update folder path: {}", e)))
+            .map_err(|e| FolderRepositoryError::StorageError(format!("Failed to update folder path: {}", e)))
     }
     
     /// Removes a folder ID from the ID mapping service
     pub async fn remove_mapped_folder_id(&self, folder_id: &str) -> FolderRepositoryResult<()> {
         self.id_mapping_service.remove_id(folder_id).await
-            .map_err(|e| FolderRepositoryError::MappingError(format!("Failed to remove folder ID: {}", e)))
+            .map_err(|e| FolderRepositoryError::StorageError(format!("Failed to remove folder ID: {}", e)))
     }
     
     /// Checks if a folder exists at a given storage path
@@ -199,7 +200,7 @@ impl FolderFsRepository {
     /// Extracts folder metadata from a physical path
     async fn get_folder_metadata(&self, abs_path: &PathBuf) -> FolderRepositoryResult<(u64, u64)> {
         let metadata = fs::metadata(&abs_path).await
-            .map_err(FolderRepositoryError::IoError)?;
+            .map_err(|e| FolderRepositoryError::StorageError(e.to_string()))?;
             
         // Get creation timestamp
         let created_at = metadata.created()
@@ -220,43 +221,9 @@ impl From<IdMappingError> for FolderRepositoryError {
     fn from(err: IdMappingError) -> Self {
         match err {
             IdMappingError::NotFound(id) => FolderRepositoryError::NotFound(id),
-            IdMappingError::IoError(e) => FolderRepositoryError::IoError(e),
-            IdMappingError::Timeout(msg) => FolderRepositoryError::Other(format!("Timeout: {}", msg)),
-            _ => FolderRepositoryError::MappingError(err.to_string()),
-        }
-    }
-}
-
-// Convert FolderRepositoryError to DomainError
-impl From<FolderRepositoryError> for DomainError {
-    fn from(err: FolderRepositoryError) -> Self {
-        match err {
-            FolderRepositoryError::NotFound(id) => {
-                DomainError::not_found("Folder", id)
-            },
-            FolderRepositoryError::AlreadyExists(path) => {
-                DomainError::already_exists("Folder", path)
-            },
-            FolderRepositoryError::InvalidPath(path) => {
-                DomainError::validation_error(format!("Invalid path: {}", path))
-            },
-            FolderRepositoryError::IoError(e) => {
-                DomainError::internal_error("Folder", format!("IO error: {}", e))
-                    .with_source(e)
-            },
-            FolderRepositoryError::ValidationError(msg) => {
-                DomainError::validation_error(msg)
-            },
-            FolderRepositoryError::MappingError(msg) => {
-                DomainError::internal_error("Folder", format!("Mapping error: {}", msg))
-            },
-            FolderRepositoryError::Other(msg) => {
-                DomainError::internal_error("Folder", msg)
-            },
-            FolderRepositoryError::OperationNotSupported(msg) => {
-                DomainError::operation_not_supported("Folder", msg)
-            },
-            FolderRepositoryError::DomainError(e) => e,
+            IdMappingError::IoError(e) => FolderRepositoryError::StorageError(e.to_string()),
+            IdMappingError::Timeout(msg) => FolderRepositoryError::StorageError(format!("Timeout: {}", msg)),
+            _ => FolderRepositoryError::StorageError(err.to_string()),
         }
     }
 }
@@ -275,87 +242,19 @@ impl Clone for FolderFsRepository {
 }
 
 #[async_trait]
-impl FolderStoragePort for FolderFsRepository {
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError> {
-        FolderRepository::create_folder(self, name, parent_id).await.map_err(DomainError::from)
-    }
-    
-    async fn get_folder(&self, id: &str) -> Result<Folder, DomainError> {
-        FolderRepository::get_folder_by_id(self, id).await.map_err(DomainError::from)
-    }
-    
-    async fn get_folder_by_path(&self, storage_path: &StoragePath) -> Result<Folder, DomainError> {
-        FolderRepository::get_folder_by_storage_path(self, storage_path).await.map_err(DomainError::from)
-    }
-    
-    async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
-        FolderRepository::list_folders(self, parent_id).await.map_err(DomainError::from)
-    }
-    
-    async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError> {
-        FolderRepository::rename_folder(self, id, new_name).await.map_err(DomainError::from)
-    }
-    
-    async fn move_folder(&self, id: &str, new_parent_id: Option<&str>) -> Result<Folder, DomainError> {
-        FolderRepository::move_folder(self, id, new_parent_id).await.map_err(DomainError::from)
-    }
-    
-    async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {
-        FolderRepository::delete_folder(self, id).await.map_err(DomainError::from)
-    }
-    
-    async fn folder_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
-        FolderRepository::folder_exists_at_storage_path(self, storage_path).await.map_err(DomainError::from)
-    }
-    
-    async fn get_folder_path(&self, id: &str) -> Result<StoragePath, DomainError> {
-        FolderRepository::get_folder_storage_path(self, id).await.map_err(DomainError::from)
-    }
-    
-    async fn list_folders_paginated(
-        &self, 
-        parent_id: Option<&str>,
-        offset: usize,
-        limit: usize,
-        include_total: bool
-    ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        FolderRepository::list_folders_paginated(self, parent_id, offset, limit, include_total)
-            .await
-            .map_err(DomainError::from)
-    }
-}
-
-#[async_trait]
 impl FolderRepository for FolderFsRepository {
-    #[instrument(skip(self))]
-    async fn move_to_trash(&self, folder_id: &str) -> FolderRepositoryResult<()> {
-        // Use the private implementation from folder_fs_repository_trash.rs
-        self._trash_move_to_trash(folder_id).await
-    }
-    
-    #[instrument(skip(self))]
-    async fn restore_from_trash(&self, folder_id: &str, original_path: &str) -> FolderRepositoryResult<()> {
-        // Use the private implementation from folder_fs_repository_trash.rs
-        self._trash_restore_from_trash(folder_id, original_path).await
-    }
-    
-    #[instrument(skip(self))]
-    async fn delete_folder_permanently(&self, folder_id: &str) -> FolderRepositoryResult<()> {
-        // Use the private implementation from folder_fs_repository_trash.rs
-        self._trash_delete_folder_permanently(folder_id).await
-    }
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> FolderRepositoryResult<Folder> {
+    async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError> {
         // Get the parent folder path (if any)
         let parent_storage_path = match &parent_id {
             Some(id) => {
-                match self.get_folder_storage_path(id).await {
+                match self._get_folder_storage_path(id).await {
                     Ok(path) => {
                         tracing::info!("Using folder path: {:?} for parent_id: {:?}", path.to_string(), id);
                         Some(path)
                     },
                     Err(e) => {
                         tracing::error!("Error getting parent folder: {}", e);
-                        return Err(e);
+                        return Err(DomainError::from(e));
                     },
                 }
             },
@@ -370,27 +269,28 @@ impl FolderRepository for FolderFsRepository {
         tracing::info!("Creating folder at path: {:?}", folder_storage_path.to_string());
         
         // Check if folder already exists
-        if self.folder_exists_at_storage_path(&folder_storage_path).await? {
-            return Err(FolderRepositoryError::AlreadyExists(folder_storage_path.to_string()));
+        if self.check_folder_exists_at_storage_path(&folder_storage_path).await.map_err(DomainError::from)? {
+            return Err(DomainError::already_exists("Folder", folder_storage_path.to_string()));
         }
         
         // Create the physical directory
         let abs_path = self.resolve_storage_path(&folder_storage_path);
         self.create_directory(&abs_path).await
-            .map_err(FolderRepositoryError::IoError)?;
+            .map_err(|e| DomainError::internal_error("Folder", e.to_string()))?;
         
         // Create and return the folder entity with a persisted ID
-        let id = self.id_mapping_service.get_or_create_id(&folder_storage_path).await?;
+        let id = self.id_mapping_service.get_or_create_id(&folder_storage_path).await
+            .map_err(|e| DomainError::internal_error("Folder", e.to_string()))?;
         let folder = self.create_folder_entity(
-            id.clone(), // Clone for logging
-            name.clone(), // Clone name for logging
-            folder_storage_path.clone(), // Clone for logging
-            parent_id.clone(), // Clone for logging
+            id.clone(),
+            name.clone(),
+            folder_storage_path.clone(),
+            parent_id.clone(),
             None,
             None,
-        ).await?;
+        ).await.map_err(DomainError::from)?;
         
-        // Ensure ID mapping is persisted - this is critical for later retrieval
+        // Ensure ID mapping is persisted
         let save_result = self.id_mapping_service.save_changes().await;
         if let Err(e) = &save_result {
             tracing::error!("Failed to save ID mapping for folder {}: {}", id, e);
@@ -404,38 +304,36 @@ impl FolderRepository for FolderFsRepository {
         Ok(folder)
     }
     
-    async fn get_folder_by_id(&self, id: &str) -> FolderRepositoryResult<Folder> {
+    async fn get_folder(&self, id: &str) -> Result<Folder, DomainError> {
         tracing::debug!("Looking for folder with ID: {}", id);
         
         // Find path by ID using the mapping service
-        let storage_path = self.id_mapping_service.get_path_by_id(id).await
-            .map_err(FolderRepositoryError::from)?;
+        let storage_path = self.id_mapping_service.get_path_by_id(id).await?;
         
         // Check if folder exists physically
         let abs_path = self.resolve_storage_path(&storage_path);
         if !abs_path.exists() || !abs_path.is_dir() {
             tracing::error!("Folder not found at path: {}", abs_path.display());
-            return Err(FolderRepositoryError::NotFound(format!("Folder {} not found at {}", id, storage_path.to_string())));
+            return Err(DomainError::not_found("Folder", format!("Folder {} not found at {}", id, storage_path.to_string())));
         }
         
         // Get folder metadata
-        let (created_at, modified_at) = self.get_folder_metadata(&abs_path).await?;
+        let (created_at, modified_at) = self.get_folder_metadata(&abs_path).await.map_err(DomainError::from)?;
         
         // Get folder name from the storage path
         let name = match storage_path.file_name() {
             Some(name) => name,
             None => {
                 tracing::error!("Invalid folder path: {}", storage_path.to_string());
-                return Err(FolderRepositoryError::InvalidPath(storage_path.to_string()));
+                return Err(DomainError::validation_error(format!("Invalid path: {}", storage_path.to_string())));
             }
         };
         
         // Determine parent ID if any
         let parent = storage_path.parent();
         let parent_id: Option<String> = if parent.is_none() || parent.as_ref().unwrap().is_empty() {
-            None // Root folder
+            None
         } else {
-            // Try to get the parent ID from the mapping service
             match self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await {
                 Ok(pid) => Some(pid),
                 Err(_) => None,
@@ -450,32 +348,31 @@ impl FolderRepository for FolderFsRepository {
             parent_id,
             Some(created_at),
             Some(modified_at),
-        ).await?;
+        ).await.map_err(DomainError::from)?;
         
         Ok(folder)
     }
     
-    async fn get_folder_by_storage_path(&self, storage_path: &StoragePath) -> FolderRepositoryResult<Folder> {
+    async fn get_folder_by_path(&self, storage_path: &StoragePath) -> Result<Folder, DomainError> {
         // Check if the physical directory exists
         let abs_path = self.resolve_storage_path(storage_path);
         if !abs_path.exists() || !abs_path.is_dir() {
-            return Err(FolderRepositoryError::NotFound(storage_path.to_string()));
+            return Err(DomainError::not_found("Folder", storage_path.to_string()));
         }
         
         // Extract folder name from storage path
         let name = match storage_path.file_name() {
             Some(name) => name,
             None => {
-                return Err(FolderRepositoryError::InvalidPath(storage_path.to_string()));
+                return Err(DomainError::validation_error(format!("Invalid path: {}", storage_path.to_string())));
             }
         };
         
         // Determine parent ID if any
         let parent = storage_path.parent();
         let parent_id: Option<String> = if parent.is_none() || parent.as_ref().unwrap().is_empty() {
-            None // Root folder
+            None
         } else {
-            // Try to get the parent ID from the mapping service
             match self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await {
                 Ok(pid) => Some(pid),
                 Err(_) => None,
@@ -483,7 +380,7 @@ impl FolderRepository for FolderFsRepository {
         };
         
         // Get folder metadata
-        let (created_at, modified_at) = self.get_folder_metadata(&abs_path).await?;
+        let (created_at, modified_at) = self.get_folder_metadata(&abs_path).await.map_err(DomainError::from)?;
         
         // Get or create an ID for this path
         let id = self.id_mapping_service.get_or_create_id(storage_path).await?;
@@ -497,7 +394,7 @@ impl FolderRepository for FolderFsRepository {
             parent_id,
             Some(created_at),
             Some(modified_at),
-        ).await?;
+        ).await.map_err(DomainError::from)?;
         
         // Ensure ID mapping is persisted
         self.id_mapping_service.save_changes().await?;
@@ -505,8 +402,8 @@ impl FolderRepository for FolderFsRepository {
         Ok(folder)
     }
     
-    async fn list_folders(&self, parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>> {
-        use futures::stream::{StreamExt};
+    async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
+        use futures::stream::StreamExt;
         use tokio::time::{timeout, Duration};
         
         tracing::info!("Listing folders in parent_id: {:?}", parent_id);
@@ -514,7 +411,7 @@ impl FolderRepository for FolderFsRepository {
         // Get the parent storage path
         let parent_storage_path = match parent_id {
             Some(id) => {
-                match self.get_folder_storage_path(id).await {
+                match self._get_folder_storage_path(id).await {
                     Ok(path) => {
                         tracing::info!("Found parent folder with path: {:?}", path.to_string());
                         path
@@ -538,21 +435,20 @@ impl FolderRepository for FolderFsRepository {
             return Ok(Vec::new());
         }
         
-        // Read the directory with a timeout to avoid indefinite blocking
+        // Read the directory with a timeout
         let read_dir_timeout = Duration::from_secs(30);
         let read_dir_result = match timeout(
             read_dir_timeout,
             fs::read_dir(&abs_parent_path)
         ).await {
-            Ok(result) => result.map_err(FolderRepositoryError::IoError)?,
+            Ok(result) => result.map_err(|e| DomainError::internal_error("Folder", e.to_string()))?,
             Err(_) => {
-                return Err(FolderRepositoryError::Other(
+                return Err(DomainError::internal_error("Folder",
                     format!("Timeout reading directory: {}", abs_parent_path.display())
                 ));
             }
         };
         
-        // Process each entry sequentially to avoid async block type issues
         let mut folders = Vec::new();
         let mut entries = tokio_stream::wrappers::ReadDirStream::new(read_dir_result);
         
@@ -568,27 +464,22 @@ impl FolderRepository for FolderFsRepository {
             let metadata = match entry.metadata().await {
                 Ok(m) => m,
                 Err(err) => {
-                    tracing::error!("Error getting metadata for {}: {}", 
-                                   entry.path().display(), err);
+                    tracing::error!("Error getting metadata for {}: {}", entry.path().display(), err);
                     continue;
                 }
             };
             
-            // Skip if not a directory
             if !metadata.is_dir() {
                 continue;
             }
             
             let folder_name = entry.file_name().to_string_lossy().to_string();
-            
-            // Create the storage path for this folder
             let folder_storage_path = parent_storage_path.join(&folder_name);
             
-            // Try to get the folder by its storage path with timeout
             let get_folder_timeout = Duration::from_secs(5);
             let folder_result = timeout(
                 get_folder_timeout,
-                self.get_folder_by_storage_path(&folder_storage_path)
+                self.get_folder_by_path(&folder_storage_path)
             ).await;
             
             match folder_result {
@@ -609,7 +500,6 @@ impl FolderRepository for FolderFsRepository {
             }
         }
         
-        // Persist any new ID mappings that were created
         if let Err(e) = self.id_mapping_service.save_changes().await {
             tracing::error!("Failed to save ID mappings: {}", e);
         }
@@ -624,21 +514,17 @@ impl FolderRepository for FolderFsRepository {
         offset: usize,
         limit: usize,
         include_total: bool
-    ) -> FolderRepositoryResult<(Vec<Folder>, Option<usize>)> {
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
         use futures::stream::StreamExt;
         use tokio::time::{timeout, Duration};
         
         tracing::info!("Listing folders in parent_id: {:?} with pagination (offset={}, limit={})", 
             parent_id, offset, limit);
         
-        // Get the parent storage path
         let parent_storage_path = match parent_id {
             Some(id) => {
-                match self.get_folder_storage_path(id).await {
-                    Ok(path) => {
-                        tracing::info!("Found parent folder with path: {:?}", path.to_string());
-                        path
-                    },
+                match self._get_folder_storage_path(id).await {
+                    Ok(path) => path,
                     Err(e) => {
                         tracing::error!("Error getting parent folder by ID: {}: {}", id, e);
                         return Ok((Vec::new(), Some(0)));
@@ -648,17 +534,12 @@ impl FolderRepository for FolderFsRepository {
             None => StoragePath::root(),
         };
         
-        // Get the absolute folder path
         let abs_parent_path = self.resolve_storage_path(&parent_storage_path);
-        tracing::info!("Absolute parent path: {:?}", abs_parent_path);
         
-        // Ensure the directory exists
         if !abs_parent_path.exists() || !abs_parent_path.is_dir() {
-            tracing::error!("Directory does not exist or is not a directory: {:?}", abs_parent_path);
             return Ok((Vec::new(), Some(0)));
         }
         
-        // Get total count if requested
         let total_count = if include_total {
             match self.count_directory_items(&abs_parent_path).await {
                 Ok(count) => Some(count),
@@ -671,34 +552,29 @@ impl FolderRepository for FolderFsRepository {
             None
         };
         
-        // Read the directory with a timeout to avoid indefinite blocking
         let read_dir_timeout = Duration::from_secs(30);
         let read_dir_result = match timeout(
             read_dir_timeout,
             fs::read_dir(&abs_parent_path)
         ).await {
-            Ok(result) => result.map_err(FolderRepositoryError::IoError)?,
+            Ok(result) => result.map_err(|e| DomainError::internal_error("Folder", e.to_string()))?,
             Err(_) => {
-                return Err(FolderRepositoryError::Other(
+                return Err(DomainError::internal_error("Folder",
                     format!("Timeout reading directory: {}", abs_parent_path.display())
                 ));
             }
         };
         
-        // Process entries sequentially to avoid async block typing issues
         let mut entries = tokio_stream::wrappers::ReadDirStream::new(read_dir_result);
         let mut folders = Vec::new();
         let mut current_idx = 0;
         
-        // Loop through entries, applying pagination manually
         while let Some(entry_result) = entries.next().await {
-            // Skip entries before offset
             if current_idx < offset {
                 current_idx += 1;
                 continue;
             }
             
-            // Stop after reaching limit
             if folders.len() >= limit {
                 break;
             }
@@ -712,7 +588,6 @@ impl FolderRepository for FolderFsRepository {
                 }
             };
             
-            // Check if it's a directory
             let file_type = match entry.file_type().await {
                 Ok(ft) => ft,
                 Err(e) => {
@@ -727,7 +602,6 @@ impl FolderRepository for FolderFsRepository {
                 continue;
             }
             
-            // Get the path and convert to StoragePath
             let path = entry.path();
             let rel_path = match path.strip_prefix(&self.root_path) {
                 Ok(rel) => StoragePath::from(rel.to_path_buf()),
@@ -738,10 +612,9 @@ impl FolderRepository for FolderFsRepository {
                 }
             };
             
-            // Get the folder entity with timeout
             let folder_result = timeout(
                 Duration::from_secs(10),
-                self.get_folder_by_storage_path(&rel_path)
+                self.get_folder_by_path(&rel_path)
             ).await;
             
             match folder_result {
@@ -761,68 +634,54 @@ impl FolderRepository for FolderFsRepository {
             current_idx += 1;
         }
         
-        // Save ID mappings
         if !folders.is_empty() {
             if let Err(e) = self.id_mapping_service.save_changes().await {
                 tracing::error!("Error saving ID mappings: {}", e);
             }
         }
         
-        tracing::info!("Found {} folders in paginated request", folders.len());
-        
         Ok((folders, total_count))
     }
     
-    async fn rename_folder(&self, id: &str, new_name: String) -> FolderRepositoryResult<Folder> {
-        // Get the original folder
-        let original_folder = self.get_folder_by_id(id).await?;
+    async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError> {
+        let original_folder = self.get_folder(id).await?;
         tracing::debug!("Renaming folder with ID: {}, Name: {}", id, original_folder.name());
         
-        // Create an immutable new version of the folder with updated name
         let renamed_folder = original_folder.with_name(new_name)
-            .map_err(|e| FolderRepositoryError::ValidationError(e.to_string()))?;
+            .map_err(|e| DomainError::validation_error(e.to_string()))?;
         
-        // Check if target already exists
-        if self.folder_exists_at_storage_path(renamed_folder.storage_path()).await? {
-            return Err(FolderRepositoryError::AlreadyExists(renamed_folder.storage_path().to_string()));
+        if self.check_folder_exists_at_storage_path(renamed_folder.storage_path()).await.map_err(DomainError::from)? {
+            return Err(DomainError::already_exists("Folder", renamed_folder.storage_path().to_string()));
         }
         
-        // Rename the physical directory
         let abs_old_path = self.resolve_storage_path(original_folder.storage_path());
         let abs_new_path = self.resolve_storage_path(renamed_folder.storage_path());
         
         fs::rename(&abs_old_path, &abs_new_path).await
-            .map_err(FolderRepositoryError::IoError)?;
+            .map_err(|e| DomainError::internal_error("Folder", e.to_string()))?;
             
-        // Update the ID mapping
-        self.id_mapping_service.update_path(id, renamed_folder.storage_path()).await
-            .map_err(FolderRepositoryError::from)?;
-        
-        // Save the updated mappings
+        self.id_mapping_service.update_path(id, renamed_folder.storage_path()).await?;
         self.id_mapping_service.save_changes().await?;
         
         tracing::debug!("Folder renamed successfully: ID={}, New name={}", id, renamed_folder.name());
         Ok(renamed_folder)
     }
     
-    async fn move_folder(&self, id: &str, new_parent_id: Option<&str>) -> FolderRepositoryResult<Folder> {
-        // Get the original folder
-        let original_folder = self.get_folder_by_id(id).await?;
+    async fn move_folder(&self, id: &str, new_parent_id: Option<&str>) -> Result<Folder, DomainError> {
+        let original_folder = self.get_folder(id).await?;
         tracing::debug!("Moving folder with ID: {}, Name: {}", id, original_folder.name());
         
-        // If the target parent is the same as current, no need to move
         if original_folder.parent_id() == new_parent_id {
             tracing::info!("Folder is already in the target parent, no need to move");
             return Ok(original_folder);
         }
         
-        // Get the target parent path
         let target_parent_storage_path = match new_parent_id {
             Some(parent_id) => {
-                match self.get_folder_storage_path(parent_id).await {
+                match self._get_folder_storage_path(parent_id).await {
                     Ok(path) => Some(path),
                     Err(e) => {
-                        return Err(FolderRepositoryError::Other(
+                        return Err(DomainError::internal_error("Folder",
                             format!("Could not get target folder: {}", e)
                         ));
                     }
@@ -831,68 +690,50 @@ impl FolderRepository for FolderFsRepository {
             None => None
         };
         
-        // Create an immutable new version of the folder with updated parent
         let new_parent_id_option = new_parent_id.map(String::from);
         let moved_folder = original_folder.with_parent(new_parent_id_option, target_parent_storage_path)
-            .map_err(|e| FolderRepositoryError::ValidationError(e.to_string()))?;
+            .map_err(|e| DomainError::validation_error(e.to_string()))?;
         
-        // Check if target already exists
-        if self.folder_exists_at_storage_path(moved_folder.storage_path()).await? {
-            return Err(FolderRepositoryError::AlreadyExists(
+        if self.check_folder_exists_at_storage_path(moved_folder.storage_path()).await.map_err(DomainError::from)? {
+            return Err(DomainError::already_exists("Folder",
                 format!("Folder already exists at destination: {}", moved_folder.storage_path().to_string())
             ));
         }
         
-        // Move the physical directory
         let old_abs_path = self.resolve_storage_path(original_folder.storage_path());
         let new_abs_path = self.resolve_storage_path(moved_folder.storage_path());
         
-        // Ensure the target directory exists
         if let Some(parent) = new_abs_path.parent() {
             fs::create_dir_all(parent).await
-                .map_err(FolderRepositoryError::IoError)?;
+                .map_err(|e| DomainError::internal_error("Folder", e.to_string()))?;
         }
         
-        // Move the directory physically (efficient rename operation)
         fs::rename(&old_abs_path, &new_abs_path).await
-            .map_err(FolderRepositoryError::IoError)?;
+            .map_err(|e| DomainError::internal_error("Folder", e.to_string()))?;
             
-        tracing::info!("Folder moved successfully from {:?} to {:?}", old_abs_path, new_abs_path);
-        
-        // Update the ID mapping
-        self.id_mapping_service.update_path(id, moved_folder.storage_path()).await
-            .map_err(FolderRepositoryError::from)?;
-        
-        // Save the updated mappings
+        self.id_mapping_service.update_path(id, moved_folder.storage_path()).await?;
         self.id_mapping_service.save_changes().await?;
         
         tracing::debug!("Folder moved successfully: ID={}, New path={:?}", id, moved_folder.storage_path().to_string());
         Ok(moved_folder)
     }
     
-    async fn delete_folder(&self, id: &str) -> FolderRepositoryResult<()> {
+    async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {
         use tokio::time::{timeout, Duration};
         
-        // Get the folder first to check if it exists
-        let folder = self.get_folder_by_id(id).await?;
+        let folder = self.get_folder(id).await?;
         let folder_name = folder.name().to_string();
         let storage_path = folder.storage_path().clone();
         
         tracing::info!("Deleting folder with ID: {}, Name: {}", id, folder_name);
         
-        // Para carpetas grandes, eliminar puede tomar tiempo
-        // Lo manejamos en un task separado para no bloquear
         let abs_path = self.resolve_storage_path(&storage_path);
-        
-        // Si la carpeta contiene muchos archivos, remove_dir_all puede tardar
-        // usamos tokio::spawn para hacerlo en un task separado
         let path_for_display = abs_path.display().to_string();
         let path_for_deletion = abs_path.clone();
         
         let delete_task = tokio::spawn(async move {
             tracing::debug!("Starting removal of folder: {}", path_for_display);
             
-            // Verificar si la carpeta existe y tiene muchas entradas
             let path_for_counting = path_for_deletion.clone();
             let entry_count = tokio::task::spawn_blocking(move || {
                 let mut count = 0;
@@ -900,19 +741,15 @@ impl FolderRepository for FolderFsRepository {
                     for _ in entries {
                         count += 1;
                         if count > 1000 {
-                            break; // Solo necesitamos saber si es grande
+                            break;
                         }
                     }
                 }
                 count
             }).await.unwrap_or(0);
             
-            // Para carpetas muy grandes, usar remove_dir_all puede causar bloqueos
-            // Para carpetas pequeñas, usamos la versión asíncrona estándar
             if entry_count > 1000 {
                 tracing::info!("Large folder detected with >1000 entries, using blocking removal");
-                
-                // Para carpetas muy grandes, usamos spawn_blocking para no bloquear el runtime de tokio
                 let path_for_large_removal = path_for_deletion.clone();
                 tokio::task::spawn_blocking(move || {
                     if let Err(e) = std::fs::remove_dir_all(&path_for_large_removal) {
@@ -930,13 +767,11 @@ impl FolderRepository for FolderFsRepository {
                     ))
                 })
             } else {
-                tracing::debug!("Using async removal for folder with {} entries", entry_count);
                 fs::remove_dir_all(&path_for_deletion).await
             }
         });
         
-        // Esperar a que termine la eliminación con timeout
-        const DELETE_TIMEOUT_SECS: u64 = 60; // 1 minuto máximo para eliminar
+        const DELETE_TIMEOUT_SECS: u64 = 60;
         
         let delete_result = timeout(
             Duration::from_secs(DELETE_TIMEOUT_SECS), 
@@ -948,29 +783,21 @@ impl FolderRepository for FolderFsRepository {
                 match task_result {
                     Ok(fs_result) => {
                         if let Err(e) = fs_result {
-                            return Err(FolderRepositoryError::IoError(e));
+                            return Err(DomainError::internal_error("Folder", e.to_string()));
                         }
                     },
                     Err(join_err) => {
-                        return Err(FolderRepositoryError::Other(
+                        return Err(DomainError::internal_error("Folder",
                             format!("Task panicked during folder deletion: {}", join_err)
                         ));
                     }
                 }
             },
             Err(_) => {
-                // El timeout ocurrió, pero la tarea sigue ejecutándose en segundo plano
                 tracing::warn!("Timeout waiting for folder deletion, continuing with ID removal");
-                // No retornamos error, continuamos con la eliminación del ID
             }
         }
         
-        // Incluso si la eliminación física puede estar en progreso (timeout),
-        // procedemos a eliminar la entrada del mapping
-        // En el peor caso, si la eliminación física falla pero el ID se elimina,
-        // la carpeta se quedará huérfana, pero no afectará al sistema
-        
-        // Remove the ID mapping con timeout
         const MAPPING_TIMEOUT_SECS: u64 = 5;
         let remove_id_result = timeout(
             Duration::from_secs(MAPPING_TIMEOUT_SECS),
@@ -978,46 +805,37 @@ impl FolderRepository for FolderFsRepository {
         ).await;
         
         match remove_id_result {
-            Ok(result) => result.map_err(FolderRepositoryError::from)?,
+            Ok(result) => result?,
             Err(_) => {
-                return Err(FolderRepositoryError::Other(
+                return Err(DomainError::internal_error("Folder",
                     "Timeout removing folder ID from mapping".to_string()
                 ));
             }
         }
         
-        // Save the updated mappings (asíncrono, no esperamos)
         let _ = self.id_mapping_service.save_changes().await;
         
         tracing::info!("Folder deleted successfully: ID={}, Name={}", id, folder_name);
         Ok(())
     }
     
-    async fn folder_exists_at_storage_path(&self, storage_path: &StoragePath) -> FolderRepositoryResult<bool> {
-        self.check_folder_exists_at_storage_path(storage_path).await
+    async fn folder_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
+        self.check_folder_exists_at_storage_path(storage_path).await.map_err(DomainError::from)
     }
     
-    async fn get_folder_storage_path(&self, id: &str) -> FolderRepositoryResult<StoragePath> {
-        // Use the ID mapping service to get the storage path
-        let storage_path = self.id_mapping_service.get_path_by_id(id).await
-            .map_err(FolderRepositoryError::from)?;
-        
-        Ok(storage_path)
+    async fn get_folder_path(&self, id: &str) -> Result<StoragePath, DomainError> {
+        self._get_folder_storage_path(id).await.map_err(DomainError::from)
     }
-    
-    // Legacy method implementations
-    
-    async fn folder_exists(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<bool> {
-        let abs_path = self.resolve_legacy_path(path);
-        Ok(abs_path.exists() && abs_path.is_dir())
+
+    async fn move_to_trash(&self, folder_id: &str) -> Result<(), DomainError> {
+        self._trash_move_to_trash(folder_id).await.map_err(DomainError::from)
     }
-    
-    async fn get_folder_by_path(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<Folder> {
-        // Convert PathBuf to StoragePath
-        let path_str = path.to_string_lossy().to_string();
-        let storage_path = StoragePath::from_string(&path_str);
-        
-        // Use the new method
-        self.get_folder_by_storage_path(&storage_path).await
+
+    async fn restore_from_trash(&self, folder_id: &str, original_path: &str) -> Result<(), DomainError> {
+        self._trash_restore_from_trash(folder_id, original_path).await.map_err(DomainError::from)
+    }
+
+    async fn delete_folder_permanently(&self, folder_id: &str) -> Result<(), DomainError> {
+        self._trash_delete_folder_permanently(folder_id).await.map_err(DomainError::from)
     }
 }

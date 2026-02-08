@@ -14,7 +14,6 @@ use crate::common::errors::ErrorKind;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState as GlobalAppState;
 use crate::interfaces::middleware::auth::AuthUser;
-use crate::infrastructure::services::zip_service::ZipService;
 
 type AppState = Arc<FolderService>;
 
@@ -59,6 +58,38 @@ impl FolderHandler {
         }
     }
     
+    /// Lists root folders (no parent ID)
+    pub async fn list_root_folders(
+        State(service): State<AppState>,
+    ) -> impl IntoResponse {
+        Self::list_folders(State(service), None).await
+    }
+
+    /// Lists contents of a specific folder by its ID
+    pub async fn list_folder_contents(
+        State(service): State<AppState>,
+        Path(id): Path<String>,
+    ) -> impl IntoResponse {
+        Self::list_folders(State(service), Some(&id)).await
+    }
+
+    /// Lists root folders with pagination support
+    pub async fn list_root_folders_paginated(
+        State(service): State<AppState>,
+        pagination: Query<PaginationRequestDto>,
+    ) -> impl IntoResponse {
+        Self::list_folders_paginated(State(service), pagination, None).await
+    }
+
+    /// Lists contents of a specific folder with pagination
+    pub async fn list_folder_contents_paginated(
+        State(service): State<AppState>,
+        Path(id): Path<String>,
+        pagination: Query<PaginationRequestDto>,
+    ) -> impl IntoResponse {
+        Self::list_folders_paginated(State(service), pagination, Some(&id)).await
+    }
+
     /// Lists folders, optionally filtered by parent ID
     pub async fn list_folders(
         State(service): State<AppState>,
@@ -226,17 +257,13 @@ impl FolderHandler {
         
         // Get folder information first to check it exists and get name
         let folder_service = &state.applications.folder_service;
-        let file_service = &state.applications.file_service;
         
         match folder_service.get_folder(&id).await {
             Ok(folder) => {
                 tracing::info!("Preparing ZIP for folder: {} ({})", folder.name, id);
                 
-                // Create ZIP service with the required services
-                let zip_service = ZipService::new(
-                    file_service.clone(),
-                    folder_service.clone()
-                );
+                // Use ZIP service from DI container
+                let zip_service = &state.core.zip_service;
                 
                 // Create the ZIP file
                 match zip_service.create_folder_zip(&id, &folder.name).await {

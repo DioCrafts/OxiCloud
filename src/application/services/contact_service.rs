@@ -44,7 +44,7 @@ impl ContactService {
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
         // Check if user is owner
-        if address_book.owner_id == user_id {
+        if address_book.owner_id() == user_id {
             return Ok(address_book);
         }
 
@@ -55,7 +55,7 @@ impl ContactService {
         }
 
         // Check if address book is public
-        if address_book.is_public {
+        if address_book.is_public() {
             return Ok(address_book);
         }
 
@@ -68,7 +68,7 @@ impl ContactService {
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
         // Check if user is owner
-        if address_book.owner_id == user_id {
+        if address_book.owner_id() == user_id {
             return Ok(address_book);
         }
 
@@ -93,12 +93,12 @@ impl ContactService {
             let line = lines[i].trim();
             
             if line.starts_with("FN:") {
-                contact.full_name = Some(line[3..].to_string());
+                contact.set_full_name(Some(line[3..].to_string()));
             } else if line.starts_with("N:") {
                 let parts: Vec<&str> = line[2..].split(';').collect();
                 if parts.len() >= 2 {
-                    contact.last_name = Some(parts[0].to_string());
-                    contact.first_name = Some(parts[1].to_string());
+                    contact.set_last_name(Some(parts[0].to_string()));
+                    contact.set_first_name(Some(parts[1].to_string()));
                 }
             } else if line.starts_with("EMAIL") {
                 let value = line.split(':').nth(1).unwrap_or("");
@@ -111,10 +111,10 @@ impl ContactService {
                         "other"
                     };
                     
-                    contact.email.push(Email {
+                    contact.push_email(Email {
                         email: value.to_string(),
                         r#type: email_type.to_string(),
-                        is_primary: contact.email.is_empty(), // First one is primary
+                        is_primary: contact.email_is_empty(), // First one is primary
                     });
                 }
             } else if line.starts_with("TEL") {
@@ -132,26 +132,26 @@ impl ContactService {
                         "other"
                     };
                     
-                    contact.phone.push(Phone {
+                    contact.push_phone(Phone {
                         number: value.to_string(),
                         r#type: phone_type.to_string(),
-                        is_primary: contact.phone.is_empty(), // First one is primary
+                        is_primary: contact.phone_is_empty(), // First one is primary
                     });
                 }
             } else if line.starts_with("ORG:") {
-                contact.organization = Some(line[4..].to_string());
+                contact.set_organization(Some(line[4..].to_string()));
             } else if line.starts_with("TITLE:") {
-                contact.title = Some(line[6..].to_string());
+                contact.set_title(Some(line[6..].to_string()));
             } else if line.starts_with("NOTE:") {
-                contact.notes = Some(line[5..].to_string());
+                contact.set_notes(Some(line[5..].to_string()));
             } else if line.starts_with("UID:") {
-                contact.uid = line[4..].to_string();
+                contact.set_uid(line[4..].to_string());
             }
         }
         
         // Store the original vCard data
-        contact.vcard = vcard_data.to_string();
-        contact.etag = Uuid::new_v4().to_string();
+        contact.set_vcard(vcard_data.to_string());
+        contact.set_etag(Uuid::new_v4().to_string());
         
         Ok(contact)
     }
@@ -160,26 +160,26 @@ impl ContactService {
         let mut vcard = String::from("BEGIN:VCARD\r\nVERSION:3.0\r\n");
         
         // UID
-        vcard.push_str(&format!("UID:{}\r\n", contact.uid));
+        vcard.push_str(&format!("UID:{}\r\n", contact.uid()));
         
         // Name fields
-        if let Some(full_name) = &contact.full_name {
+        if let Some(full_name) = contact.full_name() {
             vcard.push_str(&format!("FN:{}\r\n", full_name));
         }
         
-        let last_name = contact.last_name.clone().unwrap_or_default();
-        let first_name = contact.first_name.clone().unwrap_or_default();
+        let last_name = contact.last_name().unwrap_or_default().to_string();
+        let first_name = contact.first_name().unwrap_or_default().to_string();
         vcard.push_str(&format!("N:{};{};;;\r\n", last_name, first_name));
         
         // Email addresses
-        for email in &contact.email {
+        for email in contact.email() {
             vcard.push_str(&format!("EMAIL;TYPE={}:{}\r\n", 
                 email.r#type.to_uppercase(),
                 email.email));
         }
         
         // Phone numbers
-        for phone in &contact.phone {
+        for phone in contact.phone() {
             let tel_type = match phone.r#type.as_str() {
                 "mobile" => "CELL",
                 "home" => "HOME",
@@ -191,7 +191,7 @@ impl ContactService {
         }
         
         // Addresses
-        for addr in &contact.address {
+        for addr in contact.address() {
             let addr_type = addr.r#type.to_uppercase();
             let street = addr.street.clone().unwrap_or_default();
             let city = addr.city.clone().unwrap_or_default();
@@ -204,27 +204,27 @@ impl ContactService {
         }
         
         // Organization
-        if let Some(org) = &contact.organization {
+        if let Some(org) = contact.organization() {
             vcard.push_str(&format!("ORG:{}\r\n", org));
         }
         
         // Title
-        if let Some(title) = &contact.title {
+        if let Some(title) = contact.title() {
             vcard.push_str(&format!("TITLE:{}\r\n", title));
         }
         
         // Notes
-        if let Some(notes) = &contact.notes {
+        if let Some(notes) = contact.notes() {
             vcard.push_str(&format!("NOTE:{}\r\n", notes));
         }
         
         // Birthday
-        if let Some(birthday) = &contact.birthday {
+        if let Some(birthday) = contact.birthday() {
             vcard.push_str(&format!("BDAY:{}\r\n", birthday.format("%Y%m%d")));
         }
         
         // Revision (last update)
-        vcard.push_str(&format!("REV:{}\r\n", contact.updated_at.format("%Y%m%dT%H%M%SZ")));
+        vcard.push_str(&format!("REV:{}\r\n", contact.updated_at().format("%Y%m%dT%H%M%SZ")));
         
         vcard.push_str("END:VCARD\r\n");
         
@@ -235,19 +235,13 @@ impl ContactService {
 #[async_trait]
 impl AddressBookUseCase for ContactService {
     async fn create_address_book(&self, dto: CreateAddressBookDto) -> Result<AddressBookDto, DomainError> {
-        let id = Uuid::new_v4();
-        let now = Utc::now();
-
-        let address_book = AddressBook {
-            id,
-            name: dto.name,
-            owner_id: dto.owner_id,
-            description: dto.description,
-            color: dto.color,
-            is_public: dto.is_public.unwrap_or(false),
-            created_at: now,
-            updated_at: now,
-        };
+        let address_book = AddressBook::new(
+            dto.name,
+            dto.owner_id,
+            dto.description,
+            dto.color,
+            dto.is_public.unwrap_or(false),
+        );
 
         let created_address_book = self.address_book_repository.create_address_book(address_book).await?;
         Ok(AddressBookDto::from(created_address_book))
@@ -261,16 +255,16 @@ impl AddressBookUseCase for ContactService {
         let address_book = self.check_address_book_write_access(&id, &update.user_id).await?;
 
         // Apply updates
-        let updated_address_book = AddressBook {
+        let updated_address_book = AddressBook::from_raw(
             id,
-            name: update.name.unwrap_or(address_book.name),
-            owner_id: address_book.owner_id,
-            description: update.description.or(address_book.description),
-            color: update.color.or(address_book.color),
-            is_public: update.is_public.unwrap_or(address_book.is_public),
-            created_at: address_book.created_at,
-            updated_at: Utc::now(),
-        };
+            update.name.unwrap_or_else(|| address_book.name().to_string()),
+            address_book.owner_id().to_string(),
+            update.description.or_else(|| address_book.description().map(|s| s.to_string())),
+            update.color.or_else(|| address_book.color().map(|s| s.to_string())),
+            update.is_public.unwrap_or(address_book.is_public()),
+            *address_book.created_at(),
+            Utc::now(),
+        );
 
         let result = self.address_book_repository.update_address_book(updated_address_book).await?;
         Ok(AddressBookDto::from(result))
@@ -285,7 +279,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::unauthorized("Only the owner can delete an address book"));
         }
 
@@ -315,16 +309,16 @@ impl AddressBookUseCase for ContactService {
         let mut address_book_map = std::collections::HashMap::new();
         
         for address_book in owned_address_books {
-            address_book_map.insert(address_book.id, address_book);
+            address_book_map.insert(*address_book.id(), address_book);
         }
         
         for address_book in shared_address_books {
-            address_book_map.insert(address_book.id, address_book);
+            address_book_map.insert(*address_book.id(), address_book);
         }
         
         for address_book in public_address_books {
-            if address_book.owner_id != user_id && !address_book_map.contains_key(&address_book.id) {
-                address_book_map.insert(address_book.id, address_book);
+            if address_book.owner_id() != user_id && !address_book_map.contains_key(address_book.id()) {
+                address_book_map.insert(*address_book.id(), address_book);
             }
         }
         
@@ -351,7 +345,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::unauthorized("Only the owner can share an address book"));
         }
 
@@ -373,7 +367,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::unauthorized("Only the owner can unshare an address book"));
         }
 
@@ -390,7 +384,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id != user_id {
+        if address_book.owner_id() != user_id {
             return Err(DomainError::unauthorized("Only the owner can view address book shares"));
         }
 
@@ -407,10 +401,6 @@ impl ContactUseCase for ContactService {
 
         // Check if user has write access to the address book
         self.check_address_book_write_access(&address_book_id, &dto.user_id).await?;
-
-        let id = Uuid::new_v4();
-        let now = Utc::now();
-        let uid = format!("{}@oxicloud", id);
 
         // Convert DTOs to domain entities
         let email: Vec<Email> = dto.email.into_iter()
@@ -441,33 +431,28 @@ impl ContactUseCase for ContactService {
             })
             .collect();
 
-        let contact = Contact {
-            id,
+        let mut contact = Contact::new(
             address_book_id,
-            uid,
-            full_name: dto.full_name,
-            first_name: dto.first_name,
-            last_name: dto.last_name,
-            nickname: dto.nickname,
+            dto.full_name,
+            dto.first_name,
+            dto.last_name,
+            dto.nickname,
             email,
             phone,
             address,
-            organization: dto.organization,
-            title: dto.title,
-            notes: dto.notes,
-            photo_url: dto.photo_url,
-            birthday: dto.birthday,
-            anniversary: dto.anniversary,
-            vcard: String::new(), // Will be generated after creation
-            etag: Uuid::new_v4().to_string(),
-            created_at: now,
-            updated_at: now,
-        };
+            dto.organization,
+            dto.title,
+            dto.notes,
+            dto.photo_url,
+            dto.birthday,
+            dto.anniversary,
+            String::new(), // Will be generated after creation
+        );
 
         // Generate vCard data
         let vcard = self.generate_vcard(&contact);
-        let mut contact_with_vcard = contact;
-        contact_with_vcard.vcard = vcard;
+        contact.set_vcard(vcard);
+        let contact_with_vcard = contact;
 
         // Create the contact
         let created_contact = self.contact_repository.create_contact(contact_with_vcard).await?;
@@ -485,17 +470,12 @@ impl ContactUseCase for ContactService {
         let mut contact = self.parse_vcard(&dto.vcard)?;
         
         // Set address book ID
-        contact.address_book_id = address_book_id;
+        contact.set_address_book_id(address_book_id);
         
-        // Generate a new ID if needed
-        if contact.id == Uuid::nil() {
-            contact.id = Uuid::new_v4();
-        }
-        
+        // The contact was created with Contact::default() which generates a new ID
         // Set creation and update timestamps
         let now = Utc::now();
-        contact.created_at = now;
-        contact.updated_at = now;
+        contact.set_updated_at(now);
         
         // Create the contact
         let created_contact = self.contact_repository.create_contact(contact).await?;
@@ -512,7 +492,10 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&contact.address_book_id, &update.user_id).await?;
+        self.check_address_book_write_access(contact.address_book_id(), &update.user_id).await?;
+
+        // Destructure contact into owned parts for updates
+        let parts = contact.into_parts();
 
         // Convert DTO fields to domain entities
         let email = if let Some(email_dtos) = update.email {
@@ -524,7 +507,7 @@ impl ContactUseCase for ContactService {
                 })
                 .collect()
         } else {
-            contact.email
+            parts.email
         };
 
         let phone = if let Some(phone_dtos) = update.phone {
@@ -536,7 +519,7 @@ impl ContactUseCase for ContactService {
                 })
                 .collect()
         } else {
-            contact.phone
+            parts.phone
         };
 
         let address = if let Some(address_dtos) = update.address {
@@ -552,37 +535,37 @@ impl ContactUseCase for ContactService {
                 })
                 .collect()
         } else {
-            contact.address
+            parts.address
         };
 
         // Update the contact object
-        let updated_contact = Contact {
+        let mut updated_contact = Contact::from_raw(
             id,
-            address_book_id: contact.address_book_id,
-            uid: contact.uid,
-            full_name: update.full_name.or(contact.full_name),
-            first_name: update.first_name.or(contact.first_name),
-            last_name: update.last_name.or(contact.last_name),
-            nickname: update.nickname.or(contact.nickname),
+            parts.address_book_id,
+            parts.uid,
+            update.full_name.or(parts.full_name),
+            update.first_name.or(parts.first_name),
+            update.last_name.or(parts.last_name),
+            update.nickname.or(parts.nickname),
             email,
             phone,
             address,
-            organization: update.organization.or(contact.organization),
-            title: update.title.or(contact.title),
-            notes: update.notes.or(contact.notes),
-            photo_url: update.photo_url.or(contact.photo_url),
-            birthday: update.birthday.or(contact.birthday),
-            anniversary: update.anniversary.or(contact.anniversary),
-            vcard: contact.vcard, // Will be regenerated
-            etag: Uuid::new_v4().to_string(), // Generate new ETag
-            created_at: contact.created_at,
-            updated_at: Utc::now(),
-        };
+            update.organization.or(parts.organization),
+            update.title.or(parts.title),
+            update.notes.or(parts.notes),
+            update.photo_url.or(parts.photo_url),
+            update.birthday.or(parts.birthday),
+            update.anniversary.or(parts.anniversary),
+            parts.vcard, // Will be regenerated
+            Uuid::new_v4().to_string(), // Generate new ETag
+            parts.created_at,
+            Utc::now(),
+        );
 
         // Generate new vCard data
         let vcard = self.generate_vcard(&updated_contact);
-        let mut contact_with_vcard = updated_contact;
-        contact_with_vcard.vcard = vcard;
+        updated_contact.set_vcard(vcard);
+        let contact_with_vcard = updated_contact;
 
         // Update the contact
         let result = self.contact_repository.update_contact(contact_with_vcard).await?;
@@ -599,7 +582,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_write_access(contact.address_book_id(), user_id).await?;
 
         // Delete the contact
         self.contact_repository.delete_contact(&id).await?;
@@ -616,7 +599,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
         Ok(ContactDto::from(contact))
     }
@@ -656,16 +639,10 @@ impl ContactUseCase for ContactService {
         // Check if user has write access to the address book
         self.check_address_book_write_access(&address_book_id, &dto.user_id).await?;
 
-        let id = Uuid::new_v4();
-        let now = Utc::now();
-
-        let group = ContactGroup {
-            id,
+        let group = ContactGroup::new(
             address_book_id,
-            name: dto.name,
-            created_at: now,
-            updated_at: now,
-        };
+            dto.name,
+        );
 
         let created_group = self.contact_group_repository.create_group(group).await?;
         Ok(ContactGroupDto::from(created_group))
@@ -681,16 +658,16 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&group.address_book_id, &update.user_id).await?;
+        self.check_address_book_write_access(group.address_book_id(), &update.user_id).await?;
 
         // Update the group
-        let updated_group = ContactGroup {
+        let updated_group = ContactGroup::from_raw(
             id,
-            address_book_id: group.address_book_id,
-            name: update.name,
-            created_at: group.created_at,
-            updated_at: Utc::now(),
-        };
+            *group.address_book_id(),
+            update.name,
+            *group.created_at(),
+            Utc::now(),
+        );
 
         let result = self.contact_group_repository.update_group(updated_group).await?;
         Ok(ContactGroupDto::from(result))
@@ -706,7 +683,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_write_access(group.address_book_id(), user_id).await?;
 
         // Delete the group
         self.contact_group_repository.delete_group(&id).await?;
@@ -723,7 +700,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id).await?;
 
         // Get the number of contacts in the group
         let contacts = self.contact_group_repository.get_contacts_in_group(&id).await?;
@@ -761,7 +738,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_write_access(group.address_book_id(), user_id).await?;
 
         // Add contact to group
         self.contact_group_repository.add_contact_to_group(&group_id, &contact_id).await?;
@@ -781,7 +758,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_write_access(group.address_book_id(), user_id).await?;
 
         // Remove contact from group
         self.contact_group_repository.remove_contact_from_group(&group_id, &contact_id).await?;
@@ -798,7 +775,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&group.address_book_id, user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id).await?;
 
         // Get contacts in group
         let contacts = self.contact_group_repository.get_contacts_in_group(&id).await?;
@@ -817,7 +794,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
         // Get groups for contact
         let groups = self.contact_group_repository.get_groups_for_contact(&id).await?;
@@ -836,10 +813,10 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&contact.address_book_id, user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id).await?;
 
         // Return the vCard data
-        Ok(contact.vcard)
+        Ok(contact.vcard().to_string())
     }
 
     async fn get_contacts_as_vcards(&self, address_book_id: &str, user_id: &str) -> Result<Vec<(String, String)>, DomainError> {
@@ -854,7 +831,7 @@ impl ContactUseCase for ContactService {
         
         // Convert to Vec<(id, vcard)>
         let vcards = contacts.into_iter()
-            .map(|contact| (contact.id.to_string(), contact.vcard))
+            .map(|contact| (contact.id().to_string(), contact.vcard().to_string()))
             .collect();
         
         Ok(vcards)

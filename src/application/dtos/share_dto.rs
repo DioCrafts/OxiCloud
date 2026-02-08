@@ -43,20 +43,20 @@ pub struct UpdateShareDto {
 /// Extension methods to convert between DTOs and domain entities
 impl ShareDto {
     pub fn from_entity(share: &Share, base_url: &str) -> Self {
-        let url = format!("{}/s/{}", base_url, share.token);
+        let url = format!("{}/s/{}", base_url, share.token());
         
         Self {
-            id: share.id.clone(),
-            item_id: share.item_id.clone(),
-            item_type: share.item_type.to_string(),
-            token: share.token.clone(),
+            id: share.id().to_string(),
+            item_id: share.item_id().to_string(),
+            item_type: share.item_type().to_string(),
+            token: share.token().to_string(),
             url,
-            has_password: share.password_hash.is_some(),
-            expires_at: share.expires_at,
-            permissions: SharePermissionsDto::from_entity(&share.permissions),
-            created_at: share.created_at,
-            created_by: share.created_by.clone(),
-            access_count: share.access_count,
+            has_password: share.has_password(),
+            expires_at: share.expires_at(),
+            permissions: SharePermissionsDto::from_entity(share.permissions()),
+            created_at: share.created_at(),
+            created_by: share.created_by().to_string(),
+            access_count: share.access_count(),
         }
     }
 }
@@ -64,9 +64,9 @@ impl ShareDto {
 impl SharePermissionsDto {
     pub fn from_entity(permissions: &SharePermissions) -> Self {
         Self {
-            read: permissions.read,
-            write: permissions.write,
-            reshare: permissions.reshare,
+            read: permissions.read(),
+            write: permissions.write(),
+            reshare: permissions.reshare(),
         }
     }
     

@@ -20,6 +20,15 @@ use tokio::fs::{self, File, OpenOptions};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use uuid::Uuid;
+use async_trait::async_trait;
+
+use crate::application::ports::chunked_upload_ports::{
+    ChunkedUploadPort,
+    CreateUploadResponseDto,
+    ChunkUploadResponseDto,
+    UploadStatusResponseDto,
+};
+use crate::domain::errors::{DomainError, ErrorKind};
 
 /// Minimum file size to use chunked upload (10MB)
 pub const CHUNKED_UPLOAD_THRESHOLD: usize = 10 * 1024 * 1024;
@@ -504,6 +513,93 @@ impl ChunkedUploadService {
     /// Get active session count (for monitoring)
     pub async fn active_sessions(&self) -> usize {
         self.sessions.read().await.len()
+    }
+}
+
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+#[async_trait]
+impl ChunkedUploadPort for ChunkedUploadService {
+    async fn create_session(
+        &self,
+        filename: String,
+        folder_id: Option<String>,
+        content_type: String,
+        total_size: u64,
+        chunk_size: Option<usize>,
+    ) -> Result<CreateUploadResponseDto, DomainError> {
+        let resp = self.create_session(filename, folder_id, content_type, total_size, chunk_size).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))?;
+        Ok(CreateUploadResponseDto {
+            upload_id: resp.upload_id,
+            chunk_size: resp.chunk_size,
+            total_chunks: resp.total_chunks,
+            expires_at: resp.expires_at,
+        })
+    }
+
+    async fn upload_chunk(
+        &self,
+        upload_id: &str,
+        chunk_index: usize,
+        data: bytes::Bytes,
+        checksum: Option<String>,
+    ) -> Result<ChunkUploadResponseDto, DomainError> {
+        let resp = self.upload_chunk(upload_id, chunk_index, data, checksum).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))?;
+        Ok(ChunkUploadResponseDto {
+            chunk_index: resp.chunk_index,
+            bytes_received: resp.bytes_received,
+            progress: resp.progress,
+            is_complete: resp.is_complete,
+        })
+    }
+
+    async fn get_status(
+        &self,
+        upload_id: &str,
+    ) -> Result<UploadStatusResponseDto, DomainError> {
+        let resp = self.get_status(upload_id).await
+            .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))?;
+        Ok(UploadStatusResponseDto {
+            upload_id: resp.upload_id,
+            filename: resp.filename,
+            total_size: resp.total_size,
+            bytes_received: resp.bytes_received,
+            progress: resp.progress,
+            total_chunks: resp.total_chunks,
+            completed_chunks: resp.completed_chunks,
+            pending_chunks: resp.pending_chunks,
+            is_complete: resp.is_complete,
+        })
+    }
+
+    async fn complete_upload(
+        &self,
+        upload_id: &str,
+    ) -> Result<(PathBuf, String, Option<String>, String, u64), DomainError> {
+        self.complete_upload(upload_id).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
+    }
+
+    async fn finalize_upload(
+        &self,
+        upload_id: &str,
+    ) -> Result<(), DomainError> {
+        self.finalize_upload(upload_id).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
+    }
+
+    async fn cancel_upload(
+        &self,
+        upload_id: &str,
+    ) -> Result<(), DomainError> {
+        self.cancel_upload(upload_id).await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
+    }
+
+    fn should_use_chunked(&self, size: u64) -> bool {
+        ChunkedUploadService::should_use_chunked(size)
     }
 }
 

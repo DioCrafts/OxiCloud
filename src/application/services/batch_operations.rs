@@ -4,7 +4,7 @@ use tokio::sync::Semaphore;
 use tracing::info;
 use thiserror::Error;
 
-use crate::application::services::file_service::FileService;
+use crate::application::ports::file_ports::{FileRetrievalUseCase, FileManagementUseCase};
 use crate::application::services::folder_service::FolderService;
 use crate::common::errors::DomainError;
 use crate::common::config::AppConfig;
@@ -59,7 +59,8 @@ pub struct BatchStats {
 
 /// Servicio de operaciones por lotes
 pub struct BatchOperationService {
-    file_service: Arc<FileService>,
+    file_retrieval: Arc<dyn FileRetrievalUseCase>,
+    file_management: Arc<dyn FileManagementUseCase>,
     folder_service: Arc<FolderService>,
     config: AppConfig,
     semaphore: Arc<Semaphore>,
@@ -68,7 +69,8 @@ pub struct BatchOperationService {
 impl BatchOperationService {
     /// Crea una nueva instancia del servicio de operaciones por lotes
     pub fn new(
-        file_service: Arc<FileService>, 
+        file_retrieval: Arc<dyn FileRetrievalUseCase>,
+        file_management: Arc<dyn FileManagementUseCase>,
         folder_service: Arc<FolderService>,
         config: AppConfig
     ) -> Self {
@@ -76,7 +78,8 @@ impl BatchOperationService {
         let max_concurrency = config.concurrency.max_concurrent_files;
         
         Self {
-            file_service,
+            file_retrieval,
+            file_management,
             folder_service,
             config,
             semaphore: Arc::new(Semaphore::new(max_concurrency)),
@@ -85,10 +88,11 @@ impl BatchOperationService {
     
     /// Crea una nueva instancia con la configuración por defecto
     pub fn default(
-        file_service: Arc<FileService>, 
+        file_retrieval: Arc<dyn FileRetrievalUseCase>,
+        file_management: Arc<dyn FileManagementUseCase>,
         folder_service: Arc<FolderService>
     ) -> Self {
-        Self::new(file_service, folder_service, AppConfig::default())
+        Self::new(file_retrieval, file_management, folder_service, AppConfig::default())
     }
     
     /// Copia múltiples archivos en paralelo
@@ -112,7 +116,7 @@ impl BatchOperationService {
         
         // Definir la operación a realizar para cada archivo
         let operations = file_ids.into_iter().map(|file_id| {
-            let file_service = self.file_service.clone();
+            let mgmt = self.file_management.clone();
             let target_folder = target_folder_id.clone();
             let semaphore = self.semaphore.clone();
             
@@ -120,7 +124,7 @@ impl BatchOperationService {
                 // Adquirir permiso del semáforo
                 let permit = semaphore.acquire().await.unwrap();
                 
-                let copy_result = file_service.move_file(&file_id, target_folder.clone()).await;
+                let copy_result = mgmt.move_file(&file_id, target_folder.clone()).await;
                 
                 // Liberar el permiso explícitamente (también se libera al hacer drop)
                 drop(permit);
@@ -183,7 +187,7 @@ impl BatchOperationService {
         
         // Definir la operación a realizar para cada archivo
         let operations = file_ids.into_iter().map(|file_id| {
-            let file_service = self.file_service.clone();
+            let mgmt = self.file_management.clone();
             let target_folder = target_folder_id.clone();
             let semaphore = self.semaphore.clone();
             
@@ -191,7 +195,7 @@ impl BatchOperationService {
                 // Adquirir permiso del semáforo
                 let permit = semaphore.acquire().await.unwrap();
                 
-                let move_result = file_service.move_file(&file_id, target_folder.clone()).await;
+                let move_result = mgmt.move_file(&file_id, target_folder.clone()).await;
                 
                 // Liberar el permiso explícitamente
                 drop(permit);
@@ -253,7 +257,7 @@ impl BatchOperationService {
         
         // Definir la operación a realizar para cada archivo
         let operations = file_ids.into_iter().map(|file_id| {
-            let file_service = self.file_service.clone();
+            let mgmt = self.file_management.clone();
             let semaphore = self.semaphore.clone();
             let id_clone = file_id.clone();
             
@@ -261,7 +265,7 @@ impl BatchOperationService {
                 // Adquirir permiso del semáforo
                 let permit = semaphore.acquire().await.unwrap();
                 
-                let delete_result = file_service.delete_file(&file_id).await;
+                let delete_result = mgmt.delete_file(&file_id).await;
                 
                 // Liberar el permiso explícitamente
                 drop(permit);
@@ -323,14 +327,14 @@ impl BatchOperationService {
         
         // Definir la operación a realizar para cada archivo
         let operations = file_ids.into_iter().map(|file_id| {
-            let file_service = self.file_service.clone();
+            let retrieval = self.file_retrieval.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
                 // Adquirir permiso del semáforo
                 let permit = semaphore.acquire().await.unwrap();
                 
-                let get_result = file_service.get_file(&file_id).await;
+                let get_result = retrieval.get_file(&file_id).await;
                 
                 // Liberar el permiso explícitamente
                 drop(permit);
@@ -665,87 +669,17 @@ impl BatchOperationService {
 mod tests {
     use super::*;
     use std::sync::Arc;
-    use tokio::sync::Mutex;
-    use mockall::predicate::*;
-    use mockall::mock;
-    
-    // Crear mocks para los servicios
-    mock! {
-        FileSvcMock {}
-        
-        #[async_trait]
-        impl FileService for FileSvcMock {
-            async fn create_file(&self, name: String, folder_id: Option<String>, content_type: String, content: Vec<u8>) -> Result<File, DomainError>;
-            async fn get_file(&self, id: &str) -> Result<File, DomainError>;
-            async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
-            async fn move_file(&self, id: &str, target_folder_id: Option<String>) -> Result<File, DomainError>;
-            async fn copy_file(&self, id: &str, target_folder_id: Option<String>) -> Result<File, DomainError>;
-            async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
-            async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
-        }
-    }
-    
-    mock! {
-        FolderSvcMock {}
-        
-        #[async_trait]
-        impl FolderService for FolderSvcMock {
-            async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError>;
-            async fn get_folder(&self, id: &str) -> Result<Folder, DomainError>;
-            async fn delete_folder(&self, id: &str) -> Result<(), DomainError>;
-            async fn delete_folder_recursive(&self, id: &str) -> Result<(), DomainError>;
-            async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError>;
-            async fn move_folder(&self, id: &str, target_parent_id: Option<String>) -> Result<Folder, DomainError>;
-        }
-    }
-    
-    #[tokio::test]
-    async fn test_batch_delete_files() {
-        // Crear mocks
-        let mut file_service = MockFileSvcMock::new();
-        
-        // Configurar comportamiento esperado
-        file_service.expect_delete_file()
-            .times(3)
-            .returning(|id| {
-                if id == "error-id" {
-                    Err(DomainError::not_found("FileService", "File not found"))
-                } else {
-                    Ok(())
-                }
-            });
-        
-        // Crear el servicio de batch con los mocks
-        let batch_service = BatchOperationService::new(
-            Arc::new(file_service),
-            Arc::new(MockFolderSvcMock::new()),
-            AppConfig::default()
-        );
-        
-        // Ejecutar la operación de batch
-        let file_ids = vec![
-            "id1".to_string(), 
-            "id2".to_string(), 
-            "error-id".to_string()
-        ];
-        
-        let result = batch_service.delete_files(file_ids).await.unwrap();
-        
-        // Verificar los resultados
-        assert_eq!(result.stats.total, 3);
-        assert_eq!(result.stats.successful, 2);
-        assert_eq!(result.stats.failed, 1);
-        assert_eq!(result.successful.len(), 2);
-        assert_eq!(result.failed.len(), 1);
-        assert_eq!(result.failed[0].0, "error-id");
-    }
+    use crate::common::stubs::{StubFileRetrievalUseCase, StubFileManagementUseCase};
     
     #[tokio::test]
     async fn test_generic_batch_operation() {
-        // Crear el servicio de batch
+        // Crear el servicio de batch with stubs
         let batch_service = BatchOperationService::new(
-            Arc::new(MockFileSvcMock::new()),
-            Arc::new(MockFolderSvcMock::new()),
+            Arc::new(StubFileRetrievalUseCase),
+            Arc::new(StubFileManagementUseCase),
+            Arc::new(FolderService::new(
+                Arc::new(crate::common::stubs::StubFolderStoragePort)
+            )),
             AppConfig::default()
         );
         
@@ -759,7 +693,7 @@ mod tests {
                 Ok(item * 2)
             } else {
                 // Simular error para números impares
-                Err(DomainError::invalid_input("Test", "Odd number not allowed"))
+                Err(DomainError::validation_error("Odd number not allowed"))
             }
         };
         

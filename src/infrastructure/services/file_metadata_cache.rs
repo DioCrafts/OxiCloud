@@ -598,6 +598,56 @@ impl FileMetadataCache {
     }
 }
 
+// ─── MetadataCachePort implementation ────────────────────────
+
+use async_trait::async_trait;
+use crate::application::ports::cache_ports::{MetadataCachePort, CachedMetadataDto};
+use crate::common::errors::DomainError;
+
+#[async_trait]
+impl MetadataCachePort for FileMetadataCache {
+    async fn get_metadata(&self, path: &Path) -> Option<CachedMetadataDto> {
+        // Delegate to the existing rich get_metadata, then project into the DTO.
+        let fm = FileMetadataCache::get_metadata(self, path).await?;
+        Some(CachedMetadataDto {
+            path: fm.path,
+            exists: fm.exists,
+            is_file: fm.entry_type == CacheEntryType::File,
+            size: fm.size,
+            mime_type: fm.mime_type,
+            created_at: fm.created_at,
+            modified_at: fm.modified_at,
+        })
+    }
+
+    async fn is_file(&self, path: &Path) -> Option<bool> {
+        FileMetadataCache::is_file(self, path).await
+    }
+
+    async fn refresh_metadata(&self, path: &Path) -> Result<CachedMetadataDto, DomainError> {
+        let fm = FileMetadataCache::refresh_metadata(self, path)
+            .await
+            .map_err(|e| DomainError::internal_error("MetadataCache", e.to_string()))?;
+        Ok(CachedMetadataDto {
+            path: fm.path,
+            exists: fm.exists,
+            is_file: fm.entry_type == CacheEntryType::File,
+            size: fm.size,
+            mime_type: fm.mime_type,
+            created_at: fm.created_at,
+            modified_at: fm.modified_at,
+        })
+    }
+
+    async fn invalidate(&self, path: &Path) {
+        FileMetadataCache::invalidate(self, path).await
+    }
+
+    async fn invalidate_directory(&self, dir_path: &Path) {
+        FileMetadataCache::invalidate_directory(self, dir_path).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -648,10 +698,12 @@ mod tests {
     async fn test_directory_operations() {
         // Crear estructura de directorios para pruebas
         let temp_dir = tempdir().unwrap();
-        let sub_dir = temp_dir.path().join("subdir");
+        // Canonicalize to handle macOS /var -> /private/var symlinks
+        let base_path = temp_dir.path().canonicalize().unwrap();
+        let sub_dir = base_path.join("subdir");
         fs::create_dir(&sub_dir).await.unwrap();
         
-        let file1 = temp_dir.path().join("file1.txt");
+        let file1 = base_path.join("file1.txt");
         let file2 = sub_dir.join("file2.txt");
         
         File::create(&file1).await.unwrap();
@@ -662,20 +714,19 @@ mod tests {
         let cache = FileMetadataCache::new(config, 1000);
         
         // Precargar directorio recursivamente
-        let count = cache.preload_directory(temp_dir.path(), true, 2).await.unwrap();
-        assert_eq!(count, 3); // dir, subdir, 2 files
+        // preload_directory caches the *contents* of the directory, not the root itself
+        let count = cache.preload_directory(&base_path, true, 2).await.unwrap();
+        assert_eq!(count, 3); // subdir, file1, file2
         
-        // Verificar existencia en caché
-        assert_eq!(cache.is_dir(temp_dir.path()).await, Some(true));
+        // Verificar existencia en caché (solo contenido, no la raíz)
         assert_eq!(cache.is_dir(&sub_dir).await, Some(true));
         assert_eq!(cache.is_file(&file1).await, Some(true));
         assert_eq!(cache.is_file(&file2).await, Some(true));
         
         // Invalidar directorio y contenido
-        cache.invalidate_directory(temp_dir.path()).await;
+        cache.invalidate_directory(&base_path).await;
         
         // Verificar que nada existe en caché
-        assert!(cache.exists(temp_dir.path()).await.is_none());
         assert!(cache.exists(&sub_dir).await.is_none());
         assert!(cache.exists(&file1).await.is_none());
         assert!(cache.exists(&file2).await.is_none());

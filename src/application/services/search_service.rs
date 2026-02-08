@@ -10,7 +10,8 @@ use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
 use crate::application::ports::inbound::SearchUseCase;
-use crate::application::ports::outbound::{FileStoragePort, FolderStoragePort};
+use crate::application::ports::outbound::FolderStoragePort;
+use crate::application::ports::storage_ports::FileReadPort;
 
 /**
  * Implementación del servicio de búsqueda para archivos y carpetas.
@@ -22,7 +23,7 @@ use crate::application::ports::outbound::{FileStoragePort, FolderStoragePort};
  */
 pub struct SearchService {
     /// Repositorio para operaciones con archivos
-    file_repository: Arc<dyn FileStoragePort>,
+    file_repository: Arc<dyn FileReadPort>,
     
     /// Repositorio para operaciones con carpetas
     folder_repository: Arc<dyn FolderStoragePort>,
@@ -66,7 +67,7 @@ impl SearchService {
      * @param max_cache_size Tamaño máximo de la caché
      */
     pub fn new(
-        file_repository: Arc<dyn FileStoragePort>,
+        file_repository: Arc<dyn FileReadPort>,
         folder_repository: Arc<dyn FolderStoragePort>,
         cache_ttl: u64,
         max_cache_size: usize,

@@ -194,32 +194,32 @@ impl TrashFsRepository {
             ))?
             .with_timezone(&Utc);
             
-        Ok(TrashedItem {
+        Ok(TrashedItem::from_raw(
             id,
             original_id,
             user_id,
             item_type,
-            name: entry.name,
-            original_path: entry.original_path,
+            entry.name,
+            entry.original_path,
             trashed_at,
             deletion_date,
-        })
+        ))
     }
     
     /// Convierte una entidad TrashedItem a entrada JSON
     fn trashed_item_to_entry(&self, item: &TrashedItem) -> TrashedItemEntry {
         TrashedItemEntry {
-            id: item.id.to_string(),
-            original_id: item.original_id.to_string(),
-            user_id: item.user_id.to_string(),
-            item_type: match item.item_type {
+            id: item.id().to_string(),
+            original_id: item.original_id().to_string(),
+            user_id: item.user_id().to_string(),
+            item_type: match item.item_type() {
                 TrashedItemType::File => "file".to_string(),
                 TrashedItemType::Folder => "folder".to_string(),
             },
-            name: item.name.clone(),
-            original_path: item.original_path.clone(),
-            trashed_at: item.trashed_at.to_rfc3339(),
-            deletion_date: item.deletion_date.to_rfc3339(),
+            name: item.name().to_string(),
+            original_path: item.original_path().to_string(),
+            trashed_at: item.trashed_at().to_rfc3339(),
+            deletion_date: item.deletion_date().to_rfc3339(),
         }
     }
 }
@@ -228,10 +228,10 @@ impl TrashFsRepository {
 impl TrashRepository for TrashFsRepository {
     #[instrument(skip(self))]
     async fn add_to_trash(&self, item: &TrashedItem) -> Result<()> {
-        debug!("Añadiendo elemento a la papelera: id={}, user={}", item.id, item.user_id);
+        debug!("Añadiendo elemento a la papelera: id={}, user={}", item.id(), item.user_id());
         
         // Aseguramos que existe el directorio de la papelera para este usuario
-        let user_trash_dir = self.trash_dir.join("files").join(item.user_id.to_string());
+        let user_trash_dir = self.trash_dir.join("files").join(item.user_id().to_string());
         debug!("User trash directory path: {}", user_trash_dir.display());
         
         // Create the user-specific trash directory

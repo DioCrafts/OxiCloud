@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use axum::{
-    extract::{State, Query},
+    extract::{State, Query, Path},
     http::StatusCode,
     response::IntoResponse,
     Json,
@@ -75,6 +75,14 @@ impl I18nHandler {
         }
     }
     
+    /// Gets all translations for a locale (Axum-compatible: extracts locale from path)
+    pub async fn get_translations_by_locale(
+        State(service): State<AppState>,
+        Path(locale_code): Path<String>,
+    ) -> impl IntoResponse {
+        Self::get_translations(State(service), locale_code).await
+    }
+
     /// Gets all translations for a locale
     pub async fn get_translations(
         State(_service): State<AppState>,

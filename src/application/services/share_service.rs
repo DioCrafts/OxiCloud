@@ -10,8 +10,10 @@ use crate::{
             share_dto::{CreateShareDto, ShareDto, UpdateShareDto},
         },
         ports::{
-            outbound::{FileStoragePort, FolderStoragePort},
+            auth_ports::PasswordHasherPort,
+            outbound::FolderStoragePort,
             share_ports::{ShareStoragePort, ShareUseCase},
+            storage_ports::FileReadPort,
         },
     },
     common::{config::AppConfig, errors::DomainError},
@@ -56,22 +58,25 @@ impl From<ShareServiceError> for DomainError {
 pub struct ShareService {
     config: Arc<AppConfig>,
     share_repository: Arc<dyn ShareStoragePort>,
-    file_repository: Arc<dyn FileStoragePort>,
+    file_repository: Arc<dyn FileReadPort>,
     folder_repository: Arc<dyn FolderStoragePort>,
+    password_hasher: Arc<dyn PasswordHasherPort>,
 }
 
 impl ShareService {
     pub fn new(
         config: Arc<AppConfig>,
         share_repository: Arc<dyn ShareStoragePort>,
-        file_repository: Arc<dyn FileStoragePort>,
+        file_repository: Arc<dyn FileReadPort>,
         folder_repository: Arc<dyn FolderStoragePort>,
+        password_hasher: Arc<dyn PasswordHasherPort>,
     ) -> Self {
         Self {
             config,
             share_repository,
             file_repository,
             folder_repository,
+            password_hasher,
         }
     }
 
@@ -98,11 +103,19 @@ impl ShareService {
         Ok(())
     }
 
-    /// Hash de contraseña
+    /// Hash de contraseña usando Argon2id (resistente a timing attacks y GPU attacks)
     fn hash_password(&self, password: &str) -> String {
-        // En una implementación real, usar un algoritmo seguro como bcrypt
-        // Para simplificar, solo devolvemos la misma contraseña
-        password.to_string()
+        use argon2::{Argon2, PasswordHasher};
+        use argon2::password_hash::SaltString;
+        use rand_core::OsRng;
+        
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+        
+        argon2
+            .hash_password(password.as_bytes(), &salt)
+            .expect("Failed to hash share password")
+            .to_string()
     }
 }
 
@@ -314,8 +327,13 @@ impl ShareUseCase for ShareService {
             return Err(ShareServiceError::Expired.into());
         }
 
-        // Verificar la contraseña
-        Ok(share.verify_password(password))
+        // Verificar la contraseña usando el port de infraestructura
+        match share.password_hash() {
+            Some(hash) => {
+                self.password_hasher.verify_password(password, hash)
+            }
+            None => Ok(true), // No password required
+        }
     }
 
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError> {
@@ -348,87 +366,147 @@ impl ShareUseCase for ShareService {
 mod tests {
     use super::*;
     use crate::application::ports::share_ports::ShareStoragePort;
+    use crate::application::ports::auth_ports::PasswordHasherPort;
+    use crate::application::dtos::share_dto::SharePermissionsDto;
+    use crate::common::config::AppConfig;
+    use crate::domain::repositories::folder_repository::FolderRepository;
     use async_trait::async_trait;
     use std::collections::HashMap;
     use std::sync::Mutex;
+
+    struct MockPasswordHasher;
+
+    impl PasswordHasherPort for MockPasswordHasher {
+        fn hash_password(&self, password: &str) -> Result<String, DomainError> {
+            Ok(format!("hashed_{}", password))
+        }
+
+        fn verify_password(&self, _password: &str, _hash: &str) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+    }
 
     struct MockFileRepository;
     struct MockFolderRepository;
 
     #[async_trait]
-    impl FileStoragePort for MockFileRepository {
-        async fn find_file_by_id(&self, id: &str) -> Result<crate::domain::entities::file::File, DomainError> {
+    impl FileReadPort for MockFileRepository {
+        async fn get_file(&self, id: &str) -> Result<crate::domain::entities::file::File, DomainError> {
             if id == "test_file_id" {
                 let file = crate::domain::entities::file::File::new(
                     id.to_string(),
                     "test.txt".to_string(),
-                    "/path/to/test.txt".to_string(),
-                    "/test.txt".to_string(),
+                    crate::domain::services::path_service::StoragePath::from_string("/path/to/test.txt"),
                     123,
                     "text/plain".to_string(),
-                    None,
-                    None,
                     None,
                 )
                 .unwrap();
                 Ok(file)
             } else {
-                Err(DomainError::NotFound(format!("File {} not found", id)))
+                Err(DomainError::not_found("File", id))
             }
         }
         
-        // Implementación dummy para el resto de métodos requeridos
-        async fn find_files_in_folder(&self, _folder_id: &str) -> Result<Vec<crate::domain::entities::file::File>, DomainError> {
+        async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::domain::entities::file::File>, DomainError> {
             unimplemented!()
         }
         
-        async fn save_file(&self, _file: &crate::domain::entities::file::File) -> Result<crate::domain::entities::file::File, DomainError> {
+        async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
             unimplemented!()
         }
-        
-        async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
+
+        async fn get_file_stream(
+            &self,
+            _id: &str,
+        ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, DomainError> {
             unimplemented!()
         }
-        
-        async fn find_all_files(&self) -> Result<Vec<crate::domain::entities::file::File>, DomainError> {
+
+        async fn get_file_range_stream(
+            &self,
+            _id: &str,
+            _start: u64,
+            _end: Option<u64>,
+        ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_file_mmap(&self, _id: &str) -> Result<bytes::Bytes, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_file_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_parent_folder_id(&self, _path: &str) -> Result<String, DomainError> {
             unimplemented!()
         }
     }
 
     #[async_trait]
-    impl FolderStoragePort for MockFolderRepository {
-        async fn find_folder_by_id(&self, id: &str) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+    impl FolderRepository for MockFolderRepository {
+        async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_folder(&self, id: &str) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             if id == "test_folder_id" {
                 let folder = crate::domain::entities::folder::Folder::new(
                     id.to_string(),
                     "test".to_string(),
-                    "/path/to/test".to_string(),
-                    "/test".to_string(),
-                    None,
-                    None,
+                    crate::domain::services::path_service::StoragePath::from_string("/path/to/test"),
                     None,
                 )
                 .unwrap();
                 Ok(folder)
             } else {
-                Err(DomainError::NotFound(format!("Folder {} not found", id)))
+                Err(DomainError::not_found("Folder", id))
             }
         }
-        
-        // Implementación dummy para el resto de métodos requeridos
-        async fn find_folders_in_folder(&self, _folder_id: &str) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
+
+        async fn get_folder_by_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()
         }
         
-        async fn save_folder(&self, _folder: &crate::domain::entities::folder::Folder) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+        async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
+            unimplemented!()
+        }
+
+        async fn list_folders_paginated(&self, _parent_id: Option<&str>, _offset: usize, _limit: usize, _include_total: bool) -> Result<(Vec<crate::domain::entities::folder::Folder>, Option<usize>), DomainError> {
+            unimplemented!()
+        }
+
+        async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+            unimplemented!()
+        }
+
+        async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()
         }
         
         async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
             unimplemented!()
         }
-        
-        async fn find_all_folders(&self) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
+
+        async fn folder_exists(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<bool, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_folder_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
+            unimplemented!()
+        }
+
+        async fn move_to_trash(&self, _folder_id: &str) -> Result<(), DomainError> {
+            unimplemented!()
+        }
+
+        async fn restore_from_trash(&self, _folder_id: &str, _original_path: &str) -> Result<(), DomainError> {
+            unimplemented!()
+        }
+
+        async fn delete_folder_permanently(&self, _folder_id: &str) -> Result<(), DomainError> {
             unimplemented!()
         }
     }
@@ -453,8 +531,8 @@ mod tests {
             let mut shares = self.shares.lock().unwrap();
             let mut tokens = self.tokens.lock().unwrap();
             
-            shares.insert(share.id.clone(), share.clone());
-            tokens.insert(share.token.clone(), share.id.clone());
+            shares.insert(share.id().to_string(), share.clone());
+            tokens.insert(share.token().to_string(), share.id().to_string());
             
             Ok(share.clone())
         }
@@ -464,7 +542,7 @@ mod tests {
             
             shares.get(id)
                 .cloned()
-                .ok_or_else(|| DomainError::NotFound(format!("Share with ID {} not found", id)))
+                .ok_or_else(|| DomainError::not_found("Share", id))
         }
         
         async fn find_share_by_token(&self, token: &str) -> Result<Share, DomainError> {
@@ -472,11 +550,11 @@ mod tests {
             let shares = self.shares.lock().unwrap();
             
             let id = tokens.get(token)
-                .ok_or_else(|| DomainError::NotFound(format!("Share with token {} not found", token)))?;
+                .ok_or_else(|| DomainError::not_found("Share", token))?;
             
             shares.get(id)
                 .cloned()
-                .ok_or_else(|| DomainError::NotFound(format!("Share with ID {} not found", id)))
+                .ok_or_else(|| DomainError::not_found("Share", id.as_str()))
         }
         
         async fn find_shares_by_item(&self, item_id: &str, item_type: &ShareItemType) -> Result<Vec<Share>, DomainError> {
@@ -484,7 +562,7 @@ mod tests {
             
             let type_str = item_type.to_string();
             let result: Vec<Share> = shares.values()
-                .filter(|s| s.item_id == item_id && s.item_type.to_string() == type_str)
+                .filter(|s| s.item_id() == item_id && s.item_type().to_string() == type_str)
                 .cloned()
                 .collect();
             
@@ -494,11 +572,12 @@ mod tests {
         async fn update_share(&self, share: &Share) -> Result<Share, DomainError> {
             let mut shares = self.shares.lock().unwrap();
             
-            if !shares.contains_key(&share.id) {
-                return Err(DomainError::not_found("Share", &share.id));
+            let id_str = share.id().to_string();
+            if !shares.contains_key(&id_str) {
+                return Err(DomainError::not_found("Share", &id_str));
             }
             
-            shares.insert(share.id.clone(), share.clone());
+            shares.insert(id_str, share.clone());
             
             Ok(share.clone())
         }
@@ -512,7 +591,7 @@ mod tests {
                 .ok_or_else(|| DomainError::not_found("Share", id))?;
             
             // Remove token mapping
-            tokens.remove(&share.token);
+            tokens.remove(share.token());
             
             // Remove the share
             shares.remove(id);
@@ -524,7 +603,7 @@ mod tests {
             let shares = self.shares.lock().unwrap();
             
             let user_shares: Vec<Share> = shares.values()
-                .filter(|s| s.created_by == user_id)
+                .filter(|s| s.created_by() == user_id)
                 .cloned()
                 .collect();
             
@@ -542,23 +621,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_shared_link() {
-        let config = Arc::new(Config {
-            base_url: "http://localhost:8085".to_string(),
-            storage_path: "/tmp/storage".to_string(),
-            log_level: "info".to_string(),
-            port: 8085,
-            database_url: "".to_string(),
-            jwt_secret: "test_secret".to_string(),
-            jwt_expiration: 3600,
-            enable_cors: false,
-            cors_origins: vec![],
-        });
+        let config = Arc::new(AppConfig::default());
         
         let share_repo = Arc::new(MockShareRepository::new());
         let file_repo = Arc::new(MockFileRepository);
         let folder_repo = Arc::new(MockFolderRepository);
+        let password_hasher = Arc::new(MockPasswordHasher);
         
-        let service = ShareService::new(config, share_repo, file_repo, folder_repo);
+        let service = ShareService::new(config, share_repo, file_repo, folder_repo, password_hasher);
         
         // Test creating a file share
         let dto = CreateShareDto {
@@ -580,6 +650,6 @@ mod tests {
         assert_eq!(share_dto.item_id, "test_file_id");
         assert_eq!(share_dto.item_type, "file");
         assert!(share_dto.has_password);
-        assert!(share_dto.url.starts_with("http://localhost:8085/s/"));
+        assert!(share_dto.url.starts_with("http://127.0.0.1:8085/s/"));
     }
 }

@@ -1,0 +1,752 @@
+//! Stub/Dummy implementations for dependency injection.
+//!
+//! These no-op implementations are used exclusively by `AppState::default()`
+//! to provide a minimal, valid state for the auth middleware and route
+//! construction before the real services are wired in `main.rs`.
+//!
+//! **None of these stubs should ever handle real user requests.**
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use bytes::Bytes;
+use futures::Stream;
+
+use crate::application::dtos::file_dto::FileDto;
+use crate::application::dtos::folder_dto::{CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto};
+use crate::application::dtos::pagination::{PaginatedResponseDto, PaginationRequestDto};
+use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
+use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
+use crate::application::ports::file_ports::{
+    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
+    UploadStrategy, OptimizedFileContent,
+};
+use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
+use crate::application::ports::outbound::IdMappingPort;
+use crate::domain::repositories::folder_repository::FolderRepository;
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
+use crate::application::ports::zip_ports::ZipPort;
+use crate::application::services::storage_mediator::{StorageMediator, StorageMediatorError};
+use crate::common::errors::DomainError;
+use crate::domain::entities::file::File;
+use crate::domain::entities::folder::Folder;
+use crate::domain::services::i18n_service::{I18nResult, I18nService, Locale};
+use crate::domain::services::path_service::StoragePath;
+
+// ---------------------------------------------------------------------------
+// ZipPort
+// ---------------------------------------------------------------------------
+
+/// Placeholder ZipPort that always errors. Replaced after application services
+/// are fully initialised.
+pub struct StubZipPort;
+
+#[async_trait]
+impl ZipPort for StubZipPort {
+    async fn create_folder_zip(
+        &self,
+        _folder_id: &str,
+        _folder_name: &str,
+    ) -> Result<Vec<u8>, DomainError> {
+        Err(DomainError::internal_error(
+            "ZipService",
+            "ZipService not initialized",
+        ))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CompressionPort
+// ---------------------------------------------------------------------------
+
+pub struct StubCompressionPort;
+
+#[async_trait]
+impl CompressionPort for StubCompressionPort {
+    async fn compress_data(
+        &self,
+        _data: &[u8],
+        _level: CompressionLevel,
+    ) -> Result<Vec<u8>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn decompress_data(&self, _compressed_data: &[u8]) -> Result<Vec<u8>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    fn should_compress(&self, _mime_type: &str, _size: u64) -> bool {
+        false
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IdMappingPort
+// ---------------------------------------------------------------------------
+
+pub struct StubIdMappingService;
+
+#[async_trait]
+impl IdMappingPort for StubIdMappingService {
+    async fn get_or_create_id(
+        &self,
+        _path: &StoragePath,
+    ) -> Result<String, DomainError> {
+        Ok("dummy-id".to_string())
+    }
+
+    async fn get_path_by_id(&self, _id: &str) -> Result<StoragePath, DomainError> {
+        Ok(StoragePath::from_string("/"))
+    }
+
+    async fn update_path(
+        &self,
+        _id: &str,
+        _new_path: &StoragePath,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn remove_id(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn save_changes(&self) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// StorageMediator
+// ---------------------------------------------------------------------------
+
+pub struct StubStorageMediator;
+
+#[async_trait]
+impl StorageMediator for StubStorageMediator {
+    async fn get_folder_path(
+        &self,
+        _folder_id: &str,
+    ) -> Result<PathBuf, StorageMediatorError> {
+        Ok(PathBuf::from("/tmp"))
+    }
+
+    async fn get_folder_storage_path(
+        &self,
+        _folder_id: &str,
+    ) -> Result<StoragePath, StorageMediatorError> {
+        Ok(StoragePath::root())
+    }
+
+    async fn get_folder(
+        &self,
+        _folder_id: &str,
+    ) -> Result<Folder, StorageMediatorError> {
+        Err(StorageMediatorError::NotFound(
+            "Stub not implemented".to_string(),
+        ))
+    }
+
+    async fn file_exists_at_path(
+        &self,
+        _path: &Path,
+    ) -> Result<bool, StorageMediatorError> {
+        Ok(false)
+    }
+
+    async fn file_exists_at_storage_path(
+        &self,
+        _storage_path: &StoragePath,
+    ) -> Result<bool, StorageMediatorError> {
+        Ok(false)
+    }
+
+    async fn folder_exists_at_path(
+        &self,
+        _path: &Path,
+    ) -> Result<bool, StorageMediatorError> {
+        Ok(false)
+    }
+
+    async fn folder_exists_at_storage_path(
+        &self,
+        _storage_path: &StoragePath,
+    ) -> Result<bool, StorageMediatorError> {
+        Ok(false)
+    }
+
+    fn resolve_path(&self, _relative_path: &Path) -> PathBuf {
+        PathBuf::from("/tmp")
+    }
+
+    fn resolve_storage_path(&self, _storage_path: &StoragePath) -> PathBuf {
+        PathBuf::from("/tmp")
+    }
+
+    async fn ensure_directory(
+        &self,
+        _path: &Path,
+    ) -> Result<(), StorageMediatorError> {
+        Ok(())
+    }
+
+    async fn ensure_storage_directory(
+        &self,
+        _storage_path: &StoragePath,
+    ) -> Result<(), StorageMediatorError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IdMappingPort
+// ---------------------------------------------------------------------------
+
+pub struct StubIdMappingPort;
+
+#[async_trait]
+impl IdMappingPort for StubIdMappingPort {
+    async fn get_or_create_id(&self, _path: &StoragePath) -> Result<String, DomainError> {
+        Ok("stub-id".to_string())
+    }
+    async fn get_path_by_id(&self, _id: &str) -> Result<StoragePath, DomainError> {
+        Ok(StoragePath::from_string("/"))
+    }
+    async fn update_path(&self, _id: &str, _new_path: &StoragePath) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_id(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn save_changes(&self) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileReadPort
+// ---------------------------------------------------------------------------
+
+pub struct StubFileReadPort;
+
+#[async_trait]
+impl FileReadPort for StubFileReadPort {
+    async fn get_file(&self, _id: &str) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
+    async fn list_files(
+        &self,
+        _folder_id: Option<&str>,
+    ) -> Result<Vec<File>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn get_file_stream(
+        &self,
+        _id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
+
+    async fn get_file_range_stream(
+        &self,
+        _id: &str,
+        _start: u64,
+        _end: Option<u64>,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
+
+    async fn get_file_mmap(&self, _id: &str) -> Result<Bytes, DomainError> {
+        Ok(Bytes::new())
+    }
+
+    async fn get_file_path(&self, _id: &str) -> Result<StoragePath, DomainError> {
+        Ok(StoragePath::from_string("/"))
+    }
+
+    async fn get_parent_folder_id(&self, _path: &str) -> Result<String, DomainError> {
+        Ok("root".to_string())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileWritePort
+// ---------------------------------------------------------------------------
+
+pub struct StubFileWritePort;
+
+#[async_trait]
+impl FileWritePort for StubFileWritePort {
+    async fn save_file(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _content: Vec<u8>,
+    ) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
+    async fn save_file_from_stream(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+    ) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
+    async fn move_file(
+        &self,
+        _file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
+    async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn update_file_content(
+        &self,
+        _file_id: &str,
+        _content: Vec<u8>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn register_file_deferred(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _size: u64,
+    ) -> Result<(File, PathBuf), DomainError> {
+        Ok((File::default(), PathBuf::from("/tmp/dummy")))
+    }
+
+    async fn move_to_trash(&self, _file_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn restore_from_trash(&self, _file_id: &str, _original_path: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn delete_file_permanently(&self, _file_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FolderStoragePort
+// ---------------------------------------------------------------------------
+
+pub struct StubFolderStoragePort;
+
+#[async_trait]
+impl FolderRepository for StubFolderStoragePort {
+    async fn create_folder(
+        &self,
+        _name: String,
+        _parent_id: Option<String>,
+    ) -> Result<Folder, DomainError> {
+        Ok(Folder::default())
+    }
+
+    async fn get_folder(&self, _id: &str) -> Result<Folder, DomainError> {
+        Ok(Folder::default())
+    }
+
+    async fn get_folder_by_path(
+        &self,
+        _storage_path: &StoragePath,
+    ) -> Result<Folder, DomainError> {
+        Ok(Folder::default())
+    }
+
+    async fn list_folders(
+        &self,
+        _parent_id: Option<&str>,
+    ) -> Result<Vec<Folder>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn list_folders_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _offset: usize,
+        _limit: usize,
+        _include_total: bool,
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
+        Ok((Vec::new(), Some(0)))
+    }
+
+    async fn rename_folder(
+        &self,
+        _id: &str,
+        _new_name: String,
+    ) -> Result<Folder, DomainError> {
+        Ok(Folder::default())
+    }
+
+    async fn move_folder(
+        &self,
+        _id: &str,
+        _new_parent_id: Option<&str>,
+    ) -> Result<Folder, DomainError> {
+        Ok(Folder::default())
+    }
+
+    async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn folder_exists(
+        &self,
+        _storage_path: &StoragePath,
+    ) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+
+    async fn get_folder_path(
+        &self,
+        _id: &str,
+    ) -> Result<StoragePath, DomainError> {
+        Ok(StoragePath::from_string("/"))
+    }
+
+    async fn move_to_trash(&self, _folder_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn restore_from_trash(&self, _folder_id: &str, _original_path: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn delete_folder_permanently(&self, _folder_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// I18nService
+// ---------------------------------------------------------------------------
+
+pub struct StubI18nService;
+
+#[async_trait]
+impl I18nService for StubI18nService {
+    async fn translate(&self, _key: &str, _locale: Locale) -> I18nResult<String> {
+        Ok(String::new())
+    }
+
+    async fn load_translations(&self, _locale: Locale) -> I18nResult<()> {
+        Ok(())
+    }
+
+    async fn available_locales(&self) -> Vec<Locale> {
+        vec![Locale::default()]
+    }
+
+    async fn is_supported(&self, _locale: Locale) -> bool {
+        true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FolderUseCase
+// ---------------------------------------------------------------------------
+
+pub struct StubFolderUseCase;
+
+#[async_trait]
+impl FolderUseCase for StubFolderUseCase {
+    async fn create_folder(
+        &self,
+        _dto: CreateFolderDto,
+    ) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
+    async fn get_folder(&self, _id: &str) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
+    async fn get_folder_by_path(
+        &self,
+        _path: &str,
+    ) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
+    async fn list_folders(
+        &self,
+        _parent_id: Option<&str>,
+    ) -> Result<Vec<FolderDto>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn list_folders_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _pagination: &PaginationRequestDto,
+    ) -> Result<PaginatedResponseDto<FolderDto>, DomainError> {
+        Ok(PaginatedResponseDto::new(Vec::new(), 0, 10, 0))
+    }
+
+    async fn rename_folder(
+        &self,
+        _id: &str,
+        _dto: RenameFolderDto,
+    ) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
+    async fn move_folder(
+        &self,
+        _id: &str,
+        _dto: MoveFolderDto,
+    ) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
+    async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileUploadUseCase
+// ---------------------------------------------------------------------------
+
+pub struct StubFileUploadUseCase;
+
+#[async_trait]
+impl FileUploadUseCase for StubFileUploadUseCase {
+    async fn upload_file(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _content: Vec<u8>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn smart_upload(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _chunks: Vec<Bytes>,
+        _total_size: usize,
+    ) -> Result<(FileDto, UploadStrategy), DomainError> {
+        Ok((FileDto::default(), UploadStrategy::Buffered))
+    }
+
+    async fn create_file(&self, _parent_path: &str, _filename: &str, _content: &[u8], _content_type: &str) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn update_file(&self, _path: &str, _content: &[u8]) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileRetrievalUseCase
+// ---------------------------------------------------------------------------
+
+pub struct StubFileRetrievalUseCase;
+
+#[async_trait]
+impl FileRetrievalUseCase for StubFileRetrievalUseCase {
+    async fn get_file(&self, _id: &str) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn list_files(
+        &self,
+        _folder_id: Option<&str>,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn get_file_stream(
+        &self,
+        _id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
+
+    async fn get_file_optimized(
+        &self,
+        _id: &str,
+        _accept_webp: bool,
+        _prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        Ok((FileDto::default(), OptimizedFileContent::Bytes {
+            data: Bytes::new(),
+            mime_type: String::new(),
+            was_transcoded: false,
+        }))
+    }
+
+    async fn get_file_range_stream(
+        &self,
+        _id: &str,
+        _start: u64,
+        _end: Option<u64>,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
+
+    async fn get_file_by_path(&self, _path: &str) -> Result<FileDto, DomainError> {
+        Err(DomainError::not_found("File", "stub"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileManagementUseCase
+// ---------------------------------------------------------------------------
+
+pub struct StubFileManagementUseCase;
+
+#[async_trait]
+impl FileManagementUseCase for StubFileManagementUseCase {
+    async fn move_file(
+        &self,
+        _file_id: &str,
+        _folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn delete_with_cleanup(
+        &self,
+        _id: &str,
+        _user_id: &str,
+    ) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FileUseCaseFactory
+// ---------------------------------------------------------------------------
+
+pub struct StubFileUseCaseFactory;
+
+impl FileUseCaseFactory for StubFileUseCaseFactory {
+    fn create_file_upload_use_case(&self) -> Arc<dyn FileUploadUseCase> {
+        Arc::new(StubFileUploadUseCase)
+    }
+
+    fn create_file_retrieval_use_case(&self) -> Arc<dyn FileRetrievalUseCase> {
+        Arc::new(StubFileRetrievalUseCase)
+    }
+
+    fn create_file_management_use_case(&self) -> Arc<dyn FileManagementUseCase> {
+        Arc::new(StubFileManagementUseCase)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SearchUseCase
+// ---------------------------------------------------------------------------
+
+pub struct StubSearchUseCase;
+
+#[async_trait]
+impl SearchUseCase for StubSearchUseCase {
+    async fn search(
+        &self,
+        _criteria: SearchCriteriaDto,
+    ) -> Result<SearchResultsDto, DomainError> {
+        Ok(SearchResultsDto::empty())
+    }
+
+    async fn clear_search_cache(&self) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MetadataCachePort
+// ---------------------------------------------------------------------------
+
+use crate::application::ports::cache_ports::{MetadataCachePort, CachedMetadataDto, ContentCachePort};
+
+pub struct StubMetadataCachePort;
+
+#[async_trait]
+impl MetadataCachePort for StubMetadataCachePort {
+    async fn get_metadata(&self, _path: &Path) -> Option<CachedMetadataDto> {
+        None
+    }
+
+    async fn is_file(&self, _path: &Path) -> Option<bool> {
+        None
+    }
+
+    async fn refresh_metadata(&self, path: &Path) -> Result<CachedMetadataDto, DomainError> {
+        Ok(CachedMetadataDto {
+            path: path.to_path_buf(),
+            exists: false,
+            is_file: false,
+            size: None,
+            mime_type: None,
+            created_at: None,
+            modified_at: None,
+        })
+    }
+
+    async fn invalidate(&self, _path: &Path) {}
+
+    async fn invalidate_directory(&self, _dir_path: &Path) {}
+}
+
+// ---------------------------------------------------------------------------
+// ContentCachePort
+// ---------------------------------------------------------------------------
+
+pub struct StubContentCachePort;
+
+#[async_trait]
+impl ContentCachePort for StubContentCachePort {
+    fn should_cache(&self, _size: usize) -> bool {
+        false
+    }
+
+    async fn get(&self, _file_id: &str) -> Option<(Bytes, String, String)> {
+        None
+    }
+
+    async fn put(&self, _file_id: String, _content: Bytes, _etag: String, _content_type: String) {}
+
+    async fn invalidate(&self, _file_id: &str) {}
+
+    async fn clear(&self) {}
+}

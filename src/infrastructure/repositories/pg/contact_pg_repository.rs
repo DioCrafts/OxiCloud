@@ -23,9 +23,9 @@ impl ContactPgRepository {
 impl ContactRepository for ContactPgRepository {
     async fn create_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact> {
         // Convert domain entities to persistence DTOs for JSONB serialization
-        let email_dtos = emails_to_persistence(&contact.email);
-        let phone_dtos = phones_to_persistence(&contact.phone);
-        let address_dtos = addresses_to_persistence(&contact.address);
+        let email_dtos = emails_to_persistence(contact.email());
+        let phone_dtos = phones_to_persistence(contact.phone());
+        let address_dtos = addresses_to_persistence(contact.address());
         
         let email_json = serde_json::to_value(&email_dtos).unwrap_or(JsonValue::Null);
         let phone_json = serde_json::to_value(&phone_dtos).unwrap_or(JsonValue::Null);
@@ -48,26 +48,26 @@ impl ContactRepository for ContactPgRepository {
                 birthday, anniversary, vcard, etag, created_at, updated_at
             "#
         )
-        .bind(contact.id)
-        .bind(contact.address_book_id)
-        .bind(&contact.uid)
-        .bind(&contact.full_name)
-        .bind(&contact.first_name)
-        .bind(&contact.last_name)
-        .bind(&contact.nickname)
+        .bind(contact.id())
+        .bind(contact.address_book_id())
+        .bind(contact.uid())
+        .bind(contact.full_name_owned())
+        .bind(contact.first_name_owned())
+        .bind(contact.last_name_owned())
+        .bind(contact.nickname_owned())
         .bind(email_json)
         .bind(phone_json)
         .bind(address_json)
-        .bind(&contact.organization)
-        .bind(&contact.title)
-        .bind(&contact.notes)
-        .bind(&contact.photo_url)
-        .bind(contact.birthday)
-        .bind(contact.anniversary)
-        .bind(&contact.vcard)
-        .bind(&contact.etag)
-        .bind(contact.created_at)
-        .bind(contact.updated_at)
+        .bind(contact.organization_owned())
+        .bind(contact.title_owned())
+        .bind(contact.notes_owned())
+        .bind(contact.photo_url_owned())
+        .bind(contact.birthday().copied())
+        .bind(contact.anniversary().copied())
+        .bind(contact.vcard())
+        .bind(contact.etag())
+        .bind(*contact.created_at())
+        .bind(*contact.updated_at())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create contact: {}", e)))?;
@@ -80,9 +80,9 @@ impl ContactRepository for ContactPgRepository {
     async fn update_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact> {
         let now = Utc::now();
         // Convert domain entities to persistence DTOs for JSONB serialization
-        let email_dtos = emails_to_persistence(&contact.email);
-        let phone_dtos = phones_to_persistence(&contact.phone);
-        let address_dtos = addresses_to_persistence(&contact.address);
+        let email_dtos = emails_to_persistence(contact.email());
+        let phone_dtos = phones_to_persistence(contact.phone());
+        let address_dtos = addresses_to_persistence(contact.address());
         
         let email_json = serde_json::to_value(&email_dtos).unwrap_or(JsonValue::Null);
         let phone_json = serde_json::to_value(&phone_dtos).unwrap_or(JsonValue::Null);
@@ -90,7 +90,7 @@ impl ContactRepository for ContactPgRepository {
         
         // Create a clone of the contact with the updated timestamp
         let mut updated_contact = contact.clone();
-        updated_contact.updated_at = now;
+        updated_contact.set_updated_at(now);
         
         let _row = sqlx::query(
             r#"
@@ -119,23 +119,23 @@ impl ContactRepository for ContactPgRepository {
                 birthday, anniversary, vcard, etag, created_at, updated_at
             "#
         )
-        .bind(&updated_contact.full_name)
-        .bind(&updated_contact.first_name)
-        .bind(&updated_contact.last_name)
-        .bind(&updated_contact.nickname)
+        .bind(updated_contact.full_name_owned())
+        .bind(updated_contact.first_name_owned())
+        .bind(updated_contact.last_name_owned())
+        .bind(updated_contact.nickname_owned())
         .bind(email_json)
         .bind(phone_json)
         .bind(address_json)
-        .bind(&updated_contact.organization)
-        .bind(&updated_contact.title)
-        .bind(&updated_contact.notes)
-        .bind(&updated_contact.photo_url)
-        .bind(updated_contact.birthday)
-        .bind(updated_contact.anniversary)
-        .bind(&updated_contact.vcard)
-        .bind(&updated_contact.etag)
+        .bind(updated_contact.organization_owned())
+        .bind(updated_contact.title_owned())
+        .bind(updated_contact.notes_owned())
+        .bind(updated_contact.photo_url_owned())
+        .bind(updated_contact.birthday().copied())
+        .bind(updated_contact.anniversary().copied())
+        .bind(updated_contact.vcard())
+        .bind(updated_contact.etag())
         .bind(now)
-        .bind(updated_contact.id)
+        .bind(updated_contact.id())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update contact: {}", e)))?;

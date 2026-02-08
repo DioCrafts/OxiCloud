@@ -78,8 +78,8 @@ impl TrashCleanupService {
         
         // Eliminar cada elemento expirado
         for item in expired_items {
-            let trash_id = item.id.to_string();
-            let user_id = item.user_id.to_string();
+            let trash_id = item.id().to_string();
+            let user_id = item.user_id().to_string();
             
             debug!("Eliminando elemento expirado: id={}, user={}", trash_id, user_id);
             

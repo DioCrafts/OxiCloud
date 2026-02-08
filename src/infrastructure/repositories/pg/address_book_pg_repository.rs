@@ -27,28 +27,28 @@ impl AddressBookRepository for AddressBookPgRepository {
             RETURNING id, name, owner_id, description, color, is_public, created_at, updated_at
             "#
         )
-        .bind(address_book.id)
-        .bind(&address_book.name)
-        .bind(&address_book.owner_id)
-        .bind(&address_book.description)
-        .bind(&address_book.color)
-        .bind(address_book.is_public)
-        .bind(address_book.created_at)
-        .bind(address_book.updated_at)
+        .bind(address_book.id())
+        .bind(address_book.name())
+        .bind(address_book.owner_id())
+        .bind(address_book.description())
+        .bind(address_book.color())
+        .bind(address_book.is_public())
+        .bind(address_book.created_at())
+        .bind(address_book.updated_at())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create address book: {}", e)))?;
 
-        Ok(AddressBook {
-            id: row.get("id"),
-            name: row.get("name"),
-            owner_id: row.get("owner_id"),
-            description: row.get("description"),
-            color: row.get("color"),
-            is_public: row.get("is_public"),
-            created_at: row.get("created_at"),
-            updated_at: row.get("updated_at"),
-        })
+        Ok(AddressBook::from_raw(
+            row.get("id"),
+            row.get("name"),
+            row.get("owner_id"),
+            row.get("description"),
+            row.get("color"),
+            row.get("is_public"),
+            row.get("created_at"),
+            row.get("updated_at"),
+        ))
     }
 
     async fn update_address_book(&self, address_book: AddressBook) -> AddressBookRepositoryResult<AddressBook> {
@@ -61,26 +61,26 @@ impl AddressBookRepository for AddressBookPgRepository {
             RETURNING id, name, owner_id, description, color, is_public, created_at, updated_at
             "#
         )
-        .bind(&address_book.name)
-        .bind(&address_book.description)
-        .bind(&address_book.color)
-        .bind(address_book.is_public)
+        .bind(address_book.name())
+        .bind(address_book.description())
+        .bind(address_book.color())
+        .bind(address_book.is_public())
         .bind(now)
-        .bind(address_book.id)
+        .bind(address_book.id())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update address book: {}", e)))?;
 
-        Ok(AddressBook {
-            id: row.get("id"),
-            name: row.get("name"),
-            owner_id: row.get("owner_id"),
-            description: row.get("description"),
-            color: row.get("color"),
-            is_public: row.get("is_public"),
-            created_at: row.get("created_at"),
-            updated_at: row.get("updated_at"),
-        })
+        Ok(AddressBook::from_raw(
+            row.get("id"),
+            row.get("name"),
+            row.get("owner_id"),
+            row.get("description"),
+            row.get("color"),
+            row.get("is_public"),
+            row.get("created_at"),
+            row.get("updated_at"),
+        ))
     }
 
     async fn delete_address_book(&self, id: &Uuid) -> AddressBookRepositoryResult<()> {
@@ -111,16 +111,16 @@ impl AddressBookRepository for AddressBookPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get address book by id: {}", e)))?;
 
-        let result = maybe_row.map(|row| AddressBook {
-            id: row.get("id"),
-            name: row.get("name"),
-            owner_id: row.get("owner_id"),
-            description: row.get("description"),
-            color: row.get("color"),
-            is_public: row.get("is_public"),
-            created_at: row.get("created_at"),
-            updated_at: row.get("updated_at"),
-        });
+        let result = maybe_row.map(|row| AddressBook::from_raw(
+            row.get("id"),
+            row.get("name"),
+            row.get("owner_id"),
+            row.get("description"),
+            row.get("color"),
+            row.get("is_public"),
+            row.get("created_at"),
+            row.get("updated_at"),
+        ));
 
         Ok(result)
     }
@@ -140,16 +140,16 @@ impl AddressBookRepository for AddressBookPgRepository {
         .map_err(|e| DomainError::database_error(format!("Failed to get address books by owner: {}", e)))?;
 
         let result = rows.into_iter()
-            .map(|row| AddressBook {
-                id: row.get("id"),
-                name: row.get("name"),
-                owner_id: row.get("owner_id"),
-                description: row.get("description"),
-                color: row.get("color"),
-                is_public: row.get("is_public"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-            })
+            .map(|row| AddressBook::from_raw(
+                row.get("id"),
+                row.get("name"),
+                row.get("owner_id"),
+                row.get("description"),
+                row.get("color"),
+                row.get("is_public"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ))
             .collect();
 
         Ok(result)
@@ -171,16 +171,16 @@ impl AddressBookRepository for AddressBookPgRepository {
         .map_err(|e| DomainError::database_error(format!("Failed to get shared address books: {}", e)))?;
 
         let result = rows.into_iter()
-            .map(|row| AddressBook {
-                id: row.get("id"),
-                name: row.get("name"),
-                owner_id: row.get("owner_id"),
-                description: row.get("description"),
-                color: row.get("color"),
-                is_public: row.get("is_public"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-            })
+            .map(|row| AddressBook::from_raw(
+                row.get("id"),
+                row.get("name"),
+                row.get("owner_id"),
+                row.get("description"),
+                row.get("color"),
+                row.get("is_public"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ))
             .collect();
 
         Ok(result)
@@ -200,16 +200,16 @@ impl AddressBookRepository for AddressBookPgRepository {
         .map_err(|e| DomainError::database_error(format!("Failed to get public address books: {}", e)))?;
 
         let result = rows.into_iter()
-            .map(|row| AddressBook {
-                id: row.get("id"),
-                name: row.get("name"),
-                owner_id: row.get("owner_id"),
-                description: row.get("description"),
-                color: row.get("color"),
-                is_public: row.get("is_public"),
-                created_at: row.get("created_at"),
-                updated_at: row.get("updated_at"),
-            })
+            .map(|row| AddressBook::from_raw(
+                row.get("id"),
+                row.get("name"),
+                row.get("owner_id"),
+                row.get("description"),
+                row.get("color"),
+                row.get("is_public"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ))
             .collect();
 
         Ok(result)

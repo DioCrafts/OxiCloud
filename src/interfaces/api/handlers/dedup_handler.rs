@@ -8,7 +8,7 @@ use bytes::Bytes;
 use serde::Serialize;
 
 use crate::common::di::AppState;
-use crate::infrastructure::services::dedup_service::DedupResult;
+use crate::application::ports::dedup_ports::DedupResultDto;
 
 /// Global application state for dependency injection
 type GlobalState = AppState;
@@ -183,8 +183,8 @@ impl DedupHandler {
                 match dedup.store_bytes(&data, Some(content_type)).await {
                     Ok(result) => {
                         let (is_new, bytes_saved) = match &result {
-                            DedupResult::NewBlob { .. } => (true, 0),
-                            DedupResult::ExistingBlob { saved_bytes, .. } => (false, *saved_bytes),
+                            DedupResultDto::NewBlob { .. } => (true, 0),
+                            DedupResultDto::ExistingBlob { saved_bytes, .. } => (false, *saved_bytes),
                         };
                         
                         let metadata = dedup.get_blob_metadata(result.hash()).await;

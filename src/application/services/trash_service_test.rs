@@ -1,17 +1,20 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::path::PathBuf;
 use chrono::Utc;
 use async_trait::async_trait;
 use uuid::Uuid;
+use bytes::Bytes;
+use futures::Stream;
 
 use crate::common::errors::{Result, DomainError};
 use crate::domain::entities::file::File;
 use crate::domain::entities::folder::Folder;
 use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
-use crate::domain::repositories::file_repository::{FileRepository, FileRepositoryResult, FileRepositoryError};
-use crate::domain::repositories::folder_repository::{FolderRepository, FolderRepositoryResult, FolderRepositoryError};
 use crate::domain::repositories::trash_repository::TrashRepository;
 use crate::domain::services::path_service::StoragePath;
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
+use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::application::services::trash_service::TrashService;
 
 // Mock repositories for testing
@@ -31,14 +34,14 @@ impl MockTrashRepository {
 impl TrashRepository for MockTrashRepository {
     async fn add_to_trash(&self, item: &TrashedItem) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
-        items.insert(item.id, item.clone());
+        items.insert(item.id(), item.clone());
         Ok(())
     }
 
     async fn get_trash_items(&self, user_id: &Uuid) -> Result<Vec<TrashedItem>> {
         let items = self.trash_items.lock().unwrap();
         let user_items = items.values()
-            .filter(|item| item.user_id == *user_id)
+            .filter(|item| item.user_id() == *user_id)
             .cloned()
             .collect();
         Ok(user_items)
@@ -47,7 +50,7 @@ impl TrashRepository for MockTrashRepository {
     async fn get_trash_item(&self, id: &Uuid, user_id: &Uuid) -> Result<Option<TrashedItem>> {
         let items = self.trash_items.lock().unwrap();
         let item = items.get(id)
-            .filter(|item| item.user_id == *user_id)
+            .filter(|item| item.user_id() == *user_id)
             .cloned();
         Ok(item)
     }
@@ -55,7 +58,7 @@ impl TrashRepository for MockTrashRepository {
     async fn restore_from_trash(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
         if let Some(item) = items.get(id) {
-            if item.user_id == *user_id {
+            if item.user_id() == *user_id {
                 items.remove(id);
             }
         }
@@ -65,7 +68,7 @@ impl TrashRepository for MockTrashRepository {
     async fn delete_permanently(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
         if let Some(item) = items.get(id) {
-            if item.user_id == *user_id {
+            if item.user_id() == *user_id {
                 items.remove(id);
             }
         }
@@ -74,7 +77,7 @@ impl TrashRepository for MockTrashRepository {
 
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
-        items.retain(|_, item| item.user_id != *user_id);
+        items.retain(|_, item| item.user_id() != *user_id);
         Ok(())
     }
 
@@ -82,7 +85,7 @@ impl TrashRepository for MockTrashRepository {
         let items = self.trash_items.lock().unwrap();
         let now = Utc::now();
         let expired = items.values()
-            .filter(|item| item.deletion_date <= now)
+            .filter(|item| item.deletion_date() <= now)
             .cloned()
             .collect();
         Ok(expired)
@@ -118,17 +121,102 @@ impl MockFileRepository {
 }
 
 #[async_trait]
-impl FileRepository for MockFileRepository {
-    async fn get_file_by_id(&self, id: &str) -> FileRepositoryResult<File> {
+impl FileReadPort for MockFileRepository {
+    async fn get_file(&self, id: &str) -> std::result::Result<File, DomainError> {
         let files = self.files.lock().unwrap();
         if let Some(file) = files.get(id) {
             Ok(file.clone())
         } else {
-            Err(FileRepositoryError::NotFound(id.to_string()))
+            Err(DomainError::not_found("File", id.to_string()))
         }
     }
 
-    async fn move_to_trash(&self, id: &str) -> FileRepositoryResult<()> {
+    async fn list_files(&self, _folder_id: Option<&str>) -> std::result::Result<Vec<File>, DomainError> {
+        Ok(vec![])
+    }
+
+    async fn get_file_content(&self, _id: &str) -> std::result::Result<Vec<u8>, DomainError> {
+        Ok(vec![])
+    }
+
+    async fn get_file_stream(
+        &self,
+        _id: &str,
+    ) -> std::result::Result<Box<dyn Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_file_range_stream(
+        &self,
+        _id: &str,
+        _start: u64,
+        _end: Option<u64>,
+    ) -> std::result::Result<Box<dyn Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_file_mmap(&self, _id: &str) -> std::result::Result<Bytes, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_file_path(&self, _id: &str) -> std::result::Result<StoragePath, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_parent_folder_id(&self, _path: &str) -> std::result::Result<String, DomainError> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
+impl FileWritePort for MockFileRepository {
+    async fn save_file(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _content: Vec<u8>,
+    ) -> std::result::Result<File, DomainError> {
+        unimplemented!()
+    }
+
+    async fn save_file_from_stream(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _stream: std::pin::Pin<Box<dyn Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send>>,
+    ) -> std::result::Result<File, DomainError> {
+        unimplemented!()
+    }
+
+    async fn move_file(
+        &self,
+        _file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> std::result::Result<File, DomainError> {
+        unimplemented!()
+    }
+
+    async fn delete_file(&self, _id: &str) -> std::result::Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn update_file_content(&self, _file_id: &str, _content: Vec<u8>) -> std::result::Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn register_file_deferred(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _size: u64,
+    ) -> std::result::Result<(File, PathBuf), DomainError> {
+        unimplemented!()
+    }
+
+    async fn move_to_trash(&self, id: &str) -> std::result::Result<(), DomainError> {
         let mut files = self.files.lock().unwrap();
         let mut trashed = self.trashed_files.lock().unwrap();
         
@@ -136,11 +224,11 @@ impl FileRepository for MockFileRepository {
             trashed.insert(id.to_string(), file);
             Ok(())
         } else {
-            Err(FileRepositoryError::NotFound(id.to_string()))
+            Err(DomainError::not_found("File", id.to_string()))
         }
     }
 
-    async fn restore_from_trash(&self, id: &str, original_path: &str) -> FileRepositoryResult<()> {
+    async fn restore_from_trash(&self, id: &str, _original_path: &str) -> std::result::Result<(), DomainError> {
         let mut files = self.files.lock().unwrap();
         let mut trashed = self.trashed_files.lock().unwrap();
         
@@ -148,26 +236,18 @@ impl FileRepository for MockFileRepository {
             files.insert(id.to_string(), file);
             Ok(())
         } else {
-            Err(FileRepositoryError::NotFound(format!("File {} not found in trash", id)))
+            Err(DomainError::not_found("File", format!("File {} not found in trash", id)))
         }
     }
 
-    async fn delete_file_permanently(&self, id: &str) -> FileRepositoryResult<()> {
+    async fn delete_file_permanently(&self, id: &str) -> std::result::Result<(), DomainError> {
         let mut trashed = self.trashed_files.lock().unwrap();
         if trashed.remove(id).is_some() {
             Ok(())
         } else {
-            Err(FileRepositoryError::NotFound(format!("File {} not found in trash", id)))
+            Err(DomainError::not_found("File", format!("File {} not found in trash", id)))
         }
     }
-
-    // Other methods required by the trait (not used in tests)
-    async fn save_file(&self, _file: &File) -> FileRepositoryResult<()> { Ok(()) }
-    async fn delete_file(&self, _id: &str) -> FileRepositoryResult<()> { Ok(()) }
-    async fn get_files_in_folder(&self, _folder_id: Option<&str>) -> FileRepositoryResult<Vec<File>> { Ok(vec![]) }
-    async fn move_file(&self, _id: &str, _new_folder_id: Option<&str>) -> FileRepositoryResult<()> { Ok(()) }
-    async fn update_file_data(&self, _id: &str, _new_data: &[u8]) -> FileRepositoryResult<()> { Ok(()) }
-    async fn get_file_data(&self, _id: &str) -> FileRepositoryResult<Vec<u8>> { Ok(vec![]) }
 }
 
 struct MockFolderRepository {
@@ -198,16 +278,58 @@ impl MockFolderRepository {
 
 #[async_trait]
 impl FolderRepository for MockFolderRepository {
-    async fn get_folder_by_id(&self, id: &str) -> FolderRepositoryResult<Folder> {
+    async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> std::result::Result<Folder, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_folder(&self, id: &str) -> std::result::Result<Folder, DomainError> {
         let folders = self.folders.lock().unwrap();
         if let Some(folder) = folders.get(id) {
             Ok(folder.clone())
         } else {
-            Err(FolderRepositoryError::NotFound(id.to_string()))
+            Err(DomainError::not_found("Folder", id.to_string()))
         }
     }
 
-    async fn move_to_trash(&self, id: &str) -> FolderRepositoryResult<()> {
+    async fn get_folder_by_path(&self, _storage_path: &StoragePath) -> std::result::Result<Folder, DomainError> {
+        unimplemented!()
+    }
+
+    async fn list_folders(&self, _parent_id: Option<&str>) -> std::result::Result<Vec<Folder>, DomainError> {
+        Ok(vec![])
+    }
+
+    async fn list_folders_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _offset: usize,
+        _limit: usize,
+        _include_total: bool,
+    ) -> std::result::Result<(Vec<Folder>, Option<usize>), DomainError> {
+        Ok((vec![], Some(0)))
+    }
+
+    async fn rename_folder(&self, _id: &str, _new_name: String) -> std::result::Result<Folder, DomainError> {
+        unimplemented!()
+    }
+
+    async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> std::result::Result<Folder, DomainError> {
+        unimplemented!()
+    }
+
+    async fn delete_folder(&self, _id: &str) -> std::result::Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn folder_exists(&self, _storage_path: &StoragePath) -> std::result::Result<bool, DomainError> {
+        Ok(false)
+    }
+
+    async fn get_folder_path(&self, _id: &str) -> std::result::Result<StoragePath, DomainError> {
+        Ok(StoragePath::from_string("/"))
+    }
+
+    async fn move_to_trash(&self, id: &str) -> std::result::Result<(), DomainError> {
         let mut folders = self.folders.lock().unwrap();
         let mut trashed = self.trashed_folders.lock().unwrap();
         
@@ -215,11 +337,11 @@ impl FolderRepository for MockFolderRepository {
             trashed.insert(id.to_string(), folder);
             Ok(())
         } else {
-            Err(FolderRepositoryError::NotFound(id.to_string()))
+            Err(DomainError::not_found("Folder", id.to_string()))
         }
     }
 
-    async fn restore_from_trash(&self, id: &str, original_path: &str) -> FolderRepositoryResult<()> {
+    async fn restore_from_trash(&self, id: &str, _original_path: &str) -> std::result::Result<(), DomainError> {
         let mut folders = self.folders.lock().unwrap();
         let mut trashed = self.trashed_folders.lock().unwrap();
         
@@ -227,29 +349,24 @@ impl FolderRepository for MockFolderRepository {
             folders.insert(id.to_string(), folder);
             Ok(())
         } else {
-            Err(FolderRepositoryError::NotFound(format!("Folder {} not found in trash", id)))
+            Err(DomainError::not_found("Folder", format!("Folder {} not found in trash", id)))
         }
     }
 
-    async fn delete_folder_permanently(&self, id: &str) -> FolderRepositoryResult<()> {
+    async fn delete_folder_permanently(&self, id: &str) -> std::result::Result<(), DomainError> {
         let mut trashed = self.trashed_folders.lock().unwrap();
         if trashed.remove(id).is_some() {
             Ok(())
         } else {
-            Err(FolderRepositoryError::NotFound(format!("Folder {} not found in trash", id)))
+            Err(DomainError::not_found("Folder", format!("Folder {} not found in trash", id)))
         }
     }
-
-    // Other methods required by the trait (not used in tests)
-    async fn save_folder(&self, _folder: &Folder) -> FolderRepositoryResult<()> { Ok(()) }
-    async fn delete_folder(&self, _id: &str) -> FolderRepositoryResult<()> { Ok(()) }
-    async fn get_folders_in_folder(&self, _parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>> { Ok(vec![]) }
-    async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> FolderRepositoryResult<()> { Ok(()) }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::application::ports::trash_ports::TrashUseCase;
 
     #[tokio::test]
     async fn test_move_file_to_trash() {
@@ -260,7 +377,8 @@ mod tests {
         
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone(),
+            file_repo.clone() as Arc<dyn FileReadPort>,
+            file_repo.clone() as Arc<dyn FileWritePort>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -284,10 +402,10 @@ mod tests {
         assert_eq!(trash_items.len(), 1, "Should have exactly one item in trash");
         let trash_item = &trash_items[0];
         
-        assert_eq!(trash_item.original_id.to_string(), file_id, "Original ID should match file ID");
-        assert_eq!(trash_item.user_id.to_string(), user_id, "User ID should match");
-        assert_eq!(trash_item.item_type, TrashedItemType::File, "Item type should be File");
-        assert_eq!(trash_item.name, "test.txt", "File name should match");
+        assert_eq!(trash_item.original_id().to_string(), file_id, "Original ID should match file ID");
+        assert_eq!(trash_item.user_id().to_string(), user_id, "User ID should match");
+        assert_eq!(*trash_item.item_type(), TrashedItemType::File, "Item type should be File");
+        assert_eq!(trash_item.name(), "test.txt", "File name should match");
         
         // Verify file is moved in file repository
         let files = file_repo.files.lock().unwrap();
@@ -306,7 +424,8 @@ mod tests {
         
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone(),
+            file_repo.clone() as Arc<dyn FileReadPort>,
+            file_repo.clone() as Arc<dyn FileWritePort>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -330,10 +449,10 @@ mod tests {
         assert_eq!(trash_items.len(), 1, "Should have exactly one item in trash");
         let trash_item = &trash_items[0];
         
-        assert_eq!(trash_item.original_id.to_string(), folder_id, "Original ID should match folder ID");
-        assert_eq!(trash_item.user_id.to_string(), user_id, "User ID should match");
-        assert_eq!(trash_item.item_type, TrashedItemType::Folder, "Item type should be Folder");
-        assert_eq!(trash_item.name, "test_folder", "Folder name should match");
+        assert_eq!(trash_item.original_id().to_string(), folder_id, "Original ID should match folder ID");
+        assert_eq!(trash_item.user_id().to_string(), user_id, "User ID should match");
+        assert_eq!(*trash_item.item_type(), TrashedItemType::Folder, "Item type should be Folder");
+        assert_eq!(trash_item.name(), "test_folder", "Folder name should match");
     }
 
     #[tokio::test]
@@ -345,7 +464,8 @@ mod tests {
         
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone(),
+            file_repo.clone() as Arc<dyn FileReadPort>,
+            file_repo.clone() as Arc<dyn FileWritePort>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -361,7 +481,7 @@ mod tests {
         // Get the trash item ID
         let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
-        let trash_id = trash_items[0].id.to_string();
+        let trash_id = trash_items[0].id().to_string();
         
         // Act
         let result = service.restore_item(&trash_id, user_id).await;
@@ -390,7 +510,8 @@ mod tests {
         
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone(),
+            file_repo.clone() as Arc<dyn FileReadPort>,
+            file_repo.clone() as Arc<dyn FileWritePort>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -405,7 +526,7 @@ mod tests {
         // Get the trash item ID
         let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
-        let trash_id = trash_items[0].id.to_string();
+        let trash_id = trash_items[0].id().to_string();
         
         // Act
         let result = service.delete_permanently(&trash_id, user_id).await;
@@ -434,7 +555,8 @@ mod tests {
         
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone(),
+            file_repo.clone() as Arc<dyn FileReadPort>,
+            file_repo.clone() as Arc<dyn FileWritePort>,
             folder_repo.clone(),
             30, // 30 days retention
         );

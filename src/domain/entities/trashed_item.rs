@@ -9,14 +9,14 @@ pub enum TrashedItemType {
 
 #[derive(Debug, Clone)]
 pub struct TrashedItem {
-    pub id: Uuid,
-    pub original_id: Uuid,
-    pub user_id: Uuid,
-    pub item_type: TrashedItemType,
-    pub name: String,
-    pub original_path: String,
-    pub trashed_at: DateTime<Utc>,
-    pub deletion_date: DateTime<Utc>, // Fecha de eliminación permanente automática
+    id: Uuid,
+    original_id: Uuid,
+    user_id: Uuid,
+    item_type: TrashedItemType,
+    name: String,
+    original_path: String,
+    trashed_at: DateTime<Utc>,
+    deletion_date: DateTime<Utc>,
 }
 
 impl TrashedItem {
@@ -39,6 +39,64 @@ impl TrashedItem {
             trashed_at: now,
             deletion_date: now + chrono::Duration::days(retention_days as i64),
         }
+    }
+
+    /// Reconstruct a TrashedItem from persisted data (e.g. JSON index).
+    /// Skips ID generation — uses the provided values directly.
+    pub fn from_raw(
+        id: Uuid,
+        original_id: Uuid,
+        user_id: Uuid,
+        item_type: TrashedItemType,
+        name: String,
+        original_path: String,
+        trashed_at: DateTime<Utc>,
+        deletion_date: DateTime<Utc>,
+    ) -> Self {
+        Self {
+            id,
+            original_id,
+            user_id,
+            item_type,
+            name,
+            original_path,
+            trashed_at,
+            deletion_date,
+        }
+    }
+
+    // ── Getters ──
+
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+
+    pub fn original_id(&self) -> Uuid {
+        self.original_id
+    }
+
+    pub fn user_id(&self) -> Uuid {
+        self.user_id
+    }
+
+    pub fn item_type(&self) -> &TrashedItemType {
+        &self.item_type
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn original_path(&self) -> &str {
+        &self.original_path
+    }
+
+    pub fn trashed_at(&self) -> DateTime<Utc> {
+        self.trashed_at
+    }
+
+    pub fn deletion_date(&self) -> DateTime<Utc> {
+        self.deletion_date
     }
 
     pub fn days_until_deletion(&self) -> i64 {

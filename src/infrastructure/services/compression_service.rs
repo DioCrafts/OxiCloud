@@ -9,6 +9,11 @@ use flate2::Compression;
 use flate2::read::GzEncoder as GzEncoderRead;
 use flate2::bufread::GzDecoder;
 
+use crate::application::ports::compression_ports::{
+    CompressionPort,
+    CompressionLevel as PortCompressionLevel,
+};
+use crate::domain::errors::DomainError;
 use crate::infrastructure::services::buffer_pool::BufferPool;
 
 /// Nivel de compresión para ficheros
@@ -254,7 +259,7 @@ impl CompressionService for GzipCompressionService {
             }
             
             // Compress collected data
-            match self.compress_data(&data, compression_level).await {
+            match CompressionService::compress_data(self, &data, compression_level).await {
                 Ok(compressed) => {
                     // Return compressed data as a single chunk
                     yield Ok(Bytes::from(compressed));
@@ -293,7 +298,7 @@ impl CompressionService for GzipCompressionService {
             }
             
             // Decompress collected data
-            match self.decompress_data(&compressed_data).await {
+            match CompressionService::decompress_data(self, &compressed_data).await {
                 Ok(decompressed) => {
                     // Return decompressed data as a single chunk
                     yield Ok(Bytes::from(decompressed));
@@ -345,6 +350,35 @@ impl CompressionService for GzipCompressionService {
     }
 }
 
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+/// Convert application-layer CompressionLevel to infrastructure CompressionLevel.
+impl From<PortCompressionLevel> for CompressionLevel {
+    fn from(level: PortCompressionLevel) -> Self {
+        match level {
+            PortCompressionLevel::None => CompressionLevel::None,
+            PortCompressionLevel::Fast => CompressionLevel::Fast,
+            PortCompressionLevel::Default => CompressionLevel::Default,
+            PortCompressionLevel::Best => CompressionLevel::Best,
+        }
+    }
+}
+
+#[async_trait]
+impl CompressionPort for GzipCompressionService {
+    async fn compress_data(&self, data: &[u8], level: PortCompressionLevel) -> Result<Vec<u8>, DomainError> {
+        CompressionService::compress_data(self, data, level.into()).await.map_err(DomainError::from)
+    }
+
+    async fn decompress_data(&self, compressed_data: &[u8]) -> Result<Vec<u8>, DomainError> {
+        CompressionService::decompress_data(self, compressed_data).await.map_err(DomainError::from)
+    }
+
+    fn should_compress(&self, mime_type: &str, size: u64) -> bool {
+        CompressionService::should_compress(self, mime_type, size)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,13 +393,13 @@ mod tests {
         let data = "Hello, world! ".repeat(1000).into_bytes();
         
         // Comprimir
-        let compressed = service.compress_data(&data, CompressionLevel::Default).await.unwrap();
+        let compressed = CompressionService::compress_data(&service, &data, CompressionLevel::Default).await.unwrap();
         
         // Verificar que la compresión reduce el tamaño
         assert!(compressed.len() < data.len());
         
         // Descomprimir
-        let decompressed = service.decompress_data(&compressed).await.unwrap();
+        let decompressed = CompressionService::decompress_data(&service, &compressed).await.unwrap();
         
         // Verificar que los datos originales se recuperan correctamente
         assert_eq!(decompressed, data);
@@ -396,7 +430,7 @@ mod tests {
             }).await.unwrap();
         
         // Descomprimir los datos
-        let decompressed = service.decompress_data(&compressed_bytes).await.unwrap();
+        let decompressed = CompressionService::decompress_data(&service, &compressed_bytes).await.unwrap();
         
         // Verificar resultado
         let expected = "Hello, world! This is a test of streaming compression.";
@@ -408,16 +442,16 @@ mod tests {
         let service = GzipCompressionService::new();
         
         // Casos que no deberían comprimirse
-        assert!(!service.should_compress("image/jpeg", 100 * 1024));
-        assert!(!service.should_compress("video/mp4", 10 * 1024 * 1024));
-        assert!(!service.should_compress("application/zip", 5 * 1024 * 1024));
+        assert!(!CompressionService::should_compress(&service, "image/jpeg", 100 * 1024));
+        assert!(!CompressionService::should_compress(&service, "video/mp4", 10 * 1024 * 1024));
+        assert!(!CompressionService::should_compress(&service, "application/zip", 5 * 1024 * 1024));
         
         // Casos que sí deberían comprimirse
-        assert!(service.should_compress("text/html", 100 * 1024));
-        assert!(service.should_compress("application/json", 200 * 1024));
-        assert!(service.should_compress("text/plain", 1024 * 1024));
+        assert!(CompressionService::should_compress(&service, "text/html", 100 * 1024));
+        assert!(CompressionService::should_compress(&service, "application/json", 200 * 1024));
+        assert!(CompressionService::should_compress(&service, "text/plain", 1024 * 1024));
         
         // Archivos pequeños no deberían comprimirse independientemente del tipo
-        assert!(!service.should_compress("text/html", 10 * 1024));
+        assert!(!CompressionService::should_compress(&service, "text/html", 10 * 1024));
     }
 }

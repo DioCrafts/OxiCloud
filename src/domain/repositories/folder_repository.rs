@@ -1,100 +1,69 @@
+//! Puerto de persistencia del dominio para la entidad Folder.
+//!
+//! Define el contrato que cualquier implementación de almacenamiento de carpetas
+//! debe cumplir. Este trait vive en el dominio porque Folder es una entidad core
+//! del sistema y sus contratos de persistencia pertenecen a la capa de dominio,
+//! siguiendo los principios de Clean/Hexagonal Architecture.
+//!
+//! Las implementaciones concretas (filesystem, PostgreSQL, S3, etc.) viven en
+//! la capa de infraestructura.
+
 use async_trait::async_trait;
+
 use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
 use crate::common::errors::DomainError;
 
-/// Error types for folder repository operations
-#[derive(Debug, thiserror::Error)]
-pub enum FolderRepositoryError {
-    #[error("Folder not found: {0}")]
-    NotFound(String),
-    
-    #[error("Folder already exists: {0}")]
-    AlreadyExists(String),
-    
-    #[error("Invalid folder path: {0}")]
-    InvalidPath(String),
-    
-    #[error("Operation not supported: {0}")]
-    OperationNotSupported(String),
-    
-    #[error("IO Error: {0}")]
-    IoError(#[from] std::io::Error),
-    
-    #[error("Mapping error: {0}")]
-    MappingError(String),
-    
-    #[error("Validation error: {0}")]
-    ValidationError(String),
-    
-    #[error("Domain error: {0}")]
-    DomainError(#[from] DomainError),
-    
-    #[error("Other error: {0}")]
-    Other(String),
-}
-
-/// Result type for folder repository operations
-pub type FolderRepositoryResult<T> = Result<T, FolderRepositoryError>;
-
-/// Repository interface for folder operations (primary port)
+/// Puerto del dominio para persistencia de carpetas.
+///
+/// Define las operaciones CRUD y de gestión necesarias para
+/// la entidad Folder en el sistema de almacenamiento.
 #[async_trait]
 pub trait FolderRepository: Send + Sync + 'static {
-    /// Creates a new folder
-    async fn create_folder(&self, name: String, parent_id: Option<String>) -> FolderRepositoryResult<Folder>;
+    /// Crea una nueva carpeta
+    async fn create_folder(&self, name: String, parent_id: Option<String>) -> Result<Folder, DomainError>;
     
-    /// Gets a folder by its ID
-    async fn get_folder_by_id(&self, id: &str) -> FolderRepositoryResult<Folder>;
+    /// Obtiene una carpeta por su ID
+    async fn get_folder(&self, id: &str) -> Result<Folder, DomainError>;
     
-    /// Gets a folder by its path
-    async fn get_folder_by_storage_path(&self, storage_path: &StoragePath) -> FolderRepositoryResult<Folder>;
+    /// Obtiene una carpeta por su ruta de almacenamiento
+    async fn get_folder_by_path(&self, storage_path: &StoragePath) -> Result<Folder, DomainError>;
     
-    /// Lists all folders in a parent folder (use with caution for large directories)
-    async fn list_folders(&self, parent_id: Option<&str>) -> FolderRepositoryResult<Vec<Folder>>;
+    /// Lista carpetas dentro de una carpeta padre
+    async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError>;
     
-    /// Lists folders in a parent folder with pagination support
-    /// 
-    /// * `parent_id` - Optional parent folder ID
-    /// * `offset` - Number of folders to skip
-    /// * `limit` - Maximum number of folders to return
-    /// * `include_total` - If true, returns the total count of folders as well
+    /// Lista carpetas con paginación
     async fn list_folders_paginated(
         &self, 
-        parent_id: Option<&str>, 
-        offset: usize, 
+        parent_id: Option<&str>,
+        offset: usize,
         limit: usize,
         include_total: bool
-    ) -> FolderRepositoryResult<(Vec<Folder>, Option<usize>)>;
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError>;
     
-    /// Renames a folder
-    async fn rename_folder(&self, id: &str, new_name: String) -> FolderRepositoryResult<Folder>;
+    /// Renombra una carpeta
+    async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError>;
     
-    /// Moves a folder to a new parent
-    async fn move_folder(&self, id: &str, new_parent_id: Option<&str>) -> FolderRepositoryResult<Folder>;
+    /// Mueve una carpeta a otro padre
+    async fn move_folder(&self, id: &str, new_parent_id: Option<&str>) -> Result<Folder, DomainError>;
     
-    /// Deletes a folder
-    async fn delete_folder(&self, id: &str) -> FolderRepositoryResult<()>;
+    /// Elimina una carpeta
+    async fn delete_folder(&self, id: &str) -> Result<(), DomainError>;
     
-    /// Checks if a folder exists at the given path
-    async fn folder_exists_at_storage_path(&self, storage_path: &StoragePath) -> FolderRepositoryResult<bool>;
+    /// Verifica si existe una carpeta en la ruta dada
+    async fn folder_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
     
-    /// Gets the storage path for a folder
-    async fn get_folder_storage_path(&self, id: &str) -> FolderRepositoryResult<StoragePath>;
-    
-    /// Legacy method - checks if a folder exists at the given PathBuf path
-    #[deprecated(note = "Use folder_exists_at_storage_path instead")]
-    async fn folder_exists(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<bool>;
-    
-    /// Legacy method - gets a folder by its PathBuf path
-    #[deprecated(note = "Use get_folder_by_storage_path instead")]
-    async fn get_folder_by_path(&self, path: &std::path::PathBuf) -> FolderRepositoryResult<Folder>;
-    
-    /// Moves a folder to trash
-    async fn move_to_trash(&self, folder_id: &str) -> FolderRepositoryResult<()>;
-    
-    /// Restores a folder from trash
-    async fn restore_from_trash(&self, folder_id: &str, original_path: &str) -> FolderRepositoryResult<()>;
-    
-    /// Permanently deletes a folder (used for trash cleanup)
-    async fn delete_folder_permanently(&self, folder_id: &str) -> FolderRepositoryResult<()>;
+    /// Obtiene la ruta de una carpeta
+    async fn get_folder_path(&self, id: &str) -> Result<StoragePath, DomainError>;
+
+    // ── Trash operations ──
+
+    /// Mueve una carpeta a la papelera
+    async fn move_to_trash(&self, folder_id: &str) -> Result<(), DomainError>;
+
+    /// Restaura una carpeta desde la papelera a su ubicación original
+    async fn restore_from_trash(&self, folder_id: &str, original_path: &str) -> Result<(), DomainError>;
+
+    /// Elimina una carpeta permanentemente (usado por la papelera)
+    async fn delete_folder_permanently(&self, folder_id: &str) -> Result<(), DomainError>;
 }

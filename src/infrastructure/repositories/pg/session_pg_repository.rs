@@ -66,8 +66,8 @@ impl SessionRepository for SessionPgRepository {
                     .bind(session_clone.user_id())
                     .bind(session_clone.refresh_token())
                     .bind(session_clone.expires_at())
-                    .bind(&session_clone.ip_address)
-                    .bind(&session_clone.user_agent)
+                    .bind(session_clone.ip_address())
+                    .bind(session_clone.user_agent())
                     .bind(session_clone.created_at())
                     .bind(session_clone.is_revoked())
                     .execute(&mut **tx)
@@ -120,16 +120,16 @@ impl SessionRepository for SessionPgRepository {
         .await
         .map_err(Self::map_sqlx_error)?;
 
-        Ok(Session {
-            id: row.get("id"),
-            user_id: row.get("user_id"),
-            refresh_token: row.get("refresh_token"),
-            expires_at: row.get("expires_at"),
-            ip_address: row.get("ip_address"),
-            user_agent: row.get("user_agent"),
-            created_at: row.get("created_at"),
-            revoked: row.get("revoked"),
-        })
+        Ok(Session::from_raw(
+            row.get("id"),
+            row.get("user_id"),
+            row.get("refresh_token"),
+            row.get("expires_at"),
+            row.get("ip_address"),
+            row.get("user_agent"),
+            row.get("created_at"),
+            row.get("revoked"),
+        ))
     }
     
     /// Obtiene una sesión por token de actualización
@@ -148,16 +148,16 @@ impl SessionRepository for SessionPgRepository {
         .await
         .map_err(Self::map_sqlx_error)?;
 
-        Ok(Session {
-            id: row.get("id"),
-            user_id: row.get("user_id"),
-            refresh_token: row.get("refresh_token"),
-            expires_at: row.get("expires_at"),
-            ip_address: row.get("ip_address"),
-            user_agent: row.get("user_agent"),
-            created_at: row.get("created_at"),
-            revoked: row.get("revoked"),
-        })
+        Ok(Session::from_raw(
+            row.get("id"),
+            row.get("user_id"),
+            row.get("refresh_token"),
+            row.get("expires_at"),
+            row.get("ip_address"),
+            row.get("user_agent"),
+            row.get("created_at"),
+            row.get("revoked"),
+        ))
     }
     
     /// Obtiene todas las sesiones de un usuario
@@ -179,16 +179,16 @@ impl SessionRepository for SessionPgRepository {
 
         let sessions = rows.into_iter()
             .map(|row| {
-                Session {
-                    id: row.get("id"),
-                    user_id: row.get("user_id"),
-                    refresh_token: row.get("refresh_token"),
-                    expires_at: row.get("expires_at"),
-                    ip_address: row.get("ip_address"),
-                    user_agent: row.get("user_agent"),
-                    created_at: row.get("created_at"),
-                    revoked: row.get("revoked"),
-                }
+                Session::from_raw(
+                    row.get("id"),
+                    row.get("user_id"),
+                    row.get("refresh_token"),
+                    row.get("expires_at"),
+                    row.get("ip_address"),
+                    row.get("user_agent"),
+                    row.get("created_at"),
+                    row.get("revoked"),
+                )
             })
             .collect();
 

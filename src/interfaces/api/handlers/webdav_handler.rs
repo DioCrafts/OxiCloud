@@ -171,7 +171,7 @@ async fn handle_propfind(
     
     // Get folder service from state
     let folder_service = &state.applications.folder_service;
-    let file_service = &state.applications.file_service;
+    let file_retrieval_service = &state.applications.file_retrieval_service;
     
     // Determine base HREF
     let base_href = format!("/webdav/{}/", path);
@@ -183,7 +183,7 @@ async fn handle_propfind(
             AppError::internal_error(format!("Failed to get subfolders: {}", e))
         })?;
         
-        let files = file_service.list_files(None).await.map_err(|e| {
+        let files = file_retrieval_service.list_files(None).await.map_err(|e| {
             AppError::internal_error(format!("Failed to get files: {}", e))
         })?;
         
@@ -224,7 +224,7 @@ async fn handle_propfind(
         if let Ok(folder) = folder_result {
             // Path is a folder
             let files = if depth != "0" {
-                file_service.list_files(Some(&folder.id)).await.map_err(|e| {
+                file_retrieval_service.list_files(Some(&folder.id)).await.map_err(|e| {
                     AppError::internal_error(format!("Failed to get files: {}", e))
                 })?
             } else {
@@ -260,7 +260,7 @@ async fn handle_propfind(
                 .unwrap())
         } else {
             // Check if path is a file
-            let file_result = file_service.get_file_by_path(&path).await;
+            let file_result = file_retrieval_service.get_file_by_path(&path).await;
             
             if let Ok(file) = file_result {
                 // Path is a file
@@ -395,7 +395,6 @@ async fn handle_get(
     })?;
     
     // Get file service from state
-    let file_service = &state.applications.file_service;
     let file_retrieval_service = &state.applications.file_retrieval_service;
     
     // Check if path is empty (root folder)
@@ -404,7 +403,7 @@ async fn handle_get(
     }
     
     // Get file metadata
-    let file = file_service.get_file_by_path(&path).await.map_err(|_e| {
+    let file = file_retrieval_service.get_file_by_path(&path).await.map_err(|_e| {
         AppError::not_found(format!("File not found: {}", path))
     })?;
     
@@ -467,7 +466,7 @@ async fn handle_put(
     };
     
     // Get file service from state
-    let file_service = &state.applications.file_service;
+    let file_upload_service = &state.applications.file_upload_service;
     
     // Check if path is empty (root folder)
     if path.is_empty() || path == "/" {
@@ -475,7 +474,7 @@ async fn handle_put(
     }
     
     // Extract content type before consuming the request
-    let content_type = req.headers()
+    let _content_type = req.headers()
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .unwrap_or("application/octet-stream")
@@ -495,38 +494,19 @@ async fn handle_put(
     };
     
     // Check if file exists
-    let file_exists = file_service.get_file_by_path(&path).await.is_ok();
+    let file_exists = file_upload_service.update_file(&path, &body_bytes).await;
     
-    if file_exists {
-        // Update existing file
-        file_service.update_file(&path, &body_bytes).await.map_err(|e| {
-            AppError::internal_error(format!("Failed to update file: {}", e))
-        })?;
-        
-        Ok(Response::builder()
-            .status(StatusCode::NO_CONTENT)
-            .body(Body::empty())
-            .unwrap())
-    } else {
-        // Create new file  
-        // Extract filename from path
-        let filename = path.split('/').last().unwrap_or("unnamed");
-        
-        // Get parent folder path
-        let parent_path = if let Some(idx) = path.rfind('/') {
-            &path[..idx]
-        } else {
-            ""
-        };
-        
-        file_service.create_file(parent_path, filename, &body_bytes, &content_type).await.map_err(|e| {
-            AppError::internal_error(format!("Failed to create file: {}", e))
-        })?;
-        
-        Ok(Response::builder()
-            .status(StatusCode::CREATED)
-            .body(Body::empty())
-            .unwrap())
+    match file_exists {
+        Ok(_) => {
+            // update_file handles both update and create-if-not-found
+            Ok(Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body(Body::empty())
+                .unwrap())
+        }
+        Err(e) => {
+            Err(AppError::internal_error(format!("Failed to put file: {}", e)))
+        }
     }
 }
 
@@ -658,7 +638,8 @@ async fn handle_delete(
     })?;
     
     // Get services from state
-    let file_service = &state.applications.file_service;
+    let file_retrieval_service = &state.applications.file_retrieval_service;
+    let file_management_service = &state.applications.file_management_service;
     let folder_service = &state.applications.folder_service;
     
     // Check if path is empty (root folder)
@@ -676,11 +657,11 @@ async fn handle_delete(
         })?;
     } else {
         // Try to delete file
-        let file = file_service.get_file_by_path(&path).await.map_err(|_e| {
+        let file = file_retrieval_service.get_file_by_path(&path).await.map_err(|_e| {
             AppError::not_found(format!("Resource not found: {}", path))
         })?;
         
-        file_service.delete_file(&file.id).await.map_err(|e| {
+        file_management_service.delete_file(&file.id).await.map_err(|e| {
             AppError::internal_error(format!("Failed to delete file: {}", e))
         })?;
     }
@@ -736,7 +717,8 @@ async fn handle_move(
     };
     
     // Get services from state
-    let file_service = &state.applications.file_service;
+    let file_retrieval_service = &state.applications.file_retrieval_service;
+    let file_management_service = &state.applications.file_management_service;
     let folder_service = &state.applications.folder_service;
     
     // Check if source is a folder
@@ -778,7 +760,7 @@ async fn handle_move(
         }
     } else {
         // Try to move file
-        let file = file_service.get_file_by_path(&source_path).await.map_err(|_e| {
+        let file = file_retrieval_service.get_file_by_path(&source_path).await.map_err(|_e| {
             AppError::not_found(format!("Resource not found: {}", source_path))
         })?;
         
@@ -788,7 +770,7 @@ async fn handle_move(
             ""
         };
         
-        file_service.move_file(&file.id, Some(dest_parent_path.to_string())).await.map_err(|e| {
+        file_management_service.move_file(&file.id, Some(dest_parent_path.to_string())).await.map_err(|e| {
             AppError::internal_error(format!("Failed to move file: {}", e))
         })?;
     }
@@ -850,9 +832,9 @@ async fn handle_copy(
         .unwrap_or("infinity");
     
     // Get services from state
-    let file_service = &state.applications.file_service;
-    let folder_service = &state.applications.folder_service;
     let file_retrieval_service = &state.applications.file_retrieval_service;
+    let file_upload_service = &state.applications.file_upload_service;
+    let folder_service = &state.applications.folder_service;
     
     // Check if source is a folder
     let folder_result = folder_service.get_folder_by_path(&source_path).await;
@@ -889,25 +871,23 @@ async fn handle_copy(
         
         if recursive {
             // Copy subfolders and files (simplified implementation)
-            let files = file_service.list_files(Some(&folder.id)).await.map_err(|e| {
+            let files = file_retrieval_service.list_files(Some(&folder.id)).await.map_err(|e| {
                 AppError::internal_error(format!("Failed to list files: {}", e))
             })?;
             
             for file in files {
                 // Get file content
-                if let Ok(file_source) = file_service.get_file_by_path(&format!("{}/{}", source_path, file.name)).await {
-                    if let Ok(content) = file_retrieval_service.get_file_content(&file_source.id).await {
-                        // Create new file in destination
-                        file_service.create_file(&destination_path, &file.name, &content, &file.mime_type).await.map_err(|e| {
-                            AppError::internal_error(format!("Failed to copy file {}: {}", file.name, e))
-                        })?;
-                    }
+                if let Ok(content) = file_retrieval_service.get_file_content(&file.id).await {
+                    // Create new file in destination
+                    file_upload_service.create_file(&destination_path, &file.name, &content, &file.mime_type).await.map_err(|e| {
+                        AppError::internal_error(format!("Failed to copy file {}: {}", file.name, e))
+                    })?;
                 }
             }
         }
     } else {
         // Try to copy file
-        let file = file_service.get_file_by_path(&source_path).await.map_err(|_e| {
+        let file = file_retrieval_service.get_file_by_path(&source_path).await.map_err(|_e| {
             AppError::not_found(format!("Resource not found: {}", source_path))
         })?;
         
@@ -925,7 +905,7 @@ async fn handle_copy(
         };
         
         // Create new file in destination
-        file_service.create_file(dest_parent_path, dest_filename, &content, &file.mime_type).await.map_err(|e| {
+        file_upload_service.create_file(dest_parent_path, dest_filename, &content, &file.mime_type).await.map_err(|e| {
             AppError::internal_error(format!("Failed to copy file: {}", e))
         })?;
     }

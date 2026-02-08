@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, error};
 
-use crate::domain::repositories::folder_repository::FolderRepositoryResult;
+use crate::infrastructure::repositories::repository_errors::FolderRepositoryResult;
 use crate::infrastructure::repositories::folder_fs_repository::FolderFsRepository;
 
 // Este archivo contiene la implementación de los métodos relacionados con la papelera
@@ -22,7 +22,7 @@ impl FolderFsRepository {
         // Asegurarse que el directorio de la papelera existe
         if !trash_dir.exists() {
             fs::create_dir_all(&trash_dir).await
-                .map_err(|e| FolderRepositoryError::IoError(e))?;
+                .map_err(|e| FolderRepositoryError::StorageError(e.to_string()))?;
         }
         
         // Crear una ruta única para la carpeta en la papelera
@@ -72,7 +72,7 @@ impl FolderFsRepository {
             },
             Err(e) => {
                 error!("Error moviendo carpeta a papelera: {}", e);
-                Err(FolderRepositoryError::IoError(e))
+                Err(FolderRepositoryError::StorageError(e.to_string()))
             }
         }
     }
@@ -99,7 +99,7 @@ impl FolderFsRepository {
                 fs::create_dir_all(parent).await
                     .map_err(|e| {
                         error!("Error creando directorio padre para restauración: {}", e);
-                        FolderRepositoryError::IoError(e)
+                        FolderRepositoryError::StorageError(e.to_string())
                     })?;
             }
         }
@@ -119,7 +119,7 @@ impl FolderFsRepository {
             },
             Err(e) => {
                 error!("Error restaurando carpeta: {}", e);
-                Err(FolderRepositoryError::IoError(e))
+                Err(FolderRepositoryError::StorageError(e.to_string()))
             }
         }
     }
@@ -147,7 +147,7 @@ impl FolderFsRepository {
                     error!("Error eliminando carpeta permanentemente: {}", e);
                     // No reportar error si la carpeta ya no existe
                     if e.kind() != std::io::ErrorKind::NotFound {
-                        return Err(FolderRepositoryError::IoError(e));
+                        return Err(FolderRepositoryError::StorageError(e.to_string()));
                     }
                 }
             }
@@ -165,4 +165,4 @@ impl FolderFsRepository {
 }
 
 // Re-exportaciones necesarias para el compilador
-use crate::domain::repositories::folder_repository::FolderRepositoryError;
+use crate::infrastructure::repositories::repository_errors::FolderRepositoryError;

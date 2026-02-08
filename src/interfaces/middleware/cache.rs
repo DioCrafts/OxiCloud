@@ -373,7 +373,7 @@ where
             let future = self.inner.call(req);
             return Box::pin(async move {
                 let response = future.await.map_err(|e| e.into())?;
-                Ok(response_map_body(response))
+                Ok(response_map_body(response).await)
             });
         }
         
@@ -421,7 +421,7 @@ where
                 
                 return Box::pin(async move {
                     let response = future.await.map_err(|e| e.into())?;
-                    let response = response_map_body(response);
+                    let response = response_map_body(response).await;
                     
                     // No cachear errores
                     if !response.status().is_success() {
@@ -455,19 +455,27 @@ where
     }
 }
 
-// Función auxiliar para convertir cualquier cuerpo en Body
-fn response_map_body<B>(response: Response<B>) -> Response<Body>
+// Función auxiliar para convertir cualquier cuerpo en Body preservando su contenido.
+// Anteriormente esta función descartaba el body con Body::empty(), causando
+// pérdida de datos en respuestas no cacheadas.
+async fn response_map_body<B>(response: Response<B>) -> Response<Body>
 where
     B: http_body::Body + Send + 'static,
     B::Data: Send + 'static,
     B::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
-    let (parts, _body) = response.into_parts();
-    
-    // Create a simple empty body as a fallback - in production you would handle this better
-    let mapped_body = Body::empty();
-    
-    Response::from_parts(parts, mapped_body)
+    use http_body_util::BodyExt;
+
+    let (parts, body) = response.into_parts();
+
+    // Collect the full body into Bytes, preserving all response data
+    let collected = body
+        .collect()
+        .await
+        .map(|c| c.to_bytes())
+        .unwrap_or_default();
+
+    Response::from_parts(parts, Body::from(collected))
 }
 
 /// Inicia una tarea de limpieza periódica para el caché
@@ -488,14 +496,9 @@ pub fn start_cache_cleanup_task(cache: HttpCache) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hyper::{Request, Body, Response};
-    use axum::routing::get;
-    use axum::{Extension, Json, Router};
-    use tower::ServiceExt;
-    use http::StatusCode;
     use serde::{Deserialize, Serialize};
     
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Hash)]
     struct TestData {
         id: u32,
         name: String,
@@ -505,13 +508,13 @@ mod tests {
     async fn test_etag_generation() {
         let cache = HttpCache::new();
         
-        let data1 = TestData { id: 1, name: "Test".to_string() };
-        let data2 = TestData { id: 1, name: "Test".to_string() };
-        let data3 = TestData { id: 2, name: "Test".to_string() };
+        let data1 = serde_json::to_vec(&TestData { id: 1, name: "Test".to_string() }).unwrap();
+        let data2 = serde_json::to_vec(&TestData { id: 1, name: "Test".to_string() }).unwrap();
+        let data3 = serde_json::to_vec(&TestData { id: 2, name: "Test".to_string() }).unwrap();
         
-        let etag1 = cache.calculate_etag(&data1);
-        let etag2 = cache.calculate_etag(&data2);
-        let etag3 = cache.calculate_etag(&data3);
+        let etag1 = cache.calculate_etag_for_bytes(&data1);
+        let etag2 = cache.calculate_etag_for_bytes(&data2);
+        let etag3 = cache.calculate_etag_for_bytes(&data3);
         
         // Mismos datos deben generar mismo ETag
         assert_eq!(etag1, etag2);
@@ -524,17 +527,12 @@ mod tests {
     async fn test_cache_hit_miss() {
         let cache = HttpCache::new();
         
-        // Primera petición (cache miss)
-        let response1 = Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::from(r#"{"id":1,"name":"Test"}"#))
-            .unwrap();
-        
-        let (parts1, body1) = response1.into_parts();
-        let bytes1 = hyper::body::to_bytes(body1).await.unwrap();
+        // Crear datos de prueba directamente como Bytes
+        let bytes1 = Bytes::from(r#"{"id":1,"name":"Test"}"#);
+        let headers1 = HeaderMap::new();
         
         let etag1 = cache.calculate_etag_for_bytes(&bytes1);
-        cache.set("test", etag1.clone(), Some(bytes1.clone()), parts1.headers.clone(), None);
+        cache.set("test", etag1.clone(), Some(bytes1.clone()), headers1, None);
         
         // Verificar cache hit
         let entry = cache.get("test").unwrap();

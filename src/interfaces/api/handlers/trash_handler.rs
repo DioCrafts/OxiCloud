@@ -2,7 +2,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use serde_json::json;
-use tracing::{debug, error, instrument};
+use tracing::{debug, error, warn, instrument};
 
 // use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
@@ -14,7 +14,12 @@ pub async fn get_trash_items(
     State(state): State<AppState>,
     auth_user: AuthUser,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    debug!("Solicitud para listar elementos en papelera para usuario {}", auth_user.id);
+    // SECURITY: Always use the authenticated user's ID from the JWT token.
+    // Never allow user ID override via query parameters to prevent
+    // privilege escalation attacks.
+    let effective_user = auth_user.id.clone();
+
+    debug!("Solicitud para listar elementos en papelera para usuario {}", effective_user);
     
     let trash_service = match state.trash_service.as_ref() {
         Some(service) => service,
@@ -25,7 +30,7 @@ pub async fn get_trash_items(
         }
     };
     
-    let result = trash_service.get_trash_items(&auth_user.id).await;
+    let result = trash_service.get_trash_items(&effective_user).await;
     
     match result {
         Ok(items) => {
@@ -184,6 +189,16 @@ pub async fn restore_from_trash(
             })))
         },
         Err(e) => {
+            let err_str = format!("{}", e);
+            // If item not found, report success (it was already restored or removed)
+            if err_str.contains("not found") || err_str.contains("NotFound") {
+                warn!("Item not found in trash, but reporting success: {}", trash_id);
+                return (StatusCode::OK, Json(json!({
+                    "success": true,
+                    "message": "Item restored (or was already removed from trash)"
+                })));
+            }
+
             error!("Error al restaurar elemento de papelera: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
                 "error": format!("Error restoring item from trash: {}", e)
@@ -220,6 +235,16 @@ pub async fn delete_permanently(
             })))
         },
         Err(e) => {
+            let err_str = format!("{}", e);
+            // If item not found, report success (it was already deleted)
+            if err_str.contains("not found") || err_str.contains("NotFound") {
+                warn!("Item not found in trash, but reporting success: {}", trash_id);
+                return (StatusCode::OK, Json(json!({
+                    "success": true,
+                    "message": "Item deleted (or was already removed from trash)"
+                })));
+            }
+
             error!("Error al eliminar permanentemente elemento: {:?}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({
                 "error": format!("Error deleting item permanently: {}", e)

@@ -10,7 +10,7 @@ use tracing::{info, debug, error};
 use bytes::{Bytes, BytesMut};
 
 use crate::common::config::AppConfig;
-use crate::domain::repositories::file_repository::FileRepositoryError;
+use crate::infrastructure::repositories::repository_errors::FileRepositoryError;
 use crate::infrastructure::services::buffer_pool::BufferPool;
 
 /// Structure for the byte range to process
@@ -172,7 +172,7 @@ impl ParallelFileProcessor {
     pub async fn read_file_parallel(&self, file_path: &PathBuf) -> Result<Vec<u8>, FileRepositoryError> {
         // Get file size
         let metadata = tokio::fs::metadata(file_path).await
-            .map_err(FileRepositoryError::IoError)?;
+            .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
         
         let file_size = metadata.len();
         
@@ -201,17 +201,17 @@ impl ParallelFileProcessor {
                 if buffer.capacity() < file_size as usize {
                     debug!("Buffer from pool too small ({}), using standard read", buffer.capacity());
                     let content = tokio::fs::read(file_path).await
-                        .map_err(FileRepositoryError::IoError)?;
+                        .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
                     
                     return Ok(content);
                 }
                 
                 // Use memory buffer from the pool
                 let mut file = File::open(file_path).await
-                    .map_err(FileRepositoryError::IoError)?;
+                    .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
                 
                 let read_size = file.read(buffer.as_mut_slice()).await
-                    .map_err(FileRepositoryError::IoError)?;
+                    .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
                 
                 buffer.set_used(read_size);
                 
@@ -221,7 +221,7 @@ impl ParallelFileProcessor {
             } else {
                 // Standard implementation without pool
                 let content = tokio::fs::read(file_path).await
-                    .map_err(FileRepositoryError::IoError)?;
+                    .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
                 
                 return Ok(content);
             }
@@ -241,7 +241,7 @@ impl ParallelFileProcessor {
         
         // Open file once and share it
         let file = Arc::new(File::open(file_path).await
-            .map_err(FileRepositoryError::IoError)?);
+            .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?);
         
         // Reference to BytesMut pool
         let bytes_pool = self.bytes_pool.clone();
@@ -312,7 +312,7 @@ impl ParallelFileProcessor {
                 Ok(Ok(())) => {},
                 Ok(Err(e)) => {
                     error!("Error in chunk {}: {}", i, e);
-                    return Err(FileRepositoryError::IoError(e));
+                    return Err(FileRepositoryError::StorageError(e.to_string()));
                 },
                 Err(e) => {
                     error!("Task error in chunk {}: {}", i, e);
@@ -347,7 +347,7 @@ impl ParallelFileProcessor {
             
             // Standard implementation (buffer pooling offers no advantages for simple writing)
             tokio::fs::write(file_path, content).await
-                .map_err(FileRepositoryError::IoError)?;
+                .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
             
             return Ok(());
         }
@@ -358,7 +358,7 @@ impl ParallelFileProcessor {
         
         // Create file (we don't use Mutex to reduce contention)
         let file = File::create(file_path).await
-            .map_err(FileRepositoryError::IoError)?;
+            .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
         
         // Convert content to Bytes (single copy step)
         let content_bytes = Bytes::copy_from_slice(content);
@@ -369,7 +369,7 @@ impl ParallelFileProcessor {
         // Process chunks in parallel
         for chunk in chunks {
             let file_clone = file.try_clone().await
-                .map_err(FileRepositoryError::IoError)?;
+                .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
             let semaphore_clone = self.concurrency_limiter.clone();
             
             // Create Bytes slice (doesn't copy data, only references)
@@ -406,7 +406,7 @@ impl ParallelFileProcessor {
                 Ok(Ok(())) => {},
                 Ok(Err(e)) => {
                     error!("Error in chunk {}: {}", i, e);
-                    return Err(FileRepositoryError::IoError(e));
+                    return Err(FileRepositoryError::StorageError(e.to_string()));
                 },
                 Err(e) => {
                     error!("Task error in chunk {}: {}", i, e);
@@ -417,7 +417,7 @@ impl ParallelFileProcessor {
         
         // Ensure everything has been written correctly
         let mut file_handle = file;
-        file_handle.flush().await.map_err(FileRepositoryError::IoError)?;
+        file_handle.flush().await.map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
         
         info!("Successfully wrote file of {}MB in parallel with optimized Bytes", file_size / (1024 * 1024));
         Ok(())
@@ -427,6 +427,7 @@ impl ParallelFileProcessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bytes::BufMut;
     use tempfile::tempdir;
     
     #[tokio::test]

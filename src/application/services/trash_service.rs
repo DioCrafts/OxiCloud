@@ -5,10 +5,10 @@ use tracing::{debug, error, info, instrument};
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
 use crate::application::ports::trash_ports::TrashUseCase;
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
+use crate::application::ports::outbound::FolderStoragePort;
 use crate::common::errors::{Result, DomainError, ErrorKind};
 use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
-use crate::domain::repositories::file_repository::FileRepository;
-use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::repositories::trash_repository::TrashRepository;
 
 /**
@@ -20,7 +20,7 @@ use crate::domain::repositories::trash_repository::TrashRepository;
  * repositories while enforcing business rules like retention policies.
  * 
  * This service follows the Clean Architecture pattern by:
- * - Depending on domain interfaces rather than concrete implementations
+ * - Depending on application ports rather than domain/infrastructure traits
  * - Orchestrating domain operations without containing domain logic
  * - Exposing its functionality through the TrashUseCase port
  */
@@ -28,11 +28,14 @@ pub struct TrashService {
     /// Repository for trash-specific operations like listing and retrieving trashed items
     trash_repository: Arc<dyn TrashRepository>,
     
-    /// Repository for file operations used when trashing, restoring, or deleting files
-    file_repository: Arc<dyn FileRepository>,
+    /// Port for file read operations (get file metadata)
+    file_read_port: Arc<dyn FileReadPort>,
     
-    /// Repository for folder operations used when trashing, restoring, or deleting folders
-    folder_repository: Arc<dyn FolderRepository>,
+    /// Port for file write operations (trash, restore, delete)
+    file_write_port: Arc<dyn FileWritePort>,
+    
+    /// Port for folder operations (get folder, trash, restore, delete)
+    folder_storage_port: Arc<dyn FolderStoragePort>,
     
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
@@ -41,33 +44,35 @@ pub struct TrashService {
 impl TrashService {
     pub fn new(
         trash_repository: Arc<dyn TrashRepository>,
-        file_repository: Arc<dyn FileRepository>,
-        folder_repository: Arc<dyn FolderRepository>,
+        file_read_port: Arc<dyn FileReadPort>,
+        file_write_port: Arc<dyn FileWritePort>,
+        folder_storage_port: Arc<dyn FolderStoragePort>,
         retention_days: u32,
     ) -> Self {
         Self {
             trash_repository,
-            file_repository,
-            folder_repository,
+            file_read_port,
+            file_write_port,
+            folder_storage_port,
             retention_days,
         }
     }
 
     /// Converts a TrashedItem entity to a DTO
     fn to_dto(&self, item: TrashedItem) -> TrashedItemDto {
-        // Calculate days_until_deletion before moving item.original_path
+        // Calculate days_until_deletion before moving item fields
         let days_until_deletion = item.days_until_deletion();
         
         TrashedItemDto {
-            id: item.id.to_string(),
-            original_id: item.original_id.to_string(),
-            item_type: match item.item_type {
+            id: item.id().to_string(),
+            original_id: item.original_id().to_string(),
+            item_type: match item.item_type() {
                 TrashedItemType::File => "file".to_string(),
                 TrashedItemType::Folder => "folder".to_string(),
             },
-            name: item.name,
-            original_path: item.original_path,
-            trashed_at: item.trashed_at,
+            name: item.name().to_string(),
+            original_path: item.original_path().to_string(),
+            trashed_at: item.trashed_at(),
             days_until_deletion,
         }
     }
@@ -83,10 +88,10 @@ impl TrashService {
 
         match self.trash_repository.get_trash_item(&item_uuid, &user_uuid).await? {
             Some(item) => {
-                if item.user_id != user_uuid {
+                if item.user_id() != user_uuid {
                     error!(
                         "User {} attempted to access trash item {} owned by {}",
-                        user_id, item_id, item.user_id
+                        user_id, item_id, item.user_id()
                     );
                     return Err(DomainError::access_denied(
                         "TrashItem",
@@ -130,10 +135,9 @@ impl TrashUseCase for TrashService {
         info!("Moving to trash: type={}, id={}, user={}", item_type, item_id, user_id);
         debug!("User UUID validation: {}", user_id);
         
-        // Validate user ownership
-        debug!("Validating user permissions");
-        self.validate_user_ownership(item_id, user_id).await?;
-        debug!("User permissions validated");
+        // Note: We do NOT call validate_user_ownership here because the item
+        // is not yet in the trash. Ownership validation is only for operations
+        // on already-trashed items (restore, delete_permanently).
         
         // Parse UUIDs with detailed error handling
         debug!("Validating item UUID: {}", item_id);
@@ -166,7 +170,7 @@ impl TrashUseCase for TrashService {
                 
                 // Get the file to verify it exists and capture its data
                 debug!("Getting file data: {}", item_id);
-                let file = match self.file_repository.get_file_by_id(item_id).await {
+                let file = match self.file_read_port.get_file(item_id).await {
                     Ok(file) => {
                         debug!("File found: {} ({})", file.name(), item_id);
                         file
@@ -194,7 +198,7 @@ impl TrashUseCase for TrashService {
                     original_path,
                     self.retention_days,
                 );
-                debug!("TrashedItem created successfully: {} -> {}", file.name(), trashed_item.id);
+                debug!("TrashedItem created successfully: {} -> {}", file.name(), trashed_item.id());
                 
                 // First add to trash index to register the item
                 info!("Adding file {} to trash index", item_id);
@@ -210,7 +214,7 @@ impl TrashUseCase for TrashService {
                 
                 // Then physically move the file to trash
                 info!("Physically moving file to trash: {}", item_id);
-                match self.file_repository.move_to_trash(item_id).await {
+                match self.file_write_port.move_to_trash(item_id).await {
                     Ok(_) => {
                         debug!("File physically moved to trash successfully: {}", item_id);
                     },
@@ -229,7 +233,7 @@ impl TrashUseCase for TrashService {
             },
             "folder" => {
                 // Get the folder to verify it exists and capture its data
-                let folder = self.folder_repository.get_folder_by_id(item_id).await
+                let folder = self.folder_storage_port.get_folder(item_id).await
                     .map_err(|e| DomainError::new(
                         ErrorKind::NotFound,
                         "Folder",
@@ -259,7 +263,7 @@ impl TrashUseCase for TrashService {
                 };
                 
                 // Then physically move the folder to trash
-                self.folder_repository.move_to_trash(item_id).await
+                self.folder_storage_port.move_to_trash(item_id).await
                     .map_err(|e| DomainError::new(
                         ErrorKind::InternalError,
                         "Folder",
@@ -306,17 +310,17 @@ impl TrashUseCase for TrashService {
         match item_result {
             Ok(Some(item)) => {
                 info!("Found item in trash: ID={}, Type={:?}, OriginalID={}", 
-                    trash_id, item.item_type, item.original_id);
+                    trash_id, item.item_type(), item.original_id());
                 
                 // Restore based on type
-                match item.item_type {
+                match item.item_type() {
                     TrashedItemType::File => {
                         // Restore the file to its original location
-                        let file_id = item.original_id.to_string();
-                        let original_path = item.original_path.clone();
+                        let file_id = item.original_id().to_string();
+                        let original_path = item.original_path().to_string();
                         
                         info!("Restoring file from trash: ID={}, OriginalPath={}", file_id, original_path);
-                        match self.file_repository.restore_from_trash(&file_id, &original_path).await {
+                        match self.file_write_port.restore_from_trash(&file_id, &original_path).await {
                             Ok(_) => {
                                 info!("Successfully restored file from trash: {}", file_id);
                             },
@@ -339,11 +343,11 @@ impl TrashUseCase for TrashService {
                     },
                     TrashedItemType::Folder => {
                         // Restore the folder to its original location
-                        let folder_id = item.original_id.to_string();
-                        let original_path = item.original_path.clone();
+                        let folder_id = item.original_id().to_string();
+                        let original_path = item.original_path().to_string();
                         
                         info!("Restoring folder from trash: ID={}, OriginalPath={}", folder_id, original_path);
-                        match self.folder_repository.restore_from_trash(&folder_id, &original_path).await {
+                        match self.folder_storage_port.restore_from_trash(&folder_id, &original_path).await {
                             Ok(_) => {
                                 info!("Successfully restored folder from trash: {}", folder_id);
                             },
@@ -431,16 +435,16 @@ impl TrashUseCase for TrashService {
         match item_result {
             Ok(Some(item)) => {
                 info!("Found item in trash: ID={}, Type={:?}, OriginalID={}", 
-                      trash_id, item.item_type, item.original_id);
+                      trash_id, item.item_type(), item.original_id());
                 
                 // Permanently delete based on type
-                match item.item_type {
+                match item.item_type() {
                     TrashedItemType::File => {
                         // Eliminar el archivo permanentemente
-                        let file_id = item.original_id.to_string();
+                        let file_id = item.original_id().to_string();
                         
                         info!("Permanently deleting file: {}", file_id);
-                        match self.file_repository.delete_file_permanently(&file_id).await {
+                        match self.file_write_port.delete_file_permanently(&file_id).await {
                             Ok(_) => {
                                 info!("Successfully deleted file permanently: {}", file_id);
                             },
@@ -463,10 +467,10 @@ impl TrashUseCase for TrashService {
                     },
                     TrashedItemType::Folder => {
                         // Eliminar la carpeta permanentemente
-                        let folder_id = item.original_id.to_string();
+                        let folder_id = item.original_id().to_string();
                         
                         info!("Permanently deleting folder: {}", folder_id);
-                        match self.folder_repository.delete_folder_permanently(&folder_id).await {
+                        match self.folder_storage_port.delete_folder_permanently(&folder_id).await {
                             Ok(_) => {
                                 info!("Successfully deleted folder permanently: {}", folder_id);
                             },
@@ -532,18 +536,18 @@ impl TrashUseCase for TrashService {
         
         // Permanently delete each item
         for item in items {
-            match item.item_type {
+            match item.item_type() {
                 TrashedItemType::File => {
                     // Permanently delete the file
-                    let file_id = item.original_id.to_string();
-                    if let Err(e) = self.file_repository.delete_file_permanently(&file_id).await {
+                    let file_id = item.original_id().to_string();
+                    if let Err(e) = self.file_write_port.delete_file_permanently(&file_id).await {
                         error!("Error permanently deleting file {}: {}", file_id, e);
                     }
                 },
                 TrashedItemType::Folder => {
                     // Permanently delete the folder
-                    let folder_id = item.original_id.to_string();
-                    if let Err(e) = self.folder_repository.delete_folder_permanently(&folder_id).await {
+                    let folder_id = item.original_id().to_string();
+                    if let Err(e) = self.folder_storage_port.delete_folder_permanently(&folder_id).await {
                         error!("Error permanently deleting folder {}: {}", folder_id, e);
                     }
                 }

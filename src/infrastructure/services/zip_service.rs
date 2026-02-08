@@ -2,10 +2,13 @@ use std::io::{Cursor, Read, Write};
 use zip::{ZipWriter, write::SimpleFileOptions};
 use thiserror::Error;
 use tracing::*;
+use async_trait::async_trait;
 use crate::{
     application::dtos::file_dto::FileDto,
     application::dtos::folder_dto::FolderDto,
-    application::ports::inbound::{FileUseCase, FolderUseCase},
+    application::ports::inbound::FolderUseCase,
+    application::ports::file_ports::FileRetrievalUseCase,
+    application::ports::zip_ports::ZipPort,
     common::errors::{Result, DomainError, ErrorKind},
 };
 use std::sync::Arc;
@@ -45,13 +48,13 @@ impl From<zip::result::ZipError> for DomainError {
 
 /// Servicio para crear archivos ZIP
 pub struct ZipService {
-    file_service: Arc<dyn FileUseCase>,
+    file_service: Arc<dyn FileRetrievalUseCase>,
     folder_service: Arc<dyn FolderUseCase>,
 }
 
 impl ZipService {
     /// Crea una nueva instancia del servicio ZIP con una referencia al servicio de archivos
-    pub fn new(file_service: Arc<dyn FileUseCase>, folder_service: Arc<dyn FolderUseCase>) -> Self {
+    pub fn new(file_service: Arc<dyn FileRetrievalUseCase>, folder_service: Arc<dyn FolderUseCase>) -> Self {
         Self {
             file_service,
             folder_service,
@@ -224,5 +227,18 @@ impl ZipService {
                 Err(ZipError::ZipError(e).into())
             }
         }
+    }
+}
+
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+#[async_trait]
+impl ZipPort for ZipService {
+    async fn create_folder_zip(
+        &self,
+        folder_id: &str,
+        folder_name: &str,
+    ) -> std::result::Result<Vec<u8>, DomainError> {
+        self.create_folder_zip(folder_id, folder_name).await
     }
 }

@@ -1,26 +1,22 @@
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::RwLock;
 use sqlx::PgPool;
 
 use crate::application::services::auth_application_service::AuthApplicationService;
 
 use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::repositories::folder_fs_repository::FolderFsRepository;
-use crate::infrastructure::repositories::file_fs_repository::FileFsRepository;
 use crate::infrastructure::repositories::trash_fs_repository::TrashFsRepository;
 use crate::infrastructure::repositories::share_fs_repository::ShareFsRepository;
 use crate::infrastructure::repositories::parallel_file_processor::ParallelFileProcessor;
 use crate::infrastructure::services::file_system_i18n_service::FileSystemI18nService;
 use crate::infrastructure::services::id_mapping_service::IdMappingService;
 use crate::infrastructure::services::id_mapping_optimizer::IdMappingOptimizer;
-use crate::infrastructure::services::cache_manager::StorageCacheManager;
 use crate::infrastructure::services::file_metadata_cache::FileMetadataCache;
-use crate::infrastructure::services::file_content_cache::{FileContentCache, FileContentCacheConfig, SharedFileContentCache};
+use crate::infrastructure::services::file_content_cache::{FileContentCache, FileContentCacheConfig};
 use crate::infrastructure::services::buffer_pool::BufferPool;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 use crate::application::services::folder_service::FolderService;
-use crate::application::services::file_service::FileService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
 use crate::application::services::trash_service::TrashService;
 use crate::application::services::search_service::SearchService;
@@ -29,18 +25,32 @@ use crate::application::services::favorites_service::FavoritesService;
 use crate::application::services::recent_service::RecentService;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::storage_mediator::{StorageMediator, FileSystemStorageMediator};
-use crate::application::ports::inbound::{FileUseCase, FolderUseCase, SearchUseCase};
-use crate::application::ports::outbound::{FileStoragePort, FolderStoragePort};
+use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
+use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::favorites_ports::FavoritesUseCase;
 use crate::application::ports::recent_ports::RecentItemsUseCase;
 use crate::application::ports::file_ports::{FileUploadUseCase, FileRetrievalUseCase, FileManagementUseCase, FileUseCaseFactory};
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
-use crate::infrastructure::repositories::{FileMetadataManager, FilePathResolver, FileFsReadRepository, FileFsWriteRepository};
+use crate::infrastructure::repositories::{FileFsReadRepository, FileFsWriteRepository};
 use crate::application::services::{FileUploadService, FileRetrievalService, FileManagementService, AppFileUseCaseFactory};
 use crate::common::errors::DomainError;
-use crate::common::adapters::{DomainFileRepoAdapter, DomainFolderRepoAdapter};
 use crate::domain::services::i18n_service::I18nService;
 use crate::common::config::AppConfig;
+use crate::application::ports::cache_ports::{WriteBehindCachePort, ContentCachePort};
+use crate::application::ports::thumbnail_ports::ThumbnailPort;
+use crate::application::ports::transcode_ports::ImageTranscodePort;
+use crate::application::ports::dedup_ports::DedupPort;
+use crate::application::ports::chunked_upload_ports::ChunkedUploadPort;
+use crate::application::ports::compression_ports::CompressionPort;
+use crate::application::ports::zip_ports::ZipPort;
+
+use crate::common::stubs::{
+    StubZipPort, StubCompressionPort, StubIdMappingService, StubStorageMediator,
+    StubFileReadPort, StubFileWritePort, StubFolderStoragePort,
+    StubI18nService, StubFolderUseCase, StubFileUploadUseCase,
+    StubFileRetrievalUseCase, StubFileManagementUseCase, StubFileUseCaseFactory,
+    StubSearchUseCase,
+};
 
 /// Fábrica para los diferentes componentes de la aplicación
 /// 
@@ -85,18 +95,6 @@ impl AppServiceFactory {
     pub async fn create_core_services(&self) -> Result<CoreServices, DomainError> {
         // Path service
         let path_service = Arc::new(PathService::new(self.storage_path.clone()));
-        
-        // Cache manager
-        let file_ttl_ms = self.config.cache.file_ttl_ms;
-        let dir_ttl_ms = self.config.cache.directory_ttl_ms;
-        let max_entries = self.config.cache.max_entries;
-        let cache_manager = Arc::new(StorageCacheManager::new(file_ttl_ms, dir_ttl_ms, max_entries));
-        
-        // Iniciar tarea de limpieza de caché en segundo plano
-        let cache_manager_clone = cache_manager.clone();
-        tokio::spawn(async move {
-            StorageCacheManager::start_cleanup_task(cache_manager_clone).await;
-        });
         
         // File content cache for ultra-fast file serving (hot files in RAM)
         let file_content_cache = Arc::new(FileContentCache::new(FileContentCacheConfig {
@@ -162,11 +160,19 @@ impl AppServiceFactory {
         );
         dedup_service.initialize().await?;
         
-        tracing::info!("Core services initialized: path service, cache manager, file content cache, ID mapping, thumbnails, write-behind cache, chunked upload, image transcode, dedup");
+        // Compression service (gzip)
+        let compression_service: Arc<dyn CompressionPort> = Arc::new(
+            crate::infrastructure::services::compression_service::GzipCompressionService::new()
+        );
+        
+        tracing::info!("Core services initialized: path service, cache manager, file content cache, ID mapping, thumbnails, write-behind cache, chunked upload, image transcode, dedup, compression");
+        
+        // NOTE: zip_service requires ApplicationServices (FileRetrievalUseCase, FolderUseCase) which are
+        // created later. It will be set via AppState::with_zip_service() after application services are ready.
+        // For now we use a placeholder that will be replaced.
         
         Ok(CoreServices {
             path_service,
-            cache_manager,
             file_content_cache,
             id_mapping_service: folder_id_mapping_service,
             file_id_mapping_service,
@@ -176,33 +182,33 @@ impl AppServiceFactory {
             chunked_upload_service,
             image_transcode_service,
             dedup_service,
+            compression_service,
+            zip_service: Arc::new(StubZipPort),  // Placeholder - replaced after app services init
             config: self.config.clone(),
         })
     }
     
     /// Inicializa los servicios de repositorio
     pub fn create_repository_services(&self, core: &CoreServices) -> RepositoryServices {
-        // Storage mediator - con inicialización diferida para folder repository
-        let folder_repository_holder = Arc::new(RwLock::new(None));
+        // Storage mediator - uses stub initially, will be replaced after folder repo is ready
+        let storage_mediator_stub: Arc<dyn StorageMediator> = Arc::new(
+            FileSystemStorageMediator::new_stub()
+        );
         
-        let storage_mediator = Arc::new(FileSystemStorageMediator::new_with_lazy_folder(
-            folder_repository_holder.clone(),
-            core.path_service.clone(),
-            core.id_mapping_optimizer.clone()
-        ));
-        
-        // Folder repository
+        // Folder repository — implements FolderStoragePort directly
         let folder_repository = Arc::new(FolderFsRepository::new(
             self.storage_path.clone(),
-            storage_mediator.clone(),
+            storage_mediator_stub.clone(),
             core.id_mapping_service.clone(),
             core.path_service.clone(),
         ));
         
-        // Actualizar el holder para el mediador
-        if let Ok(mut holder) = folder_repository_holder.write() {
-            *holder = Some(folder_repository.clone());
-        }
+        // Now create the real storage mediator with the folder repo (as FolderStoragePort)
+        let storage_mediator: Arc<dyn StorageMediator> = Arc::new(FileSystemStorageMediator::new(
+            folder_repository.clone() as Arc<dyn FolderStoragePort>,
+            core.path_service.clone(),
+            core.id_mapping_optimizer.clone()
+        ));
         
         // Metadata cache
         let metadata_cache = Arc::new(
@@ -225,44 +231,25 @@ impl AppServiceFactory {
             buffer_pool.clone()
         ));
         
-        // Componentes refactorizados
-        let metadata_manager = Arc::new(FileMetadataManager::new(
-            metadata_cache.clone(),
-            core.config.clone()
-        ));
-        
-        let path_resolver = Arc::new(FilePathResolver::new(
-            core.path_service.clone(),
-            storage_mediator.clone(),
-            core.id_mapping_service.clone()
-        ));
-        
         // File repositories separados para lectura y escritura
         let file_read_repository = Arc::new(FileFsReadRepository::new(
             self.storage_path.clone(),
-            metadata_manager.clone(),
-            path_resolver.clone(),
-            core.config.clone(),
-            Some(parallel_processor.clone())
-        ));
-        
-        let file_write_repository = Arc::new(FileFsWriteRepository::new(
-            self.storage_path.clone(),
-            metadata_manager.clone(),
-            path_resolver.clone(),
-            storage_mediator.clone(),
-            core.config.clone(),
-            Some(parallel_processor.clone())
-        ));
-        
-        // File repository con procesamiento paralelo
-        let file_repository = Arc::new(FileFsRepository::new_with_processor(
-            self.storage_path.clone(), 
             storage_mediator.clone(),
             core.file_id_mapping_service.clone(),
             core.path_service.clone(),
             metadata_cache.clone(),
-            parallel_processor
+            core.config.clone(),
+            Some(parallel_processor.clone()),
+        ));
+        
+        let file_write_repository = Arc::new(FileFsWriteRepository::new(
+            self.storage_path.clone(),
+            storage_mediator.clone(),
+            core.file_id_mapping_service.clone(),
+            core.path_service.clone(),
+            metadata_cache.clone(),
+            core.config.clone(),
+            Some(parallel_processor.clone()),
         ));
         
         // I18n repository
@@ -284,40 +271,48 @@ impl AppServiceFactory {
         
         RepositoryServices {
             folder_repository,
-            file_repository,
             file_read_repository,
             file_write_repository,
             i18n_repository,
             storage_mediator,
-            metadata_manager,
-            path_resolver,
             metadata_cache,
             trash_repository,
         }
     }
     
     /// Inicializa los servicios de aplicación
-    pub fn create_application_services(&self, repos: &RepositoryServices) -> ApplicationServices {
+    pub fn create_application_services(
+        &self,
+        core: &CoreServices,
+        repos: &RepositoryServices,
+        trash_service: Option<Arc<dyn TrashUseCase>>,
+    ) -> ApplicationServices {
         // Servicios principales
         let folder_service = Arc::new(FolderService::new(
             repos.folder_repository.clone()
         ));
         
-        let file_service = Arc::new(FileService::new(
-            repos.file_repository.clone()
+        // Servicios refactorizados con todos los puertos de infraestructura
+        let file_upload_service = Arc::new(FileUploadService::new_full(
+            repos.file_write_repository.clone(),
+            repos.file_read_repository.clone(),
+            core.write_behind_cache.clone(),
+            core.dedup_service.clone(),
         ));
         
-        // Servicios refactorizados
-        let file_upload_service = Arc::new(FileUploadService::new(
-            repos.file_write_repository.clone()
+        let file_retrieval_service = Arc::new(FileRetrievalService::new_full(
+            repos.file_read_repository.clone(),
+            core.write_behind_cache.clone(),
+            core.file_content_cache.clone(),
+            core.image_transcode_service.clone(),
         ));
         
-        let file_retrieval_service = Arc::new(FileRetrievalService::new(
-            repos.file_read_repository.clone()
-        ));
-        
-        let file_management_service = Arc::new(FileManagementService::new(
-            repos.file_write_repository.clone()
+        // FileManagementService con dedup y trash
+        let file_management_service = Arc::new(FileManagementService::new_full(
+            repos.file_write_repository.clone(),
+            repos.file_read_repository.clone(),
+            trash_service.clone(),
+            core.dedup_service.clone(),
         ));
         
         let file_use_case_factory = Arc::new(AppFileUseCaseFactory::new(
@@ -331,7 +326,7 @@ impl AppServiceFactory {
         
         // Search service con caché
         let search_service: Option<Arc<dyn SearchUseCase>> = Some(Arc::new(SearchService::new(
-            repos.file_repository.clone(),
+            repos.file_read_repository.clone(),
             repos.folder_repository.clone(),
             300, // Cache TTL in seconds (5 minutes)
             1000, // Maximum cache entries
@@ -342,16 +337,14 @@ impl AppServiceFactory {
         ApplicationServices {
             // Tipos concretos para handlers que los necesitan
             folder_service_concrete: folder_service.clone(),
-            file_service_concrete: file_service.clone(),
             // Traits para abstracción
             folder_service,
-            file_service,
             file_upload_service,
             file_retrieval_service,
             file_management_service,
             file_use_case_factory,
             i18n_service,
-            trash_service: None, // Se configura después con create_trash_service
+            trash_service, // Already set via parameter
             search_service,
             share_service: None, // Se configura después con create_share_service
             favorites_service: None, // Se configura después con create_favorites_service
@@ -371,14 +364,12 @@ impl AppServiceFactory {
         
         let trash_repo = repos.trash_repository.as_ref()?;
         
-        // Crear adaptadores
-        let file_repo_adapter = Arc::new(DomainFileRepoAdapter::new(repos.file_repository.clone()));
-        let folder_repo_adapter = Arc::new(DomainFolderRepoAdapter::new(repos.folder_repository.clone()));
-        
+        // Wire ports directly to TrashService — no adapter layer needed
         let service = Arc::new(TrashService::new(
             trash_repo.clone(),
-            file_repo_adapter,
-            folder_repo_adapter,
+            repos.file_read_repository.clone(),
+            repos.file_write_repository.clone(),
+            repos.folder_repository.clone(),
             self.config.storage.trash_retention_days,
         ));
         
@@ -409,11 +400,16 @@ impl AppServiceFactory {
             Arc::new(self.config.clone())
         ));
         
+        // Build a password hasher for share password verification
+        let password_hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
+            Arc::new(crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new());
+
         let service = Arc::new(ShareService::new(
             Arc::new(self.config.clone()),
             share_repository,
-            repos.file_repository.clone(),
-            repos.folder_repository.clone()
+            repos.file_read_repository.clone(),
+            repos.folder_repository.clone(),
+            password_hasher,
         ));
         
         tracing::info!("File sharing service initialized");
@@ -425,7 +421,10 @@ impl AppServiceFactory {
         &self,
         db_pool: &Arc<PgPool>,
     ) -> Arc<dyn FavoritesUseCase> {
-        let service = Arc::new(FavoritesService::new(db_pool.clone()));
+        let repo = Arc::new(
+            crate::infrastructure::repositories::pg::FavoritesPgRepository::new(db_pool.clone())
+        );
+        let service = Arc::new(FavoritesService::new(repo));
         tracing::info!("Favorites service initialized");
         service
     }
@@ -435,8 +434,11 @@ impl AppServiceFactory {
         &self,
         db_pool: &Arc<PgPool>,
     ) -> Arc<dyn RecentItemsUseCase> {
+        let repo = Arc::new(
+            crate::infrastructure::repositories::pg::RecentItemsPgRepository::new(db_pool.clone())
+        );
         let service = Arc::new(RecentService::new(
-            db_pool.clone(),
+            repo,
             50 // Maximum recent items per user
         ));
         tracing::info!("Recent items service initialized");
@@ -463,22 +465,135 @@ impl AppServiceFactory {
             tracing::info!("Preloaded {} directory entries into cache", count);
         }
     }
+
+    /// Crea el servicio de uso de almacenamiento (requiere base de datos)
+    pub fn create_storage_usage_service(
+        &self,
+        repos: &RepositoryServices,
+        db_pool: &Arc<PgPool>,
+    ) -> Arc<dyn crate::application::ports::storage_ports::StorageUsagePort> {
+        let user_repository = Arc::new(
+            crate::infrastructure::repositories::pg::UserPgRepository::new(db_pool.clone())
+        );
+        let service = Arc::new(
+            crate::application::services::storage_usage_service::StorageUsageService::new(
+                repos.file_read_repository.clone(),
+                user_repository,
+            )
+        );
+        tracing::info!("Storage usage service initialized");
+        service
+    }
+
+    /// Construye el AppState completo usando todos los servicios de la fábrica.
+    ///
+    /// Este es el punto de entrada principal que reemplaza toda la lógica manual de `main.rs`.
+    pub async fn build_app_state(
+        &self,
+        db_pool: Option<Arc<PgPool>>,
+    ) -> Result<AppState, DomainError> {
+        // 1. Core services
+        let core = self.create_core_services().await?;
+
+        // 2. Repository services
+        let repos = self.create_repository_services(&core);
+
+        // 3. Trash service (needed before application services)
+        let trash_service = self.create_trash_service(&repos).await;
+
+        // 4. Application services (with trash already wired)
+        let mut apps = self.create_application_services(&core, &repos, trash_service.clone());
+
+        // 5. Share service
+        let share_service = self.create_share_service(&repos);
+        apps.share_service = share_service.clone();
+
+        // 6. Database-dependent services
+        let mut favorites_service: Option<Arc<dyn FavoritesUseCase>> = None;
+        let mut recent_service: Option<Arc<dyn RecentItemsUseCase>> = None;
+        let mut storage_usage_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>> = None;
+        let mut auth_services: Option<crate::common::di::AuthServices> = None;
+
+        if let Some(ref pool) = db_pool {
+            let favs = self.create_favorites_service(pool);
+            favorites_service = Some(favs.clone());
+            apps.favorites_service = Some(favs);
+
+            let recent = self.create_recent_service(pool);
+            recent_service = Some(recent.clone());
+            apps.recent_service = Some(recent);
+
+            storage_usage_service = Some(self.create_storage_usage_service(&repos, pool));
+
+            // Auth services
+            if self.config.features.enable_auth {
+                match crate::infrastructure::auth_factory::create_auth_services(
+                    &self.config,
+                    pool.clone(),
+                    Some(apps.folder_service_concrete.clone()),
+                ).await {
+                    Ok(services) => {
+                        tracing::info!("Authentication services initialized successfully");
+                        auth_services = Some(services);
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to initialize authentication services: {}", e);
+                    }
+                }
+            }
+        }
+
+        // 7. Preload translations
+        self.preload_translations(&apps.i18n_service).await;
+
+        // 8. Preload cache
+        self.preload_cache(&repos.metadata_cache).await;
+
+        // 9. Build the ZipService with real application services
+        let zip_service: Arc<dyn crate::application::ports::zip_ports::ZipPort> = Arc::new(
+            crate::infrastructure::services::zip_service::ZipService::new(
+                apps.file_retrieval_service.clone(),
+                apps.folder_service.clone(),
+            )
+        );
+        let mut core = core;
+        core.zip_service = zip_service;
+
+        // 10. Assemble final AppState
+        let app_state = AppState {
+            core,
+            repositories: repos,
+            applications: apps,
+            db_pool,
+            auth_service: auth_services,
+            trash_service,
+            share_service,
+            favorites_service,
+            recent_service,
+            storage_usage_service,
+            calendar_service: None,
+            contact_service: None,
+        };
+
+        Ok(app_state)
+    }
 }
 
 /// Contenedor para servicios base
 #[derive(Clone)]
 pub struct CoreServices {
     pub path_service: Arc<PathService>,
-    pub cache_manager: Arc<StorageCacheManager>,
-    pub file_content_cache: SharedFileContentCache,
+    pub file_content_cache: Arc<dyn ContentCachePort>,
     pub id_mapping_service: Arc<dyn crate::application::ports::outbound::IdMappingPort>,
     pub file_id_mapping_service: Arc<IdMappingService>,
     pub id_mapping_optimizer: Arc<IdMappingOptimizer>,
-    pub thumbnail_service: Arc<crate::infrastructure::services::thumbnail_service::ThumbnailService>,
-    pub write_behind_cache: Arc<crate::infrastructure::services::write_behind_cache::WriteBehindCache>,
-    pub chunked_upload_service: Arc<crate::infrastructure::services::chunked_upload_service::ChunkedUploadService>,
-    pub image_transcode_service: Arc<crate::infrastructure::services::image_transcode_service::ImageTranscodeService>,
-    pub dedup_service: Arc<crate::infrastructure::services::dedup_service::DedupService>,
+    pub thumbnail_service: Arc<dyn ThumbnailPort>,
+    pub write_behind_cache: Arc<dyn WriteBehindCachePort>,
+    pub chunked_upload_service: Arc<dyn ChunkedUploadPort>,
+    pub image_transcode_service: Arc<dyn ImageTranscodePort>,
+    pub dedup_service: Arc<dyn DedupPort>,
+    pub compression_service: Arc<dyn CompressionPort>,
+    pub zip_service: Arc<dyn ZipPort>,
     pub config: AppConfig,
 }
 
@@ -486,13 +601,10 @@ pub struct CoreServices {
 #[derive(Clone)]
 pub struct RepositoryServices {
     pub folder_repository: Arc<dyn FolderStoragePort>,
-    pub file_repository: Arc<dyn FileStoragePort>,
     pub file_read_repository: Arc<dyn FileReadPort>,
     pub file_write_repository: Arc<dyn FileWritePort>,
     pub i18n_repository: Arc<dyn I18nService>,
     pub storage_mediator: Arc<dyn StorageMediator>,
-    pub metadata_manager: Arc<FileMetadataManager>,
-    pub path_resolver: Arc<FilePathResolver>,
     pub metadata_cache: Arc<FileMetadataCache>,
     pub trash_repository: Option<Arc<dyn crate::domain::repositories::trash_repository::TrashRepository>>,
 }
@@ -502,10 +614,8 @@ pub struct RepositoryServices {
 pub struct ApplicationServices {
     // Tipos concretos para compatibilidad con handlers existentes
     pub folder_service_concrete: Arc<FolderService>,
-    pub file_service_concrete: Arc<FileService>,
     // Traits para abstracción
     pub folder_service: Arc<dyn FolderUseCase>,
-    pub file_service: Arc<dyn FileUseCase>,
     pub file_upload_service: Arc<dyn FileUploadUseCase>,
     pub file_retrieval_service: Arc<dyn FileRetrievalUseCase>,
     pub file_management_service: Arc<dyn FileManagementUseCase>,
@@ -544,526 +654,71 @@ pub struct AppState {
 
 impl Default for AppState {
     fn default() -> Self {
-        // This is just a minimal stub version for auth middleware
-        // We'll need to create proper instance in main.rs
-        
+        // Minimal stub version for auth middleware and route construction.
+        // Real services are wired in main.rs via AppServiceFactory or manual init.
+
         let config = crate::common::config::AppConfig::default();
         let path_service = Arc::new(
             crate::infrastructure::services::path_service::PathService::new(
                 std::path::PathBuf::from("./storage")
             )
         );
-        
-        // Create stub service implementations
-        struct DummyIdMappingService;
-        #[async_trait::async_trait]
-        impl crate::application::ports::outbound::IdMappingPort for DummyIdMappingService {
-            async fn get_or_create_id(&self, _path: &crate::domain::services::path_service::StoragePath) -> Result<String, crate::common::errors::DomainError> {
-                Ok("dummy-id".to_string())
-            }
-            
-            async fn get_path_by_id(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, crate::common::errors::DomainError> {
-                Ok(crate::domain::services::path_service::StoragePath::from_string("/"))
-            }
-            
-            async fn update_path(&self, _id: &str, _new_path: &crate::domain::services::path_service::StoragePath) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn remove_id(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn save_changes(&self) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-        }
-        
-        struct DummyStorageMediator;
-        #[async_trait::async_trait]
-        impl crate::application::services::storage_mediator::StorageMediator for DummyStorageMediator {
-            async fn get_folder_path(&self, _folder_id: &str) -> Result<std::path::PathBuf, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(std::path::PathBuf::from("/tmp"))
-            }
-            
-            async fn get_folder_storage_path(&self, _folder_id: &str) -> Result<crate::domain::services::path_service::StoragePath, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(crate::domain::services::path_service::StoragePath::root())
-            }
-            
-            async fn get_folder(&self, _folder_id: &str) -> Result<crate::domain::entities::folder::Folder, crate::application::services::storage_mediator::StorageMediatorError> {
-                Err(crate::application::services::storage_mediator::StorageMediatorError::NotFound("Stub not implemented".to_string()))
-            }
-            
-            async fn file_exists_at_path(&self, _path: &std::path::Path) -> Result<bool, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(false)
-            }
-            
-            async fn file_exists_at_storage_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<bool, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(false)
-            }
-            
-            async fn folder_exists_at_path(&self, _path: &std::path::Path) -> Result<bool, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(false)
-            }
-            
-            async fn folder_exists_at_storage_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<bool, crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(false)
-            }
-            
-            fn resolve_path(&self, _relative_path: &std::path::Path) -> std::path::PathBuf {
-                std::path::PathBuf::from("/tmp")
-            }
-            
-            fn resolve_storage_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> std::path::PathBuf {
-                std::path::PathBuf::from("/tmp")
-            }
-            
-            async fn ensure_directory(&self, _path: &std::path::Path) -> Result<(), crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(())
-            }
-            
-            async fn ensure_storage_directory(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<(), crate::application::services::storage_mediator::StorageMediatorError> {
-                Ok(())
-            }
-        }
-        
-        struct DummyFileReadPort;
-        #[async_trait::async_trait]
-        impl crate::application::ports::storage_ports::FileReadPort for DummyFileReadPort {
-            async fn get_file(&self, _id: &str) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::domain::entities::file::File>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_stream(&self, _id: &str) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
-                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
-                Ok(Box::new(empty_stream))
-            }
-        }
-        
-        struct DummyFileWritePort;
-        #[async_trait::async_trait]
-        impl crate::application::ports::storage_ports::FileWritePort for DummyFileWritePort {
-            async fn save_file(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _content: Vec<u8>,
-            ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn move_file(&self, _file_id: &str, _target_folder_id: Option<String>) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn delete_file(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn get_folder_details(&self, _folder_id: &str) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn get_folder_path_str(&self, _folder_id: &str) -> Result<String, crate::common::errors::DomainError> {
-                Ok("/Mi Carpeta - dummy".to_string())
-            }
-        }
-        
-        struct DummyFileStoragePort;
-        #[async_trait::async_trait]
-        impl crate::application::ports::outbound::FileStoragePort for DummyFileStoragePort {
-            async fn save_file(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _content: Vec<u8>,
-            ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn save_file_from_stream(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _stream: std::pin::Pin<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>>,
-            ) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn get_file(&self, _id: &str) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::domain::entities::file::File>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn delete_file(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_stream(&self, _id: &str) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
-                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
-                Ok(Box::new(empty_stream))
-            }
-            
-            async fn get_file_range_stream(
-                &self, 
-                _id: &str, 
-                _start: u64, 
-                _end: Option<u64>
-            ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
-                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
-                Ok(Box::new(empty_stream))
-            }
-            
-            async fn get_file_mmap(&self, _id: &str) -> Result<bytes::Bytes, crate::common::errors::DomainError> {
-                Ok(bytes::Bytes::new())
-            }
-            
-            async fn move_file(&self, _file_id: &str, _target_folder_id: Option<String>) -> Result<crate::domain::entities::file::File, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::file::File::default())
-            }
-            
-            async fn get_file_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, crate::common::errors::DomainError> {
-                Ok(crate::domain::services::path_service::StoragePath::from_string("/"))
-            }
-            
-            async fn get_parent_folder_id(&self, _path: &str) -> Result<String, crate::common::errors::DomainError> {
-                Ok("root".to_string())
-            }
-            
-            async fn update_file_content(&self, _file_id: &str, _content: Vec<u8>) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn register_file_deferred(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _size: u64,
-            ) -> Result<(crate::domain::entities::file::File, std::path::PathBuf), crate::common::errors::DomainError> {
-                Ok((crate::domain::entities::file::File::default(), std::path::PathBuf::from("/tmp/dummy")))
-            }
-        }
-        
-        struct DummyFolderStoragePort;
-        #[async_trait::async_trait]
-        impl crate::application::ports::outbound::FolderStoragePort for DummyFolderStoragePort {
-            async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::folder::Folder::default())
-            }
-            
-            async fn get_folder(&self, _id: &str) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::folder::Folder::default())
-            }
-            
-            async fn get_folder_by_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::folder::Folder::default())
-            }
-            
-            async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<crate::domain::entities::folder::Folder>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn list_folders_paginated(
-                &self,
-                _parent_id: Option<&str>,
-                _offset: usize,
-                _limit: usize,
-                _include_total: bool
-            ) -> Result<(Vec<crate::domain::entities::folder::Folder>, Option<usize>), crate::common::errors::DomainError> {
-                Ok((Vec::new(), Some(0)))
-            }
-            
-            async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::folder::Folder::default())
-            }
-            
-            async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> Result<crate::domain::entities::folder::Folder, crate::common::errors::DomainError> {
-                Ok(crate::domain::entities::folder::Folder::default())
-            }
-            
-            async fn delete_folder(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn folder_exists(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<bool, crate::common::errors::DomainError> {
-                Ok(false)
-            }
-            
-            async fn get_folder_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, crate::common::errors::DomainError> {
-                Ok(crate::domain::services::path_service::StoragePath::from_string("/"))
-            }
-        }
-        
-        // File path resolution is handled by other components
-        
-        struct DummyI18nService;
-        #[async_trait::async_trait]
-        impl crate::domain::services::i18n_service::I18nService for DummyI18nService {
-            async fn translate(&self, _key: &str, _locale: crate::domain::services::i18n_service::Locale) -> crate::domain::services::i18n_service::I18nResult<String> {
-                Ok(String::new())
-            }
-            
-            async fn load_translations(&self, _locale: crate::domain::services::i18n_service::Locale) -> crate::domain::services::i18n_service::I18nResult<()> {
-                Ok(())
-            }
-            
-            async fn available_locales(&self) -> Vec<crate::domain::services::i18n_service::Locale> {
-                vec![crate::domain::services::i18n_service::Locale::default()]
-            }
-            
-            async fn is_supported(&self, _locale: crate::domain::services::i18n_service::Locale) -> bool {
-                true
-            }
-        }
-        
-        struct DummyFolderUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::inbound::FolderUseCase for DummyFolderUseCase {
-            async fn create_folder(&self, _dto: crate::application::dtos::folder_dto::CreateFolderDto) -> Result<crate::application::dtos::folder_dto::FolderDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::folder_dto::FolderDto::default())
-            }
-            
-            async fn get_folder(&self, _id: &str) -> Result<crate::application::dtos::folder_dto::FolderDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::folder_dto::FolderDto::default())
-            }
-            
-            async fn get_folder_by_path(&self, _path: &str) -> Result<crate::application::dtos::folder_dto::FolderDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::folder_dto::FolderDto::default())
-            }
-            
-            async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<crate::application::dtos::folder_dto::FolderDto>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn list_folders_paginated(
-                &self,
-                _parent_id: Option<&str>,
-                _pagination: &crate::application::dtos::pagination::PaginationRequestDto
-            ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<crate::application::dtos::folder_dto::FolderDto>, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::pagination::PaginatedResponseDto::new(
-                    Vec::new(),
-                    0,
-                    10,
-                    0
-                ))
-            }
-            
-            async fn rename_folder(&self, _id: &str, _dto: crate::application::dtos::folder_dto::RenameFolderDto) -> Result<crate::application::dtos::folder_dto::FolderDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::folder_dto::FolderDto::default())
-            }
-            
-            async fn move_folder(&self, _id: &str, _dto: crate::application::dtos::folder_dto::MoveFolderDto) -> Result<crate::application::dtos::folder_dto::FolderDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::folder_dto::FolderDto::default())
-            }
-            
-            async fn delete_folder(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-        }
-        
-        struct DummyFileUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::inbound::FileUseCase for DummyFileUseCase {
-            async fn upload_file(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _content: Vec<u8>,
-            ) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn get_file(&self, _id: &str) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn get_file_by_path(&self, _path: &str) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn create_file(&self, _parent_path: &str, _filename: &str, _content: &[u8], _content_type: &str) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn update_file(&self, _path: &str, _content: &[u8]) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::application::dtos::file_dto::FileDto>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn delete_file(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-            
-            async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_stream(&self, _id: &str) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
-                // Create an empty stream
-                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
-                Ok(Box::new(empty_stream))
-            }
-            
-            async fn move_file(&self, _file_id: &str, _folder_id: Option<String>) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-        }
-        
-        struct DummyFileUploadUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::file_ports::FileUploadUseCase for DummyFileUploadUseCase {
-            async fn upload_file(
-                &self,
-                _name: String,
-                _folder_id: Option<String>,
-                _content_type: String,
-                _content: Vec<u8>,
-            ) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-        }
-        
-        struct DummyFileRetrievalUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::file_ports::FileRetrievalUseCase for DummyFileRetrievalUseCase {
-            async fn get_file(&self, _id: &str) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::application::dtos::file_dto::FileDto>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, crate::common::errors::DomainError> {
-                Ok(Vec::new())
-            }
-            
-            async fn get_file_stream(&self, _id: &str) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, crate::common::errors::DomainError> {
-                // Create an empty stream
-                let empty_stream = futures::stream::empty::<Result<bytes::Bytes, std::io::Error>>();
-                Ok(Box::new(empty_stream))
-            }
-        }
-        
-        struct DummyFileManagementUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::file_ports::FileManagementUseCase for DummyFileManagementUseCase {
-            async fn move_file(&self, _file_id: &str, _folder_id: Option<String>) -> Result<crate::application::dtos::file_dto::FileDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::file_dto::FileDto::default())
-            }
-            
-            async fn delete_file(&self, _id: &str) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-        }
-        
-        struct DummyFileUseCaseFactory;
-        impl crate::application::ports::file_ports::FileUseCaseFactory for DummyFileUseCaseFactory {
-            fn create_file_upload_use_case(&self) -> std::sync::Arc<dyn crate::application::ports::file_ports::FileUploadUseCase> {
-                std::sync::Arc::new(DummyFileUploadUseCase)
-            }
-            
-            fn create_file_retrieval_use_case(&self) -> std::sync::Arc<dyn crate::application::ports::file_ports::FileRetrievalUseCase> {
-                std::sync::Arc::new(DummyFileRetrievalUseCase)
-            }
-            
-            fn create_file_management_use_case(&self) -> std::sync::Arc<dyn crate::application::ports::file_ports::FileManagementUseCase> {
-                std::sync::Arc::new(DummyFileManagementUseCase)
-            }
-        }
-        
-        struct DummyI18nApplicationService {}
-        
-        // Need to implement the actual service to match the type signature in DI container
-        impl DummyI18nApplicationService {
-            fn dummy() -> crate::application::services::i18n_application_service::I18nApplicationService {
-                // We need to create an actual I18nApplicationService
-                crate::application::services::i18n_application_service::I18nApplicationService::new(
-                    Arc::new(DummyI18nService) as Arc<dyn crate::domain::services::i18n_service::I18nService>
-                )
-            }
-        }
-        
-        // Create service instances
-        let id_mapping_service = Arc::new(DummyIdMappingService) as Arc<dyn crate::application::ports::outbound::IdMappingPort>;
-        let storage_mediator = Arc::new(DummyStorageMediator) as Arc<dyn crate::application::services::storage_mediator::StorageMediator>;
-        let i18n_repository = Arc::new(DummyI18nService) as Arc<dyn crate::domain::services::i18n_service::I18nService>;
-        let folder_service = Arc::new(DummyFolderUseCase) as Arc<dyn crate::application::ports::inbound::FolderUseCase>;
-        let file_service = Arc::new(DummyFileUseCase) as Arc<dyn crate::application::ports::inbound::FileUseCase>;
-        let file_upload_service = Arc::new(DummyFileUploadUseCase) as Arc<dyn crate::application::ports::file_ports::FileUploadUseCase>;
-        let file_retrieval_service = Arc::new(DummyFileRetrievalUseCase) as Arc<dyn crate::application::ports::file_ports::FileRetrievalUseCase>;
-        let file_management_service = Arc::new(DummyFileManagementUseCase) as Arc<dyn crate::application::ports::file_ports::FileManagementUseCase>;
-        let file_use_case_factory = Arc::new(DummyFileUseCaseFactory) as Arc<dyn crate::application::ports::file_ports::FileUseCaseFactory>;
-        
+
+        // Create service instances from the stubs module
+        let id_mapping_service = Arc::new(StubIdMappingService) as Arc<dyn crate::application::ports::outbound::IdMappingPort>;
+        let storage_mediator = Arc::new(StubStorageMediator) as Arc<dyn crate::application::services::storage_mediator::StorageMediator>;
+        let i18n_repository = Arc::new(StubI18nService) as Arc<dyn crate::domain::services::i18n_service::I18nService>;
+        let folder_service = Arc::new(StubFolderUseCase) as Arc<dyn crate::application::ports::inbound::FolderUseCase>;
+        let file_upload_service = Arc::new(StubFileUploadUseCase) as Arc<dyn crate::application::ports::file_ports::FileUploadUseCase>;
+        let file_retrieval_service = Arc::new(StubFileRetrievalUseCase) as Arc<dyn crate::application::ports::file_ports::FileRetrievalUseCase>;
+        let file_management_service = Arc::new(StubFileManagementUseCase) as Arc<dyn crate::application::ports::file_ports::FileManagementUseCase>;
+        let file_use_case_factory = Arc::new(StubFileUseCaseFactory) as Arc<dyn crate::application::ports::file_ports::FileUseCaseFactory>;
+
         // Create dummy ID mapping service for files
         let dummy_file_id_mapping = Arc::new(IdMappingService::dummy());
         let dummy_id_optimizer = Arc::new(IdMappingOptimizer::new(dummy_file_id_mapping.clone()));
-        
+
         // Create file content cache for stub
         let file_content_cache = Arc::new(FileContentCache::new(FileContentCacheConfig::default()));
-        
+
         // Create dummy thumbnail service
-        let dummy_thumbnail_service = Arc::new(
+        let dummy_thumbnail_service: Arc<dyn ThumbnailPort> = Arc::new(
             crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
                 &std::path::PathBuf::from("./storage"),
                 100,
                 10 * 1024 * 1024,
             )
         );
-        
+
         // Create dummy write-behind cache
-        let dummy_write_behind_cache = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
-        
+        let dummy_write_behind_cache: Arc<dyn WriteBehindCachePort> = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
+
         // Create dummy chunked upload service
-        let dummy_chunked_upload_service = Arc::new(
+        let dummy_chunked_upload_service: Arc<dyn ChunkedUploadPort> = Arc::new(
             crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
                 std::path::PathBuf::from("./storage/.uploads")
             )
         );
-        
+
         // Create dummy image transcode service
-        let dummy_image_transcode_service = Arc::new(
+        let dummy_image_transcode_service: Arc<dyn ImageTranscodePort> = Arc::new(
             crate::infrastructure::services::image_transcode_service::ImageTranscodeService::new(
                 &std::path::PathBuf::from("./storage"),
                 100,
                 10 * 1024 * 1024,
             )
         );
-        
+
         // Create dummy dedup service
-        let dummy_dedup_service = Arc::new(
+        let dummy_dedup_service: Arc<dyn DedupPort> = Arc::new(
             crate::infrastructure::services::dedup_service::DedupService::new(
                 &std::path::PathBuf::from("./storage")
             )
         );
-        
-        // This creates the core services needed for basic functionality
+
+        // Core services using stubs
         let core_services = CoreServices {
             path_service: path_service.clone(),
-            cache_manager: Arc::new(crate::infrastructure::services::cache_manager::StorageCacheManager::default()),
             file_content_cache,
             id_mapping_service: id_mapping_service.clone(),
             file_id_mapping_service: dummy_file_id_mapping,
@@ -1073,71 +728,50 @@ impl Default for AppState {
             chunked_upload_service: dummy_chunked_upload_service,
             image_transcode_service: dummy_image_transcode_service,
             dedup_service: dummy_dedup_service,
+            compression_service: Arc::new(StubCompressionPort) as Arc<dyn CompressionPort>,
+            zip_service: Arc::new(StubZipPort) as Arc<dyn ZipPort>,
             config: config.clone(),
         };
-        
-        // Create dummy metadata cache
+
+        // Dummy metadata cache
         let dummy_metadata_cache = Arc::new(FileMetadataCache::default_with_config(config.clone()));
-        
-        // Create empty repository implementations
+
+        // Repository services using stubs
         let repository_services = RepositoryServices {
-            folder_repository: Arc::new(DummyFolderStoragePort) as Arc<dyn crate::application::ports::outbound::FolderStoragePort>,
-            file_repository: Arc::new(DummyFileStoragePort) as Arc<dyn crate::application::ports::outbound::FileStoragePort>,
-            file_read_repository: Arc::new(DummyFileReadPort) as Arc<dyn crate::application::ports::storage_ports::FileReadPort>,
-            file_write_repository: Arc::new(DummyFileWritePort) as Arc<dyn crate::application::ports::storage_ports::FileWritePort>,
+            folder_repository: Arc::new(StubFolderStoragePort) as Arc<dyn crate::application::ports::outbound::FolderStoragePort>,
+            file_read_repository: Arc::new(StubFileReadPort) as Arc<dyn crate::application::ports::storage_ports::FileReadPort>,
+            file_write_repository: Arc::new(StubFileWritePort) as Arc<dyn crate::application::ports::storage_ports::FileWritePort>,
             i18n_repository,
             storage_mediator: storage_mediator.clone(),
-            metadata_manager: Arc::new(crate::infrastructure::repositories::FileMetadataManager::default()),
-            path_resolver: Arc::new(crate::infrastructure::repositories::file_path_resolver::FilePathResolver::new(
-                path_service.clone(),
-                storage_mediator.clone(),
-                id_mapping_service.clone()
-            )),
             metadata_cache: dummy_metadata_cache,
-            trash_repository: None, // No trash repository in minimal mode
+            trash_repository: None,
         };
-        
-        // Create dummy search use case
-        struct DummySearchUseCase;
-        #[async_trait::async_trait]
-        impl crate::application::ports::inbound::SearchUseCase for DummySearchUseCase {
-            async fn search(
-                &self, 
-                _criteria: crate::application::dtos::search_dto::SearchCriteriaDto
-            ) -> Result<crate::application::dtos::search_dto::SearchResultsDto, crate::common::errors::DomainError> {
-                Ok(crate::application::dtos::search_dto::SearchResultsDto::empty())
-            }
-            
-            async fn clear_search_cache(&self) -> Result<(), crate::common::errors::DomainError> {
-                Ok(())
-            }
-        }
-        
-        // Create dummy concrete services for compatibility
-        let dummy_folder_storage = Arc::new(DummyFolderStoragePort) as Arc<dyn crate::application::ports::outbound::FolderStoragePort>;
-        let dummy_file_storage = Arc::new(DummyFileStoragePort) as Arc<dyn crate::application::ports::outbound::FileStoragePort>;
-        let folder_service_concrete = Arc::new(FolderService::new(dummy_folder_storage));
-        let file_service_concrete = Arc::new(FileService::new(dummy_file_storage));
 
-        // Create application services
+        // Dummy concrete services for compatibility
+        let dummy_folder_storage = Arc::new(StubFolderStoragePort) as Arc<dyn crate::application::ports::outbound::FolderStoragePort>;
+        let folder_service_concrete = Arc::new(FolderService::new(dummy_folder_storage));
+
+        // Dummy I18nApplicationService
+        let dummy_i18n_app_service = crate::application::services::i18n_application_service::I18nApplicationService::new(
+            Arc::new(StubI18nService) as Arc<dyn crate::domain::services::i18n_service::I18nService>
+        );
+
+        // Application services using stubs
         let application_services = ApplicationServices {
             folder_service_concrete: folder_service_concrete.clone(),
-            file_service_concrete: file_service_concrete.clone(),
             folder_service,
-            file_service,
             file_upload_service,
             file_retrieval_service,
             file_management_service,
             file_use_case_factory,
-            i18n_service: Arc::new(DummyI18nApplicationService::dummy()),
-            trash_service: None, // No trash service in minimal mode
-            search_service: Some(Arc::new(DummySearchUseCase) as Arc<dyn crate::application::ports::inbound::SearchUseCase>),
-            share_service: None, // No share service in minimal mode
-            favorites_service: None, // No favorites service in minimal mode
-            recent_service: None, // No recent service in minimal mode
+            i18n_service: Arc::new(dummy_i18n_app_service),
+            trash_service: None,
+            search_service: Some(Arc::new(StubSearchUseCase) as Arc<dyn crate::application::ports::inbound::SearchUseCase>),
+            share_service: None,
+            favorites_service: None,
+            recent_service: None,
         };
-        
-        // Return a minimal app state
+
         Self {
             core: core_services,
             repositories: repository_services,
@@ -1182,6 +816,60 @@ impl AppState {
         self
     }
     
+    /// Creates a minimal AppState for route construction.
+    ///
+    /// Uses `Default` stubs for infrastructure services, then overlays the real
+    /// application-level services that arrive as parameters from `main.rs`.
+    /// This keeps `routes.rs` free of any `crate::infrastructure` references.
+    pub fn for_routing(
+        folder_service: Arc<FolderService>,
+        file_retrieval_service: Arc<dyn crate::application::ports::file_ports::FileRetrievalUseCase>,
+        file_upload_service: Arc<dyn FileUploadUseCase>,
+        file_management_service: Arc<dyn FileManagementUseCase>,
+        folder_use_case: Arc<dyn crate::application::ports::inbound::FolderUseCase>,
+        i18n_service: Option<Arc<crate::application::services::i18n_application_service::I18nApplicationService>>,
+        trash_service: Option<Arc<dyn TrashUseCase>>,
+        search_service: Option<Arc<dyn crate::application::ports::inbound::SearchUseCase>>,
+        share_service: Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>>,
+        favorites_service: Option<Arc<dyn FavoritesUseCase>>,
+        recent_service: Option<Arc<dyn RecentItemsUseCase>>,
+    ) -> Self {
+        let mut state = Self::default();
+        
+        // Override application services with real ones
+        state.applications.folder_service_concrete = folder_service.clone();
+        state.applications.folder_service = folder_use_case;
+        state.applications.file_upload_service = file_upload_service;
+        state.applications.file_retrieval_service = file_retrieval_service.clone();
+        state.applications.file_management_service = file_management_service;
+        
+        if let Some(i18n) = i18n_service {
+            state.applications.i18n_service = i18n;
+        }
+        
+        state.applications.trash_service = trash_service.clone();
+        state.applications.search_service = search_service.clone();
+        state.applications.share_service = share_service.clone();
+        state.applications.favorites_service = favorites_service.clone();
+        state.applications.recent_service = recent_service.clone();
+        
+        // Also set top-level optional services
+        state.trash_service = trash_service;
+        state.share_service = share_service;
+        state.favorites_service = favorites_service;
+        state.recent_service = recent_service;
+        
+        // Create real ZipService with the actual file/folder services
+        state.core.zip_service = Arc::new(
+            crate::infrastructure::services::zip_service::ZipService::new(
+                file_retrieval_service as Arc<dyn crate::application::ports::file_ports::FileRetrievalUseCase>,
+                folder_service.clone() as Arc<dyn crate::application::ports::inbound::FolderUseCase>,
+            )
+        );
+        
+        state
+    }
+    
     pub fn with_auth_services(mut self, auth_services: AuthServices) -> Self {
         self.auth_service = Some(auth_services);
         self
@@ -1219,6 +907,11 @@ impl AppState {
     
     pub fn with_contact_service(mut self, contact_service: Arc<dyn crate::application::ports::storage_ports::StorageUseCase>) -> Self {
         self.contact_service = Some(contact_service);
+        self
+    }
+    
+    pub fn with_zip_service(mut self, zip_service: Arc<dyn ZipPort>) -> Self {
+        self.core.zip_service = zip_service;
         self
     }
 }

@@ -18,7 +18,8 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::common::di::AppState;
-use crate::infrastructure::services::chunked_upload_service::DEFAULT_CHUNK_SIZE;
+use crate::application::ports::chunked_upload_ports::DEFAULT_CHUNK_SIZE;
+use crate::domain::errors::ErrorKind;
 
 /// Request body for creating an upload session
 #[derive(Debug, Deserialize)]
@@ -115,7 +116,7 @@ impl ChunkedUploadHandler {
             Err(e) => {
                 tracing::error!("Failed to create upload session: {}", e);
                 (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": e
+                    "error": e.to_string()
                 }))).into_response()
             }
         }
@@ -166,18 +167,15 @@ impl ChunkedUploadHandler {
                     .into_response()
             }
             Err(e) => {
-                let status = if e.contains("not found") {
-                    StatusCode::NOT_FOUND
-                } else if e.contains("Invalid") || e.contains("already uploaded") {
-                    StatusCode::BAD_REQUEST
-                } else if e.contains("Checksum") {
-                    StatusCode::CONFLICT
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
+                let status = match e.kind {
+                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
+                    ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
+                    ErrorKind::AlreadyExists => StatusCode::CONFLICT,
+                    _ => StatusCode::INTERNAL_SERVER_ERROR,
                 };
                 
                 (status, Json(serde_json::json!({
-                    "error": e
+                    "error": e.to_string()
                 }))).into_response()
             }
         }
@@ -208,7 +206,7 @@ impl ChunkedUploadHandler {
             }
             Err(e) => {
                 (StatusCode::NOT_FOUND, Json(serde_json::json!({
-                    "error": e
+                    "error": e.to_string()
                 }))).into_response()
             }
         }
@@ -222,23 +220,21 @@ impl ChunkedUploadHandler {
         Path(upload_id): Path<String>,
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
-        let file_service = &state.applications.file_service_concrete;
+        let upload_service = &state.applications.file_upload_service;
         
         // Assemble chunks
         let (assembled_path, filename, folder_id, content_type, total_size) = 
             match chunked_service.complete_upload(&upload_id).await {
                 Ok(result) => result,
                 Err(e) => {
-                    let status = if e.contains("not found") {
-                        StatusCode::NOT_FOUND
-                    } else if e.contains("not complete") {
-                        StatusCode::CONFLICT
-                    } else {
-                        StatusCode::INTERNAL_SERVER_ERROR
+                    let status = match e.kind {
+                        ErrorKind::NotFound => StatusCode::NOT_FOUND,
+                        ErrorKind::InvalidInput | ErrorKind::AlreadyExists => StatusCode::CONFLICT,
+                        _ => StatusCode::INTERNAL_SERVER_ERROR,
                     };
                     
                     return (status, Json(serde_json::json!({
-                        "error": e
+                        "error": e.to_string()
                     }))).into_response();
                 }
             };
@@ -255,7 +251,7 @@ impl ChunkedUploadHandler {
         };
         
         // Upload via normal service (this handles path resolution, metadata, etc.)
-        match file_service.upload_file_from_bytes(
+        match upload_service.upload_file(
             filename.clone(),
             folder_id.clone(),
             content_type,
@@ -299,7 +295,7 @@ impl ChunkedUploadHandler {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(e) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": e
+                    "error": e.to_string()
                 }))).into_response()
             }
         }

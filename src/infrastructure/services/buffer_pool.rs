@@ -89,9 +89,11 @@ impl BufferPool {
         )
     }
     
-    /// Obtiene un buffer del pool o crea uno nuevo si es necesario
+    /// Obtiene un buffer del pool o crea uno nuevo si es necesario.
+    /// This version takes an Arc<Self> to ensure the BorrowedBuffer keeps a proper
+    /// reference to the shared pool (not a clone).
     #[allow(unused_variables)]
-    pub async fn get_buffer(&self) -> BorrowedBuffer {
+    pub async fn get_buffer(self: &Arc<Self>) -> BorrowedBuffer {
         // Incrementar contador de gets
         {
             let mut stats = self.stats.lock().await;
@@ -99,26 +101,30 @@ impl BufferPool {
         }
         
         // Control de concurrencia
-        // Usando el mecanismo RAII de Rust para gestión automática 
-        // de recursos al finalizar la función
-        let _ = match self.limit.try_acquire() {
-            Ok(_permit) => _permit, // _ prefix para indicar que es intencional
+        // Acquire a semaphore permit. If none available, wait.
+        // We forget() the permit so it doesn't auto-release on drop.
+        // Instead, the permit is manually released in return_buffer/Drop via add_permits(1).
+        match self.limit.try_acquire() {
+            Ok(permit) => permit.forget(),
             Err(_) => {
                 // No hay permisos disponibles, esperamos
-                let mut stats = self.stats.lock().await;
-                stats.waits += 1;
-                stats.max_buffers_reached += 1;
-                drop(stats);
+                {
+                    let mut stats = self.stats.lock().await;
+                    stats.waits += 1;
+                    stats.max_buffers_reached += 1;
+                }
                 
                 debug!("Buffer pool: waiting for available buffer");
-                let _permit = self.limit.acquire().await.expect("Semaphore should not be closed");
+                let permit = self.limit.acquire().await.expect("Semaphore should not be closed");
                 debug!("Buffer pool: acquired buffer after waiting");
-                _permit
+                permit.forget();
             }
         };
         
         // Intentar obtener un buffer existente del pool
         let mut pool_locked = self.pool.lock().await;
+        
+        let pool_arc = Arc::clone(self);
         
         if let Some(mut pooled_buffer) = pool_locked.pop_front() {
             // Verificar si el buffer ha expirado
@@ -137,7 +143,7 @@ impl BufferPool {
                 BorrowedBuffer {
                     buffer: vec![0; self.buffer_size],
                     used_size: 0,
-                    pool: Arc::new(self.clone()),
+                    pool: pool_arc,
                     return_to_pool: true,
                 }
             } else {
@@ -155,7 +161,7 @@ impl BufferPool {
                 BorrowedBuffer {
                     buffer: pooled_buffer.buffer,
                     used_size: 0,
-                    pool: Arc::new(self.clone()),
+                    pool: pool_arc,
                     return_to_pool: true,
                 }
             }
@@ -173,7 +179,7 @@ impl BufferPool {
             BorrowedBuffer {
                 buffer: vec![0; self.buffer_size],
                 used_size: 0,
-                pool: Arc::new(self.clone()),
+                pool: pool_arc,
                 return_to_pool: true,
             }
         }
@@ -185,6 +191,8 @@ impl BufferPool {
         if buffer.capacity() != self.buffer_size {
             debug!("Buffer pool: discarding buffer of wrong size: {} (expected {})", 
                  buffer.capacity(), self.buffer_size);
+            // Release the semaphore permit even if we discard the buffer
+            self.limit.add_permits(1);
             return;
         }
         
@@ -202,6 +210,11 @@ impl BufferPool {
         // Actualizar estadísticas
         let mut stats = self.stats.lock().await;
         stats.returns += 1;
+        
+        // Release the semaphore permit so another caller can acquire a buffer
+        drop(pool_locked);
+        drop(stats);
+        self.limit.add_permits(1);
     }
     
     /// Limpia buffers expirados del pool
@@ -331,9 +344,13 @@ impl Drop for BorrowedBuffer {
             let pool = self.pool.clone();
             
             // Spawn del return para que el drop no bloquee
+            // return_buffer will release the semaphore permit
             tokio::spawn(async move {
                 pool.return_buffer(buffer).await;
             });
+        } else {
+            // Buffer not returned to pool, but we still need to release the semaphore permit
+            self.pool.limit.add_permits(1);
         }
     }
 }

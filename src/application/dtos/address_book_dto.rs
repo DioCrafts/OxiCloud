@@ -32,14 +32,14 @@ impl Default for AddressBookDto {
 impl From<AddressBook> for AddressBookDto {
     fn from(book: AddressBook) -> Self {
         Self {
-            id: book.id.to_string(),
-            name: book.name,
-            owner_id: book.owner_id,
-            description: book.description,
-            color: book.color,
-            is_public: book.is_public,
-            created_at: book.created_at,
-            updated_at: book.updated_at,
+            id: book.id().to_string(),
+            name: book.name().to_string(),
+            owner_id: book.owner_id().to_string(),
+            description: book.description().map(|s| s.to_string()),
+            color: book.color().map(|s| s.to_string()),
+            is_public: book.is_public(),
+            created_at: *book.created_at(),
+            updated_at: *book.updated_at(),
         }
     }
 }

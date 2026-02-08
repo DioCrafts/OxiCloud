@@ -6,23 +6,23 @@ pub use super::entity_errors::ShareError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Share {
-    pub id: String,
-    pub item_id: String,
-    pub item_type: ShareItemType,
-    pub token: String,
-    pub password_hash: Option<String>,
-    pub expires_at: Option<u64>,
-    pub permissions: SharePermissions,
-    pub created_at: u64,
-    pub created_by: String,
-    pub access_count: u64,
+    id: String,
+    item_id: String,
+    item_type: ShareItemType,
+    token: String,
+    password_hash: Option<String>,
+    expires_at: Option<u64>,
+    permissions: SharePermissions,
+    created_at: u64,
+    created_by: String,
+    access_count: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SharePermissions {
-    pub read: bool,
-    pub write: bool,
-    pub reshare: bool,
+    read: bool,
+    write: bool,
+    reshare: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -80,6 +80,74 @@ impl Share {
         })
     }
 
+    /// Reconstruct a Share from persisted data (e.g. filesystem/database).
+    /// Skips validation and ID generation — uses the provided values directly.
+    pub fn from_raw(
+        id: String,
+        item_id: String,
+        item_type: ShareItemType,
+        token: String,
+        password_hash: Option<String>,
+        expires_at: Option<u64>,
+        permissions: SharePermissions,
+        created_at: u64,
+        created_by: String,
+        access_count: u64,
+    ) -> Self {
+        Self {
+            id,
+            item_id,
+            item_type,
+            token,
+            password_hash,
+            expires_at,
+            permissions,
+            created_at,
+            created_by,
+            access_count,
+        }
+    }
+
+    // ── Getters ──
+
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn item_id(&self) -> &str {
+        &self.item_id
+    }
+
+    pub fn item_type(&self) -> &ShareItemType {
+        &self.item_type
+    }
+
+    pub fn token(&self) -> &str {
+        &self.token
+    }
+
+    pub fn expires_at(&self) -> Option<u64> {
+        self.expires_at
+    }
+
+    pub fn permissions(&self) -> &SharePermissions {
+        &self.permissions
+    }
+
+    pub fn created_at(&self) -> u64 {
+        self.created_at
+    }
+
+    pub fn created_by(&self) -> &str {
+        &self.created_by
+    }
+
+    pub fn access_count(&self) -> u64 {
+        self.access_count
+    }
+
+    // ── Builder-style modifiers (immutable) ──
+
     pub fn with_permissions(mut self, permissions: SharePermissions) -> Self {
         self.permissions = permissions;
         self
@@ -118,15 +186,17 @@ impl Share {
         self
     }
 
-    pub fn verify_password(&self, password: &str) -> bool {
-        match &self.password_hash {
-            Some(hash) => {
-                // In a real implementation, use a proper password hashing function like bcrypt
-                // For simplicity, we're just comparing strings here
-                hash == password
-            }
-            None => true,
-        }
+    /// Returns whether this share requires a password to access.
+    pub fn has_password(&self) -> bool {
+        self.password_hash.is_some()
+    }
+
+    /// Returns a reference to the password hash, if one is set.
+    /// 
+    /// Password verification should be performed externally via PasswordHasherPort
+    /// to keep cryptographic dependencies out of the domain layer.
+    pub fn password_hash(&self) -> Option<&str> {
+        self.password_hash.as_deref()
     }
 }
 
@@ -138,13 +208,25 @@ impl SharePermissions {
             reshare,
         }
     }
+
+    pub fn read(&self) -> bool {
+        self.read
+    }
+
+    pub fn write(&self) -> bool {
+        self.write
+    }
+
+    pub fn reshare(&self) -> bool {
+        self.reshare
+    }
 }
 
-impl ToString for ShareItemType {
-    fn to_string(&self) -> String {
+impl std::fmt::Display for ShareItemType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ShareItemType::File => "file".to_string(),
-            ShareItemType::Folder => "folder".to_string(),
+            ShareItemType::File => write!(f, "file"),
+            ShareItemType::Folder => write!(f, "folder"),
         }
     }
 }
@@ -177,15 +259,15 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(share.item_id, "test_file_id");
-        assert_eq!(share.item_type, ShareItemType::File);
-        assert_eq!(share.created_by, "user123");
-        assert_eq!(share.permissions.read, true);
-        assert_eq!(share.permissions.write, false);
-        assert_eq!(share.permissions.reshare, false);
-        assert!(share.password_hash.is_none());
-        assert!(share.expires_at.is_none());
-        assert_eq!(share.access_count, 0);
+        assert_eq!(share.item_id(), "test_file_id");
+        assert_eq!(*share.item_type(), ShareItemType::File);
+        assert_eq!(share.created_by(), "user123");
+        assert_eq!(share.permissions().read(), true);
+        assert_eq!(share.permissions().write(), false);
+        assert_eq!(share.permissions().reshare(), false);
+        assert!(!share.has_password());
+        assert!(share.expires_at().is_none());
+        assert_eq!(share.access_count(), 0);
     }
 
     #[test]
@@ -232,5 +314,37 @@ mod tests {
         assert_eq!(ShareItemType::try_from("folder").unwrap(), ShareItemType::Folder);
         assert_eq!(ShareItemType::try_from("FILE").unwrap(), ShareItemType::File);
         assert!(ShareItemType::try_from("invalid").is_err());
+    }
+    
+    #[test]
+    fn test_has_password_with_hash() {
+        let share = Share::new(
+            "test_file_id".to_string(),
+            ShareItemType::File,
+            "user123".to_string(),
+            None,
+            Some("some_hash_value".to_string()),
+            None,
+        )
+        .unwrap();
+        
+        assert!(share.has_password());
+        assert_eq!(share.password_hash(), Some("some_hash_value"));
+    }
+    
+    #[test]
+    fn test_has_password_without_hash() {
+        let share = Share::new(
+            "test_file_id".to_string(),
+            ShareItemType::File,
+            "user123".to_string(),
+            None,
+            None, // No password
+            None,
+        )
+        .unwrap();
+        
+        assert!(!share.has_password());
+        assert_eq!(share.password_hash(), None);
     }
 }

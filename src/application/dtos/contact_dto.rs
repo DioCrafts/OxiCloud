@@ -112,26 +112,27 @@ impl Default for ContactDto {
 
 impl From<Contact> for ContactDto {
     fn from(contact: Contact) -> Self {
+        let parts = contact.into_parts();
         Self {
-            id: contact.id.to_string(),
-            address_book_id: contact.address_book_id.to_string(),
-            uid: contact.uid,
-            full_name: contact.full_name,
-            first_name: contact.first_name,
-            last_name: contact.last_name,
-            nickname: contact.nickname,
-            email: contact.email.into_iter().map(EmailDto::from).collect(),
-            phone: contact.phone.into_iter().map(PhoneDto::from).collect(),
-            address: contact.address.into_iter().map(AddressDto::from).collect(),
-            organization: contact.organization,
-            title: contact.title,
-            notes: contact.notes,
-            photo_url: contact.photo_url,
-            birthday: contact.birthday,
-            anniversary: contact.anniversary,
-            created_at: contact.created_at,
-            updated_at: contact.updated_at,
-            etag: contact.etag,
+            id: parts.id.to_string(),
+            address_book_id: parts.address_book_id.to_string(),
+            uid: parts.uid,
+            full_name: parts.full_name,
+            first_name: parts.first_name,
+            last_name: parts.last_name,
+            nickname: parts.nickname,
+            email: parts.email.into_iter().map(EmailDto::from).collect(),
+            phone: parts.phone.into_iter().map(PhoneDto::from).collect(),
+            address: parts.address.into_iter().map(AddressDto::from).collect(),
+            organization: parts.organization,
+            title: parts.title,
+            notes: parts.notes,
+            photo_url: parts.photo_url,
+            birthday: parts.birthday,
+            anniversary: parts.anniversary,
+            created_at: parts.created_at,
+            updated_at: parts.updated_at,
+            etag: parts.etag,
         }
     }
 }
@@ -193,11 +194,11 @@ pub struct ContactGroupDto {
 impl From<ContactGroup> for ContactGroupDto {
     fn from(group: ContactGroup) -> Self {
         Self {
-            id: group.id.to_string(),
-            address_book_id: group.address_book_id.to_string(),
-            name: group.name,
-            created_at: group.created_at,
-            updated_at: group.updated_at,
+            id: group.id().to_string(),
+            address_book_id: group.address_book_id().to_string(),
+            name: group.name().to_string(),
+            created_at: *group.created_at(),
+            updated_at: *group.updated_at(),
             members_count: None,
         }
     }

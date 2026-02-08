@@ -252,7 +252,10 @@ pub struct AuthConfig {
 impl Default for AuthConfig {
     fn default() -> Self {
         Self {
-            jwt_secret: "ox1cl0ud-sup3r-s3cr3t-k3y-f0r-t0k3n-s1gn1ng".to_string(),
+            // SECURITY: This default is intentionally insecure to force operators
+            // to set OXICLOUD_JWT_SECRET in production. The from_env() method
+            // will validate this and warn/panic if not configured.
+            jwt_secret: String::new(),
             access_token_expiry_secs: 3600, // 1 hora
             refresh_token_expiry_secs: 2592000, // 30 días
             hash_memory_cost: 65536, // 64MB
@@ -376,6 +379,23 @@ impl AppConfig {
         // Configuración Auth
         if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
             config.auth.jwt_secret = jwt_secret;
+        }
+        
+        // SECURITY: Validate JWT secret when auth is enabled
+        if config.features.enable_auth && config.auth.jwt_secret.is_empty() {
+            // Generate a random secret for this session and warn loudly
+            use rand_core::{OsRng, RngCore};
+            let mut key = [0u8; 32];
+            OsRng.fill_bytes(&mut key);
+            let generated_secret: String = key.iter().map(|b| format!("{:02x}", b)).collect();
+            config.auth.jwt_secret = generated_secret;
+            
+            tracing::error!("==========================================================");
+            tracing::error!("SECURITY WARNING: OXICLOUD_JWT_SECRET is not set!");
+            tracing::error!("A random secret has been generated for this session.");
+            tracing::error!("All tokens will be INVALIDATED on restart.");
+            tracing::error!("Set OXICLOUD_JWT_SECRET env var for production use.");
+            tracing::error!("==========================================================");
         }
             
         if let Ok(access_token_expiry) = env::var("OXICLOUD_ACCESS_TOKEN_EXPIRY_SECS")

@@ -9,6 +9,7 @@ use std::sync::Arc;
 use serde_json::json;
 
 use crate::common::di::AppState;
+use crate::interfaces::middleware::auth::AuthUser;
 use crate::application::dtos::address_book_dto::{
     AddressBookDto, CreateAddressBookDto, UpdateAddressBookDto,
     ShareAddressBookDto, UnshareAddressBookDto
@@ -83,8 +84,9 @@ pub fn carddav_routes() -> Router<AppState> {
 // Address Book handlers
 async fn list_address_books(
     State(state): State<AppState>,
+    auth_user: AuthUser,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -142,9 +144,10 @@ async fn create_address_book(
 
 async fn get_address_book(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -176,10 +179,11 @@ async fn get_address_book(
 
 async fn update_address_book(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
     Json(mut update): Json<UpdateAddressBookDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     update.user_id = user_id.to_string();
     
     match &state.contact_service {
@@ -214,9 +218,10 @@ async fn update_address_book(
 
 async fn delete_address_book(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -246,9 +251,10 @@ async fn delete_address_book(
 
 async fn get_address_book_shares(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -278,10 +284,11 @@ async fn get_address_book_shares(
 
 async fn share_address_book(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
     Json(mut dto): Json<ShareAddressBookDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     dto.address_book_id = address_book_id;
     
     match &state.contact_service {
@@ -314,9 +321,10 @@ async fn share_address_book(
 
 async fn unshare_address_book(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((address_book_id, shared_with)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -354,9 +362,10 @@ async fn unshare_address_book(
 // Contact handlers
 async fn list_contacts(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -388,10 +397,11 @@ async fn list_contacts(
 
 async fn search_contacts(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
     axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     let query = params.get("q").unwrap_or(&String::new()).to_string();
     
     match &state.contact_service {
@@ -425,10 +435,11 @@ async fn search_contacts(
 
 async fn create_contact(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
     Json(mut dto): Json<CreateContactDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     dto.address_book_id = address_book_id;
     dto.user_id = user_id.to_string();
     
@@ -457,10 +468,11 @@ async fn create_contact(
 
 async fn create_contact_from_vcard(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
     Json(mut dto): Json<CreateContactVCardDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     dto.address_book_id = address_book_id;
     dto.user_id = user_id.to_string();
     
@@ -489,9 +501,10 @@ async fn create_contact_from_vcard(
 
 async fn get_contact(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, contact_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -523,10 +536,11 @@ async fn get_contact(
 
 async fn update_contact(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, contact_id)): Path<(String, String)>,
     Json(mut update): Json<UpdateContactDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     update.user_id = user_id.to_string();
     
     match &state.contact_service {
@@ -561,9 +575,10 @@ async fn update_contact(
 
 async fn delete_contact(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, contact_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -593,9 +608,10 @@ async fn delete_contact(
 
 async fn get_contact_vcard(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, contact_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -639,9 +655,10 @@ async fn get_contact_vcard(
 // Group handlers
 async fn list_groups(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -673,10 +690,11 @@ async fn list_groups(
 
 async fn create_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(address_book_id): Path<String>,
     Json(mut dto): Json<CreateContactGroupDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     dto.address_book_id = address_book_id;
     dto.user_id = user_id.to_string();
     
@@ -705,9 +723,10 @@ async fn create_group(
 
 async fn get_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, group_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -739,10 +758,11 @@ async fn get_group(
 
 async fn update_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, group_id)): Path<(String, String)>,
     Json(mut update): Json<UpdateContactGroupDto>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     update.user_id = user_id.to_string();
     
     match &state.contact_service {
@@ -777,9 +797,10 @@ async fn update_group(
 
 async fn delete_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, group_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -809,9 +830,10 @@ async fn delete_group(
 
 async fn list_contacts_in_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((_, group_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -843,9 +865,10 @@ async fn list_contacts_in_group(
 
 async fn add_contact_to_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((group_id, contact_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -882,9 +905,10 @@ async fn add_contact_to_group(
 
 async fn remove_contact_from_group(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path((group_id, contact_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {
@@ -921,9 +945,10 @@ async fn remove_contact_from_group(
 
 async fn list_groups_for_contact(
     State(state): State<AppState>,
+    auth_user: AuthUser,
     Path(contact_id): Path<String>,
 ) -> impl IntoResponse {
-    let user_id = "default_user"; // In production, get this from auth middleware
+    let user_id = &auth_user.id;
     
     match &state.contact_service {
         Some(contact_service) => {

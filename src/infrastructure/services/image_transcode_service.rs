@@ -18,6 +18,14 @@ use bytes::Bytes;
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use image::{ImageFormat, DynamicImage};
+use async_trait::async_trait;
+
+use crate::application::ports::transcode_ports::{
+    ImageTranscodePort,
+    OutputFormat as PortOutputFormat,
+    TranscodeStatsDto,
+};
+use crate::domain::errors::{DomainError, ErrorKind};
 
 /// Maximum file size for transcoding (5MB - larger files stream directly)
 pub const MAX_TRANSCODE_SIZE: u64 = 5 * 1024 * 1024;
@@ -351,6 +359,59 @@ impl ImageTranscodeService {
         }
         
         Ok(())
+    }
+}
+
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+/// Convert port OutputFormat to infra OutputFormat.
+impl From<PortOutputFormat> for OutputFormat {
+    fn from(fmt: PortOutputFormat) -> Self {
+        match fmt {
+            PortOutputFormat::WebP => OutputFormat::WebP,
+        }
+    }
+}
+
+#[async_trait]
+impl ImageTranscodePort for ImageTranscodeService {
+    fn can_transcode(&self, mime_type: &str) -> bool {
+        ImageTranscodeService::can_transcode(mime_type)
+    }
+
+    fn should_transcode(&self, mime_type: &str, file_size: u64) -> bool {
+        ImageTranscodeService::should_transcode(mime_type, file_size)
+    }
+
+    async fn get_transcoded(
+        &self,
+        file_id: &str,
+        original_content: &[u8],
+        original_mime: &str,
+        target_format: PortOutputFormat,
+    ) -> Result<(Bytes, String, bool), DomainError> {
+        self.get_transcoded(file_id, original_content, original_mime, target_format.into())
+            .await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ImageTranscode", e))
+    }
+
+    async fn invalidate(&self, file_id: &str) {
+        self.invalidate(file_id).await
+    }
+
+    async fn get_stats(&self) -> TranscodeStatsDto {
+        let stats = self.get_stats().await;
+        TranscodeStatsDto {
+            cache_hits: stats.cache_hits,
+            disk_hits: stats.disk_hits,
+            transcodes: stats.transcodes,
+            bytes_saved: stats.bytes_saved,
+            transcode_errors: stats.transcode_errors,
+        }
+    }
+
+    async fn clear_cache(&self) -> Result<(), DomainError> {
+        self.clear_cache().await.map_err(DomainError::from)
     }
 }
 

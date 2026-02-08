@@ -83,35 +83,35 @@ impl ShareFsRepository {
             record.permissions_reshare,
         );
 
-        Share {
-            id: record.id.clone(),
-            item_id: record.item_id.clone(),
+        Share::from_raw(
+            record.id.clone(),
+            record.item_id.clone(),
             item_type,
-            token: record.token.clone(),
-            password_hash: record.password_hash.clone(),
-            expires_at: record.expires_at,
+            record.token.clone(),
+            record.password_hash.clone(),
+            record.expires_at,
             permissions,
-            created_at: record.created_at,
-            created_by: record.created_by.clone(),
-            access_count: record.access_count,
-        }
+            record.created_at,
+            record.created_by.clone(),
+            record.access_count,
+        )
     }
 
     /// Convierte una entidad de dominio a un registro para el sistema de archivos
     fn to_record(&self, share: &Share) -> ShareRecord {
         ShareRecord {
-            id: share.id.clone(),
-            item_id: share.item_id.clone(),
-            item_type: share.item_type.to_string(),
-            token: share.token.clone(),
-            password_hash: share.password_hash.clone(),
-            expires_at: share.expires_at,
-            permissions_read: share.permissions.read,
-            permissions_write: share.permissions.write,
-            permissions_reshare: share.permissions.reshare,
-            created_at: share.created_at,
-            created_by: share.created_by.clone(),
-            access_count: share.access_count,
+            id: share.id().to_string(),
+            item_id: share.item_id().to_string(),
+            item_type: share.item_type().to_string(),
+            token: share.token().to_string(),
+            password_hash: share.password_hash().map(|s| s.to_string()),
+            expires_at: share.expires_at(),
+            permissions_read: share.permissions().read(),
+            permissions_write: share.permissions().write(),
+            permissions_reshare: share.permissions().reshare(),
+            created_at: share.created_at(),
+            created_by: share.created_by().to_string(),
+            access_count: share.access_count(),
         }
     }
 }
@@ -123,7 +123,7 @@ impl ShareStoragePort for ShareFsRepository {
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
         // Verifica si el enlace ya existe
-        let existing_index = shares.iter().position(|s| s.id == share.id);
+        let existing_index = shares.iter().position(|s| s.id == share.id());
 
         let record = self.to_record(share);
 
@@ -191,9 +191,9 @@ impl ShareStoragePort for ShareFsRepository {
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
         // Busca el índice del enlace a actualizar
-        let index = shares.iter().position(|s| s.id == share.id)
+        let index = shares.iter().position(|s| s.id == share.id())
             .ok_or_else(|| {
-                DomainError::not_found("Share", format!("Share with ID {} not found for update", share.id))
+                DomainError::not_found("Share", format!("Share with ID {} not found for update", share.id()))
             })?;
 
         // Actualiza el registro

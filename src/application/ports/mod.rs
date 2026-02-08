@@ -1,6 +1,10 @@
 pub mod auth_ports;
+pub mod cache_ports;
 pub mod calendar_ports;
 pub mod carddav_ports;
+pub mod chunked_upload_ports;
+pub mod compression_ports;
+pub mod dedup_ports;
 pub mod favorites_ports;
 pub mod file_ports;
 pub mod inbound;
@@ -8,4 +12,7 @@ pub mod outbound;
 pub mod recent_ports;
 pub mod share_ports;
 pub mod storage_ports;
+pub mod thumbnail_ports;
+pub mod transcode_ports;
 pub mod trash_ports;
+pub mod zip_ports;

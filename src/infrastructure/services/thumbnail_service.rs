@@ -19,6 +19,14 @@ use image::{ImageFormat, imageops::FilterType};
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use bytes::Bytes;
+use async_trait::async_trait;
+
+use crate::application::ports::thumbnail_ports::{
+    ThumbnailPort,
+    ThumbnailSize as PortThumbnailSize,
+    ThumbnailStatsDto,
+};
+use crate::domain::errors::{DomainError, ErrorKind};
 
 /// Thumbnail sizes supported by the system
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -325,6 +333,60 @@ impl ThumbnailService {
             cached_thumbnails: cache.len(),
             cache_size_bytes: current_size,
             max_cache_bytes: self.max_cache_bytes,
+        }
+    }
+}
+
+// ─── Port implementation ─────────────────────────────────────────────────────
+
+/// Convert port ThumbnailSize to infra ThumbnailSize.
+impl From<PortThumbnailSize> for ThumbnailSize {
+    fn from(size: PortThumbnailSize) -> Self {
+        match size {
+            PortThumbnailSize::Icon => ThumbnailSize::Icon,
+            PortThumbnailSize::Preview => ThumbnailSize::Preview,
+            PortThumbnailSize::Large => ThumbnailSize::Large,
+        }
+    }
+}
+
+#[async_trait]
+impl ThumbnailPort for ThumbnailService {
+    fn is_supported_image(&self, mime_type: &str) -> bool {
+        ThumbnailService::is_supported_image(mime_type)
+    }
+
+    async fn get_thumbnail(
+        &self,
+        file_id: &str,
+        size: PortThumbnailSize,
+        original_path: &Path,
+    ) -> Result<Bytes, DomainError> {
+        self.get_thumbnail(file_id, size.into(), original_path)
+            .await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
+    }
+
+    fn generate_all_sizes_background(
+        self: Arc<Self>,
+        file_id: String,
+        original_path: PathBuf,
+    ) {
+        ThumbnailService::generate_all_sizes_background(self, file_id, original_path)
+    }
+
+    async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError> {
+        self.delete_thumbnails(file_id)
+            .await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
+    }
+
+    async fn get_stats(&self) -> ThumbnailStatsDto {
+        let stats = self.get_stats().await;
+        ThumbnailStatsDto {
+            cached_thumbnails: stats.cached_thumbnails,
+            cache_size_bytes: stats.cache_size_bytes,
+            max_cache_bytes: stats.max_cache_bytes,
         }
     }
 }
