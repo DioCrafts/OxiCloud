@@ -125,6 +125,9 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     /// Mueve un archivo a otra carpeta
     async fn move_file(&self, file_id: &str, folder_id: Option<String>) -> Result<FileDto, DomainError>;
     
+    /// Renombra un archivo
+    async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
+    
     /// Elimina un archivo
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 

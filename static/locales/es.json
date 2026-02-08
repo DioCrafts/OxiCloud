@@ -133,6 +133,8 @@
     "search": "Buscar archivos...",
     "new_folder": "Nueva carpeta",
     "upload": "Subir",
+    "upload_files": "Subir archivos",
+    "upload_folder": "Subir carpeta",
     "rename": "Renombrar",
     "move": "Mover a...",
     "move_to": "Mover a",
@@ -142,13 +144,23 @@
     "cancel": "Cancelar",
     "confirm": "Confirmar",
     "share": "Compartir",
+    "favorite": "Añadir a favoritos",
+    "unfavorite": "Quitar de favoritos",
     "copy": "Copiar",
     "notify": "Notificar",
     "send": "Enviar",
     "clear_recent": "Limpiar recientes",
     "logout": "Cerrar sesión",
     "create": "Crear",
-    "search_btn": "Buscar"
+    "search_btn": "Buscar",
+    "close": "Cerrar",
+    "delete_permanently": "Eliminar permanentemente",
+    "empty_trash": "Vaciar papelera"
+  },
+  "user_menu": {
+    "appearance": "Apariencia",
+    "about": "Acerca de OxiCloud",
+    "about_description": "Plataforma de almacenamiento en la nube creada con Rust y Arquitectura Limpia. Rápida, segura y privada."
   },
   "files": {
     "name": "Nombre",
@@ -156,6 +168,7 @@
     "size": "Tamaño",
     "modified": "Modificado",
     "no_files": "No hay archivos en esta carpeta",
+    "loading": "Cargando archivos…",
     "view_grid": "Vista de cuadrícula",
     "view_list": "Vista de lista",
     "file_types": {
@@ -170,17 +183,28 @@
   },
   "dialogs": {
     "rename_folder": "Renombrar carpeta",
+    "rename_file": "Renombrar archivo",
     "new_name": "Nuevo nombre",
     "new_folder_title": "Nueva carpeta",
     "folder_name": "Nombre de la carpeta",
     "folder_placeholder": "Mi carpeta",
     "rename_title": "Renombrar",
     "move_file": "Mover archivo",
-    "select_destination": "Selecciona la carpeta destino",
+    "move_folder": "Mover carpeta",
+    "select_destination": "Selecciona la carpeta destino:",
     "root": "Raíz",
     "delete_confirmation": "¿Estás seguro de que quieres eliminar",
     "and_contents": "y todo su contenido",
     "no_undo": "Esta acción no se puede deshacer",
+    "confirm_title": "Confirmar acción",
+    "confirm_delete": "Mover a papelera",
+    "confirm_delete_file": "¿Estás seguro de que quieres mover a la papelera el archivo \"{{name}}\"?",
+    "confirm_delete_folder": "¿Estás seguro de que quieres mover a la papelera la carpeta \"{{name}}\" y todo su contenido?",
+    "confirm_permanent_delete": "Eliminar permanentemente",
+    "confirm_permanent_delete_msg": "¿Estás seguro de que quieres eliminar permanentemente este elemento? Esta acción no se puede deshacer.",
+    "confirm_empty_trash": "Vaciar papelera",
+    "confirm_delete_share": "Eliminar enlace compartido",
+    "confirm_delete_share_msg": "¿Estás seguro de que quieres eliminar este enlace compartido?",
     "share_file": "Compartir Archivo",
     "existing_shares": "Compartidos Existentes",
     "share_options": "Opciones de Compartición",
@@ -293,5 +317,16 @@
     "accessed": "Accedido",
     "empty_state": "No hay archivos recientes",
     "empty_hint": "Los archivos que abras aparecerán aquí"
+  },
+  "notifications": {
+    "file_renamed": "Archivo renombrado",
+    "file_renamed_to": "Archivo renombrado a \"{{name}}\"",
+    "folder_renamed": "Carpeta renombrada",
+    "folder_renamed_to": "Carpeta renombrada a \"{{name}}\"",
+    "file_uploaded": "Archivo subido",
+    "file_deleted": "Archivo movido a papelera",
+    "folder_deleted": "Carpeta movida a papelera",
+    "item_deleted_permanently": "Elemento eliminado permanentemente",
+    "trash_emptied": "Papelera vaciada correctamente"
   }
 }

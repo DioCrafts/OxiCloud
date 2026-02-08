@@ -21,17 +21,19 @@ const ui = {
                 <div class="context-menu-item" id="favorite-folder-option">
                     <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Añadir a favoritos</span>
                 </div>
-                <div class="context-menu-item" id="rename-folder-option">
-                    <i class="fas fa-edit"></i> <span data-i18n="actions.rename">Renombrar</span>
-                </div>
-                <div class="context-menu-item" id="move-folder-option">
-                    <i class="fas fa-exchange-alt"></i> <span data-i18n="actions.move">Mover a...</span>
-                </div>
                 <div class="context-menu-item" id="share-folder-option">
                     <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Compartir</span>
                 </div>
-                <div class="context-menu-item" id="delete-folder-option">
-                    <i class="fas fa-trash"></i> <span data-i18n="actions.delete">Eliminar</span>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item" id="rename-folder-option">
+                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Renombrar</span>
+                </div>
+                <div class="context-menu-item" id="move-folder-option">
+                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Mover a...</span>
+                </div>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item context-menu-item-danger" id="delete-folder-option">
+                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Eliminar</span>
                 </div>
             `;
             document.body.appendChild(folderMenu);
@@ -49,33 +51,44 @@ const ui = {
                 <div class="context-menu-item" id="download-file-option">
                     <i class="fas fa-download"></i> <span data-i18n="actions.download">Descargar</span>
                 </div>
+                <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="favorite-file-option">
                     <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Añadir a favoritos</span>
                 </div>
                 <div class="context-menu-item" id="share-file-option">
                     <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Compartir</span>
                 </div>
-                <div class="context-menu-item" id="move-file-option">
-                    <i class="fas fa-exchange-alt"></i> <span data-i18n="actions.move">Mover a...</span>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item" id="rename-file-option">
+                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Renombrar</span>
                 </div>
-                <div class="context-menu-item" id="delete-file-option">
-                    <i class="fas fa-trash"></i> <span data-i18n="actions.delete">Eliminar</span>
+                <div class="context-menu-item" id="move-file-option">
+                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Mover a...</span>
+                </div>
+                <div class="context-menu-separator"></div>
+                <div class="context-menu-item context-menu-item-danger" id="delete-file-option">
+                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Eliminar</span>
                 </div>
             `;
             document.body.appendChild(fileMenu);
         }
 
-        // Rename dialog
+        // Rename dialog — modern
         if (!document.getElementById('rename-dialog')) {
             const renameDialog = document.createElement('div');
             renameDialog.className = 'rename-dialog';
             renameDialog.id = 'rename-dialog';
             renameDialog.innerHTML = `
                 <div class="rename-dialog-content">
-                    <div class="rename-dialog-header" data-i18n="dialogs.rename_folder">Renombrar carpeta</div>
-                    <input type="text" id="rename-input" data-i18n-placeholder="dialogs.new_name" placeholder="Nuevo nombre">
+                    <div class="rename-dialog-header">
+                        <i class="fas fa-pen" style="color:#ff5e3a"></i>
+                        <span data-i18n="dialogs.rename_folder">Renombrar</span>
+                    </div>
+                    <div class="rename-dialog-body">
+                        <input type="text" id="rename-input" data-i18n-placeholder="dialogs.new_name" placeholder="Nuevo nombre">
+                    </div>
                     <div class="rename-dialog-buttons">
-                        <button class="btn" id="rename-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
+                        <button class="btn btn-secondary" id="rename-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
                         <button class="btn btn-primary" id="rename-confirm-btn" data-i18n="actions.rename">Renombrar</button>
                     </div>
                 </div>
@@ -83,23 +96,27 @@ const ui = {
             document.body.appendChild(renameDialog);
         }
 
-        // Move dialog
+        // Move dialog — modern
         if (!document.getElementById('move-file-dialog')) {
             const moveDialog = document.createElement('div');
             moveDialog.className = 'rename-dialog';
             moveDialog.id = 'move-file-dialog';
             moveDialog.innerHTML = `
                 <div class="rename-dialog-content">
-                    <div class="rename-dialog-header" data-i18n="dialogs.move_file">Mover archivo</div>
-                    <p data-i18n="dialogs.select_destination">Selecciona la carpeta destino:</p>
-                    <div id="folder-select-container" style="max-height: 200px; overflow-y: auto; margin: 15px 0; border: 1px solid #ddd; border-radius: 4px; padding: 10px;">
-                        <!-- Las carpetas se cargarán aquí dinámicamente -->
-                        <div class="folder-select-item" data-folder-id="">
-                            <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Raíz</span>
+                    <div class="rename-dialog-header">
+                        <i class="fas fa-arrows-alt" style="color:#ff5e3a"></i>
+                        <span data-i18n="dialogs.move_file">Mover</span>
+                    </div>
+                    <div class="rename-dialog-body">
+                        <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Selecciona la carpeta destino:</p>
+                        <div id="folder-select-container" style="max-height:220px;overflow-y:auto;">
+                            <div class="folder-select-item selected" data-folder-id="">
+                                <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Raíz</span>
+                            </div>
                         </div>
                     </div>
                     <div class="rename-dialog-buttons">
-                        <button class="btn" id="move-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
+                        <button class="btn btn-secondary" id="move-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
                         <button class="btn btn-primary" id="move-confirm-btn" data-i18n="actions.move_to">Mover</button>
                     </div>
                 </div>
@@ -114,7 +131,10 @@ const ui = {
             shareDialog.id = 'share-dialog';
             shareDialog.innerHTML = `
                 <div class="share-dialog-content">
-                    <div class="share-dialog-header" data-i18n="dialogs.share_file">Compartir archivo</div>
+                    <div class="share-dialog-header">
+                        <i class="fas fa-share-alt" style="color:#ff5e3a"></i>
+                        <span data-i18n="dialogs.share_file">Compartir archivo</span>
+                    </div>
                     <div class="shared-item-info">
                         <strong>Elemento:</strong> <span id="shared-item-name"></span>
                     </div>
@@ -172,7 +192,7 @@ const ui = {
                     </div>
                     
                     <div class="share-dialog-buttons">
-                        <button class="btn" id="share-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
+                        <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
                         <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Compartir</button>
                     </div>
                 </div>
@@ -206,7 +226,10 @@ const ui = {
             notificationDialog.id = 'notification-dialog';
             notificationDialog.innerHTML = `
                 <div class="share-dialog-content">
-                    <div class="share-dialog-header" data-i18n="dialogs.notify">Notificar enlace compartido</div>
+                    <div class="share-dialog-header">
+                        <i class="fas fa-envelope" style="color:#ff5e3a"></i>
+                        <span data-i18n="dialogs.notify">Notificar enlace compartido</span>
+                    </div>
                     
                     <p><strong>URL:</strong> <span id="notification-share-url"></span></p>
                     
@@ -221,7 +244,7 @@ const ui = {
                     </div>
                     
                     <div class="share-dialog-buttons">
-                        <button class="btn" id="notification-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
+                        <button class="btn btn-secondary" id="notification-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
                         <button class="btn btn-primary" id="notification-send-btn" data-i18n="actions.send">Enviar</button>
                     </div>
                 </div>
@@ -473,40 +496,132 @@ const ui = {
 
             if (iconElement.classList.contains('folder-icon')) {
                 iconElement.innerHTML = '';
+                return;
             }
-            else if (fileName.endsWith('.docx') || fileName.endsWith('.pdf') || fileName.endsWith('.txt') || fileName.endsWith('.xlsx')) {
-                iconElement.classList.add('doc-icon');
-                iconElement.innerHTML = '';
-            }
-            else if (fileName.endsWith('.jpg') || fileName.endsWith('.png') || fileName.endsWith('.gif') || fileName.endsWith('.jpeg')) {
-                iconElement.classList.add('image-icon');
-                iconElement.innerHTML = '';
-            }
-            else if (fileName.endsWith('.mp4') || fileName.endsWith('.avi') || fileName.endsWith('.mov') || fileName.endsWith('.mkv')) {
-                iconElement.classList.add('video-icon');
-                iconElement.innerHTML = '';
-            }
-            else {
-                const extension = fileName.split('.').pop().toLowerCase();
 
-                if (['json', 'js', 'jsx', 'ts', 'tsx', 'html', 'css', 'scss', 'py', 'java', 'c', 'cpp', 'cs', 'php', 'rb', 'go', 'rs', 'swift', 'kt'].includes(extension)) {
-                    iconElement.className = 'file-icon code-icon';
+            const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
+            
+            // Map extensions to icon types
+            const iconMap = {
+                // Documents
+                pdf:   { cls: 'pdf-icon', fa: 'fas fa-file-pdf' },
+                doc:   { cls: 'doc-icon', fa: 'fas fa-file-word' },
+                docx:  { cls: 'doc-icon', fa: 'fas fa-file-word' },
+                txt:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
+                rtf:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
+                odt:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
+                // Spreadsheets
+                xlsx:  { cls: 'spreadsheet-icon' },
+                xls:   { cls: 'spreadsheet-icon' },
+                csv:   { cls: 'spreadsheet-icon' },
+                ods:   { cls: 'spreadsheet-icon' },
+                // Presentations
+                pptx:  { cls: 'presentation-icon' },
+                ppt:   { cls: 'presentation-icon' },
+                odp:   { cls: 'presentation-icon' },
+                // Images
+                jpg:   { cls: 'image-icon' },
+                jpeg:  { cls: 'image-icon' },
+                png:   { cls: 'image-icon' },
+                gif:   { cls: 'image-icon' },
+                svg:   { cls: 'image-icon' },
+                webp:  { cls: 'image-icon' },
+                bmp:   { cls: 'image-icon' },
+                ico:   { cls: 'image-icon' },
+                // Videos
+                mp4:   { cls: 'video-icon' },
+                avi:   { cls: 'video-icon' },
+                mov:   { cls: 'video-icon' },
+                mkv:   { cls: 'video-icon' },
+                webm:  { cls: 'video-icon' },
+                flv:   { cls: 'video-icon' },
+                // Audio
+                mp3:   { cls: 'audio-icon' },
+                wav:   { cls: 'audio-icon' },
+                ogg:   { cls: 'audio-icon' },
+                flac:  { cls: 'audio-icon' },
+                aac:   { cls: 'audio-icon' },
+                m4a:   { cls: 'audio-icon' },
+                // Archives
+                zip:   { cls: 'archive-icon' },
+                rar:   { cls: 'archive-icon' },
+                '7z':  { cls: 'archive-icon' },
+                tar:   { cls: 'archive-icon' },
+                gz:    { cls: 'archive-icon' },
+                bz2:   { cls: 'archive-icon' },
+                // Installers
+                dmg:   { cls: 'installer-icon' },
+                exe:   { cls: 'installer-icon' },
+                msi:   { cls: 'installer-icon' },
+                deb:   { cls: 'installer-icon' },
+                rpm:   { cls: 'installer-icon' },
+                pkg:   { cls: 'installer-icon' },
+                app:   { cls: 'installer-icon' },
+                // Scripts
+                sh:    { cls: 'script-icon', fa: 'fas fa-terminal' },
+                bash:  { cls: 'script-icon', fa: 'fas fa-terminal' },
+                zsh:   { cls: 'script-icon', fa: 'fas fa-terminal' },
+                bat:   { cls: 'script-icon', fa: 'fas fa-terminal' },
+                ps1:   { cls: 'script-icon', fa: 'fas fa-terminal' },
+                // Code — each with sub-type
+                json:  { cls: 'code-icon', sub: 'json-icon' },
+                js:    { cls: 'code-icon', sub: 'js-icon' },
+                jsx:   { cls: 'code-icon', sub: 'js-icon' },
+                ts:    { cls: 'code-icon', sub: 'ts-icon' },
+                tsx:   { cls: 'code-icon', sub: 'ts-icon' },
+                html:  { cls: 'code-icon', sub: 'html-icon' },
+                htm:   { cls: 'code-icon', sub: 'html-icon' },
+                css:   { cls: 'code-icon', sub: 'css-icon' },
+                scss:  { cls: 'code-icon', sub: 'css-icon' },
+                py:    { cls: 'code-icon', sub: 'py-icon' },
+                rs:    { cls: 'code-icon', sub: 'rust-icon' },
+                go:    { cls: 'code-icon', sub: 'go-icon' },
+                java:  { cls: 'code-icon', sub: 'java-icon' },
+                c:     { cls: 'code-icon', sub: 'c-icon' },
+                cpp:   { cls: 'code-icon', sub: 'c-icon' },
+                cs:    { cls: 'code-icon', sub: 'cs-icon' },
+                php:   { cls: 'code-icon', sub: 'php-icon' },
+                rb:    { cls: 'code-icon', sub: 'ruby-icon' },
+                swift: { cls: 'code-icon', sub: 'swift-icon' },
+                kt:    { cls: 'code-icon', sub: 'kotlin-icon' },
+                sql:   { cls: 'code-icon', sub: 'sql-icon' },
+                yaml:  { cls: 'code-icon', sub: 'yaml-icon' },
+                yml:   { cls: 'code-icon', sub: 'yaml-icon' },
+                toml:  { cls: 'code-icon', sub: 'toml-icon' },
+                xml:   { cls: 'code-icon', sub: 'html-icon' },
+                md:    { cls: 'code-icon', sub: 'md-icon' },
+                // Config
+                ini:   { cls: 'config-icon', fa: 'fas fa-cog' },
+                cfg:   { cls: 'config-icon', fa: 'fas fa-cog' },
+                conf:  { cls: 'config-icon', fa: 'fas fa-cog' },
+                env:   { cls: 'config-icon', fa: 'fas fa-cog' },
+            };
+
+            const mapping = iconMap[extension];
+            if (mapping) {
+                iconElement.className = `file-icon ${mapping.cls}`;
+                if (mapping.cls === 'code-icon') {
+                    // Code icons use pseudo-element lines
                     iconElement.innerHTML = `
                         <div class="code-line-1"></div>
                         <div class="code-line-2"></div>
                         <div class="code-line-3"></div>
                     `;
-
-                    if (extension === 'json') {
-                        iconElement.classList.add('json-icon');
-                    } else if (['js', 'jsx', 'ts', 'tsx'].includes(extension)) {
-                        iconElement.classList.add('js-icon');
-                    } else if (extension === 'html') {
-                        iconElement.classList.add('html-icon');
-                    } else if (['css', 'scss'].includes(extension)) {
-                        iconElement.classList.add('css-icon');
-                    } else if (extension === 'py') {
-                        iconElement.classList.add('py-icon');
+                    if (mapping.sub) iconElement.classList.add(mapping.sub);
+                } else {
+                    // Types with pure CSS visuals — clear the <i>
+                    const pureCssTypes = ['image-icon','video-icon','spreadsheet-icon','presentation-icon','audio-icon','archive-icon','installer-icon'];
+                    if (pureCssTypes.includes(mapping.cls)) {
+                        iconElement.innerHTML = '';
+                    } else if (mapping.fa) {
+                        // Types that keep the FA icon — update <i> class
+                        let iEl = iconElement.querySelector('i');
+                        if (!iEl) {
+                            iEl = document.createElement('i');
+                            iconElement.innerHTML = '';
+                            iconElement.appendChild(iEl);
+                        }
+                        iEl.className = mapping.fa;
                     }
                 }
             }
@@ -534,6 +649,8 @@ const ui = {
         folderGridElement.dataset.folderName = folder.name;
         folderGridElement.dataset.parentId = folder.parent_id || "";
         folderGridElement.innerHTML = `
+            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
+            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
@@ -546,6 +663,10 @@ const ui = {
             folderGridElement.setAttribute('draggable', 'true');
 
             folderGridElement.addEventListener('dragstart', (e) => {
+                if (!folderGridElement.classList.contains('selected')) {
+                    e.preventDefault();
+                    return;
+                }
                 e.dataTransfer.setData('text/plain', folder.id);
                 e.dataTransfer.setData('application/oxicloud-folder', 'true');
                 folderGridElement.classList.add('dragging');
@@ -559,11 +680,34 @@ const ui = {
             });
         }
 
-        // Click to navigate
-        folderGridElement.addEventListener('click', () => {
+        // Single click to select, double click to navigate
+        folderGridElement.addEventListener('click', (e) => {
+            if (e.target.closest('.file-card-more') || e.target.closest('.file-card-checkbox')) return;
+            toggleCardSelection(folderGridElement, e);
+        });
+
+        folderGridElement.addEventListener('dblclick', () => {
             window.app.currentPath = folder.id;
             this.updateBreadcrumb(folder.name);
             window.loadFiles();
+        });
+
+        // Checkbox click
+        folderGridElement.querySelector('.file-card-checkbox').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCardSelection(folderGridElement, e);
+        });
+
+        // More actions button
+        folderGridElement.querySelector('.file-card-more').addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            window.app.contextMenuTargetFolder = {
+                id: folder.id,
+                name: folder.name,
+                parent_id: folder.parent_id || ""
+            };
+            showContextMenuAtElement(e.currentTarget, 'folder-context-menu');
         });
 
         // Context menu
@@ -766,6 +910,8 @@ const ui = {
         const fileGridElement = document.createElement('div');
         fileGridElement.className = 'file-card';
         fileGridElement.innerHTML = `
+            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
+            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
             <div class="file-icon">
                 <i class="${iconClass}"></i>
             </div>
@@ -781,6 +927,10 @@ const ui = {
         fileGridElement.setAttribute('draggable', 'true');
 
         fileGridElement.addEventListener('dragstart', (e) => {
+            if (!fileGridElement.classList.contains('selected')) {
+                e.preventDefault();
+                return;
+            }
             e.dataTransfer.setData('text/plain', file.id);
             fileGridElement.classList.add('dragging');
         });
@@ -792,8 +942,13 @@ const ui = {
             });
         });
 
-        // View or download on click
-        fileGridElement.addEventListener('click', () => {
+        // Single click = select, double click = open/download
+        fileGridElement.addEventListener('click', (e) => {
+            if (e.target.closest('.file-card-more') || e.target.closest('.file-card-checkbox')) return;
+            toggleCardSelection(fileGridElement, e);
+        });
+
+        fileGridElement.addEventListener('dblclick', () => {
             // Track this file access for recent files
             if (window.recent) {
                 document.dispatchEvent(new CustomEvent('file-accessed', {
@@ -804,20 +959,34 @@ const ui = {
             // Check if it's a viewable file type
             if ((file.mime_type && file.mime_type.startsWith('image/')) || 
                 (file.mime_type && file.mime_type === 'application/pdf')) {
-                // Open in the inline viewer
                 if (window.inlineViewer) {
                     window.inlineViewer.openFile(file);
                 } else if (window.fileViewer) {
-                    // Fallback to standard file viewer
                     window.fileViewer.open(file);
                 } else {
-                    // No viewer available, download directly
                     window.location.href = `/api/files/${file.id}`;
                 }
             } else {
-                // For other file types, download directly
                 window.location.href = `/api/files/${file.id}`;
             }
+        });
+
+        // Checkbox click
+        fileGridElement.querySelector('.file-card-checkbox').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCardSelection(fileGridElement, e);
+        });
+
+        // More actions button
+        fileGridElement.querySelector('.file-card-more').addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            window.app.contextMenuTargetFile = {
+                id: file.id,
+                name: file.name,
+                folder_id: file.folder_id || ""
+            };
+            showContextMenuAtElement(e.currentTarget, 'file-context-menu');
         });
 
         // Context menu
@@ -919,6 +1088,198 @@ const ui = {
         document.getElementById('files-list-view').appendChild(fileListElement);
     }
 };
+
+// --- Global helper functions for card interactions ---
+
+/**
+ * Toggle selection state of a file/folder card.
+ * Each click toggles that card independently (multi-select by default).
+ */
+function toggleCardSelection(card, event) {
+    card.classList.toggle('selected');
+}
+
+/**
+ * Show the context menu anchored next to a trigger element (the 3-dot button).
+ */
+function showContextMenuAtElement(triggerElement, menuId) {
+    // Hide any open menus first
+    document.querySelectorAll('.context-menu').forEach(m => m.style.display = 'none');
+
+    const menu = document.getElementById(menuId);
+    if (!menu) return;
+
+    const rect = triggerElement.getBoundingClientRect();
+    const menuWidth = 200; // approximate
+
+    // Position below the trigger, aligned to the right edge
+    let left = rect.right - menuWidth + window.scrollX;
+    let top = rect.bottom + 4 + window.scrollY;
+
+    // Keep inside viewport
+    if (left < 8) left = 8;
+    if (top + 300 > window.innerHeight + window.scrollY) {
+        top = rect.top - 4 + window.scrollY; // flip above if no room
+    }
+
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.display = 'block';
+}
+
+/**
+ * Rubber band (lasso) selection — click + drag on empty grid area
+ * to draw a rectangle and select all cards it touches.
+ */
+function initRubberBandSelection() {
+    // Create the visual rectangle element once
+    let selRect = document.getElementById('selection-rect');
+    if (!selRect) {
+        selRect = document.createElement('div');
+        selRect.id = 'selection-rect';
+        selRect.className = 'selection-rect';
+        document.body.appendChild(selRect);
+    }
+
+    let active = false;
+    let startX = 0, startY = 0;
+
+    // We listen on the whole files-container (covers grid + empty space)
+    const container = document.querySelector('.files-container') || document.getElementById('files-grid');
+    if (!container) return;
+
+    container.addEventListener('mousedown', (e) => {
+        // Only start if clicking empty area (not on a card, button, menu, input…)
+        if (e.button !== 0) return; // left click only
+        if (e.target.closest('.file-card') || e.target.closest('.context-menu') ||
+            e.target.closest('.upload-dropdown') || e.target.closest('button') ||
+            e.target.closest('input') || e.target.closest('.breadcrumb')) return;
+
+        active = true;
+        startX = e.clientX;
+        startY = e.clientY;
+
+        selRect.style.left = `${startX}px`;
+        selRect.style.top = `${startY}px`;
+        selRect.style.width = '0px';
+        selRect.style.height = '0px';
+        selRect.style.display = 'none'; // show only after a small movement
+
+        e.preventDefault(); // prevent text selection
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!active) return;
+
+        const curX = e.clientX;
+        const curY = e.clientY;
+
+        const left = Math.min(startX, curX);
+        const top = Math.min(startY, curY);
+        const width = Math.abs(curX - startX);
+        const height = Math.abs(curY - startY);
+
+        // Only show the rect after a small threshold to avoid flicker on click
+        if (width > 5 || height > 5) {
+            selRect.style.display = 'block';
+        }
+
+        selRect.style.left = `${left}px`;
+        selRect.style.top = `${top}px`;
+        selRect.style.width = `${width}px`;
+        selRect.style.height = `${height}px`;
+
+        // Highlight cards that intersect with the rectangle
+        const rectBounds = { left, top, right: left + width, bottom: top + height };
+
+        document.querySelectorAll('#files-grid .file-card').forEach(card => {
+            const cardRect = card.getBoundingClientRect();
+            const intersects =
+                cardRect.left < rectBounds.right &&
+                cardRect.right > rectBounds.left &&
+                cardRect.top < rectBounds.bottom &&
+                cardRect.bottom > rectBounds.top;
+
+            if (intersects) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (!active) return;
+        active = false;
+        selRect.style.display = 'none';
+    });
+}
+
+// Initialize rubber band once DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRubberBandSelection);
+} else {
+    initRubberBandSelection();
+}
+
+// Expose helpers globally
+window.toggleCardSelection = toggleCardSelection;
+window.showContextMenuAtElement = showContextMenuAtElement;
+window.initRubberBandSelection = initRubberBandSelection;
+
+/**
+ * Show a modern confirm dialog (replaces native confirm())
+ * @param {Object} options
+ * @param {string} options.title - Dialog title
+ * @param {string} options.message - Dialog message/body
+ * @param {string} [options.confirmText='Confirmar'] - Text for confirm button
+ * @param {string} [options.cancelText='Cancelar'] - Text for cancel button
+ * @param {boolean} [options.danger=false] - Use danger styling (red)
+ * @returns {Promise<boolean>} true if confirmed, false if cancelled
+ */
+function showConfirmDialog({ title, message, confirmText, cancelText, danger = true } = {}) {
+    const ct = confirmText || (window.i18n ? window.i18n.t('actions.delete') : 'Eliminar');
+    const cc = cancelText || (window.i18n ? window.i18n.t('actions.cancel') : 'Cancelar');
+    const t = title || (window.i18n ? window.i18n.t('dialogs.confirm_title') : 'Confirmar acción');
+
+    return new Promise((resolve) => {
+        // Remove any previous confirm dialog
+        const prev = document.getElementById('confirm-dialog-overlay');
+        if (prev) prev.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'confirm-dialog-overlay';
+        overlay.className = 'confirm-dialog';
+        overlay.innerHTML = `
+            <div class="confirm-dialog-content">
+                <div class="confirm-dialog-icon">
+                    <i class="fas ${danger ? 'fa-exclamation-triangle' : 'fa-question-circle'}"></i>
+                </div>
+                <div class="confirm-dialog-title">${t}</div>
+                <div class="confirm-dialog-message">${message || ''}</div>
+                <div class="confirm-dialog-buttons">
+                    <button class="btn btn-secondary confirm-dialog-cancel">${cc}</button>
+                    <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} confirm-dialog-ok">${ct}</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        // Force layout then show
+        requestAnimationFrame(() => { overlay.classList.add('active'); });
+
+        const cleanup = (result) => {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 200);
+            resolve(result);
+        };
+
+        overlay.querySelector('.confirm-dialog-cancel').addEventListener('click', () => cleanup(false));
+        overlay.querySelector('.confirm-dialog-ok').addEventListener('click', () => cleanup(true));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+    });
+}
+window.showConfirmDialog = showConfirmDialog;
 
 // Expose UI module globally
 window.ui = ui;

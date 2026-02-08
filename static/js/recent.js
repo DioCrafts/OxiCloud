@@ -117,8 +117,8 @@ const recent = {
                 </div>
             `;
             
-            // Update breadcrumb for recents
-            window.ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.recent') : 'Recientes');
+            // Update breadcrumb - just show Home
+            window.ui.updateBreadcrumb('');
             
             // Show empty state if no recent files
             if (recentFiles.length === 0) {

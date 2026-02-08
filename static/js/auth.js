@@ -23,24 +23,78 @@ const LANGUAGE_TEXTS = {
     en: {
         title: 'Welcome to OxiCloud',
         subtitle: 'Please select your language',
-        continue: 'Continue'
+        continue: 'Continue',
+        autodetected: 'We detected your language',
+        moreLanguages: 'More languages...',
+        modalTitle: 'Select language',
+        searchPlaceholder: 'Search language...'
     },
     es: {
         title: 'Bienvenido a OxiCloud',
         subtitle: 'Por favor, selecciona tu idioma',
-        continue: 'Continuar'
+        continue: 'Continuar',
+        autodetected: 'Hemos detectado tu idioma',
+        moreLanguages: 'Más idiomas...',
+        modalTitle: 'Seleccionar idioma',
+        searchPlaceholder: 'Buscar idioma...'
     },
     zh: {
         title: '欢迎使用 OxiCloud',
         subtitle: '请选择您的语言',
-        continue: '继续'
+        continue: '继续',
+        autodetected: '我们检测到了您的语言',
+        moreLanguages: '更多语言...',
+        modalTitle: '选择语言',
+        searchPlaceholder: '搜索语言...'
     },
     fa: {
         title: 'به OxiCloud خوش آمدید',
         subtitle: 'لطفا زبان خود را انتخاب کنید',
-        continue: 'ادامه'
+        continue: 'ادامه',
+        autodetected: 'زبان شما شناسایی شد',
+        moreLanguages: 'زبان‌های بیشتر...',
+        modalTitle: 'انتخاب زبان',
+        searchPlaceholder: 'جستجوی زبان...'
     }
 };
+
+// Complete language registry — add new languages here, they'll appear automatically
+// `popular: true` languages show as cards on the main screen, the rest in the modal
+const ALL_LANGUAGES = [
+    { code: 'en', name: 'English',    nativeName: 'English',    flag: '🇬🇧', popular: true },
+    { code: 'es', name: 'Spanish',    nativeName: 'Español',    flag: '🇪🇸', popular: true },
+    { code: 'zh', name: 'Chinese',    nativeName: '中文',       flag: '🇨🇳', popular: true },
+    { code: 'fa', name: 'Persian',    nativeName: 'فارسی',      flag: '🇮🇷', popular: true },
+    { code: 'fr', name: 'French',     nativeName: 'Français',   flag: '🇫🇷', popular: false },
+    { code: 'de', name: 'German',     nativeName: 'Deutsch',    flag: '🇩🇪', popular: false },
+    { code: 'pt', name: 'Portuguese', nativeName: 'Português',  flag: '🇧🇷', popular: false },
+    { code: 'it', name: 'Italian',    nativeName: 'Italiano',   flag: '🇮🇹', popular: false },
+    { code: 'ru', name: 'Russian',    nativeName: 'Русский',    flag: '🇷🇺', popular: false },
+    { code: 'ja', name: 'Japanese',   nativeName: '日本語',      flag: '🇯🇵', popular: false },
+    { code: 'ko', name: 'Korean',     nativeName: '한국어',      flag: '🇰🇷', popular: false },
+    { code: 'ar', name: 'Arabic',     nativeName: 'العربية',     flag: '🇸🇦', popular: false },
+    { code: 'hi', name: 'Hindi',      nativeName: 'हिन्दी',      flag: '🇮🇳', popular: false },
+    { code: 'tr', name: 'Turkish',    nativeName: 'Türkçe',     flag: '🇹🇷', popular: false },
+    { code: 'nl', name: 'Dutch',      nativeName: 'Nederlands', flag: '🇳🇱', popular: false },
+    { code: 'pl', name: 'Polish',     nativeName: 'Polski',     flag: '🇵🇱', popular: false },
+    { code: 'sv', name: 'Swedish',    nativeName: 'Svenska',    flag: '🇸🇪', popular: false },
+    { code: 'da', name: 'Danish',     nativeName: 'Dansk',      flag: '🇩🇰', popular: false },
+    { code: 'fi', name: 'Finnish',    nativeName: 'Suomi',      flag: '🇫🇮', popular: false },
+    { code: 'no', name: 'Norwegian',  nativeName: 'Norsk',      flag: '🇳🇴', popular: false },
+    { code: 'uk', name: 'Ukrainian',  nativeName: 'Українська', flag: '🇺🇦', popular: false },
+    { code: 'cs', name: 'Czech',      nativeName: 'Čeština',    flag: '🇨🇿', popular: false },
+    { code: 'el', name: 'Greek',      nativeName: 'Ελληνικά',   flag: '🇬🇷', popular: false },
+    { code: 'he', name: 'Hebrew',     nativeName: 'עברית',       flag: '🇮🇱', popular: false },
+    { code: 'th', name: 'Thai',       nativeName: 'ไทย',         flag: '🇹🇭', popular: false },
+    { code: 'vi', name: 'Vietnamese', nativeName: 'Tiếng Việt', flag: '🇻🇳', popular: false },
+    { code: 'id', name: 'Indonesian', nativeName: 'Bahasa Indonesia', flag: '🇮🇩', popular: false },
+    { code: 'ms', name: 'Malay',      nativeName: 'Bahasa Melayu',    flag: '🇲🇾', popular: false },
+    { code: 'ro', name: 'Romanian',   nativeName: 'Română',     flag: '🇷🇴', popular: false },
+    { code: 'hu', name: 'Hungarian',  nativeName: 'Magyar',     flag: '🇭🇺', popular: false },
+    { code: 'ca', name: 'Catalan',    nativeName: 'Català',     flag: '🏴', popular: false },
+    { code: 'eu', name: 'Basque',     nativeName: 'Euskara',    flag: '🏴', popular: false },
+    { code: 'gl', name: 'Galician',   nativeName: 'Galego',     flag: '🏴', popular: false },
+];
 
 // Check if this is a first run (no locale saved)
 function isFirstRun() {
@@ -62,35 +116,117 @@ async function checkSystemStatus() {
     }
 }
 
-// Initialize language selector panel
+// Detect user's browser language and return the best matching language from ALL_LANGUAGES
+function detectBrowserLanguage() {
+    const browserLangs = navigator.languages || [navigator.language || navigator.userLanguage || 'en'];
+    for (const bl of browserLangs) {
+        const code = bl.substring(0, 2).toLowerCase();
+        const match = ALL_LANGUAGES.find(l => l.code === code);
+        if (match) return match;
+    }
+    return ALL_LANGUAGES[0]; // fallback to English
+}
+
+// Build a language option element (card style)
+function buildLanguageCard(lang, isSelected) {
+    const label = document.createElement('label');
+    label.className = 'language-option' + (isSelected ? ' selected' : '');
+    label.setAttribute('data-lang', lang.code);
+    label.innerHTML = `
+        <input type="radio" name="language" value="${lang.code}" ${isSelected ? 'checked' : ''}>
+        <span class="language-radio"></span>
+        <span class="language-flag">${lang.flag}</span>
+        <span class="language-name">${lang.nativeName}</span>
+    `;
+    return label;
+}
+
+// Initialize language selector panel with hybrid approach
 function initLanguageSelector() {
     const languagePanel = document.getElementById('language-panel');
-    const languageOptions = document.querySelectorAll('.language-option');
     const continueBtn = document.getElementById('language-continue');
+    const optionsContainer = document.getElementById('language-options');
+    const moreLangBtn = document.getElementById('lang-more-btn');
+    
+    if (!languagePanel || !optionsContainer) return;
+    
     let selectedLanguage = null;
     
-    if (!languagePanel) return;
+    // --- Auto-detect browser language ---
+    const detected = detectBrowserLanguage();
     
-    // Handle language option clicks
-    languageOptions.forEach(option => {
-        option.addEventListener('click', () => {
-            // Remove selected class from all options
-            languageOptions.forEach(opt => opt.classList.remove('selected'));
-            // Add selected class to clicked option
-            option.classList.add('selected');
-            // Check the radio button
-            option.querySelector('input[type="radio"]').checked = true;
-            // Store selected language
-            selectedLanguage = option.getAttribute('data-lang');
-            // Enable continue button
+    // Build the list of popular languages to show as cards
+    // If the detected language isn't already popular, promote it to the top
+    let popularLangs = ALL_LANGUAGES.filter(l => l.popular);
+    const detectedInPopular = popularLangs.find(l => l.code === detected.code);
+    if (!detectedInPopular) {
+        // Insert detected language at the top of popular cards
+        popularLangs = [detected, ...popularLangs];
+    }
+    
+    // Auto-select the detected language
+    selectedLanguage = detected.code;
+    continueBtn.disabled = false;
+    
+    // Show autodetection banner
+    const autodetectedBanner = document.getElementById('lang-autodetected');
+    if (autodetectedBanner) {
+        autodetectedBanner.style.display = 'flex';
+    }
+    updateLanguagePanelTexts(detected.code);
+    
+    // --- Render popular language cards ---
+    optionsContainer.innerHTML = '';
+    popularLangs.forEach(lang => {
+        const card = buildLanguageCard(lang, lang.code === selectedLanguage);
+        card.addEventListener('click', () => {
+            // Deselect all
+            optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
+            card.classList.add('selected');
+            card.querySelector('input[type="radio"]').checked = true;
+            selectedLanguage = lang.code;
             continueBtn.disabled = false;
-            
-            // Update UI texts based on selected language
-            updateLanguagePanelTexts(selectedLanguage);
+            updateLanguagePanelTexts(lang.code);
         });
+        optionsContainer.appendChild(card);
     });
     
-    // Handle continue button click
+    // --- "More languages" button opens the modal ---
+    if (moreLangBtn) {
+        moreLangBtn.addEventListener('click', () => openLanguageModal(selectedLanguage, (langCode) => {
+            selectedLanguage = langCode;
+            continueBtn.disabled = false;
+            updateLanguagePanelTexts(langCode);
+            
+            // Update cards to reflect new selection
+            optionsContainer.querySelectorAll('.language-option').forEach(o => {
+                const isThis = o.getAttribute('data-lang') === langCode;
+                o.classList.toggle('selected', isThis);
+                o.querySelector('input[type="radio"]').checked = isThis;
+            });
+            
+            // If selected lang is not in the popular cards, add it temporarily
+            if (!optionsContainer.querySelector(`[data-lang="${langCode}"]`)) {
+                const lang = ALL_LANGUAGES.find(l => l.code === langCode);
+                if (lang) {
+                    // Deselect all existing
+                    optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
+                    const card = buildLanguageCard(lang, true);
+                    card.addEventListener('click', () => {
+                        optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
+                        card.classList.add('selected');
+                        card.querySelector('input[type="radio"]').checked = true;
+                        selectedLanguage = lang.code;
+                        updateLanguagePanelTexts(lang.code);
+                    });
+                    // Insert at the top
+                    optionsContainer.insertBefore(card, optionsContainer.firstChild);
+                }
+            }
+        }));
+    }
+    
+    // --- Continue button ---
     continueBtn.addEventListener('click', async () => {
         if (!selectedLanguage) return;
         
@@ -111,19 +247,16 @@ function initLanguageSelector() {
         console.log('System status after language selection:', systemStatus);
         
         if (!systemStatus.initialized) {
-            // No admin exists - show admin setup
             console.log('No admin exists, showing admin setup panel');
             document.getElementById('login-panel').style.display = 'none';
             document.getElementById('register-panel').style.display = 'none';
             document.getElementById('admin-setup-panel').style.display = 'block';
             
-            // Hide the "Already set up? Sign in" link
             const backToLoginLink = document.getElementById('back-to-login');
             if (backToLoginLink) {
                 backToLoginLink.parentElement.style.display = 'none';
             }
         } else {
-            // Admin exists - show login panel
             document.getElementById('login-panel').style.display = 'block';
         }
         
@@ -134,16 +267,100 @@ function initLanguageSelector() {
     });
 }
 
+// Open the full language modal with search
+function openLanguageModal(currentSelection, onSelect) {
+    const overlay = document.getElementById('lang-modal-overlay');
+    const list = document.getElementById('lang-modal-list');
+    const searchInput = document.getElementById('lang-search-input');
+    const closeBtn = document.getElementById('lang-modal-close');
+    
+    if (!overlay || !list) return;
+    
+    // Render all languages
+    function renderList(filter = '') {
+        list.innerHTML = '';
+        const filterLower = filter.toLowerCase();
+        
+        const filtered = ALL_LANGUAGES.filter(lang => {
+            if (!filter) return true;
+            return lang.name.toLowerCase().includes(filterLower) ||
+                   lang.nativeName.toLowerCase().includes(filterLower) ||
+                   lang.code.toLowerCase().includes(filterLower);
+        });
+        
+        if (filtered.length === 0) {
+            list.innerHTML = '<div class="lang-modal-empty">No languages found</div>';
+            return;
+        }
+        
+        filtered.forEach(lang => {
+            const item = document.createElement('div');
+            item.className = 'lang-modal-item' + (lang.code === currentSelection ? ' selected' : '');
+            item.setAttribute('data-lang', lang.code);
+            item.innerHTML = `
+                <span class="lang-modal-flag">${lang.flag}</span>
+                <span class="lang-modal-native">${lang.nativeName}</span>
+                <span class="lang-modal-english">${lang.name}</span>
+                ${lang.code === currentSelection ? '<i class="fas fa-check lang-modal-check"></i>' : ''}
+            `;
+            item.addEventListener('click', () => {
+                currentSelection = lang.code;
+                onSelect(lang.code);
+                closeModal();
+            });
+            list.appendChild(item);
+        });
+    }
+    
+    function closeModal() {
+        overlay.style.display = 'none';
+        if (searchInput) searchInput.value = '';
+    }
+    
+    // Show modal
+    overlay.style.display = 'flex';
+    renderList();
+    
+    // Focus search
+    if (searchInput) {
+        setTimeout(() => searchInput.focus(), 100);
+        searchInput.value = '';
+        searchInput.oninput = () => renderList(searchInput.value);
+    }
+    
+    // Close handlers
+    if (closeBtn) {
+        closeBtn.onclick = closeModal;
+    }
+    overlay.onclick = (e) => {
+        if (e.target === overlay) closeModal();
+    };
+    document.addEventListener('keydown', function escHandler(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
+}
+
 // Update language panel texts based on selected language
 function updateLanguagePanelTexts(lang) {
     const texts = LANGUAGE_TEXTS[lang] || LANGUAGE_TEXTS.en;
     const titleEl = document.getElementById('language-title');
     const subtitleEl = document.getElementById('language-subtitle');
     const continueBtn = document.getElementById('language-continue');
+    const autodetectedText = document.getElementById('lang-autodetected-text');
+    const moreText = document.getElementById('lang-more-text');
+    const modalTitle = document.getElementById('lang-modal-title');
+    const searchInput = document.getElementById('lang-search-input');
     
     if (titleEl) titleEl.textContent = texts.title;
     if (subtitleEl) subtitleEl.textContent = texts.subtitle;
     if (continueBtn) continueBtn.textContent = texts.continue;
+    if (autodetectedText) autodetectedText.textContent = texts.autodetected;
+    if (moreText) moreText.textContent = texts.moreLanguages;
+    if (modalTitle) modalTitle.textContent = texts.modalTitle;
+    if (searchInput) searchInput.placeholder = texts.searchPlaceholder;
 }
 
 // Show appropriate panel based on system status and first run

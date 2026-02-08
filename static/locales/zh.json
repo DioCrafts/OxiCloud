@@ -14,6 +14,8 @@
     "search": "搜索文件...",
     "new_folder": "新建文件夹",
     "upload": "上传",
+    "upload_files": "上传文件",
+    "upload_folder": "上传文件夹",
     "rename": "重命名",
     "move": "移动到...",
     "move_to": "移动到",
@@ -23,13 +25,21 @@
     "cancel": "取消",
     "confirm": "确认",
     "share": "共享",
+    "favorite": "添加到收藏",
+    "unfavorite": "取消收藏",
     "copy": "复制",
     "notify": "通知",
     "send": "发送",
     "clear_recent": "清除最近",
     "logout": "退出登录",
     "create": "创建",
-    "search_btn": "搜索"
+    "search_btn": "搜索",
+    "close": "关闭"
+  },
+  "user_menu": {
+    "appearance": "外观",
+    "about": "关于 OxiCloud",
+    "about_description": "基于 Rust 和整洁架构构建的云存储平台。快速、安全、私密。"
   },
   "share": {
     "dialogTitle": "共享链接",

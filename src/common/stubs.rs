@@ -314,6 +314,14 @@ impl FileWritePort for StubFileWritePort {
         Ok(File::default())
     }
 
+    async fn rename_file(
+        &self,
+        _file_id: &str,
+        _new_name: &str,
+    ) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
     async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
         Ok(())
     }
@@ -636,6 +644,14 @@ impl FileManagementUseCase for StubFileManagementUseCase {
         &self,
         _file_id: &str,
         _folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn rename_file(
+        &self,
+        _file_id: &str,
+        _new_name: &str,
     ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }

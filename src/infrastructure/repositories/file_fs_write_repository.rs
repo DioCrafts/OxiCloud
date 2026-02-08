@@ -372,6 +372,55 @@ impl FileWritePort for FileFsWriteRepository {
             .map_err(|e| DomainError::internal_error("File", e.to_string()))
     }
 
+    async fn rename_file(
+        &self,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<File, DomainError> {
+        // 1. Get current file info
+        let original_path = self.id_mapping_service.get_path_by_id(file_id).await?;
+        let old_abs = self.resolve_storage_path(&original_path);
+        if !old_abs.exists() || !old_abs.is_file() {
+            return Err(DomainError::not_found("File", file_id.to_string()));
+        }
+        let (size, created_at, modified_at) = self.get_file_metadata_raw(&old_abs).await.map_err(map_repo_err)?;
+
+        // 2. Build new path (same parent directory, different filename)
+        let parent = original_path.parent()
+            .unwrap_or_else(|| StoragePath::new(vec![]));
+        let new_storage_path = parent.join(new_name);
+        if self.file_exists_at_storage_path(&new_storage_path).await.map_err(map_repo_err)? {
+            return Err(DomainError::already_exists("File",
+                format!("File already exists: {}", new_name)));
+        }
+        let new_abs = self.resolve_storage_path(&new_storage_path);
+        let mime = from_path(&new_abs).first_or_octet_stream().to_string();
+
+        // 3. Rename on disk
+        time::timeout(
+            self.config.timeouts.file_timeout(),
+            FileSystemUtils::rename_with_sync(&old_abs, &new_abs),
+        ).await
+        .map_err(|_| DomainError::internal_error("File", "Timeout renaming file"))?
+        .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
+
+        // 4. Update id→path mapping
+        self.id_mapping_service.update_path(file_id, &new_storage_path).await?;
+        let _ = self.id_mapping_service.save_changes().await;
+
+        File::with_timestamps(
+            file_id.to_string(),
+            new_name.to_string(),
+            new_storage_path,
+            size,
+            mime,
+            None,
+            created_at,
+            modified_at,
+        )
+        .map_err(|e| DomainError::internal_error("File", e.to_string()))
+    }
+
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         let storage_path = self.id_mapping_service.get_path_by_id(id).await?;
         let abs_path = self.resolve_storage_path(&storage_path);

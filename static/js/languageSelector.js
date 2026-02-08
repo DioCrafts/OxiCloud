@@ -4,12 +4,18 @@
  */
 
 // Language codes, names, and flag emojis
-const languages = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'zh', name: '中文', flag: '🇨🇳' },
-    { code: 'fa', name: 'فارسی', flag: '🦁' }
-];
+// Uses ALL_LANGUAGES from auth.js if available, otherwise fallback
+function getAvailableLanguages() {
+    if (typeof ALL_LANGUAGES !== 'undefined') {
+        return ALL_LANGUAGES.map(l => ({ code: l.code, name: l.nativeName, flag: l.flag }));
+    }
+    return [
+        { code: 'en', name: 'English', flag: '🇬🇧' },
+        { code: 'es', name: 'Español', flag: '🇪🇸' },
+        { code: 'zh', name: '中文', flag: '🇨🇳' },
+        { code: 'fa', name: 'فارسی', flag: '🇮🇷' }
+    ];
+}
 
 // RTL languages
 const rtlLanguages = ['fa']; // ['fa', 'ar']
@@ -47,6 +53,7 @@ function createLanguageSelector(containerId = 'language-selector') {
     container.className = 'language-selector';
     
     // Get current language
+    const languages = getAvailableLanguages();
     const currentLocale = window.i18n ? window.i18n.getCurrentLocale() : 'en';
     const currentLang = languages.find(l => l.code === currentLocale) || languages[0];
     
@@ -182,6 +189,7 @@ async function selectLanguage(langCode, container) {
  * Update the UI to reflect selected language
  */
 function updateSelectedLanguage(langCode, container) {
+    const languages = getAvailableLanguages();
     const lang = languages.find(l => l.code === langCode) || languages[0];
     
     // Update toggle button text

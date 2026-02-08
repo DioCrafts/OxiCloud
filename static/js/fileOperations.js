@@ -3,6 +3,19 @@
  * This file handles file and folder operations (create, move, delete, rename, upload)
  */
 
+/**
+ * Get authorization headers for API requests
+ * @returns {Object} Headers object with Authorization bearer token
+ */
+function getAuthHeaders() {
+    const token = localStorage.getItem('oxicloud_token');
+    const headers = {};
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 // File Operations Module
 const fileOps = {
     /**
@@ -49,6 +62,7 @@ const fileOps = {
                     // Añadir cache: 'no-store' para evitar problemas de caché durante la subida
                     cache: 'no-store',
                     headers: {
+                        ...getAuthHeaders(),
                         // Agregar este encabezado para forzar recargas frescas
                         'Cache-Control': 'no-cache, no-store, must-revalidate'
                     }
@@ -105,6 +119,133 @@ const fileOps = {
     },
 
     /**
+     * Upload folder files maintaining directory structure
+     * Creates subfolders as needed, then uploads files into them
+     * @param {FileList} files - Files from folder input (with webkitRelativePath)
+     */
+    async uploadFolderFiles(files) {
+        if (!files || files.length === 0) return;
+        
+        const progressBar = document.querySelector('.progress-fill');
+        const uploadProgressDiv = document.querySelector('.upload-progress');
+        uploadProgressDiv.style.display = 'block';
+        progressBar.style.width = '0%';
+
+        const currentFolderId = window.app.currentPath || window.app.userHomeFolderId;
+        
+        // Build folder structure from relative paths
+        // webkitRelativePath looks like: "folderName/subfolder/file.txt"
+        const folderMap = new Map(); // path -> folder_id
+        folderMap.set('', currentFolderId); // root = current folder
+        
+        // Collect all unique folder paths
+        const folderPaths = new Set();
+        for (const file of files) {
+            const parts = file.webkitRelativePath.split('/');
+            // Remove filename, keep folder parts
+            for (let i = 1; i < parts.length; i++) {
+                const path = parts.slice(0, i).join('/');
+                folderPaths.add(path);
+            }
+        }
+        
+        // Sort paths by depth so parents are created first
+        const sortedPaths = [...folderPaths].sort((a, b) => 
+            a.split('/').length - b.split('/').length
+        );
+        
+        // Create folders
+        for (const folderPath of sortedPaths) {
+            const parts = folderPath.split('/');
+            const folderName = parts[parts.length - 1];
+            const parentPath = parts.slice(0, -1).join('/');
+            const parentId = folderMap.get(parentPath) || currentFolderId;
+            
+            try {
+                const response = await fetch('/api/folders', {
+                    method: 'POST',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    },
+                    body: JSON.stringify({
+                        name: folderName,
+                        parent_id: parentId
+                    })
+                });
+                
+                if (response.ok) {
+                    const folder = await response.json();
+                    folderMap.set(folderPath, folder.id);
+                    console.log(`Created folder: ${folderPath} -> ${folder.id}`);
+                } else {
+                    console.error(`Error creating folder ${folderPath}:`, await response.text());
+                    window.ui.showNotification('Error', `Error creando carpeta: ${folderName}`);
+                }
+            } catch (error) {
+                console.error(`Network error creating folder ${folderPath}:`, error);
+            }
+        }
+        
+        // Upload files into their respective folders
+        let uploadedCount = 0;
+        const totalFiles = files.length;
+        
+        for (let i = 0; i < totalFiles; i++) {
+            const file = files[i];
+            const parts = file.webkitRelativePath.split('/');
+            const parentPath = parts.slice(0, -1).join('/');
+            const targetFolderId = folderMap.get(parentPath) || currentFolderId;
+            
+            const formData = new FormData();
+            formData.append('folder_id', targetFolderId);
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/api/files/upload', {
+                    method: 'POST',
+                    body: formData,
+                    cache: 'no-store',
+                    headers: {
+                        ...getAuthHeaders(),
+                        'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    }
+                });
+                
+                uploadedCount++;
+                const percentComplete = (uploadedCount / totalFiles) * 100;
+                progressBar.style.width = percentComplete + '%';
+                
+                if (response.ok) {
+                    console.log(`Uploaded: ${file.webkitRelativePath}`);
+                } else {
+                    console.error(`Error uploading ${file.webkitRelativePath}:`, await response.text());
+                }
+            } catch (error) {
+                console.error(`Network error uploading ${file.webkitRelativePath}:`, error);
+            }
+        }
+        
+        // Finish up
+        window.ui.showNotification('Carpeta subida', `${uploadedCount} archivos subidos correctamente`);
+        
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        try {
+            await window.loadFiles({ forceRefresh: true });
+        } catch (reloadError) {
+            console.error('Error reloading files:', reloadError);
+        }
+        
+        setTimeout(() => {
+            const dropzone = document.getElementById('dropzone');
+            if (dropzone) dropzone.style.display = 'none';
+            uploadProgressDiv.style.display = 'none';
+        }, 500);
+    },
+
+    /**
      * Create a new folder
      * @param {string} name - Folder name
      */
@@ -116,6 +257,7 @@ const fileOps = {
             const response = await fetch('/api/folders', {
                 method: 'POST',
                 headers: {
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json',
                     'Cache-Control': 'no-cache, no-store, must-revalidate'
                 },
@@ -162,6 +304,7 @@ const fileOps = {
             const response = await fetch(`/api/files/${fileId}/move`, {
                 method: 'PUT',
                 headers: {
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -203,6 +346,7 @@ const fileOps = {
             const response = await fetch(`/api/folders/${folderId}/move`, {
                 method: 'PUT',
                 headers: {
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -234,6 +378,53 @@ const fileOps = {
     },
 
     /**
+     * Rename a file
+     * @param {string} fileId - File ID
+     * @param {string} newName - New file name
+     * @returns {Promise<boolean>} - Success status
+     */
+    async renameFile(fileId, newName) {
+        try {
+            console.log(`Renaming file ${fileId} to "${newName}"`);
+
+            const response = await fetch(`/api/files/${fileId}/rename`, {
+                method: 'PUT',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: newName })
+            });
+
+            console.log('Response status:', response.status);
+
+            if (response.ok) {
+                window.ui.showNotification(
+                    window.i18n ? window.i18n.t('notifications.file_renamed') : 'Archivo renombrado',
+                    window.i18n ? window.i18n.t('notifications.file_renamed_to', { name: newName }) : `Archivo renombrado a "${newName}"`
+                );
+                return true;
+            } else {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                let errorMessage = 'Error desconocido';
+                try {
+                    const errorData = JSON.parse(errorText);
+                    errorMessage = errorData.error || response.statusText;
+                } catch (e) {
+                    errorMessage = errorText || response.statusText;
+                }
+                window.ui.showNotification('Error', `Error al renombrar el archivo: ${errorMessage}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error renaming file:', error);
+            window.ui.showNotification('Error', 'Error al renombrar el archivo');
+            return false;
+        }
+    },
+
+    /**
      * Rename a folder
      * @param {string} folderId - Folder ID
      * @param {string} newName - New folder name
@@ -246,6 +437,7 @@ const fileOps = {
             const response = await fetch(`/api/folders/${folderId}/rename`, {
                 method: 'PUT',
                 headers: {
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ name: newName })
@@ -287,14 +479,18 @@ const fileOps = {
      * @returns {Promise<boolean>} - Success status
      */
     async deleteFile(fileId, fileName) {
-        if (!confirm(`¿Estás seguro de que quieres mover a la papelera el archivo "${fileName}"?`)) {
-            return false;
-        }
+        const confirmed = await showConfirmDialog({
+            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Mover a papelera',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `¿Estás seguro de que quieres mover a la papelera el archivo "${fileName}"?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+        });
+        if (!confirmed) return false;
         
         try {
             // Use the trash API endpoint
             const response = await fetch(`/api/trash/files/${fileId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
 
             if (response.ok) {
@@ -304,7 +500,8 @@ const fileOps = {
             } else {
                 // Fallback to direct deletion if trash fails
                 const fallbackResponse = await fetch(`/api/files/${fileId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
                 });
                 
                 if (fallbackResponse.ok) {
@@ -330,14 +527,18 @@ const fileOps = {
      * @returns {Promise<boolean>} - Success status
      */
     async deleteFolder(folderId, folderName) {
-        if (!confirm(`¿Estás seguro de que quieres mover a la papelera la carpeta "${folderName}" y todo su contenido?`)) {
-            return false;
-        }
+        const confirmed = await showConfirmDialog({
+            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Mover a papelera',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName }) : `¿Estás seguro de que quieres mover a la papelera la carpeta "${folderName}" y todo su contenido?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+        });
+        if (!confirmed) return false;
         
         try {
             // Use the trash API endpoint
             const response = await fetch(`/api/trash/folders/${folderId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
 
             if (response.ok) {
@@ -352,7 +553,8 @@ const fileOps = {
             } else {
                 // Fallback to direct deletion if trash fails
                 const fallbackResponse = await fetch(`/api/folders/${folderId}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: getAuthHeaders()
                 });
                 
                 if (fallbackResponse.ok) {
@@ -382,7 +584,9 @@ const fileOps = {
      */
     async getTrashItems() {
         try {
-            const response = await fetch('/api/trash');
+            const response = await fetch('/api/trash', {
+                headers: getAuthHeaders()
+            });
             
             if (response.ok) {
                 return await response.json();
@@ -406,6 +610,7 @@ const fileOps = {
             const response = await fetch(`/api/trash/${trashId}/restore`, {
                 method: 'POST',
                 headers: {
+                    ...getAuthHeaders(),
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({})
@@ -431,13 +636,17 @@ const fileOps = {
      * @returns {Promise<boolean>} - Éxito de la operación
      */
     async deletePermanently(trashId) {
-        if (!confirm('¿Estás seguro de que quieres eliminar permanentemente este elemento? Esta acción no se puede deshacer.')) {
-            return false;
-        }
+        const confirmed = await showConfirmDialog({
+            title: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete') : 'Eliminar permanentemente',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete_msg') : '¿Estás seguro de que quieres eliminar permanentemente este elemento? Esta acción no se puede deshacer.',
+            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Eliminar permanentemente',
+        });
+        if (!confirmed) return false;
         
         try {
             const response = await fetch(`/api/trash/${trashId}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
             
             if (response.ok) {
@@ -459,14 +668,17 @@ const fileOps = {
      * @returns {Promise<boolean>} - Éxito de la operación
      */
     async emptyTrash() {
-        const confirmMsg = window.i18n ? window.i18n.t('trash.empty_confirm') : '¿Estás seguro de que quieres vaciar la papelera? Esta acción eliminará permanentemente todos los elementos.';
-        if (!confirm(confirmMsg)) {
-            return false;
-        }
+        const confirmed = await showConfirmDialog({
+            title: window.i18n ? window.i18n.t('dialogs.confirm_empty_trash') : 'Vaciar papelera',
+            message: window.i18n ? window.i18n.t('trash.empty_confirm') : '¿Estás seguro de que quieres vaciar la papelera? Esta acción eliminará permanentemente todos los elementos.',
+            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Vaciar papelera',
+        });
+        if (!confirmed) return false;
         
         try {
             const response = await fetch('/api/trash/empty', {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
             
             if (response.ok) {
@@ -488,15 +700,28 @@ const fileOps = {
      * @param {string} fileId - ID del archivo
      * @param {string} fileName - Nombre del archivo
      */
-    downloadFile(fileId, fileName) {
-        // Create a link and trigger download
-        const link = document.createElement('a');
-        link.href = `/api/files/${fileId}`;
-        link.download = fileName;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    async downloadFile(fileId, fileName) {
+        try {
+            const response = await fetch(`/api/files/${fileId}`, {
+                headers: getAuthHeaders()
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                window.ui.showNotification('Error', 'Error al descargar el archivo');
+            }
+        } catch (error) {
+            console.error('Error downloading file:', error);
+            window.ui.showNotification('Error', 'Error al descargar el archivo');
+        }
     },
     
     /**
@@ -509,15 +734,22 @@ const fileOps = {
             // Show notification to user
             window.ui.showNotification('Preparando descarga', 'Preparando la carpeta para descargar...');
             
-            // Request the server to create a ZIP of the folder
-            // Since the API might not support this directly, we will simply download with zip parameter
-            const link = document.createElement('a');
-            link.href = `/api/folders/${folderId}/download?format=zip`;
-            link.download = `${folderName}.zip`;
-            link.target = '_blank';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const response = await fetch(`/api/folders/${folderId}/download?format=zip`, {
+                headers: getAuthHeaders()
+            });
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${folderName}.zip`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                window.ui.showNotification('Error', 'Error al descargar la carpeta');
+            }
         } catch (error) {
             console.error('Error downloading folder:', error);
             window.ui.showNotification('Error', 'Error al descargar la carpeta');

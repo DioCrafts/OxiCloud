@@ -60,14 +60,6 @@ const sharedView = {
         
         // Update container
         sharedContainer.innerHTML = `
-            <div class="actions-bar">
-                <div class="action-buttons">
-                    <button class="btn btn-secondary" id="go-to-files-btn">
-                        <i class="fas fa-arrow-left" style="margin-right: 5px;"></i> <span data-i18n="shared.backToFiles">Back to Files</span>
-                    </button>
-                </div>
-            </div>
-            
             <div class="shared-filters">
                 <div class="filter-group">
                     <label for="filter-type" data-i18n="shared.filterType">Type:</label>
@@ -234,7 +226,6 @@ const sharedView = {
         const sortBy = document.getElementById('sort-by');
         const searchFilter = document.getElementById('shared-search-filter');
         const searchBtn = document.getElementById('shared-search-filter-btn');
-        const goToFilesBtn = document.getElementById('go-to-files-btn');
         const emptyGoToFiles = document.getElementById('empty-go-to-files');
         
         if (filterType) filterType.addEventListener('change', () => this.filterAndSortItems());
@@ -244,8 +235,7 @@ const sharedView = {
         });
         if (searchBtn) searchBtn.addEventListener('click', () => this.filterAndSortItems());
         
-        // Back to files buttons
-        if (goToFilesBtn) goToFilesBtn.addEventListener('click', () => window.switchToFilesView());
+        // Back to files button (empty state)
         if (emptyGoToFiles) emptyGoToFiles.addEventListener('click', () => window.switchToFilesView());
         
         // Share dialog buttons

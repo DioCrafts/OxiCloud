@@ -126,12 +126,202 @@ function cacheElements() {
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');
     elements.breadcrumb = document.querySelector('.breadcrumb');
-    elements.logoutBtn = document.getElementById('logout-btn');
     elements.pageTitle = document.querySelector('.page-title');
     elements.actionsBar = document.querySelector('.actions-bar');
     elements.navItems = document.querySelectorAll('.nav-item');
     elements.trashBtn = document.querySelector('.nav-item:nth-child(5)'); // The trash nav item
     elements.searchInput = document.querySelector('.search-container input');
+}
+
+/**
+ * Setup the user menu (avatar dropdown with profile, storage, theme, about, logout)
+ */
+function setupUserMenu() {
+    const wrapper = document.getElementById('user-menu-wrapper');
+    const avatarBtn = document.getElementById('user-avatar-btn');
+    const menu = document.getElementById('user-menu');
+    const logoutBtn = document.getElementById('user-menu-logout');
+    const themeBtn = document.getElementById('user-menu-theme');
+    const aboutBtn = document.getElementById('user-menu-about');
+    
+    if (!wrapper || !avatarBtn || !menu) return;
+    
+    // Toggle menu
+    avatarBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = wrapper.classList.contains('open');
+        wrapper.classList.toggle('open');
+        if (!isOpen) {
+            updateUserMenuData();
+        }
+    });
+    
+    // Close menu on outside click
+    document.addEventListener('click', (e) => {
+        if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) {
+            wrapper.classList.remove('open');
+        }
+    });
+    
+    // Logout
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            wrapper.classList.remove('open');
+            logout();
+        });
+    }
+    
+    // Theme toggle (dark mode placeholder — toggles pill visually)
+    if (themeBtn) {
+        const pill = document.getElementById('theme-toggle-pill');
+        const isDark = localStorage.getItem('oxicloud_theme') === 'dark';
+        if (isDark && pill) pill.classList.add('active');
+        
+        themeBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (pill) {
+                pill.classList.toggle('active');
+                const dark = pill.classList.contains('active');
+                localStorage.setItem('oxicloud_theme', dark ? 'dark' : 'light');
+                // Theme switching could be expanded here in the future
+                window.ui.showNotification(
+                    dark ? '🌙' : '☀️',
+                    dark ? 'Modo oscuro activado (próximamente)' : 'Modo claro activado'
+                );
+            }
+        });
+    }
+    
+    // About modal
+    if (aboutBtn) {
+        aboutBtn.addEventListener('click', () => {
+            wrapper.classList.remove('open');
+            const overlay = document.getElementById('about-modal-overlay');
+            if (overlay) overlay.classList.add('show');
+        });
+    }
+    
+    // About modal close
+    const aboutCloseBtn = document.getElementById('about-close-btn');
+    const aboutOverlay = document.getElementById('about-modal-overlay');
+    if (aboutCloseBtn) {
+        aboutCloseBtn.addEventListener('click', () => {
+            aboutOverlay.classList.remove('show');
+        });
+    }
+    if (aboutOverlay) {
+        aboutOverlay.addEventListener('click', (e) => {
+            if (e.target === aboutOverlay) {
+                aboutOverlay.classList.remove('show');
+            }
+        });
+    }
+    
+    // Fetch version from backend (centralized in Cargo.toml)
+    fetchAppVersion();
+}
+
+/**
+ * Update user menu data (name, email, storage) from localStorage
+ */
+function updateUserMenuData() {
+    const USER_DATA_KEY = 'oxicloud_user';
+    const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
+    
+    const nameEl = document.getElementById('user-menu-name');
+    const emailEl = document.getElementById('user-menu-email');
+    const avatarEl = document.getElementById('user-menu-avatar');
+    const storageFill = document.getElementById('user-menu-storage-fill');
+    const storageText = document.getElementById('user-menu-storage-text');
+    
+    if (userData.username) {
+        if (nameEl) nameEl.textContent = userData.username;
+        if (emailEl) emailEl.textContent = userData.email || '';
+        if (avatarEl) avatarEl.textContent = userData.username.substring(0, 2).toUpperCase();
+    }
+    
+    // Storage info
+    const usedBytes = userData.storage_used_bytes || 0;
+    const quotaBytes = userData.storage_quota_bytes || 10737418240;
+    const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
+    
+    if (storageFill) storageFill.style.width = percentage + '%';
+    if (storageText) {
+        const used = formatFileSize(usedBytes);
+        const total = formatFileSize(quotaBytes);
+        storageText.textContent = `${percentage}% · ${used} / ${total}`;
+    }
+}
+
+/**
+ * Fetch app version from backend (centralized in Cargo.toml)
+ * Updates the about modal version display
+ */
+async function fetchAppVersion() {
+    try {
+        const response = await fetch('/api/version');
+        if (response.ok) {
+            const data = await response.json();
+            const versionEl = document.getElementById('about-version');
+            if (versionEl && data.version) {
+                versionEl.textContent = `v${data.version}`;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not fetch app version:', err);
+        // Fallback: leave placeholder
+    }
+}
+
+/**
+ * Setup the upload dropdown button and menu
+ * Handles opening/closing the dropdown and triggering file/folder inputs
+ */
+function setupUploadDropdown() {
+    const dropdown = document.getElementById('upload-dropdown');
+    const uploadBtn = document.getElementById('upload-btn');
+    const menu = document.getElementById('upload-dropdown-menu');
+    const uploadFilesBtn = document.getElementById('upload-files-btn');
+    const uploadFolderBtn = document.getElementById('upload-folder-btn');
+    
+    if (!uploadBtn || !menu) return;
+    
+    // Toggle dropdown on button click
+    uploadBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = menu.classList.contains('show');
+        // Close any other open dropdowns
+        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+        if (!isOpen) {
+            menu.classList.add('show');
+        }
+    });
+    
+    // Upload files option
+    if (uploadFilesBtn) {
+        uploadFilesBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menu.classList.remove('show');
+            elements.fileInput.click();
+        });
+    }
+    
+    // Upload folder option
+    if (uploadFolderBtn) {
+        uploadFolderBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menu.classList.remove('show');
+            const folderInput = document.getElementById('folder-input');
+            if (folderInput) {
+                folderInput.click();
+            }
+        });
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    });
 }
 
 /**
@@ -165,20 +355,27 @@ function setupEventListeners() {
         }
     });
     
-    // Upload button
-    elements.uploadBtn.addEventListener('click', () => {
-        elements.dropzone.style.display = elements.dropzone.style.display === 'none' ? 'block' : 'none';
-        if (elements.dropzone.style.display === 'block') {
-            elements.fileInput.click();
-        }
-    });
+    // Upload dropdown
+    setupUploadDropdown();
     
     // File input
     elements.fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
             fileOps.uploadFiles(e.target.files);
+            e.target.value = ''; // reset so same file can be re-uploaded
         }
     });
+    
+    // Folder input
+    const folderInput = document.getElementById('folder-input');
+    if (folderInput) {
+        folderInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                fileOps.uploadFolderFiles(e.target.files);
+                e.target.value = '';
+            }
+        });
+    }
     
     // New folder button
     elements.newFolderBtn.addEventListener('click', async () => {
@@ -298,9 +495,23 @@ function setupEventListeners() {
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Archivos';
                 elements.actionsBar.innerHTML = `
                     <div class="action-buttons">
-                        <button class="btn btn-primary" id="upload-btn">
-                            <i class="fas fa-upload" style="margin-right: 5px;"></i> <span data-i18n="actions.upload">Subir</span>
-                        </button>
+                        <div class="upload-dropdown" id="upload-dropdown">
+                            <button class="btn btn-primary" id="upload-btn">
+                                <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
+                                <span data-i18n="actions.upload">Subir</span>
+                                <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                            </button>
+                            <div class="upload-dropdown-menu" id="upload-dropdown-menu">
+                                <button class="upload-dropdown-item" id="upload-files-btn">
+                                    <i class="fas fa-file"></i>
+                                    <span data-i18n="actions.upload_files">Subir archivos</span>
+                                </button>
+                                <button class="upload-dropdown-item" id="upload-folder-btn">
+                                    <i class="fas fa-folder-open"></i>
+                                    <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                                </button>
+                            </div>
+                        </div>
                         <button class="btn btn-secondary" id="new-folder-btn">
                             <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">Nueva carpeta</span>
                         </button>
@@ -323,12 +534,7 @@ function setupEventListeners() {
                 if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
                 
                 // Restore event listeners
-                document.getElementById('upload-btn').addEventListener('click', () => {
-                    elements.dropzone.style.display = elements.dropzone.style.display === 'none' ? 'block' : 'none';
-                    if (elements.dropzone.style.display === 'block') {
-                        elements.fileInput.click();
-                    }
-                });
+                setupUploadDropdown();
                 
                 document.getElementById('new-folder-btn').addEventListener('click', async () => {
                     const folderName = await window.Modal.promptNewFolder();
@@ -360,10 +566,10 @@ function setupEventListeners() {
         ui.switchToListView();
     }
     
-    // Logout button
-    elements.logoutBtn.addEventListener('click', logout);
+    // User menu
+    setupUserMenu();
     
-    // Global events to close context menus
+    // Global events to close context menus and deselect cards
     document.addEventListener('click', (e) => {
         const folderMenu = document.getElementById('folder-context-menu');
         const fileMenu = document.getElementById('file-context-menu');
@@ -376,6 +582,11 @@ function setupEventListeners() {
         if (fileMenu && fileMenu.style.display === 'block' && 
             !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
+        }
+
+        // Deselect all cards when clicking empty area (not on a card, menu, or modal)
+        if (!e.target.closest('.file-card') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal')) {
+            document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
         }
     });
 }
@@ -397,6 +608,14 @@ async function loadFiles(options = {}) {
         }
         
         window.isLoadingFiles = true;
+        
+        // Show loading spinner
+        elements.filesGrid.innerHTML = `
+            <div class="files-loading-spinner">
+                <div class="spinner"></div>
+                <span>${window.i18n ? window.i18n.t('files.loading') : 'Cargando archivos…'}</span>
+            </div>
+        `;
         
         // Always ensure a userHomeFolderId is set
         if (!app.userHomeFolderId) {
@@ -606,8 +825,8 @@ async function loadTrashItems() {
             window.i18n.translatePage();
         }
         
-        // Update breadcrumb for trash
-        ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.trash') : 'Papelera');
+        // Update breadcrumb - just show Home
+        ui.updateBreadcrumb('');
         
         // Get trash items
         const trashItems = await fileOps.getTrashItems();
@@ -833,7 +1052,7 @@ function switchToSharedView() {
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Compartidos';
     
     // Clear breadcrumb and show root
-    ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.shared') : 'Compartidos');
+    ui.updateBreadcrumb('');
     
     // Hide standard actions bar
     if (elements.actionsBar) {
@@ -873,9 +1092,23 @@ function switchToFilesView() {
     // Reset UI
     elements.actionsBar.innerHTML = `
         <div class="action-buttons">
-            <button class="btn btn-primary" id="upload-btn">
-                <i class="fas fa-upload" style="margin-right: 5px;"></i> <span data-i18n="actions.upload">Subir</span>
-            </button>
+            <div class="upload-dropdown" id="upload-dropdown">
+                <button class="btn btn-primary" id="upload-btn">
+                    <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
+                    <span data-i18n="actions.upload">Subir</span>
+                    <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                </button>
+                <div class="upload-dropdown-menu" id="upload-dropdown-menu">
+                    <button class="upload-dropdown-item" id="upload-files-btn">
+                        <i class="fas fa-file"></i>
+                        <span data-i18n="actions.upload_files">Subir archivos</span>
+                    </button>
+                    <button class="upload-dropdown-item" id="upload-folder-btn">
+                        <i class="fas fa-folder-open"></i>
+                        <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                    </button>
+                </div>
+            </div>
             <button class="btn btn-secondary" id="new-folder-btn">
                 <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">Nueva carpeta</span>
             </button>
@@ -892,12 +1125,7 @@ function switchToFilesView() {
     elements.actionsBar.style.display = 'flex';
     
     // Restore event listeners
-    document.getElementById('upload-btn').addEventListener('click', () => {
-        elements.dropzone.style.display = elements.dropzone.style.display === 'none' ? 'block' : 'none';
-        if (elements.dropzone.style.display === 'block') {
-            elements.fileInput.click();
-        }
-    });
+    setupUploadDropdown();
     
     document.getElementById('new-folder-btn').addEventListener('click', async () => {
         const folderName = await window.Modal.promptNewFolder();
@@ -967,7 +1195,7 @@ function switchToFavoritesView() {
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.favorites') : 'Favoritos';
     
     // Clear breadcrumb and show root
-    ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.favorites') : 'Favoritos');
+    ui.updateBreadcrumb('');
     
     // Hide shared view if it exists
     if (window.sharedView) {
@@ -1056,7 +1284,7 @@ function switchToRecentFilesView() {
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.recent') : 'Recientes';
     
     // Clear breadcrumb and show root
-    ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.recent') : 'Recientes');
+    ui.updateBreadcrumb('');
     
     // Hide shared view if it exists
     if (window.sharedView) {
@@ -1231,20 +1459,14 @@ function checkAuthentication() {
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(defaultUserData));
             
             // Update avatar with default initials
-            const userAvatar = document.querySelector('.user-avatar');
-            if (userAvatar) {
-                userAvatar.textContent = 'US';
-            }
+            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
             
             // Update storage display with default values
             updateStorageUsageDisplay(defaultUserData);
         } else {
             // Update avatar with user initials
             const userInitials = userData.username.substring(0, 2).toUpperCase();
-            const userAvatar = document.querySelector('.user-avatar');
-            if (userAvatar) {
-                userAvatar.textContent = userInitials;
-            }
+            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
             
             // Show cached storage first, then try to refresh from server
             updateStorageUsageDisplay(userData);
@@ -1302,10 +1524,14 @@ function checkAuthentication() {
         if (userData.username) {
             // Update user avatar with initials
             const userInitials = userData.username.substring(0, 2).toUpperCase();
-            const userAvatar = document.querySelector('.user-avatar');
-            if (userAvatar) {
-                userAvatar.textContent = userInitials;
-            }
+            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => {
+                el.textContent = userInitials;
+            });
+            // Update user menu info
+            const menuName = document.getElementById('user-menu-name');
+            const menuEmail = document.getElementById('user-menu-email');
+            if (menuName) menuName.textContent = userData.username;
+            if (menuEmail) menuEmail.textContent = userData.email || '';
             
             // Update storage usage information with cached data first (for fast display)
             updateStorageUsageDisplay(userData);
@@ -1335,10 +1561,7 @@ function checkAuthentication() {
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(defaultUserData));
             
             // Update avatar with default initials
-            const userAvatar = document.querySelector('.user-avatar');
-            if (userAvatar) {
-                userAvatar.textContent = 'US';
-            }
+            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
             
             // Update storage display with default values
             updateStorageUsageDisplay(defaultUserData);
@@ -1367,10 +1590,7 @@ function checkAuthentication() {
         localStorage.setItem('oxicloud_user', JSON.stringify(defaultUserData));
         
         // Update avatar
-        const userAvatar = document.querySelector('.user-avatar');
-        if (userAvatar) {
-            userAvatar.textContent = 'US';
-        }
+        document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
         
         // Update storage display with default values
         updateStorageUsageDisplay(defaultUserData);

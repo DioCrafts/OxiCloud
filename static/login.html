@@ -28,40 +28,44 @@
                 <div class="auth-logo-text">OxiCloud</div>
             </div>
             
+            <!-- Auto-detected language banner -->
+            <div class="lang-autodetected" id="lang-autodetected" style="display: none;">
+                <i class="fas fa-magic"></i>
+                <span id="lang-autodetected-text">We detected your language</span>
+            </div>
+
             <h2 class="auth-title" id="language-title">Welcome to OxiCloud</h2>
             <p class="language-subtitle" id="language-subtitle">Please select your language</p>
             
+            <!-- Popular languages shown as cards -->
             <div class="language-options" id="language-options">
-                <label class="language-option" data-lang="en">
-                    <input type="radio" name="language" value="en">
-                    <span class="language-radio"></span>
-                    <span class="language-flag">🇬🇧</span>
-                    <span class="language-name">English</span>
-                </label>
-                
-                <label class="language-option" data-lang="es">
-                    <input type="radio" name="language" value="es">
-                    <span class="language-radio"></span>
-                    <span class="language-flag">🇪🇸</span>
-                    <span class="language-name">Español</span>
-                </label>
-                
-                <label class="language-option" data-lang="zh">
-                    <input type="radio" name="language" value="zh">
-                    <span class="language-radio"></span>
-                    <span class="language-flag">🇨🇳</span>
-                    <span class="language-name">中文</span>
-                </label>
-
-                <label class="language-option" data-lang="fa">
-                    <input type="radio" name="language" value="fa">
-                    <span class="language-radio"></span>
-                    <span class="language-flag">🦁</span>
-                    <span class="language-name">فارسی</span>
-                </label>
+                <!-- Populated dynamically by auth.js -->
             </div>
+
+            <!-- "More languages" link -->
+            <button type="button" class="lang-more-btn" id="lang-more-btn">
+                <i class="fas fa-globe"></i>
+                <span id="lang-more-text">More languages...</span>
+            </button>
             
             <button type="button" class="auth-button" id="language-continue" disabled>Continue</button>
+        </div>
+
+        <!-- Modal: All languages with search -->
+        <div class="lang-modal-overlay" id="lang-modal-overlay" style="display: none;">
+            <div class="lang-modal">
+                <div class="lang-modal-header">
+                    <h3 id="lang-modal-title">Select language</h3>
+                    <button type="button" class="lang-modal-close" id="lang-modal-close">&times;</button>
+                </div>
+                <div class="lang-modal-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="lang-search-input" placeholder="Search language..." autocomplete="off">
+                </div>
+                <div class="lang-modal-list" id="lang-modal-list">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
         </div>
 
         <div class="auth-panel" id="login-panel" style="display: none;">

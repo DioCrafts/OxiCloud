@@ -80,7 +80,7 @@
         </div>
 
         <div class="storage-container">
-            <div class="storage-title" data-i18n="storage.title">Storage</div>
+            <div class="storage-title"><i class="fas fa-database"></i> <span data-i18n="storage.title">Storage</span></div>
             <div class="storage-bar">
                 <div class="storage-fill"></div>
             </div>
@@ -102,9 +102,46 @@
 
             <div class="user-controls">
                 <div id="language-selector"></div>
-                <div class="user-avatar" id="user-avatar">AD</div>
-                <div id="logout-btn" class="logout-btn" data-i18n-title="actions.logout" title="Log out">
-                    <i class="fas fa-sign-out-alt"></i>
+                <div class="user-menu-wrapper" id="user-menu-wrapper">
+                    <button class="user-avatar-btn" id="user-avatar-btn">
+                        <div class="user-avatar" id="user-avatar">AD</div>
+                    </button>
+                    <div class="user-menu" id="user-menu">
+                        <div class="user-menu-header">
+                            <div class="user-menu-avatar" id="user-menu-avatar">AD</div>
+                            <div class="user-menu-info">
+                                <div class="user-menu-name" id="user-menu-name">Usuario</div>
+                                <div class="user-menu-email" id="user-menu-email">usuario@oxicloud.app</div>
+                            </div>
+                        </div>
+                        <div class="user-menu-storage">
+                            <div class="user-menu-storage-label">
+                                <i class="fas fa-database"></i>
+                                <span data-i18n="storage.title">Almacenamiento</span>
+                            </div>
+                            <div class="user-menu-storage-bar">
+                                <div class="user-menu-storage-fill" id="user-menu-storage-fill"></div>
+                            </div>
+                            <div class="user-menu-storage-text" id="user-menu-storage-text">0% usado</div>
+                        </div>
+                        <div class="user-menu-divider"></div>
+                        <button class="user-menu-item" id="user-menu-theme">
+                            <i class="fas fa-moon"></i>
+                            <span data-i18n="user_menu.appearance">Apariencia</span>
+                            <div class="theme-toggle-pill" id="theme-toggle-pill">
+                                <div class="theme-toggle-knob"></div>
+                            </div>
+                        </button>
+                        <button class="user-menu-item" id="user-menu-about">
+                            <i class="fas fa-info-circle"></i>
+                            <span data-i18n="user_menu.about">Acerca de OxiCloud</span>
+                        </button>
+                        <div class="user-menu-divider"></div>
+                        <button class="user-menu-item user-menu-logout" id="user-menu-logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span data-i18n="actions.logout">Cerrar sesión</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -114,10 +151,23 @@
 
             <div class="actions-bar">
                 <div class="action-buttons">
-                    <button class="btn btn-primary" id="upload-btn">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <span data-i18n="actions.upload">Subir</span>
-                    </button>
+                    <div class="upload-dropdown" id="upload-dropdown">
+                        <button class="btn btn-primary" id="upload-btn">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span data-i18n="actions.upload">Subir</span>
+                            <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                        </button>
+                        <div class="upload-dropdown-menu" id="upload-dropdown-menu">
+                            <button class="upload-dropdown-item" id="upload-files-btn">
+                                <i class="fas fa-file"></i>
+                                <span data-i18n="actions.upload_files">Subir archivos</span>
+                            </button>
+                            <button class="upload-dropdown-item" id="upload-folder-btn">
+                                <i class="fas fa-folder-open"></i>
+                                <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                            </button>
+                        </div>
+                    </div>
                     <button class="btn btn-secondary" id="new-folder-btn">
                         <i class="fas fa-folder-plus"></i>
                         <span data-i18n="actions.new_folder">Nueva carpeta</span>
@@ -138,6 +188,7 @@
                 <i class="fas fa-cloud-upload-alt" style="font-size: 32px; margin-bottom: 10px;"></i>
                 <p data-i18n="dropzone.drag_files">Arrastra archivos aquí o haz clic para seleccionar</p>
                 <input type="file" id="file-input" style="display: none;" multiple>
+                <input type="file" id="folder-input" style="display: none;" webkitdirectory directory multiple>
                 <div class="upload-progress">
                     <div class="progress-bar">
                         <div class="progress-fill"></div>
@@ -190,6 +241,35 @@
                 <button class="btn btn-secondary" id="modal-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
                 <button class="btn btn-primary" id="modal-confirm-btn" data-i18n="actions.confirm">Crear</button>
             </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="about-modal-overlay" id="about-modal-overlay">
+        <div class="about-modal">
+            <div class="about-modal-logo">
+                <i class="fas fa-cloud"></i>
+            </div>
+            <h2>OxiCloud</h2>
+            <div class="about-version" id="about-version">v...</div>
+            <div class="about-description" data-i18n="user_menu.about_description">
+                Cloud storage platform built with Rust &amp; Clean Architecture. Fast, secure, and private.
+            </div>
+            <div class="about-tech">
+                <span class="about-tech-badge">Rust</span>
+                <span class="about-tech-badge">Axum</span>
+                <span class="about-tech-badge">PostgreSQL</span>
+                <span class="about-tech-badge">Clean Architecture</span>
+            </div>
+            <div class="about-links">
+                <a href="https://github.com" class="about-link" target="_blank" rel="noopener">
+                    <i class="fab fa-github"></i> GitHub
+                </a>
+                <a href="#" class="about-link" id="about-license-link">
+                    <i class="fas fa-file-alt"></i> MIT License
+                </a>
+            </div>
+            <button class="about-close-btn" id="about-close-btn" data-i18n="actions.close">Cerrar</button>
         </div>
     </div>
 </body>

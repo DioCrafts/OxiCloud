@@ -540,6 +540,41 @@ impl FileHandler {
     //  MOVE
     // ═══════════════════════════════════════════════════════════════════════
 
+    /// Renames a file
+    pub async fn rename_file(
+        State(state): State<GlobalState>,
+        Path(id): Path<String>,
+        Json(payload): Json<serde_json::Value>,
+    ) -> impl IntoResponse {
+        let new_name = match payload.get("name").and_then(|v| v.as_str()) {
+            Some(name) if !name.trim().is_empty() => name.trim().to_string(),
+            _ => {
+                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
+                    "error": "Missing or empty 'name' field"
+                }))).into_response();
+            }
+        };
+
+        tracing::info!("Renaming file {} to \"{}\"", id, new_name);
+        let mgmt = &state.applications.file_management_service;
+        match mgmt.rename_file(&id, &new_name).await {
+            Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
+            Err(err) => {
+                tracing::error!("Error renaming file: {}", err);
+                let status = if err.to_string().contains("not found") || err.to_string().contains("NotFound") {
+                    StatusCode::NOT_FOUND
+                } else if err.to_string().contains("already exists") {
+                    StatusCode::CONFLICT
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                };
+                (status, Json(serde_json::json!({
+                    "error": format!("Error renaming file: {}", err)
+                }))).into_response()
+            }
+        }
+    }
+
     /// Moves a file to a different folder
     pub async fn move_file(
         State(state): State<GlobalState>,

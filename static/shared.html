@@ -21,30 +21,30 @@
         </div>
 
         <div class="nav-menu">
-            <div class="nav-item">
+            <a href="/" class="nav-item">
                 <i class="fas fa-folder"></i>
                 <span data-i18n="nav.files">Files</span>
-            </div>
-            <div class="nav-item active">
+            </a>
+            <a href="/shared.html" class="nav-item active">
                 <i class="fas fa-share-alt"></i>
                 <span data-i18n="nav.shared">Shared</span>
-            </div>
-            <div class="nav-item">
+            </a>
+            <a href="/#recent" class="nav-item">
                 <i class="fas fa-clock"></i>
                 <span data-i18n="nav.recent">Recent</span>
-            </div>
-            <div class="nav-item">
+            </a>
+            <a href="/#favorites" class="nav-item">
                 <i class="fas fa-star"></i>
                 <span data-i18n="nav.favorites">Favorites</span>
-            </div>
-            <div class="nav-item">
+            </a>
+            <a href="/#trash" class="nav-item">
                 <i class="fas fa-trash"></i>
                 <span data-i18n="nav.trash">Trash</span>
-            </div>
+            </a>
         </div>
 
         <div class="storage-container">
-            <div class="storage-title" data-i18n="storage.title">Storage</div>
+            <div class="storage-title"><i class="fas fa-database" style="margin-right:6px;color:#ff5e3a"></i><span data-i18n="storage.title">Storage</span></div>
             <div class="storage-bar">
                 <div class="storage-fill"></div>
             </div>
@@ -66,9 +66,19 @@
 
             <div class="user-controls">
                 <div id="language-selector"></div>
-                <div class="user-avatar" id="user-avatar">AD</div>
-                <div id="logout-btn" class="logout-btn" data-i18n-title="actions.logout" title="Log out">
-                    <i class="fas fa-sign-out-alt"></i>
+                <div class="user-menu-wrapper">
+                    <div class="user-avatar" id="user-avatar">AD</div>
+                    <div class="user-menu" id="user-menu">
+                        <div class="user-menu-header">
+                            <span class="user-name" id="user-menu-name">Admin</span>
+                            <span class="user-email" id="user-menu-email">admin@oxicloud.local</span>
+                        </div>
+                        <div class="user-menu-divider"></div>
+                        <div class="user-menu-item" id="menu-logout">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span data-i18n="actions.logout">Log out</span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -76,14 +86,6 @@
         <div class="content-area">
             <h1 class="page-title" data-i18n="shared.pageTitle">Shared Resources</h1>
             <p class="page-description" data-i18n="shared.pageDescription">Manage your shared files and folders</p>
-
-            <div class="actions-bar">
-                <div class="action-buttons">
-                    <button class="btn btn-secondary" id="go-to-files-btn">
-                        <i class="fas fa-arrow-left" style="margin-right: 5px;"></i> <span data-i18n="shared.backToFiles">Back to Files</span>
-                    </button>
-                </div>
-            </div>
 
             <div class="shared-filters">
                 <div class="filter-group">
@@ -223,7 +225,7 @@
 
                     <div class="form-group">
                         <label for="notification-message" data-i18n="share.notifyMessageLabel">Message (optional):</label>
-                        <textarea id="notification-message" placeholder="Add a personal message" rows="3"></textarea>
+                        <textarea id="notification-msg-text" placeholder="Add a personal message" rows="3"></textarea>
                     </div>
                 </div>
 
@@ -243,6 +245,47 @@
     <script src="/js/i18n.js"></script>
     <script src="/js/languageSelector.js"></script>
     <script src="/js/fileSharing.js"></script>
+    <script>
+        // Auth check — redirect to login if no token
+        (function() {
+            const token = localStorage.getItem('oxicloud_token');
+            if (!token) {
+                window.location.href = '/auth/login.html';
+                return;
+            }
+            // Set user avatar initials
+            const userData = JSON.parse(localStorage.getItem('oxicloud_user') || '{}');
+            const avatarEl = document.getElementById('user-avatar');
+            const nameEl = document.getElementById('user-menu-name');
+            const emailEl = document.getElementById('user-menu-email');
+            if (userData.username && avatarEl) {
+                const initials = userData.username.substring(0, 2).toUpperCase();
+                avatarEl.textContent = initials;
+            }
+            if (nameEl) nameEl.textContent = userData.username || 'User';
+            if (emailEl) emailEl.textContent = userData.email || '';
+
+            // User menu toggle
+            if (avatarEl) {
+                avatarEl.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.getElementById('user-menu').classList.toggle('active');
+                });
+            }
+            document.addEventListener('click', () => {
+                const menu = document.getElementById('user-menu');
+                if (menu) menu.classList.remove('active');
+            });
+            const logoutBtn = document.getElementById('menu-logout');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', () => {
+                    localStorage.removeItem('oxicloud_token');
+                    localStorage.removeItem('oxicloud_user');
+                    window.location.href = '/auth/login.html';
+                });
+            }
+        })();
+    </script>
     <script src="/js/shared.js"></script>
 </body>
 </html>

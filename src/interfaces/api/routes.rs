@@ -2,12 +2,22 @@ use std::sync::Arc;
 use axum::{
     routing::{get, post, put, delete},
     Router,
+    response::Json as AxumJson,
 };
+use serde_json::json;
 use tower_http::{
     compression::CompressionLayer, 
     trace::TraceLayer,
 };
 use crate::common::di::AppState;
+
+/// Returns the application version from Cargo.toml (compile-time constant)
+async fn get_version() -> AxumJson<serde_json::Value> {
+    AxumJson(json!({
+        "name": "OxiCloud",
+        "version": env!("CARGO_PKG_VERSION")
+    }))
+}
 
 use crate::interfaces::middleware::cache::{HttpCache, start_cache_cleanup_task};
 
@@ -56,6 +66,9 @@ pub fn create_public_api_routes(app_state: &AppState) -> Router<AppState> {
         
         router = router.nest("/i18n", i18n_router);
     }
+
+    // Version endpoint — public, no auth required
+    router = router.route("/version", get(get_version));
 
     router
 }
@@ -134,7 +147,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     // File operations with trash support
     let file_operations_router = Router::new()
         .route("/{id}", delete(FileHandler::delete_file))
-        .route("/{id}/move", put(FileHandler::move_file_simple));
+        .route("/{id}/move", put(FileHandler::move_file_simple))
+        .route("/{id}/rename", put(FileHandler::rename_file));
     
     // Merge the routers
     let files_router = basic_file_router.merge(file_operations_router);

@@ -97,6 +97,13 @@ pub trait FileWriteRepository: Send + Sync + 'static {
         target_folder_id: Option<String>,
     ) -> Result<File, DomainError>;
 
+    /// Renombra un archivo (same folder, different name).
+    async fn rename_file(
+        &self,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<File, DomainError>;
+
     /// Elimina un archivo.
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 

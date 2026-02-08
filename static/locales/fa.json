@@ -14,6 +14,8 @@
     "search": "جست‌و‌جوی پرونده‌ها..",
     "new_folder": "پوشهٔ جدید",
     "upload": "بارگذاری",
+    "upload_files": "بارگذاری پرونده‌ها",
+    "upload_folder": "بارگذاری پوشه",
     "rename": "تغییر نام",
     "move": "انتقال به...",
     "move_to": "انتقال به",
@@ -23,13 +25,21 @@
     "cancel": "لغو",
     "confirm": "تأیید",
     "share": "هم‌رسانی",
+    "favorite": "افزودن به موردعلاقه‌ها",
+    "unfavorite": "حذف از موردعلاقه‌ها",
     "copy": "رونوشت",
     "notify": "آگاه‌سازی",
     "send": "ارسال",
     "clear_recent": "پاک‌کردن موارد اخیر",
     "logout": "خروج",
     "create": "ایجاد",
-    "search_btn": "جست‌و‌جو"
+    "search_btn": "جست‌و‌جو",
+    "close": "بستن"
+  },
+  "user_menu": {
+    "appearance": "ظاهر",
+    "about": "درباره OxiCloud",
+    "about_description": "پلتفرم ذخیره‌سازی ابری ساخته شده با Rust و معماری تمیز. سریع، امن و خصوصی."
   },
   "share": {
     "dialogTitle": "پیوند هم‌رسانی",

@@ -164,6 +164,12 @@ class InlineViewer {
       xhr.open('GET', `/api/files/${file.id}?inline=true`, true);
       xhr.responseType = 'blob';
       
+      // Add auth header
+      const token = localStorage.getItem('oxicloud_token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+      
       // Create a promise to handle the XHR
       const response = await new Promise((resolve, reject) => {
         xhr.onload = function() {
@@ -288,14 +294,25 @@ class InlineViewer {
   }
   
   downloadFile(file) {
-    // Create a link and click it
-    const link = document.createElement('a');
-    link.href = `/api/files/${file.id}`;
-    link.download = file.name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const token = localStorage.getItem('oxicloud_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    fetch(`/api/files/${file.id}`, { headers })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      })
+      .catch(err => console.error('Download error:', err));
   }
   
   zoomImage(factor) {

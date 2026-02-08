@@ -14,6 +14,8 @@
     "search": "Search files...",
     "new_folder": "New folder",
     "upload": "Upload",
+    "upload_files": "Upload files",
+    "upload_folder": "Upload folder",
     "rename": "Rename",
     "move": "Move to...",
     "move_to": "Move to",
@@ -23,13 +25,23 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "share": "Share",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
     "copy": "Copy",
     "notify": "Notify",
     "send": "Send",
     "clear_recent": "Clear recent",
     "logout": "Log out",
     "create": "Create",
-    "search_btn": "Search"
+    "search_btn": "Search",
+    "close": "Close",
+    "delete_permanently": "Delete permanently",
+    "empty_trash": "Empty trash"
+  },
+  "user_menu": {
+    "appearance": "Appearance",
+    "about": "About OxiCloud",
+    "about_description": "Cloud storage platform built with Rust & Clean Architecture. Fast, secure, and private."
   },
   "share": {
     "dialogTitle": "Share Link",
@@ -156,6 +168,7 @@
     "size": "Size",
     "modified": "Modified",
     "no_files": "No files in this folder",
+    "loading": "Loading files…",
     "view_grid": "Grid view",
     "view_list": "List view",
     "file_types": {
@@ -170,17 +183,28 @@
   },
   "dialogs": {
     "rename_folder": "Rename folder",
+    "rename_file": "Rename file",
     "new_name": "New name",
     "new_folder_title": "New folder",
     "folder_name": "Folder name",
     "folder_placeholder": "My folder",
     "rename_title": "Rename",
     "move_file": "Move file",
-    "select_destination": "Select destination folder",
+    "move_folder": "Move folder",
+    "select_destination": "Select destination folder:",
     "root": "Root",
     "delete_confirmation": "Are you sure you want to delete",
     "and_contents": "and all its contents",
     "no_undo": "This action cannot be undone",
+    "confirm_title": "Confirm action",
+    "confirm_delete": "Move to trash",
+    "confirm_delete_file": "Are you sure you want to move the file \"{{name}}\" to trash?",
+    "confirm_delete_folder": "Are you sure you want to move the folder \"{{name}}\" and all its contents to trash?",
+    "confirm_permanent_delete": "Delete permanently",
+    "confirm_permanent_delete_msg": "Are you sure you want to permanently delete this item? This action cannot be undone.",
+    "confirm_empty_trash": "Empty trash",
+    "confirm_delete_share": "Delete share link",
+    "confirm_delete_share_msg": "Are you sure you want to delete this shared link?",
     "share_file": "Share File",
     "existing_shares": "Existing Shares",
     "share_options": "Share Options",
@@ -293,5 +317,16 @@
     "accessed": "Accessed",
     "empty_state": "No recent files",
     "empty_hint": "Files you open will appear here"
+  },
+  "notifications": {
+    "file_renamed": "File renamed",
+    "file_renamed_to": "File renamed to \"{{name}}\"",
+    "folder_renamed": "Folder renamed",
+    "folder_renamed_to": "Folder renamed to \"{{name}}\"",
+    "file_uploaded": "File uploaded",
+    "file_deleted": "File moved to trash",
+    "folder_deleted": "Folder moved to trash",
+    "item_deleted_permanently": "Item permanently deleted",
+    "trash_emptied": "Trash emptied successfully"
   }
 }

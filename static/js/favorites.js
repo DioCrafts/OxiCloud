@@ -317,8 +317,8 @@ const favorites = {
                 </div>
             `;
             
-            // Update breadcrumb for favorites
-            window.ui.updateBreadcrumb(window.i18n ? window.i18n.t('nav.favorites') : 'Favoritos');
+            // Update breadcrumb - just show Home
+            window.ui.updateBreadcrumb('');
             
             // Show empty state if no favorites
             if (favorites.length === 0) {

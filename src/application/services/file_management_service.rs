@@ -109,6 +109,27 @@ impl FileManagementUseCase for FileManagementService {
         Ok(FileDto::from(moved_file))
     }
 
+    async fn rename_file(
+        &self,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<FileDto, DomainError> {
+        info!("Renaming file with ID: {} to \"{}\"", file_id, new_name);
+
+        let renamed_file = self.file_repository.rename_file(file_id, new_name).await.map_err(|e| {
+            error!("Error renaming file (ID: {}): {}", file_id, e);
+            e
+        })?;
+
+        info!(
+            "File renamed successfully: {} (ID: {})",
+            renamed_file.name(),
+            renamed_file.id()
+        );
+
+        Ok(FileDto::from(renamed_file))
+    }
+
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         self.file_repository.delete_file(id).await
     }

@@ -107,6 +107,14 @@ impl FileWritePort for CompositeFileRepository {
         self.write.move_file(file_id, target_folder_id).await
     }
 
+    async fn rename_file(
+        &self,
+        file_id: &str,
+        new_name: &str,
+    ) -> Result<File, DomainError> {
+        self.write.rename_file(file_id, new_name).await
+    }
+
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         self.write.delete_file(id).await
     }

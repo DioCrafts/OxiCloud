@@ -82,7 +82,10 @@ const contextMenus = {
         document.getElementById('view-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
                 // Fetch file details to get the mime type
-                fetch(`/api/files/${window.app.contextMenuTargetFile.id}?metadata=true`)
+                const token = localStorage.getItem('oxicloud_token');
+                fetch(`/api/files/${window.app.contextMenuTargetFile.id}?metadata=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
                     .then(response => response.json())
                     .then(fileDetails => {
                         // Check if viewable file type
@@ -157,6 +160,13 @@ const contextMenus = {
             window.ui.closeFileContextMenu();
         });
         
+        document.getElementById('rename-file-option').addEventListener('click', () => {
+            if (window.app.contextMenuTargetFile) {
+                this.showRenameFileDialog(window.app.contextMenuTargetFile);
+            }
+            window.ui.closeFileContextMenu();
+        });
+
         document.getElementById('move-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
                 this.showMoveDialog(window.app.contextMenuTargetFile, 'file');
@@ -187,12 +197,12 @@ const contextMenus = {
         const renameInput = document.getElementById('rename-input');
 
         renameCancelBtn.addEventListener('click', this.closeRenameDialog);
-        renameConfirmBtn.addEventListener('click', this.renameFolder);
+        renameConfirmBtn.addEventListener('click', () => contextMenus.renameItem());
 
         // Rename on Enter key
         renameInput.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
-                this.renameFolder();
+                contextMenus.renameItem();
             } else if (e.key === 'Escape') {
                 this.closeRenameDialog();
             }
@@ -232,7 +242,29 @@ const contextMenus = {
         const renameInput = document.getElementById('rename-input');
         const renameDialog = document.getElementById('rename-dialog');
 
+        window.app.renameMode = 'folder';
         renameInput.value = folder.name;
+        // Update header text
+        const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
+        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_folder') : 'Renombrar carpeta';
+        renameDialog.style.display = 'flex';
+        renameInput.focus();
+        renameInput.select();
+    },
+
+    /**
+     * Show rename dialog for a file
+     * @param {Object} file - File object
+     */
+    showRenameFileDialog(file) {
+        const renameInput = document.getElementById('rename-input');
+        const renameDialog = document.getElementById('rename-dialog');
+
+        window.app.renameMode = 'file';
+        renameInput.value = file.name;
+        // Update header text
+        const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
+        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_file') : 'Renombrar archivo';
         renameDialog.style.display = 'flex';
         renameInput.focus();
         renameInput.select();
@@ -258,11 +290,12 @@ const contextMenus = {
         // Reset selection
         window.app.selectedTargetFolderId = "";
 
-        // Update dialog title
+        // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
-        dialogHeader.textContent = mode === 'file' ?
+        const titleText = mode === 'file' ?
             (window.i18n ? window.i18n.t('dialogs.move_file') : 'Mover archivo') :
             (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Mover carpeta');
+        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
 
         // Load all available folders
         await this.loadAllFolders(item.id, mode);
@@ -281,22 +314,33 @@ const contextMenus = {
     },
 
     /**
-     * Rename the selected folder
+     * Rename the selected folder or file
      */
-    async renameFolder() {
-        if (!window.app.contextMenuTargetFolder) return;
-
+    async renameItem() {
         const newName = document.getElementById('rename-input').value.trim();
         if (!newName) {
             alert(window.i18n ? window.i18n.t('errors.empty_name') : 'El nombre no puede estar vacío');
             return;
         }
 
-        const success = await window.fileOps.renameFolder(window.app.contextMenuTargetFolder.id, newName);
-        if (success) {
-            contextMenus.closeRenameDialog();
-            window.loadFiles();
+        if (window.app.renameMode === 'file' && window.app.contextMenuTargetFile) {
+            const success = await window.fileOps.renameFile(window.app.contextMenuTargetFile.id, newName);
+            if (success) {
+                contextMenus.closeRenameDialog();
+                window.loadFiles();
+            }
+        } else if (window.app.contextMenuTargetFolder) {
+            const success = await window.fileOps.renameFolder(window.app.contextMenuTargetFolder.id, newName);
+            if (success) {
+                contextMenus.closeRenameDialog();
+                window.loadFiles();
+            }
         }
+    },
+
+    // Keep backward compat
+    renameFolder() {
+        return contextMenus.renameItem();
     },
 
     /**
@@ -306,7 +350,10 @@ const contextMenus = {
      */
     async loadAllFolders(itemId, mode) {
         try {
-            const response = await fetch('/api/folders');
+            const token = localStorage.getItem('oxicloud_token');
+            const response = await fetch('/api/folders', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (response.ok) {
                 const folders = await response.json();
                 const folderSelectContainer = document.getElementById('folder-select-container');
@@ -459,15 +506,19 @@ const contextMenus = {
                     e.preventDefault();
                     const shareId = btn.getAttribute('data-share-id');
                     
-                    if (confirm('¿Estás seguro de que quieres eliminar este enlace compartido?')) {
-                        window.fileSharing.removeSharedLink(shareId);
-                        btn.closest('.existing-share-item').remove();
-                        
-                        // Check if we still have shares
-                        if (existingSharesContainer.children.length === 0) {
-                            document.getElementById('existing-shares-section').style.display = 'none';
+                    showConfirmDialog({
+                        title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Eliminar enlace',
+                        message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : '¿Estás seguro de que quieres eliminar este enlace compartido?',
+                        confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+                    }).then(confirmed => {
+                        if (confirmed) {
+                            window.fileSharing.removeSharedLink(shareId);
+                            btn.closest('.existing-share-item').remove();
+                            if (existingSharesContainer.children.length === 0) {
+                                document.getElementById('existing-shares-section').style.display = 'none';
+                            }
                         }
-                    }
+                    });
                 });
             });
         } else {

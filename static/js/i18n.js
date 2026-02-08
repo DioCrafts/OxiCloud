@@ -11,7 +11,8 @@ let currentLocale =
     (navigator.userLanguage && navigator.userLanguage.substring(0, 2)) || 
     'en';
 
-// Supported locales
+// Supported locales (languages that have locale files on the server)
+// When a locale file is not found, the system gracefully falls back to English
 const supportedLocales = ['en', 'es', 'zh', 'fa'];
 
 // Fallback to English if locale is not supported
