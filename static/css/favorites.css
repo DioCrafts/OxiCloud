@@ -15,6 +15,11 @@
     cursor: pointer;
     z-index: 5;
     transition: all 0.2s ease;
+
+    [dir='rtl'] & {
+        left: 10px;
+        right: unset;
+    }
 }
 
 .favorite-indicator:hover {
@@ -34,6 +39,11 @@
 /* Ajustes para la vista de cuadrícula */
 .file-card.favorite-item {
     border-left: 3px solid #ffc107;
+
+    [dir='rtl'] & {
+        border-right: 3px solid #ffc107;
+        border-left: unset;
+    }
 }
 
 /* Ajustes para la vista de lista */

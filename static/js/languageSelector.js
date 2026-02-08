@@ -11,6 +11,24 @@ const languages = [
     { code: 'fa', name: 'فارسی', flag: '🦁' }
 ];
 
+// RTL languages
+const rtlLanguages = ['fa']; // ['fa', 'ar']
+
+// Update HTML lang attribute and dir for RTL languages
+function updateHtmlAttributes(langCode) {
+    const htmlElement = document.documentElement;
+    
+    // Set lang attribute
+    htmlElement.setAttribute('lang', langCode);
+    
+    // Set dir attribute for RTL languages
+    if (rtlLanguages.includes(langCode)) {
+        htmlElement.setAttribute('dir', 'rtl');
+    } else {
+        htmlElement.removeAttribute('dir');
+    }
+}
+
 /**
  * Creates and initializes a custom language selector component
  * @param {string} containerId - ID of the container element
@@ -31,6 +49,9 @@ function createLanguageSelector(containerId = 'language-selector') {
     // Get current language
     const currentLocale = window.i18n ? window.i18n.getCurrentLocale() : 'en';
     const currentLang = languages.find(l => l.code === currentLocale) || languages[0];
+    
+    // Set initial HTML attributes
+    updateHtmlAttributes(currentLocale);
     
     // Create toggle button
     const toggle = document.createElement('div');
@@ -149,6 +170,9 @@ async function selectLanguage(langCode, container) {
     if (window.i18n) {
         await window.i18n.setLocale(langCode);
     }
+    
+    // Update HTML lang attribute and dir for RTL languages
+    updateHtmlAttributes(langCode);
     
     updateSelectedLanguage(langCode, container);
     closeDropdown(container);

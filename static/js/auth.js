@@ -34,6 +34,11 @@ const LANGUAGE_TEXTS = {
         title: '欢迎使用 OxiCloud',
         subtitle: '请选择您的语言',
         continue: '继续'
+    },
+    fa: {
+        title: 'به OxiCloud خوش آمدید',
+        subtitle: 'لطفا زبان خود را انتخاب کنید',
+        continue: 'ادامه'
     }
 };
 

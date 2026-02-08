@@ -13,6 +13,11 @@
     border-radius: 50%;
     color: #6c757d;
     z-index: 5;
+
+    [dir='rtl'] & {
+        left: 10px;
+        right: unset;
+    }
 }
 
 /* Estilos para los elementos de la vista de recientes */
@@ -23,6 +28,11 @@
 /* Ajustes para la vista de cuadrícula */
 .file-card.recent-item {
     border-left: 3px solid #6c757d;
+
+    [dir='rtl'] & {
+        border-right: 3px solid #6c757d;
+        border-left: unset;
+    }
 }
 
 /* Ajustes para la vista de lista */

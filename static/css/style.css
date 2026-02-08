@@ -93,6 +93,11 @@ select:focus {
     align-items: center;
     justify-content: center;
     margin-right: 10px;
+
+    [dir='rtl'] & {
+        margin-left: 10px;
+        margin-right: unset;
+    }
 }
 
 .logo svg {
@@ -137,6 +142,11 @@ select:focus {
     margin-right: 15px;
     width: 20px;
     text-align: center;
+
+    [dir='rtl'] & {
+        margin-left: 15px;
+        margin-right: unset;
+    }
 }
 
 /* Storage indicator */
@@ -202,6 +212,11 @@ select:focus {
     margin-right: 20px;
     display: flex;
     align-items: center;
+
+    [dir='rtl'] & {
+        margin-left: 20px;
+        margin-right: unset;
+    }
 }
 
 .search-container input {
@@ -241,6 +256,11 @@ select:focus {
     font-size: 16px;
     pointer-events: none;
     transition: color 0.2s ease;
+
+    [dir='rtl'] & {
+        right: 16px;
+        left: unset;
+    }
 }
 
 .search-container input:focus + .search-icon,
@@ -265,6 +285,11 @@ select:focus {
     justify-content: center;
     transition: all 0.2s ease;
     box-shadow: 0 2px 8px rgba(255, 94, 58, 0.3);
+
+    [dir='rtl'] & {
+        left: 6px;
+        right: unset;
+    }
 }
 
 .search-button:hover {
@@ -1058,6 +1083,11 @@ select:focus {
     margin-right: 8px;
     width: 16px;
     text-align: center;
+
+    [dir='rtl'] & {
+        margin-left: 8px;
+        margin-right: unset;
+    }
 }
 
 /* Dialog */
@@ -1153,6 +1183,13 @@ select:focus {
     border-left: 4px solid #ff5e3a;
     z-index: 1000;
     display: none;
+
+    [dir='rtl'] & {
+        left: 20px;
+        border-right: 4px solid #ff5e3a;
+        right: unset;
+        border-left: unset;
+    }
 }
 
 .notification-title {
@@ -1221,6 +1258,11 @@ select:focus {
     justify-content: center;
     margin-right: 14px;
     flex-shrink: 0;
+
+    [dir='rtl'] & {
+        margin-left: 14px;
+        margin-right: unset;
+    }
 }
 
 .modal-icon i {
@@ -1251,6 +1293,11 @@ select:focus {
     justify-content: center;
     color: #64748b;
     transition: all 0.15s ease;
+
+    [dir='rtl'] & {
+        left: 16px;
+        right: unset;
+    }
 }
 
 .modal-close-btn:hover {
@@ -1571,6 +1618,10 @@ header {
     background-repeat: no-repeat;
     background-position: right 10px center;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    [dir='rtl'] & {
+        background-position: left 10px center;
+    }
 }
 
 .filter-group select:hover {
@@ -1990,11 +2041,21 @@ header {
 .folder-select-item.selected {
     background-color: #e6f7ff;
     border-left: 3px solid #1890ff;
+
+    [dir='rtl'] & {
+        border-right: 3px solid #1890ff;
+        border-left: unset;
+    }
 }
 
 .folder-select-item i {
     margin-right: 8px;
     color: #ffc107;
+
+    [dir='rtl'] & {
+        margin-left: 8px;
+        margin-right: unset;
+    }
 }
 
 /* Styles for trash */
@@ -2240,4 +2301,13 @@ header {
 
 .button.primary:hover {
     background-color: #e64a29;
+}
+
+html[dir='rtl'] .fa-arrow-left::before {
+    content: "\f061";
+}
+
+html[dir='rtl'] .fa-sign-out-alt {
+    -webkit-transform: rotate(180deg);
+    transform: rotate(180deg);
 }
