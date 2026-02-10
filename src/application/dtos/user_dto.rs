@@ -75,3 +75,40 @@ pub struct CurrentUser {
     pub email: String,
     pub role: String,
 }
+
+// ============================================================================
+// OIDC DTOs
+// ============================================================================
+
+/// Response with the OIDC authorization URL for client redirect
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OidcAuthorizeResponseDto {
+    pub authorize_url: String,
+    pub state: String,
+}
+
+/// Query parameters received on the OIDC callback
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OidcCallbackQueryDto {
+    pub code: String,
+    pub state: String,
+}
+
+/// Information about available OIDC providers
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OidcProviderInfoDto {
+    pub enabled: bool,
+    pub provider_name: String,
+    pub authorize_endpoint: String,
+    pub password_login_enabled: bool,
+}
+
+/// Claims extracted from the validated OIDC ID token
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OidcUserInfoDto {
+    pub sub: String,
+    pub preferred_username: Option<String>,
+    pub email: Option<String>,
+    pub name: Option<String>,
+    pub groups: Vec<String>,
+}

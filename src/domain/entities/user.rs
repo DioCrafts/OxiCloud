@@ -33,6 +33,8 @@ pub struct User {
     updated_at: DateTime<Utc>,
     last_login_at: Option<DateTime<Utc>>,
     active: bool,
+    oidc_provider: Option<String>,
+    oidc_subject: Option<String>,
 }
 
 impl User {
@@ -88,6 +90,45 @@ impl User {
             updated_at: now,
             last_login_at: None,
             active: true,
+            oidc_provider: None,
+            oidc_subject: None,
+        })
+    }
+    
+    /// Create a new OIDC-authenticated user (no password required).
+    pub fn new_oidc(
+        username: String,
+        email: String,
+        role: UserRole,
+        storage_quota_bytes: i64,
+        oidc_provider: String,
+        oidc_subject: String,
+    ) -> UserResult<Self> {
+        if username.is_empty() || username.len() < 3 || username.len() > 32 {
+            return Err(UserError::InvalidUsername(
+                "Username debe tener entre 3 y 32 caracteres".to_string(),
+            ));
+        }
+        if !email.contains('@') || email.len() < 5 {
+            return Err(UserError::ValidationError(
+                "Email inválido".to_string(),
+            ));
+        }
+        let now = Utc::now();
+        Ok(Self {
+            id: Uuid::new_v4().to_string(),
+            username,
+            email,
+            password_hash: "__OIDC_NO_PASSWORD__".to_string(),
+            role,
+            storage_quota_bytes,
+            storage_used_bytes: 0,
+            created_at: now,
+            updated_at: now,
+            last_login_at: None,
+            active: true,
+            oidc_provider: Some(oidc_provider),
+            oidc_subject: Some(oidc_subject),
         })
     }
     
@@ -117,6 +158,41 @@ impl User {
             updated_at,
             last_login_at,
             active,
+            oidc_provider: None,
+            oidc_subject: None,
+        }
+    }
+
+    /// Reconstruct from DB with OIDC fields
+    pub fn from_data_full(
+        id: String,
+        username: String,
+        email: String,
+        password_hash: String,
+        role: UserRole,
+        storage_quota_bytes: i64,
+        storage_used_bytes: i64,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
+        last_login_at: Option<DateTime<Utc>>,
+        active: bool,
+        oidc_provider: Option<String>,
+        oidc_subject: Option<String>,
+    ) -> Self {
+        Self {
+            id,
+            username,
+            email,
+            password_hash,
+            role,
+            storage_quota_bytes,
+            storage_used_bytes,
+            created_at,
+            updated_at,
+            last_login_at,
+            active,
+            oidc_provider,
+            oidc_subject,
         }
     }
     
@@ -163,6 +239,19 @@ impl User {
     
     pub fn password_hash(&self) -> &str {
         &self.password_hash
+    }
+
+    pub fn oidc_provider(&self) -> Option<&str> {
+        self.oidc_provider.as_deref()
+    }
+
+    pub fn oidc_subject(&self) -> Option<&str> {
+        self.oidc_subject.as_deref()
+    }
+
+    /// Returns true if this is an OIDC-only user (no password)
+    pub fn is_oidc_user(&self) -> bool {
+        self.oidc_provider.is_some()
     }
     
     /// Update the password hash.

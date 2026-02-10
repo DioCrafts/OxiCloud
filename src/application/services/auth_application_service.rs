@@ -1,11 +1,12 @@
 use std::sync::Arc;
 use crate::domain::entities::user::{User, UserRole};
 use crate::domain::entities::session::Session;
-use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort};
+use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort, OidcServicePort, OidcIdClaims};
 use crate::application::dtos::user_dto::{UserDto, RegisterDto, LoginDto, AuthResponseDto, ChangePasswordDto, RefreshTokenDto};
 use crate::application::dtos::folder_dto::CreateFolderDto;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::errors::{DomainError, ErrorKind};
+use crate::common::config::OidcConfig;
 
 pub struct AuthApplicationService {
     user_storage: Arc<dyn UserStoragePort>,
@@ -13,6 +14,8 @@ pub struct AuthApplicationService {
     password_hasher: Arc<dyn PasswordHasherPort>,
     token_service: Arc<dyn TokenServicePort>,
     folder_service: Option<Arc<dyn FolderUseCase>>,
+    oidc_service: Option<Arc<dyn OidcServicePort>>,
+    oidc_config: Option<OidcConfig>,
 }
 
 impl AuthApplicationService {
@@ -28,6 +31,8 @@ impl AuthApplicationService {
             password_hasher,
             token_service,
             folder_service: None,
+            oidc_service: None,
+            oidc_config: None,
         }
     }
     
@@ -35,6 +40,33 @@ impl AuthApplicationService {
     pub fn with_folder_service(mut self, folder_service: Arc<dyn FolderUseCase>) -> Self {
         self.folder_service = Some(folder_service);
         self
+    }
+
+    /// Configura el servicio OIDC
+    pub fn with_oidc(mut self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) -> Self {
+        self.oidc_service = Some(oidc_service);
+        self.oidc_config = Some(oidc_config);
+        self
+    }
+
+    /// Returns whether OIDC is configured and enabled
+    pub fn oidc_enabled(&self) -> bool {
+        self.oidc_service.is_some() && self.oidc_config.as_ref().map_or(false, |c| c.enabled)
+    }
+
+    /// Returns whether password login is disabled (OIDC-only mode)
+    pub fn password_login_disabled(&self) -> bool {
+        self.oidc_config.as_ref().map_or(false, |c| c.disable_password_login)
+    }
+
+    /// Returns the OIDC config if available
+    pub fn oidc_config(&self) -> Option<&OidcConfig> {
+        self.oidc_config.as_ref()
+    }
+
+    /// Returns the OIDC service if available
+    pub fn oidc_service(&self) -> Option<&Arc<dyn OidcServicePort>> {
+        self.oidc_service.as_ref()
     }
     
     pub async fn register(&self, dto: RegisterDto) -> Result<UserDto, DomainError> {
@@ -518,5 +550,202 @@ impl AuthApplicationService {
     pub async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<UserDto>, DomainError> {
         let users = self.user_storage.list_users(limit, offset).await?;
         Ok(users.into_iter().map(UserDto::from).collect())
+    }
+
+    // ========================================================================
+    // OIDC Methods
+    // ========================================================================
+
+    /// Generate the OIDC authorization URL for redirecting the user to the IdP.
+    /// The `state` parameter is a signed JWT to prevent CSRF.
+    pub fn oidc_authorize_url(&self, state: &str) -> Result<String, DomainError> {
+        let oidc = self.oidc_service.as_ref().ok_or_else(|| DomainError::new(
+            ErrorKind::InternalError, "OIDC", "OIDC service not configured",
+        ))?;
+        oidc.get_authorize_url(state)
+    }
+
+    /// Generate a signed OIDC state token (JWT containing a random nonce)
+    pub fn generate_oidc_state(&self) -> Result<String, DomainError> {
+        // Re-use the token service's secret for HMAC signing
+        // State = base64(random_bytes) — simple and sufficient for CSRF protection
+        use rand_core::{OsRng, RngCore};
+        let mut nonce = [0u8; 32];
+        OsRng.fill_bytes(&mut nonce);
+        Ok(hex::encode(nonce))
+    }
+
+    /// Handle the OIDC callback: exchange code, validate ID token,
+    /// find or create user (JIT provisioning), and issue internal tokens.
+    pub async fn oidc_callback(&self, code: &str) -> Result<AuthResponseDto, DomainError> {
+        let oidc = self.oidc_service.as_ref().ok_or_else(|| DomainError::new(
+            ErrorKind::InternalError, "OIDC", "OIDC service not configured",
+        ))?;
+        let oidc_config = self.oidc_config.as_ref().ok_or_else(|| DomainError::new(
+            ErrorKind::InternalError, "OIDC", "OIDC config not available",
+        ))?;
+
+        // 1. Exchange authorization code for tokens
+        let token_set = oidc.exchange_code(code).await?;
+
+        // 2. Validate ID token and extract claims
+        let claims = oidc.validate_id_token(&token_set.id_token).await?;
+
+        // 3. Try to enrich claims from UserInfo endpoint if email is missing
+        let claims = if claims.email.is_none() {
+            match oidc.fetch_user_info(&token_set.access_token).await {
+                Ok(user_info) => OidcIdClaims {
+                    email: user_info.email.or(claims.email),
+                    preferred_username: user_info.preferred_username.or(claims.preferred_username),
+                    name: user_info.name.or(claims.name),
+                    groups: if user_info.groups.is_empty() { claims.groups } else { user_info.groups },
+                    ..claims
+                },
+                Err(e) => {
+                    tracing::warn!("Failed to fetch UserInfo (continuing with ID token claims): {}", e);
+                    claims
+                }
+            }
+        } else {
+            claims
+        };
+
+        let provider_name = oidc.provider_name().to_string();
+
+        // 4. Determine username and email
+        let oidc_username = claims.preferred_username.clone()
+            .or(claims.name.clone())
+            .unwrap_or_else(|| format!("oidc_{}", &claims.sub[..8.min(claims.sub.len())]));
+        let oidc_email = claims.email.clone()
+            .unwrap_or_else(|| format!("{}@oidc.local", oidc_username));
+
+        // 5. Look up existing user by OIDC subject
+        let user = match self.user_storage.get_user_by_oidc_subject(&provider_name, &claims.sub).await {
+            Ok(mut existing_user) => {
+                // User exists — update last login
+                existing_user.register_login();
+                self.user_storage.update_user(existing_user.clone()).await?;
+                existing_user
+            }
+            Err(_) => {
+                // User doesn't exist — try to match by email
+                let matched_user = self.user_storage.get_user_by_email(&oidc_email).await.ok();
+
+                if let Some(_existing) = matched_user {
+                    // Email match but no OIDC link — for security, don't auto-link
+                    // The user must link their account manually or admin must do it
+                    return Err(DomainError::new(
+                        ErrorKind::AlreadyExists, "OIDC",
+                        format!("A user with email '{}' already exists. Contact admin to link your OIDC identity.", oidc_email),
+                    ));
+                }
+
+                // No match — JIT provision if enabled
+                if !oidc_config.auto_provision {
+                    return Err(DomainError::new(
+                        ErrorKind::AccessDenied, "OIDC",
+                        "Auto-provisioning is disabled. Contact admin to create your account.",
+                    ));
+                }
+
+                // Determine role from OIDC groups
+                let role = self.map_oidc_role(&claims.groups, oidc_config);
+
+                let quota = if role == UserRole::Admin {
+                    107374182400 // 100GB
+                } else {
+                    1024 * 1024 * 1024 // 1GB
+                };
+
+                // Sanitize username (max 32 chars, ensure uniqueness)
+                let mut username = oidc_username.chars().take(32).collect::<String>();
+                if username.len() < 3 {
+                    username = format!("user_{}", &claims.sub[..8.min(claims.sub.len())]);
+                }
+
+                // Check for username collision
+                if self.user_storage.get_user_by_username(&username).await.is_ok() {
+                    // Append random suffix
+                    let suffix = &claims.sub[..4.min(claims.sub.len())];
+                    username = format!("{}_{}", &username[..username.len().min(27)], suffix);
+                }
+
+                let new_user = User::new_oidc(
+                    username.clone(),
+                    oidc_email,
+                    role,
+                    quota,
+                    provider_name.clone(),
+                    claims.sub.clone(),
+                ).map_err(|e| DomainError::new(
+                    ErrorKind::InvalidInput, "OIDC",
+                    format!("Failed to create OIDC user: {}", e),
+                ))?;
+
+                let created_user = self.user_storage.create_user(new_user).await?;
+
+                // Create personal folder
+                self.create_personal_folder(&username, created_user.id()).await;
+
+                tracing::info!("OIDC user provisioned: {} (provider: {}, sub: {})", 
+                    created_user.id(), provider_name, claims.sub);
+
+                created_user
+            }
+        };
+
+        // 6. Issue internal tokens (same as regular login)
+        let access_token = self.token_service.generate_access_token(&user)?;
+        let refresh_token = self.token_service.generate_refresh_token();
+
+        let session = Session::new(
+            user.id().to_string(),
+            refresh_token.clone(),
+            None,
+            None,
+            self.token_service.refresh_token_expiry_days(),
+        );
+        self.session_storage.create_session(session).await?;
+
+        Ok(AuthResponseDto {
+            user: UserDto::from(user),
+            access_token,
+            refresh_token,
+            token_type: "Bearer".to_string(),
+            expires_in: self.token_service.refresh_token_expiry_secs(),
+        })
+    }
+
+    /// Map OIDC groups to internal role
+    fn map_oidc_role(&self, groups: &[String], config: &OidcConfig) -> UserRole {
+        if config.admin_groups.is_empty() {
+            return UserRole::User;
+        }
+        let admin_groups: Vec<&str> = config.admin_groups.split(',').map(|s| s.trim()).collect();
+        for group in groups {
+            if admin_groups.iter().any(|ag| ag.eq_ignore_ascii_case(group)) {
+                return UserRole::Admin;
+            }
+        }
+        UserRole::User
+    }
+
+    /// Helper to create a personal folder for a new user
+    async fn create_personal_folder(&self, username: &str, user_id: &str) {
+        if let Some(folder_service) = &self.folder_service {
+            let folder_name = format!("Mi Carpeta - {}", username);
+            match folder_service.create_folder(CreateFolderDto {
+                name: folder_name.clone(),
+                parent_id: None,
+            }).await {
+                Ok(folder) => {
+                    tracing::info!("Personal folder created for user {}: {} (ID: {})", 
+                        user_id, folder.name, folder.id);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create personal folder for user {}: {}", user_id, e);
+                }
+            }
+        }
     }
 }

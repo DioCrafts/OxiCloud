@@ -74,9 +74,11 @@ impl UserRepository for UserPgRepository {
                         INSERT INTO auth.users (
                             id, username, email, password_hash, role, 
                             storage_quota_bytes, storage_used_bytes, 
-                            created_at, updated_at, last_login_at, active
+                            created_at, updated_at, last_login_at, active,
+                            oidc_provider, oidc_subject
                         ) VALUES (
-                            $1, $2, $3, $4, $5::auth.userrole, $6, $7, $8, $9, $10, $11
+                            $1, $2, $3, $4, $5::auth.userrole, $6, $7, $8, $9, $10, $11,
+                            $12, $13
                         )
                         RETURNING *
                         "#
@@ -92,6 +94,8 @@ impl UserRepository for UserPgRepository {
                     .bind(user_clone.updated_at())
                     .bind(user_clone.last_login_at())
                     .bind(user_clone.is_active())
+                    .bind(user_clone.oidc_provider())
+                    .bind(user_clone.oidc_subject())
                     .execute(&mut **tx)
                     .await
                     .map_err(Self::map_sqlx_error)?;
@@ -114,7 +118,8 @@ impl UserRepository for UserPgRepository {
             SELECT 
                 id, username, email, password_hash, role::text as role_text, 
                 storage_quota_bytes, storage_used_bytes, 
-                created_at, updated_at, last_login_at, active
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
             FROM auth.users
             WHERE id = $1
             "#
@@ -131,7 +136,7 @@ impl UserRepository for UserPgRepository {
             _ => UserRole::User,
         };
         
-        Ok(User::from_data(
+        Ok(User::from_data_full(
             row.get("id"),
             row.get("username"),
             row.get("email"),
@@ -143,6 +148,8 @@ impl UserRepository for UserPgRepository {
             row.get("updated_at"),
             row.get("last_login_at"),
             row.get("active"),
+            row.get("oidc_provider"),
+            row.get("oidc_subject"),
         ))
     }
     
@@ -153,7 +160,8 @@ impl UserRepository for UserPgRepository {
             SELECT 
                 id, username, email, password_hash, role::text as role_text, 
                 storage_quota_bytes, storage_used_bytes, 
-                created_at, updated_at, last_login_at, active
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
             FROM auth.users
             WHERE username = $1
             "#
@@ -170,7 +178,7 @@ impl UserRepository for UserPgRepository {
             _ => UserRole::User,
         };
         
-        Ok(User::from_data(
+        Ok(User::from_data_full(
             row.get("id"),
             row.get("username"),
             row.get("email"),
@@ -182,6 +190,8 @@ impl UserRepository for UserPgRepository {
             row.get("updated_at"),
             row.get("last_login_at"),
             row.get("active"),
+            row.get("oidc_provider"),
+            row.get("oidc_subject"),
         ))
     }
     
@@ -192,7 +202,8 @@ impl UserRepository for UserPgRepository {
             SELECT 
                 id, username, email, password_hash, role::text as role_text, 
                 storage_quota_bytes, storage_used_bytes, 
-                created_at, updated_at, last_login_at, active
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
             FROM auth.users
             WHERE email = $1
             "#
@@ -209,7 +220,7 @@ impl UserRepository for UserPgRepository {
             _ => UserRole::User,
         };
         
-        Ok(User::from_data(
+        Ok(User::from_data_full(
             row.get("id"),
             row.get("username"),
             row.get("email"),
@@ -221,6 +232,8 @@ impl UserRepository for UserPgRepository {
             row.get("updated_at"),
             row.get("last_login_at"),
             row.get("active"),
+            row.get("oidc_provider"),
+            row.get("oidc_subject"),
         ))
     }
     
@@ -322,7 +335,8 @@ impl UserRepository for UserPgRepository {
             SELECT 
                 id, username, email, password_hash, role::text as role_text, 
                 storage_quota_bytes, storage_used_bytes, 
-                created_at, updated_at, last_login_at, active
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
             FROM auth.users
             ORDER BY created_at DESC
             LIMIT $1 OFFSET $2
@@ -343,7 +357,7 @@ impl UserRepository for UserPgRepository {
                     _ => UserRole::User,
                 };
                 
-                User::from_data(
+                User::from_data_full(
                     row.get("id"),
                     row.get("username"),
                     row.get("email"),
@@ -355,6 +369,8 @@ impl UserRepository for UserPgRepository {
                     row.get("updated_at"),
                     row.get("last_login_at"),
                     row.get("active"),
+                    row.get("oidc_provider"),
+                    row.get("oidc_subject"),
                 )
             })
             .collect();
@@ -432,7 +448,8 @@ impl UserRepository for UserPgRepository {
             SELECT 
                 id, username, email, password_hash, role::text as role_text, 
                 storage_quota_bytes, storage_used_bytes, 
-                created_at, updated_at, last_login_at, active
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
             FROM auth.users
             WHERE role::text = $1
             ORDER BY created_at DESC
@@ -452,7 +469,7 @@ impl UserRepository for UserPgRepository {
                     _ => UserRole::User,
                 };
                 
-                User::from_data(
+                User::from_data_full(
                     row.get("id"),
                     row.get("username"),
                     row.get("email"),
@@ -464,6 +481,8 @@ impl UserRepository for UserPgRepository {
                     row.get("updated_at"),
                     row.get("last_login_at"),
                     row.get("active"),
+                    row.get("oidc_provider"),
+                    row.get("oidc_subject"),
                 )
             })
             .collect();
@@ -485,6 +504,48 @@ impl UserRepository for UserPgRepository {
         .map_err(Self::map_sqlx_error)?;
 
         Ok(())
+    }
+
+    /// Finds a user by OIDC provider + subject pair
+    async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> UserRepositoryResult<User> {
+        let row = sqlx::query(
+            r#"
+            SELECT 
+                id, username, email, password_hash, role::text as role_text, 
+                storage_quota_bytes, storage_used_bytes, 
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
+            FROM auth.users
+            WHERE oidc_provider = $1 AND oidc_subject = $2
+            "#
+        )
+        .bind(provider)
+        .bind(subject)
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(Self::map_sqlx_error)?;
+
+        let role_str: Option<String> = row.try_get("role_text").unwrap_or(None);
+        let role = match role_str.as_deref() {
+            Some("admin") => UserRole::Admin,
+            _ => UserRole::User,
+        };
+
+        Ok(User::from_data_full(
+            row.get("id"),
+            row.get("username"),
+            row.get("email"),
+            row.get("password_hash"),
+            role,
+            row.get("storage_quota_bytes"),
+            row.get("storage_used_bytes"),
+            row.get("created_at"),
+            row.get("updated_at"),
+            row.get("last_login_at"),
+            row.get("active"),
+            row.get("oidc_provider"),
+            row.get("oidc_subject"),
+        ))
     }
 }
 
@@ -533,6 +594,12 @@ impl UserStoragePort for UserPgRepository {
     
     async fn change_password(&self, user_id: &str, password_hash: &str) -> Result<(), DomainError> {
         UserRepository::change_password(self, user_id, password_hash)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> Result<User, DomainError> {
+        UserRepository::get_user_by_oidc_subject(self, provider, subject)
             .await
             .map_err(DomainError::from)
     }

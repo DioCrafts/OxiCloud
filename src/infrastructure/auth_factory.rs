@@ -8,6 +8,7 @@ use crate::application::services::folder_service::FolderService;
 use crate::infrastructure::repositories::{UserPgRepository, SessionPgRepository};
 use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::services::oidc_service::OidcService;
 use crate::common::config::AppConfig;
 use crate::common::di::AuthServices;
 
@@ -41,6 +42,19 @@ pub async fn create_auth_services(
     // Configurar servicio de carpetas si está disponible
     if let Some(folder_svc) = folder_service {
         auth_app_service = auth_app_service.with_folder_service(folder_svc);
+    }
+
+    // Configure OIDC service if enabled
+    if config.oidc.enabled {
+        tracing::info!("Initializing OIDC service (provider: {}, issuer: {})", 
+            config.oidc.provider_name, config.oidc.issuer_url);
+        
+        let oidc_service = Arc::new(OidcService::new(config.oidc.clone()));
+        auth_app_service = auth_app_service.with_oidc(oidc_service, config.oidc.clone());
+
+        if config.oidc.disable_password_login {
+            tracing::warn!("Password login is DISABLED — only OIDC authentication is allowed");
+        }
     }
     
     // Empaquetar servicio en Arc

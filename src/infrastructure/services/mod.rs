@@ -16,3 +16,4 @@ pub mod write_behind_cache;
 pub mod chunked_upload_service;
 pub mod image_transcode_service;
 pub mod dedup_service;
+pub mod oidc_service;

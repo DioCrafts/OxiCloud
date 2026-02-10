@@ -91,4 +91,7 @@ pub trait UserRepository: Send + Sync + 'static {
     
     /// Elimina un usuario
     async fn delete_user(&self, user_id: &str) -> UserRepositoryResult<()>;
+
+    /// Finds a user by OIDC provider + subject pair
+    async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> UserRepositoryResult<User>;
 }

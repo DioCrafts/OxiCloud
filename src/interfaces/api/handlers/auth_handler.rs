@@ -2,14 +2,15 @@ use std::sync::Arc;
 use axum::{
     Router,
     routing::{post, get, put},
-    extract::{State, Json},
+    extract::{State, Json, Query},
     http::{StatusCode, HeaderMap, header},
-    response::IntoResponse,
+    response::{IntoResponse, Redirect},
 };
 
 use crate::common::di::AppState;
 use crate::application::dtos::user_dto::{
-    LoginDto, RegisterDto, ChangePasswordDto, RefreshTokenDto
+    LoginDto, RegisterDto, ChangePasswordDto, RefreshTokenDto,
+    OidcCallbackQueryDto, OidcProviderInfoDto,
 };
 use crate::interfaces::errors::AppError;
 
@@ -19,7 +20,11 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/register", post(register))
         .route("/login", post(login))
         .route("/refresh", post(refresh_token))
-        .route("/status", get(get_system_status));
+        .route("/status", get(get_system_status))
+        // OIDC endpoints (all public)
+        .route("/oidc/providers", get(oidc_providers))
+        .route("/oidc/authorize", get(oidc_authorize))
+        .route("/oidc/callback", get(oidc_callback));
     
     // Rutas que SÍ requieren autenticación - usamos route_layer para aplicar middleware
     // El middleware usará el state que se pase con .with_state() desde main.rs
@@ -141,6 +146,13 @@ async fn login(
             return Err(AppError::internal_error("Servicio de autenticación no configurado"));
         }
     };
+
+    // Check if password login is disabled (OIDC-only mode)
+    if auth_service.auth_application_service.password_login_disabled() {
+        return Err(AppError::unauthorized(
+            "Password login is disabled. Please use SSO/OIDC to sign in."
+        ));
+    }
     
     // Try the normal login process
     match auth_service.auth_application_service.login(dto.clone()).await {
@@ -307,4 +319,107 @@ async fn get_system_status(
     tracing::info!("System status check: initialized={}, admin_count={}", status.initialized, status.admin_count);
     
     Ok((StatusCode::OK, Json(status)))
+}
+
+// ============================================================================
+// OIDC Handlers
+// ============================================================================
+
+/// GET /api/auth/oidc/providers — Returns OIDC provider info for the UI
+async fn oidc_providers(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    let auth_app = &auth_service.auth_application_service;
+
+    if !auth_app.oidc_enabled() {
+        return Ok(Json(OidcProviderInfoDto {
+            enabled: false,
+            provider_name: String::new(),
+            authorize_endpoint: String::new(),
+            password_login_enabled: true,
+        }));
+    }
+
+    let config = auth_app.oidc_config().unwrap();
+
+    Ok(Json(OidcProviderInfoDto {
+        enabled: true,
+        provider_name: config.provider_name.clone(),
+        authorize_endpoint: "/api/auth/oidc/authorize".to_string(),
+        password_login_enabled: !config.disable_password_login,
+    }))
+}
+
+/// GET /api/auth/oidc/authorize — Redirects user to the OIDC provider
+async fn oidc_authorize(
+    State(state): State<Arc<AppState>>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    let auth_app = &auth_service.auth_application_service;
+
+    if !auth_app.oidc_enabled() {
+        return Err(AppError::new(
+            StatusCode::NOT_FOUND,
+            "OIDC is not enabled",
+            "OidcDisabled",
+        ));
+    }
+
+    // Generate CSRF state
+    let state_token = auth_app.generate_oidc_state()?;
+    
+    // Build authorization URL
+    let authorize_url = auth_app.oidc_authorize_url(&state_token)?;
+
+    tracing::info!("OIDC authorize redirect generated");
+
+    Ok(Redirect::temporary(&authorize_url))
+}
+
+/// GET /api/auth/oidc/callback?code=...&state=... — Handles OIDC callback
+async fn oidc_callback(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<OidcCallbackQueryDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    let auth_app = &auth_service.auth_application_service;
+
+    if !auth_app.oidc_enabled() {
+        return Err(AppError::new(
+            StatusCode::NOT_FOUND,
+            "OIDC is not enabled",
+            "OidcDisabled",
+        ));
+    }
+
+    tracing::info!("OIDC callback received with code");
+
+    // Exchange code and authenticate
+    let auth_response = auth_app.oidc_callback(&query.code).await
+        .map_err(|e| {
+            tracing::error!("OIDC callback failed: {}", e);
+            AppError::from(e)
+        })?;
+
+    // Redirect to frontend with tokens as fragment
+    let config = auth_app.oidc_config().unwrap();
+    let frontend_url = config.frontend_url.trim_end_matches('/');
+    let redirect_url = format!(
+        "{}/#access_token={}&refresh_token={}&token_type=Bearer&expires_in={}",
+        frontend_url,
+        auth_response.access_token,
+        auth_response.refresh_token,
+        auth_response.expires_in,
+    );
+
+    tracing::info!("OIDC login successful for user: {}", auth_response.user.username);
+
+    Ok(Redirect::temporary(&redirect_url))
 }

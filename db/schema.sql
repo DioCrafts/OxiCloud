@@ -120,6 +120,12 @@ COMMENT ON TABLE auth.user_files IS 'Tracks file ownership and storage utilizati
 COMMENT ON TABLE auth.user_favorites IS 'Stores user favorite files and folders for cross-device synchronization';
 COMMENT ON TABLE auth.user_recent_files IS 'Stores recently accessed files and folders for cross-device synchronization';
 
+-- OIDC identity linking columns
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS oidc_provider VARCHAR(255);
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS oidc_subject VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc ON auth.users(oidc_provider, oidc_subject)
+    WHERE oidc_provider IS NOT NULL AND oidc_subject IS NOT NULL;
+
 -- NOTE: No default users are created. The first user to register through
 -- the admin setup wizard will become the administrator.
 

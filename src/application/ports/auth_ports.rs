@@ -94,6 +94,50 @@ pub trait UserStoragePort: Send + Sync + 'static {
     
     /// Cambia la contraseña de un usuario
     async fn change_password(&self, user_id: &str, password_hash: &str) -> Result<(), DomainError>;
+
+    /// Finds a user by OIDC provider + subject pair
+    async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> Result<User, DomainError>;
+}
+
+// ============================================================================
+// OIDC Port
+// ============================================================================
+
+/// Represents the token set returned by the OIDC provider after code exchange
+#[derive(Debug, Clone)]
+pub struct OidcTokenSet {
+    pub access_token: String,
+    pub id_token: String,
+    pub refresh_token: Option<String>,
+}
+
+/// Claims extracted from the validated OIDC ID token
+#[derive(Debug, Clone)]
+pub struct OidcIdClaims {
+    pub sub: String,
+    pub email: Option<String>,
+    pub preferred_username: Option<String>,
+    pub name: Option<String>,
+    pub groups: Vec<String>,
+}
+
+/// Port for OIDC operations — implemented in infrastructure layer
+#[async_trait]
+pub trait OidcServicePort: Send + Sync + 'static {
+    /// Get the authorization URL for redirecting the user to the IdP
+    fn get_authorize_url(&self, state: &str) -> Result<String, DomainError>;
+
+    /// Exchange an authorization code for tokens
+    async fn exchange_code(&self, code: &str) -> Result<OidcTokenSet, DomainError>;
+
+    /// Validate an ID token and extract claims
+    async fn validate_id_token(&self, id_token: &str) -> Result<OidcIdClaims, DomainError>;
+
+    /// Fetch user info from the UserInfo endpoint (fallback for missing ID token claims)
+    async fn fetch_user_info(&self, access_token: &str) -> Result<OidcIdClaims, DomainError>;
+
+    /// Get the OIDC provider display name
+    fn provider_name(&self) -> &str;
 }
 
 #[async_trait]

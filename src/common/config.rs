@@ -264,6 +264,51 @@ impl Default for AuthConfig {
     }
 }
 
+/// Configuración de OpenID Connect (OIDC)
+#[derive(Debug, Clone)]
+pub struct OidcConfig {
+    /// Whether OIDC authentication is enabled
+    pub enabled: bool,
+    /// OIDC Issuer URL (e.g. https://authentik.example.com/application/o/oxicloud/)
+    pub issuer_url: String,
+    /// OIDC Client ID
+    pub client_id: String,
+    /// OIDC Client Secret
+    pub client_secret: String,
+    /// Redirect URI after OIDC authentication (must match IdP config)
+    pub redirect_uri: String,
+    /// OIDC scopes to request
+    pub scopes: String,
+    /// Frontend URL to redirect after successful OIDC login (tokens appended as fragment)
+    pub frontend_url: String,
+    /// Whether to auto-create users on first OIDC login (JIT provisioning)
+    pub auto_provision: bool,
+    /// Comma-separated list of OIDC groups that map to admin role
+    pub admin_groups: String,
+    /// Whether to disable password-based login entirely
+    pub disable_password_login: bool,
+    /// OIDC provider display name (shown in UI)
+    pub provider_name: String,
+}
+
+impl Default for OidcConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            issuer_url: String::new(),
+            client_id: String::new(),
+            client_secret: String::new(),
+            redirect_uri: "http://localhost:8086/api/auth/oidc/callback".to_string(),
+            scopes: "openid profile email".to_string(),
+            frontend_url: "http://localhost:8086".to_string(),
+            auto_provision: true,
+            admin_groups: String::new(),
+            disable_password_login: false,
+            provider_name: "SSO".to_string(),
+        }
+    }
+}
+
 /// Configuración de funcionalidades (feature flags)
 #[derive(Debug, Clone)]
 pub struct FeaturesConfig {
@@ -313,6 +358,8 @@ pub struct AppConfig {
     pub auth: AuthConfig,
     /// Configuración de funcionalidades
     pub features: FeaturesConfig,
+    /// Configuración OIDC
+    pub oidc: OidcConfig,
 }
 
 impl Default for AppConfig {
@@ -330,6 +377,7 @@ impl Default for AppConfig {
             database: DatabaseConfig::default(),
             auth: AuthConfig::default(),
             features: FeaturesConfig::default(),
+            oidc: OidcConfig::default(),
         }
     }
 }
@@ -448,6 +496,49 @@ impl AppConfig {
             }
         }
         
+        // OIDC configuration
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ENABLED") {
+            config.oidc.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ISSUER_URL") {
+            config.oidc.issuer_url = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_CLIENT_ID") {
+            config.oidc.client_id = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_CLIENT_SECRET") {
+            config.oidc.client_secret = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_REDIRECT_URI") {
+            config.oidc.redirect_uri = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_SCOPES") {
+            config.oidc.scopes = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_FRONTEND_URL") {
+            config.oidc.frontend_url = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_AUTO_PROVISION") {
+            config.oidc.auto_provision = v.parse::<bool>().unwrap_or(true);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ADMIN_GROUPS") {
+            config.oidc.admin_groups = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_DISABLE_PASSWORD_LOGIN") {
+            config.oidc.disable_password_login = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_PROVIDER_NAME") {
+            config.oidc.provider_name = v;
+        }
+
+        // Validate OIDC config when enabled
+        if config.oidc.enabled {
+            if config.oidc.issuer_url.is_empty() || config.oidc.client_id.is_empty() || config.oidc.client_secret.is_empty() {
+                tracing::error!("OIDC is enabled but OXICLOUD_OIDC_ISSUER_URL, OXICLOUD_OIDC_CLIENT_ID, or OXICLOUD_OIDC_CLIENT_SECRET are not set");
+                config.oidc.enabled = false;
+            }
+        }
+
         config
     }
     
