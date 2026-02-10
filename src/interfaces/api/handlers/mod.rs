@@ -10,6 +10,7 @@ pub mod favorites_handler;
 pub mod recent_handler;
 pub mod webdav_handler;
 pub mod caldav_handler;
+pub mod carddav_handler;
 pub mod chunked_upload_handler;
 pub mod dedup_handler;
 

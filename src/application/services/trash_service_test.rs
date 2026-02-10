@@ -198,6 +198,14 @@ impl FileWritePort for MockFileRepository {
         unimplemented!()
     }
 
+    async fn rename_file(
+        &self,
+        _file_id: &str,
+        _new_name: &str,
+    ) -> std::result::Result<File, DomainError> {
+        unimplemented!()
+    }
+
     async fn delete_file(&self, _id: &str) -> std::result::Result<(), DomainError> {
         Ok(())
     }

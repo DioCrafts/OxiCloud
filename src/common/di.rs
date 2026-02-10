@@ -560,11 +560,11 @@ impl AppServiceFactory {
         core.zip_service = zip_service;
 
         // 10. Assemble final AppState
-        let app_state = AppState {
+        let mut app_state = AppState {
             core,
             repositories: repos,
             applications: apps,
-            db_pool,
+            db_pool: db_pool.clone(),
             auth_service: auth_services,
             trash_service,
             share_service,
@@ -573,7 +573,53 @@ impl AppServiceFactory {
             storage_usage_service,
             calendar_service: None,
             contact_service: None,
+            calendar_use_case: None,
+            addressbook_use_case: None,
+            contact_use_case: None,
         };
+        
+        // 11. Wire CalDAV/CardDAV services when database is available
+        if let Some(ref pool) = db_pool {
+            // CalDAV
+            let calendar_repo: Arc<dyn crate::domain::repositories::calendar_repository::CalendarRepository> = Arc::new(
+                crate::infrastructure::repositories::pg::CalendarPgRepository::new(pool.clone())
+            );
+            let event_repo: Arc<dyn crate::domain::repositories::calendar_event_repository::CalendarEventRepository> = Arc::new(
+                crate::infrastructure::repositories::pg::CalendarEventPgRepository::new(pool.clone())
+            );
+            let calendar_storage = Arc::new(
+                crate::infrastructure::adapters::calendar_storage_adapter::CalendarStorageAdapter::new(
+                    calendar_repo,
+                    event_repo,
+                )
+            );
+            let calendar_service = Arc::new(
+                crate::application::services::calendar_service::CalendarService::new(calendar_storage)
+            );
+            app_state.calendar_use_case = Some(calendar_service as Arc<dyn crate::application::ports::calendar_ports::CalendarUseCase>);
+            
+            // CardDAV
+            let address_book_repo: Arc<dyn crate::domain::repositories::address_book_repository::AddressBookRepository> = Arc::new(
+                crate::infrastructure::repositories::pg::AddressBookPgRepository::new(pool.clone())
+            );
+            let contact_repo: Arc<dyn crate::domain::repositories::contact_repository::ContactRepository> = Arc::new(
+                crate::infrastructure::repositories::pg::ContactPgRepository::new(pool.clone())
+            );
+            let group_repo: Arc<dyn crate::domain::repositories::contact_repository::ContactGroupRepository> = Arc::new(
+                crate::infrastructure::repositories::pg::ContactGroupPgRepository::new(pool.clone())
+            );
+            let contact_storage = Arc::new(
+                crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter::new(
+                    address_book_repo,
+                    contact_repo,
+                    group_repo,
+                )
+            );
+            app_state.addressbook_use_case = Some(contact_storage.clone() as Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>);
+            app_state.contact_use_case = Some(contact_storage as Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>);
+            
+            tracing::info!("CalDAV and CardDAV services initialized with PostgreSQL repositories");
+        }
 
         Ok(app_state)
     }
@@ -650,6 +696,9 @@ pub struct AppState {
     pub storage_usage_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>>,
     pub calendar_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUseCase>>,
     pub contact_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUseCase>>,
+    pub calendar_use_case: Option<Arc<dyn crate::application::ports::calendar_ports::CalendarUseCase>>,
+    pub addressbook_use_case: Option<Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>>,
+    pub contact_use_case: Option<Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>>,
 }
 
 impl Default for AppState {
@@ -785,6 +834,9 @@ impl Default for AppState {
             storage_usage_service: None,
             calendar_service: None,
             contact_service: None,
+            calendar_use_case: None,
+            addressbook_use_case: None,
+            contact_use_case: None,
         }
     }
 }
@@ -808,6 +860,9 @@ impl AppState {
             storage_usage_service: None,
             calendar_service: None,
             contact_service: None,
+            calendar_use_case: None,
+            addressbook_use_case: None,
+            contact_use_case: None,
         }
     }
     
@@ -907,6 +962,21 @@ impl AppState {
     
     pub fn with_contact_service(mut self, contact_service: Arc<dyn crate::application::ports::storage_ports::StorageUseCase>) -> Self {
         self.contact_service = Some(contact_service);
+        self
+    }
+    
+    pub fn with_calendar_use_case(mut self, calendar_use_case: Arc<dyn crate::application::ports::calendar_ports::CalendarUseCase>) -> Self {
+        self.calendar_use_case = Some(calendar_use_case);
+        self
+    }
+    
+    pub fn with_addressbook_use_case(mut self, addressbook_use_case: Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>) -> Self {
+        self.addressbook_use_case = Some(addressbook_use_case);
+        self
+    }
+    
+    pub fn with_contact_use_case(mut self, contact_use_case: Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>) -> Self {
+        self.contact_use_case = Some(contact_use_case);
         self
     }
     

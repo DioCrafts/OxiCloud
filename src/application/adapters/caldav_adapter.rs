@@ -120,9 +120,7 @@ impl CalDavAdapter {
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
                     
                     match name_str {
-                        s if s == "calendar-query" || s.ends_with(":calendar-query") => in_calendar_query = false,
-                        s if s == "calendar-multiget" || s.ends_with(":calendar-multiget") => in_calendar_multiget = false,
-                        s if s == "sync-collection" || s.ends_with(":sync-collection") => in_sync_collection = false,
+                        // Don't reset report-type flags — they're needed at EOF for decision logic
                         s if s == "prop" || s.ends_with(":prop") => in_prop = false,
                         s if s == "filter" || s.ends_with(":filter") => in_filter = false,
                         s if s == "time-range" || s.ends_with(":time-range") => { /* time-range end, attributes already parsed */ },
@@ -512,6 +510,73 @@ impl CalDavAdapter {
             }
         }
         
+        Ok(())
+    }
+    
+    /// Generate PROPFIND response for a single calendar collection + its events
+    pub fn generate_calendar_collection_propfind<W: Write>(
+        writer: W,
+        calendar: &CalendarDto,
+        events: &[CalendarEventDto],
+        request: &PropFindRequest,
+        base_href: &str,
+        depth: &str,
+    ) -> Result<()> {
+        let mut xml_writer = Writer::new(writer);
+        
+        xml_writer.write_event(Event::Start(BytesStart::new("D:multistatus").with_attributes([
+            ("xmlns:D", "DAV:"),
+            ("xmlns:C", "urn:ietf:params:xml:ns:caldav"),
+            ("xmlns:CS", "http://calendarserver.org/ns/"),
+        ])))?;
+        
+        // Write the calendar collection itself
+        Self::write_calendar_response(&mut xml_writer, calendar, request, base_href)?;
+        
+        // If depth > 0, include event resources
+        if depth != "0" {
+            for event in events {
+                // Write a basic DAV response for each event
+                xml_writer.write_event(Event::Start(BytesStart::new("D:response")))?;
+                
+                let event_href = format!("{}{}.ics", base_href, event.ical_uid);
+                xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                xml_writer.write_event(Event::Text(BytesText::new(&event_href)))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                
+                xml_writer.write_event(Event::Start(BytesStart::new("D:propstat")))?;
+                xml_writer.write_event(Event::Start(BytesStart::new("D:prop")))?;
+                
+                // resourcetype (empty for non-collection)
+                xml_writer.write_event(Event::Empty(BytesStart::new("D:resourcetype")))?;
+                
+                // getetag
+                xml_writer.write_event(Event::Start(BytesStart::new("D:getetag")))?;
+                xml_writer.write_event(Event::Text(BytesText::new(&format!("\"{}\"", event.id))))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:getetag")))?;
+                
+                // getcontenttype
+                xml_writer.write_event(Event::Start(BytesStart::new("D:getcontenttype")))?;
+                xml_writer.write_event(Event::Text(BytesText::new("text/calendar; component=vevent")))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:getcontenttype")))?;
+                
+                // getlastmodified
+                xml_writer.write_event(Event::Start(BytesStart::new("D:getlastmodified")))?;
+                xml_writer.write_event(Event::Text(BytesText::new(&event.updated_at.to_rfc2822())))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:getlastmodified")))?;
+                
+                xml_writer.write_event(Event::End(BytesEnd::new("D:prop")))?;
+                
+                xml_writer.write_event(Event::Start(BytesStart::new("D:status")))?;
+                xml_writer.write_event(Event::Text(BytesText::new("HTTP/1.1 200 OK")))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:status")))?;
+                
+                xml_writer.write_event(Event::End(BytesEnd::new("D:propstat")))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:response")))?;
+            }
+        }
+        
+        xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
         Ok(())
     }
     

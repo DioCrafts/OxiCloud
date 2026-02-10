@@ -1,5 +1,11 @@
 {
-  "path_to_id": {},
-  "id_to_path": {},
-  "version": 0
+  "path_to_id": {
+    "/Mi Carpeta - test": "edfc23e0-d9f9-4cc7-b1dc-6369568b19e6",
+    "/Mi Carpeta - testuser": "304384d6-9a7e-4b22-a659-287957e8b667"
+  },
+  "id_to_path": {
+    "304384d6-9a7e-4b22-a659-287957e8b667": "/Mi Carpeta - testuser",
+    "edfc23e0-d9f9-4cc7-b1dc-6369568b19e6": "/Mi Carpeta - test"
+  },
+  "version": 2
 }

@@ -1,6 +1,14 @@
--- OxiCloud Authentication Database Schema
+-- ============================================================
+-- OxiCloud Unified Database Schema
+-- For clean installations: psql -f db/schema.sql
+-- ============================================================
+-- Order: auth (base) → caldav → carddav
+-- All tables use IF NOT EXISTS for idempotent re-runs.
+-- ============================================================
 
--- Create schema for auth-related tables
+-- ============================================================
+-- 1. AUTH SCHEMA
+-- ============================================================
 CREATE SCHEMA IF NOT EXISTS auth;
 
 -- Create UserRole enum type
@@ -30,7 +38,6 @@ CREATE TABLE IF NOT EXISTS auth.users (
     active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
--- Create indexes for users table
 CREATE INDEX IF NOT EXISTS idx_users_username ON auth.users(username);
 CREATE INDEX IF NOT EXISTS idx_users_email ON auth.users(email);
 
@@ -40,18 +47,16 @@ CREATE TABLE IF NOT EXISTS auth.sessions (
     user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     refresh_token TEXT NOT NULL UNIQUE,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    ip_address TEXT, -- to support IPv6
+    ip_address TEXT,
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     revoked BOOLEAN NOT NULL DEFAULT FALSE
 );
 
--- Create indexes for sessions table
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON auth.sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_refresh_token ON auth.sessions(refresh_token);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON auth.sessions(expires_at);
 
--- Create function for active sessions to use in index
 CREATE OR REPLACE FUNCTION auth.is_session_active(expires_at timestamptz)
 RETURNS boolean AS $$
 BEGIN
@@ -59,7 +64,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;
 
--- Create index for active sessions with IMMUTABLE function
 CREATE INDEX IF NOT EXISTS idx_sessions_active ON auth.sessions(user_id, revoked)
 WHERE NOT revoked AND auth.is_session_active(expires_at);
 
@@ -75,11 +79,10 @@ CREATE TABLE IF NOT EXISTS auth.user_files (
     UNIQUE(user_id, file_path)
 );
 
--- Create indexes for user_files
 CREATE INDEX IF NOT EXISTS idx_user_files_user_id ON auth.user_files(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_files_file_id ON auth.user_files(file_id);
 
--- User favorites table for cross-device synchronization
+-- User favorites
 CREATE TABLE IF NOT EXISTS auth.user_favorites (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -89,16 +92,13 @@ CREATE TABLE IF NOT EXISTS auth.user_favorites (
     UNIQUE(user_id, item_id, item_type)
 );
 
--- Create indexes for efficient querying
 CREATE INDEX IF NOT EXISTS idx_user_favorites_user_id ON auth.user_favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_item_id ON auth.user_favorites(item_id);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_type ON auth.user_favorites(item_type);
 CREATE INDEX IF NOT EXISTS idx_user_favorites_created ON auth.user_favorites(created_at);
-
--- Combined index for quick lookups by user and type
 CREATE INDEX IF NOT EXISTS idx_user_favorites_user_type ON auth.user_favorites(user_id, item_type);
 
--- Table for recent files 
+-- Recent files
 CREATE TABLE IF NOT EXISTS auth.user_recent_files (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -108,21 +108,178 @@ CREATE TABLE IF NOT EXISTS auth.user_recent_files (
     UNIQUE(user_id, item_id, item_type)
 );
 
--- Create indexes for efficient querying
 CREATE INDEX IF NOT EXISTS idx_user_recent_user_id ON auth.user_recent_files(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_recent_item_id ON auth.user_recent_files(item_id);
 CREATE INDEX IF NOT EXISTS idx_user_recent_type ON auth.user_recent_files(item_type);
 CREATE INDEX IF NOT EXISTS idx_user_recent_accessed ON auth.user_recent_files(accessed_at);
-
--- Combined index for quick lookups by user and accessed time (for sorting)
 CREATE INDEX IF NOT EXISTS idx_user_recent_user_accessed ON auth.user_recent_files(user_id, accessed_at DESC);
-
-COMMENT ON TABLE auth.user_recent_files IS 'Stores recently accessed files and folders for cross-device synchronization';
-
--- NOTE: No default users are created. The first user to register through
--- the admin setup wizard will become the administrator.
 
 COMMENT ON TABLE auth.users IS 'Stores user account information';
 COMMENT ON TABLE auth.sessions IS 'Stores user session information for refresh tokens';
 COMMENT ON TABLE auth.user_files IS 'Tracks file ownership and storage utilization by users';
 COMMENT ON TABLE auth.user_favorites IS 'Stores user favorite files and folders for cross-device synchronization';
+COMMENT ON TABLE auth.user_recent_files IS 'Stores recently accessed files and folders for cross-device synchronization';
+
+-- NOTE: No default users are created. The first user to register through
+-- the admin setup wizard will become the administrator.
+
+-- ============================================================
+-- 2. CALDAV SCHEMA (RFC 4791)
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS caldav;
+
+-- Calendars
+CREATE TABLE IF NOT EXISTS caldav.calendars (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    description TEXT,
+    color VARCHAR(9), -- #RRGGBB or #RRGGBBAA
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    ctag VARCHAR(64) NOT NULL DEFAULT '0',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendars_owner_id ON caldav.calendars(owner_id);
+
+-- Calendar events (VEVENT)
+CREATE TABLE IF NOT EXISTS caldav.calendar_events (
+    id UUID PRIMARY KEY,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
+    summary TEXT NOT NULL,
+    description TEXT,
+    location TEXT,
+    start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+    all_day BOOLEAN NOT NULL DEFAULT FALSE,
+    rrule TEXT,
+    ical_uid VARCHAR(255) NOT NULL,
+    ical_data TEXT, -- Full iCalendar data for round-trip fidelity
+    etag VARCHAR(64),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_calendar_id ON caldav.calendar_events(calendar_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_ical_uid ON caldav.calendar_events(ical_uid);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_time_range ON caldav.calendar_events(calendar_id, start_time, end_time);
+
+-- Calendar sharing
+CREATE TABLE IF NOT EXISTS caldav.calendar_shares (
+    id SERIAL PRIMARY KEY,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    access_level VARCHAR(10) NOT NULL DEFAULT 'read', -- read, write, owner
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(calendar_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_shares_calendar_id ON caldav.calendar_shares(calendar_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_shares_user_id ON caldav.calendar_shares(user_id);
+
+-- Calendar custom properties
+CREATE TABLE IF NOT EXISTS caldav.calendar_properties (
+    id SERIAL PRIMARY KEY,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
+    property_name TEXT NOT NULL,
+    property_value TEXT NOT NULL,
+    UNIQUE(calendar_id, property_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_properties_calendar_id ON caldav.calendar_properties(calendar_id);
+
+COMMENT ON TABLE caldav.calendars IS 'CalDAV calendars for each user';
+COMMENT ON TABLE caldav.calendar_events IS 'Calendar events (VEVENT) stored with iCal data';
+COMMENT ON TABLE caldav.calendar_shares IS 'Calendar sharing permissions between users';
+COMMENT ON TABLE caldav.calendar_properties IS 'Custom WebDAV properties on calendars';
+
+-- ============================================================
+-- 3. CARDDAV SCHEMA (RFC 6352)
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS carddav;
+
+-- Address books
+CREATE TABLE IF NOT EXISTS carddav.address_books (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    description TEXT,
+    color VARCHAR(9),
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    ctag VARCHAR(64) NOT NULL DEFAULT '0',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_address_books_owner_id ON carddav.address_books(owner_id);
+
+-- Contacts
+CREATE TABLE IF NOT EXISTS carddav.contacts (
+    id UUID PRIMARY KEY,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    uid VARCHAR(255) NOT NULL,
+    full_name TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    nickname TEXT,
+    organization TEXT,
+    title TEXT,
+    notes TEXT,
+    photo_url TEXT,
+    birthday DATE,
+    anniversary DATE,
+    email JSONB NOT NULL DEFAULT '[]',
+    phone JSONB NOT NULL DEFAULT '[]',
+    address JSONB NOT NULL DEFAULT '[]',
+    vcard TEXT, -- Full vCard data for round-trip fidelity
+    etag VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_contacts_address_book_id ON carddav.contacts(address_book_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_uid ON carddav.contacts(uid);
+CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON carddav.contacts(full_name);
+
+-- Address book sharing
+CREATE TABLE IF NOT EXISTS carddav.address_book_shares (
+    id SERIAL PRIMARY KEY,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    can_write BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(address_book_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_address_book_shares_address_book_id ON carddav.address_book_shares(address_book_id);
+CREATE INDEX IF NOT EXISTS idx_address_book_shares_user_id ON carddav.address_book_shares(user_id);
+
+-- Contact groups
+CREATE TABLE IF NOT EXISTS carddav.contact_groups (
+    id UUID PRIMARY KEY,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_contact_groups_address_book_id ON carddav.contact_groups(address_book_id);
+
+-- Group memberships
+CREATE TABLE IF NOT EXISTS carddav.group_memberships (
+    id SERIAL PRIMARY KEY,
+    group_id UUID NOT NULL REFERENCES carddav.contact_groups(id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES carddav.contacts(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(group_id, contact_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_group_memberships_group_id ON carddav.group_memberships(group_id);
+CREATE INDEX IF NOT EXISTS idx_group_memberships_contact_id ON carddav.group_memberships(contact_id);
+
+COMMENT ON TABLE carddav.address_books IS 'CardDAV address books for each user';
+COMMENT ON TABLE carddav.contacts IS 'Contacts stored with vCard data for round-trip fidelity';
+COMMENT ON TABLE carddav.address_book_shares IS 'Address book sharing permissions between users';
+COMMENT ON TABLE carddav.contact_groups IS 'Contact groups within address books';
+COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between contacts and groups';

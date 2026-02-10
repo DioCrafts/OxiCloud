@@ -282,11 +282,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         router = router.merge(webdav_handler::webdav_routes());
     }
     
-    // Add CalDAV routes
-    {
-        use crate::interfaces::api::handlers::caldav_handler;
-        router = router.nest("/caldav", caldav_handler::caldav_routes());
-    }
+    // NOTE: CalDAV and CardDAV routes are mounted at top-level (/caldav, /carddav)
+    // in main.rs for protocol compliance, NOT under /api.
 
     router
         .layer(CompressionLayer::new())

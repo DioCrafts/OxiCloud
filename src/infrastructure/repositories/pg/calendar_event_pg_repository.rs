@@ -112,10 +112,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         start: &DateTime<Utc>, 
         end: &DateTime<Utc>
     ) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
-        // Para una implementación real, necesitaríamos construir objetos CalendarEvent con un constructor adecuado
-        // Esta es una implementación simplificada para mostrar cómo evitar las macros query_as!
-        
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -139,15 +136,25 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get events in time range: {}", e)))?;
 
-        // En un escenario real, construiríamos objetos CalendarEvent para cada fila
-        // Aquí solo devolvemos un vector vacío como ejemplo
-        
-        let events = Vec::new();
-        // Código para construir eventos desde rows iría aquí
-        // Por ejemplo:
-        // for row in rows {
-        //     events.push(CalendarEvent::new(...))
-        // }
+        let mut events = Vec::new();
+        for row in rows {
+            let event = CalendarEvent::with_id(
+                row.get("id"),
+                row.get("calendar_id"),
+                row.get("summary"),
+                row.get::<Option<String>, _>("description"),
+                row.get::<Option<String>, _>("location"),
+                row.get("start_time"),
+                row.get("end_time"),
+                row.get("all_day"),
+                row.get::<Option<String>, _>("rrule"),
+                row.get("ical_uid"),
+                row.get("ical_data"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+            events.push(event);
+        }
         
         Ok(events)
     }
@@ -193,8 +200,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
     }
     
     async fn list_events_by_calendar(&self, calendar_id: &Uuid) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
-        // Usamos sqlx::query en lugar de query_as para evitar la necesidad de verificar la base de datos en tiempo de compilación
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -210,20 +216,25 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get events by calendar: {}", e)))?;
 
-        // En una implementación real, mapearíamos cada fila a un objeto CalendarEvent
-        // Este es un ejemplo simplificado que devuelve una lista vacía
-        let events = Vec::new();
-        
-        // Ejemplo de cómo sería el mapeo real:
-        // for row in rows {
-        //     let event = CalendarEvent::new(
-        //         row.get("id"),
-        //         row.get("calendar_id"),
-        //         row.get("summary"),
-        //         // ... otros campos
-        //     );
-        //     events.push(event);
-        // }
+        let mut events = Vec::new();
+        for row in rows {
+            let event = CalendarEvent::with_id(
+                row.get("id"),
+                row.get("calendar_id"),
+                row.get("summary"),
+                row.get::<Option<String>, _>("description"),
+                row.get::<Option<String>, _>("location"),
+                row.get("start_time"),
+                row.get("end_time"),
+                row.get("all_day"),
+                row.get::<Option<String>, _>("rrule"),
+                row.get("ical_uid"),
+                row.get("ical_data"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+            events.push(event);
+        }
         
         Ok(events)
     }
@@ -231,7 +242,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
     async fn find_events_by_summary(&self, calendar_id: &Uuid, summary: &str) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
         let search_pattern = format!("%{}%", summary);
         
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -248,20 +259,31 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to find events by summary: {}", e)))?;
 
-        // En una implementación real, mapearíamos cada fila a un objeto CalendarEvent
-        // Este es un ejemplo simplificado que devuelve una lista vacía
-        let events = Vec::new();
-        
-        // Aquí iría el código para construir eventos desde rows
-        // for row in rows {
-        //     events.push(CalendarEvent::new(...));
-        // }
+        let mut events = Vec::new();
+        for row in rows {
+            let event = CalendarEvent::with_id(
+                row.get("id"),
+                row.get("calendar_id"),
+                row.get("summary"),
+                row.get::<Option<String>, _>("description"),
+                row.get::<Option<String>, _>("location"),
+                row.get("start_time"),
+                row.get("end_time"),
+                row.get("all_day"),
+                row.get::<Option<String>, _>("rrule"),
+                row.get("ical_uid"),
+                row.get("ical_data"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+            events.push(event);
+        }
         
         Ok(events)
     }
     
     async fn find_event_by_ical_uid(&self, calendar_id: &Uuid, ical_uid: &str) -> CalendarEventRepositoryResult<Option<CalendarEvent>> {
-        let _row_opt = sqlx::query(
+        let row_opt = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -277,9 +299,27 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get calendar event by UID: {}", e)))?;
 
-        // En una implementación real, crearíamos un objeto CalendarEvent a partir de row_opt
-        // Por simplicidad, devolvemos None como ejemplo
-        Ok(None)
+        match row_opt {
+            Some(row) => {
+                let event = CalendarEvent::with_id(
+                    row.get("id"),
+                    row.get("calendar_id"),
+                    row.get("summary"),
+                    row.get::<Option<String>, _>("description"),
+                    row.get::<Option<String>, _>("location"),
+                    row.get("start_time"),
+                    row.get("end_time"),
+                    row.get("all_day"),
+                    row.get::<Option<String>, _>("rrule"),
+                    row.get("ical_uid"),
+                    row.get("ical_data"),
+                    row.get("created_at"),
+                    row.get("updated_at"),
+                ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+                Ok(Some(event))
+            }
+            None => Ok(None),
+        }
     }
     
     async fn count_events_in_calendar(&self, calendar_id: &Uuid) -> CalendarEventRepositoryResult<i64> {
@@ -319,8 +359,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         limit: i64,
         offset: i64
     ) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
-        // Usamos sqlx::query en lugar de query_as para evitar la necesidad de verificar la base de datos en tiempo de compilación
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -339,20 +378,25 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get paginated events by calendar: {}", e)))?;
 
-        // En una implementación real, mapearíamos cada fila a un objeto CalendarEvent
-        // Este es un ejemplo simplificado que devuelve una lista vacía
-        let events = Vec::new();
-        
-        // Ejemplo de cómo sería el mapeo real:
-        // for row in rows {
-        //     let event = CalendarEvent::new(
-        //         row.get("id"),
-        //         row.get("calendar_id"),
-        //         row.get("summary"),
-        //         // ... otros campos
-        //     );
-        //     events.push(event);
-        // }
+        let mut events = Vec::new();
+        for row in rows {
+            let event = CalendarEvent::with_id(
+                row.get("id"),
+                row.get("calendar_id"),
+                row.get("summary"),
+                row.get::<Option<String>, _>("description"),
+                row.get::<Option<String>, _>("location"),
+                row.get("start_time"),
+                row.get("end_time"),
+                row.get("all_day"),
+                row.get::<Option<String>, _>("rrule"),
+                row.get("ical_uid"),
+                row.get("ical_data"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+            events.push(event);
+        }
         
         Ok(events)
     }
@@ -363,7 +407,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         start: &DateTime<Utc>,
         end: &DateTime<Utc>
     ) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, calendar_id, summary, description, location, 
@@ -384,28 +428,25 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to find recurring events in range: {}", e)))?;
 
-        // En una implementación real, mapearíamos cada fila a un objeto CalendarEvent
-        // Por simplicidad, devolvemos una lista vacía de eventos
-        let events = Vec::new();
-        
-        // Aquí iría el código para construir los objetos CalendarEvent
-        // for row in rows {
-        //     events.push(CalendarEvent::with_id(
-        //         row.get("id"),
-        //         row.get("calendar_id"),
-        //         row.get("summary"),
-        //         row.get::<Option<String>, _>("description"),
-        //         row.get::<Option<String>, _>("location"),
-        //         row.get("start_time"),
-        //         row.get("end_time"),
-        //         row.get("all_day"),
-        //         row.get::<Option<String>, _>("rrule"),
-        //         row.get("ical_uid"),
-        //         row.get("ical_data"),
-        //         row.get("created_at"),
-        //         row.get("updated_at")
-        //     ).unwrap());
-        // }
+        let mut events = Vec::new();
+        for row in rows {
+            let event = CalendarEvent::with_id(
+                row.get("id"),
+                row.get("calendar_id"),
+                row.get("summary"),
+                row.get::<Option<String>, _>("description"),
+                row.get::<Option<String>, _>("location"),
+                row.get("start_time"),
+                row.get("end_time"),
+                row.get("all_day"),
+                row.get::<Option<String>, _>("rrule"),
+                row.get("ical_uid"),
+                row.get("ical_data"),
+                row.get("created_at"),
+                row.get("updated_at"),
+            ).map_err(|e| DomainError::database_error(format!("Error creating calendar event: {}", e)))?;
+            events.push(event);
+        }
         
         Ok(events)
     }

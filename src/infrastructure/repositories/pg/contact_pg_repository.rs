@@ -1,13 +1,17 @@
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{PgPool, types::Uuid};
+use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
 use serde_json::Value as JsonValue;
 
 use crate::domain::entities::contact::Contact;
 use crate::domain::repositories::contact_repository::{ContactRepository, ContactRepositoryResult};
 use crate::common::errors::DomainError;
-use super::contact_persistence_dto::{emails_to_persistence, phones_to_persistence, addresses_to_persistence};
+use super::contact_persistence_dto::{
+    emails_to_persistence, phones_to_persistence, addresses_to_persistence,
+    emails_from_persistence, phones_from_persistence, addresses_from_persistence,
+    EmailPersistenceDto, PhonePersistenceDto, AddressPersistenceDto,
+};
 
 pub struct ContactPgRepository {
     pool: Arc<PgPool>,
@@ -16,6 +20,46 @@ pub struct ContactPgRepository {
 impl ContactPgRepository {
     pub fn new(pool: Arc<PgPool>) -> Self {
         Self { pool }
+    }
+
+    /// Maps a database row to a Contact domain entity
+    fn row_to_contact(row: &sqlx::postgres::PgRow) -> Result<Contact, DomainError> {
+        let email_json: JsonValue = row.get("email");
+        let phone_json: JsonValue = row.get("phone");
+        let address_json: JsonValue = row.get("address");
+
+        let emails = serde_json::from_value::<Vec<EmailPersistenceDto>>(email_json)
+            .map(emails_from_persistence)
+            .unwrap_or_default();
+        let phones = serde_json::from_value::<Vec<PhonePersistenceDto>>(phone_json)
+            .map(phones_from_persistence)
+            .unwrap_or_default();
+        let addresses = serde_json::from_value::<Vec<AddressPersistenceDto>>(address_json)
+            .map(addresses_from_persistence)
+            .unwrap_or_default();
+
+        Ok(Contact::from_raw(
+            row.get("id"),
+            row.get("address_book_id"),
+            row.get("uid"),
+            row.get::<Option<String>, _>("full_name"),
+            row.get::<Option<String>, _>("first_name"),
+            row.get::<Option<String>, _>("last_name"),
+            row.get::<Option<String>, _>("nickname"),
+            emails,
+            phones,
+            addresses,
+            row.get::<Option<String>, _>("organization"),
+            row.get::<Option<String>, _>("title"),
+            row.get::<Option<String>, _>("notes"),
+            row.get::<Option<String>, _>("photo_url"),
+            row.get("birthday"),
+            row.get("anniversary"),
+            row.get("vcard"),
+            row.get("etag"),
+            row.get("created_at"),
+            row.get("updated_at"),
+        ))
     }
 }
 
@@ -31,7 +75,7 @@ impl ContactRepository for ContactPgRepository {
         let phone_json = serde_json::to_value(&phone_dtos).unwrap_or(JsonValue::Null);
         let address_json = serde_json::to_value(&address_dtos).unwrap_or(JsonValue::Null);
         
-        let _row = sqlx::query(
+        let row = sqlx::query(
             r#"
             INSERT INTO carddav.contacts (
                 id, address_book_id, uid, full_name, first_name, last_name, nickname,
@@ -72,9 +116,7 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create contact: {}", e)))?;
 
-        // En una implementación real, construiríamos un objeto Contact completo
-        // Por simplicidad, devolvemos el contacto original
-        Ok(contact)
+        Self::row_to_contact(&row)
     }
 
     async fn update_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact> {
@@ -92,7 +134,7 @@ impl ContactRepository for ContactPgRepository {
         let mut updated_contact = contact.clone();
         updated_contact.set_updated_at(now);
         
-        let _row = sqlx::query(
+        let row = sqlx::query(
             r#"
             UPDATE carddav.contacts
             SET 
@@ -140,9 +182,7 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update contact: {}", e)))?;
 
-        // En una implementación real, construiríamos un objeto Contact a partir de la fila resultante
-        // Por simplicidad, devolvemos el contacto con el timestamp actualizado
-        Ok(updated_contact)
+        Self::row_to_contact(&row)
     }
 
     async fn delete_contact(&self, id: &Uuid) -> ContactRepositoryResult<()> {
@@ -176,13 +216,10 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get contact by id: {}", e)))?;
 
-        if let Some(_row) = row_opt {
-            // En una implementación real, construiríamos un objeto Contact a partir de la fila
-            // Por simplicidad y demostración, devolvemos una instancia predeterminada
-            return Ok(Some(Contact::default()));
+        match row_opt {
+            Some(row) => Ok(Some(Self::row_to_contact(&row)?)),
+            None => Ok(None),
         }
-
-        Ok(None)
     }
 
     async fn get_contact_by_uid(&self, address_book_id: &Uuid, uid: &str) -> ContactRepositoryResult<Option<Contact>> {
@@ -202,17 +239,14 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get contact by uid: {}", e)))?;
 
-        if let Some(_row) = row_opt {
-            // En una implementación real, construiríamos un objeto Contact a partir de la fila
-            // Por simplicidad y demostración, devolvemos una instancia predeterminada
-            return Ok(Some(Contact::default()));
+        match row_opt {
+            Some(row) => Ok(Some(Self::row_to_contact(&row)?)),
+            None => Ok(None),
         }
-
-        Ok(None)
     }
 
     async fn get_contacts_by_address_book(&self, address_book_id: &Uuid) -> ContactRepositoryResult<Vec<Contact>> {
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, address_book_id, uid, full_name, first_name, last_name, nickname,
@@ -228,17 +262,17 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get contacts by address book: {}", e)))?;
 
-        // En una implementación real, construiríamos objetos Contact a partir de las filas
-        // Por simplicidad y demostración, devolvemos una lista vacía
-        let contacts = Vec::new();
-        
+        let mut contacts = Vec::new();
+        for row in &rows {
+            contacts.push(Self::row_to_contact(row)?);
+        }
         Ok(contacts)
     }
 
     async fn get_contacts_by_email(&self, email: &str) -> ContactRepositoryResult<Vec<Contact>> {
         let search_pattern = format!("%{}%", email);
         
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, address_book_id, uid, full_name, first_name, last_name, nickname,
@@ -254,15 +288,15 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get contacts by email: {}", e)))?;
 
-        // En una implementación real, construiríamos objetos Contact a partir de las filas
-        // Por simplicidad y demostración, devolvemos una lista vacía
-        let contacts = Vec::new();
-        
+        let mut contacts = Vec::new();
+        for row in &rows {
+            contacts.push(Self::row_to_contact(row)?);
+        }
         Ok(contacts)
     }
 
     async fn get_contacts_by_group(&self, group_id: &Uuid) -> ContactRepositoryResult<Vec<Contact>> {
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 c.id, c.address_book_id, c.uid, c.full_name, c.first_name, c.last_name, c.nickname,
@@ -279,17 +313,17 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to get contacts by group: {}", e)))?;
 
-        // En una implementación real, construiríamos objetos Contact a partir de las filas
-        // Por simplicidad y demostración, devolvemos una lista vacía
-        let contacts = Vec::new();
-        
+        let mut contacts = Vec::new();
+        for row in &rows {
+            contacts.push(Self::row_to_contact(row)?);
+        }
         Ok(contacts)
     }
 
     async fn search_contacts(&self, address_book_id: &Uuid, query: &str) -> ContactRepositoryResult<Vec<Contact>> {
         let search_pattern = format!("%{}%", query);
         
-        let _rows = sqlx::query(
+        let rows = sqlx::query(
             r#"
             SELECT 
                 id, address_book_id, uid, full_name, first_name, last_name, nickname,
@@ -315,10 +349,10 @@ impl ContactRepository for ContactPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to search contacts: {}", e)))?;
 
-        // En una implementación real, construiríamos objetos Contact a partir de las filas
-        // Por simplicidad y demostración, devolvemos una lista vacía
-        let contacts = Vec::new();
-        
+        let mut contacts = Vec::new();
+        for row in &rows {
+            contacts.push(Self::row_to_contact(row)?);
+        }
         Ok(contacts)
     }
 }

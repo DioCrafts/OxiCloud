@@ -344,25 +344,90 @@ impl ContactUseCase for ContactStorageAdapter {
         // Check write access
         self.check_write_access(&address_book_id, &dto.user_id).await?;
 
-        // Parse vCard - for now, create a basic contact with the raw vCard
+        // Parse vCard fields
         let now = chrono::Utc::now();
+        let vcard_data = &dto.vcard;
+
+        let mut uid: Option<String> = None;
+        let mut full_name: Option<String> = None;
+        let mut first_name: Option<String> = None;
+        let mut last_name: Option<String> = None;
+        let mut nickname: Option<String> = None;
+        let mut organization: Option<String> = None;
+        let mut title: Option<String> = None;
+        let mut notes: Option<String> = None;
+        let mut emails: Vec<Email> = Vec::new();
+        let mut phones: Vec<Phone> = Vec::new();
+
+        for line in vcard_data.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("UID:") {
+                uid = Some(trimmed[4..].trim().to_string());
+            } else if trimmed.starts_with("FN:") {
+                full_name = Some(trimmed[3..].trim().to_string());
+            } else if trimmed.starts_with("N:") {
+                let parts: Vec<&str> = trimmed[2..].split(';').collect();
+                if parts.len() >= 2 {
+                    last_name = Some(parts[0].trim().to_string()).filter(|s| !s.is_empty());
+                    first_name = Some(parts[1].trim().to_string()).filter(|s| !s.is_empty());
+                }
+            } else if trimmed.starts_with("NICKNAME:") {
+                nickname = Some(trimmed[9..].trim().to_string());
+            } else if trimmed.starts_with("ORG:") {
+                organization = Some(trimmed[4..].trim().to_string());
+            } else if trimmed.starts_with("TITLE:") {
+                title = Some(trimmed[6..].trim().to_string());
+            } else if trimmed.starts_with("NOTE:") {
+                notes = Some(trimmed[5..].trim().to_string());
+            } else if trimmed.starts_with("EMAIL") {
+                if let Some(value) = trimmed.split(':').nth(1) {
+                    if !value.is_empty() {
+                        let email_type = if trimmed.contains("TYPE=HOME") { "home" }
+                            else if trimmed.contains("TYPE=WORK") { "work" }
+                            else { "other" };
+                        emails.push(Email {
+                            email: value.trim().to_string(),
+                            r#type: email_type.to_string(),
+                            is_primary: emails.is_empty(),
+                        });
+                    }
+                }
+            } else if trimmed.starts_with("TEL") {
+                if let Some(value) = trimmed.split(':').nth(1) {
+                    if !value.is_empty() {
+                        let phone_type = if trimmed.contains("TYPE=CELL") || trimmed.contains("TYPE=MOBILE") { "mobile" }
+                            else if trimmed.contains("TYPE=HOME") { "home" }
+                            else if trimmed.contains("TYPE=WORK") { "work" }
+                            else { "other" };
+                        phones.push(Phone {
+                            number: value.trim().to_string(),
+                            r#type: phone_type.to_string(),
+                            is_primary: phones.is_empty(),
+                        });
+                    }
+                }
+            }
+        }
+
+        let contact_uid = uid.unwrap_or_else(|| format!("{}@oxicloud", Uuid::new_v4()));
+
         let contact = Contact::from_raw(
             Uuid::new_v4(),
             address_book_id,
-            format!("{}@oxicloud", Uuid::new_v4()),
-            Some("Imported Contact".to_string()),
-            None,
-            None,
-            None,
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
+            contact_uid,
+            full_name,
+            first_name,
+            last_name,
+            nickname,
+            emails,
+            phones,
+            Vec::new(), // addresses — simplified for now
+            organization,
+            title,
+            notes,
+            None,  // photo_url
+            None,  // birthday
+            None,  // anniversary
             dto.vcard,
             Uuid::new_v4().to_string(),
             now,
