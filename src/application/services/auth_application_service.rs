@@ -1,5 +1,8 @@
 use std::sync::Arc;
 use std::sync::RwLock;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::time::Instant;
 use crate::domain::entities::user::{User, UserRole};
 use crate::domain::entities::session::Session;
 use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort, OidcServicePort, OidcIdClaims};
@@ -8,6 +11,24 @@ use crate::application::dtos::folder_dto::CreateFolderDto;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::common::config::OidcConfig;
+
+/// Maximum age for pending OIDC flows (10 minutes)
+const OIDC_FLOW_TTL_SECS: u64 = 600;
+/// Maximum age for pending one-time token codes (60 seconds)
+const OIDC_TOKEN_TTL_SECS: u64 = 60;
+
+/// Tracks a pending OIDC authorization flow (CSRF + PKCE + nonce)
+struct PendingOidcFlow {
+    created_at: Instant,
+    pkce_verifier: String,
+    nonce: String,
+}
+
+/// Tracks a pending one-time token exchange after successful OIDC callback
+struct PendingOidcToken {
+    auth_response: AuthResponseDto,
+    created_at: Instant,
+}
 
 /// Interior state for OIDC — protected by RwLock for hot-reload.
 struct OidcState {
@@ -22,6 +43,10 @@ pub struct AuthApplicationService {
     token_service: Arc<dyn TokenServicePort>,
     folder_service: Option<Arc<dyn FolderUseCase>>,
     oidc: RwLock<OidcState>,
+    /// Pending OIDC authorization flows keyed by state token (CSRF + PKCE + nonce)
+    pending_oidc_flows: Mutex<HashMap<String, PendingOidcFlow>>,
+    /// Pending one-time token codes for secure token delivery after OIDC callback
+    pending_oidc_tokens: Mutex<HashMap<String, PendingOidcToken>>,
 }
 
 impl AuthApplicationService {
@@ -38,6 +63,8 @@ impl AuthApplicationService {
             token_service,
             folder_service: None,
             oidc: RwLock::new(OidcState { service: None, config: None }),
+            pending_oidc_flows: Mutex::new(HashMap::new()),
+            pending_oidc_tokens: Mutex::new(HashMap::new()),
         }
     }
     
@@ -582,28 +609,83 @@ impl AuthApplicationService {
     // OIDC Methods
     // ========================================================================
 
-    /// Generate the OIDC authorization URL for redirecting the user to the IdP.
-    /// The `state` parameter is a signed JWT to prevent CSRF.
-    pub fn oidc_authorize_url(&self, state: &str) -> Result<String, DomainError> {
+    /// Prepare the OIDC authorization flow: generates CSRF state, PKCE pair,
+    /// nonce, stores them in pending_oidc_flows, and returns the authorize URL.
+    pub fn prepare_oidc_authorize(&self) -> Result<String, DomainError> {
         let oidc = self.oidc_service().ok_or_else(|| DomainError::new(
             ErrorKind::InternalError, "OIDC", "OIDC service not configured",
         ))?;
-        oidc.get_authorize_url(state)
-    }
 
-    /// Generate a signed OIDC state token (JWT containing a random nonce)
-    pub fn generate_oidc_state(&self) -> Result<String, DomainError> {
-        // Re-use the token service's secret for HMAC signing
-        // State = base64(random_bytes) — simple and sufficient for CSRF protection
+        // Generate CSRF state token
         use rand_core::{OsRng, RngCore};
-        let mut nonce = [0u8; 32];
-        OsRng.fill_bytes(&mut nonce);
-        Ok(hex::encode(nonce))
+        let mut state_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut state_bytes);
+        let state_token = hex::encode(state_bytes);
+
+        // Generate nonce for ID token binding
+        let mut nonce_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let nonce = hex::encode(nonce_bytes);
+
+        // Generate PKCE pair (RFC 7636, S256)
+        let mut verifier_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut verifier_bytes);
+        let pkce_verifier = base64_url_encode(&verifier_bytes);
+        let pkce_challenge = {
+            use sha2::{Sha256, Digest};
+            let hash = Sha256::digest(pkce_verifier.as_bytes());
+            base64_url_encode(&hash)
+        };
+
+        // Store pending flow
+        {
+            let mut flows = self.pending_oidc_flows.lock().unwrap();
+            // Cleanup expired entries
+            let now = Instant::now();
+            flows.retain(|_, f| now.duration_since(f.created_at).as_secs() < OIDC_FLOW_TTL_SECS);
+
+            flows.insert(state_token.clone(), PendingOidcFlow {
+                created_at: now,
+                pkce_verifier,
+                nonce: nonce.clone(),
+            });
+        }
+
+        // Build authorization URL with state, nonce, and PKCE challenge
+        let authorize_url = oidc.get_authorize_url(&state_token, &nonce, &pkce_challenge)?;
+
+        tracing::info!("OIDC authorize flow prepared (state={}...)", &state_token[..8]);
+
+        Ok(authorize_url)
     }
 
-    /// Handle the OIDC callback: exchange code, validate ID token,
-    /// find or create user (JIT provisioning), and issue internal tokens.
-    pub async fn oidc_callback(&self, code: &str) -> Result<AuthResponseDto, DomainError> {
+    /// Handle the OIDC callback: validate CSRF state, exchange code with PKCE,
+    /// validate ID token nonce, find or create user (JIT provisioning),
+    /// issue internal tokens, and return a one-time exchange code.
+    pub async fn oidc_callback(&self, code: &str, state: &str) -> Result<String, DomainError> {
+        // 0. Validate CSRF state and retrieve PKCE verifier + nonce
+        let (pkce_verifier, nonce) = {
+            let mut flows = self.pending_oidc_flows.lock().unwrap();
+            let flow = flows.remove(state).ok_or_else(|| {
+                tracing::warn!("OIDC callback with invalid/expired state token");
+                DomainError::new(
+                    ErrorKind::AccessDenied, "OIDC",
+                    "Invalid or expired OIDC state — possible CSRF attack. Please try logging in again.",
+                )
+            })?;
+
+            // Check TTL
+            if Instant::now().duration_since(flow.created_at).as_secs() >= OIDC_FLOW_TTL_SECS {
+                tracing::warn!("OIDC callback with expired state token");
+                return Err(DomainError::new(
+                    ErrorKind::AccessDenied, "OIDC",
+                    "OIDC authorization flow expired. Please try logging in again.",
+                ));
+            }
+
+            (flow.pkce_verifier, flow.nonce)
+        };
+
         // Clone the Arc and config out of the RwLock so we don't hold the lock across await points
         let (oidc, oidc_config) = {
             let state = self.oidc.read().unwrap();
@@ -616,11 +698,11 @@ impl AuthApplicationService {
             (svc, cfg)
         };
 
-        // 1. Exchange authorization code for tokens
-        let token_set = oidc.exchange_code(code).await?;
+        // 1. Exchange authorization code for tokens (with PKCE verifier)
+        let token_set = oidc.exchange_code(code, &pkce_verifier).await?;
 
-        // 2. Validate ID token and extract claims
-        let claims = oidc.validate_id_token(&token_set.id_token).await?;
+        // 2. Validate ID token and extract claims (with nonce verification)
+        let claims = oidc.validate_id_token(&token_set.id_token, Some(&nonce)).await?;
 
         // 3. Try to enrich claims from UserInfo endpoint if email is missing
         let claims = if claims.email.is_none() {
@@ -664,7 +746,6 @@ impl AuthApplicationService {
 
                 if let Some(_existing) = matched_user {
                     // Email match but no OIDC link — for security, don't auto-link
-                    // The user must link their account manually or admin must do it
                     return Err(DomainError::new(
                         ErrorKind::AlreadyExists, "OIDC",
                         format!("A user with email '{}' already exists. Contact admin to link your OIDC identity.", oidc_email),
@@ -696,7 +777,6 @@ impl AuthApplicationService {
 
                 // Check for username collision
                 if self.user_storage.get_user_by_username(&username).await.is_ok() {
-                    // Append random suffix
                     let suffix = &claims.sub[..4.min(claims.sub.len())];
                     username = format!("{}_{}", &username[..username.len().min(27)], suffix);
                 }
@@ -738,13 +818,57 @@ impl AuthApplicationService {
         );
         self.session_storage.create_session(session).await?;
 
-        Ok(AuthResponseDto {
+        let auth_response = AuthResponseDto {
             user: UserDto::from(user),
             access_token,
             refresh_token,
             token_type: "Bearer".to_string(),
             expires_in: self.token_service.refresh_token_expiry_secs(),
-        })
+        };
+
+        // 7. Store auth response behind a one-time exchange code (Fix #4: no tokens in URL)
+        let mut code_bytes = [0u8; 32];
+        use rand_core::{OsRng, RngCore};
+        OsRng.fill_bytes(&mut code_bytes);
+        let exchange_code = hex::encode(code_bytes);
+
+        {
+            let mut tokens = self.pending_oidc_tokens.lock().unwrap();
+            // Cleanup expired entries
+            let now = Instant::now();
+            tokens.retain(|_, t| now.duration_since(t.created_at).as_secs() < OIDC_TOKEN_TTL_SECS);
+
+            tokens.insert(exchange_code.clone(), PendingOidcToken {
+                auth_response,
+                created_at: now,
+            });
+        }
+
+        tracing::info!("OIDC login successful, one-time exchange code generated");
+
+        Ok(exchange_code)
+    }
+
+    /// Exchange a one-time code for the authentication tokens.
+    /// The code is single-use and expires after 60 seconds.
+    pub fn exchange_oidc_token(&self, one_time_code: &str) -> Result<AuthResponseDto, DomainError> {
+        let mut tokens = self.pending_oidc_tokens.lock().unwrap();
+        let pending = tokens.remove(one_time_code).ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::AccessDenied, "OIDC",
+                "Invalid or expired exchange code. Please try logging in again.",
+            )
+        })?;
+
+        // Check TTL
+        if Instant::now().duration_since(pending.created_at).as_secs() >= OIDC_TOKEN_TTL_SECS {
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied, "OIDC",
+                "Exchange code expired. Please try logging in again.",
+            ));
+        }
+
+        Ok(pending.auth_response)
     }
 
     /// Map OIDC groups to internal role
@@ -779,4 +903,10 @@ impl AuthApplicationService {
             }
         }
     }
+}
+
+/// URL-safe base64 encoding without padding (RFC 4648 §5)
+fn base64_url_encode(input: &[u8]) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(input)
 }

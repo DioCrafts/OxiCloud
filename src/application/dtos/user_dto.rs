@@ -94,6 +94,12 @@ pub struct OidcCallbackQueryDto {
     pub state: String,
 }
 
+/// Request body for the OIDC one-time code exchange endpoint
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OidcExchangeDto {
+    pub code: String,
+}
+
 /// Information about available OIDC providers
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OidcProviderInfoDto {

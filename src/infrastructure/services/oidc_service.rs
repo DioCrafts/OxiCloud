@@ -71,6 +71,7 @@ struct IdTokenClaims {
     preferred_username: Option<String>,
     name: Option<String>,
     groups: Option<Vec<String>>,
+    nonce: Option<String>,
     // Standard JWT fields
     #[allow(dead_code)]
     iss: Option<String>,
@@ -237,7 +238,7 @@ impl OidcService {
 
 #[async_trait]
 impl OidcServicePort for OidcService {
-    fn get_authorize_url(&self, state: &str) -> Result<String, DomainError> {
+    fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError> {
         // We need the authorization_endpoint. If not cached, we'll construct it from issuer.
         // In practice, the discovery should be pre-fetched during startup.
         let auth_endpoint = {
@@ -256,18 +257,20 @@ impl OidcServicePort for OidcService {
 
         let scopes = self.config.scopes.replace(',', " ");
         let url = format!(
-            "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}",
+            "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}&nonce={}&code_challenge={}&code_challenge_method=S256",
             auth_endpoint,
             urlencoding::encode(&self.config.client_id),
             urlencoding::encode(&self.config.redirect_uri),
             urlencoding::encode(&scopes),
             urlencoding::encode(state),
+            urlencoding::encode(nonce),
+            urlencoding::encode(pkce_challenge),
         );
 
         Ok(url)
     }
 
-    async fn exchange_code(&self, code: &str) -> Result<OidcTokenSet, DomainError> {
+    async fn exchange_code(&self, code: &str, pkce_verifier: &str) -> Result<OidcTokenSet, DomainError> {
         let discovery = self.get_discovery().await?;
 
         tracing::debug!("Exchanging authorization code at: {}", discovery.token_endpoint);
@@ -279,6 +282,7 @@ impl OidcServicePort for OidcService {
                 ("redirect_uri", &self.config.redirect_uri),
                 ("client_id", &self.config.client_id),
                 ("client_secret", &self.config.client_secret),
+                ("code_verifier", pkce_verifier),
             ])
             .send()
             .await
@@ -314,7 +318,7 @@ impl OidcServicePort for OidcService {
         })
     }
 
-    async fn validate_id_token(&self, id_token: &str) -> Result<OidcIdClaims, DomainError> {
+    async fn validate_id_token(&self, id_token: &str, expected_nonce: Option<&str>) -> Result<OidcIdClaims, DomainError> {
         let jwks = self.get_jwks().await?;
         let discovery = self.get_discovery().await?;
 
@@ -366,6 +370,24 @@ impl OidcServicePort for OidcService {
         })?;
 
         let claims = token_data.claims;
+
+        // Verify nonce to prevent token replay attacks
+        if let Some(expected) = expected_nonce {
+            match &claims.nonce {
+                Some(actual) if actual == expected => { /* OK */ }
+                Some(actual) => {
+                    tracing::warn!("OIDC nonce mismatch: expected={}, got={}", expected, actual);
+                    return Err(DomainError::new(
+                        ErrorKind::AccessDenied, "OIDC",
+                        "ID token nonce mismatch — possible replay attack",
+                    ));
+                }
+                None => {
+                    tracing::warn!("OIDC nonce missing from ID token (expected={})", expected);
+                    // Some providers don't include nonce; log warning but don't fail
+                }
+            }
+        }
 
         Ok(OidcIdClaims {
             sub: claims.sub,

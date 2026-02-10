@@ -124,14 +124,16 @@ pub struct OidcIdClaims {
 /// Port for OIDC operations — implemented in infrastructure layer
 #[async_trait]
 pub trait OidcServicePort: Send + Sync + 'static {
-    /// Get the authorization URL for redirecting the user to the IdP
-    fn get_authorize_url(&self, state: &str) -> Result<String, DomainError>;
+    /// Get the authorization URL for redirecting the user to the IdP.
+    /// Includes PKCE code_challenge (S256) and nonce for ID token binding.
+    fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError>;
 
-    /// Exchange an authorization code for tokens
-    async fn exchange_code(&self, code: &str) -> Result<OidcTokenSet, DomainError>;
+    /// Exchange an authorization code for tokens, providing PKCE code_verifier.
+    async fn exchange_code(&self, code: &str, pkce_verifier: &str) -> Result<OidcTokenSet, DomainError>;
 
-    /// Validate an ID token and extract claims
-    async fn validate_id_token(&self, id_token: &str) -> Result<OidcIdClaims, DomainError>;
+    /// Validate an ID token and extract claims.
+    /// If `expected_nonce` is provided, verifies the `nonce` claim matches.
+    async fn validate_id_token(&self, id_token: &str, expected_nonce: Option<&str>) -> Result<OidcIdClaims, DomainError>;
 
     /// Fetch user info from the UserInfo endpoint (fallback for missing ID token claims)
     async fn fetch_user_info(&self, access_token: &str) -> Result<OidcIdClaims, DomainError>;

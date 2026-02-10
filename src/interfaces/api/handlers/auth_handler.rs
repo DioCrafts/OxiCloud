@@ -10,7 +10,7 @@ use axum::{
 use crate::common::di::AppState;
 use crate::application::dtos::user_dto::{
     LoginDto, RegisterDto, ChangePasswordDto, RefreshTokenDto,
-    OidcCallbackQueryDto, OidcProviderInfoDto,
+    OidcCallbackQueryDto, OidcProviderInfoDto, OidcExchangeDto,
 };
 use crate::interfaces::errors::AppError;
 
@@ -24,7 +24,8 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         // OIDC endpoints (all public)
         .route("/oidc/providers", get(oidc_providers))
         .route("/oidc/authorize", get(oidc_authorize))
-        .route("/oidc/callback", get(oidc_callback));
+        .route("/oidc/callback", get(oidc_callback))
+        .route("/oidc/exchange", post(oidc_exchange));
     
     // Rutas que SÍ requieren autenticación - usamos route_layer para aplicar middleware
     // El middleware usará el state que se pase con .with_state() desde main.rs
@@ -55,6 +56,15 @@ async fn register(
             return Err(AppError::internal_error("Servicio de autenticación no configurado"));
         }
     };
+
+    // Fix #5: Block password registration when OIDC-only mode is active
+    if auth_service.auth_application_service.password_login_disabled() {
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "Password registration is disabled. Please use SSO/OIDC to sign in.",
+            "PasswordRegistrationDisabled",
+        ));
+    }
     
     // Check if this is a fresh install
     tracing::info!("New user registration detected, checking if it's a fresh install");
@@ -370,11 +380,8 @@ async fn oidc_authorize(
         ));
     }
 
-    // Generate CSRF state
-    let state_token = auth_app.generate_oidc_state()?;
-    
-    // Build authorization URL
-    let authorize_url = auth_app.oidc_authorize_url(&state_token)?;
+    // Prepare OIDC authorization flow (generates CSRF state, PKCE pair, nonce)
+    let authorize_url = auth_app.prepare_oidc_authorize()?;
 
     tracing::info!("OIDC authorize redirect generated");
 
@@ -401,25 +408,44 @@ async fn oidc_callback(
 
     tracing::info!("OIDC callback received with code");
 
-    // Exchange code and authenticate
-    let auth_response = auth_app.oidc_callback(&query.code).await
+    // Exchange code, validate state/nonce/PKCE, authenticate user
+    let exchange_code = auth_app.oidc_callback(&query.code, &query.state).await
         .map_err(|e| {
             tracing::error!("OIDC callback failed: {}", e);
             AppError::from(e)
         })?;
 
-    // Redirect to frontend with tokens as fragment
+    // Redirect to frontend with one-time exchange code (NOT raw tokens)
     let config = auth_app.oidc_config().unwrap();
     let frontend_url = config.frontend_url.trim_end_matches('/');
     let redirect_url = format!(
-        "{}/#access_token={}&refresh_token={}&token_type=Bearer&expires_in={}",
+        "{}/?oidc_code={}",
         frontend_url,
-        auth_response.access_token,
-        auth_response.refresh_token,
-        auth_response.expires_in,
+        exchange_code,
     );
 
-    tracing::info!("OIDC login successful for user: {}", auth_response.user.username);
+    tracing::info!("OIDC login successful, redirecting with exchange code");
 
     Ok(Redirect::temporary(&redirect_url))
+}
+
+/// POST /api/auth/oidc/exchange — Exchange one-time code for auth tokens
+/// Request body: { "code": "<one_time_code>" }
+async fn oidc_exchange(
+    State(state): State<Arc<AppState>>,
+    Json(body): Json<OidcExchangeDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    let auth_response = auth_service.auth_application_service
+        .exchange_oidc_token(&body.code)
+        .map_err(|e| {
+            tracing::warn!("OIDC token exchange failed: {}", e);
+            AppError::from(e)
+        })?;
+
+    tracing::info!("OIDC token exchange successful for user: {}", auth_response.user.username);
+
+    Ok((StatusCode::OK, Json(auth_response)))
 }
