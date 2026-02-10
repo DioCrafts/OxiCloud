@@ -94,11 +94,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let mut app;
     
-    // Build CalDAV / CardDAV protocol routers (merged at top-level, not under /api)
+    // Build CalDAV / CardDAV / WebDAV protocol routers (merged at top-level, not under /api)
     use oxicloud::interfaces::api::handlers::caldav_handler;
     use oxicloud::interfaces::api::handlers::carddav_handler;
+    use oxicloud::interfaces::api::handlers::webdav_handler;
     let caldav_router = caldav_handler::caldav_routes();
     let carddav_router = carddav_handler::carddav_routes();
+    let webdav_router = webdav_handler::webdav_routes();
 
     // Apply auth middleware to protected API routes when auth is enabled
     if config.features.enable_auth && app_state.auth_service.is_some() {
@@ -112,10 +114,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let protected_api = api_routes
             .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
         
-        // CalDAV/CardDAV with auth middleware (merged, not nested)
+        // CalDAV/CardDAV/WebDAV with auth middleware (merged, not nested)
         let caldav_protected = caldav_router
             .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
         let carddav_protected = carddav_router
+            .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
+        let webdav_protected = webdav_router
             .layer(axum::middleware::from_fn_with_state(app_state_arc, auth_middleware));
         
         app = Router::new()
@@ -125,9 +129,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware
             .nest("/api", protected_api)
-            // CalDAV/CardDAV protocols merged at top-level for client compatibility
+            // CalDAV/CardDAV/WebDAV protocols merged at top-level for client compatibility
             .merge(caldav_protected)
             .merge(carddav_protected)
+            .merge(webdav_protected)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
     } else {
@@ -136,9 +141,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app = Router::new()
             .nest("/api", public_api_routes)
             .nest("/api", api_routes)
-            // CalDAV/CardDAV protocols merged at top-level
+            // CalDAV/CardDAV/WebDAV protocols merged at top-level
             .merge(caldav_router)
             .merge(carddav_router)
+            .merge(webdav_router)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
     }

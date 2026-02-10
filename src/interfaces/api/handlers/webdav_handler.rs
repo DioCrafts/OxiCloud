@@ -13,7 +13,6 @@ use axum::{
     http::{StatusCode, header, HeaderName, Request},
     body::{Body, self},
 };
-use std::sync::Arc;
 use uuid::Uuid;
 use chrono::Utc;
 use bytes::Buf;
@@ -38,29 +37,67 @@ const HEADER_LOCK_TOKEN: HeaderName = HeaderName::from_static("lock-token");
  * @return Router configured with WebDAV endpoints
  */
 pub fn webdav_routes() -> Router<AppState> {
-    // Create the router with a single catchall route
-    // This will internally dispatch to the appropriate method handler
+    // Three explicit routes to avoid Axum trailing-slash gaps
+    // (same pattern used for CalDAV/CardDAV)
     Router::new()
         .route("/webdav/{*path}", axum::routing::any(handle_webdav_methods))
+        .route("/webdav/", axum::routing::any(handle_webdav_methods_root))
+        .route("/webdav", axum::routing::any(handle_webdav_methods_root))
+}
+
+/// Extract the resource path from the request URI, stripping the `/webdav/` prefix.
+fn extract_webdav_path(uri: &axum::http::Uri) -> String {
+    let raw = uri.path();
+    if let Some(rest) = raw.strip_prefix("/webdav/") {
+        rest.trim_end_matches('/').to_string()
+    } else if raw == "/webdav" {
+        String::new()
+    } else {
+        // Fallback: split-based extraction
+        let parts: Vec<&str> = raw.split('/').collect();
+        if parts.len() > 2 {
+            parts[2..].join("/")
+        } else {
+            String::new()
+        }
+    }
+}
+
+async fn handle_webdav_methods_root(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    req: Request<Body>,
+) -> Result<Response<Body>, AppError> {
+    handle_webdav_dispatch(state, req, String::new()).await
 }
 
 async fn handle_webdav_methods(
+    axum::extract::State(state): axum::extract::State<AppState>,
     req: Request<Body>,
+) -> Result<Response<Body>, AppError> {
+    let path = extract_webdav_path(req.uri());
+    handle_webdav_dispatch(state, req, path).await
+}
+
+async fn handle_webdav_dispatch(
+    state: AppState,
+    req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
     let method = req.method().clone();
     
     match method.as_str() {
-        "OPTIONS" => handle_options(req).await,
-        "GET" => handle_get(req).await,
-        "PUT" => handle_put(req).await,
-        "MKCOL" => handle_mkcol(req).await,
-        "DELETE" => handle_delete(req).await,
-        "MOVE" => handle_move(req).await,
-        "COPY" => handle_copy(req).await,
-        "PROPFIND" => handle_propfind(req).await,
-        "PROPPATCH" => handle_proppatch(req).await,
-        "LOCK" => handle_lock(req).await,
-        "UNLOCK" => handle_unlock(req).await,
+        "OPTIONS" => handle_options(path).await,
+        "GET" => handle_get(state, req, path).await,
+        "HEAD" => handle_head(state, req, path).await,
+        "PUT" => handle_put(state, req, path).await,
+        "MKCOL" => handle_mkcol(state, req, path).await,
+        "DELETE" => handle_delete(state, req, path).await,
+        "MOVE" => handle_move(state, req, path).await,
+        "COPY" => handle_copy(state, req, path).await,
+        "PROPFIND" => handle_propfind(state, req, path).await,
+        "PROPPATCH" => handle_proppatch(state, req, path).await,
+        "LOCK" => handle_lock(state, req, path).await,
+        "UNLOCK" => handle_unlock(state, req, path).await,
         _ => Err(AppError::method_not_allowed(format!("Method not allowed: {}", method))),
     }
 }
@@ -76,15 +113,8 @@ async fn handle_webdav_methods(
  * @return HTTP response with appropriate WebDAV headers
  */
 async fn handle_options(
-    req: Request<Body>,
+    _path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State and Path from request
-    let parts = req.uri().path().split('/').collect::<Vec<&str>>();
-    let _path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -108,33 +138,16 @@ async fn handle_options(
  * @return XML response with resource properties
  */
 async fn handle_propfind(
+    state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Clone all necessary data first to avoid borrow issues
-    let uri = req.uri().clone();
-    let path = {
-        let parts = uri.path().split('/').collect::<Vec<&str>>();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            "".to_string()
-        }
-    };
-    
     // Extract depth header (cloning to avoid borrowing issues)
     let depth = req.headers()
         .get("Depth")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("infinity")
         .to_string();
-    
-    // Get the state and user in a way that doesn't keep req borrowed
-    let state = {
-        let state_ref = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-            AppError::internal_error("Missing AppState extension")
-        })?;
-        state_ref.clone()
-    };
     
     let _user = {
         let user_ref = req.extensions().get::<CurrentUser>().ok_or_else(|| {
@@ -301,20 +314,10 @@ async fn handle_propfind(
  * @return XML response with property modification results
  */
 async fn handle_proppatch(
+    _state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State, Extension, and Path from request
-    let uri = req.uri().clone();
-    let parts = uri.path().split('/').collect::<Vec<&str>>();
-    let path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-    
-    let _state = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-        AppError::internal_error("Missing AppState extension")
-    })?;
     let _user = req.extensions().get::<CurrentUser>().ok_or_else(|| {
         AppError::unauthorized("Authentication required")
     })?;
@@ -376,23 +379,10 @@ async fn handle_proppatch(
  * @return HTTP response with file contents
  */
 async fn handle_get(
-    req: Request<Body>,
+    state: AppState,
+    _req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State, Extension, and Path from request
-    let uri = req.uri().clone();
-    let parts = uri.path().split('/').collect::<Vec<&str>>();
-    let path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-    
-    let state = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-        AppError::internal_error("Missing AppState extension")
-    })?;
-    let _user = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-        AppError::unauthorized("Authentication required")
-    })?;
     
     // Get file service from state
     let file_retrieval_service = &state.applications.file_retrieval_service;
@@ -426,6 +416,60 @@ async fn handle_get(
 }
 
 /**
+ * Handles HEAD requests — same as GET but returns only headers, no body.
+ */
+async fn handle_head(
+    state: AppState,
+    _req: Request<Body>,
+    path: String,
+) -> Result<Response<Body>, AppError> {
+
+    let file_retrieval_service = &state.applications.file_retrieval_service;
+    let folder_service = &state.applications.folder_service;
+
+    if path.is_empty() || path == "/" {
+        // Root folder — return collection headers
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "httpd/unix-directory")
+            .header(header::CONTENT_LENGTH, 0)
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // Check if it's a folder first
+    if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "httpd/unix-directory")
+            .header(header::CONTENT_LENGTH, 0)
+            .header(header::ETAG, format!("\"{}\"", folder.id))
+            .body(Body::empty())
+            .unwrap());
+    }
+
+    // Try as file
+    let file = file_retrieval_service.get_file_by_path(&path).await.map_err(|_e| {
+        AppError::not_found(format!("Resource not found: {}", path))
+    })?;
+
+    let content = file_retrieval_service.get_file_content(&file.id).await.map_err(|e| {
+        AppError::internal_error(format!("Failed to get file content: {}", e))
+    })?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, &file.mime_type)
+        .header(header::CONTENT_LENGTH, content.len())
+        .header(header::ETAG, format!("\"{}\"", file.id))
+        .header(header::LAST_MODIFIED, chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
+            .unwrap_or_else(|| Utc::now())
+            .to_rfc2822())
+        .body(Body::empty())
+        .unwrap())
+}
+
+/**
  * Handles PUT requests to create or update files.
  * 
  * This handler creates a new file or updates an existing file at the specified path.
@@ -437,33 +481,10 @@ async fn handle_get(
  * @return HTTP response indicating success
  */
 async fn handle_put(
+    state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Clone all necessary data first to avoid borrow issues
-    let uri = req.uri().clone();
-    let path = {
-        let parts = uri.path().split('/').collect::<Vec<&str>>();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            "".to_string()
-        }
-    };
-    
-    // Get the state and user in a way that doesn't keep req borrowed
-    let state = {
-        let state_ref = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-            AppError::internal_error("Missing AppState extension")
-        })?;
-        state_ref.clone()
-    };
-    
-    let _user = {
-        let user_ref = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-            AppError::unauthorized("Authentication required")
-        })?;
-        user_ref.clone()
-    };
     
     // Get file service from state
     let file_upload_service = &state.applications.file_upload_service;
@@ -521,33 +542,10 @@ async fn handle_put(
  * @return HTTP response indicating success
  */
 async fn handle_mkcol(
+    state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Clone all necessary data first to avoid borrow issues
-    let uri = req.uri().clone();
-    let path = {
-        let parts = uri.path().split('/').collect::<Vec<&str>>();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            "".to_string()
-        }
-    };
-    
-    // Get the state and user in a way that doesn't keep req borrowed
-    let state = {
-        let state_ref = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-            AppError::internal_error("Missing AppState extension")
-        })?;
-        state_ref.clone()
-    };
-    
-    let _user = {
-        let user_ref = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-            AppError::unauthorized("Authentication required")
-        })?;
-        user_ref.clone()
-    };
     
     // Get folder service from state
     let folder_service = &state.applications.folder_service;
@@ -619,23 +617,10 @@ async fn handle_mkcol(
  * @return HTTP response indicating success
  */
 async fn handle_delete(
-    req: Request<Body>,
+    state: AppState,
+    _req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State, Extension, and Path from request
-    let uri = req.uri().clone();
-    let parts = uri.path().split('/').collect::<Vec<&str>>();
-    let path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-    
-    let state = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-        AppError::internal_error("Missing AppState extension")
-    })?;
-    let _user = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-        AppError::unauthorized("Authentication required")
-    })?;
     
     // Get services from state
     let file_retrieval_service = &state.applications.file_retrieval_service;
@@ -684,34 +669,29 @@ async fn handle_delete(
  * @return HTTP response indicating success
  */
 async fn handle_move(
+    state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State, Extension, and Path from request
-    let uri = req.uri().clone();
-    let parts = uri.path().split('/').collect::<Vec<&str>>();
-    let source_path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-    
-    let state = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-        AppError::internal_error("Missing AppState extension")
-    })?;
-    let _user = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-        AppError::unauthorized("Authentication required")
-    })?;
+    let source_path = path;
     
     // Get destination from Destination header
     let destination = req.headers()
         .get("Destination")
         .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| AppError::bad_request("Destination header required"))?;
+        .ok_or_else(|| AppError::bad_request("Destination header required"))?
+        .to_string();
+    
+    // Overwrite header (RFC 4918 §9.8.4): T = overwrite, F = fail if exists
+    let overwrite = req.headers()
+        .get("Overwrite")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("T") != "F";
     
     // Extract destination path from URL
     let destination_path = if let Some(webdav_prefix) = destination.find("/webdav/") {
         let after_prefix = &destination[webdav_prefix + 8..];
-        after_prefix.trim_end_matches('/')
+        after_prefix.trim_end_matches('/').to_string()
     } else {
         return Err(AppError::bad_request("Invalid destination URL"));
     };
@@ -720,6 +700,15 @@ async fn handle_move(
     let file_retrieval_service = &state.applications.file_retrieval_service;
     let file_management_service = &state.applications.file_management_service;
     let folder_service = &state.applications.folder_service;
+    
+    // Check if destination already exists (for Overwrite header compliance)
+    if !overwrite {
+        let dest_exists = folder_service.get_folder_by_path(&destination_path).await.is_ok()
+            || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok();
+        if dest_exists {
+            return Err(AppError::precondition_failed("Destination already exists and Overwrite is F"));
+        }
+    }
     
     // Check if source is a folder
     let folder_result = folder_service.get_folder_by_path(&source_path).await;
@@ -764,19 +753,37 @@ async fn handle_move(
             AppError::not_found(format!("Resource not found: {}", source_path))
         })?;
         
+        let dest_filename = destination_path.split('/').last().unwrap_or(&destination_path);
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {
             ""
         };
         
-        file_management_service.move_file(&file.id, Some(dest_parent_path.to_string())).await.map_err(|e| {
-            AppError::internal_error(format!("Failed to move file: {}", e))
-        })?;
+        // Determine source parent path for comparison
+        let source_parent_path = if let Some(idx) = source_path.rfind('/') {
+            &source_path[..idx]
+        } else {
+            ""
+        };
+        
+        // Only call move_file if the parent directory actually changes
+        if source_parent_path != dest_parent_path {
+            file_management_service.move_file(&file.id, Some(dest_parent_path.to_string())).await.map_err(|e| {
+                AppError::internal_error(format!("Failed to move file: {}", e))
+            })?;
+        }
+        
+        // Rename the file if the name changed
+        if file.name != dest_filename {
+            file_management_service.rename_file(&file.id, dest_filename).await.map_err(|e| {
+                AppError::internal_error(format!("Failed to rename file: {}", e))
+            })?;
+        }
     }
     
     Ok(Response::builder()
-        .status(StatusCode::NO_CONTENT)
+        .status(StatusCode::CREATED)
         .body(Body::empty())
         .unwrap())
 }
@@ -793,34 +800,29 @@ async fn handle_move(
  * @return HTTP response indicating success
  */
 async fn handle_copy(
+    state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract State, Extension, and Path from request
-    let uri = req.uri().clone();
-    let parts = uri.path().split('/').collect::<Vec<&str>>();
-    let source_path = if parts.len() > 2 {
-        parts[2..].join("/")
-    } else {
-        "".to_string()
-    };
-    
-    let state = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-        AppError::internal_error("Missing AppState extension")
-    })?;
-    let _user = req.extensions().get::<CurrentUser>().ok_or_else(|| {
-        AppError::unauthorized("Authentication required")
-    })?;
+    let source_path = path;
     
     // Get destination from Destination header
     let destination = req.headers()
         .get("Destination")
         .and_then(|v| v.to_str().ok())
-        .ok_or_else(|| AppError::bad_request("Destination header required"))?;
+        .ok_or_else(|| AppError::bad_request("Destination header required"))?
+        .to_string();
+    
+    // Overwrite header (RFC 4918 §9.8.4): T = overwrite, F = fail if exists
+    let overwrite = req.headers()
+        .get("Overwrite")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("T") != "F";
     
     // Extract destination path from URL
     let destination_path = if let Some(webdav_prefix) = destination.find("/webdav/") {
         let after_prefix = &destination[webdav_prefix + 8..];
-        after_prefix.trim_end_matches('/')
+        after_prefix.trim_end_matches('/').to_string()
     } else {
         return Err(AppError::bad_request("Invalid destination URL"));
     };
@@ -835,6 +837,15 @@ async fn handle_copy(
     let file_retrieval_service = &state.applications.file_retrieval_service;
     let file_upload_service = &state.applications.file_upload_service;
     let folder_service = &state.applications.folder_service;
+    
+    // Check if destination already exists (for Overwrite header compliance)
+    if !overwrite {
+        let dest_exists = folder_service.get_folder_by_path(&destination_path).await.is_ok()
+            || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok();
+        if dest_exists {
+            return Err(AppError::precondition_failed("Destination already exists and Overwrite is F"));
+        }
+    }
     
     // Check if source is a folder
     let folder_result = folder_service.get_folder_by_path(&source_path).await;
@@ -929,27 +940,10 @@ async fn handle_copy(
  * @return XML response with lock information
  */
 async fn handle_lock(
+    _state: AppState,
     req: Request<Body>,
+    path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Clone all necessary data first to avoid borrow issues
-    let uri = req.uri().clone();
-    let path = {
-        let parts = uri.path().split('/').collect::<Vec<&str>>();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            "".to_string()
-        }
-    };
-    
-    // Get the state and user in a way that doesn't keep req borrowed
-    let _state = {
-        let state_ref = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-            AppError::internal_error("Missing AppState extension")
-        })?;
-        state_ref.clone()
-    };
-    
     let user = {
         let user_ref = req.extensions().get::<CurrentUser>().ok_or_else(|| {
             AppError::unauthorized("Authentication required")
@@ -1079,27 +1073,10 @@ async fn handle_lock(
  * @return HTTP response indicating success
  */
 async fn handle_unlock(
+    _state: AppState,
     req: Request<Body>,
+    _path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Clone all necessary data first to avoid borrow issues
-    let uri = req.uri().clone();
-    let _path = {
-        let parts = uri.path().split('/').collect::<Vec<&str>>();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            "".to_string()
-        }
-    };
-    
-    // Get the state and user in a way that doesn't keep req borrowed
-    let _state = {
-        let state_ref = req.extensions().get::<Arc<AppState>>().ok_or_else(|| {
-            AppError::internal_error("Missing AppState extension")
-        })?;
-        state_ref.clone()
-    };
-    
     let _user = {
         let user_ref = req.extensions().get::<CurrentUser>().ok_or_else(|| {
             AppError::unauthorized("Authentication required")

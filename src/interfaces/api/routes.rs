@@ -276,11 +276,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         tracing::warn!("Trash service not available - trash view will not work");
     }
     
-    // Add WebDAV routes
-    {
-        use crate::interfaces::api::handlers::webdav_handler;
-        router = router.merge(webdav_handler::webdav_routes());
-    }
+    // NOTE: WebDAV routes are mounted at top-level (/webdav) in main.rs
+    // for client compatibility, NOT under /api.
     
     // NOTE: CalDAV and CardDAV routes are mounted at top-level (/caldav, /carddav)
     // in main.rs for protocol compliance, NOT under /api.

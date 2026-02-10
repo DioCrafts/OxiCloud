@@ -78,6 +78,11 @@ impl AppError {
     pub fn unsupported_media_type(message: impl Into<String>) -> Self {
         Self::new(StatusCode::UNSUPPORTED_MEDIA_TYPE, message, "UnsupportedMediaType")
     }
+    
+    /// Create a 412 Precondition Failed error.
+    pub fn precondition_failed(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::PRECONDITION_FAILED, message, "PreconditionFailed")
+    }
 }
 
 impl From<DomainError> for AppError {
