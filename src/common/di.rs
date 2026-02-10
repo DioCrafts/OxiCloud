@@ -3,6 +3,7 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::application::services::auth_application_service::AuthApplicationService;
+use crate::application::services::admin_settings_service::AdminSettingsService;
 
 use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::repositories::folder_fs_repository::FolderFsRepository;
@@ -566,6 +567,7 @@ impl AppServiceFactory {
             applications: apps,
             db_pool: db_pool.clone(),
             auth_service: auth_services,
+            admin_settings_service: None,
             trash_service,
             share_service,
             favorites_service,
@@ -577,6 +579,47 @@ impl AppServiceFactory {
             addressbook_use_case: None,
             contact_use_case: None,
         };
+        
+        // 10b. Wire admin settings service when auth + DB are available
+        if let (Some(ref auth_svc), Some(ref pool)) = (&app_state.auth_service, &db_pool) {
+            let settings_repo = Arc::new(
+                crate::infrastructure::repositories::pg::SettingsPgRepository::new(pool.clone())
+            );
+            let server_base_url = std::env::var("OXICLOUD_BASE_URL").unwrap_or_else(|_| {
+                format!("http://{}:{}", self.config.server_host, self.config.server_port)
+            });
+
+            // Load OIDC config from env vars (the snapshot from startup)
+            let env_oidc = crate::common::config::OidcConfig::from_env();
+
+            let admin_svc = Arc::new(AdminSettingsService::new(
+                settings_repo.clone(),
+                env_oidc,
+                auth_svc.auth_application_service.clone(),
+                server_base_url,
+            ));
+
+            // Hot-reload OIDC from DB settings if configured
+            match admin_svc.load_effective_oidc_config().await {
+                Ok(eff) if eff.enabled && !eff.issuer_url.is_empty()
+                    && !eff.client_id.is_empty() && !eff.client_secret.is_empty() =>
+                {
+                    let oidc_svc = Arc::new(
+                        crate::infrastructure::services::oidc_service::OidcService::new(eff.clone())
+                    );
+                    auth_svc.auth_application_service.reload_oidc(oidc_svc, eff);
+                    tracing::info!("OIDC config loaded from admin settings (database)");
+                }
+                Ok(_) => {
+                    tracing::info!("No active OIDC config in admin settings — using env vars or defaults");
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to load OIDC settings from database (table may not exist yet): {}", e);
+                }
+            }
+
+            app_state.admin_settings_service = Some(admin_svc);
+        }
         
         // 11. Wire CalDAV/CardDAV services when database is available
         if let Some(ref pool) = db_pool {
@@ -689,6 +732,7 @@ pub struct AppState {
     pub applications: ApplicationServices,
     pub db_pool: Option<Arc<PgPool>>,
     pub auth_service: Option<AuthServices>,
+    pub admin_settings_service: Option<Arc<AdminSettingsService>>,
     pub trash_service: Option<Arc<dyn TrashUseCase>>,
     pub share_service: Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>>,
     pub favorites_service: Option<Arc<dyn FavoritesUseCase>>,
@@ -827,6 +871,7 @@ impl Default for AppState {
             applications: application_services,
             db_pool: None,
             auth_service: None,
+            admin_settings_service: None,
             trash_service: None,
             share_service: None,
             favorites_service: None,
@@ -853,6 +898,7 @@ impl AppState {
             applications,
             db_pool: None,
             auth_service: None,
+            admin_settings_service: None,
             trash_service: None,
             share_service: None,
             favorites_service: None,

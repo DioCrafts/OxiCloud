@@ -309,6 +309,32 @@ impl Default for OidcConfig {
     }
 }
 
+impl OidcConfig {
+    /// Load OIDC configuration from environment variables only
+    pub fn from_env() -> Self {
+        use std::env;
+        let mut cfg = Self::default();
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ENABLED") {
+            cfg.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ISSUER_URL") { cfg.issuer_url = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_CLIENT_ID") { cfg.client_id = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_CLIENT_SECRET") { cfg.client_secret = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_REDIRECT_URI") { cfg.redirect_uri = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_SCOPES") { cfg.scopes = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_FRONTEND_URL") { cfg.frontend_url = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_AUTO_PROVISION") {
+            cfg.auto_provision = v.parse::<bool>().unwrap_or(true);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_ADMIN_GROUPS") { cfg.admin_groups = v; }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_DISABLE_PASSWORD_LOGIN") {
+            cfg.disable_password_login = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_OIDC_PROVIDER_NAME") { cfg.provider_name = v; }
+        cfg
+    }
+}
+
 /// Configuración de funcionalidades (feature flags)
 #[derive(Debug, Clone)]
 pub struct FeaturesConfig {

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::RwLock;
 use crate::domain::entities::user::{User, UserRole};
 use crate::domain::entities::session::Session;
 use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort, OidcServicePort, OidcIdClaims};
@@ -8,14 +9,19 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::common::config::OidcConfig;
 
+/// Interior state for OIDC — protected by RwLock for hot-reload.
+struct OidcState {
+    service: Option<Arc<dyn OidcServicePort>>,
+    config: Option<OidcConfig>,
+}
+
 pub struct AuthApplicationService {
     user_storage: Arc<dyn UserStoragePort>,
     session_storage: Arc<dyn SessionStoragePort>,
     password_hasher: Arc<dyn PasswordHasherPort>,
     token_service: Arc<dyn TokenServicePort>,
     folder_service: Option<Arc<dyn FolderUseCase>>,
-    oidc_service: Option<Arc<dyn OidcServicePort>>,
-    oidc_config: Option<OidcConfig>,
+    oidc: RwLock<OidcState>,
 }
 
 impl AuthApplicationService {
@@ -31,8 +37,7 @@ impl AuthApplicationService {
             password_hasher,
             token_service,
             folder_service: None,
-            oidc_service: None,
-            oidc_config: None,
+            oidc: RwLock::new(OidcState { service: None, config: None }),
         }
     }
     
@@ -43,30 +48,51 @@ impl AuthApplicationService {
     }
 
     /// Configura el servicio OIDC
-    pub fn with_oidc(mut self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) -> Self {
-        self.oidc_service = Some(oidc_service);
-        self.oidc_config = Some(oidc_config);
+    pub fn with_oidc(self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) -> Self {
+        {
+            let mut state = self.oidc.write().unwrap();
+            state.service = Some(oidc_service);
+            state.config = Some(oidc_config);
+        }
         self
+    }
+
+    /// Hot-reload OIDC configuration at runtime (called from admin settings service)
+    pub fn reload_oidc(&self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) {
+        let mut state = self.oidc.write().unwrap();
+        state.service = Some(oidc_service);
+        state.config = Some(oidc_config);
+    }
+
+    /// Disable OIDC at runtime (called from admin settings service)
+    pub fn disable_oidc(&self) {
+        let mut state = self.oidc.write().unwrap();
+        state.service = None;
+        state.config = None;
     }
 
     /// Returns whether OIDC is configured and enabled
     pub fn oidc_enabled(&self) -> bool {
-        self.oidc_service.is_some() && self.oidc_config.as_ref().map_or(false, |c| c.enabled)
+        let state = self.oidc.read().unwrap();
+        state.service.is_some() && state.config.as_ref().map_or(false, |c| c.enabled)
     }
 
     /// Returns whether password login is disabled (OIDC-only mode)
     pub fn password_login_disabled(&self) -> bool {
-        self.oidc_config.as_ref().map_or(false, |c| c.disable_password_login)
+        let state = self.oidc.read().unwrap();
+        state.config.as_ref().map_or(false, |c| c.disable_password_login)
     }
 
-    /// Returns the OIDC config if available
-    pub fn oidc_config(&self) -> Option<&OidcConfig> {
-        self.oidc_config.as_ref()
+    /// Returns a clone of the OIDC config if available
+    pub fn oidc_config(&self) -> Option<OidcConfig> {
+        let state = self.oidc.read().unwrap();
+        state.config.clone()
     }
 
-    /// Returns the OIDC service if available
-    pub fn oidc_service(&self) -> Option<&Arc<dyn OidcServicePort>> {
-        self.oidc_service.as_ref()
+    /// Returns an Arc clone of the OIDC service if available
+    pub fn oidc_service(&self) -> Option<Arc<dyn OidcServicePort>> {
+        let state = self.oidc.read().unwrap();
+        state.service.clone()
     }
     
     pub async fn register(&self, dto: RegisterDto) -> Result<UserDto, DomainError> {
@@ -559,7 +585,7 @@ impl AuthApplicationService {
     /// Generate the OIDC authorization URL for redirecting the user to the IdP.
     /// The `state` parameter is a signed JWT to prevent CSRF.
     pub fn oidc_authorize_url(&self, state: &str) -> Result<String, DomainError> {
-        let oidc = self.oidc_service.as_ref().ok_or_else(|| DomainError::new(
+        let oidc = self.oidc_service().ok_or_else(|| DomainError::new(
             ErrorKind::InternalError, "OIDC", "OIDC service not configured",
         ))?;
         oidc.get_authorize_url(state)
@@ -578,12 +604,17 @@ impl AuthApplicationService {
     /// Handle the OIDC callback: exchange code, validate ID token,
     /// find or create user (JIT provisioning), and issue internal tokens.
     pub async fn oidc_callback(&self, code: &str) -> Result<AuthResponseDto, DomainError> {
-        let oidc = self.oidc_service.as_ref().ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC", "OIDC service not configured",
-        ))?;
-        let oidc_config = self.oidc_config.as_ref().ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC", "OIDC config not available",
-        ))?;
+        // Clone the Arc and config out of the RwLock so we don't hold the lock across await points
+        let (oidc, oidc_config) = {
+            let state = self.oidc.read().unwrap();
+            let svc = state.service.clone().ok_or_else(|| DomainError::new(
+                ErrorKind::InternalError, "OIDC", "OIDC service not configured",
+            ))?;
+            let cfg = state.config.clone().ok_or_else(|| DomainError::new(
+                ErrorKind::InternalError, "OIDC", "OIDC config not available",
+            ))?;
+            (svc, cfg)
+        };
 
         // 1. Exchange authorization code for tokens
         let token_set = oidc.exchange_code(code).await?;
@@ -649,7 +680,7 @@ impl AuthApplicationService {
                 }
 
                 // Determine role from OIDC groups
-                let role = self.map_oidc_role(&claims.groups, oidc_config);
+                let role = self.map_oidc_role(&claims.groups, &oidc_config);
 
                 let quota = if role == UserRole::Admin {
                     107374182400 // 100GB

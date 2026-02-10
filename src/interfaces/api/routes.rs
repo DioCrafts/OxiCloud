@@ -28,6 +28,7 @@ use crate::interfaces::api::handlers::file_handler::FileHandler;
 use crate::interfaces::api::handlers::i18n_handler::I18nHandler;
 use crate::interfaces::api::handlers::chunked_upload_handler::ChunkedUploadHandler;
 use crate::interfaces::api::handlers::trash_handler;
+use crate::interfaces::api::handlers::admin_handler;
 use crate::interfaces::api::handlers::batch_handler::{
     self, BatchHandlerState
 };
@@ -281,6 +282,11 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     
     // NOTE: CalDAV and CardDAV routes are mounted at top-level (/caldav, /carddav)
     // in main.rs for protocol compliance, NOT under /api.
+
+    // Admin settings routes (protected by admin_guard inside the handler)
+    let admin_router = admin_handler::admin_routes()
+        .with_state(app_state.clone());
+    router = router.nest("/admin", admin_router);
 
     router
         .layer(CompressionLayer::new())

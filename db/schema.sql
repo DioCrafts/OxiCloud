@@ -120,6 +120,20 @@ COMMENT ON TABLE auth.user_files IS 'Tracks file ownership and storage utilizati
 COMMENT ON TABLE auth.user_favorites IS 'Stores user favorite files and folders for cross-device synchronization';
 COMMENT ON TABLE auth.user_recent_files IS 'Stores recently accessed files and folders for cross-device synchronization';
 
+-- Admin settings (key-value store for platform configuration)
+CREATE TABLE IF NOT EXISTS auth.admin_settings (
+    key VARCHAR(255) PRIMARY KEY,
+    value TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL DEFAULT 'general',
+    is_secret BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(36)
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_settings_category ON auth.admin_settings(category);
+
+COMMENT ON TABLE auth.admin_settings IS 'Platform configuration settings managed via admin panel';
+
 -- OIDC identity linking columns
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS oidc_provider VARCHAR(255);
 ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS oidc_subject VARCHAR(255);

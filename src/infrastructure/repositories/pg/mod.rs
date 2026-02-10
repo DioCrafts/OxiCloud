@@ -7,6 +7,7 @@ mod contact_persistence_dto;
 mod favorites_pg_repository;
 mod recent_items_pg_repository;
 mod session_pg_repository;
+mod settings_pg_repository;
 mod transaction_utils;
 mod user_pg_repository;
 
@@ -19,4 +20,5 @@ pub use contact_persistence_dto::*;
 pub use favorites_pg_repository::FavoritesPgRepository;
 pub use recent_items_pg_repository::RecentItemsPgRepository;
 pub use session_pg_repository::SessionPgRepository;
+pub use settings_pg_repository::SettingsPgRepository;
 pub use user_pg_repository::UserPgRepository;

@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OxiCloud — Admin Settings</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa;color:#1a1a2e;line-height:1.6}
+.container{max-width:720px;margin:40px auto;padding:0 20px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+header h1{font-size:1.5rem;color:#1a1a2e}
+header a{color:#3b82f6;text-decoration:none;font-size:.9rem}
+header a:hover{text-decoration:underline}
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:28px;margin-bottom:24px}
+.card h2{font-size:1.15rem;margin-bottom:20px;color:#1a1a2e;display:flex;align-items:center;gap:8px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:.85rem;font-weight:600;margin-bottom:4px;color:#374151}
+.form-group input[type="text"],.form-group input[type="password"],.form-group input[type="url"]{
+  width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;transition:border .2s}
+.form-group input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.form-group small{color:#6b7280;font-size:.78rem;display:block;margin-top:2px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.toggle-row label{font-size:.9rem;font-weight:500}
+.switch{position:relative;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:24px;transition:.3s}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked+.slider{background:#3b82f6}
+.switch input:checked+.slider:before{transform:translateX(20px)}
+.readonly-field{display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:.85rem;word-break:break-all}
+.readonly-field button{flex-shrink:0;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:.78rem}
+.readonly-field button:hover{background:#f3f4f6}
+details{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px}
+details summary{cursor:pointer;font-weight:600;font-size:.9rem;color:#6b7280;padding:4px 0;user-select:none}
+details[open] summary{margin-bottom:12px}
+.actions{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
+.btn{padding:10px 20px;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-primary{background:#3b82f6;color:#fff}
+.btn-primary:hover{background:#2563eb}
+.btn-secondary{background:#fff;color:#374151;border:1px solid #d1d5db}
+.btn-secondary:hover{background:#f9fafb}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.alert{padding:12px 16px;border-radius:8px;font-size:.85rem;margin-top:16px;display:none}
+.alert-success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:block}
+.alert-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:block}
+.alert-info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;display:block}
+.badge{display:inline-block;font-size:.7rem;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;margin-left:6px;font-weight:600}
+.discovery-result{margin:12px 0;padding:12px;border-radius:8px;font-size:.82rem}
+.discovery-result.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
+.discovery-result.fail{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
+.discovery-result dt{font-weight:600;margin-top:6px}
+.discovery-result dd{margin-left:0;word-break:break-all}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.info-item{padding:12px;background:#f9fafb;border-radius:8px}
+.info-item .label{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
+.info-item .value{font-size:1.1rem;font-weight:600;margin-top:4px}
+.warning{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#92400e;margin-top:8px;display:flex;align-items:baseline;gap:6px}
+#access-denied{display:none;text-align:center;padding:60px 20px}
+#access-denied h2{color:#991b1b;margin-bottom:8px}
+#loading{text-align:center;padding:60px;color:#6b7280}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>⚙️ Admin Settings</h1>
+    <a href="/">← Back to OxiCloud</a>
+  </header>
+
+  <div id="loading">Loading…</div>
+  <div id="access-denied"><h2>Access Denied</h2><p>Administrator privileges required.</p><a href="/login.html">Sign in</a></div>
+
+  <div id="main-content" style="display:none">
+    <!-- OIDC / SSO Settings -->
+    <div class="card">
+      <h2>🔐 Single Sign-On (OIDC / SSO)</h2>
+
+      <div class="toggle-row">
+        <label>Enable SSO Authentication</label>
+        <label class="switch"><input type="checkbox" id="oidc-enabled"><span class="slider"></span></label>
+      </div>
+
+      <div id="oidc-form" style="display:none">
+        <div class="form-group">
+          <label>Provider Name <span id="badge-provider_name"></span></label>
+          <input type="text" id="provider-name" placeholder="e.g., Authentik, Keycloak">
+        </div>
+
+        <div class="form-group">
+          <label>Issuer URL <span id="badge-issuer_url"></span></label>
+          <input type="url" id="issuer-url" placeholder="https://auth.example.com/application/o/oxicloud/">
+          <small>The OpenID Connect issuer URL of your identity provider</small>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <button class="btn btn-secondary" id="discover-btn" onclick="testConnection()">🔍 Auto-discover</button>
+        </div>
+        <div id="discovery-result"></div>
+
+        <div class="form-group">
+          <label>Client ID <span id="badge-client_id"></span></label>
+          <input type="text" id="client-id" placeholder="oxicloud">
+        </div>
+
+        <div class="form-group">
+          <label>Client Secret <span id="badge-client_secret"></span></label>
+          <input type="password" id="client-secret" placeholder="Leave empty to keep current value">
+          <small id="secret-hint" style="display:none">✓ A client secret is already configured</small>
+        </div>
+
+        <div class="form-group">
+          <label>Callback URL <small>(copy this to your IdP configuration)</small></label>
+          <div class="readonly-field">
+            <span id="callback-url">—</span>
+            <button onclick="copyCallback()">📋 Copy</button>
+          </div>
+        </div>
+
+        <details>
+          <summary>Advanced Settings</summary>
+
+          <div class="form-group">
+            <label>Scopes <span id="badge-scopes"></span></label>
+            <input type="text" id="scopes" placeholder="openid profile email">
+          </div>
+
+          <div class="toggle-row">
+            <label>Auto-provision users on first login</label>
+            <label class="switch"><input type="checkbox" id="auto-provision" checked><span class="slider"></span></label>
+          </div>
+
+          <div class="form-group">
+            <label>Admin Groups <span id="badge-admin_groups"></span></label>
+            <input type="text" id="admin-groups" placeholder="e.g., oxicloud-admins">
+            <small>Comma-separated OIDC group names that map to admin role</small>
+          </div>
+
+          <div class="toggle-row">
+            <label>Disable password login (OIDC only)</label>
+            <label class="switch"><input type="checkbox" id="disable-password"><span class="slider"></span></label>
+          </div>
+          <div class="warning" id="password-warning" style="display:none">
+            ⚠️ Enabling this will prevent ALL password-based logins. Make sure OIDC is working first!
+          </div>
+        </details>
+
+        <div class="actions">
+          <button class="btn btn-secondary" onclick="testConnection()">🧪 Test Connection</button>
+          <button class="btn btn-primary" id="save-btn" onclick="saveSettings()">💾 Save Settings</button>
+        </div>
+
+        <div id="status-message" class="alert"></div>
+      </div>
+    </div>
+
+    <!-- System Info -->
+    <div class="card">
+      <h2>📊 System Information</h2>
+      <div class="info-grid" id="general-info">
+        <div class="info-item"><div class="label">Version</div><div class="value" id="info-version">—</div></div>
+        <div class="info-item"><div class="label">Users</div><div class="value" id="info-users">—</div></div>
+        <div class="info-item"><div class="label">Auth</div><div class="value" id="info-auth">—</div></div>
+        <div class="info-item"><div class="label">OIDC</div><div class="value" id="info-oidc">—</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api';
+const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+
+// Toggle OIDC form visibility
+document.getElementById('oidc-enabled').addEventListener('change', function() {
+  document.getElementById('oidc-form').style.display = this.checked ? 'block' : 'none';
+});
+
+// Show password warning
+document.getElementById('disable-password').addEventListener('change', function() {
+  document.getElementById('password-warning').style.display = this.checked ? 'flex' : 'none';
+});
+
+function headers() {
+  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('status-message');
+  el.textContent = msg;
+  el.className = 'alert alert-' + type;
+}
+
+function copyCallback() {
+  const text = document.getElementById('callback-url').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.readonly-field button');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy', 2000);
+  });
+}
+
+async function init() {
+  if (!token) { showAccessDenied(); return; }
+
+  try {
+    // Verify admin access
+    const me = await fetch(API + '/auth/me', { headers: headers() });
+    if (!me.ok) { showAccessDenied(); return; }
+    const user = await me.json();
+    if (user.role !== 'admin') { showAccessDenied(); return; }
+
+    // Load OIDC settings
+    const oidcResp = await fetch(API + '/admin/settings/oidc', { headers: headers() });
+    if (oidcResp.ok) {
+      const s = await oidcResp.json();
+      document.getElementById('oidc-enabled').checked = s.enabled;
+      document.getElementById('oidc-form').style.display = s.enabled ? 'block' : 'none';
+      document.getElementById('provider-name').value = s.provider_name || '';
+      document.getElementById('issuer-url').value = s.issuer_url || '';
+      document.getElementById('client-id').value = s.client_id || '';
+      document.getElementById('scopes').value = s.scopes || 'openid profile email';
+      document.getElementById('auto-provision').checked = s.auto_provision;
+      document.getElementById('admin-groups').value = s.admin_groups || '';
+      document.getElementById('disable-password').checked = s.disable_password_login;
+      document.getElementById('password-warning').style.display = s.disable_password_login ? 'flex' : 'none';
+      document.getElementById('callback-url').textContent = s.callback_url;
+      if (s.client_secret_set) document.getElementById('secret-hint').style.display = 'block';
+
+      // Show env override badges
+      (s.env_overrides || []).forEach(field => {
+        const badge = document.getElementById('badge-' + field);
+        if (badge) { badge.innerHTML = '<span class="badge">ENV</span>'; }
+      });
+    }
+
+    // Load general info
+    const genResp = await fetch(API + '/admin/settings/general', { headers: headers() });
+    if (genResp.ok) {
+      const g = await genResp.json();
+      document.getElementById('info-version').textContent = g.server_version;
+      document.getElementById('info-users').textContent = g.total_users;
+      document.getElementById('info-auth').textContent = g.auth_enabled ? 'Enabled' : 'Disabled';
+      document.getElementById('info-oidc').textContent = g.oidc_configured ? 'Active' : 'Not configured';
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+  } catch (e) {
+    console.error(e);
+    showAccessDenied();
+  }
+}
+
+function showAccessDenied() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('access-denied').style.display = 'block';
+}
+
+async function testConnection() {
+  const url = document.getElementById('issuer-url').value.trim();
+  if (!url) { showStatus('Please enter an Issuer URL first', 'error'); return; }
+
+  const btn = document.getElementById('discover-btn');
+  btn.disabled = true; btn.textContent = '⏳ Testing…';
+  const resultDiv = document.getElementById('discovery-result');
+  resultDiv.innerHTML = '';
+
+  try {
+    const resp = await fetch(API + '/admin/settings/oidc/test', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ issuer_url: url })
+    });
+    const r = await resp.json();
+
+    if (r.success) {
+      resultDiv.innerHTML = '<div class="discovery-result ok">' +
+        '<strong>✓ ' + r.message + '</strong>' +
+        '<dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd>' +
+        '<dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd>' +
+        '<dt>Token Endpoint</dt><dd>' + (r.token_endpoint||'—') + '</dd></dl></div>';
+      // Auto-fill provider name if empty
+      if (!document.getElementById('provider-name').value && r.provider_name_suggestion) {
+        document.getElementById('provider-name').value = r.provider_name_suggestion;
+      }
+    } else {
+      resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ ' + r.message + '</strong></div>';
+    }
+  } catch (e) {
+    resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ Network error: ' + e.message + '</strong></div>';
+  }
+  btn.disabled = false; btn.textContent = '🔍 Auto-discover';
+}
+
+async function saveSettings() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
+
+  const body = {
+    enabled: document.getElementById('oidc-enabled').checked,
+    issuer_url: document.getElementById('issuer-url').value.trim(),
+    client_id: document.getElementById('client-id').value.trim(),
+    client_secret: document.getElementById('client-secret').value || null,
+    scopes: document.getElementById('scopes').value.trim() || null,
+    auto_provision: document.getElementById('auto-provision').checked,
+    admin_groups: document.getElementById('admin-groups').value.trim() || null,
+    disable_password_login: document.getElementById('disable-password').checked,
+    provider_name: document.getElementById('provider-name').value.trim() || null,
+  };
+
+  try {
+    const resp = await fetch(API + '/admin/settings/oidc', {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify(body)
+    });
+    if (resp.ok) {
+      showStatus('Settings saved and applied — OIDC is now ' + (body.enabled ? 'active' : 'disabled') + '.', 'success');
+      if (body.client_secret) document.getElementById('secret-hint').style.display = 'block';
+      // Refresh OIDC status
+      const genResp = await fetch(API + '/admin/settings/general', { headers: headers() });
+      if (genResp.ok) { const g = await genResp.json(); document.getElementById('info-oidc').textContent = g.oidc_configured ? 'Active' : 'Not configured'; }
+    } else {
+      const err = await resp.json().catch(() => ({}));
+      showStatus('Error: ' + (err.message || resp.statusText), 'error');
+    }
+  } catch (e) {
+    showStatus('Network error: ' + e.message, 'error');
+  }
+  btn.disabled = false; btn.textContent = '💾 Save Settings';
+}
+
+init();
+</script>
+</body>
+</html>
