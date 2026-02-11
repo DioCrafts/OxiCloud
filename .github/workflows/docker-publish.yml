@@ -28,6 +28,7 @@ jobs:
   build-and-push:
     name: Build & Push Multi-Arch
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     needs: test
     steps:
       - name: Checkout
