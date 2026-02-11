@@ -41,7 +41,10 @@
   "user_menu": {
     "appearance": "Appearance",
     "about": "About OxiCloud",
-    "about_description": "Cloud storage platform built with Rust & Clean Architecture. Fast, secure, and private."
+    "about_description": "Cloud storage platform built with Rust & Clean Architecture. Fast, secure, and private.",
+    "admin_panel": "Admin Panel",
+    "profile": "My Profile",
+    "role_user": "User"
   },
   "share": {
     "dialogTitle": "Share Link",
@@ -302,7 +305,10 @@
       "en": "English",
       "es": "Español",
       "zh": "中文",
-      "fa": "فارسی"
+      "fa": "فارسی",
+      "fr": "Français",
+      "de": "Deutsch",
+      "pt": "Português"
     }
   },
   "favorites": {

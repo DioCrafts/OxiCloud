@@ -16,6 +16,9 @@ impl From<Locale> for LocaleDto {
         let (code, name) = match locale {
             Locale::English => ("en", "English"),
             Locale::Spanish => ("es", "Español"),
+            Locale::French => ("fr", "Français"),
+            Locale::German => ("de", "Deutsch"),
+            Locale::Portuguese => ("pt", "Português"),
         };
         
         Self {

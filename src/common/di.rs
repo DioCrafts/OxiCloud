@@ -456,6 +456,15 @@ impl AppServiceFactory {
         if let Err(e) = i18n_service.load_translations(Locale::Spanish).await {
             tracing::warn!("Failed to load Spanish translations: {}", e);
         }
+        if let Err(e) = i18n_service.load_translations(Locale::French).await {
+            tracing::warn!("Failed to load French translations: {}", e);
+        }
+        if let Err(e) = i18n_service.load_translations(Locale::German).await {
+            tracing::warn!("Failed to load German translations: {}", e);
+        }
+        if let Err(e) = i18n_service.load_translations(Locale::Portuguese).await {
+            tracing::warn!("Failed to load Portuguese translations: {}", e);
+        }
         tracing::info!("Translations preloaded");
     }
     

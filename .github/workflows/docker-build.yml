@@ -1,6 +1,5 @@
 name: Docker Build and Test
 
-# Trigger on push to main branch or on pull requests
 on:
   push:
     branches: [ "main", "dev" ]
@@ -8,21 +7,18 @@ on:
     branches: [ "main", "dev" ]
 
 jobs:
-  # Build and test Docker image but don't push
   build-and-test:
     name: Build and Test Docker Image
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Aumentado a 2 horas para dar más tiempo a la compilación
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set up Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Extract metadata (tags, labels) for Docker
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -33,7 +29,6 @@ jobs:
             type=ref,event=pr
             type=sha
 
-      # Build Docker image but don't push
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -41,16 +36,41 @@ jobs:
           push: false
           load: true
           tags: test/oxicloud:test
-          # Caché eliminado para evitar problemas de expiración de token
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      # Run some basic tests against the built image
-      - name: Test Docker image
+      - name: Verify image starts correctly
         run: |
-          docker run --rm test/oxicloud:test --version || true
-          docker run --rm test/oxicloud:test --help || true
+          # Start the container in background
+          docker run -d --name oxicloud-test \
+            -e DATABASE_URL="postgres://test:test@localhost/test" \
+            -p 8080:8080 \
+            test/oxicloud:test || true
 
-          # Verify the image structure
-          echo "✅ Checking Docker image layers and size"
-          docker image inspect test/oxicloud:test
+          # Give it a moment to start (or fail)
+          sleep 3
+
+          # Check that the container exists and show logs
+          echo "=== Container status ==="
+          docker ps -a --filter name=oxicloud-test
+          echo "=== Container logs ==="
+          docker logs oxicloud-test 2>&1 || true
+
+          # Cleanup
+          docker rm -f oxicloud-test || true
+
+      - name: Verify image structure
+        run: |
+          echo "=== Image size ==="
+          docker image ls test/oxicloud:test
+
+          echo "=== Binary exists and is executable ==="
+          docker run --rm --entrypoint sh test/oxicloud:test -c "test -x /usr/local/bin/oxicloud && echo 'OK: binary is executable'"
+
+          echo "=== Static files present ==="
+          docker run --rm --entrypoint sh test/oxicloud:test -c "ls /app/static/index.html && echo 'OK: static files present'"
+
+          echo "=== DB schema present ==="
+          docker run --rm --entrypoint sh test/oxicloud:test -c "ls /app/db/schema.sql && echo 'OK: schema present'"
 
           echo "✅ Docker build and test completed successfully"

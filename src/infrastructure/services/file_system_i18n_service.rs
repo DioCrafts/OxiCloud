@@ -139,7 +139,7 @@ impl I18nService for FileSystemI18nService {
     }
     
     async fn available_locales(&self) -> Vec<Locale> {
-        vec![Locale::English, Locale::Spanish]
+        vec![Locale::English, Locale::Spanish, Locale::French, Locale::German, Locale::Portuguese]
     }
     
     async fn is_supported(&self, locale: Locale) -> bool {

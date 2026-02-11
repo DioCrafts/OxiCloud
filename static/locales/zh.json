@@ -39,7 +39,10 @@
   "user_menu": {
     "appearance": "外观",
     "about": "关于 OxiCloud",
-    "about_description": "基于 Rust 和整洁架构构建的云存储平台。快速、安全、私密。"
+    "about_description": "基于 Rust 和整洁架构构建的云存储平台。快速、安全、私密。",
+    "admin_panel": "管理面板",
+    "profile": "我的资料",
+    "role_user": "用户"
   },
   "share": {
     "dialogTitle": "共享链接",
@@ -250,7 +253,10 @@
       "en": "English",
       "es": "Español",
       "zh": "中文",
-      "fa": "فارسی"
+      "fa": "فارسی",
+      "fr": "Français",
+      "de": "Deutsch",
+      "pt": "Português"
     }
   },
   "favorites": {

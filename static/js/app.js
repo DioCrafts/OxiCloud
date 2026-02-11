@@ -143,6 +143,10 @@ function setupUserMenu() {
     const logoutBtn = document.getElementById('user-menu-logout');
     const themeBtn = document.getElementById('user-menu-theme');
     const aboutBtn = document.getElementById('user-menu-about');
+    const adminBtn = document.getElementById('user-menu-admin');
+    const adminDivider = document.getElementById('user-menu-admin-divider');
+    const profileBtn = document.getElementById('user-menu-profile');
+    const roleBadge = document.getElementById('user-menu-role-badge');
     
     if (!wrapper || !avatarBtn || !menu) return;
     
@@ -153,6 +157,13 @@ function setupUserMenu() {
         wrapper.classList.toggle('open');
         if (!isOpen) {
             updateUserMenuData();
+            // Show/hide admin panel button based on user role
+            const USER_DATA_KEY = 'oxicloud_user';
+            const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
+            const isAdmin = userData.role === 'admin';
+            if (adminBtn) adminBtn.style.display = isAdmin ? 'flex' : 'none';
+            if (adminDivider) adminDivider.style.display = isAdmin ? 'block' : 'none';
+            if (roleBadge) roleBadge.style.display = isAdmin ? 'block' : 'none';
         }
     });
     
@@ -189,6 +200,22 @@ function setupUserMenu() {
                     dark ? 'Modo oscuro activado (próximamente)' : 'Modo claro activado'
                 );
             }
+        });
+    }
+    
+    // Admin panel link
+    if (adminBtn) {
+        adminBtn.addEventListener('click', () => {
+            wrapper.classList.remove('open');
+            window.location.href = '/admin.html';
+        });
+    }
+    
+    // Profile button — shows user info modal
+    if (profileBtn) {
+        profileBtn.addEventListener('click', () => {
+            wrapper.classList.remove('open');
+            showUserProfileModal();
         });
     }
     
@@ -1416,6 +1443,74 @@ async function refreshUserData() {
 
 // Expose refreshUserData globally
 window.refreshUserData = refreshUserData;
+
+/**
+ * Show User Profile modal with account details
+ */
+function showUserProfileModal() {
+    const USER_DATA_KEY = 'oxicloud_user';
+    const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
+    const username = userData.username || 'Usuario';
+    const email = userData.email || '';
+    const role = userData.role || 'user';
+    const initials = username.substring(0, 2).toUpperCase();
+    const usedBytes = userData.storage_used_bytes || 0;
+    const quotaBytes = userData.storage_quota_bytes || 0;
+    const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
+    const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
+    
+    const t = (key, fallback) => (window.i18n && window.i18n.t) ? window.i18n.t(key) || fallback : fallback;
+    
+    // Remove existing modal if any
+    const existing = document.getElementById('profile-modal-overlay');
+    if (existing) existing.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'profile-modal-overlay';
+    overlay.className = 'about-modal-overlay';
+    overlay.innerHTML = `
+        <div class="about-modal" style="max-width:380px">
+            <div style="text-align:center;padding:20px 20px 0">
+                <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:12px">${initials}</div>
+                <h3 style="margin:0;font-size:18px;color:#1a1a2e">${username}</h3>
+                <p style="margin:4px 0 0;font-size:13px;color:#64748b">${email}</p>
+                <span style="display:inline-block;margin-top:8px;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;${
+                    role === 'admin' 
+                        ? 'background:#dbeafe;color:#1d4ed8' 
+                        : 'background:#f1f5f9;color:#64748b'
+                }">${role === 'admin' ? '🛡️ Admin' : '👤 ' + t('user_menu.role_user', 'User')}</span>
+            </div>
+            <div style="padding:16px 20px">
+                <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+                    <i class="fas fa-database" style="margin-right:4px"></i>${t('storage.title', 'Storage')}
+                </div>
+                <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px">
+                    <div style="height:100%;width:${percentage}%;background:${barColor};border-radius:6px;transition:width .3s"></div>
+                </div>
+                <div style="font-size:12px;color:#64748b;text-align:right">${percentage}% · ${formatFileSize(usedBytes)} / ${quotaBytes > 0 ? formatFileSize(quotaBytes) : '∞'}</div>
+            </div>
+            <div style="padding:0 20px 16px;display:flex;justify-content:center">
+                <button id="profile-modal-close" style="padding:8px 24px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s">${t('actions.close', 'Close')}</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    // Show with animation
+    requestAnimationFrame(() => overlay.classList.add('show'));
+    
+    // Close handlers
+    overlay.querySelector('#profile-modal-close').addEventListener('click', () => {
+        overlay.classList.remove('show');
+        setTimeout(() => overlay.remove(), 200);
+    });
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+            overlay.classList.remove('show');
+            setTimeout(() => overlay.remove(), 200);
+        }
+    });
+}
 
 /**
  * Check if user is authenticated and load user's home folder

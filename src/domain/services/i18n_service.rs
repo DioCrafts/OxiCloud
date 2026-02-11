@@ -22,6 +22,9 @@ pub type I18nResult<T> = Result<T, I18nError>;
 pub enum Locale {
     English,
     Spanish,
+    French,
+    German,
+    Portuguese,
 }
 
 impl Locale {
@@ -30,6 +33,9 @@ impl Locale {
         match self {
             Locale::English => "en",
             Locale::Spanish => "es",
+            Locale::French => "fr",
+            Locale::German => "de",
+            Locale::Portuguese => "pt",
         }
     }
     
@@ -38,6 +44,9 @@ impl Locale {
         match code.to_lowercase().as_str() {
             "en" => Some(Locale::English),
             "es" => Some(Locale::Spanish),
+            "fr" => Some(Locale::French),
+            "de" => Some(Locale::German),
+            "pt" => Some(Locale::Portuguese),
             _ => None,
         }
     }

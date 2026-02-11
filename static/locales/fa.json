@@ -39,7 +39,10 @@
   "user_menu": {
     "appearance": "ظاهر",
     "about": "درباره OxiCloud",
-    "about_description": "پلتفرم ذخیره‌سازی ابری ساخته شده با Rust و معماری تمیز. سریع، امن و خصوصی."
+    "about_description": "پلتفرم ذخیره‌سازی ابری ساخته شده با Rust و معماری تمیز. سریع، امن و خصوصی.",
+    "admin_panel": "پنل مدیریت",
+    "profile": "نمایه من",
+    "role_user": "کاربر"
   },
   "share": {
     "dialogTitle": "پیوند هم‌رسانی",
@@ -288,7 +291,10 @@
       "en": "English",
       "es": "Español",
       "zh": "中文",
-      "fa": "فارسی"
+      "fa": "فارسی",
+      "fr": "Français",
+      "de": "Deutsch",
+      "pt": "Português"
     }
   },
   "favorites": {

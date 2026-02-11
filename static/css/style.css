@@ -621,6 +621,41 @@ select:focus {
     transform: translateX(18px);
 }
 
+.user-menu-admin {
+    color: #1d4ed8;
+}
+
+.user-menu-admin i {
+    color: #3b82f6;
+}
+
+.user-menu-admin:hover {
+    background: #eff6ff;
+}
+
+.user-menu-role-badge {
+    padding: 0 20px 4px;
+}
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.role-badge-admin {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.role-badge i {
+    font-size: 10px;
+}
+
 .user-menu-logout {
     color: #ef4444;
     margin-bottom: 4px;

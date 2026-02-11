@@ -114,6 +114,9 @@
                                 <div class="user-menu-email" id="user-menu-email">usuario@oxicloud.app</div>
                             </div>
                         </div>
+                        <div class="user-menu-role-badge" id="user-menu-role-badge" style="display:none">
+                            <span class="role-badge role-badge-admin"><i class="fas fa-shield-alt"></i> Admin</span>
+                        </div>
                         <div class="user-menu-storage">
                             <div class="user-menu-storage-label">
                                 <i class="fas fa-database"></i>
@@ -125,6 +128,15 @@
                             <div class="user-menu-storage-text" id="user-menu-storage-text">0% usado</div>
                         </div>
                         <div class="user-menu-divider"></div>
+                        <button class="user-menu-item user-menu-admin" id="user-menu-admin" style="display:none">
+                            <i class="fas fa-cogs"></i>
+                            <span data-i18n="user_menu.admin_panel">Panel de administración</span>
+                        </button>
+                        <button class="user-menu-item" id="user-menu-profile">
+                            <i class="fas fa-user-circle"></i>
+                            <span data-i18n="user_menu.profile">Mi perfil</span>
+                        </button>
+                        <div class="user-menu-divider" id="user-menu-admin-divider" style="display:none"></div>
                         <button class="user-menu-item" id="user-menu-theme">
                             <i class="fas fa-moon"></i>
                             <span data-i18n="user_menu.appearance">Apariencia</span>

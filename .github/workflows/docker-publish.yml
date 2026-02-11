@@ -6,63 +6,47 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Versión del release'
-        required: false
-        default: '0.1.0-rc1'
+        description: 'Version tag to publish (e.g. v0.3.0)'
+        required: true
+
+env:
+  REGISTRY_IMAGE: diocrafts/oxicloud
 
 jobs:
-  build-and-push:
+  # Run tests before publishing
+  test:
+    name: Pre-publish Tests
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace
+
+  # Build and push multi-arch image in a single job
+  build-and-push:
+    name: Build & Push Multi-Arch
+    runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set version tag
         id: version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+            VERSION="${{ github.event.inputs.version }}"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+            VERSION="${GITHUB_REF#refs/tags/}"
           fi
+          # Strip leading 'v' if present for Docker tag
+          VERSION="${VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/${{ matrix.arch }}
-          push: true
-          tags: |
-            diocrafts/oxicloud:${{ env.VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            VERSION=${{ env.VERSION }}
-
-  # Crear el manifiesto multi-arch una vez todas las imágenes estén listas
-  manifest:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set version tag
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-          fi
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -73,9 +57,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Create and Push Manifest
+      - name: Build and Push Multi-Arch Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY_IMAGE }}:${{ env.VERSION }}
+            ${{ env.REGISTRY_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ env.VERSION }}
+
+      - name: Verify published image
         run: |
-          docker buildx imagetools create \
-            -t diocrafts/oxicloud:${{ env.VERSION }} \
-            diocrafts/oxicloud:${{ env.VERSION }}@linux/amd64 \
-            diocrafts/oxicloud:${{ env.VERSION }}@linux/arm64
+          docker pull ${{ env.REGISTRY_IMAGE }}:${{ env.VERSION }}
+          docker image inspect ${{ env.REGISTRY_IMAGE }}:${{ env.VERSION }}
+          echo "✅ Image ${{ env.REGISTRY_IMAGE }}:${{ env.VERSION }} published successfully"

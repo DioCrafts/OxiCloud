@@ -160,7 +160,10 @@
   "user_menu": {
     "appearance": "Apariencia",
     "about": "Acerca de OxiCloud",
-    "about_description": "Plataforma de almacenamiento en la nube creada con Rust y Arquitectura Limpia. Rápida, segura y privada."
+    "about_description": "Plataforma de almacenamiento en la nube creada con Rust y Arquitectura Limpia. Rápida, segura y privada.",
+    "admin_panel": "Panel de administración",
+    "profile": "Mi perfil",
+    "role_user": "Usuario"
   },
   "files": {
     "name": "Nombre",
@@ -302,7 +305,10 @@
       "en": "English",
       "es": "Español",
       "zh": "中文",
-      "fa": "فارسی"
+      "fa": "فارسی",
+      "fr": "Français",
+      "de": "Deutsch",
+      "pt": "Português"
     }
   },
   "favorites": {
