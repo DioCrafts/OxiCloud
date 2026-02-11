@@ -14,7 +14,7 @@ tempfile = "3.25.0"
 tower = "0.5.3"
 tower-http = { version = "0.6.8", features = ["fs", "compression-gzip", "trace", "cors", "add-extension", "request-id"] }
 flate2 = "1.1.9"
-zip = "=6.0.0"
+zip = "=7.4.0"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 chrono = { version = "0.4.43", features = ["serde"] }
