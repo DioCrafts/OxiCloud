@@ -8,6 +8,7 @@ const ASSETS_TO_CACHE = [
   '/locales/en.json',
   '/locales/es.json',
   '/locales/fa.json',
+  '/locales/de.json',
   '/favicon.ico',
   'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
   'https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js'
