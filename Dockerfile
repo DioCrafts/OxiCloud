@@ -17,9 +17,10 @@ RUN apk --no-cache upgrade && \
 # Copy cached dependencies (only target dir and cargo registry)
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo/registry /usr/local/cargo/registry
-# Copy only what Cargo needs to compile (static/db are runtime-only, copied in final stage)
+# Copy source and static (login.html is embedded at compile-time via include_str!)
 COPY Cargo.toml Cargo.lock ./
 COPY src src
+COPY static static
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
 RUN DATABASE_URL="${DATABASE_URL}" cargo build --release
