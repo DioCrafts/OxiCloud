@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          # Get previous tag (if any)
+          PREV_TAG=$(git tag --sort=-creatordate | head -2 | tail -1 || echo "")
+          if [ -n "$PREV_TAG" ] && [ "$PREV_TAG" != "${{ github.ref_name }}" ]; then
+            RANGE="${PREV_TAG}..${{ github.ref_name }}"
+          else
+            RANGE="${{ github.ref_name }}"
+          fi
+          echo "range=${RANGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
