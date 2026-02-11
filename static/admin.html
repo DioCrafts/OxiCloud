@@ -4,185 +4,259 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — Admin Panel</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa;color:#1a1a2e;line-height:1.6}
-.container{max-width:960px;margin:0 auto;padding:20px}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
-header h1{font-size:1.5rem;color:#1a1a2e}
-header a{color:#3b82f6;text-decoration:none;font-size:.9rem}
-header a:hover{text-decoration:underline}
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif}
+body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-direction:column}
 
-/* Tabs */
-.tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid #e5e7eb;padding-bottom:0}
-.tab{padding:10px 20px;cursor:pointer;font-weight:600;font-size:.9rem;color:#6b7280;border:none;background:none;
-  border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
-.tab:hover{color:#3b82f6}
-.tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.25)}
+*{scrollbar-width:thin;scrollbar-color:rgba(0,0,0,.15) transparent}
+
+/* ── Top Header Bar ── */
+.admin-header{
+  background:linear-gradient(135deg,#2a3042 0%,#232838 100%);
+  padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,.15);position:sticky;top:0;z-index:100;
+}
+.admin-header-left{display:flex;align-items:center;gap:14px}
+.admin-logo{
+  width:38px;height:38px;background:linear-gradient(135deg,#ff5e3a,#ff2d55);border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 10px rgba(255,94,58,.35);
+}
+.admin-logo svg{width:20px;height:20px;fill:#fff}
+.admin-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:.3px}
+.admin-title span{color:rgba(255,255,255,.5);font-weight:400;margin-left:6px}
+.admin-header-right a{
+  color:rgba(255,255,255,.65);text-decoration:none;font-size:13px;font-weight:500;
+  display:flex;align-items:center;gap:6px;transition:color .2s;
+}
+.admin-header-right a:hover{color:#fff}
+
+/* ── Container ── */
+.admin-container{max-width:1080px;margin:0 auto;padding:28px 24px 60px;width:100%}
+
+/* ── Tabs ── */
+.admin-tabs{display:flex;gap:6px;margin-bottom:28px;background:#fff;border-radius:14px;padding:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.admin-tab{
+  padding:10px 22px;cursor:pointer;font-weight:600;font-size:13.5px;color:#64748b;
+  border:none;background:none;border-radius:10px;transition:all .2s;display:flex;align-items:center;gap:8px;
+}
+.admin-tab:hover{color:#1e293b;background:#f8fafc}
+.admin-tab.active{color:#fff;background:linear-gradient(135deg,#ff5e3a,#ff2d55);box-shadow:0 3px 12px rgba(255,94,58,.25)}
+.admin-tab.active i{color:#fff}
+.admin-tab i{font-size:14px;width:16px;text-align:center}
 .tab-content{display:none}
 .tab-content.active{display:block}
 
-/* Cards */
-.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:24px;margin-bottom:20px}
-.card h2{font-size:1.1rem;margin-bottom:16px;color:#1a1a2e;display:flex;align-items:center;gap:8px}
-.card h3{font-size:.95rem;margin:16px 0 10px;color:#374151}
+/* ── Cards ── */
+.admin-card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03);padding:28px;margin-bottom:22px}
+.admin-card h2{font-size:16px;font-weight:700;margin-bottom:20px;color:#1e293b;display:flex;align-items:center;gap:10px}
+.admin-card h2 i{color:#ff5e3a;font-size:17px}
 
-/* Stats Grid */
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
-.stat-card{padding:16px;background:#f9fafb;border-radius:10px;text-align:center;border:1px solid #e5e7eb}
-.stat-value{font-size:1.6rem;font-weight:700;color:#1a1a2e}
-.stat-label{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+/* ── Stats Grid ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:22px}
+.stat-card{
+  padding:20px;background:#f8fafc;border-radius:14px;text-align:center;
+  border:1px solid #e2e8f0;transition:transform .15s,box-shadow .15s;
+}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.stat-value{font-size:1.75rem;font-weight:800;color:#1e293b}
+.stat-label{font-size:11.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-top:4px;font-weight:600}
 .stat-card.warn{border-color:#fbbf24;background:#fffbeb}
 .stat-card.danger{border-color:#ef4444;background:#fef2f2}
-.stat-card .stat-value.text-blue{color:#3b82f6}
-.stat-card .stat-value.text-green{color:#059669}
-.stat-card .stat-value.text-orange{color:#d97706}
-.stat-card .stat-value.text-red{color:#dc2626}
+.text-blue{color:#3b82f6!important}
+.text-green{color:#059669!important}
+.text-orange{color:#d97706!important}
+.text-red{color:#dc2626!important}
 
-/* Progress bar */
-.progress-bar{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-top:6px}
-.progress-fill{height:100%;border-radius:4px;transition:width .5s}
-.progress-fill.green{background:#059669}
-.progress-fill.orange{background:#d97706}
-.progress-fill.red{background:#dc2626}
+/* ── Progress bar ── */
+.progress-bar{width:100%;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.progress-fill.green{background:linear-gradient(90deg,#059669,#10b981)}
+.progress-fill.orange{background:linear-gradient(90deg,#d97706,#f59e0b)}
+.progress-fill.red{background:linear-gradient(90deg,#dc2626,#ef4444)}
 
-/* Table */
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-size:.85rem}
-th{text-align:left;padding:10px 12px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:.75rem;
-  text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
-td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
-tr:hover{background:#f9fafb}
-.user-info{display:flex;flex-direction:column;gap:1px}
-.user-name{font-weight:600;color:#1a1a2e}
-.user-email{font-size:.8rem;color:#6b7280}
+/* ── Table ── */
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid #e2e8f0}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;padding:12px 16px;background:#f8fafc;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;white-space:nowrap;border-bottom:1px solid #e2e8f0}
+td{padding:14px 16px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover{background:#fafbfd}
+.user-info{display:flex;flex-direction:column;gap:2px}
+.user-name{font-weight:600;color:#1e293b}
+.user-email{font-size:12px;color:#94a3b8}
 
-/* Badges */
-.badge{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
 .badge-admin{background:#dbeafe;color:#1d4ed8}
-.badge-user{background:#f3f4f6;color:#6b7280}
+.badge-user{background:#f1f5f9;color:#64748b}
 .badge-active{background:#d1fae5;color:#065f46}
 .badge-inactive{background:#fee2e2;color:#991b1b}
 .badge-oidc{background:#ede9fe;color:#6d28d9}
-.badge-env{background:#fef3c7;color:#92400e;font-size:.65rem;margin-left:4px}
+.badge-env{background:#fef3c7;color:#92400e;font-size:10px;padding:1px 6px;margin-left:4px}
 
-/* Buttons */
-.btn{padding:6px 14px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-.btn-sm{padding:4px 10px;font-size:.75rem}
-.btn-primary{background:#3b82f6;color:#fff}
-.btn-primary:hover{background:#2563eb}
-.btn-secondary{background:#fff;color:#374151;border:1px solid #d1d5db}
-.btn-secondary:hover{background:#f9fafb}
-.btn-danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
-.btn-danger:hover{background:#fecaca}
-.btn-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
-.btn-success:hover{background:#a7f3d0}
-.btn:disabled{opacity:.5;cursor:not-allowed}
+/* ── Buttons ── */
+.btn{
+  padding:8px 18px;border:none;border-radius:10px;font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:8px}
+.btn-primary{background:linear-gradient(135deg,#ff5e3a,#ff2d55);color:#fff;box-shadow:0 2px 8px rgba(255,94,58,.25)}
+.btn-primary:hover{box-shadow:0 4px 14px rgba(255,94,58,.35);transform:translateY(-1px)}
+.btn-secondary{background:#fff;color:#334155;border:1px solid #e2e8f0}
+.btn-secondary:hover{background:#f8fafc;border-color:#cbd5e1}
+.btn-danger{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.btn-danger:hover{background:#fee2e2}
+.btn-success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+.btn-success:hover{background:#d1fae5}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
 .actions-row{display:flex;gap:6px;flex-wrap:wrap}
 
-/* Forms */
-.form-group{margin-bottom:14px}
-.form-group label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px;color:#374151}
+/* ── Forms ── */
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:4px;color:#334155}
 .form-group input[type="text"],.form-group input[type="password"],.form-group input[type="url"],.form-group input[type="number"],.form-group select{
-  width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;transition:border .2s}
-.form-group input:focus,.form-group select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.form-group small{color:#6b7280;font-size:.75rem;display:block;margin-top:2px}
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
-.toggle-row label{font-size:.85rem;font-weight:500}
-.switch{position:relative;width:40px;height:22px;flex-shrink:0}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:22px;transition:.3s}
-.slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
-.switch input:checked+.slider{background:#3b82f6}
-.switch input:checked+.slider:before{transform:translateX(18px)}
-.readonly-field{display:flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 12px;font-family:monospace;font-size:.82rem;word-break:break-all}
-.readonly-field button{flex-shrink:0;padding:3px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;font-size:.75rem}
+  width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;
+  background:#f8fafc;transition:all .2s;font-family:inherit;color:#1e293b;
+}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#ff5e3a;background:#fff;box-shadow:0 0 0 3px rgba(255,94,58,.1)}
+.form-group small{color:#94a3b8;font-size:12px;display:block;margin-top:3px}
 
-/* Alerts */
-.alert{padding:10px 14px;border-radius:8px;font-size:.82rem;margin-top:12px;display:none}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
+.toggle-row label{font-size:14px;font-weight:500;color:#334155}
+.switch{position:relative;width:44px;height:24px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:24px;transition:.3s}
+.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.switch input:checked+.slider{background:linear-gradient(135deg,#ff5e3a,#ff2d55)}
+.switch input:checked+.slider:before{transform:translateX(20px)}
+
+.readonly-field{
+  display:flex;align-items:center;gap:8px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:10px;
+  padding:10px 14px;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:13px;word-break:break-all;color:#334155;
+}
+.readonly-field button{
+  flex-shrink:0;padding:6px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;cursor:pointer;
+  font-size:12px;transition:all .15s;color:#64748b;
+}
+.readonly-field button:hover{background:#f1f5f9;color:#334155}
+
+/* ── Alerts ── */
+.alert{padding:12px 16px;border-radius:10px;font-size:13px;margin-top:14px;display:none;font-weight:500}
 .alert-success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:block}
 .alert-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:block}
 .alert-info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;display:block}
-.warning{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#92400e;margin-top:6px;display:flex;align-items:baseline;gap:4px}
+.warning{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;font-size:13px;color:#92400e;margin-top:8px;display:flex;align-items:center;gap:6px;font-weight:500}
 
-/* Discovery */
-.discovery-result{margin:10px 0;padding:10px;border-radius:8px;font-size:.8rem}
+/* ── Discovery ── */
+.discovery-result{margin:12px 0;padding:14px;border-radius:10px;font-size:13px}
 .discovery-result.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
 .discovery-result.fail{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
-.discovery-result dt{font-weight:600;margin-top:4px}
+.discovery-result dt{font-weight:700;margin-top:6px}
 .discovery-result dd{margin-left:0;word-break:break-all}
 
-/* Details */
-details{margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px}
-details summary{cursor:pointer;font-weight:600;font-size:.85rem;color:#6b7280;padding:4px 0;user-select:none}
-details[open] summary{margin-bottom:10px}
+/* ── Details ── */
+details{margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px}
+details summary{cursor:pointer;font-weight:600;font-size:14px;color:#64748b;padding:6px 0;user-select:none;transition:color .2s}
+details summary:hover{color:#ff5e3a}
+details[open] summary{margin-bottom:14px;color:#ff5e3a}
 
-/* Modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000}
-.modal{background:#fff;border-radius:12px;padding:24px;width:400px;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,.2)}
-.modal h3{margin-bottom:16px}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{background:#fff;border-radius:20px;padding:28px;width:420px;max-width:90vw;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:modalIn .2s ease-out}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+.modal h3{margin-bottom:18px;font-size:17px;color:#1e293b;display:flex;align-items:center}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
 
-/* Quota bar inline */
-.quota-bar{display:flex;align-items:center;gap:8px}
+/* ── Quota bar inline ── */
+.quota-bar{display:flex;align-items:center;gap:10px}
 .quota-bar .progress-bar{flex:1;height:6px}
-.quota-text{font-size:.75rem;color:#6b7280;white-space:nowrap}
+.quota-text{font-size:12px;color:#94a3b8;white-space:nowrap}
 
-/* Access / loading */
-#access-denied{display:none;text-align:center;padding:60px 20px}
-#access-denied h2{color:#991b1b;margin-bottom:8px}
-#loading{text-align:center;padding:60px;color:#6b7280}
+/* ── Access / Loading ── */
+#access-denied{display:none;text-align:center;padding:80px 20px}
+#access-denied .access-icon{width:80px;height:80px;background:#fef2f2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px}
+#access-denied .access-icon i{font-size:32px;color:#ef4444}
+#access-denied h2{color:#991b1b;margin-bottom:8px;font-size:20px}
+#access-denied p{color:#64748b;margin-bottom:20px;font-size:14px}
+#access-denied a{display:inline-flex;align-items:center;gap:6px;padding:10px 24px;background:linear-gradient(135deg,#ff5e3a,#ff2d55);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;box-shadow:0 3px 12px rgba(255,94,58,.3);transition:all .2s}
+#access-denied a:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(255,94,58,.4)}
+#loading{text-align:center;padding:80px;color:#94a3b8;font-size:15px}
+#loading i{font-size:32px;color:#ff5e3a;display:block;margin-bottom:12px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* Pagination */
-.pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:.82rem;color:#6b7280}
-.pagination button{padding:4px 12px}
+/* ── Pagination ── */
+.pagination{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:13px;color:#94a3b8;padding:0 4px}
+.pagination button{padding:6px 14px}
 </style>
 </head>
 <body>
-<div class="container">
-  <header>
-    <h1>⚙️ Admin Panel</h1>
-    <a href="/">← Back to OxiCloud</a>
-  </header>
 
-  <div id="loading">Loading…</div>
-  <div id="access-denied"><h2>Access Denied</h2><p>Administrator privileges required.</p><a href="/login.html">Sign in</a></div>
+<!-- Header -->
+<div class="admin-header">
+  <div class="admin-header-left">
+    <div class="admin-logo">
+      <svg viewBox="0 0 500 500">
+        <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"/>
+      </svg>
+    </div>
+    <div class="admin-title">OxiCloud <span>· Admin</span></div>
+  </div>
+  <div class="admin-header-right">
+    <a href="/"><i class="fas fa-arrow-left"></i> Back to OxiCloud</a>
+  </div>
+</div>
+
+<div class="admin-container">
+  <div id="loading"><i class="fas fa-circle-notch"></i> Loading…</div>
+  <div id="access-denied">
+    <div class="access-icon"><i class="fas fa-lock"></i></div>
+    <h2>Access Denied</h2>
+    <p>Administrator privileges required to access this panel.</p>
+    <a href="/login.html"><i class="fas fa-sign-in-alt"></i> Sign in</a>
+  </div>
 
   <div id="main-content" style="display:none">
     <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
-      <button class="tab" onclick="switchTab('users')">👥 Users</button>
-      <button class="tab" onclick="switchTab('oidc')">🔐 SSO / OIDC</button>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchTab('dashboard',this)"><i class="fas fa-chart-pie"></i> Dashboard</button>
+      <button class="admin-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
+      <button class="admin-tab" onclick="switchTab('oidc',this)"><i class="fas fa-key"></i> SSO / OIDC</button>
     </div>
 
     <!-- ======== DASHBOARD TAB ======== -->
     <div id="tab-dashboard" class="tab-content active">
-      <div class="stats-grid" id="dashboard-stats">
+      <div class="stats-grid">
         <div class="stat-card"><div class="stat-value text-blue" id="ds-total-users">—</div><div class="stat-label">Total Users</div></div>
         <div class="stat-card"><div class="stat-value text-green" id="ds-active-users">—</div><div class="stat-label">Active Users</div></div>
         <div class="stat-card"><div class="stat-value text-blue" id="ds-admin-users">—</div><div class="stat-label">Admins</div></div>
         <div class="stat-card"><div class="stat-value" id="ds-version">—</div><div class="stat-label">Version</div></div>
       </div>
 
-      <div class="card">
-        <h2>💾 Storage Overview</h2>
+      <div class="admin-card">
+        <h2><i class="fas fa-hdd"></i> Storage Overview</h2>
         <div class="stats-grid">
           <div class="stat-card"><div class="stat-value" id="ds-used">—</div><div class="stat-label">Used</div></div>
           <div class="stat-card"><div class="stat-value" id="ds-quota">—</div><div class="stat-label">Total Quota</div></div>
           <div class="stat-card"><div class="stat-value" id="ds-usage-pct">—</div><div class="stat-label">Usage %</div></div>
         </div>
         <div class="progress-bar"><div class="progress-fill green" id="ds-bar" style="width:0%"></div></div>
-        <div style="margin-top:12px">
+        <div style="margin-top:14px">
           <div class="stats-grid">
-            <div class="stat-card warn" id="ds-warn-card" style="display:none"><div class="stat-value text-orange" id="ds-over80">0</div><div class="stat-label">Users >80% quota</div></div>
+            <div class="stat-card warn" id="ds-warn-card" style="display:none"><div class="stat-value text-orange" id="ds-over80">0</div><div class="stat-label">Users &gt;80% quota</div></div>
             <div class="stat-card danger" id="ds-danger-card" style="display:none"><div class="stat-value text-red" id="ds-overquota">0</div><div class="stat-label">Users over quota</div></div>
           </div>
         </div>
       </div>
 
-      <div class="card">
-        <h2>ℹ️ System</h2>
+      <div class="admin-card">
+        <h2><i class="fas fa-server"></i> System</h2>
         <div class="stats-grid">
           <div class="stat-card"><div class="stat-value" id="ds-auth">—</div><div class="stat-label">Auth</div></div>
           <div class="stat-card"><div class="stat-value" id="ds-oidc">—</div><div class="stat-label">OIDC</div></div>
@@ -193,8 +267,8 @@ details[open] summary{margin-bottom:10px}
 
     <!-- ======== USERS TAB ======== -->
     <div id="tab-users" class="tab-content">
-      <div class="card">
-        <h2>👥 User Management</h2>
+      <div class="admin-card">
+        <h2><i class="fas fa-users-cog"></i> User Management</h2>
         <div class="table-wrap">
           <table>
             <thead>
@@ -207,14 +281,14 @@ details[open] summary{margin-bottom:10px}
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="users-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:#6b7280">Loading users…</td></tr></tbody>
+            <tbody id="users-tbody"><tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8"><i class="fas fa-spinner fa-spin"></i> Loading users…</td></tr></tbody>
           </table>
         </div>
         <div class="pagination">
           <span id="users-info">—</span>
-          <div>
-            <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="prevPage()" disabled>← Prev</button>
-            <button class="btn btn-sm btn-secondary" id="next-btn" onclick="nextPage()">Next →</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="prevPage()" disabled><i class="fas fa-chevron-left"></i> Prev</button>
+            <button class="btn btn-sm btn-secondary" id="next-btn" onclick="nextPage()">Next <i class="fas fa-chevron-right"></i></button>
           </div>
         </div>
       </div>
@@ -222,8 +296,8 @@ details[open] summary{margin-bottom:10px}
 
     <!-- ======== OIDC TAB ======== -->
     <div id="tab-oidc" class="tab-content">
-      <div class="card">
-        <h2>🔐 Single Sign-On (OIDC / SSO)</h2>
+      <div class="admin-card">
+        <h2><i class="fas fa-shield-alt"></i> Single Sign-On (OIDC / SSO)</h2>
         <div class="toggle-row">
           <label>Enable SSO Authentication</label>
           <label class="switch"><input type="checkbox" id="oidc-enabled"><span class="slider"></span></label>
@@ -238,8 +312,8 @@ details[open] summary{margin-bottom:10px}
             <input type="url" id="issuer-url" placeholder="https://auth.example.com/application/o/oxicloud/">
             <small>OpenID Connect issuer URL of your identity provider</small>
           </div>
-          <div style="margin-bottom:10px">
-            <button class="btn btn-secondary btn-sm" id="discover-btn" onclick="testConnection()">🔍 Auto-discover</button>
+          <div style="margin-bottom:12px">
+            <button class="btn btn-secondary btn-sm" id="discover-btn" onclick="testConnection()"><i class="fas fa-search"></i> Auto-discover</button>
           </div>
           <div id="discovery-result"></div>
           <div class="form-group">
@@ -249,14 +323,14 @@ details[open] summary{margin-bottom:10px}
           <div class="form-group">
             <label>Client Secret <span id="badge-client_secret"></span></label>
             <input type="password" id="client-secret" placeholder="Leave empty to keep current value">
-            <small id="secret-hint" style="display:none">✓ A client secret is already configured</small>
+            <small id="secret-hint" style="display:none"><i class="fas fa-check-circle" style="color:#059669"></i> A client secret is already configured</small>
           </div>
           <div class="form-group">
-            <label>Callback URL <small>(register in your IdP)</small></label>
-            <div class="readonly-field"><span id="callback-url">—</span><button onclick="copyCallback()">📋</button></div>
+            <label>Callback URL <small style="font-weight:400;color:#94a3b8">(register in your IdP)</small></label>
+            <div class="readonly-field"><span id="callback-url">—</span><button onclick="copyCallback()" title="Copy"><i class="fas fa-copy"></i></button></div>
           </div>
           <details>
-            <summary>Advanced Settings</summary>
+            <summary><i class="fas fa-sliders-h" style="margin-right:6px"></i> Advanced Settings</summary>
             <div class="form-group">
               <label>Scopes <span id="badge-scopes"></span></label>
               <input type="text" id="scopes" placeholder="openid profile email">
@@ -274,11 +348,11 @@ details[open] summary{margin-bottom:10px}
               <label>Disable password login (OIDC only)</label>
               <label class="switch"><input type="checkbox" id="disable-password"><span class="slider"></span></label>
             </div>
-            <div class="warning" id="password-warning" style="display:none">⚠️ This will prevent ALL password-based logins!</div>
+            <div class="warning" id="password-warning" style="display:none"><i class="fas fa-exclamation-triangle"></i> This will prevent ALL password-based logins!</div>
           </details>
-          <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-            <button class="btn btn-secondary" onclick="testConnection()">🧪 Test</button>
-            <button class="btn btn-primary" id="save-btn" onclick="saveOidcSettings()">💾 Save</button>
+          <div style="display:flex;gap:10px;margin-top:24px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="testConnection()"><i class="fas fa-vial"></i> Test</button>
+            <button class="btn btn-primary" id="save-btn" onclick="saveOidcSettings()"><i class="fas fa-save"></i> Save</button>
           </div>
           <div id="oidc-status" class="alert"></div>
         </div>
@@ -290,28 +364,28 @@ details[open] summary{margin-bottom:10px}
 <!-- Quota Modal -->
 <div id="quota-modal" class="modal-overlay" style="display:none">
   <div class="modal">
-    <h3>Update Storage Quota</h3>
+    <h3><i class="fas fa-box" style="color:#ff5e3a;margin-right:8px"></i> Update Storage Quota</h3>
     <div class="form-group">
       <label>User: <strong id="qm-username"></strong></label>
     </div>
     <div class="form-group">
       <label>New Quota</label>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:10px;align-items:center">
         <input type="number" id="qm-value" min="0" step="1" style="flex:1">
-        <select id="qm-unit" style="width:80px"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
+        <select id="qm-unit" style="width:90px;padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;background:#f8fafc"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
       </div>
       <small>Set to 0 for unlimited</small>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeQuotaModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveQuota()">Save Quota</button>
+      <button class="btn btn-primary" onclick="saveQuota()"><i class="fas fa-save"></i> Save</button>
     </div>
   </div>
 </div>
 
 <script>
 const API = '/api';
-const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+const token = localStorage.getItem('oxicloud_token') || localStorage.getItem('token') || localStorage.getItem('access_token');
 let currentAdminId = '';
 let usersPage = 0;
 const PAGE_SIZE = 50;
@@ -341,11 +415,11 @@ function timeAgo(dateStr) {
 }
 
 // ── Tab switching ──
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+function switchTab(name, el) {
+  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
-  event.target.classList.add('active');
+  if (el) el.classList.add('active');
   if (name === 'users') loadUsers();
   if (name === 'dashboard') loadDashboard();
 }
@@ -384,14 +458,14 @@ async function loadDashboard() {
 // ── Users ──
 async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#6b7280">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
   try {
     const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers() });
-    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b">Failed to load users</td></tr>'; return; }
+    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b;padding:20px"><i class="fas fa-exclamation-circle"></i> Failed to load users</td></tr>'; return; }
     const data = await resp.json();
     totalUsers = data.total;
     const users = data.users;
-    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px">No users found</td></tr>'; return; }
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:#94a3b8">No users found</td></tr>'; return; }
 
     tbody.innerHTML = users.map(u => {
       const quotaPct = u.storage_quota_bytes > 0 ? ((u.storage_used_bytes / u.storage_quota_bytes) * 100) : 0;
@@ -399,16 +473,16 @@ async function loadUsers() {
       const quotaText = u.storage_quota_bytes > 0 ? formatBytes(u.storage_used_bytes) + ' / ' + formatBytes(u.storage_quota_bytes) : formatBytes(u.storage_used_bytes) + ' / ∞';
       const isSelf = u.id === currentAdminId;
       return '<tr>' +
-        '<td><div class="user-info"><span class="user-name">' + u.username + (isSelf ? ' (you)' : '') + '</span><span class="user-email">' + u.email + '</span></div></td>' +
-        '<td><span class="badge badge-' + u.role + '">' + u.role + '</span></td>' +
+        '<td><div class="user-info"><span class="user-name">' + u.username + (isSelf ? ' <span style="color:#94a3b8;font-weight:400">(you)</span>' : '') + '</span><span class="user-email">' + u.email + '</span></div></td>' +
+        '<td><span class="badge badge-' + u.role + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt" style="font-size:10px"></i> ' : '') + u.role + '</span></td>' +
         '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
         '<td><div class="quota-bar"><div class="progress-bar" style="width:80px"><div class="progress-fill ' + quotaColor + '" style="width:' + Math.min(quotaPct, 100) + '%"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
-        '<td style="font-size:.8rem;color:#6b7280">' + timeAgo(u.last_login_at) + '</td>' +
+        '<td style="font-size:12px;color:#94a3b8">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
-          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota">📦</button>' +
-          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '>' + (u.role === 'admin' ? '👤' : '👑') + '</button>' +
-          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '>' + (u.active ? '🚫' : '✅') + '</button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '>🗑</button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
+          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
         '</div></td></tr>';
     }).join('');
 
@@ -416,7 +490,7 @@ async function loadUsers() {
     document.getElementById('prev-btn').disabled = usersPage === 0;
     document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b;padding:20px"><i class="fas fa-exclamation-circle"></i> Error: ' + e.message + '</td></tr>';
   }
 }
 
@@ -501,24 +575,24 @@ async function testConnection() {
   const url = document.getElementById('issuer-url').value.trim();
   if (!url) { showOidcStatus('Enter an Issuer URL first', 'error'); return; }
   const btn = document.getElementById('discover-btn');
-  btn.disabled = true; btn.textContent = '⏳ …';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering…';
   const resultDiv = document.getElementById('discovery-result');
   try {
     const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), body: JSON.stringify({ issuer_url: url }) });
     const r = await resp.json();
     if (r.success) {
-      resultDiv.innerHTML = '<div class="discovery-result ok"><strong>✓ ' + r.message + '</strong><dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd></dl></div>';
+      resultDiv.innerHTML = '<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ' + r.message + '</strong><dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd></dl></div>';
       if (!document.getElementById('provider-name').value && r.provider_name_suggestion) document.getElementById('provider-name').value = r.provider_name_suggestion;
     } else {
-      resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ ' + r.message + '</strong></div>';
+      resultDiv.innerHTML = '<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ' + r.message + '</strong></div>';
     }
-  } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail">Error: ' + e.message + '</div>'; }
-  btn.disabled = false; btn.textContent = '🔍 Auto-discover';
+  } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ' + e.message + '</div>'; }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Auto-discover';
 }
 
 async function saveOidcSettings() {
   const btn = document.getElementById('save-btn');
-  btn.disabled = true; btn.textContent = '⏳ …';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
   const body = {
     enabled: document.getElementById('oidc-enabled').checked,
     issuer_url: document.getElementById('issuer-url').value.trim(),
@@ -535,7 +609,7 @@ async function saveOidcSettings() {
     if (resp.ok) { showOidcStatus('Settings saved — OIDC is now ' + (body.enabled ? 'active' : 'disabled'), 'success'); loadDashboard(); }
     else { const e = await resp.json().catch(()=>({})); showOidcStatus('Error: ' + (e.message || resp.statusText), 'error'); }
   } catch (e) { showOidcStatus('Network error: ' + e.message, 'error'); }
-  btn.disabled = false; btn.textContent = '💾 Save';
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save';
 }
 
 // ── Init ──

@@ -56,15 +56,6 @@ const LANGUAGE_TEXTS = {
         modalTitle: 'انتخاب زبان',
         searchPlaceholder: 'جستجوی زبان...'
     }
-    de: {
-        title: 'Willkommen bei OxiCloud',
-        subtitle: 'Bitte wählen Sie Ihre Sprache',
-        continue: 'Fortfahren',
-        autodetected: 'Wir haben Ihre Sprache automatisch erkannt',
-        moreLanguages: 'Weitere Sprachen...',
-        modalTitle: 'Sprache auswählen',
-        searchPlaceholder: 'Sprache suchen...'
-    }  
 };
 
 // Complete language registry — add new languages here, they'll appear automatically
@@ -138,102 +129,126 @@ function detectBrowserLanguage() {
 
 // Build a language option element (card style)
 function buildLanguageCard(lang, isSelected) {
-    const label = document.createElement('label');
-    label.className = 'language-option' + (isSelected ? ' selected' : '');
-    label.setAttribute('data-lang', lang.code);
-    label.innerHTML = `
-        <input type="radio" name="language" value="${lang.code}" ${isSelected ? 'checked' : ''}>
-        <span class="language-radio"></span>
-        <span class="language-flag">${lang.flag}</span>
-        <span class="language-name">${lang.nativeName}</span>
+    const item = document.createElement('div');
+    item.className = 'lang-picker-item' + (isSelected ? ' selected' : '');
+    item.setAttribute('data-lang', lang.code);
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', isSelected);
+    item.innerHTML = `
+        <span class="lang-picker-item-flag">${lang.flag}</span>
+        <span class="lang-picker-item-name">${lang.nativeName}</span>
+        <span class="lang-picker-item-english">${lang.name}</span>
+        ${isSelected ? '<i class="fas fa-check lang-picker-item-check"></i>' : ''}
     `;
-    return label;
+    return item;
 }
 
-// Initialize language selector panel with hybrid approach
+// Initialize language selector panel with compact dropdown approach
 function initLanguageSelector() {
     const languagePanel = document.getElementById('language-panel');
     const continueBtn = document.getElementById('language-continue');
-    const optionsContainer = document.getElementById('language-options');
-    const moreLangBtn = document.getElementById('lang-more-btn');
+    const picker = document.getElementById('lang-picker');
+    const pickerSelected = document.getElementById('lang-picker-selected');
+    const pickerDropdown = document.getElementById('lang-picker-dropdown');
+    const pickerList = document.getElementById('lang-picker-list');
+    const pickerFlag = document.getElementById('lang-picker-flag');
+    const pickerName = document.getElementById('lang-picker-name');
+    const searchInput = document.getElementById('lang-picker-search-input');
     
-    if (!languagePanel || !optionsContainer) return;
-    
-    let selectedLanguage = null;
+    if (!languagePanel || !picker) return;
     
     // --- Auto-detect browser language ---
     const detected = detectBrowserLanguage();
+    let selectedLanguage = detected.code;
     
-    // Build the list of popular languages to show as cards
-    // If the detected language isn't already popular, promote it to the top
-    let popularLangs = ALL_LANGUAGES.filter(l => l.popular);
-    const detectedInPopular = popularLangs.find(l => l.code === detected.code);
-    if (!detectedInPopular) {
-        // Insert detected language at the top of popular cards
-        popularLangs = [detected, ...popularLangs];
-    }
+    // Update the selected box with detected language
+    pickerFlag.textContent = detected.flag;
+    pickerName.textContent = detected.nativeName;
+    updateLanguagePanelTexts(selectedLanguage);
     
-    // Auto-select the detected language
-    selectedLanguage = detected.code;
-    continueBtn.disabled = false;
-    
-    // Show autodetection banner
-    const autodetectedBanner = document.getElementById('lang-autodetected');
-    if (autodetectedBanner) {
-        autodetectedBanner.style.display = 'flex';
-    }
-    updateLanguagePanelTexts(detected.code);
-    
-    // --- Render popular language cards ---
-    optionsContainer.innerHTML = '';
-    popularLangs.forEach(lang => {
-        const card = buildLanguageCard(lang, lang.code === selectedLanguage);
-        card.addEventListener('click', () => {
-            // Deselect all
-            optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
-            card.classList.add('selected');
-            card.querySelector('input[type="radio"]').checked = true;
-            selectedLanguage = lang.code;
-            continueBtn.disabled = false;
-            updateLanguagePanelTexts(lang.code);
+    // Render dropdown list
+    function renderDropdownList(filter = '') {
+        pickerList.innerHTML = '';
+        const filterLower = filter.toLowerCase();
+        
+        const filtered = ALL_LANGUAGES.filter(lang => {
+            if (!filter) return true;
+            return lang.name.toLowerCase().includes(filterLower) ||
+                   lang.nativeName.toLowerCase().includes(filterLower) ||
+                   lang.code.toLowerCase().includes(filterLower);
         });
-        optionsContainer.appendChild(card);
+        
+        if (filtered.length === 0) {
+            pickerList.innerHTML = '<div class="lang-picker-empty">—</div>';
+            return;
+        }
+        
+        filtered.forEach(lang => {
+            const item = buildLanguageCard(lang, lang.code === selectedLanguage);
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                selectedLanguage = lang.code;
+                pickerFlag.textContent = lang.flag;
+                pickerName.textContent = lang.nativeName;
+                updateLanguagePanelTexts(lang.code);
+                closePicker();
+                renderDropdownList('');
+            });
+            pickerList.appendChild(item);
+        });
+    }
+    
+    function openPicker() {
+        picker.classList.add('open');
+        pickerSelected.setAttribute('aria-expanded', 'true');
+        renderDropdownList('');
+        if (searchInput) {
+            searchInput.value = '';
+            setTimeout(() => searchInput.focus(), 50);
+        }
+        // Scroll active item into view
+        setTimeout(() => {
+            const active = pickerList.querySelector('.lang-picker-item.selected');
+            if (active) active.scrollIntoView({ block: 'nearest' });
+        }, 60);
+    }
+    
+    function closePicker() {
+        picker.classList.remove('open');
+        pickerSelected.setAttribute('aria-expanded', 'false');
+        if (searchInput) searchInput.value = '';
+    }
+    
+    // Toggle dropdown
+    pickerSelected.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (picker.classList.contains('open')) {
+            closePicker();
+        } else {
+            openPicker();
+        }
     });
     
-    // --- "More languages" button opens the modal ---
-    if (moreLangBtn) {
-        moreLangBtn.addEventListener('click', () => openLanguageModal(selectedLanguage, (langCode) => {
-            selectedLanguage = langCode;
-            continueBtn.disabled = false;
-            updateLanguagePanelTexts(langCode);
-            
-            // Update cards to reflect new selection
-            optionsContainer.querySelectorAll('.language-option').forEach(o => {
-                const isThis = o.getAttribute('data-lang') === langCode;
-                o.classList.toggle('selected', isThis);
-                o.querySelector('input[type="radio"]').checked = isThis;
-            });
-            
-            // If selected lang is not in the popular cards, add it temporarily
-            if (!optionsContainer.querySelector(`[data-lang="${langCode}"]`)) {
-                const lang = ALL_LANGUAGES.find(l => l.code === langCode);
-                if (lang) {
-                    // Deselect all existing
-                    optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
-                    const card = buildLanguageCard(lang, true);
-                    card.addEventListener('click', () => {
-                        optionsContainer.querySelectorAll('.language-option').forEach(o => o.classList.remove('selected'));
-                        card.classList.add('selected');
-                        card.querySelector('input[type="radio"]').checked = true;
-                        selectedLanguage = lang.code;
-                        updateLanguagePanelTexts(lang.code);
-                    });
-                    // Insert at the top
-                    optionsContainer.insertBefore(card, optionsContainer.firstChild);
-                }
-            }
-        }));
+    // Keyboard support
+    pickerSelected.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (picker.classList.contains('open')) closePicker(); else openPicker();
+        } else if (e.key === 'Escape') {
+            closePicker();
+        }
+    });
+    
+    // Search input
+    if (searchInput) {
+        searchInput.addEventListener('input', () => renderDropdownList(searchInput.value));
+        searchInput.addEventListener('click', (e) => e.stopPropagation());
     }
+    
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!picker.contains(e.target)) closePicker();
+    });
     
     // --- Continue button ---
     continueBtn.addEventListener('click', async () => {
@@ -276,99 +291,17 @@ function initLanguageSelector() {
     });
 }
 
-// Open the full language modal with search
-function openLanguageModal(currentSelection, onSelect) {
-    const overlay = document.getElementById('lang-modal-overlay');
-    const list = document.getElementById('lang-modal-list');
-    const searchInput = document.getElementById('lang-search-input');
-    const closeBtn = document.getElementById('lang-modal-close');
-    
-    if (!overlay || !list) return;
-    
-    // Render all languages
-    function renderList(filter = '') {
-        list.innerHTML = '';
-        const filterLower = filter.toLowerCase();
-        
-        const filtered = ALL_LANGUAGES.filter(lang => {
-            if (!filter) return true;
-            return lang.name.toLowerCase().includes(filterLower) ||
-                   lang.nativeName.toLowerCase().includes(filterLower) ||
-                   lang.code.toLowerCase().includes(filterLower);
-        });
-        
-        if (filtered.length === 0) {
-            list.innerHTML = '<div class="lang-modal-empty">No languages found</div>';
-            return;
-        }
-        
-        filtered.forEach(lang => {
-            const item = document.createElement('div');
-            item.className = 'lang-modal-item' + (lang.code === currentSelection ? ' selected' : '');
-            item.setAttribute('data-lang', lang.code);
-            item.innerHTML = `
-                <span class="lang-modal-flag">${lang.flag}</span>
-                <span class="lang-modal-native">${lang.nativeName}</span>
-                <span class="lang-modal-english">${lang.name}</span>
-                ${lang.code === currentSelection ? '<i class="fas fa-check lang-modal-check"></i>' : ''}
-            `;
-            item.addEventListener('click', () => {
-                currentSelection = lang.code;
-                onSelect(lang.code);
-                closeModal();
-            });
-            list.appendChild(item);
-        });
-    }
-    
-    function closeModal() {
-        overlay.style.display = 'none';
-        if (searchInput) searchInput.value = '';
-    }
-    
-    // Show modal
-    overlay.style.display = 'flex';
-    renderList();
-    
-    // Focus search
-    if (searchInput) {
-        setTimeout(() => searchInput.focus(), 100);
-        searchInput.value = '';
-        searchInput.oninput = () => renderList(searchInput.value);
-    }
-    
-    // Close handlers
-    if (closeBtn) {
-        closeBtn.onclick = closeModal;
-    }
-    overlay.onclick = (e) => {
-        if (e.target === overlay) closeModal();
-    };
-    document.addEventListener('keydown', function escHandler(e) {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
-    });
-}
-
 // Update language panel texts based on selected language
 function updateLanguagePanelTexts(lang) {
     const texts = LANGUAGE_TEXTS[lang] || LANGUAGE_TEXTS.en;
     const titleEl = document.getElementById('language-title');
     const subtitleEl = document.getElementById('language-subtitle');
     const continueBtn = document.getElementById('language-continue');
-    const autodetectedText = document.getElementById('lang-autodetected-text');
-    const moreText = document.getElementById('lang-more-text');
-    const modalTitle = document.getElementById('lang-modal-title');
-    const searchInput = document.getElementById('lang-search-input');
+    const searchInput = document.getElementById('lang-picker-search-input');
     
     if (titleEl) titleEl.textContent = texts.title;
     if (subtitleEl) subtitleEl.textContent = texts.subtitle;
     if (continueBtn) continueBtn.textContent = texts.continue;
-    if (autodetectedText) autodetectedText.textContent = texts.autodetected;
-    if (moreText) moreText.textContent = texts.moreLanguages;
-    if (modalTitle) modalTitle.textContent = texts.modalTitle;
     if (searchInput) searchInput.placeholder = texts.searchPlaceholder;
 }
 

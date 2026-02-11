@@ -1,0 +1,32 @@
+# Build artifacts
+target/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker
+Dockerfile
+Dockerfile.rootless
+docker-compose.yml
+rootless-compose.yml
+
+# Runtime data (mapped via volumes)
+storage/
+
+# Documentation
+doc/
+*.md
+LICENSE
+CODEOWNERS
+
+# Miscellaneous
+.github/
+.env
+*.bak

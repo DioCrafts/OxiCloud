@@ -211,11 +211,11 @@ function setupUserMenu() {
         });
     }
     
-    // Profile button — shows user info modal
+    // Profile button — navigates to profile page
     if (profileBtn) {
         profileBtn.addEventListener('click', () => {
             wrapper.classList.remove('open');
-            showUserProfileModal();
+            window.location.href = '/profile.html';
         });
     }
     
