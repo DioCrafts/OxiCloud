@@ -97,6 +97,18 @@ pub trait UserStoragePort: Send + Sync + 'static {
 
     /// Finds a user by OIDC provider + subject pair
     async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> Result<User, DomainError>;
+
+    /// Activa o desactiva un usuario
+    async fn set_user_active_status(&self, user_id: &str, active: bool) -> Result<(), DomainError>;
+
+    /// Cambia el rol de un usuario
+    async fn change_role(&self, user_id: &str, role: &str) -> Result<(), DomainError>;
+
+    /// Actualiza la cuota de almacenamiento de un usuario
+    async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> Result<(), DomainError>;
+
+    /// Cuenta el número total de usuarios
+    async fn count_users(&self) -> Result<i64, DomainError>;
 }
 
 // ============================================================================

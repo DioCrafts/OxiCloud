@@ -606,6 +606,69 @@ impl AuthApplicationService {
     }
 
     // ========================================================================
+    // Admin User Management Methods
+    // ========================================================================
+
+    /// Get a single user by ID (for admin panel)
+    pub async fn get_user_admin(&self, user_id: &str) -> Result<UserDto, DomainError> {
+        let user = self.user_storage.get_user_by_id(user_id).await?;
+        Ok(UserDto::from(user))
+    }
+
+    /// Delete a user by ID (admin only)
+    pub async fn delete_user_admin(&self, user_id: &str) -> Result<(), DomainError> {
+        // Prevent deleting yourself
+        let user = self.user_storage.get_user_by_id(user_id).await?;
+        tracing::info!("Admin deleting user: {} ({})", user.username(), user_id);
+        self.user_storage.delete_user(user_id).await
+    }
+
+    /// Activate or deactivate a user (admin only)
+    pub async fn set_user_active(&self, user_id: &str, active: bool) -> Result<(), DomainError> {
+        self.user_storage.set_user_active_status(user_id, active).await
+    }
+
+    /// Change user role (admin only)
+    pub async fn change_user_role(&self, user_id: &str, role: &str) -> Result<(), DomainError> {
+        if role != "admin" && role != "user" {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                format!("Invalid role: {}. Must be 'admin' or 'user'", role),
+            ));
+        }
+        self.user_storage.change_role(user_id, role).await
+    }
+
+    /// Update user's storage quota (admin only)
+    pub async fn update_user_quota(&self, user_id: &str, quota_bytes: i64) -> Result<(), DomainError> {
+        if quota_bytes < 0 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                "Quota must be non-negative".to_string(),
+            ));
+        }
+        self.user_storage.update_storage_quota(user_id, quota_bytes).await
+    }
+
+    /// Check if a user has enough quota for an upload of the given size
+    pub async fn check_quota(&self, user_id: &str, additional_bytes: i64) -> Result<bool, DomainError> {
+        let user = self.user_storage.get_user_by_id(user_id).await?;
+        let quota = user.storage_quota_bytes();
+        if quota <= 0 {
+            // 0 or negative means unlimited
+            return Ok(true);
+        }
+        Ok(user.storage_used_bytes() + additional_bytes <= quota)
+    }
+
+    /// Count users efficiently
+    pub async fn count_users_efficient(&self) -> Result<i64, DomainError> {
+        self.user_storage.count_users().await
+    }
+
+    // ========================================================================
     // OIDC Methods
     // ========================================================================
 

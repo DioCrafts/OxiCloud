@@ -56,3 +56,53 @@ pub struct OidcTestResultDto {
     /// Suggested provider name (derived from issuer hostname)
     pub provider_name_suggestion: Option<String>,
 }
+
+// ============================================================================
+// Admin User Management DTOs
+// ============================================================================
+
+/// Request body for updating a user's role
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserRoleDto {
+    pub role: String,
+}
+
+/// Request body for updating a user's active status
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserActiveDto {
+    pub active: bool,
+}
+
+/// Request body for updating a user's storage quota
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateUserQuotaDto {
+    /// Quota in bytes. Use 0 for unlimited.
+    pub quota_bytes: i64,
+}
+
+/// Query parameters for listing users
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListUsersQueryDto {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+/// Dashboard statistics
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DashboardStatsDto {
+    // System info
+    pub server_version: String,
+    pub auth_enabled: bool,
+    pub oidc_configured: bool,
+    pub quotas_enabled: bool,
+    // User stats
+    pub total_users: i64,
+    pub active_users: i64,
+    pub admin_users: i64,
+    // Storage stats
+    pub total_quota_bytes: i64,
+    pub total_used_bytes: i64,
+    pub storage_usage_percent: f64,
+    pub users_over_80_percent: i64,
+    pub users_over_quota: i64,
+}

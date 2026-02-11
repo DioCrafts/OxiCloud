@@ -3,68 +3,145 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OxiCloud — Admin Settings</title>
+<title>OxiCloud — Admin Panel</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f5f7fa;color:#1a1a2e;line-height:1.6}
-.container{max-width:720px;margin:40px auto;padding:0 20px}
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+.container{max-width:960px;margin:0 auto;padding:20px}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
 header h1{font-size:1.5rem;color:#1a1a2e}
 header a{color:#3b82f6;text-decoration:none;font-size:.9rem}
 header a:hover{text-decoration:underline}
-.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:28px;margin-bottom:24px}
-.card h2{font-size:1.15rem;margin-bottom:20px;color:#1a1a2e;display:flex;align-items:center;gap:8px}
-.form-group{margin-bottom:16px}
-.form-group label{display:block;font-size:.85rem;font-weight:600;margin-bottom:4px;color:#374151}
-.form-group input[type="text"],.form-group input[type="password"],.form-group input[type="url"]{
-  width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:.9rem;transition:border .2s}
-.form-group input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.form-group small{color:#6b7280;font-size:.78rem;display:block;margin-top:2px}
-.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0}
-.toggle-row label{font-size:.9rem;font-weight:500}
-.switch{position:relative;width:44px;height:24px;flex-shrink:0}
-.switch input{opacity:0;width:0;height:0}
-.slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:24px;transition:.3s}
-.slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
-.switch input:checked+.slider{background:#3b82f6}
-.switch input:checked+.slider:before{transform:translateX(20px)}
-.readonly-field{display:flex;align-items:center;gap:8px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;font-family:monospace;font-size:.85rem;word-break:break-all}
-.readonly-field button{flex-shrink:0;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;background:#fff;cursor:pointer;font-size:.78rem}
-.readonly-field button:hover{background:#f3f4f6}
-details{margin-top:16px;border-top:1px solid #e5e7eb;padding-top:12px}
-details summary{cursor:pointer;font-weight:600;font-size:.9rem;color:#6b7280;padding:4px 0;user-select:none}
-details[open] summary{margin-bottom:12px}
-.actions{display:flex;gap:12px;margin-top:24px;justify-content:flex-end}
-.btn{padding:10px 20px;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;transition:all .2s}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;margin-bottom:24px;border-bottom:2px solid #e5e7eb;padding-bottom:0}
+.tab{padding:10px 20px;cursor:pointer;font-weight:600;font-size:.9rem;color:#6b7280;border:none;background:none;
+  border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{color:#3b82f6}
+.tab.active{color:#3b82f6;border-bottom-color:#3b82f6}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* Cards */
+.card{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.1);padding:24px;margin-bottom:20px}
+.card h2{font-size:1.1rem;margin-bottom:16px;color:#1a1a2e;display:flex;align-items:center;gap:8px}
+.card h3{font-size:.95rem;margin:16px 0 10px;color:#374151}
+
+/* Stats Grid */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.stat-card{padding:16px;background:#f9fafb;border-radius:10px;text-align:center;border:1px solid #e5e7eb}
+.stat-value{font-size:1.6rem;font-weight:700;color:#1a1a2e}
+.stat-label{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.stat-card.warn{border-color:#fbbf24;background:#fffbeb}
+.stat-card.danger{border-color:#ef4444;background:#fef2f2}
+.stat-card .stat-value.text-blue{color:#3b82f6}
+.stat-card .stat-value.text-green{color:#059669}
+.stat-card .stat-value.text-orange{color:#d97706}
+.stat-card .stat-value.text-red{color:#dc2626}
+
+/* Progress bar */
+.progress-bar{width:100%;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-top:6px}
+.progress-fill{height:100%;border-radius:4px;transition:width .5s}
+.progress-fill.green{background:#059669}
+.progress-fill.orange{background:#d97706}
+.progress-fill.red{background:#dc2626}
+
+/* Table */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{text-align:left;padding:10px 12px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-size:.75rem;
+  text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+tr:hover{background:#f9fafb}
+.user-info{display:flex;flex-direction:column;gap:1px}
+.user-name{font-weight:600;color:#1a1a2e}
+.user-email{font-size:.8rem;color:#6b7280}
+
+/* Badges */
+.badge{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-admin{background:#dbeafe;color:#1d4ed8}
+.badge-user{background:#f3f4f6;color:#6b7280}
+.badge-active{background:#d1fae5;color:#065f46}
+.badge-inactive{background:#fee2e2;color:#991b1b}
+.badge-oidc{background:#ede9fe;color:#6d28d9}
+.badge-env{background:#fef3c7;color:#92400e;font-size:.65rem;margin-left:4px}
+
+/* Buttons */
+.btn{padding:6px 14px;border:none;border-radius:6px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-sm{padding:4px 10px;font-size:.75rem}
 .btn-primary{background:#3b82f6;color:#fff}
 .btn-primary:hover{background:#2563eb}
 .btn-secondary{background:#fff;color:#374151;border:1px solid #d1d5db}
 .btn-secondary:hover{background:#f9fafb}
+.btn-danger{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.btn-danger:hover{background:#fecaca}
+.btn-success{background:#d1fae5;color:#065f46;border:1px solid #a7f3d0}
+.btn-success:hover{background:#a7f3d0}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.alert{padding:12px 16px;border-radius:8px;font-size:.85rem;margin-top:16px;display:none}
+.actions-row{display:flex;gap:6px;flex-wrap:wrap}
+
+/* Forms */
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.82rem;font-weight:600;margin-bottom:3px;color:#374151}
+.form-group input[type="text"],.form-group input[type="password"],.form-group input[type="url"],.form-group input[type="number"],.form-group select{
+  width:100%;padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.85rem;transition:border .2s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.form-group small{color:#6b7280;font-size:.75rem;display:block;margin-top:2px}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.toggle-row label{font-size:.85rem;font-weight:500}
+.switch{position:relative;width:40px;height:22px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#d1d5db;border-radius:22px;transition:.3s}
+.slider:before{content:"";position:absolute;height:16px;width:16px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s}
+.switch input:checked+.slider{background:#3b82f6}
+.switch input:checked+.slider:before{transform:translateX(18px)}
+.readonly-field{display:flex;align-items:center;gap:6px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:6px 12px;font-family:monospace;font-size:.82rem;word-break:break-all}
+.readonly-field button{flex-shrink:0;padding:3px 8px;border:1px solid #d1d5db;border-radius:4px;background:#fff;cursor:pointer;font-size:.75rem}
+
+/* Alerts */
+.alert{padding:10px 14px;border-radius:8px;font-size:.82rem;margin-top:12px;display:none}
 .alert-success{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;display:block}
 .alert-error{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;display:block}
 .alert-info{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;display:block}
-.badge{display:inline-block;font-size:.7rem;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;margin-left:6px;font-weight:600}
-.discovery-result{margin:12px 0;padding:12px;border-radius:8px;font-size:.82rem}
+.warning{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 12px;font-size:.8rem;color:#92400e;margin-top:6px;display:flex;align-items:baseline;gap:4px}
+
+/* Discovery */
+.discovery-result{margin:10px 0;padding:10px;border-radius:8px;font-size:.8rem}
 .discovery-result.ok{background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46}
 .discovery-result.fail{background:#fef2f2;border:1px solid #fecaca;color:#991b1b}
-.discovery-result dt{font-weight:600;margin-top:6px}
+.discovery-result dt{font-weight:600;margin-top:4px}
 .discovery-result dd{margin-left:0;word-break:break-all}
-.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.info-item{padding:12px;background:#f9fafb;border-radius:8px}
-.info-item .label{font-size:.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
-.info-item .value{font-size:1.1rem;font-weight:600;margin-top:4px}
-.warning{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#92400e;margin-top:8px;display:flex;align-items:baseline;gap:6px}
+
+/* Details */
+details{margin-top:12px;border-top:1px solid #e5e7eb;padding-top:10px}
+details summary{cursor:pointer;font-weight:600;font-size:.85rem;color:#6b7280;padding:4px 0;user-select:none}
+details[open] summary{margin-bottom:10px}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000}
+.modal{background:#fff;border-radius:12px;padding:24px;width:400px;max-width:90vw;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.modal h3{margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+
+/* Quota bar inline */
+.quota-bar{display:flex;align-items:center;gap:8px}
+.quota-bar .progress-bar{flex:1;height:6px}
+.quota-text{font-size:.75rem;color:#6b7280;white-space:nowrap}
+
+/* Access / loading */
 #access-denied{display:none;text-align:center;padding:60px 20px}
 #access-denied h2{color:#991b1b;margin-bottom:8px}
 #loading{text-align:center;padding:60px;color:#6b7280}
+
+/* Pagination */
+.pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:.82rem;color:#6b7280}
+.pagination button{padding:4px 12px}
 </style>
 </head>
 <body>
 <div class="container">
   <header>
-    <h1>⚙️ Admin Settings</h1>
+    <h1>⚙️ Admin Panel</h1>
     <a href="/">← Back to OxiCloud</a>
   </header>
 
@@ -72,97 +149,162 @@ details[open] summary{margin-bottom:12px}
   <div id="access-denied"><h2>Access Denied</h2><p>Administrator privileges required.</p><a href="/login.html">Sign in</a></div>
 
   <div id="main-content" style="display:none">
-    <!-- OIDC / SSO Settings -->
-    <div class="card">
-      <h2>🔐 Single Sign-On (OIDC / SSO)</h2>
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('dashboard')">📊 Dashboard</button>
+      <button class="tab" onclick="switchTab('users')">👥 Users</button>
+      <button class="tab" onclick="switchTab('oidc')">🔐 SSO / OIDC</button>
+    </div>
 
-      <div class="toggle-row">
-        <label>Enable SSO Authentication</label>
-        <label class="switch"><input type="checkbox" id="oidc-enabled"><span class="slider"></span></label>
+    <!-- ======== DASHBOARD TAB ======== -->
+    <div id="tab-dashboard" class="tab-content active">
+      <div class="stats-grid" id="dashboard-stats">
+        <div class="stat-card"><div class="stat-value text-blue" id="ds-total-users">—</div><div class="stat-label">Total Users</div></div>
+        <div class="stat-card"><div class="stat-value text-green" id="ds-active-users">—</div><div class="stat-label">Active Users</div></div>
+        <div class="stat-card"><div class="stat-value text-blue" id="ds-admin-users">—</div><div class="stat-label">Admins</div></div>
+        <div class="stat-card"><div class="stat-value" id="ds-version">—</div><div class="stat-label">Version</div></div>
       </div>
 
-      <div id="oidc-form" style="display:none">
-        <div class="form-group">
-          <label>Provider Name <span id="badge-provider_name"></span></label>
-          <input type="text" id="provider-name" placeholder="e.g., Authentik, Keycloak">
+      <div class="card">
+        <h2>💾 Storage Overview</h2>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="ds-used">—</div><div class="stat-label">Used</div></div>
+          <div class="stat-card"><div class="stat-value" id="ds-quota">—</div><div class="stat-label">Total Quota</div></div>
+          <div class="stat-card"><div class="stat-value" id="ds-usage-pct">—</div><div class="stat-label">Usage %</div></div>
         </div>
-
-        <div class="form-group">
-          <label>Issuer URL <span id="badge-issuer_url"></span></label>
-          <input type="url" id="issuer-url" placeholder="https://auth.example.com/application/o/oxicloud/">
-          <small>The OpenID Connect issuer URL of your identity provider</small>
-        </div>
-
-        <div style="margin-bottom:12px">
-          <button class="btn btn-secondary" id="discover-btn" onclick="testConnection()">🔍 Auto-discover</button>
-        </div>
-        <div id="discovery-result"></div>
-
-        <div class="form-group">
-          <label>Client ID <span id="badge-client_id"></span></label>
-          <input type="text" id="client-id" placeholder="oxicloud">
-        </div>
-
-        <div class="form-group">
-          <label>Client Secret <span id="badge-client_secret"></span></label>
-          <input type="password" id="client-secret" placeholder="Leave empty to keep current value">
-          <small id="secret-hint" style="display:none">✓ A client secret is already configured</small>
-        </div>
-
-        <div class="form-group">
-          <label>Callback URL <small>(copy this to your IdP configuration)</small></label>
-          <div class="readonly-field">
-            <span id="callback-url">—</span>
-            <button onclick="copyCallback()">📋 Copy</button>
+        <div class="progress-bar"><div class="progress-fill green" id="ds-bar" style="width:0%"></div></div>
+        <div style="margin-top:12px">
+          <div class="stats-grid">
+            <div class="stat-card warn" id="ds-warn-card" style="display:none"><div class="stat-value text-orange" id="ds-over80">0</div><div class="stat-label">Users >80% quota</div></div>
+            <div class="stat-card danger" id="ds-danger-card" style="display:none"><div class="stat-value text-red" id="ds-overquota">0</div><div class="stat-label">Users over quota</div></div>
           </div>
         </div>
+      </div>
 
-        <details>
-          <summary>Advanced Settings</summary>
-
-          <div class="form-group">
-            <label>Scopes <span id="badge-scopes"></span></label>
-            <input type="text" id="scopes" placeholder="openid profile email">
-          </div>
-
-          <div class="toggle-row">
-            <label>Auto-provision users on first login</label>
-            <label class="switch"><input type="checkbox" id="auto-provision" checked><span class="slider"></span></label>
-          </div>
-
-          <div class="form-group">
-            <label>Admin Groups <span id="badge-admin_groups"></span></label>
-            <input type="text" id="admin-groups" placeholder="e.g., oxicloud-admins">
-            <small>Comma-separated OIDC group names that map to admin role</small>
-          </div>
-
-          <div class="toggle-row">
-            <label>Disable password login (OIDC only)</label>
-            <label class="switch"><input type="checkbox" id="disable-password"><span class="slider"></span></label>
-          </div>
-          <div class="warning" id="password-warning" style="display:none">
-            ⚠️ Enabling this will prevent ALL password-based logins. Make sure OIDC is working first!
-          </div>
-        </details>
-
-        <div class="actions">
-          <button class="btn btn-secondary" onclick="testConnection()">🧪 Test Connection</button>
-          <button class="btn btn-primary" id="save-btn" onclick="saveSettings()">💾 Save Settings</button>
+      <div class="card">
+        <h2>ℹ️ System</h2>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value" id="ds-auth">—</div><div class="stat-label">Auth</div></div>
+          <div class="stat-card"><div class="stat-value" id="ds-oidc">—</div><div class="stat-label">OIDC</div></div>
+          <div class="stat-card"><div class="stat-value" id="ds-quotas-flag">—</div><div class="stat-label">Quotas</div></div>
         </div>
-
-        <div id="status-message" class="alert"></div>
       </div>
     </div>
 
-    <!-- System Info -->
-    <div class="card">
-      <h2>📊 System Information</h2>
-      <div class="info-grid" id="general-info">
-        <div class="info-item"><div class="label">Version</div><div class="value" id="info-version">—</div></div>
-        <div class="info-item"><div class="label">Users</div><div class="value" id="info-users">—</div></div>
-        <div class="info-item"><div class="label">Auth</div><div class="value" id="info-auth">—</div></div>
-        <div class="info-item"><div class="label">OIDC</div><div class="value" id="info-oidc">—</div></div>
+    <!-- ======== USERS TAB ======== -->
+    <div id="tab-users" class="tab-content">
+      <div class="card">
+        <h2>👥 User Management</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Storage</th>
+                <th>Last Login</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:#6b7280">Loading users…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="users-info">—</span>
+          <div>
+            <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="prevPage()" disabled>← Prev</button>
+            <button class="btn btn-sm btn-secondary" id="next-btn" onclick="nextPage()">Next →</button>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <!-- ======== OIDC TAB ======== -->
+    <div id="tab-oidc" class="tab-content">
+      <div class="card">
+        <h2>🔐 Single Sign-On (OIDC / SSO)</h2>
+        <div class="toggle-row">
+          <label>Enable SSO Authentication</label>
+          <label class="switch"><input type="checkbox" id="oidc-enabled"><span class="slider"></span></label>
+        </div>
+        <div id="oidc-form" style="display:none">
+          <div class="form-group">
+            <label>Provider Name <span id="badge-provider_name"></span></label>
+            <input type="text" id="provider-name" placeholder="e.g., Authentik, Keycloak">
+          </div>
+          <div class="form-group">
+            <label>Issuer URL <span id="badge-issuer_url"></span></label>
+            <input type="url" id="issuer-url" placeholder="https://auth.example.com/application/o/oxicloud/">
+            <small>OpenID Connect issuer URL of your identity provider</small>
+          </div>
+          <div style="margin-bottom:10px">
+            <button class="btn btn-secondary btn-sm" id="discover-btn" onclick="testConnection()">🔍 Auto-discover</button>
+          </div>
+          <div id="discovery-result"></div>
+          <div class="form-group">
+            <label>Client ID <span id="badge-client_id"></span></label>
+            <input type="text" id="client-id" placeholder="oxicloud">
+          </div>
+          <div class="form-group">
+            <label>Client Secret <span id="badge-client_secret"></span></label>
+            <input type="password" id="client-secret" placeholder="Leave empty to keep current value">
+            <small id="secret-hint" style="display:none">✓ A client secret is already configured</small>
+          </div>
+          <div class="form-group">
+            <label>Callback URL <small>(register in your IdP)</small></label>
+            <div class="readonly-field"><span id="callback-url">—</span><button onclick="copyCallback()">📋</button></div>
+          </div>
+          <details>
+            <summary>Advanced Settings</summary>
+            <div class="form-group">
+              <label>Scopes <span id="badge-scopes"></span></label>
+              <input type="text" id="scopes" placeholder="openid profile email">
+            </div>
+            <div class="toggle-row">
+              <label>Auto-provision users on first login</label>
+              <label class="switch"><input type="checkbox" id="auto-provision" checked><span class="slider"></span></label>
+            </div>
+            <div class="form-group">
+              <label>Admin Groups <span id="badge-admin_groups"></span></label>
+              <input type="text" id="admin-groups" placeholder="e.g., oxicloud-admins">
+              <small>Comma-separated OIDC group names that map to admin role</small>
+            </div>
+            <div class="toggle-row">
+              <label>Disable password login (OIDC only)</label>
+              <label class="switch"><input type="checkbox" id="disable-password"><span class="slider"></span></label>
+            </div>
+            <div class="warning" id="password-warning" style="display:none">⚠️ This will prevent ALL password-based logins!</div>
+          </details>
+          <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="testConnection()">🧪 Test</button>
+            <button class="btn btn-primary" id="save-btn" onclick="saveOidcSettings()">💾 Save</button>
+          </div>
+          <div id="oidc-status" class="alert"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quota Modal -->
+<div id="quota-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h3>Update Storage Quota</h3>
+    <div class="form-group">
+      <label>User: <strong id="qm-username"></strong></label>
+    </div>
+    <div class="form-group">
+      <label>New Quota</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="qm-value" min="0" step="1" style="flex:1">
+        <select id="qm-unit" style="width:80px"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
+      </div>
+      <small>Set to 0 for unlimited</small>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeQuotaModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveQuota()">Save Quota</button>
     </div>
   </div>
 </div>
@@ -170,45 +312,241 @@ details[open] summary{margin-bottom:12px}
 <script>
 const API = '/api';
 const token = localStorage.getItem('token') || localStorage.getItem('access_token');
-
-// Toggle OIDC form visibility
-document.getElementById('oidc-enabled').addEventListener('change', function() {
-  document.getElementById('oidc-form').style.display = this.checked ? 'block' : 'none';
-});
-
-// Show password warning
-document.getElementById('disable-password').addEventListener('change', function() {
-  document.getElementById('password-warning').style.display = this.checked ? 'flex' : 'none';
-});
+let currentAdminId = '';
+let usersPage = 0;
+const PAGE_SIZE = 50;
+let totalUsers = 0;
 
 function headers() {
   return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 }
 
-function showStatus(msg, type) {
-  const el = document.getElementById('status-message');
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function timeAgo(dateStr) {
+  if (!dateStr) return 'Never';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const secs = Math.floor((now - d) / 1000);
+  if (secs < 60) return 'Just now';
+  if (secs < 3600) return Math.floor(secs/60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs/3600) + 'h ago';
+  if (secs < 2592000) return Math.floor(secs/86400) + 'd ago';
+  return d.toLocaleDateString();
+}
+
+// ── Tab switching ──
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'users') loadUsers();
+  if (name === 'dashboard') loadDashboard();
+}
+
+// ── Dashboard ──
+async function loadDashboard() {
+  try {
+    const resp = await fetch(API + '/admin/dashboard', { headers: headers() });
+    if (!resp.ok) return;
+    const d = await resp.json();
+    document.getElementById('ds-total-users').textContent = d.total_users;
+    document.getElementById('ds-active-users').textContent = d.active_users;
+    document.getElementById('ds-admin-users').textContent = d.admin_users;
+    document.getElementById('ds-version').textContent = 'v' + d.server_version;
+    document.getElementById('ds-used').textContent = formatBytes(d.total_used_bytes);
+    document.getElementById('ds-quota').textContent = formatBytes(d.total_quota_bytes);
+    document.getElementById('ds-usage-pct').textContent = d.storage_usage_percent.toFixed(1) + '%';
+    const bar = document.getElementById('ds-bar');
+    bar.style.width = Math.min(d.storage_usage_percent, 100) + '%';
+    bar.className = 'progress-fill ' + (d.storage_usage_percent > 90 ? 'red' : d.storage_usage_percent > 70 ? 'orange' : 'green');
+    document.getElementById('ds-auth').textContent = d.auth_enabled ? 'Enabled' : 'Disabled';
+    document.getElementById('ds-oidc').textContent = d.oidc_configured ? 'Active' : 'Off';
+    document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? 'Enabled' : 'Disabled';
+
+    if (d.users_over_80_percent > 0) {
+      document.getElementById('ds-warn-card').style.display = '';
+      document.getElementById('ds-over80').textContent = d.users_over_80_percent;
+    }
+    if (d.users_over_quota > 0) {
+      document.getElementById('ds-danger-card').style.display = '';
+      document.getElementById('ds-overquota').textContent = d.users_over_quota;
+    }
+  } catch (e) { console.error('Dashboard error', e); }
+}
+
+// ── Users ──
+async function loadUsers() {
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#6b7280">Loading…</td></tr>';
+  try {
+    const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers() });
+    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b">Failed to load users</td></tr>'; return; }
+    const data = await resp.json();
+    totalUsers = data.total;
+    const users = data.users;
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px">No users found</td></tr>'; return; }
+
+    tbody.innerHTML = users.map(u => {
+      const quotaPct = u.storage_quota_bytes > 0 ? ((u.storage_used_bytes / u.storage_quota_bytes) * 100) : 0;
+      const quotaColor = quotaPct > 90 ? 'red' : quotaPct > 70 ? 'orange' : 'green';
+      const quotaText = u.storage_quota_bytes > 0 ? formatBytes(u.storage_used_bytes) + ' / ' + formatBytes(u.storage_quota_bytes) : formatBytes(u.storage_used_bytes) + ' / ∞';
+      const isSelf = u.id === currentAdminId;
+      return '<tr>' +
+        '<td><div class="user-info"><span class="user-name">' + u.username + (isSelf ? ' (you)' : '') + '</span><span class="user-email">' + u.email + '</span></div></td>' +
+        '<td><span class="badge badge-' + u.role + '">' + u.role + '</span></td>' +
+        '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td><div class="quota-bar"><div class="progress-bar" style="width:80px"><div class="progress-fill ' + quotaColor + '" style="width:' + Math.min(quotaPct, 100) + '%"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
+        '<td style="font-size:.8rem;color:#6b7280">' + timeAgo(u.last_login_at) + '</td>' +
+        '<td><div class="actions-row">' +
+          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota">📦</button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '>' + (u.role === 'admin' ? '👤' : '👑') + '</button>' +
+          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '>' + (u.active ? '🚫' : '✅') + '</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '>🗑</button>' +
+        '</div></td></tr>';
+    }).join('');
+
+    document.getElementById('users-info').textContent = 'Showing ' + (usersPage * PAGE_SIZE + 1) + '-' + Math.min((usersPage + 1) * PAGE_SIZE, totalUsers) + ' of ' + totalUsers;
+    document.getElementById('prev-btn').disabled = usersPage === 0;
+    document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#991b1b">Error: ' + e.message + '</td></tr>';
+  }
+}
+
+function prevPage() { if (usersPage > 0) { usersPage--; loadUsers(); } }
+function nextPage() { if ((usersPage + 1) * PAGE_SIZE < totalUsers) { usersPage++; loadUsers(); } }
+
+async function toggleRole(userId, currentRole) {
+  const newRole = currentRole === 'admin' ? 'user' : 'admin';
+  if (!confirm('Change role to ' + newRole + '?')) return;
+  try {
+    const resp = await fetch(API + '/admin/users/' + userId + '/role', {
+      method: 'PUT', headers: headers(), body: JSON.stringify({ role: newRole })
+    });
+    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function toggleActive(userId, currentActive) {
+  const action = currentActive ? 'deactivate' : 'activate';
+  if (!confirm('Are you sure you want to ' + action + ' this user?')) return;
+  try {
+    const resp = await fetch(API + '/admin/users/' + userId + '/active', {
+      method: 'PUT', headers: headers(), body: JSON.stringify({ active: !currentActive })
+    });
+    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function deleteUser(userId, username) {
+  if (!confirm('DELETE user "' + username + '"? This cannot be undone!')) return;
+  try {
+    const resp = await fetch(API + '/admin/users/' + userId, { method: 'DELETE', headers: headers() });
+    if (resp.ok) { loadUsers(); loadDashboard(); } else { const e = await resp.json(); alert(e.message || 'Failed'); }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Quota Modal ──
+let quotaUserId = '';
+function openQuotaModal(userId, username, currentQuota) {
+  quotaUserId = userId;
+  document.getElementById('qm-username').textContent = username;
+  const gb = currentQuota / 1073741824;
+  document.getElementById('qm-unit').value = '1073741824';
+  document.getElementById('qm-value').value = gb > 0 ? Math.round(gb * 10) / 10 : 0;
+  document.getElementById('quota-modal').style.display = 'flex';
+}
+function closeQuotaModal() { document.getElementById('quota-modal').style.display = 'none'; }
+
+async function saveQuota() {
+  const val = parseFloat(document.getElementById('qm-value').value) || 0;
+  const unit = parseInt(document.getElementById('qm-unit').value);
+  const bytes = Math.round(val * unit);
+  try {
+    const resp = await fetch(API + '/admin/users/' + quotaUserId + '/quota', {
+      method: 'PUT', headers: headers(), body: JSON.stringify({ quota_bytes: bytes })
+    });
+    if (resp.ok) { closeQuotaModal(); loadUsers(); loadDashboard(); }
+    else { const e = await resp.json(); alert(e.message || 'Failed'); }
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── OIDC settings ──
+document.getElementById('oidc-enabled').addEventListener('change', function() {
+  document.getElementById('oidc-form').style.display = this.checked ? 'block' : 'none';
+});
+document.getElementById('disable-password').addEventListener('change', function() {
+  document.getElementById('password-warning').style.display = this.checked ? 'flex' : 'none';
+});
+
+function showOidcStatus(msg, type) {
+  const el = document.getElementById('oidc-status');
   el.textContent = msg;
   el.className = 'alert alert-' + type;
 }
 
 function copyCallback() {
   const text = document.getElementById('callback-url').textContent;
-  navigator.clipboard.writeText(text).then(() => {
-    const btn = document.querySelector('.readonly-field button');
-    btn.textContent = '✓ Copied!';
-    setTimeout(() => btn.textContent = '📋 Copy', 2000);
-  });
+  navigator.clipboard.writeText(text);
 }
 
+async function testConnection() {
+  const url = document.getElementById('issuer-url').value.trim();
+  if (!url) { showOidcStatus('Enter an Issuer URL first', 'error'); return; }
+  const btn = document.getElementById('discover-btn');
+  btn.disabled = true; btn.textContent = '⏳ …';
+  const resultDiv = document.getElementById('discovery-result');
+  try {
+    const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), body: JSON.stringify({ issuer_url: url }) });
+    const r = await resp.json();
+    if (r.success) {
+      resultDiv.innerHTML = '<div class="discovery-result ok"><strong>✓ ' + r.message + '</strong><dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd></dl></div>';
+      if (!document.getElementById('provider-name').value && r.provider_name_suggestion) document.getElementById('provider-name').value = r.provider_name_suggestion;
+    } else {
+      resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ ' + r.message + '</strong></div>';
+    }
+  } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail">Error: ' + e.message + '</div>'; }
+  btn.disabled = false; btn.textContent = '🔍 Auto-discover';
+}
+
+async function saveOidcSettings() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = '⏳ …';
+  const body = {
+    enabled: document.getElementById('oidc-enabled').checked,
+    issuer_url: document.getElementById('issuer-url').value.trim(),
+    client_id: document.getElementById('client-id').value.trim(),
+    client_secret: document.getElementById('client-secret').value || null,
+    scopes: document.getElementById('scopes').value.trim() || null,
+    auto_provision: document.getElementById('auto-provision').checked,
+    admin_groups: document.getElementById('admin-groups').value.trim() || null,
+    disable_password_login: document.getElementById('disable-password').checked,
+    provider_name: document.getElementById('provider-name').value.trim() || null,
+  };
+  try {
+    const resp = await fetch(API + '/admin/settings/oidc', { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+    if (resp.ok) { showOidcStatus('Settings saved — OIDC is now ' + (body.enabled ? 'active' : 'disabled'), 'success'); loadDashboard(); }
+    else { const e = await resp.json().catch(()=>({})); showOidcStatus('Error: ' + (e.message || resp.statusText), 'error'); }
+  } catch (e) { showOidcStatus('Network error: ' + e.message, 'error'); }
+  btn.disabled = false; btn.textContent = '💾 Save';
+}
+
+// ── Init ──
 async function init() {
   if (!token) { showAccessDenied(); return; }
-
   try {
-    // Verify admin access
     const me = await fetch(API + '/auth/me', { headers: headers() });
     if (!me.ok) { showAccessDenied(); return; }
     const user = await me.json();
     if (user.role !== 'admin') { showAccessDenied(); return; }
+    currentAdminId = user.id;
 
     // Load OIDC settings
     const oidcResp = await fetch(API + '/admin/settings/oidc', { headers: headers() });
@@ -226,107 +564,21 @@ async function init() {
       document.getElementById('password-warning').style.display = s.disable_password_login ? 'flex' : 'none';
       document.getElementById('callback-url').textContent = s.callback_url;
       if (s.client_secret_set) document.getElementById('secret-hint').style.display = 'block';
-
-      // Show env override badges
       (s.env_overrides || []).forEach(field => {
         const badge = document.getElementById('badge-' + field);
-        if (badge) { badge.innerHTML = '<span class="badge">ENV</span>'; }
+        if (badge) badge.innerHTML = '<span class="badge badge-env">ENV</span>';
       });
     }
 
-    // Load general info
-    const genResp = await fetch(API + '/admin/settings/general', { headers: headers() });
-    if (genResp.ok) {
-      const g = await genResp.json();
-      document.getElementById('info-version').textContent = g.server_version;
-      document.getElementById('info-users').textContent = g.total_users;
-      document.getElementById('info-auth').textContent = g.auth_enabled ? 'Enabled' : 'Disabled';
-      document.getElementById('info-oidc').textContent = g.oidc_configured ? 'Active' : 'Not configured';
-    }
-
+    await loadDashboard();
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
-  } catch (e) {
-    console.error(e);
-    showAccessDenied();
-  }
+  } catch (e) { console.error(e); showAccessDenied(); }
 }
 
 function showAccessDenied() {
   document.getElementById('loading').style.display = 'none';
   document.getElementById('access-denied').style.display = 'block';
-}
-
-async function testConnection() {
-  const url = document.getElementById('issuer-url').value.trim();
-  if (!url) { showStatus('Please enter an Issuer URL first', 'error'); return; }
-
-  const btn = document.getElementById('discover-btn');
-  btn.disabled = true; btn.textContent = '⏳ Testing…';
-  const resultDiv = document.getElementById('discovery-result');
-  resultDiv.innerHTML = '';
-
-  try {
-    const resp = await fetch(API + '/admin/settings/oidc/test', {
-      method: 'POST', headers: headers(),
-      body: JSON.stringify({ issuer_url: url })
-    });
-    const r = await resp.json();
-
-    if (r.success) {
-      resultDiv.innerHTML = '<div class="discovery-result ok">' +
-        '<strong>✓ ' + r.message + '</strong>' +
-        '<dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd>' +
-        '<dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd>' +
-        '<dt>Token Endpoint</dt><dd>' + (r.token_endpoint||'—') + '</dd></dl></div>';
-      // Auto-fill provider name if empty
-      if (!document.getElementById('provider-name').value && r.provider_name_suggestion) {
-        document.getElementById('provider-name').value = r.provider_name_suggestion;
-      }
-    } else {
-      resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ ' + r.message + '</strong></div>';
-    }
-  } catch (e) {
-    resultDiv.innerHTML = '<div class="discovery-result fail"><strong>✗ Network error: ' + e.message + '</strong></div>';
-  }
-  btn.disabled = false; btn.textContent = '🔍 Auto-discover';
-}
-
-async function saveSettings() {
-  const btn = document.getElementById('save-btn');
-  btn.disabled = true; btn.textContent = '⏳ Saving…';
-
-  const body = {
-    enabled: document.getElementById('oidc-enabled').checked,
-    issuer_url: document.getElementById('issuer-url').value.trim(),
-    client_id: document.getElementById('client-id').value.trim(),
-    client_secret: document.getElementById('client-secret').value || null,
-    scopes: document.getElementById('scopes').value.trim() || null,
-    auto_provision: document.getElementById('auto-provision').checked,
-    admin_groups: document.getElementById('admin-groups').value.trim() || null,
-    disable_password_login: document.getElementById('disable-password').checked,
-    provider_name: document.getElementById('provider-name').value.trim() || null,
-  };
-
-  try {
-    const resp = await fetch(API + '/admin/settings/oidc', {
-      method: 'PUT', headers: headers(),
-      body: JSON.stringify(body)
-    });
-    if (resp.ok) {
-      showStatus('Settings saved and applied — OIDC is now ' + (body.enabled ? 'active' : 'disabled') + '.', 'success');
-      if (body.client_secret) document.getElementById('secret-hint').style.display = 'block';
-      // Refresh OIDC status
-      const genResp = await fetch(API + '/admin/settings/general', { headers: headers() });
-      if (genResp.ok) { const g = await genResp.json(); document.getElementById('info-oidc').textContent = g.oidc_configured ? 'Active' : 'Not configured'; }
-    } else {
-      const err = await resp.json().catch(() => ({}));
-      showStatus('Error: ' + (err.message || resp.statusText), 'error');
-    }
-  } catch (e) {
-    showStatus('Network error: ' + e.message, 'error');
-  }
-  btn.disabled = false; btn.textContent = '💾 Save Settings';
 }
 
 init();

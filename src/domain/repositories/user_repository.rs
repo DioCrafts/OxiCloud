@@ -94,4 +94,24 @@ pub trait UserRepository: Send + Sync + 'static {
 
     /// Finds a user by OIDC provider + subject pair
     async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> UserRepositoryResult<User>;
+
+    /// Actualiza la cuota de almacenamiento de un usuario
+    async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> UserRepositoryResult<()>;
+
+    /// Cuenta el número total de usuarios
+    async fn count_users(&self) -> UserRepositoryResult<i64>;
+
+    /// Obtiene estadísticas de almacenamiento agregadas
+    async fn get_storage_stats(&self) -> UserRepositoryResult<StorageStats>;
+}
+
+/// Estadísticas de almacenamiento agregadas
+#[derive(Debug, Clone)]
+pub struct StorageStats {
+    pub total_users: i64,
+    pub active_users: i64,
+    pub total_quota_bytes: i64,
+    pub total_used_bytes: i64,
+    pub users_over_80_percent: i64,
+    pub users_over_quota: i64,
 }

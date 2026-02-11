@@ -4,7 +4,7 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 
 use crate::domain::entities::user::{User, UserRole};
-use crate::domain::repositories::user_repository::{UserRepository, UserRepositoryError, UserRepositoryResult};
+use crate::domain::repositories::user_repository::{UserRepository, UserRepositoryError, UserRepositoryResult, StorageStats};
 use crate::application::ports::auth_ports::UserStoragePort;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::transaction_utils::with_transaction;
@@ -547,6 +547,67 @@ impl UserRepository for UserPgRepository {
             row.get("oidc_subject"),
         ))
     }
+
+    /// Actualiza la cuota de almacenamiento de un usuario
+    async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> UserRepositoryResult<()> {
+        sqlx::query(
+            r#"
+            UPDATE auth.users
+            SET 
+                storage_quota_bytes = $2,
+                updated_at = NOW()
+            WHERE id = $1
+            "#
+        )
+        .bind(user_id)
+        .bind(quota_bytes)
+        .execute(&*self.pool)
+        .await
+        .map_err(Self::map_sqlx_error)?;
+
+        Ok(())
+    }
+
+    /// Cuenta el número total de usuarios
+    async fn count_users(&self) -> UserRepositoryResult<i64> {
+        let row = sqlx::query(
+            "SELECT COUNT(*) as count FROM auth.users"
+        )
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(Self::map_sqlx_error)?;
+
+        let count: i64 = row.get("count");
+        Ok(count)
+    }
+
+    /// Obtiene estadísticas de almacenamiento agregadas
+    async fn get_storage_stats(&self) -> UserRepositoryResult<StorageStats> {
+        let row = sqlx::query(
+            r#"
+            SELECT
+                COUNT(*) as total_users,
+                COUNT(*) FILTER (WHERE active = true) as active_users,
+                COALESCE(SUM(storage_quota_bytes), 0) as total_quota_bytes,
+                COALESCE(SUM(storage_used_bytes), 0) as total_used_bytes,
+                COUNT(*) FILTER (WHERE storage_quota_bytes > 0 AND storage_used_bytes > storage_quota_bytes * 0.8) as users_over_80_percent,
+                COUNT(*) FILTER (WHERE storage_quota_bytes > 0 AND storage_used_bytes > storage_quota_bytes) as users_over_quota
+            FROM auth.users
+            "#
+        )
+        .fetch_one(&*self.pool)
+        .await
+        .map_err(Self::map_sqlx_error)?;
+
+        Ok(StorageStats {
+            total_users: row.get("total_users"),
+            active_users: row.get("active_users"),
+            total_quota_bytes: row.get("total_quota_bytes"),
+            total_used_bytes: row.get("total_used_bytes"),
+            users_over_80_percent: row.get("users_over_80_percent"),
+            users_over_quota: row.get("users_over_quota"),
+        })
+    }
 }
 
 // Implementación del puerto de almacenamiento para la capa de aplicación
@@ -600,6 +661,34 @@ impl UserStoragePort for UserPgRepository {
 
     async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> Result<User, DomainError> {
         UserRepository::get_user_by_oidc_subject(self, provider, subject)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn set_user_active_status(&self, user_id: &str, active: bool) -> Result<(), DomainError> {
+        UserRepository::set_user_active_status(self, user_id, active)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn change_role(&self, user_id: &str, role: &str) -> Result<(), DomainError> {
+        let user_role = match role {
+            "admin" => UserRole::Admin,
+            _ => UserRole::User,
+        };
+        UserRepository::change_role(self, user_id, user_role)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> Result<(), DomainError> {
+        UserRepository::update_storage_quota(self, user_id, quota_bytes)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn count_users(&self) -> Result<i64, DomainError> {
+        UserRepository::count_users(self)
             .await
             .map_err(DomainError::from)
     }
