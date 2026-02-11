@@ -56,6 +56,15 @@ const LANGUAGE_TEXTS = {
         modalTitle: 'انتخاب زبان',
         searchPlaceholder: 'جستجوی زبان...'
     }
+    de: {
+        title: 'Willkommen bei OxiCloud',
+        subtitle: 'Bitte wählen Sie Ihre Sprache',
+        continue: 'Fortfahren',
+        autodetected: 'Wir haben Ihre Sprache automatisch erkannt',
+        moreLanguages: 'Weitere Sprachen...',
+        modalTitle: 'Sprache auswählen',
+        searchPlaceholder: 'Sprache suchen...'
+    }  
 };
 
 // Complete language registry — add new languages here, they'll appear automatically
