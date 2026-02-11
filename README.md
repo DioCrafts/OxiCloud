@@ -123,4 +123,18 @@ MIT. See [LICENSE](LICENSE).
 
 ---
 
+## Star History
+
+<div align="center">
+  <a href="https://star-history.com/#DioCrafts/OxiCloud&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date" />
+      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
+    </picture>
+  </a>
+</div>
+
+---
+
 Questions? Open an issue. Want to help? PRs welcome.
