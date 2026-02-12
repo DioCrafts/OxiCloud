@@ -16,24 +16,24 @@ const ui = {
             folderMenu.id = 'folder-context-menu';
             folderMenu.innerHTML = `
                 <div class="context-menu-item" id="download-folder-option">
-                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Descargar</span>
+                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
                 </div>
                 <div class="context-menu-item" id="favorite-folder-option">
-                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Añadir a favoritos</span>
+                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Add to favorites</span>
                 </div>
                 <div class="context-menu-item" id="share-folder-option">
-                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Compartir</span>
+                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="rename-folder-option">
-                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Renombrar</span>
+                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Rename</span>
                 </div>
                 <div class="context-menu-item" id="move-folder-option">
-                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Mover a...</span>
+                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Move to...</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item context-menu-item-danger" id="delete-folder-option">
-                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Eliminar</span>
+                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Delete</span>
                 </div>
             `;
             document.body.appendChild(folderMenu);
@@ -46,28 +46,28 @@ const ui = {
             fileMenu.id = 'file-context-menu';
             fileMenu.innerHTML = `
                 <div class="context-menu-item" id="view-file-option">
-                    <i class="fas fa-eye"></i> <span data-i18n="actions.view">Ver</span>
+                    <i class="fas fa-eye"></i> <span data-i18n="actions.view">View</span>
                 </div>
                 <div class="context-menu-item" id="download-file-option">
-                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Descargar</span>
+                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="favorite-file-option">
-                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Añadir a favoritos</span>
+                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Add to favorites</span>
                 </div>
                 <div class="context-menu-item" id="share-file-option">
-                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Compartir</span>
+                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="rename-file-option">
-                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Renombrar</span>
+                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Rename</span>
                 </div>
                 <div class="context-menu-item" id="move-file-option">
-                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Mover a...</span>
+                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Move to...</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item context-menu-item-danger" id="delete-file-option">
-                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Eliminar</span>
+                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Delete</span>
                 </div>
             `;
             document.body.appendChild(fileMenu);
@@ -82,14 +82,14 @@ const ui = {
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
                         <i class="fas fa-pen" style="color:#ff5e3a"></i>
-                        <span data-i18n="dialogs.rename_folder">Renombrar</span>
+                        <span data-i18n="dialogs.rename_folder">Rename</span>
                     </div>
                     <div class="rename-dialog-body">
-                        <input type="text" id="rename-input" data-i18n-placeholder="dialogs.new_name" placeholder="Nuevo nombre">
+                        <input type="text" id="rename-input" data-i18n-placeholder="dialogs.new_name" placeholder="New name">
                     </div>
                     <div class="rename-dialog-buttons">
-                        <button class="btn btn-secondary" id="rename-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
-                        <button class="btn btn-primary" id="rename-confirm-btn" data-i18n="actions.rename">Renombrar</button>
+                        <button class="btn btn-secondary" id="rename-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-primary" id="rename-confirm-btn" data-i18n="actions.rename">Rename</button>
                     </div>
                 </div>
             `;
@@ -105,19 +105,19 @@ const ui = {
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
                         <i class="fas fa-arrows-alt" style="color:#ff5e3a"></i>
-                        <span data-i18n="dialogs.move_file">Mover</span>
+                        <span data-i18n="dialogs.move_file">Move</span>
                     </div>
                     <div class="rename-dialog-body">
-                        <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Selecciona la carpeta destino:</p>
+                        <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Select destination folder:</p>
                         <div id="folder-select-container" style="max-height:220px;overflow-y:auto;">
                             <div class="folder-select-item selected" data-folder-id="">
-                                <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Raíz</span>
+                                <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
                             </div>
                         </div>
                     </div>
                     <div class="rename-dialog-buttons">
-                        <button class="btn btn-secondary" id="move-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
-                        <button class="btn btn-primary" id="move-confirm-btn" data-i18n="actions.move_to">Mover</button>
+                        <button class="btn btn-secondary" id="move-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-primary" id="move-confirm-btn" data-i18n="actions.move_to">Move</button>
                     </div>
                 </div>
             `;
@@ -133,67 +133,67 @@ const ui = {
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
                         <i class="fas fa-share-alt" style="color:#ff5e3a"></i>
-                        <span data-i18n="dialogs.share_file">Compartir archivo</span>
+                        <span data-i18n="dialogs.share_file">Share file</span>
                     </div>
                     <div class="shared-item-info">
-                        <strong>Elemento:</strong> <span id="shared-item-name"></span>
+                        <strong>Item:</strong> <span id="shared-item-name"></span>
                     </div>
                     
                     <div id="existing-shares-section" style="display:none; margin: 15px 0;">
-                        <h3 data-i18n="dialogs.existing_shares">Enlaces compartidos existentes</h3>
+                        <h3 data-i18n="dialogs.existing_shares">Existing shared links</h3>
                         <div id="existing-shares-container"></div>
                     </div>
                     
                     <div class="share-options">
-                        <h3 data-i18n="dialogs.share_options">Opciones de compartición</h3>
+                        <h3 data-i18n="dialogs.share_options">Share options</h3>
                         
                         <div class="form-group">
-                            <label for="share-password" data-i18n="dialogs.password">Contraseña (opcional):</label>
-                            <input type="password" id="share-password" placeholder="Proteger con contraseña">
+                            <label for="share-password" data-i18n="dialogs.password">Password (optional):</label>
+                            <input type="password" id="share-password" placeholder="Protect with password">
                         </div>
                         
                         <div class="form-group">
-                            <label for="share-expiration" data-i18n="dialogs.expiration">Fecha de vencimiento (opcional):</label>
+                            <label for="share-expiration" data-i18n="dialogs.expiration">Expiration date (optional):</label>
                             <input type="date" id="share-expiration">
                         </div>
                         
                         <div class="form-group">
-                            <label data-i18n="dialogs.permissions">Permisos:</label>
+                            <label data-i18n="dialogs.permissions">Permissions:</label>
                             <div class="permission-options">
                                 <div class="permission-option">
                                     <input type="checkbox" id="share-permission-read" checked>
-                                    <label for="share-permission-read" data-i18n="permissions.read">Lectura</label>
+                                    <label for="share-permission-read" data-i18n="permissions.read">Read</label>
                                 </div>
                                 <div class="permission-option">
                                     <input type="checkbox" id="share-permission-write">
-                                    <label for="share-permission-write" data-i18n="permissions.write">Escritura</label>
+                                    <label for="share-permission-write" data-i18n="permissions.write">Write</label>
                                 </div>
                                 <div class="permission-option">
                                     <input type="checkbox" id="share-permission-reshare">
-                                    <label for="share-permission-reshare" data-i18n="permissions.reshare">Permitir compartir</label>
+                                    <label for="share-permission-reshare" data-i18n="permissions.reshare">Allow sharing</label>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     <div id="new-share-section" style="display:none; margin: 15px 0;">
-                        <h3 data-i18n="dialogs.generated_link">Enlace generado</h3>
+                        <h3 data-i18n="dialogs.generated_link">Generated link</h3>
                         <div class="form-group">
                             <input type="text" id="generated-share-url" readonly>
                             <div class="share-link-actions">
                                 <button class="btn btn-small" id="copy-share-btn">
-                                    <i class="fas fa-copy"></i> <span data-i18n="actions.copy">Copiar</span>
+                                    <i class="fas fa-copy"></i> <span data-i18n="actions.copy">Copy</span>
                                 </button>
                                 <button class="btn btn-small" id="notify-share-btn">
-                                    <i class="fas fa-envelope"></i> <span data-i18n="actions.notify">Notificar</span>
+                                    <i class="fas fa-envelope"></i> <span data-i18n="actions.notify">Notify</span>
                                 </button>
                             </div>
                         </div>
                     </div>
                     
                     <div class="share-dialog-buttons">
-                        <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
-                        <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Compartir</button>
+                        <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Share</button>
                     </div>
                 </div>
             `;
@@ -228,24 +228,24 @@ const ui = {
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
                         <i class="fas fa-envelope" style="color:#ff5e3a"></i>
-                        <span data-i18n="dialogs.notify">Notificar enlace compartido</span>
+                        <span data-i18n="dialogs.notify">Notify shared link</span>
                     </div>
                     
                     <p><strong>URL:</strong> <span id="notification-share-url"></span></p>
                     
                     <div class="form-group">
-                        <label for="notification-email" data-i18n="dialogs.recipient">Destinatario:</label>
-                        <input type="email" id="notification-email" placeholder="Correo electrónico">
+                        <label for="notification-email" data-i18n="dialogs.recipient">Recipient:</label>
+                        <input type="email" id="notification-email" placeholder="Email address">
                     </div>
                     
                     <div class="form-group">
-                        <label for="notification-message" data-i18n="dialogs.message">Mensaje (opcional):</label>
+                        <label for="notification-message" data-i18n="dialogs.message">Message (optional):</label>
                         <textarea id="notification-message" rows="3"></textarea>
                     </div>
                     
                     <div class="share-dialog-buttons">
-                        <button class="btn btn-secondary" id="notification-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
-                        <button class="btn btn-primary" id="notification-send-btn" data-i18n="actions.send">Enviar</button>
+                        <button class="btn btn-secondary" id="notification-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-primary" id="notification-send-btn" data-i18n="actions.send">Send</button>
                     </div>
                 </div>
             `;
@@ -402,7 +402,7 @@ const ui = {
             homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
             
             // For searching, we might have a custom breadcrumb text
-            if (folderName && folderName.startsWith('Búsqueda:')) {
+            if (folderName && folderName.startsWith('Search:')) {
                 // We're in search mode - don't add click handler
                 breadcrumb.appendChild(homeItem);
                 return;
@@ -421,7 +421,7 @@ const ui = {
         breadcrumb.appendChild(homeItem);
 
         // If we have a subfolder, add it to the breadcrumb
-        if (folderName && !folderName.startsWith('Mi Carpeta') && !folderName.startsWith('Búsqueda:')) {
+        if (folderName && !folderName.startsWith('Mi Carpeta') && !folderName.startsWith('Search:')) {
             const separator = document.createElement('span');
             separator.className = 'breadcrumb-separator';
             separator.textContent = '>';
@@ -633,14 +633,14 @@ const ui = {
      * @param {Object} folder - Folder object
      */
     addFolderToView(folder) {
-        // Verificar si la carpeta ya existe en la vista para evitar duplicados
+        // Check if the folder already exists in the view to avoid duplicates
         if (document.querySelector(`.file-card[data-folder-id="${folder.id}"]`) || 
             document.querySelector(`.file-item[data-folder-id="${folder.id}"]`)) {
-            console.log(`Carpeta ${folder.name} (${folder.id}) ya existe en la vista, no duplicando`);
+            console.log(`Folder ${folder.name} (${folder.id}) already exists in the view, not duplicating`);
             return;
         }
         
-        console.log(`Añadiendo carpeta a la vista: ${folder.name} (${folder.id})`);
+        console.log(`Adding folder to the view: ${folder.name} (${folder.id})`);
         
         // Grid view element
         const folderGridElement = document.createElement('div');
@@ -655,7 +655,7 @@ const ui = {
                 <i class="fas fa-folder"></i>
             </div>
             <div class="file-name">${folder.name}</div>
-            <div class="file-info">Carpeta</div>
+            <div class="file-info">Folder</div>
         `;
 
         // Drag and drop setup for folders
@@ -746,7 +746,7 @@ const ui = {
             if (id) {
                 if (isFolder) {
                     if (id === folder.id) {
-                        alert("No puedes mover una carpeta a sí misma");
+                        alert("You cannot move a folder to itself");
                         return;
                     }
                     await fileOps.moveFolder(id, folder.id);
@@ -758,7 +758,7 @@ const ui = {
 
         document.getElementById('files-grid').appendChild(folderGridElement);
 
-        // List view element - Mejorado
+        // List view element - Improved
         const folderListElement = document.createElement('div');
         folderListElement.className = 'file-item';
         folderListElement.dataset.folderId = folder.id;
@@ -788,7 +788,7 @@ const ui = {
             });
         }
 
-        // Mejorado: Estructura y clases para la vista de lista
+        // Improved: Structure and classes for list view
         folderListElement.innerHTML = `
             <div class="name-cell">
                 <div class="file-icon folder-icon">
@@ -796,7 +796,7 @@ const ui = {
                 </div>
                 <span>${folder.name}</span>
             </div>
-            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Carpeta'}</div>
+            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
         `;
@@ -844,7 +844,7 @@ const ui = {
             if (id) {
                 if (isFolder) {
                     if (id === folder.id) {
-                        alert("No puedes mover una carpeta a sí misma");
+                        alert("You cannot move a folder to itself");
                         return;
                     }
                     await fileOps.moveFolder(id, folder.id);
@@ -862,29 +862,29 @@ const ui = {
      * @param {Object} file - File object
      */
     addFileToView(file) {
-        // Verificar si el archivo ya existe en la vista para evitar duplicados
+        // Check if the file already exists in the view to avoid duplicates
         if (document.querySelector(`.file-card[data-file-id="${file.id}"]`) ||
             document.querySelector(`.file-item[data-file-id="${file.id}"]`)) {
-            console.log(`Archivo ${file.name} (${file.id}) ya existe en la vista, no duplicando`);
+            console.log(`File ${file.name} (${file.id}) already exists in the view, not duplicating`);
             return;
         }
         
-        console.log(`Añadiendo archivo a la vista: ${file.name} (${file.id})`);
+        console.log(`Adding file to the view: ${file.name} (${file.id})`);
         
         // Determine icon and type
         let iconClass = 'fas fa-file';
         let iconSpecialClass = '';
-        let typeLabel = 'Documento';
+        let typeLabel = 'Document';
 
         if (file.mime_type) {
             if (file.mime_type.startsWith('image/')) {
                 iconClass = 'fas fa-file-image';
                 iconSpecialClass = 'image-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Imagen';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
             } else if (file.mime_type.startsWith('text/')) {
                 iconClass = 'fas fa-file-alt';
                 iconSpecialClass = 'text-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Texto';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
             } else if (file.mime_type.startsWith('video/')) {
                 iconClass = 'fas fa-file-video';
                 iconSpecialClass = 'video-icon';
@@ -916,7 +916,7 @@ const ui = {
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${file.name}</div>
-            <div class="file-info">Modificado ${formattedDate.split(' ')[0]}</div>
+            <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
 
         fileGridElement.dataset.fileId = file.id;
@@ -1007,7 +1007,7 @@ const ui = {
 
         document.getElementById('files-grid').appendChild(fileGridElement);
 
-        // List view element - Mejorado con clases específicas y diseño mejorado
+        // List view element - Improved with specific classes and enhanced layout
         const fileListElement = document.createElement('div');
         fileListElement.className = 'file-item';
         fileListElement.dataset.fileId = file.id;
@@ -1238,9 +1238,9 @@ window.initRubberBandSelection = initRubberBandSelection;
  * @returns {Promise<boolean>} true if confirmed, false if cancelled
  */
 function showConfirmDialog({ title, message, confirmText, cancelText, danger = true } = {}) {
-    const ct = confirmText || (window.i18n ? window.i18n.t('actions.delete') : 'Eliminar');
-    const cc = cancelText || (window.i18n ? window.i18n.t('actions.cancel') : 'Cancelar');
-    const t = title || (window.i18n ? window.i18n.t('dialogs.confirm_title') : 'Confirmar acción');
+    const ct = confirmText || (window.i18n ? window.i18n.t('actions.delete') : 'Delete');
+    const cc = cancelText || (window.i18n ? window.i18n.t('actions.cancel') : 'Cancel');
+    const t = title || (window.i18n ? window.i18n.t('dialogs.confirm_title') : 'Confirm action');
 
     return new Promise((resolve) => {
         // Remove any previous confirm dialog

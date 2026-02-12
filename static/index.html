@@ -27,7 +27,7 @@
     <script src="/js/fileRenderer.js"></script>
     <script src="/js/fileSharing.js"></script>
     <script src="/js/components/sharedView.js"></script>
-    <!-- Los viewers se cargan al final para asegurar que document.body esté disponible -->
+    <!-- Viewers are loaded last to ensure document.body is available -->
     <script defer src="/js/fileViewer.js"></script>
     <script defer src="/js/inlineViewer.js"></script>
     <script src="/js/app.js"></script>
@@ -94,7 +94,7 @@
         <div class="top-bar">
             <div class="search-container">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" id="search-input" data-i18n-placeholder="actions.search" placeholder="Buscar archivos, carpetas...">
+                <input type="text" id="search-input" data-i18n-placeholder="actions.search" placeholder="Search files, folders...">
                 <button id="search-button" class="search-button" data-i18n-title="actions.search_btn" title="Search">
                     <i class="fas fa-search"></i>
                 </button>
@@ -110,8 +110,8 @@
                         <div class="user-menu-header">
                             <div class="user-menu-avatar" id="user-menu-avatar">AD</div>
                             <div class="user-menu-info">
-                                <div class="user-menu-name" id="user-menu-name">Usuario</div>
-                                <div class="user-menu-email" id="user-menu-email">usuario@oxicloud.app</div>
+                                <div class="user-menu-name" id="user-menu-name">User</div>
+                                <div class="user-menu-email" id="user-menu-email">user@oxicloud.app</div>
                             </div>
                         </div>
                         <div class="user-menu-role-badge" id="user-menu-role-badge" style="display:none">
@@ -120,38 +120,38 @@
                         <div class="user-menu-storage">
                             <div class="user-menu-storage-label">
                                 <i class="fas fa-database"></i>
-                                <span data-i18n="storage.title">Almacenamiento</span>
+                                <span data-i18n="storage.title">Storage</span>
                             </div>
                             <div class="user-menu-storage-bar">
                                 <div class="user-menu-storage-fill" id="user-menu-storage-fill"></div>
                             </div>
-                            <div class="user-menu-storage-text" id="user-menu-storage-text">0% usado</div>
+                            <div class="user-menu-storage-text" id="user-menu-storage-text">0% used</div>
                         </div>
                         <div class="user-menu-divider"></div>
                         <button class="user-menu-item user-menu-admin" id="user-menu-admin" style="display:none">
                             <i class="fas fa-cogs"></i>
-                            <span data-i18n="user_menu.admin_panel">Panel de administración</span>
+                            <span data-i18n="user_menu.admin_panel">Admin panel</span>
                         </button>
                         <button class="user-menu-item" id="user-menu-profile">
                             <i class="fas fa-user-circle"></i>
-                            <span data-i18n="user_menu.profile">Mi perfil</span>
+                            <span data-i18n="user_menu.profile">My profile</span>
                         </button>
                         <div class="user-menu-divider" id="user-menu-admin-divider" style="display:none"></div>
                         <button class="user-menu-item" id="user-menu-theme">
                             <i class="fas fa-moon"></i>
-                            <span data-i18n="user_menu.appearance">Apariencia</span>
+                            <span data-i18n="user_menu.appearance">Appearance</span>
                             <div class="theme-toggle-pill" id="theme-toggle-pill">
                                 <div class="theme-toggle-knob"></div>
                             </div>
                         </button>
                         <button class="user-menu-item" id="user-menu-about">
                             <i class="fas fa-info-circle"></i>
-                            <span data-i18n="user_menu.about">Acerca de OxiCloud</span>
+                            <span data-i18n="user_menu.about">About OxiCloud</span>
                         </button>
                         <div class="user-menu-divider"></div>
                         <button class="user-menu-item user-menu-logout" id="user-menu-logout">
                             <i class="fas fa-sign-out-alt"></i>
-                            <span data-i18n="actions.logout">Cerrar sesión</span>
+                            <span data-i18n="actions.logout">Log out</span>
                         </button>
                     </div>
                 </div>
@@ -159,38 +159,38 @@
         </div>
 
         <div class="content-area">
-            <h1 class="page-title" data-i18n="nav.files">Archivos</h1>
+            <h1 class="page-title" data-i18n="nav.files">Files</h1>
 
             <div class="actions-bar">
                 <div class="action-buttons">
                     <div class="upload-dropdown" id="upload-dropdown">
                         <button class="btn btn-primary" id="upload-btn">
                             <i class="fas fa-cloud-upload-alt"></i>
-                            <span data-i18n="actions.upload">Subir</span>
+                            <span data-i18n="actions.upload">Upload</span>
                             <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
                         </button>
                         <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                             <button class="upload-dropdown-item" id="upload-files-btn">
                                 <i class="fas fa-file"></i>
-                                <span data-i18n="actions.upload_files">Subir archivos</span>
+                                <span data-i18n="actions.upload_files">Upload files</span>
                             </button>
                             <button class="upload-dropdown-item" id="upload-folder-btn">
                                 <i class="fas fa-folder-open"></i>
-                                <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                                <span data-i18n="actions.upload_folder">Upload folder</span>
                             </button>
                         </div>
                     </div>
                     <button class="btn btn-secondary" id="new-folder-btn">
                         <i class="fas fa-folder-plus"></i>
-                        <span data-i18n="actions.new_folder">Nueva carpeta</span>
+                        <span data-i18n="actions.new_folder">New folder</span>
                     </button>
                 </div>
 
                 <div class="view-toggle">
-                    <button class="toggle-btn active" id="grid-view-btn" title="Vista de cuadrícula">
+                    <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
                         <i class="fas fa-th"></i>
                     </button>
-                    <button class="toggle-btn" id="list-view-btn" title="Vista de lista">
+                    <button class="toggle-btn" id="list-view-btn" title="List view">
                         <i class="fas fa-list"></i>
                     </button>
                 </div>
@@ -198,7 +198,7 @@
 
             <div class="dropzone" id="dropzone">
                 <i class="fas fa-cloud-upload-alt" style="font-size: 32px; margin-bottom: 10px;"></i>
-                <p data-i18n="dropzone.drag_files">Arrastra archivos aquí o haz clic para seleccionar</p>
+                <p data-i18n="dropzone.drag_files">Drag files here or click to select</p>
                 <input type="file" id="file-input" style="display: none;" multiple>
                 <input type="file" id="folder-input" style="display: none;" webkitdirectory directory multiple>
                 <div class="upload-progress">
@@ -222,10 +222,10 @@
                 <!-- List View (hidden by default) -->
                 <div class="files-list-view" id="files-list-view" style="display: none;">
                     <div class="list-header">
-                        <div data-i18n="files.name">Nombre</div>
-                        <div data-i18n="files.type">Tipo</div>
-                        <div data-i18n="files.size">Tamaño</div>
-                        <div data-i18n="files.modified">Modificado</div>
+                        <div data-i18n="files.name">Name</div>
+                        <div data-i18n="files.type">Type</div>
+                        <div data-i18n="files.size">Size</div>
+                        <div data-i18n="files.modified">Modified</div>
                     </div>
                     <!-- Files will be populated here in list view -->
                 </div>
@@ -240,18 +240,18 @@
                 <div class="modal-icon">
                     <i id="modal-icon" class="fas fa-folder-plus"></i>
                 </div>
-                <h3 id="modal-title" data-i18n="dialogs.new_folder_title">Nueva carpeta</h3>
+                <h3 id="modal-title" data-i18n="dialogs.new_folder_title">New folder</h3>
                 <button class="modal-close-btn" id="modal-close-btn">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="modal-body">
-                <label id="modal-label" for="modal-input" data-i18n="dialogs.folder_name">Nombre de la carpeta</label>
+                <label id="modal-label" for="modal-input" data-i18n="dialogs.folder_name">Folder name</label>
                 <input type="text" id="modal-input" class="modal-input" placeholder="" autocomplete="off">
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="modal-cancel-btn" data-i18n="actions.cancel">Cancelar</button>
-                <button class="btn btn-primary" id="modal-confirm-btn" data-i18n="actions.confirm">Crear</button>
+                <button class="btn btn-secondary" id="modal-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                <button class="btn btn-primary" id="modal-confirm-btn" data-i18n="actions.confirm">Create</button>
             </div>
         </div>
     </div>
@@ -281,7 +281,7 @@
                     <i class="fas fa-file-alt"></i> MIT License
                 </a>
             </div>
-            <button class="about-close-btn" id="about-close-btn" data-i18n="actions.close">Cerrar</button>
+            <button class="about-close-btn" id="about-close-btn" data-i18n="actions.close">Close</button>
         </div>
     </div>
 </body>

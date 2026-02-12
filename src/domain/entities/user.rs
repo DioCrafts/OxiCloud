@@ -1,7 +1,7 @@
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
 
-// Re-exportar errores de entidad desde el módulo centralizado
+// Re-export entity errors from the centralized module
 pub use super::entity_errors::{UserError, UserResult};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,22 +57,22 @@ impl User {
         role: UserRole,
         storage_quota_bytes: i64,
     ) -> UserResult<Self> {
-        // Validaciones
+        // Validations
         if username.is_empty() || username.len() < 3 || username.len() > 32 {
             return Err(UserError::InvalidUsername(format!(
-                "Username debe tener entre 3 y 32 caracteres"
+                "Username must be between 3 and 32 characters"
             )));
         }
         
         if !email.contains('@') || email.len() < 5 {
             return Err(UserError::ValidationError(format!(
-                "Email inválido"
+                "Invalid email"
             )));
         }
         
         if password_hash.is_empty() {
             return Err(UserError::InvalidPassword(format!(
-                "Password hash no puede estar vacío"
+                "Password hash cannot be empty"
             )));
         }
         
@@ -106,12 +106,12 @@ impl User {
     ) -> UserResult<Self> {
         if username.is_empty() || username.len() < 3 || username.len() > 32 {
             return Err(UserError::InvalidUsername(
-                "Username debe tener entre 3 y 32 caracteres".to_string(),
+                "Username must be between 3 and 32 characters".to_string(),
             ));
         }
         if !email.contains('@') || email.len() < 5 {
             return Err(UserError::ValidationError(
-                "Email inválido".to_string(),
+                "Invalid email".to_string(),
             ));
         }
         let now = Utc::now();
@@ -132,7 +132,7 @@ impl User {
         })
     }
     
-    // Crear desde valores existentes (para reconstrucción desde BD)
+    // Create from existing values (for reconstruction from DB)
     pub fn from_data(
         id: String,
         username: String,
@@ -263,26 +263,26 @@ impl User {
         self.updated_at = Utc::now();
     }
     
-    // Actualizar uso de almacenamiento
+    // Update storage usage
     pub fn update_storage_used(&mut self, storage_used_bytes: i64) {
         self.storage_used_bytes = storage_used_bytes;
         self.updated_at = Utc::now();
     }
     
-    // Registrar login
+    // Register login
     pub fn register_login(&mut self) {
         let now = Utc::now();
         self.last_login_at = Some(now);
         self.updated_at = now;
     }
     
-    // Desactivar usuario
+    // Deactivate user
     pub fn deactivate(&mut self) {
         self.active = false;
         self.updated_at = Utc::now();
     }
     
-    // Activar usuario
+    // Activate user
     pub fn activate(&mut self) {
         self.active = true;
         self.updated_at = Utc::now();

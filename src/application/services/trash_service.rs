@@ -303,17 +303,7 @@ impl TrashUseCase for TrashService {
             }
         };
         
-        // Obtener el elemento de la papelera
-        info!("Retrieving trash item from repository: ID={}", trash_id);
-        let item_result = self.trash_repository.get_trash_item(&trash_uuid, &user_uuid).await;
-        
-        match item_result {
-            Ok(Some(item)) => {
-                info!("Found item in trash: ID={}, Type={:?}, OriginalID={}", 
-                    trash_id, item.item_type(), item.original_id());
-                
-                // Restore based on type
-                match item.item_type() {
+        // Get the trash item
                     TrashedItemType::File => {
                         // Restore the file to its original location
                         let file_id = item.original_id().to_string();
@@ -428,7 +418,7 @@ impl TrashUseCase for TrashService {
             }
         };
         
-        // Obtener el elemento de la papelera
+        // Get the trash item
         info!("Retrieving trash item from repository: ID={}", trash_id);
         let item_result = self.trash_repository.get_trash_item(&trash_uuid, &user_uuid).await;
         
@@ -440,7 +430,7 @@ impl TrashUseCase for TrashService {
                 // Permanently delete based on type
                 match item.item_type() {
                     TrashedItemType::File => {
-                        // Eliminar el archivo permanentemente
+                        // Permanently delete the file
                         let file_id = item.original_id().to_string();
                         
                         info!("Permanently deleting file: {}", file_id);
@@ -466,7 +456,7 @@ impl TrashUseCase for TrashService {
                         }
                     },
                     TrashedItemType::Folder => {
-                        // Eliminar la carpeta permanentemente
+                        // Permanently delete the folder
                         let folder_id = item.original_id().to_string();
                         
                         info!("Permanently deleting folder: {}", folder_id);

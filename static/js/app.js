@@ -197,7 +197,7 @@ function setupUserMenu() {
                 // Theme switching could be expanded here in the future
                 window.ui.showNotification(
                     dark ? '🌙' : '☀️',
-                    dark ? 'Modo oscuro activado (próximamente)' : 'Modo claro activado'
+                    dark ? 'Dark mode enabled (coming soon)' : 'Light mode enabled'
                 );
             }
         });
@@ -476,12 +476,12 @@ function setupEventListeners() {
                 if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
                 
                 // Update UI
-                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Papelera';
+                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';
                 elements.actionsBar.innerHTML = `
                     <div class="action-buttons">
                         <button class="btn btn-danger" id="empty-trash-btn">
                             <i class="fas fa-trash-alt"></i>
-                            <span>${window.i18n ? window.i18n.t('trash.empty_trash') : 'Vaciar papelera'}</span>
+                            <span>${window.i18n ? window.i18n.t('trash.empty_trash') : 'Empty trash'}</span>
                         </button>
                     </div>
                 `;
@@ -519,35 +519,35 @@ function setupEventListeners() {
                 app.currentSection = 'files';
                 
                 // Reset UI
-                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Archivos';
+                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
                 elements.actionsBar.innerHTML = `
                     <div class="action-buttons">
                         <div class="upload-dropdown" id="upload-dropdown">
                             <button class="btn btn-primary" id="upload-btn">
                                 <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
-                                <span data-i18n="actions.upload">Subir</span>
+                                <span data-i18n="actions.upload">Upload</span>
                                 <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
                             </button>
                             <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                                 <button class="upload-dropdown-item" id="upload-files-btn">
                                     <i class="fas fa-file"></i>
-                                    <span data-i18n="actions.upload_files">Subir archivos</span>
+                                    <span data-i18n="actions.upload_files">Upload files</span>
                                 </button>
                                 <button class="upload-dropdown-item" id="upload-folder-btn">
                                     <i class="fas fa-folder-open"></i>
-                                    <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                                    <span data-i18n="actions.upload_folder">Upload folder</span>
                                 </button>
                             </div>
                         </div>
                         <button class="btn btn-secondary" id="new-folder-btn">
-                            <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">Nueva carpeta</span>
+                            <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">New folder</span>
                         </button>
                     </div>
                     <div class="view-toggle">
-                        <button class="toggle-btn active" id="grid-view-btn" title="Vista de cuadrícula">
+                        <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
                             <i class="fas fa-th"></i>
                         </button>
-                        <button class="toggle-btn" id="list-view-btn" title="Vista de lista">
+                        <button class="toggle-btn" id="list-view-btn" title="List view">
                             <i class="fas fa-list"></i>
                         </button>
                     </div>
@@ -623,14 +623,14 @@ function setupEventListeners() {
  */
 async function loadFiles(options = {}) {
     try {
-        console.log("Iniciando loadFiles() - cargando archivos...", options);
+        console.log("Starting loadFiles() - loading files...", options);
         
-        // Flag para forzar el refresco completo ignorando caché
+        // Flag to force complete refresh ignoring cache
         const forceRefresh = options.forceRefresh || false;
         
-        // Prevenir múltiples solicitudes de carga simultáneas
+        // Prevent multiple simultaneous load requests
         if (window.isLoadingFiles) {
-            console.log("Ya hay una carga de archivos en progreso, ignorando solicitud");
+            console.log("A file load is already in progress, ignoring request");
             return;
         }
         
@@ -640,7 +640,7 @@ async function loadFiles(options = {}) {
         elements.filesGrid.innerHTML = `
             <div class="files-loading-spinner">
                 <div class="spinner"></div>
-                <span>${window.i18n ? window.i18n.t('files.loading') : 'Cargando archivos…'}</span>
+                <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
             </div>
         `;
         
@@ -651,12 +651,12 @@ async function loadFiles(options = {}) {
             const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
             if (userData.username) {
                 // Find user's home folder
-                console.log("Buscando carpeta de usuario para", userData.username);
+                console.log("Looking for user folder for", userData.username);
                 await findUserHomeFolder(userData.username);
             }
         }
         
-        // Agregar timestamp para evitar caché
+        // Add timestamp to avoid cache
         const timestamp = new Date().getTime();
         let url;
         
@@ -667,7 +667,7 @@ async function loadFiles(options = {}) {
                 url = `/api/folders/${app.userHomeFolderId}/contents?t=${timestamp}`;
                 app.currentPath = app.userHomeFolderId;
                 ui.updateBreadcrumb(app.userHomeFolderName || 'Home');
-                console.log(`Cargando carpeta del usuario: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
+                console.log(`Loading user folder: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
             } else {
                 // Emergency fallback - this should rarely happen but prevents errors
                 url = `/api/folders?t=${timestamp}`;
@@ -676,7 +676,7 @@ async function loadFiles(options = {}) {
         } else {
             // Normal case - viewing subfolder contents
             url = `/api/folders/${app.currentPath}/contents?t=${timestamp}`;
-            console.log(`Cargando contenido de subcarpeta: ${app.currentPath}`);
+            console.log(`Loading subfolder content: ${app.currentPath}`);
         }
         
         const token = localStorage.getItem('oxicloud_token');
@@ -686,14 +686,14 @@ async function loadFiles(options = {}) {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache'
             },
-            cache: 'no-store'  // Instruir al navegador a no usar caché
+            cache: 'no-store'  // Instruct the browser not to use cache
         };
         
-        // Si se especifica forceRefresh, agregar un parámetro adicional para evitar caché
+        // If forceRefresh is specified, add an additional parameter to avoid cache
         if (forceRefresh) {
             url += `&force_refresh=true`;
             requestOptions.headers['X-Force-Refresh'] = 'true';
-            console.log('Forzando refresco completo ignorando caché');
+            console.log('Forcing complete refresh ignoring cache');
         }
         
         console.log(`Loading files from ${url}`);
@@ -703,13 +703,13 @@ async function loadFiles(options = {}) {
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");
             // Just show empty state instead of causing redirect loops
-            elements.filesGrid.innerHTML = '<div class="empty-state"><p>No se pudieron cargar los archivos</p></div>';
+            elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
             elements.filesListView.innerHTML = `
                 <div class="list-header">
-                    <div>Nombre</div>
-                    <div>Tipo</div>
-                    <div>Tamaño</div>
-                    <div>Modificado</div>
+                    <div>Name</div>
+                    <div>Type</div>
+                    <div>Size</div>
+                    <div>Modified</div>
                 </div>
             `;
             return;
@@ -724,10 +724,10 @@ async function loadFiles(options = {}) {
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
             <div class="list-header">
-                <div data-i18n="files.name">Nombre</div>
-                <div data-i18n="files.type">Tipo</div>
-                <div data-i18n="files.size">Tamaño</div>
-                <div data-i18n="files.modified">Modificado</div>
+                <div data-i18n="files.name">Name</div>
+                <div data-i18n="files.type">Type</div>
+                <div data-i18n="files.size">Size</div>
+                <div data-i18n="files.modified">Modified</div>
             </div>
         `;
         
@@ -766,11 +766,11 @@ async function loadFiles(options = {}) {
         
         // Also load files in this folder
         const cacheTimestamp = new Date().getTime();
-        let filesUrl = `/api/files?t=${cacheTimestamp}`; // Agregar timestamp para evitar problemas de caché
+        let filesUrl = `/api/files?t=${cacheTimestamp}`; // Add timestamp to avoid cache issues
         if (app.currentPath) {
             filesUrl += `&folder_id=${app.currentPath}`;
         }
-        console.log(`Cargando archivos desde: ${filesUrl}`);
+        console.log(`Loading files from: ${filesUrl}`);
         
         try {
             console.log(`Fetching files from: ${filesUrl}`);
@@ -810,7 +810,7 @@ async function loadFiles(options = {}) {
         console.error('Error loading folders:', error);
         ui.showNotification('Error', 'Could not load files and folders');
     } finally {
-        // Marcar que ya no estamos cargando archivos para permitir solicitudes futuras
+        // Mark that we are no longer loading files to allow future requests
         window.isLoadingFiles = false;
     }
 }
@@ -839,11 +839,11 @@ async function loadTrashItems() {
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
             <div class="list-header">
-                <div data-i18n="files.name">Nombre</div>
-                <div data-i18n="files.type">Tipo</div>
-                <div data-i18n="trash.original_location">Ubicación original</div>
-                <div data-i18n="trash.deleted_date">Fecha eliminación</div>
-                <div data-i18n="trash.actions">Acciones</div>
+                <div data-i18n="files.name">Name</div>
+                <div data-i18n="files.type">Type</div>
+                <div data-i18n="trash.original_location">Original location</div>
+                <div data-i18n="trash.deleted_date">Deletion date</div>
+                <div data-i18n="trash.actions">Actions</div>
             </div>
         `;
         
@@ -864,7 +864,7 @@ async function loadTrashItems() {
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
                 <i class="fas fa-trash" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
-                <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'La papelera está vacía'}</p>
+                <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'The trash is empty'}</p>
             `;
             elements.filesGrid.appendChild(emptyState);
             return;
@@ -877,7 +877,7 @@ async function loadTrashItems() {
         
     } catch (error) {
         console.error('Error loading trash items:', error);
-        window.ui.showNotification('Error', 'Error al cargar elementos de la papelera');
+        window.ui.showNotification('Error', 'Error loading trash items');
     }
 }
 
@@ -896,8 +896,8 @@ function addTrashItemToView(item) {
                          
     // Item type label
     const typeLabel = isFile ? 
-        (window.i18n ? window.i18n.t('files.file_types.file') : 'Archivo') :
-        (window.i18n ? window.i18n.t('files.file_types.folder') : 'Carpeta');
+        (window.i18n ? window.i18n.t('files.file_types.file') : 'File') :
+        (window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder');
     
     // Grid view element
     const gridElement = document.createElement('div');
@@ -912,10 +912,10 @@ function addTrashItemToView(item) {
         <div class="file-name">${item.name}</div>
         <div class="file-info">${typeLabel} - ${formattedDate}</div>
         <div class="trash-actions">
-            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restaurar'}">
+            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
                 <i class="fas fa-undo"></i>
             </button>
-            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Eliminar permanentemente'}">
+            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
                 <i class="fas fa-trash"></i>
             </button>
         </div>
@@ -956,10 +956,10 @@ function addTrashItemToView(item) {
         <div class="path-cell">${item.original_path || '--'}</div>
         <div class="date-cell">${formattedDate}</div>
         <div class="actions-cell">
-            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restaurar'}">
+            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
                 <i class="fas fa-undo"></i>
             </button>
-            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Eliminar permanentemente'}">
+            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
                 <i class="fas fa-trash"></i>
             </button>
         </div>
@@ -995,7 +995,7 @@ async function performSearch(query) {
         app.isSearchMode = true;
         
         // Set breadcrumb for search
-        ui.updateBreadcrumb(`Búsqueda: "${query}"`);
+        ui.updateBreadcrumb(`Search: "${query}"`);
         
         // Prepare search options
         const options = {
@@ -1037,7 +1037,7 @@ async function performSearch(query) {
         
     } catch (error) {
         console.error('Search error:', error);
-        window.ui.showNotification('Error', 'Error al realizar la búsqueda');
+        window.ui.showNotification('Error', 'Error performing search');
     }
 }
 
@@ -1076,7 +1076,7 @@ function switchToSharedView() {
     }
     
     // Update UI
-    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Compartidos';
+    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Shared';
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
@@ -1105,7 +1105,7 @@ function switchToFilesView() {
     app.currentSection = 'files';
     
     // Update UI
-    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Archivos';
+    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
     
     // Remove active class from all nav items
     elements.navItems.forEach(navItem => navItem.classList.remove('active'));
@@ -1122,29 +1122,29 @@ function switchToFilesView() {
             <div class="upload-dropdown" id="upload-dropdown">
                 <button class="btn btn-primary" id="upload-btn">
                     <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
-                    <span data-i18n="actions.upload">Subir</span>
+                    <span data-i18n="actions.upload">Upload</span>
                     <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
                 </button>
                 <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                     <button class="upload-dropdown-item" id="upload-files-btn">
                         <i class="fas fa-file"></i>
-                        <span data-i18n="actions.upload_files">Subir archivos</span>
+                        <span data-i18n="actions.upload_files">Upload files</span>
                     </button>
                     <button class="upload-dropdown-item" id="upload-folder-btn">
                         <i class="fas fa-folder-open"></i>
-                        <span data-i18n="actions.upload_folder">Subir carpeta</span>
+                        <span data-i18n="actions.upload_folder">Upload folder</span>
                     </button>
                 </div>
             </div>
             <button class="btn btn-secondary" id="new-folder-btn">
-                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">Nueva carpeta</span>
+                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">New folder</span>
             </button>
         </div>
         <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Vista de cuadrícula">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
                 <i class="fas fa-th"></i>
             </button>
-            <button class="toggle-btn" id="list-view-btn" title="Vista de lista">
+            <button class="toggle-btn" id="list-view-btn" title="List view">
                 <i class="fas fa-list"></i>
             </button>
         </div>
@@ -1219,7 +1219,7 @@ function switchToFavoritesView() {
     }
     
     // Update UI
-    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.favorites') : 'Favoritos';
+    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.favorites') : 'Favorites';
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
@@ -1235,10 +1235,10 @@ function switchToFavoritesView() {
             <!-- No actions needed for favorites view -->
         </div>
         <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Vista de cuadrícula">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
                 <i class="fas fa-th"></i>
             </button>
-            <button class="toggle-btn" id="list-view-btn" title="Vista de lista">
+            <button class="toggle-btn" id="list-view-btn" title="List view">
                 <i class="fas fa-list"></i>
             </button>
         </div>
@@ -1278,7 +1278,7 @@ function switchToFavoritesView() {
             filesGrid.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
-                    <p>Error al cargar el módulo de favoritos</p>
+                    <p>Error loading the favorites module</p>
                 </div>
             `;
         }
@@ -1308,7 +1308,7 @@ function switchToRecentFilesView() {
     }
     
     // Update UI
-    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.recent') : 'Recientes';
+    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.recent') : 'Recent';
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
@@ -1322,14 +1322,14 @@ function switchToRecentFilesView() {
     elements.actionsBar.innerHTML = `
         <div class="action-buttons">
             <button class="btn btn-secondary" id="clear-recent-btn">
-                <i class="fas fa-broom" style="margin-right: 5px;"></i> <span data-i18n="actions.clear_recent">Limpiar recientes</span>
+                <i class="fas fa-broom" style="margin-right: 5px;"></i> <span data-i18n="actions.clear_recent">Clear recent</span>
             </button>
         </div>
         <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Vista de cuadrícula">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
                 <i class="fas fa-th"></i>
             </button>
-            <button class="toggle-btn" id="list-view-btn" title="Vista de lista">
+            <button class="toggle-btn" id="list-view-btn" title="List view">
                 <i class="fas fa-list"></i>
             </button>
         </div>
@@ -1341,7 +1341,7 @@ function switchToRecentFilesView() {
         if (window.recent) {
             window.recent.clearRecentFiles();
             window.recent.displayRecentFiles();
-            window.ui.showNotification('Limpieza completada', 'Se ha limpiado el historial de archivos recientes');
+            window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
         }
     });
     
@@ -1378,7 +1378,7 @@ function switchToRecentFilesView() {
             filesGrid.innerHTML = `
                 <div class="empty-state">
                     <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
-                    <p>Error al cargar el módulo de archivos recientes</p>
+                    <p>Error loading the recent files module</p>
                 </div>
             `;
         }
@@ -1450,7 +1450,7 @@ window.refreshUserData = refreshUserData;
 function showUserProfileModal() {
     const USER_DATA_KEY = 'oxicloud_user';
     const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-    const username = userData.username || 'Usuario';
+    const username = userData.username || 'User';
     const email = userData.email || '';
     const role = userData.role || 'user';
     const initials = username.substring(0, 2).toUpperCase();
@@ -1847,7 +1847,7 @@ async function findUserHomeFolder(username) {
  * Logout - clear all auth data and redirect to login
  */
 function logout() {
-    // Nombres de variables según auth.js
+    // Variable names as per auth.js
     const TOKEN_KEY = 'oxicloud_token';
     const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
     const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';

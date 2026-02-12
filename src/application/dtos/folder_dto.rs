@@ -66,11 +66,11 @@ impl From<Folder> for FolderDto {
     }
 }
 
-// Para convertir de FolderDto a Folder para los batch handlers
+// To convert from FolderDto to Folder for batch handlers
 impl From<FolderDto> for Folder {
     fn from(dto: FolderDto) -> Self {
-        // Usar constructor para crear una entidad desde DTO
-        // Nota: esto debe simplificarse si Folder tiene un constructor adecuado
+        // Use constructor to create an entity from DTO
+        // Note: this should be simplified if Folder has a proper constructor
         Folder::from_dto(
             dto.id,
             dto.name,

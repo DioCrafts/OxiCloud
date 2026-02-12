@@ -2,98 +2,98 @@ use std::time::Duration;
 use std::path::PathBuf;
 use std::env;
 
-/// Configuración de caché
+/// Cache configuration
 #[derive(Debug, Clone)]
 pub struct CacheConfig {
-    /// TTL para entradas de archivos en caché (ms)
+    /// TTL for file cache entries (ms)
     pub file_ttl_ms: u64,
-    /// TTL para entradas de directorios en caché (ms)
+    /// TTL for directory cache entries (ms)
     pub directory_ttl_ms: u64,
-    /// Máximo número de entradas en caché
+    /// Maximum number of cache entries
     pub max_entries: usize,
 }
 
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            file_ttl_ms: 60_000,     // 1 minuto
-            directory_ttl_ms: 120_000, // 2 minutos
-            max_entries: 10_000,      // 10,000 entradas
+            file_ttl_ms: 60_000,     // 1 minute
+            directory_ttl_ms: 120_000, // 2 minutes
+            max_entries: 10_000,      // 10,000 entries
         }
     }
 }
 
-/// Configuración de timeouts para diferentes operaciones
+/// Timeout configuration for different operations
 #[derive(Debug, Clone)]
 pub struct TimeoutConfig {
-    /// Timeout para operaciones de archivo (ms)
+    /// Timeout for file operations (ms)
     pub file_operation_ms: u64,
-    /// Timeout para operaciones de directorio (ms)
+    /// Timeout for directory operations (ms)
     pub dir_operation_ms: u64,
-    /// Timeout para adquisición de locks (ms)
+    /// Timeout for lock acquisition (ms)
     pub lock_acquisition_ms: u64,
-    /// Timeout para operaciones de red (ms)
+    /// Timeout for network operations (ms)
     pub network_operation_ms: u64,
 }
 
 impl Default for TimeoutConfig {
     fn default() -> Self {
         Self {
-            file_operation_ms: 10000,    // 10 segundos
-            dir_operation_ms: 30000,     // 30 segundos
-            lock_acquisition_ms: 5000,   // 5 segundos
-            network_operation_ms: 15000, // 15 segundos
+            file_operation_ms: 10000,    // 10 seconds
+            dir_operation_ms: 30000,     // 30 seconds
+            lock_acquisition_ms: 5000,   // 5 seconds
+            network_operation_ms: 15000, // 15 seconds
         }
     }
 }
 
 impl TimeoutConfig {
-    /// Obtiene un Duration para operaciones de archivo
+    /// Gets a Duration for file operations
     pub fn file_timeout(&self) -> Duration {
         Duration::from_millis(self.file_operation_ms)
     }
 
-    /// Obtiene un Duration para operaciones de escritura de archivo
+    /// Gets a Duration for file write operations
     pub fn file_write_timeout(&self) -> Duration {
         Duration::from_millis(self.file_operation_ms)
     }
 
-    /// Obtiene un Duration para operaciones de lectura de archivo
+    /// Gets a Duration for file read operations
     pub fn file_read_timeout(&self) -> Duration {
         Duration::from_millis(self.file_operation_ms)
     }
 
-    /// Obtiene un Duration para operaciones de eliminación de archivo
+    /// Gets a Duration for file delete operations
     pub fn file_delete_timeout(&self) -> Duration {
         Duration::from_millis(self.file_operation_ms)
     }
 
-    /// Obtiene un Duration para operaciones de directorio
+    /// Gets a Duration for directory operations
     pub fn dir_timeout(&self) -> Duration {
         Duration::from_millis(self.dir_operation_ms)
     }
 
-    /// Obtiene un Duration para adquisición de locks
+    /// Gets a Duration for lock acquisition
     pub fn lock_timeout(&self) -> Duration {
         Duration::from_millis(self.lock_acquisition_ms)
     }
 
-    /// Obtiene un Duration para operaciones de red
+    /// Gets a Duration for network operations
     pub fn network_timeout(&self) -> Duration {
         Duration::from_millis(self.network_operation_ms)
     }
 }
 
-/// Configuración para manejo de recursos grandes
+/// Configuration for large resource handling
 #[derive(Debug, Clone)]
 pub struct ResourceConfig {
-    /// Umbral en MB para considerar un archivo como grande
+    /// Threshold in MB to consider a file as large
     pub large_file_threshold_mb: u64,
-    /// Umbral de entradas para considerar un directorio como grande
+    /// Entry threshold to consider a directory as large
     pub large_dir_threshold_entries: usize,
-    /// Tamaño de chunk para procesamiento de archivos grandes (bytes)
+    /// Chunk size for large file processing (bytes)
     pub chunk_size_bytes: usize,
-    /// Límite de tamaño de archivo para cargar en memoria (MB)
+    /// File size limit for loading into memory (MB)
     pub max_in_memory_file_size_mb: u64,
 }
 
@@ -101,7 +101,7 @@ impl Default for ResourceConfig {
     fn default() -> Self {
         Self {
             large_file_threshold_mb: 100,       // 100 MB
-            large_dir_threshold_entries: 1000,  // 1000 entradas
+            large_dir_threshold_entries: 1000,  // 1000 entries
             chunk_size_bytes: 1024 * 1024,      // 1 MB
             max_in_memory_file_size_mb: 50,     // 50 MB
         }
@@ -109,71 +109,71 @@ impl Default for ResourceConfig {
 }
 
 impl ResourceConfig {
-    /// Convierte un tamaño en bytes a MB
+    /// Converts a size in bytes to MB
     pub fn bytes_to_mb(&self, bytes: u64) -> u64 {
         bytes / (1024 * 1024)
     }
 
-    /// Determina si un archivo es considerado grande
+    /// Determines if a file is considered large
     pub fn is_large_file(&self, size_bytes: u64) -> bool {
         self.bytes_to_mb(size_bytes) >= self.large_file_threshold_mb
     }
     
-    /// Determina si un archivo es suficientemente grande para procesamiento paralelo
+    /// Determines if a file is large enough for parallel processing
     pub fn needs_parallel_processing(&self, size_bytes: u64, config: &ConcurrencyConfig) -> bool {
         self.bytes_to_mb(size_bytes) >= config.min_size_for_parallel_chunks_mb
     }
 
-    /// Determina si un archivo puede cargarse completo en memoria
+    /// Determines if a file can be fully loaded into memory
     pub fn can_load_in_memory(&self, size_bytes: u64) -> bool {
         self.bytes_to_mb(size_bytes) <= self.max_in_memory_file_size_mb
     }
 
-    /// Determina si un directorio es considerado grande
+    /// Determines if a directory is considered large
     pub fn is_large_directory(&self, entry_count: usize) -> bool {
         entry_count >= self.large_dir_threshold_entries
     }
     
-    /// Calcula el número de chunks para procesamiento paralelo
+    /// Calculates the number of chunks for parallel processing
     pub fn calculate_optimal_chunks(&self, size_bytes: u64, config: &ConcurrencyConfig) -> usize {
-        // Si el archivo no es suficientemente grande, retornar 1
+        // If the file is not large enough, return 1
         if !self.needs_parallel_processing(size_bytes, config) {
             return 1;
         }
         
-        // Calcular el número de chunks basado en el tamaño
+        // Calculate the number of chunks based on size
         let chunk_count = (size_bytes as usize + config.parallel_chunk_size_bytes - 1) 
                          / config.parallel_chunk_size_bytes;
                          
-        // Limitar al máximo de chunks en paralelo
+        // Limit to the maximum number of parallel chunks
         chunk_count.min(config.max_parallel_chunks)
     }
     
-    /// Calcula el tamaño óptimo de cada chunk para procesamiento paralelo
+    /// Calculates the optimal size of each chunk for parallel processing
     pub fn calculate_chunk_size(&self, file_size: u64, chunk_count: usize) -> usize {
         if chunk_count <= 1 {
             return file_size as usize;
         }
         
-        // Distribuir equitativamente el tamaño entre los chunks
+        // Distribute the size evenly among the chunks
         ((file_size as usize) + chunk_count - 1) / chunk_count
     }
 }
 
-/// Configuración para operaciones concurrentes
+/// Configuration for concurrent operations
 #[derive(Debug, Clone)]
 pub struct ConcurrencyConfig {
-    /// Máximo de tareas de archivo concurrentes
+    /// Maximum concurrent file tasks
     pub max_concurrent_files: usize,
-    /// Máximo de tareas de directorio concurrentes
+    /// Maximum concurrent directory tasks
     pub max_concurrent_dirs: usize,
-    /// Máximo de operaciones de IO concurrentes
+    /// Maximum concurrent IO operations
     pub max_concurrent_io: usize,
-    /// Máximo de chunks para procesar en paralelo por archivo
+    /// Maximum chunks to process in parallel per file
     pub max_parallel_chunks: usize,
-    /// Tamaño mínimo de archivo (MB) para aplicar procesamiento paralelo de chunks
+    /// Minimum file size (MB) to apply parallel chunk processing
     pub min_size_for_parallel_chunks_mb: u64,
-    /// Tamaño de chunk para procesamiento paralelo (bytes)
+    /// Chunk size for parallel processing (bytes)
     pub parallel_chunk_size_bytes: usize,
 }
 
@@ -190,16 +190,16 @@ impl Default for ConcurrencyConfig {
     }
 }
 
-/// Configuración de almacenamiento
+/// Storage configuration
 #[derive(Debug, Clone)]
 pub struct StorageConfig {
-    /// Directorio raíz para el almacenamiento
+    /// Root directory for storage
     pub root_dir: String,
-    /// Tamaño de chunk para procesamiento de archivos
+    /// Chunk size for file processing
     pub chunk_size: usize,
-    /// Umbral para procesamiento paralelo
+    /// Threshold for parallel processing
     pub parallel_threshold: usize,
-    /// Días de retención para archivos en la papelera
+    /// Retention days for files in the trash
     pub trash_retention_days: u32,
 }
 
@@ -209,12 +209,12 @@ impl Default for StorageConfig {
             root_dir: "storage".to_string(),
             chunk_size: 1024 * 1024,      // 1 MB
             parallel_threshold: 100 * 1024 * 1024, // 100 MB
-            trash_retention_days: 30,     // 30 días
+            trash_retention_days: 30,     // 30 days
         }
     }
 }
 
-/// Configuración de base de datos
+/// Database configuration
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
     pub connection_string: String,
@@ -239,7 +239,7 @@ impl Default for DatabaseConfig {
     }
 }
 
-/// Configuración de autenticación
+/// Authentication configuration
 #[derive(Debug, Clone)]
 pub struct AuthConfig {
     pub jwt_secret: String,
@@ -256,15 +256,15 @@ impl Default for AuthConfig {
             // to set OXICLOUD_JWT_SECRET in production. The from_env() method
             // will validate this and warn/panic if not configured.
             jwt_secret: String::new(),
-            access_token_expiry_secs: 3600, // 1 hora
-            refresh_token_expiry_secs: 2592000, // 30 días
+            access_token_expiry_secs: 3600, // 1 hour
+            refresh_token_expiry_secs: 2592000, // 30 days
             hash_memory_cost: 65536, // 64MB
             hash_time_cost: 3,
         }
     }
 }
 
-/// Configuración de OpenID Connect (OIDC)
+/// OpenID Connect (OIDC) configuration
 #[derive(Debug, Clone)]
 pub struct OidcConfig {
     /// Whether OIDC authentication is enabled
@@ -335,7 +335,7 @@ impl OidcConfig {
     }
 }
 
-/// Configuración de funcionalidades (feature flags)
+/// Feature configuration (feature flags)
 #[derive(Debug, Clone)]
 pub struct FeaturesConfig {
     pub enable_auth: bool,
@@ -357,34 +357,34 @@ impl Default for FeaturesConfig {
     }
 }
 
-/// Configuración global de la aplicación
+/// Global application configuration
 #[derive(Debug, Clone)]
 pub struct AppConfig {
-    /// Ruta del directorio de almacenamiento
+    /// Storage directory path
     pub storage_path: PathBuf,
-    /// Ruta del directorio de archivos estáticos
+    /// Static files directory path
     pub static_path: PathBuf,
-    /// Puerto del servidor
+    /// Server port
     pub server_port: u16,
-    /// Host del servidor
+    /// Server host
     pub server_host: String,
-    /// Configuración de caché
+    /// Cache configuration
     pub cache: CacheConfig,
-    /// Configuración de timeouts
+    /// Timeout configuration
     pub timeouts: TimeoutConfig,
-    /// Configuración de recursos
+    /// Resource configuration
     pub resources: ResourceConfig,
-    /// Configuración de concurrencia
+    /// Concurrency configuration
     pub concurrency: ConcurrencyConfig,
-    /// Configuración de almacenamiento
+    /// Storage configuration
     pub storage: StorageConfig,
-    /// Configuración de base de datos
+    /// Database configuration
     pub database: DatabaseConfig,
-    /// Configuración de autenticación
+    /// Authentication configuration
     pub auth: AuthConfig,
-    /// Configuración de funcionalidades
+    /// Feature configuration
     pub features: FeaturesConfig,
-    /// Configuración OIDC
+    /// OIDC configuration
     pub oidc: OidcConfig,
 }
 
@@ -412,7 +412,7 @@ impl AppConfig {
     pub fn from_env() -> Self {
         let mut config = Self::default();
         
-        // Usar variables de entorno para sobrescribir valores por defecto
+        // Use environment variables to override default values
         if let Ok(storage_path) = env::var("OXICLOUD_STORAGE_PATH") {
             config.storage_path = PathBuf::from(storage_path);
         }
@@ -431,7 +431,7 @@ impl AppConfig {
             config.server_host = server_host;
         }
         
-        // Configuración de Database
+        // Database configuration
         if let Ok(connection_string) = env::var("OXICLOUD_DB_CONNECTION_STRING") {
             config.database.connection_string = connection_string;
         }
@@ -450,7 +450,7 @@ impl AppConfig {
             }
         }
         
-        // Configuración Auth
+        // Auth configuration
         if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
             config.auth.jwt_secret = jwt_secret;
         }
@@ -582,7 +582,7 @@ impl AppConfig {
     }
 }
 
-/// Obtenemos una configuración global por defecto
+/// Gets a default global configuration
 pub fn default_config() -> AppConfig {
     AppConfig::default()
 }

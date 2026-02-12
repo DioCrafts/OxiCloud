@@ -14,7 +14,7 @@ use chrono::{DateTime, Utc, Duration, TimeZone};
 
 use crate::common::errors::{Result, DomainError, ErrorKind};
 
-// Re-exportar errores de entidad desde el módulo centralizado
+// Re-export entity errors from the centralized module
 pub use super::entity_errors::CalendarEventError;
 
 /**

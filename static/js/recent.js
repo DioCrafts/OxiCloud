@@ -110,10 +110,10 @@ const recent = {
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
                 <div class="list-header">
-                    <div data-i18n="files.name">Nombre</div>
-                    <div data-i18n="files.type">Tipo</div>
-                    <div data-i18n="files.size">Tamaño</div>
-                    <div data-i18n="files.last_accessed">Último acceso</div>
+                    <div data-i18n="files.name">Name</div>
+                    <div data-i18n="files.type">Type</div>
+                    <div data-i18n="files.size">Size</div>
+                    <div data-i18n="files.last_accessed">Last accessed</div>
                 </div>
             `;
             
@@ -126,8 +126,8 @@ const recent = {
                 emptyState.className = 'empty-state';
                 emptyState.innerHTML = `
                     <i class="fas fa-clock" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
-                    <p>${window.i18n ? window.i18n.t('recent.empty_state') : 'No hay archivos recientes'}</p>
-                    <p>${window.i18n ? window.i18n.t('recent.empty_hint') : 'Los archivos que abras aparecerán aquí'}</p>
+                    <p>${window.i18n ? window.i18n.t('recent.empty_state') : 'No recent files'}</p>
+                    <p>${window.i18n ? window.i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
                 `;
                 filesGrid.appendChild(emptyState);
                 return;
@@ -143,7 +143,7 @@ const recent = {
             
         } catch (error) {
             console.error('Error displaying recent files:', error);
-            window.ui.showNotification('Error', 'Error al cargar archivos recientes');
+            window.ui.showNotification('Error', 'Error loading recent files');
         }
     },
     
@@ -157,17 +157,17 @@ const recent = {
         // Determine icon and type
         let iconClass = 'fas fa-file';
         let iconSpecialClass = '';
-        let typeLabel = 'Documento';
+        let typeLabel = 'Document';
 
         if (file.mime_type) {
             if (file.mime_type.startsWith('image/')) {
                 iconClass = 'fas fa-file-image';
                 iconSpecialClass = 'image-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Imagen';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
             } else if (file.mime_type.startsWith('text/')) {
                 iconClass = 'fas fa-file-alt';
                 iconSpecialClass = 'text-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Texto';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
             } else if (file.mime_type.startsWith('video/')) {
                 iconClass = 'fas fa-file-video';
                 iconSpecialClass = 'video-icon';
@@ -204,7 +204,7 @@ const recent = {
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${file.name}</div>
-            <div class="file-info">Accedido ${formattedDate.split(' ')[0]}</div>
+            <div class="file-info">Accessed ${formattedDate.split(' ')[0]}</div>
         `;
 
         // Download on click

@@ -12,7 +12,7 @@ use crate::common::errors::{DomainError, ErrorKind};
 use crate::application::ports::outbound::IdMappingPort;
 use crate::common::config::TimeoutConfig;
 
-/// Error específico para el servicio de mapeo de IDs
+/// Specific error for the ID mapping service
 #[derive(Debug, thiserror::Error)]
 pub enum IdMappingError {
     #[error("ID not found: {0}")]
@@ -31,7 +31,7 @@ pub enum IdMappingError {
     Other(String),
 }
 
-// Implementar conversión de IdMappingError a DomainError
+// Implement conversion from IdMappingError to DomainError
 impl From<IdMappingError> for DomainError {
     fn from(err: IdMappingError) -> Self {
         match err {
@@ -59,25 +59,25 @@ impl From<IdMappingError> for DomainError {
     }
 }
 
-/// Estructura para almacenar IDs mapeados a sus rutas
+/// Structure to store IDs mapped to their paths
 #[derive(Serialize, Deserialize, Debug, Default)]
 struct IdMap {
     path_to_id: HashMap<String, String>,
-    id_to_path: HashMap<String, String>, // Campo para búsqueda bidireccional eficiente
-    version: u32, // Versión para detectar cambios
+    id_to_path: HashMap<String, String>, // Field for efficient bidirectional lookup
+    version: u32, // Version to detect changes
 }
 
-/// Servicio para gestionar mapeos entre rutas y IDs únicos
+/// Service to manage mappings between paths and unique IDs
 pub struct IdMappingService {
     map_path: PathBuf,
     id_map: RwLock<IdMap>,
-    save_mutex: Mutex<()>, // Para evitar múltiples guardados concurrentes
+    save_mutex: Mutex<()>, // To prevent multiple concurrent saves
     timeouts: TimeoutConfig,
-    pending_save: RwLock<bool>, // Indica si hay cambios pendientes
+    pending_save: RwLock<bool>, // Indicates if there are pending changes
 }
 
 impl IdMappingService {
-    /// Crea un nuevo servicio de mapeo de IDs
+    /// Creates a new ID mapping service
     pub async fn new(map_path: PathBuf) -> Result<Self, DomainError> {
         let timeouts = TimeoutConfig::default();
         let id_map = Self::load_id_map(&map_path, &timeouts).await?;
@@ -91,7 +91,7 @@ impl IdMappingService {
         })
     }
     
-    /// Crea un servicio de mapeo de IDs en memoria (para pruebas)
+    /// Creates an in-memory ID mapping service (for testing)
     ///
     /// Similar functionality as new_in_memory but with a simpler signature for dummy use
     pub fn dummy() -> Self {
@@ -104,7 +104,7 @@ impl IdMappingService {
         }
     }
     
-    /// Crea un servicio de mapeo de IDs en memoria (para pruebas - versión original)
+    /// Creates an in-memory ID mapping service (for testing - original version)
     pub fn new_in_memory() -> Self {
         Self {
             map_path: PathBuf::from("memory"),
@@ -115,10 +115,10 @@ impl IdMappingService {
         }
     }
     
-    /// Carga el mapa de IDs desde disco con manejo robusto de errores
+    /// Loads the ID map from disk with robust error handling
     async fn load_id_map(map_path: &PathBuf, timeouts: &TimeoutConfig) -> Result<IdMap, DomainError> {
         if map_path.exists() {
-            // Intentar leer con timeout para evitar bloqueos indefinidos
+            // Try to read with timeout to avoid indefinite blocking
             let read_result = time::timeout(
                 timeouts.lock_timeout(),
                 fs::read_to_string(map_path)
@@ -127,10 +127,10 @@ impl IdMappingService {
             
             let content = read_result.map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to read ID map from {}: {}", map_path.display(), e)))?;
             
-            // Parsear el JSON
+            // Parse the JSON
             match serde_json::from_str::<IdMap>(&content) {
                 Ok(mut map) => {
-                    // Reconstruir el mapa inverso si es necesario
+                    // Rebuild the inverse map if necessary
                     if map.id_to_path.is_empty() && !map.path_to_id.is_empty() {
                         let mut rebuild_count = 0;
                         for (path, id) in &map.path_to_id {
@@ -146,7 +146,7 @@ impl IdMappingService {
                 },
                 Err(e) => {
                     tracing::error!("Error parsing ID map: {}", e);
-                    // Intentar hacer un respaldo del archivo corrupto
+                    // Try to backup the corrupted file
                     let backup_path = map_path.with_extension("json.bak");
                     if let Err(copy_err) = tokio::fs::copy(map_path, &backup_path).await {
                         tracing::error!("Failed to backup corrupted map file: {}", copy_err);
@@ -158,18 +158,18 @@ impl IdMappingService {
                     return Ok(IdMap {
                         path_to_id: HashMap::new(),
                         id_to_path: HashMap::new(),
-                        version: 1, // Iniciar con versión 1
+                        version: 1, // Start with version 1
                     });
                 }
             }
         }
         
-        // Devolver un mapa vacío si el archivo no existe y crear el archivo
+        // Return an empty map if the file doesn't exist and create the file
         tracing::info!("No existing ID map found, creating new empty map");
         let empty_map = IdMap {
             path_to_id: HashMap::new(),
             id_to_path: HashMap::new(),
-            version: 1, // Iniciar con versión 1
+            version: 1, // Start with version 1
         };
         
         // Ensure directory exists
@@ -198,16 +198,16 @@ impl IdMappingService {
         Ok(empty_map)
     }
     
-    /// Guarda el mapa de IDs en disco de manera segura
+    /// Saves the ID map to disk safely
     async fn save_id_map(&self) -> Result<(), DomainError> {
-        // Adquirir bloqueo exclusivo para salvar
+        // Acquire exclusive lock for saving
         let _lock = time::timeout(
             self.timeouts.lock_timeout(),
             self.save_mutex.lock()
         ).await
         .map_err(|_| DomainError::timeout("IdMapping", "Timeout acquiring save lock for ID mapping"))?;
         
-        // Crear JSON con el lock de lectura para minimizar el tiempo de bloqueo
+        // Create JSON with read lock to minimize lock hold time
         let json = {
             let mut map = time::timeout(
                 self.timeouts.lock_timeout(),
@@ -215,7 +215,7 @@ impl IdMappingService {
             ).await
             .map_err(|_| DomainError::timeout("IdMapping", "Timeout acquiring write lock for ID mapping"))?;
             
-            // Incrementar versión sólo si hay cambios por guardar
+            // Increment version only if there are pending changes to save
             let pending = *self.pending_save.read().await;
             if pending {
                 map.version += 1;
@@ -227,16 +227,16 @@ impl IdMappingService {
                 .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to serialize ID map to JSON: {}", e)))?
         };
         
-        // Escribir a un archivo temporal primero para evitar corrupción
+        // Write to a temporary file first to avoid corruption
         let temp_path = self.map_path.with_extension("json.tmp");
         fs::write(&temp_path, &json).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to write temporary ID map to {}: {}", temp_path.display(), e)))?;
         
-        // Realizar el rename atómico
+        // Perform the atomic rename
         fs::rename(&temp_path, &self.map_path).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to rename temporary ID map to {}: {}", self.map_path.display(), e)))?;
         
-        // Resetear flag de pendientes
+        // Reset pending flag
         {
             let mut pending = self.pending_save.write().await;
             *pending = false;
@@ -246,22 +246,22 @@ impl IdMappingService {
         Ok(())
     }
     
-    /// Genera un ID único
+    /// Generates a unique ID
     fn generate_id(&self) -> String {
         Uuid::new_v4().to_string()
     }
     
-    /// Marca cambios como pendientes
+    /// Marks changes as pending
     async fn mark_pending(&self) {
         let mut pending = self.pending_save.write().await;
         *pending = true;
     }
     
-    /// Obtiene el ID para una ruta o genera uno nuevo si no existe
+    /// Gets the ID for a path or generates a new one if it doesn't exist
     pub async fn get_or_create_id(&self, path: &StoragePath) -> Result<String, IdMappingError> {
         let path_str = path.to_string();
         
-        // Primer intento con lock de lectura (más eficiente)
+        // First attempt with read lock (more efficient)
         {
             let read_result = match time::timeout(
                 self.timeouts.lock_timeout(), 
@@ -276,7 +276,7 @@ impl IdMappingService {
             }
         }
         
-        // Si no se encuentra, adquirir lock de escritura
+        // If not found, acquire write lock
         let write_result = match time::timeout(
             self.timeouts.lock_timeout(),
             self.id_map.write()
@@ -287,18 +287,18 @@ impl IdMappingService {
         
         let mut map = write_result;
         
-        // Verificar nuevamente (podría haberse agregado mientras esperábamos el lock)
+        // Check again (it could have been added while we were waiting for the lock)
         if let Some(id) = map.path_to_id.get(&path_str) {
             return Ok(id.clone());
         }
         
-        // Generar un nuevo ID y almacenarlo
+        // Generate a new ID and store it
         let id = self.generate_id();
         map.path_to_id.insert(path_str.clone(), id.clone());
         map.id_to_path.insert(id.clone(), path_str);
         
-        // Marcar como pendiente para guardar
-        drop(map); // Liberar el write lock antes de adquirir otro
+        // Mark as pending for saving
+        drop(map); // Release the write lock before acquiring another
         self.mark_pending().await;
         
         tracing::debug!("Created new ID mapping: {} -> {}", path.to_string(), id);
@@ -306,7 +306,7 @@ impl IdMappingService {
         Ok(id)
     }
     
-    /// Obtiene una ruta por su ID con manejo de timeout
+    /// Gets a path by its ID with timeout handling
     pub async fn get_path_by_id(&self, id: &str) -> Result<StoragePath, IdMappingError> {
         let read_result = match time::timeout(
             self.timeouts.lock_timeout(), 
@@ -323,7 +323,7 @@ impl IdMappingService {
         Err(IdMappingError::NotFound(id.to_string()))
     }
     
-    /// Actualiza el mapeo de un ID existente a una nueva ruta
+    /// Updates the mapping of an existing ID to a new path
     pub async fn update_path(&self, id: &str, new_path: &StoragePath) -> Result<(), IdMappingError> {
         let write_result = match time::timeout(
             self.timeouts.lock_timeout(),
@@ -335,17 +335,17 @@ impl IdMappingService {
         
         let mut map = write_result;
         
-        // Buscar la ruta anterior para eliminarla
+        // Find the previous path to remove it
         if let Some(old_path) = map.id_to_path.get(id).cloned() {
             map.path_to_id.remove(&old_path);
             
-            // Registrar la nueva ruta
+            // Register the new path
             let new_path_str = new_path.to_string();
             map.path_to_id.insert(new_path_str.clone(), id.to_string());
             map.id_to_path.insert(id.to_string(), new_path_str);
             
-            // Marcar como pendiente
-            drop(map); // Liberar el write lock antes de adquirir otro
+            // Mark as pending
+            drop(map); // Release the write lock before acquiring another
             self.mark_pending().await;
             
             tracing::debug!("Updated path mapping for ID {}: {} -> {}", 
@@ -357,7 +357,7 @@ impl IdMappingService {
         }
     }
     
-    /// Elimina un ID del mapa
+    /// Removes an ID from the map
     pub async fn remove_id(&self, id: &str) -> Result<(), IdMappingError> {
         let write_result = match time::timeout(
             self.timeouts.lock_timeout(),
@@ -369,12 +369,12 @@ impl IdMappingService {
         
         let mut map = write_result;
         
-        // Buscar la ruta para eliminarla
+        // Find the path to remove it
         if let Some(path) = map.id_to_path.remove(id) {
             map.path_to_id.remove(&path);
             
-            // Marcar como pendiente
-            drop(map); // Liberar el write lock antes de adquirir otro
+            // Mark as pending
+            drop(map); // Release the write lock before acquiring another
             self.mark_pending().await;
             
             tracing::debug!("Removed ID mapping: {} -> {}", id, path);
@@ -384,9 +384,9 @@ impl IdMappingService {
         }
     }
     
-    /// Guarda cambios pendientes al disco inmediatamente, sin debounce
+    /// Saves pending changes to disk immediately, without debounce
     pub async fn save_pending_changes(&self) -> Result<(), IdMappingError> {
-        // Verificar si hay cambios pendientes
+        // Check if there are pending changes
         {
             let pending = self.pending_save.read().await;
             if !*pending {
@@ -394,12 +394,12 @@ impl IdMappingService {
             }
         }
         
-        // Guardar inmediatamente (sin debounce ni spawn)
+        // Save immediately (without debounce or spawn)
         match self.save_id_map().await {
             Ok(_) => {
                 tracing::info!("ID mappings saved successfully to disk at {}", self.map_path.display());
                 
-                // Verificar explícitamente que el archivo existe y tiene tamaño
+                // Explicitly verify that the file exists and has size
                 match std::fs::metadata(&self.map_path) {
                     Ok(metadata) => {
                         if metadata.len() > 0 {
@@ -410,7 +410,7 @@ impl IdMappingService {
                     },
                     Err(e) => {
                         tracing::error!("Failed to verify saved map file: {}", e);
-                        // Intentar un segundo guardado si la verificación falla
+                        // Try a second save if verification fails
                         if let Err(retry_err) = self.save_id_map().await {
                             tracing::error!("Second save attempt also failed: {}", retry_err);
                             return Err(IdMappingError::IoError(std::io::Error::new(
@@ -426,7 +426,7 @@ impl IdMappingService {
             },
             Err(e) => {
                 tracing::error!("Failed to save ID map to {}: {}", self.map_path.display(), e);
-                // Intentar un segundo guardado con retraso en caso de error
+                // Try a second save with delay in case of error
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 match self.save_id_map().await {
                     Ok(_) => {
@@ -448,31 +448,31 @@ impl IdMappingService {
 
 #[async_trait]
 impl IdMappingPort for IdMappingService {
-    /// Obtiene el ID para una ruta o genera uno nuevo si no existe
+    /// Gets the ID for a path or generates a new one if it doesn't exist
     async fn get_or_create_id(&self, path: &StoragePath) -> Result<String, DomainError> {
         self.get_or_create_id(path).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to get or create ID for path: {}: {}", path.to_string(), e)))
     }
     
-    /// Obtiene una ruta por su ID con manejo de timeout
+    /// Gets a path by its ID with timeout handling
     async fn get_path_by_id(&self, id: &str) -> Result<StoragePath, DomainError> {
         self.get_path_by_id(id).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to get path for ID: {}: {}", id, e)))
     }
     
-    /// Actualiza el mapeo de un ID existente a una nueva ruta
+    /// Updates the mapping of an existing ID to a new path
     async fn update_path(&self, id: &str, new_path: &StoragePath) -> Result<(), DomainError> {
         self.update_path(id, new_path).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to update path for ID: {} to {}: {}", id, new_path.to_string(), e)))
     }
     
-    /// Elimina un ID del mapa
+    /// Removes an ID from the map
     async fn remove_id(&self, id: &str) -> Result<(), DomainError> {
         self.remove_id(id).await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to remove ID: {}: {}", id, e)))
     }
     
-    /// Guarda cambios pendientes al disco
+    /// Saves pending changes to disk
     async fn save_changes(&self) -> Result<(), DomainError> {
         self.save_pending_changes().await
             .map_err(|e| DomainError::internal_error("IdMapping", format!("Failed to save pending ID mapping changes: {}", e)))
@@ -481,7 +481,7 @@ impl IdMappingPort for IdMappingService {
 
 // The extension methods were moved to the IdMappingPort trait as default implementations
 
-// Implementar Clone para poder usar en tokio::spawn
+// Implement Clone to allow use in tokio::spawn
 /// Synchronous helper for contexts where we can't use async
 impl IdMappingService {
     /// Create a new service synchronously (only for stubs and initialization)
@@ -499,13 +499,13 @@ impl IdMappingService {
 
 impl Clone for IdMappingService {
     fn clone(&self) -> Self {
-        // No podemos clonar directamente los RwLock/Mutex,
-        // pero podemos crear nuevas instancias que apunten al mismo Arc interno
-        // Sin embargo, en este caso simplemente necesitamos la map_path
+        // We cannot directly clone the RwLock/Mutex,
+        // but we can create new instances that point to the same internal Arc
+        // However, in this case we simply need the map_path
         Self {
             map_path: self.map_path.clone(),
-            id_map: RwLock::new(IdMap::default()), // Esto no se usa en el task asíncrono
-            save_mutex: Mutex::new(()),           // Esto tampoco
+            id_map: RwLock::new(IdMap::default()), // This is not used in the async task
+            save_mutex: Mutex::new(()),           // Neither is this
             timeouts: self.timeouts.clone(),
             pending_save: RwLock::new(false),
         }
@@ -530,7 +530,7 @@ mod tests {
         
         assert!(!id.is_empty(), "ID should not be empty");
         
-        // Verificar que el mismo ID se devuelve para la misma ruta
+        // Verify that the same ID is returned for the same path
         let id2 = service.get_or_create_id(&path).await.unwrap();
         assert_eq!(id, id2, "Same path should return same ID");
     }
@@ -557,7 +557,7 @@ mod tests {
         let temp_dir = tempdir().unwrap();
         let map_path = temp_dir.path().join("id_map.json");
         
-        // Crear y poblar el servicio
+        // Create and populate the service
         let service = IdMappingService::new(map_path.clone()).await.unwrap();
         
         let path1 = StoragePath::from_string("/test/file1.txt");
@@ -565,16 +565,16 @@ mod tests {
         let id1 = service.get_or_create_id(&path1).await.unwrap();
         let id2 = service.get_or_create_id(&path2).await.unwrap();
         
-        // Guardar cambios
+        // Save changes
         service.save_pending_changes().await.unwrap();
         
-        // Esperar para asegurar que el guardado asíncrono termine
+        // Wait to ensure the async save completes
         tokio::time::sleep(Duration::from_millis(500)).await;
         
-        // Crear un nuevo servicio que debería cargar el mismo mapa
+        // Create a new service that should load the same map
         let service2 = IdMappingService::new(map_path).await.unwrap();
         
-        // Verificar que los IDs coinciden
+        // Verify that the IDs match
         let loaded_id1 = service2.get_or_create_id(&path1).await.unwrap();
         let loaded_id2 = service2.get_or_create_id(&path2).await.unwrap();
         
@@ -591,7 +591,7 @@ mod tests {
         
         let service = std::sync::Arc::new(IdMappingService::new(map_path).await.unwrap());
         
-        // Crear múltiples tareas que intentan acceder simultáneamente
+        // Create multiple tasks that attempt simultaneous access
         let mut tasks = Vec::new();
         for i in 0..100 {
             let path = StoragePath::from_string(&format!("/test/concurrent/file{}.txt", i));
@@ -602,15 +602,15 @@ mod tests {
             }));
         }
         
-        // Esperar a que todas terminen
+        // Wait for all to finish
         let results = join_all(tasks).await;
         
-        // Verificar que todas tuvieron éxito
+        // Verify that all succeeded
         for result in results {
             assert!(result.unwrap().is_ok(), "Concurrent operations should succeed");
         }
         
-        // Guardar cambios
+        // Save changes
         service.save_pending_changes().await.unwrap();
     }
 }

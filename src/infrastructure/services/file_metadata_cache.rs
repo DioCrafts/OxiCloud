@@ -13,61 +13,61 @@ use crate::domain::entities::file::File;
 
 use crate::common::config::AppConfig;
 
-/// Tipos de entradas en caché
+/// Cache entry types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CacheEntryType {
-    /// Archivo
+    /// File
     File,
-    /// Directorio
+    /// Directory
     Directory,
-    /// Tipo desconocido
+    /// Unknown type
     Unknown,
 }
 
-/// Estadísticas de caché para monitoreo
+/// Cache statistics for monitoring
 #[derive(Debug, Clone, Default)]
 pub struct CacheStats {
-    /// Número de hits en caché
+    /// Number of cache hits
     pub hits: usize,
-    /// Número de misses en caché
+    /// Number of cache misses
     pub misses: usize,
-    /// Número de invalidaciones manuales
+    /// Number of manual invalidations
     pub invalidations: usize,
-    /// Número de expiraciones automáticas
+    /// Number of automatic expirations
     pub expirations: usize,
-    /// Número de inserciones en caché
+    /// Number of cache inserts
     pub inserts: usize,
-    /// Tiempo total ahorrado (milisegundos)
+    /// Total time saved (milliseconds)
     pub time_saved_ms: u64,
 }
 
-/// Metadatos completos de archivo en caché
+/// Complete cached file metadata
 #[derive(Debug, Clone)]
 pub struct FileMetadata {
-    /// Ruta absoluta del archivo
+    /// Absolute file path
     pub path: PathBuf,
-    /// Si el archivo existe físicamente
+    /// Whether the file physically exists
     pub exists: bool,
-    /// Tipo de entrada (archivo, directorio)
+    /// Entry type (file, directory)
     pub entry_type: CacheEntryType,
-    /// Tamaño en bytes (para archivos)
+    /// Size in bytes (for files)
     pub size: Option<u64>,
-    /// Tipo MIME (para archivos)
+    /// MIME type (for files)
     pub mime_type: Option<String>,
-    /// Timestamp de creación (UNIX epoch seconds)
+    /// Creation timestamp (UNIX epoch seconds)
     pub created_at: Option<u64>,
-    /// Timestamp de modificación (UNIX epoch seconds)
+    /// Modification timestamp (UNIX epoch seconds)
     pub modified_at: Option<u64>,
-    /// Acceso previo (usado para LRU)
+    /// Previous access (used for LRU)
     pub last_access: Instant,
-    /// Tiempo de expiración de la caché
+    /// Cache expiration time
     pub expires_at: Instant,
-    /// Número de accesos a esta entrada
+    /// Number of accesses to this entry
     pub access_count: usize,
 }
 
 impl FileMetadata {
-    /// Crea una nueva entrada de metadatos
+    /// Creates a new metadata entry
     pub fn new(
         path: PathBuf,
         exists: bool,
@@ -94,56 +94,56 @@ impl FileMetadata {
         }
     }
     
-    /// Actualiza el tiempo de último acceso
+    /// Updates the last access time
     pub fn touch(&mut self) {
         self.last_access = Instant::now();
         self.access_count += 1;
     }
     
-    /// Verifica si la entrada ha expirado
+    /// Checks if the entry has expired
     pub fn is_expired(&self) -> bool {
         Instant::now() > self.expires_at
     }
     
-    /// Actualiza el tiempo de expiración con un nuevo TTL
+    /// Updates the expiration time with a new TTL
     pub fn update_expiry(&mut self, ttl: Duration) {
         self.expires_at = Instant::now() + ttl;
     }
 }
 
-/// Caché avanzada de metadatos de archivos
+/// Advanced file metadata cache
 pub struct FileMetadataCache {
-    /// Caché principal de metadatos
+    /// Main metadata cache
     metadata_cache: RwLock<HashMap<PathBuf, FileMetadata>>,
-    /// Cola LRU para administración de caché
+    /// LRU queue for cache management
     lru_queue: RwLock<VecDeque<PathBuf>>,
-    /// Estadísticas de uso del caché
+    /// Cache usage statistics
     stats: RwLock<CacheStats>,
-    /// Configuración global de la aplicación
+    /// Global application configuration
     config: AppConfig,
-    /// TTL adaptativo para entradas populares
+    /// Adaptive TTL for popular entries
     ttl_multiplier: f64,
-    /// Umbral de popularidad para TTL extendido
+    /// Popularity threshold for extended TTL
     popularity_threshold: usize,
-    /// Tamaño máximo de caché
+    /// Maximum cache size
     max_entries: usize,
 }
 
 impl FileMetadataCache {
-    /// Crea una nueva instancia de caché de metadatos
+    /// Creates a new metadata cache instance
     pub fn new(config: AppConfig, max_entries: usize) -> Self {
         Self {
             metadata_cache: RwLock::new(HashMap::with_capacity(max_entries)),
             lru_queue: RwLock::new(VecDeque::with_capacity(max_entries)),
             stats: RwLock::new(CacheStats::default()),
             config,
-            ttl_multiplier: 5.0, // Entradas populares tienen 5x TTL
-            popularity_threshold: 10, // Después de 10 accesos se considera popular
+            ttl_multiplier: 5.0, // Popular entries have 5x TTL
+            popularity_threshold: 10, // After 10 accesses it's considered popular
             max_entries,
         }
     }
     
-    /// Crea un objeto FileMetadata a partir de un objeto File
+    /// Creates a FileMetadata object from a File object
     pub fn create_metadata_from_file(file: &File, abs_path: PathBuf) -> FileMetadata {
         let entry_type = CacheEntryType::File;
         let size = Some(file.size());
@@ -151,8 +151,8 @@ impl FileMetadataCache {
         let created_at = Some(file.created_at());
         let modified_at = Some(file.modified_at());
         
-        // Usar un TTL estándar
-        let ttl = Duration::from_secs(60); // 1 minuto
+        // Use a standard TTL
+        let ttl = Duration::from_secs(60); // 1 minute
         
         FileMetadata::new(
             abs_path,
@@ -166,28 +166,28 @@ impl FileMetadataCache {
         )
     }
     
-    /// Crea una instancia por defecto
+    /// Creates a default instance
     pub fn default() -> Self {
         Self::new(AppConfig::default(), 10_000)
     }
     
-    /// Crea una instancia de caché con configuración por defecto
+    /// Creates a cache instance with default configuration
     pub fn default_with_config(config: AppConfig) -> Self {
-        Self::new(config, 50_000) // Caché más grande para sistema en producción
+        Self::new(config, 50_000) // Larger cache for production system
     }
     
-    /// Obtiene los metadatos de un archivo si están en caché
+    /// Gets file metadata if cached
     pub async fn get_metadata(&self, path: &Path) -> Option<FileMetadata> {
         let start_time = Instant::now();
         let mut cache = self.metadata_cache.write().await;
         
         if let Some(metadata) = cache.get_mut(path) {
-            // Verificar si ha expirado
+            // Check if expired
             if metadata.is_expired() {
-                // Eliminar de caché si expiró
+                // Remove from cache if expired
                 cache.remove(path);
                 
-                // Actualizar estadísticas
+                // Update statistics
                 let mut stats = self.stats.write().await;
                 stats.misses += 1;
                 stats.expirations += 1;
@@ -197,10 +197,10 @@ impl FileMetadataCache {
                 return None;
             }
             
-            // Actualizar tiempo de acceso
+            // Update access time
             metadata.touch();
             
-            // Para entradas populares, extender TTL
+            // For popular entries, extend TTL
             if metadata.access_count >= self.popularity_threshold {
                 let new_ttl = match metadata.entry_type {
                     CacheEntryType::File => Duration::from_millis(
@@ -209,33 +209,33 @@ impl FileMetadataCache {
                     CacheEntryType::Directory => Duration::from_millis(
                         (self.config.timeouts.dir_operation_ms as f64 * self.ttl_multiplier) as u64
                     ),
-                    _ => Duration::from_secs(60), // 1 minuto por defecto
+                    _ => Duration::from_secs(60), // 1 minute by default
                 };
                 
                 metadata.update_expiry(new_ttl);
                 debug!("Extended TTL for popular entry: {}", path.display());
             }
             
-            // Calcular tiempo ahorrado aproximado
+            // Calculate approximate time saved
             let elapsed = start_time.elapsed().as_millis() as u64;
-            let estimated_io_time: u64 = 10; // Asumimos 10ms mínimo para operación de IO
+            let estimated_io_time: u64 = 10; // We assume 10ms minimum for IO operation
             let time_saved = estimated_io_time.saturating_sub(elapsed);
             
-            // Actualizar estadísticas
+            // Update statistics
             let mut stats = self.stats.write().await;
             stats.hits += 1;
             stats.time_saved_ms += time_saved;
             
             debug!("Cache hit for: {}", path.display());
             
-            // Mantener también la cola LRU actualizada
+            // Also keep the LRU queue updated
             self.update_lru(path.to_path_buf()).await;
             
-            // Clonar para retornar
+            // Clone to return
             return Some(metadata.clone());
         }
         
-        // No encontrado en caché
+        // Not found in cache
         let mut stats = self.stats.write().await;
         stats.misses += 1;
         
@@ -243,20 +243,20 @@ impl FileMetadataCache {
         None
     }
     
-    /// Actualiza la cola LRU
+    /// Updates the LRU queue
     async fn update_lru(&self, path: PathBuf) {
         let mut lru = self.lru_queue.write().await;
         
-        // Eliminar si ya existe
+        // Remove if already exists
         if let Some(pos) = lru.iter().position(|p| p == &path) {
             lru.remove(pos);
         }
         
-        // Agregar al final (más reciente)
+        // Add to the end (most recent)
         lru.push_back(path);
     }
     
-    /// Verifica si un archivo existe
+    /// Checks if a file exists
     pub async fn exists(&self, path: &Path) -> Option<bool> {
         if let Some(metadata) = self.get_metadata(path).await {
             return Some(metadata.exists);
@@ -265,7 +265,7 @@ impl FileMetadataCache {
         None
     }
     
-    /// Verifica si un path es un directorio
+    /// Checks if a path is a directory
     pub async fn is_dir(&self, path: &Path) -> Option<bool> {
         if let Some(metadata) = self.get_metadata(path).await {
             return Some(metadata.entry_type == CacheEntryType::Directory);
@@ -274,7 +274,7 @@ impl FileMetadataCache {
         None
     }
     
-    /// Verifica si un path es un archivo
+    /// Checks if a path is a file
     pub async fn is_file(&self, path: &Path) -> Option<bool> {
         if let Some(metadata) = self.get_metadata(path).await {
             return Some(metadata.entry_type == CacheEntryType::File);
@@ -283,7 +283,7 @@ impl FileMetadataCache {
         None
     }
     
-    /// Obtiene el tamaño de un archivo
+    /// Gets the size of a file
     pub async fn get_size(&self, path: &Path) -> Option<u64> {
         if let Some(metadata) = self.get_metadata(path).await {
             return metadata.size;
@@ -292,7 +292,7 @@ impl FileMetadataCache {
         None
     }
     
-    /// Obtiene el tipo MIME de un archivo
+    /// Gets the MIME type of a file
     pub async fn get_mime_type(&self, path: &Path) -> Option<String> {
         if let Some(metadata) = self.get_metadata(path).await {
             return metadata.mime_type;
@@ -301,12 +301,12 @@ impl FileMetadataCache {
         None
     }
     
-    /// Refresca los metadatos de un path
+    /// Refreshes metadata for a path
     pub async fn refresh_metadata(&self, path: &Path) -> Result<FileMetadata, std::io::Error> {
-        // Realizar lectura real del sistema de archivos
+        // Perform actual filesystem read
         let metadata = fs::metadata(path).await?;
         
-        // Determinar tipo de entrada
+        // Determine entry type
         let entry_type = if metadata.is_dir() {
             CacheEntryType::Directory
         } else if metadata.is_file() {
@@ -315,21 +315,21 @@ impl FileMetadataCache {
             CacheEntryType::Unknown
         };
         
-        // Obtener tamaño para archivos
+        // Get size for files
         let size = if metadata.is_file() {
             Some(metadata.len())
         } else {
             None
         };
         
-        // Obtener tipo MIME para archivos
+        // Get MIME type for files
         let mime_type = if metadata.is_file() {
             Some(from_path(path).first_or_octet_stream().to_string())
         } else {
             None
         };
         
-        // Obtener timestamps
+        // Get timestamps
         let created_at = metadata.created()
             .map(|time| time.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
             .ok();
@@ -338,14 +338,14 @@ impl FileMetadataCache {
             .map(|time| time.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs())
             .ok();
         
-        // Determinar TTL apropiado
+        // Determine appropriate TTL
         let ttl = if metadata.is_dir() {
             Duration::from_millis(self.config.timeouts.dir_operation_ms)
         } else {
             Duration::from_millis(self.config.timeouts.file_operation_ms)
         };
         
-        // Crear entrada de metadatos
+        // Create metadata entry
         let file_metadata = FileMetadata::new(
             path.to_path_buf(),
             true,
@@ -357,34 +357,34 @@ impl FileMetadataCache {
             ttl,
         );
         
-        // Actualizar caché
+        // Update cache
         self.update_cache(file_metadata.clone()).await;
         
         Ok(file_metadata)
     }
     
-    /// Actualiza la caché con nuevos metadatos
+    /// Updates the cache with new metadata
     pub async fn update_cache(&self, metadata: FileMetadata) {
-        // Evitar caché llena antes de insertar
+        // Avoid full cache before inserting
         self.ensure_capacity().await;
         
         let path = metadata.path.clone();
         
-        // Insertar en caché
+        // Insert into cache
         {
             let mut cache = self.metadata_cache.write().await;
             cache.insert(path.clone(), metadata);
             
-            // Actualizar estadísticas
+            // Update statistics
             let mut stats = self.stats.write().await;
             stats.inserts += 1;
         }
         
-        // Actualizar la cola LRU
+        // Update the LRU queue
         self.update_lru(path).await;
     }
     
-    /// Asegura que hay espacio en la caché
+    /// Ensures there is space in the cache
     async fn ensure_capacity(&self) {
         let cache_size = {
             let cache = self.metadata_cache.read().await;
@@ -392,15 +392,15 @@ impl FileMetadataCache {
         };
         
         if cache_size >= self.max_entries {
-            self.evict_lru_entries(cache_size / 10).await; // Liberar 10%
+            self.evict_lru_entries(cache_size / 10).await; // Free up 10%
         }
     }
     
-    /// Elimina entradas menos recientemente usadas
+    /// Removes least recently used entries
     async fn evict_lru_entries(&self, count: usize) {
         let mut paths_to_remove = Vec::with_capacity(count);
         
-        // Obtener entries a eliminar de la cola LRU
+        // Get entries to remove from the LRU queue
         {
             let mut lru = self.lru_queue.write().await;
             for _ in 0..count {
@@ -412,7 +412,7 @@ impl FileMetadataCache {
             }
         }
         
-        // Eliminar de la caché principal
+        // Remove from the main cache
         {
             let mut cache = self.metadata_cache.write().await;
             for path in paths_to_remove {
@@ -423,19 +423,19 @@ impl FileMetadataCache {
         debug!("Evicted {} LRU entries from cache", count);
     }
     
-    /// Invalidar una entrada específica de caché
+    /// Invalidate a specific cache entry
     pub async fn invalidate(&self, path: &Path) {
-        // Eliminar de la caché principal
+        // Remove from the main cache
         {
             let mut cache = self.metadata_cache.write().await;
             cache.remove(path);
             
-            // Actualizar estadísticas
+            // Update statistics
             let mut stats = self.stats.write().await;
             stats.invalidations += 1;
         }
         
-        // Eliminar de la cola LRU
+        // Remove from the LRU queue
         let path_buf = path.to_path_buf();
         {
             let mut lru = self.lru_queue.write().await;
@@ -447,12 +447,12 @@ impl FileMetadataCache {
         debug!("Invalidated cache entry for: {}", path.display());
     }
     
-    /// Invalidar recursivamente entradas bajo un directorio
+    /// Recursively invalidate entries under a directory
     pub async fn invalidate_directory(&self, dir_path: &Path) {
         let dir_str = dir_path.to_string_lossy().to_string();
         let mut paths_to_remove = Vec::new();
         
-        // Encontrar todos los paths que comienzan con el directorio
+        // Find all paths that start with the directory
         {
             let cache = self.metadata_cache.read().await;
             for path in cache.keys() {
@@ -463,13 +463,13 @@ impl FileMetadataCache {
             }
         }
         
-        // Actualizar estadísticas
+        // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.invalidations += paths_to_remove.len();
         }
         
-        // Eliminar cada path encontrado
+        // Remove each found path
         for path in paths_to_remove {
             self.invalidate(&path).await;
         }
@@ -477,18 +477,18 @@ impl FileMetadataCache {
         debug!("Invalidated directory and contents: {}", dir_path.display());
     }
     
-    /// Obtener estadísticas actuales de la caché
+    /// Get current cache statistics
     pub async fn get_stats(&self) -> CacheStats {
         let stats = self.stats.read().await;
         stats.clone()
     }
     
-    /// Limpia todas las entradas expiradas de la caché
+    /// Clears all expired entries from the cache
     pub async fn clear_expired(&self) {
         let now = Instant::now();
         let mut paths_to_remove = Vec::new();
         
-        // Encontrar entradas expiradas
+        // Find expired entries
         {
             let cache = self.metadata_cache.read().await;
             for (path, metadata) in cache.iter() {
@@ -498,16 +498,16 @@ impl FileMetadataCache {
             }
         }
         
-        // Actualizar estadísticas
+        // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.expirations += paths_to_remove.len();
         }
         
-        // Guardar la cantidad de entradas para el logging
+        // Save the number of entries for logging
         let num_paths = paths_to_remove.len();
         
-        // Eliminar entradas expiradas
+        // Remove expired entries
         for path in paths_to_remove {
             self.invalidate(&path).await;
         }
@@ -515,19 +515,19 @@ impl FileMetadataCache {
         debug!("Cleared {} expired entries from cache", num_paths);
     }
     
-    /// Inicia el proceso de limpieza periódica
+    /// Starts the periodic cleanup process
     pub fn start_cleanup_task(cache: Arc<Self>) -> BoxFuture<'static, ()> {
         Box::pin(async move {
-            let cleanup_interval = Duration::from_secs(60); // Cada minuto
+            let cleanup_interval = Duration::from_secs(60); // Every minute
             
             loop {
-                // Esperar el intervalo
+                // Wait for the interval
                 time::sleep(cleanup_interval).await;
                 
-                // Limpiar entradas expiradas
+                // Clean expired entries
                 cache.clear_expired().await;
                 
-                // Registrar estadísticas
+                // Log statistics
                 let stats = cache.get_stats().await;
                 let cache_size = {
                     let cache_map = cache.metadata_cache.read().await;
@@ -550,12 +550,12 @@ impl FileMetadataCache {
         })
     }
     
-    /// Precarga metadatos de directorios completos (útil para inicialización)
+    /// Preloads metadata for entire directories (useful for initialization)
     pub async fn preload_directory(&self, dir_path: &Path, recursive: bool, max_depth: usize) -> Result<usize, std::io::Error> {
         self._preload_directory_internal(dir_path, recursive, max_depth, 0).await
     }
     
-    /// Implementación interna de precarga con seguimiento de profundidad
+    /// Internal preload implementation with depth tracking
     async fn _preload_directory_internal(
         &self, 
         dir_path: &Path, 
@@ -568,20 +568,20 @@ impl FileMetadataCache {
             return Ok(0);
         }
         
-        // Obtener entradas del directorio
+        // Get directory entries
         let mut entries = fs::read_dir(dir_path).await?;
         let mut count = 0;
         
-        // Procesar cada entrada
+        // Process each entry
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
             let metadata = fs::metadata(&path).await?;
             
-            // Refrescar metadatos de esta entrada
+            // Refresh metadata for this entry
             self.refresh_metadata(&path).await?;
             count += 1;
             
-            // Recursivamente procesar subdirectorios si es necesario
+            // Recursively process subdirectories if needed
             if recursive && metadata.is_dir() {
                 // Box to break recursion
                 count += self._preload_directory_internal(
@@ -657,37 +657,37 @@ mod tests {
     
     #[tokio::test]
     async fn test_cache_operations() {
-        // Crear directorio temporal para pruebas
+        // Create temporary directory for tests
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test_file.txt");
         
-        // Crear un archivo de prueba
+        // Create a test file
         let mut file = File::create(&file_path).await.unwrap();
         file.write_all(b"test content").await.unwrap();
         file.flush().await.unwrap();
         drop(file);
         
-        // Crear caché
+        // Create cache
         let config = AppConfig::default();
         let cache = FileMetadataCache::new(config, 1000);
         
-        // Verificar miss inicial
+        // Verify initial miss
         assert!(cache.exists(&file_path).await.is_none());
         
-        // Refrescar y verificar hit
+        // Refresh and verify hit
         let metadata = cache.refresh_metadata(&file_path).await.unwrap();
         assert_eq!(metadata.entry_type, CacheEntryType::File);
         assert_eq!(metadata.size, Some(12)); // "test content" = 12 bytes
         
-        // Verificar que ahora existe en caché
+        // Verify it now exists in cache
         assert_eq!(cache.exists(&file_path).await, Some(true));
         assert_eq!(cache.is_file(&file_path).await, Some(true));
         
-        // Invalidar y verificar que ya no existe en caché
+        // Invalidate and verify it no longer exists in cache
         cache.invalidate(&file_path).await;
         assert!(cache.exists(&file_path).await.is_none());
         
-        // Verificar estadísticas
+        // Verify statistics
         let stats = cache.get_stats().await;
         assert_eq!(stats.inserts, 1);
         assert_eq!(stats.invalidations, 1);
@@ -696,7 +696,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_directory_operations() {
-        // Crear estructura de directorios para pruebas
+        // Create directory structure for tests
         let temp_dir = tempdir().unwrap();
         // Canonicalize to handle macOS /var -> /private/var symlinks
         let base_path = temp_dir.path().canonicalize().unwrap();
@@ -709,24 +709,24 @@ mod tests {
         File::create(&file1).await.unwrap();
         File::create(&file2).await.unwrap();
         
-        // Crear caché
+        // Create cache
         let config = AppConfig::default();
         let cache = FileMetadataCache::new(config, 1000);
         
-        // Precargar directorio recursivamente
+        // Preload directory recursively
         // preload_directory caches the *contents* of the directory, not the root itself
         let count = cache.preload_directory(&base_path, true, 2).await.unwrap();
         assert_eq!(count, 3); // subdir, file1, file2
         
-        // Verificar existencia en caché (solo contenido, no la raíz)
+        // Verify existence in cache (only contents, not the root)
         assert_eq!(cache.is_dir(&sub_dir).await, Some(true));
         assert_eq!(cache.is_file(&file1).await, Some(true));
         assert_eq!(cache.is_file(&file2).await, Some(true));
         
-        // Invalidar directorio y contenido
+        // Invalidate directory and contents
         cache.invalidate_directory(&base_path).await;
         
-        // Verificar que nada existe en caché
+        // Verify nothing exists in cache
         assert!(cache.exists(&sub_dir).await.is_none());
         assert!(cache.exists(&file1).await.is_none());
         assert!(cache.exists(&file2).await.is_none());

@@ -2,19 +2,19 @@ use async_trait::async_trait;
 use crate::common::errors::Result;
 use crate::application::dtos::recent_dto::RecentItemDto;
 
-/// Define operaciones para gestionar elementos recientes del usuario
+/// Defines operations for managing user recent items
 #[async_trait]
 pub trait RecentItemsUseCase: Send + Sync {
-    /// Obtener todos los elementos recientes de un usuario
+    /// Get all recent items for a user
     async fn get_recent_items(&self, user_id: &str, limit: Option<i32>) -> Result<Vec<RecentItemDto>>;
     
-    /// Registrar acceso a un elemento
+    /// Record access to an item
     async fn record_item_access(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()>;
     
-    /// Eliminar un elemento de recientes
+    /// Remove an item from recents
     async fn remove_from_recent(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
     
-    /// Limpiar toda la lista de elementos recientes
+    /// Clear the entire recent items list
     async fn clear_recent_items(&self, user_id: &str) -> Result<()>;
 }
 
@@ -22,24 +22,24 @@ pub trait RecentItemsUseCase: Send + Sync {
 // Outbound port — persistence abstraction
 // ─────────────────────────────────────────────────────
 
-/// Puerto secundario (outbound) para persistencia de elementos recientes.
+/// Secondary (outbound) port for recent items persistence.
 ///
-/// Abstrae el acceso a la tabla `auth.user_recent_files` para que
-/// `RecentService` no dependa directamente de `PgPool`.
+/// Abstracts access to the `auth.user_recent_files` table so that
+/// `RecentService` does not depend directly on `PgPool`.
 #[async_trait]
 pub trait RecentItemsRepositoryPort: Send + Sync + 'static {
-    /// Obtiene los últimos elementos recientes de un usuario (ordenados por fecha desc).
+    /// Gets the latest recent items for a user (ordered by date desc).
     async fn get_recent_items(&self, user_id: &str, limit: i32) -> Result<Vec<RecentItemDto>>;
 
-    /// Registra/actualiza el acceso a un ítem (upsert por user+item+type).
+    /// Records/updates access to an item (upsert by user+item+type).
     async fn upsert_access(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()>;
 
-    /// Elimina un ítem de recientes. Devuelve `true` si existía.
+    /// Removes an item from recents. Returns `true` if it existed.
     async fn remove_item(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
 
-    /// Elimina todos los elementos recientes de un usuario.
+    /// Removes all recent items for a user.
     async fn clear_all(&self, user_id: &str) -> Result<()>;
 
-    /// Elimina elementos que excedan `max_items` (los más antiguos).
+    /// Removes items exceeding `max_items` (the oldest ones).
     async fn prune(&self, user_id: &str, max_items: i32) -> Result<()>;
 }

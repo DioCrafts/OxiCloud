@@ -22,22 +22,22 @@ pub trait FavoritesUseCase: Send + Sync {
 // Outbound port — persistence abstraction
 // ─────────────────────────────────────────────────────
 
-/// Puerto secundario (outbound) para persistencia de favoritos.
+/// Secondary (outbound) port for favorites persistence.
 ///
-/// Los servicios de aplicación dependen de este trait en lugar de
-/// acceder directamente a `PgPool`. La implementación concreta
-/// vive en `infrastructure::repositories::pg`.
+/// Application services depend on this trait instead of
+/// accessing `PgPool` directly. The concrete implementation
+/// lives in `infrastructure::repositories::pg`.
 #[async_trait]
 pub trait FavoritesRepositoryPort: Send + Sync + 'static {
-    /// Obtiene todos los favoritos de un usuario.
+    /// Gets all favorites for a user.
     async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>>;
 
-    /// Añade un ítem a favoritos. Devuelve `Ok(())` si ya existía (idempotente).
+    /// Adds an item to favorites. Returns `Ok(())` if it already existed (idempotent).
     async fn add_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()>;
 
-    /// Elimina un ítem de favoritos. Devuelve `true` si existía.
+    /// Removes an item from favorites. Returns `true` if it existed.
     async fn remove_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
 
-    /// Comprueba si un ítem está en favoritos.
+    /// Checks if an item is in favorites.
     async fn is_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
 }

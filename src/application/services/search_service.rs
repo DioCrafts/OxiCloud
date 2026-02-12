@@ -14,57 +14,57 @@ use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::FileReadPort;
 
 /**
- * Implementación del servicio de búsqueda para archivos y carpetas.
+ * Search service implementation for files and folders.
  * 
- * Este servicio implementa la funcionalidad de búsqueda avanzada que permite
- * a los usuarios encontrar archivos y carpetas basados en diversos criterios
- * como nombre, tipo, fecha y tamaño. También incluye una caché para mejorar
- * el rendimiento de búsquedas repetidas.
+ * This service implements the advanced search functionality that allows
+ * users to find files and folders based on various criteria
+ * such as name, type, date and size. It also includes a cache to improve
+ * the performance of repeated searches.
  */
 pub struct SearchService {
-    /// Repositorio para operaciones con archivos
+    /// Repository for file operations
     file_repository: Arc<dyn FileReadPort>,
     
-    /// Repositorio para operaciones con carpetas
+    /// Repository for folder operations
     folder_repository: Arc<dyn FolderStoragePort>,
     
-    /// Caché de resultados de búsqueda con tiempo de expiración
+    /// Search results cache with expiration time
     search_cache: Arc<Mutex<HashMap<SearchCacheKey, CachedSearchResult>>>,
     
-    /// Duración de validez de la caché en segundos
+    /// Cache validity duration in seconds
     cache_ttl: u64,
     
-    /// Tamaño máximo de la caché (número de resultados almacenados)
+    /// Maximum cache size (number of stored results)
     max_cache_size: usize,
 }
 
-/// Clave para la caché de búsqueda
+/// Key for the search cache
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SearchCacheKey {
-    /// Representación serializada de los criterios de búsqueda
+    /// Serialized representation of the search criteria
     criteria_hash: String,
     
-    /// ID del usuario (para aislar búsquedas entre usuarios)
+    /// User ID (to isolate searches between users)
     user_id: String,
 }
 
-/// Resultado de búsqueda en caché con tiempo de expiración
+/// Cached search result with expiration time
 struct CachedSearchResult {
-    /// Resultados de la búsqueda
+    /// Search results
     results: SearchResultsDto,
     
-    /// Momento en que se creó la entrada de caché
+    /// Time when the cache entry was created
     timestamp: Instant,
 }
 
 impl SearchService {
     /**
-     * Crea una nueva instancia del servicio de búsqueda.
+     * Creates a new instance of the search service.
      * 
-     * @param file_repository Repositorio para operaciones con archivos
-     * @param folder_repository Repositorio para operaciones con carpetas
-     * @param cache_ttl Tiempo de vida de la caché en segundos (0 para desactivar)
-     * @param max_cache_size Tamaño máximo de la caché
+     * @param file_repository Repository for file operations
+     * @param folder_repository Repository for folder operations
+     * @param cache_ttl Cache time-to-live in seconds (0 to disable)
+     * @param max_cache_size Maximum cache size
      */
     pub fn new(
         file_repository: Arc<dyn FileReadPort>,
@@ -80,7 +80,7 @@ impl SearchService {
             max_cache_size,
         };
         
-        // Iniciar tarea de limpieza de caché si TTL > 0
+        // Start cache cleanup task if TTL > 0
         if cache_ttl > 0 {
             Self::start_cache_cleanup_task(search_service.search_cache.clone(), cache_ttl);
         }
@@ -89,10 +89,10 @@ impl SearchService {
     }
     
     /**
-     * Inicia una tarea asíncrona para limpiar entradas expiradas de la caché.
+     * Starts an asynchronous task to clean up expired cache entries.
      * 
-     * @param cache_ref Referencia a la caché compartida
-     * @param ttl_seconds TTL en segundos
+     * @param cache_ref Reference to the shared cache
+     * @param ttl_seconds TTL in seconds
      */
     fn start_cache_cleanup_task(
         cache_ref: Arc<Mutex<HashMap<SearchCacheKey, CachedSearchResult>>>,
@@ -105,18 +105,18 @@ impl SearchService {
             loop {
                 time::sleep(cleanup_interval).await;
                 
-                // Obtener lock y limpiar entradas expiradas
+                // Acquire lock and clean up expired entries
                 if let Ok(mut cache) = cache_ref.lock() {
                     let now = Instant::now();
                     
-                    // Identificar entradas expiradas
+                    // Identify expired entries
                     let expired_keys: Vec<SearchCacheKey> = cache
                         .iter()
                         .filter(|(_, result)| now.duration_since(result.timestamp) > ttl)
                         .map(|(key, _)| key.clone())
                         .collect();
                     
-                    // Eliminar entradas expiradas
+                    // Remove expired entries
                     for key in expired_keys {
                         cache.remove(&key);
                     }
@@ -126,14 +126,14 @@ impl SearchService {
     }
     
     /**
-     * Crea una clave de caché a partir de los criterios de búsqueda.
+     * Creates a cache key from the search criteria.
      * 
-     * @param criteria Criterios de búsqueda
-     * @param user_id ID del usuario (para aislar caché entre usuarios)
-     * @return Clave para la caché
+     * @param criteria Search criteria
+     * @param user_id User ID (to isolate cache between users)
+     * @return Cache key
      */
     fn create_cache_key(&self, criteria: &SearchCriteriaDto, user_id: &str) -> SearchCacheKey {
-        // Serializar criterios para generar un hash
+        // Serialize criteria to generate a hash
         let criteria_str = serde_json::to_string(criteria).unwrap_or_default();
         
         SearchCacheKey {
@@ -143,13 +143,13 @@ impl SearchService {
     }
     
     /**
-     * Intenta obtener resultados de la caché.
+     * Attempts to retrieve results from the cache.
      * 
-     * @param key Clave de caché
-     * @return Opcionalmente, los resultados si existen y no han expirado
+     * @param key Cache key
+     * @return Optionally, the results if they exist and have not expired
      */
     fn get_from_cache(&self, key: &SearchCacheKey) -> Option<SearchResultsDto> {
-        // Si TTL es 0, la caché está desactivada
+        // If TTL is 0, the cache is disabled
         if self.cache_ttl == 0 {
             return None;
         }
@@ -159,7 +159,7 @@ impl SearchService {
                 let now = Instant::now();
                 let ttl = Duration::from_secs(self.cache_ttl);
                 
-                // Comprobar si la entrada ha expirado
+                // Check if the entry has expired
                 if now.duration_since(cached_result.timestamp) < ttl {
                     return Some(cached_result.results.clone());
                 }
@@ -170,19 +170,19 @@ impl SearchService {
     }
     
     /**
-     * Almacena resultados en la caché.
+     * Stores results in the cache.
      * 
-     * @param key Clave de caché
-     * @param results Resultados a almacenar
+     * @param key Cache key
+     * @param results Results to store
      */
     fn store_in_cache(&self, key: SearchCacheKey, results: SearchResultsDto) {
-        // Si TTL es 0, la caché está desactivada
+        // If TTL is 0, the cache is disabled
         if self.cache_ttl == 0 {
             return;
         }
         
         if let Ok(mut cache) = self.search_cache.lock() {
-            // Si la caché está llena, eliminar la entrada más antigua
+            // If the cache is full, remove the oldest entry
             if cache.len() >= self.max_cache_size {
                 if let Some((oldest_key, _)) = cache
                     .iter()
@@ -192,7 +192,7 @@ impl SearchService {
                 }
             }
             
-            // Almacenar el nuevo resultado
+            // Store the new result
             cache.insert(key, CachedSearchResult {
                 results,
                 timestamp: Instant::now(),
@@ -201,35 +201,35 @@ impl SearchService {
     }
     
     /**
-     * Filtra archivos según los criterios de búsqueda.
+     * Filters files according to the search criteria.
      * 
-     * @param files Lista de archivos a filtrar
-     * @param criteria Criterios de búsqueda
-     * @return Archivos que cumplen con los criterios
+     * @param files List of files to filter
+     * @param criteria Search criteria
+     * @return Files that match the criteria
      */
     fn filter_files(&self, files: Vec<FileDto>, criteria: &SearchCriteriaDto) -> Vec<FileDto> {
         files.into_iter()
             .filter(|file| {
-                // Filtrar por nombre
+                // Filter by name
                 if let Some(name_query) = &criteria.name_contains {
                     if !file.name.to_lowercase().contains(&name_query.to_lowercase()) {
                         return false;
                     }
                 }
                 
-                // Filtrar por tipo de archivo (extensión)
+                // Filter by file type (extension)
                 if let Some(file_types) = &criteria.file_types {
                     if let Some(extension) = file.name.split('.').last() {
                         if !file_types.iter().any(|ext| ext.eq_ignore_ascii_case(extension)) {
                             return false;
                         }
                     } else {
-                        // No tiene extensión
+                        // Has no extension
                         return false;
                     }
                 }
                 
-                // Filtrar por fecha de creación
+                // Filter by creation date
                 if let Some(created_after) = criteria.created_after {
                     if file.created_at < created_after {
                         return false;
@@ -242,7 +242,7 @@ impl SearchService {
                     }
                 }
                 
-                // Filtrar por fecha de modificación
+                // Filter by modification date
                 if let Some(modified_after) = criteria.modified_after {
                     if file.modified_at < modified_after {
                         return false;
@@ -255,7 +255,7 @@ impl SearchService {
                     }
                 }
                 
-                // Filtrar por tamaño
+                // Filter by size
                 if let Some(min_size) = criteria.min_size {
                     if file.size < min_size {
                         return false;
@@ -274,23 +274,23 @@ impl SearchService {
     }
     
     /**
-     * Filtra carpetas según los criterios de búsqueda.
+     * Filters folders according to the search criteria.
      * 
-     * @param folders Lista de carpetas a filtrar
-     * @param criteria Criterios de búsqueda
-     * @return Carpetas que cumplen con los criterios
+     * @param folders List of folders to filter
+     * @param criteria Search criteria
+     * @return Folders that match the criteria
      */
     fn filter_folders(&self, folders: Vec<FolderDto>, criteria: &SearchCriteriaDto) -> Vec<FolderDto> {
         folders.into_iter()
             .filter(|folder| {
-                // Filtrar por nombre
+                // Filter by name
                 if let Some(name_query) = &criteria.name_contains {
                     if !folder.name.to_lowercase().contains(&name_query.to_lowercase()) {
                         return false;
                     }
                 }
                 
-                // Filtrar por fecha de creación
+                // Filter by creation date
                 if let Some(created_after) = criteria.created_after {
                     if folder.created_at < created_after {
                         return false;
@@ -303,7 +303,7 @@ impl SearchService {
                     }
                 }
                 
-                // Filtrar por fecha de modificación
+                // Filter by modification date
                 if let Some(modified_after) = criteria.modified_after {
                     if folder.modified_at < modified_after {
                         return false;
@@ -322,12 +322,12 @@ impl SearchService {
     }
     
     /**
-     * Implementación de la búsqueda recursiva a través de carpetas.
+     * Implementation of recursive search through folders.
      * 
-     * @param current_folder_id ID de la carpeta actual
-     * @param criteria Criterios de búsqueda
-     * @param found_files Archivos encontrados hasta ahora
-     * @param found_folders Carpetas encontradas hasta ahora
+     * @param current_folder_id ID of the current folder
+     * @param criteria Search criteria
+     * @param found_files Files found so far
+     * @param found_folders Folders found so far
      */
     async fn search_recursive(
         &self,
@@ -337,31 +337,31 @@ impl SearchService {
         found_folders: &mut Vec<FolderDto>,
     ) -> Result<()> {
         Box::pin(async move {
-        // Listar archivos en la carpeta actual
+        // List files in the current folder
         let files = self.file_repository.list_files(current_folder_id).await?;
         
-        // Filtrar archivos según criterios y agregarlos a los resultados
+        // Filter files according to criteria and add them to the results
         let filtered_files = self.filter_files(
             files.into_iter().map(FileDto::from).collect(), 
             criteria
         );
         found_files.extend(filtered_files);
         
-        // Si la búsqueda es recursiva, procesar subcarpetas
+        // If the search is recursive, process subfolders
         if criteria.recursive {
-            // Listar subcarpetas
+            // List subfolders
             let folders = self.folder_repository.list_folders(current_folder_id).await?;
             
-            // Filtrar carpetas según criterios y agregarlas a los resultados
+            // Filter folders according to criteria and add them to the results
             let filtered_folders: Vec<FolderDto> = self.filter_folders(
                 folders.into_iter().map(FolderDto::from).collect(),
                 criteria
             );
             
-            // Añadir las carpetas filtradas a los resultados
+            // Add filtered folders to the results
             found_folders.extend(filtered_folders.iter().cloned());
             
-            // Buscar recursivamente en cada subcarpeta
+            // Search recursively in each subfolder
             for folder in filtered_folders {
                 self.search_recursive(
                     Some(&folder.id),
@@ -380,26 +380,26 @@ impl SearchService {
 #[async_trait]
 impl SearchUseCase for SearchService {
     /**
-     * Realiza una búsqueda basada en los criterios especificados.
+     * Performs a search based on the specified criteria.
      * 
-     * @param criteria Criterios de búsqueda
-     * @return Resultados de la búsqueda
+     * @param criteria Search criteria
+     * @return Search results
      */
     async fn search(&self, criteria: SearchCriteriaDto) -> Result<SearchResultsDto> {
-        // TODO: Obtener ID de usuario del contexto de autenticación
+        // TODO: Get user ID from the authentication context
         let user_id = "default-user";
         let cache_key = self.create_cache_key(&criteria, user_id);
         
-        // Intentar obtener resultados de la caché
+        // Try to get results from the cache
         if let Some(cached_results) = self.get_from_cache(&cache_key) {
             return Ok(cached_results);
         }
         
-        // Inicializar colecciones para resultados
+        // Initialize collections for results
         let mut found_files: Vec<FileDto> = Vec::new();
         let mut found_folders: Vec<FolderDto> = Vec::new();
         
-        // Realizar búsqueda en la carpeta especificada o en la raíz
+        // Perform search in the specified folder or at the root
         self.search_recursive(
             criteria.folder_id.as_deref(),
             &criteria,
@@ -407,29 +407,29 @@ impl SearchUseCase for SearchService {
             &mut found_folders,
         ).await?;
         
-        // Aplicar paginación
+        // Apply pagination
         let total_count = found_files.len() + found_folders.len();
         
-        // Ordenar por relevancia o fecha según criterios
-        // Por defecto, ordenamos por fecha de modificación (más reciente primero)
+        // Sort by relevance or date according to criteria
+        // By default, sort by modification date (most recent first)
         found_files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
         found_folders.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
         
-        // Aplicar límite y offset para paginación
+        // Apply limit and offset for pagination
         let start_idx = criteria.offset.min(total_count);
         let end_idx = (criteria.offset + criteria.limit).min(total_count);
         
         let paginated_items: Vec<(bool, usize)> = (start_idx..end_idx)
             .map(|i| {
                 if i < found_folders.len() {
-                    (true, i) // Es una carpeta
+                    (true, i) // It's a folder
                 } else {
-                    (false, i - found_folders.len()) // Es un archivo
+                    (false, i - found_folders.len()) // It's a file
                 }
             })
             .collect();
         
-        // Extraer elementos paginados
+        // Extract paginated items
         let mut paginated_folders = Vec::new();
         let mut paginated_files = Vec::new();
         
@@ -445,7 +445,7 @@ impl SearchUseCase for SearchService {
             }
         }
         
-        // Crear objeto de resultados
+        // Create results object
         let search_results = SearchResultsDto::new(
             paginated_files,
             paginated_folders,
@@ -454,16 +454,16 @@ impl SearchUseCase for SearchService {
             Some(total_count),
         );
         
-        // Almacenar en caché
+        // Store in cache
         self.store_in_cache(cache_key, search_results.clone());
         
         Ok(search_results)
     }
     
     /**
-     * Limpia la caché de resultados de búsqueda.
+     * Clears the search results cache.
      * 
-     * @return Resultado indicando éxito
+     * @return Result indicating success
      */
     async fn clear_search_cache(&self) -> Result<()> {
         if let Ok(mut cache) = self.search_cache.lock() {
@@ -473,9 +473,9 @@ impl SearchUseCase for SearchService {
     }
 }
 
-// Implementar el caso de uso de prueba (stub)
+// Implement the test use case (stub)
 impl SearchService {
-    /// Crea una versión stub del servicio para pruebas
+    /// Creates a stub version of the service for testing
     pub fn new_stub() -> impl SearchUseCase {
         struct SearchServiceStub;
         

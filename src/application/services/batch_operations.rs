@@ -12,52 +12,52 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
 
-/// Errores específicos para operaciones por lotes
+/// Specific errors for batch operations
 #[derive(Debug, Error)]
 pub enum BatchOperationError {
-    #[error("Error de dominio: {0}")]
+    #[error("Domain error: {0}")]
     Domain(#[from] DomainError),
     
-    #[error("Operación cancelada: {0}")]
+    #[error("Operation cancelled: {0}")]
     Cancelled(String),
     
-    #[error("Límite de concurrencia excedido: {0}")]
+    #[error("Concurrency limit exceeded: {0}")]
     ConcurrencyLimit(String),
     
-    #[error("Error en operación del lote: {0} ({1} de {2} completadas)")]
+    #[error("Batch operation error: {0} ({1} of {2} completed)")]
     PartialFailure(String, usize, usize),
     
-    #[error("Error interno: {0}")]
+    #[error("Internal error: {0}")]
     Internal(String),
 }
 
-/// Resultado de una operación por lotes con estadísticas
+/// Result of a batch operation with statistics
 #[derive(Debug, Clone)]
 pub struct BatchResult<T> {
-    /// Resultados exitosos
+    /// Successful results
     pub successful: Vec<T>,
-    /// Operaciones fallidas con sus errores
+    /// Failed operations with their errors
     pub failed: Vec<(String, String)>,
-    /// Estadísticas de la operación
+    /// Operation statistics
     pub stats: BatchStats,
 }
 
-/// Estadísticas de una operación por lotes
+/// Statistics of a batch operation
 #[derive(Debug, Clone, Default)]
 pub struct BatchStats {
-    /// Número total de operaciones
+    /// Total number of operations
     pub total: usize,
-    /// Número de operaciones exitosas
+    /// Number of successful operations
     pub successful: usize,
-    /// Número de operaciones fallidas
+    /// Number of failed operations
     pub failed: usize,
-    /// Tiempo total de ejecución en milisegundos
+    /// Total execution time in milliseconds
     pub execution_time_ms: u128,
-    /// Concurrencia máxima alcanzada
+    /// Maximum concurrency reached
     pub max_concurrency: usize,
 }
 
-/// Servicio de operaciones por lotes
+/// Batch operations service
 pub struct BatchOperationService {
     file_retrieval: Arc<dyn FileRetrievalUseCase>,
     file_management: Arc<dyn FileManagementUseCase>,
@@ -67,14 +67,14 @@ pub struct BatchOperationService {
 }
 
 impl BatchOperationService {
-    /// Crea una nueva instancia del servicio de operaciones por lotes
+    /// Creates a new instance of the batch operations service
     pub fn new(
         file_retrieval: Arc<dyn FileRetrievalUseCase>,
         file_management: Arc<dyn FileManagementUseCase>,
         folder_service: Arc<FolderService>,
         config: AppConfig
     ) -> Self {
-        // Limitar la concurrencia basada en la configuración
+        // Limit concurrency based on configuration
         let max_concurrency = config.concurrency.max_concurrent_files;
         
         Self {
@@ -86,7 +86,7 @@ impl BatchOperationService {
         }
     }
     
-    /// Crea una nueva instancia con la configuración por defecto
+    /// Creates a new instance with default configuration
     pub fn default(
         file_retrieval: Arc<dyn FileRetrievalUseCase>,
         file_management: Arc<dyn FileManagementUseCase>,
@@ -95,16 +95,16 @@ impl BatchOperationService {
         Self::new(file_retrieval, file_management, folder_service, AppConfig::default())
     }
     
-    /// Copia múltiples archivos en paralelo
+    /// Copies multiple files in parallel
     pub async fn copy_files(
         &self,
         file_ids: Vec<String>,
         target_folder_id: Option<String>,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
-        info!("Iniciando copia en lote de {} archivos", file_ids.len());
+        info!("Starting batch copy of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -114,30 +114,30 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación a realizar para cada archivo
+        // Define the operation to perform for each file
         let operations = file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
             let target_folder = target_folder_id.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let copy_result = mgmt.move_file(&file_id, target_folder.clone()).await;
                 
-                // Liberar el permiso explícitamente (también se libera al hacer drop)
+                // Release the permit explicitly (also released on drop)
                 drop(permit);
                 
-                // Devolver el resultado junto con el ID para identificar éxitos/fallos
+                // Return the result along with the ID to identify successes/failures
                 (file_id, copy_result)
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo con control de concurrencia
+        // Execute all operations in parallel with concurrency control
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (file_id, operation_result) in operation_results {
             match operation_result {
                 Ok(file) => {
@@ -151,13 +151,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Copia en lote completada: {}/{} exitosas en {}ms",
+            "Batch copy completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -166,16 +166,16 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Mueve múltiples archivos en paralelo
+    /// Moves multiple files in parallel
     pub async fn move_files(
         &self,
         file_ids: Vec<String>,
         target_folder_id: Option<String>,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
-        info!("Iniciando movimiento en lote de {} archivos", file_ids.len());
+        info!("Starting batch move of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -185,30 +185,30 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación a realizar para cada archivo
+        // Define the operation to perform for each file
         let operations = file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
             let target_folder = target_folder_id.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let move_result = mgmt.move_file(&file_id, target_folder.clone()).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado junto con el ID para identificar éxitos/fallos
+                // Return the result along with the ID to identify successes/failures
                 (file_id, move_result)
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo con control de concurrencia
+        // Execute all operations in parallel with concurrency control
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (file_id, operation_result) in operation_results {
             match operation_result {
                 Ok(file) => {
@@ -222,13 +222,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Movimiento en lote completado: {}/{} exitosas en {}ms",
+            "Batch move completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -237,15 +237,15 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Elimina múltiples archivos en paralelo
+    /// Deletes multiple files in parallel
     pub async fn delete_files(
         &self,
         file_ids: Vec<String>,
     ) -> Result<BatchResult<String>, BatchOperationError> {
-        info!("Iniciando eliminación en lote de {} archivos", file_ids.len());
+        info!("Starting batch deletion of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -255,30 +255,30 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación a realizar para cada archivo
+        // Define the operation to perform for each file
         let operations = file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
             let semaphore = self.semaphore.clone();
             let id_clone = file_id.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let delete_result = mgmt.delete_file(&file_id).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado junto con el ID
+                // Return the result along with the ID
                 (id_clone.clone(), delete_result.map(|_| id_clone))
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo con control de concurrencia
+        // Execute all operations in parallel with concurrency control
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (file_id, operation_result) in operation_results {
             match operation_result {
                 Ok(id) => {
@@ -292,13 +292,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Eliminación en lote completada: {}/{} exitosas en {}ms",
+            "Batch deletion completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -307,15 +307,15 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Carga múltiples archivos en paralelo (datos en memoria)
+    /// Loads multiple files in parallel (data in memory)
     pub async fn get_multiple_files(
         &self,
         file_ids: Vec<String>,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
-        info!("Iniciando carga en lote de {} archivos", file_ids.len());
+        info!("Starting batch load of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -325,29 +325,29 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación a realizar para cada archivo
+        // Define the operation to perform for each file
         let operations = file_ids.into_iter().map(|file_id| {
             let retrieval = self.file_retrieval.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let get_result = retrieval.get_file(&file_id).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado junto con el ID
+                // Return the result along with the ID
                 (file_id, get_result)
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo con control de concurrencia
+        // Execute all operations in parallel with concurrency control
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (file_id, operation_result) in operation_results {
             match operation_result {
                 Ok(file) => {
@@ -361,13 +361,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Carga en lote completada: {}/{} exitosas en {}ms",
+            "Batch load completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -376,16 +376,16 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Elimina múltiples carpetas en paralelo
+    /// Deletes multiple folders in parallel
     pub async fn delete_folders(
         &self,
         folder_ids: Vec<String>,
         _recursive: bool,
     ) -> Result<BatchResult<String>, BatchOperationError> {
-        info!("Iniciando eliminación en lote de {} carpetas", folder_ids.len());
+        info!("Starting batch deletion of {} folders", folder_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -395,32 +395,32 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación a realizar para cada carpeta
+        // Define the operation to perform for each folder
         let operations = folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
             let semaphore = self.semaphore.clone();
             let id_clone = folder_id.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 // For both recursive and non-recursive, use the standard delete_folder method
                 // since FolderUseCase only has a single delete_folder method
                 let delete_result = folder_service.delete_folder(&folder_id).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado junto con el ID
+                // Return the result along with the ID
                 (id_clone.clone(), delete_result.map(|_| id_clone))
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo con control de concurrencia
+        // Execute all operations in parallel with concurrency control
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (folder_id, operation_result) in operation_results {
             match operation_result {
                 Ok(id) => {
@@ -434,13 +434,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Eliminación en lote de carpetas completada: {}/{} exitosas en {}ms",
+            "Batch folder deletion completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -449,7 +449,7 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Operación genérica de lote para cualquier tipo de función asíncrona
+    /// Generic batch operation for any type of async function
     pub async fn generic_batch_operation<T, F, Fut>(
         &self,
         items: Vec<T>,
@@ -460,10 +460,10 @@ impl BatchOperationService {
         F: Fn(T, Arc<Semaphore>) -> Fut + Clone + Send + Sync + 'static,
         Fut: Future<Output = Result<T, DomainError>> + Send + 'static,
     {
-        info!("Iniciando operación genérica en lote con {} items", items.len());
+        info!("Starting generic batch operation with {} items", items.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -473,25 +473,25 @@ impl BatchOperationService {
             },
         };
         
-        // Convertir cada item a una tarea
+        // Convert each item to a task
         let tasks = items.iter().map(|item| {
             let item_clone = item.clone();
             let op = operation.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // La función proporcionada debe manejar la adquisición del semáforo
+                // The provided function must handle semaphore acquisition
                 let op_result = op(item_clone.clone(), semaphore).await;
                 
-                // Devolver el resultado junto con el item original para identificación
+                // Return the result along with the original item for identification
                 (item_clone, op_result)
             }
         });
         
-        // Ejecutar todas las tareas en paralelo
+        // Execute all tasks in parallel
         let operation_results = join_all(tasks).await;
         
-        // Procesar resultados
+        // Process results
         for (item, operation_result) in operation_results {
             match operation_result {
                 Ok(result_item) => {
@@ -499,20 +499,20 @@ impl BatchOperationService {
                     result.stats.successful += 1;
                 }
                 Err(e) => {
-                    // Convertir el item a string para el reporte de error
+                    // Convert item to string for error reporting
                     result.failed.push((format!("{:?}", item), e.to_string()));
                     result.stats.failed += 1;
                 }
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Operación genérica en lote completada: {}/{} exitosas en {}ms",
+            "Generic batch operation completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -521,15 +521,15 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Crear múltiples carpetas en paralelo
+    /// Create multiple folders in parallel
     pub async fn create_folders(
         &self,
-        folders: Vec<(String, Option<String>)>, // (nombre, padre_id)
+        folders: Vec<(String, Option<String>)>, // (name, parent_id)
     ) -> Result<BatchResult<FolderDto>, BatchOperationError> {
-        info!("Iniciando creación en lote de {} carpetas", folders.len());
+        info!("Starting batch creation of {} folders", folders.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -539,13 +539,13 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación para cada carpeta
+        // Define the operation for each folder
         let operations = folders.into_iter().map(|(name, parent_id)| {
             let folder_service = self.folder_service.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let dto = crate::application::dtos::folder_dto::CreateFolderDto {
@@ -554,19 +554,19 @@ impl BatchOperationService {
                 };
                 let create_result = folder_service.create_folder(dto).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado con un identificador para los errores
+                // Return the result with an identifier for errors
                 let id = format!("{}:{}", name, parent_id.unwrap_or_default());
                 (id, create_result)
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo
+        // Execute all operations in parallel
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (id, operation_result) in operation_results {
             match operation_result {
                 Ok(folder) => {
@@ -580,13 +580,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Creación en lote de carpetas completada: {}/{} exitosas en {}ms",
+            "Batch folder creation completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -595,15 +595,15 @@ impl BatchOperationService {
         Ok(result)
     }
     
-    /// Obtener metadatos de múltiples carpetas en paralelo
+    /// Get metadata of multiple folders in parallel
     pub async fn get_multiple_folders(
         &self,
         folder_ids: Vec<String>,
     ) -> Result<BatchResult<FolderDto>, BatchOperationError> {
-        info!("Iniciando carga en lote de {} carpetas", folder_ids.len());
+        info!("Starting batch load of {} folders", folder_ids.len());
         let start_time = std::time::Instant::now();
         
-        // Crear estructura para el resultado
+        // Create result structure
         let mut result = BatchResult {
             successful: Vec::new(),
             failed: Vec::new(),
@@ -613,29 +613,29 @@ impl BatchOperationService {
             },
         };
         
-        // Definir la operación para cada carpeta
+        // Define the operation for each folder
         let operations = folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
             let semaphore = self.semaphore.clone();
             
             async move {
-                // Adquirir permiso del semáforo
+                // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
                 
                 let get_result = folder_service.get_folder(&folder_id).await;
                 
-                // Liberar el permiso explícitamente
+                // Release the permit explicitly
                 drop(permit);
                 
-                // Devolver el resultado con su ID
+                // Return the result with its ID
                 (folder_id, get_result)
             }
         });
         
-        // Ejecutar todas las operaciones en paralelo
+        // Execute all operations in parallel
         let operation_results = join_all(operations).await;
         
-        // Procesar los resultados
+        // Process the results
         for (folder_id, operation_result) in operation_results {
             match operation_result {
                 Ok(folder) => {
@@ -649,13 +649,13 @@ impl BatchOperationService {
             }
         }
         
-        // Completar estadísticas
+        // Complete statistics
         result.stats.execution_time_ms = start_time.elapsed().as_millis();
         result.stats.max_concurrency = self.config.concurrency.max_concurrent_files
             .min(result.stats.total);
         
         info!(
-            "Carga en lote de carpetas completada: {}/{} exitosas en {}ms",
+            "Batch folder load completed: {}/{} successful in {}ms",
             result.stats.successful,
             result.stats.total,
             result.stats.execution_time_ms
@@ -673,7 +673,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_generic_batch_operation() {
-        // Crear el servicio de batch with stubs
+        // Create the batch service with stubs
         let batch_service = BatchOperationService::new(
             Arc::new(StubFileRetrievalUseCase),
             Arc::new(StubFileManagementUseCase),
@@ -683,35 +683,35 @@ mod tests {
             AppConfig::default()
         );
         
-        // Definir una operación genérica de prueba
+        // Define a generic test operation
         let operation = |item: i32, semaphore: Arc<Semaphore>| async move {
-            // Adquirir y liberar el semáforo
+            // Acquire and release the semaphore
             let _permit = semaphore.acquire().await.unwrap();
             
             if item % 2 == 0 {
-                // Simular éxito para números pares
+                // Simulate success for even numbers
                 Ok(item * 2)
             } else {
-                // Simular error para números impares
+                // Simulate error for odd numbers
                 Err(DomainError::validation_error("Odd number not allowed"))
             }
         };
         
-        // Ejecutar la operación de batch
+        // Execute the batch operation
         let items = vec![1, 2, 3, 4, 5];
         
         let result = batch_service.generic_batch_operation(items, operation).await.unwrap();
         
-        // Verificar los resultados
+        // Verify the results
         assert_eq!(result.stats.total, 5);
         assert_eq!(result.stats.successful, 2);
         assert_eq!(result.stats.failed, 3);
         
-        // Los números pares deberían estar en los éxitos, duplicados
+        // Even numbers should be in successes, doubled
         assert!(result.successful.contains(&4)); // 2*2
         assert!(result.successful.contains(&8)); // 4*2
         
-        // Los impares deberían estar en los fallos
+        // Odd numbers should be in failures
         assert_eq!(result.failed.len(), 3);
     }
 }

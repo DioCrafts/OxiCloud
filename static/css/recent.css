@@ -1,6 +1,6 @@
-/* Estilos para la funcionalidad de archivos recientes */
+/* Styles for the recent files feature */
 
-/* Indicador de reciente */
+/* Recent indicator */
 .recent-indicator {
     position: absolute;
     top: 10px;
@@ -20,12 +20,12 @@
     }
 }
 
-/* Estilos para los elementos de la vista de recientes */
+/* Styles for the recent view items */
 .recent-item {
     position: relative;
 }
 
-/* Ajustes para la vista de cuadrícula */
+/* Adjustments for grid view */
 .file-card.recent-item {
     border-left: 3px solid #6c757d;
 
@@ -35,7 +35,7 @@
     }
 }
 
-/* Ajustes para la vista de lista */
+/* Adjustments for list view */
 .file-item.recent-item {
     position: relative;
     grid-template-columns: 30px minmax(200px, 2fr) 1fr 1fr 120px;
@@ -49,7 +49,7 @@
     height: 30px;
 }
 
-/* Estilos para el estado vacío específico de recientes */
+/* Styles for the recent-specific empty state */
 .recents-empty-state {
     display: flex;
     flex-direction: column;
@@ -72,12 +72,12 @@
     max-width: 400px;
 }
 
-/* Tooltip para tiempo de acceso */
+/* Tooltip for access time */
 .recent-item .file-info {
     cursor: help;
 }
 
-/* Animación para archivos recientes */
+/* Animation for recent files */
 .recent-item {
     animation: recent-fade-in 0.3s ease;
 }

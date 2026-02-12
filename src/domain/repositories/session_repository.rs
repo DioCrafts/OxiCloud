@@ -4,19 +4,19 @@ use crate::common::errors::DomainError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionRepositoryError {
-    #[error("Sesión no encontrada: {0}")]
+    #[error("Session not found: {0}")]
     NotFound(String),
     
-    #[error("Error de base de datos: {0}")]
+    #[error("Database error: {0}")]
     DatabaseError(String),
     
-    #[error("Error de tiempo de espera: {0}")]
+    #[error("Timeout error: {0}")]
     Timeout(String),
 }
 
 pub type SessionRepositoryResult<T> = Result<T, SessionRepositoryError>;
 
-// Conversión de SessionRepositoryError a DomainError
+// Conversion from SessionRepositoryError to DomainError
 impl From<SessionRepositoryError> for DomainError {
     fn from(err: SessionRepositoryError) -> Self {
         match err {
@@ -35,24 +35,24 @@ impl From<SessionRepositoryError> for DomainError {
 
 #[async_trait]
 pub trait SessionRepository: Send + Sync + 'static {
-    /// Crea una nueva sesión
+    /// Creates a new session
     async fn create_session(&self, session: Session) -> SessionRepositoryResult<Session>;
     
-    /// Obtiene una sesión por ID
+    /// Gets a session by ID
     async fn get_session_by_id(&self, id: &str) -> SessionRepositoryResult<Session>;
     
-    /// Obtiene una sesión por token de actualización
+    /// Gets a session by refresh token
     async fn get_session_by_refresh_token(&self, refresh_token: &str) -> SessionRepositoryResult<Session>;
     
-    /// Obtiene todas las sesiones de un usuario
+    /// Gets all sessions for a user
     async fn get_sessions_by_user_id(&self, user_id: &str) -> SessionRepositoryResult<Vec<Session>>;
     
-    /// Revoca una sesión específica
+    /// Revokes a specific session
     async fn revoke_session(&self, session_id: &str) -> SessionRepositoryResult<()>;
     
-    /// Revoca todas las sesiones de un usuario
+    /// Revokes all sessions for a user
     async fn revoke_all_user_sessions(&self, user_id: &str) -> SessionRepositoryResult<u64>;
     
-    /// Elimina sesiones expiradas
+    /// Deletes expired sessions
     async fn delete_expired_sessions(&self) -> SessionRepositoryResult<u64>;
 }

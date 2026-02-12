@@ -230,8 +230,8 @@ const favorites = {
             
             // Show success notification
             window.ui.showNotification(
-                'Añadido a favoritos', 
-                `"${name}" añadido a favoritos`
+                'Added to favorites', 
+                `"${name}" added to favorites`
             );
             
             return true;
@@ -271,8 +271,8 @@ const favorites = {
                 // Show success notification if item was found
                 if (item) {
                     window.ui.showNotification(
-                        'Eliminado de favoritos', 
-                        `"${item.name}" eliminado de favoritos`
+                        'Removed from favorites', 
+                        `"${item.name}" removed from favorites`
                     );
                 }
                 return true;
@@ -310,10 +310,10 @@ const favorites = {
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
                 <div class="list-header">
-                    <div data-i18n="files.name">Nombre</div>
-                    <div data-i18n="files.type">Tipo</div>
-                    <div data-i18n="files.size">Tamaño</div>
-                    <div data-i18n="files.modified">Modificado</div>
+                    <div data-i18n="files.name">Name</div>
+                    <div data-i18n="files.type">Type</div>
+                    <div data-i18n="files.size">Size</div>
+                    <div data-i18n="files.modified">Modified</div>
                 </div>
             `;
             
@@ -326,8 +326,8 @@ const favorites = {
                 emptyState.className = 'empty-state';
                 emptyState.innerHTML = `
                     <i class="fas fa-star" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
-                    <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No hay elementos favoritos'}</p>
-                    <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'Para marcar como favorito, haz clic derecho en cualquier archivo o carpeta'}</p>
+                    <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No favorite items'}</p>
+                    <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
                 `;
                 filesGrid.appendChild(emptyState);
                 return;
@@ -359,7 +359,7 @@ const favorites = {
             
         } catch (error) {
             console.error('Error displaying favorites:', error);
-            window.ui.showNotification('Error', 'Error al cargar elementos favoritos');
+            window.ui.showNotification('Error', 'Error loading favorite items');
         }
     },
     
@@ -468,7 +468,7 @@ const favorites = {
                 <i class="fas fa-folder"></i>
             </div>
             <div class="file-name">${folder.name}</div>
-            <div class="file-info">Carpeta</div>
+            <div class="file-info">Folder</div>
         `;
 
         // Click to navigate
@@ -518,7 +518,7 @@ const favorites = {
                 </div>
                 <span>${folder.name}</span>
             </div>
-            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Carpeta'}</div>
+            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
         `;
@@ -559,17 +559,17 @@ const favorites = {
         // Determine icon and type
         let iconClass = 'fas fa-file';
         let iconSpecialClass = '';
-        let typeLabel = 'Documento';
+        let typeLabel = 'Document';
 
         if (file.mime_type) {
             if (file.mime_type.startsWith('image/')) {
                 iconClass = 'fas fa-file-image';
                 iconSpecialClass = 'image-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Imagen';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
             } else if (file.mime_type.startsWith('text/')) {
                 iconClass = 'fas fa-file-alt';
                 iconSpecialClass = 'text-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Texto';
+                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
             } else if (file.mime_type.startsWith('video/')) {
                 iconClass = 'fas fa-file-video';
                 iconSpecialClass = 'video-icon';
@@ -606,7 +606,7 @@ const favorites = {
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${file.name}</div>
-            <div class="file-info">Modificado ${formattedDate.split(' ')[0]}</div>
+            <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
 
         // Download on click

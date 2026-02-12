@@ -10,7 +10,7 @@ use crate::application::ports::auth_ports::SessionStoragePort;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::transaction_utils::with_transaction;
 
-// Implementar From<sqlx::Error> para SessionRepositoryError para permitir conversiones automáticas
+// Implement From<sqlx::Error> for SessionRepositoryError to allow automatic conversions
 impl From<sqlx::Error> for SessionRepositoryError {
     fn from(err: sqlx::Error) -> Self {
         SessionPgRepository::map_sqlx_error(err)
@@ -26,14 +26,14 @@ impl SessionPgRepository {
         Self { pool }
     }
     
-    // Método auxiliar para mapear errores SQL a errores de dominio
+    // Helper method to map SQL errors to domain errors
     pub fn map_sqlx_error(err: sqlx::Error) -> SessionRepositoryError {
         match err {
             sqlx::Error::RowNotFound => {
-                SessionRepositoryError::NotFound("Sesión no encontrada".to_string())
+                SessionRepositoryError::NotFound("Session not found".to_string())
             },
             _ => SessionRepositoryError::DatabaseError(
-                format!("Error de base de datos: {}", err)
+                format!("Database error: {}", err)
             ),
         }
     }
@@ -41,9 +41,9 @@ impl SessionPgRepository {
 
 #[async_trait]
 impl SessionRepository for SessionPgRepository {
-    /// Crea una nueva sesión utilizando una transacción
+    /// Creates a new session using a transaction
     async fn create_session(&self, session: Session) -> SessionRepositoryResult<Session> {
-        // Crear una copia de la sesión para el closure
+        // Create a copy of the session for the closure
         let session_clone = session.clone();
         
         with_transaction(
@@ -51,7 +51,7 @@ impl SessionRepository for SessionPgRepository {
             "create_session",
             |tx| {
                 Box::pin(async move {
-                    // Insertar la sesión
+                    // Insert the session
                     sqlx::query(
                         r#"
                         INSERT INTO auth.sessions (
@@ -74,8 +74,8 @@ impl SessionRepository for SessionPgRepository {
                     .await
                     .map_err(Self::map_sqlx_error)?;
                     
-                    // Opcionalmente, actualizar el último login del usuario
-                    // dentro de la misma transacción
+                    // Optionally, update the user's last login
+                    // within the same transaction
                     sqlx::query(
                         r#"
                         UPDATE auth.users
@@ -87,12 +87,12 @@ impl SessionRepository for SessionPgRepository {
                     .execute(&mut **tx)
                     .await
                     .map_err(|e| {
-                        // Convertimos el error pero sin interrumpir la creación
-                        // de la sesión si falla la actualización
-                        tracing::warn!("No se pudo actualizar last_login_at para usuario {}: {}", 
+                        // Convert the error but without interrupting session
+                        // creation if the update fails
+                        tracing::warn!("Could not update last_login_at for user {}: {}", 
                                     session_clone.user_id(), e);
                         SessionRepositoryError::DatabaseError(format!(
-                            "Sesión creada pero no se pudo actualizar last_login_at: {}", e
+                            "Session created but could not update last_login_at: {}", e
                         ))
                     })?;
                     
@@ -104,7 +104,7 @@ impl SessionRepository for SessionPgRepository {
         Ok(session)
     }
     
-    /// Obtiene una sesión por ID
+    /// Gets a session by ID
     async fn get_session_by_id(&self, id: &str) -> SessionRepositoryResult<Session> {
         let row = sqlx::query(
             r#"
@@ -132,7 +132,7 @@ impl SessionRepository for SessionPgRepository {
         ))
     }
     
-    /// Obtiene una sesión por token de actualización
+    /// Gets a session by refresh token
     async fn get_session_by_refresh_token(&self, refresh_token: &str) -> SessionRepositoryResult<Session> {
         let row = sqlx::query(
             r#"
@@ -160,7 +160,7 @@ impl SessionRepository for SessionPgRepository {
         ))
     }
     
-    /// Obtiene todas las sesiones de un usuario
+    /// Gets all sessions for a user
     async fn get_sessions_by_user_id(&self, user_id: &str) -> SessionRepositoryResult<Vec<Session>> {
         let rows = sqlx::query(
             r#"
@@ -195,16 +195,16 @@ impl SessionRepository for SessionPgRepository {
         Ok(sessions)
     }
     
-    /// Revoca una sesión específica utilizando una transacción
+    /// Revokes a specific session using a transaction
     async fn revoke_session(&self, session_id: &str) -> SessionRepositoryResult<()> {
-        let id = session_id.to_string(); // Clone para uso en closure
+        let id = session_id.to_string(); // Clone for use in closure
         
         with_transaction(
             &self.pool,
             "revoke_session",
             |tx| {
                 Box::pin(async move {
-                    // Revocar la sesión
+                    // Revoke the session
                     let result = sqlx::query(
                         r#"
                         UPDATE auth.sessions
@@ -218,14 +218,14 @@ impl SessionRepository for SessionPgRepository {
                     .await
                     .map_err(Self::map_sqlx_error)?;
                     
-                    // Si encontramos la sesión, podemos registrar un evento de seguridad
+                    // If we found the session, we can log a security event
                     if let Some(row) = result {
                         let user_id: String = row.try_get("user_id").unwrap_or_default();
                         
-                        // Registrar evento de seguridad (en una tabla de seguridad)
-                        // Esto es opcional pero muestra cómo se puede realizar operaciones
-                        // adicionales en la misma transacción
-                        tracing::info!("Sesión con ID {} del usuario {} revocada", id, user_id);
+                        // Log security event (in a security table)
+                        // This is optional but shows how additional operations
+                        // can be performed in the same transaction
+                        tracing::info!("Session with ID {} for user {} revoked", id, user_id);
                     }
                     
                     Ok(())
@@ -234,16 +234,16 @@ impl SessionRepository for SessionPgRepository {
         ).await
     }
     
-    /// Revoca todas las sesiones de un usuario utilizando una transacción
+    /// Revokes all sessions for a user using a transaction
     async fn revoke_all_user_sessions(&self, user_id: &str) -> SessionRepositoryResult<u64> {
-        let user_id_clone = user_id.to_string(); // Clone para uso en closure
+        let user_id_clone = user_id.to_string(); // Clone for use in closure
         
         with_transaction(
             &self.pool,
             "revoke_all_user_sessions",
             |tx| {
                 Box::pin(async move {
-                    // Revocar todas las sesiones del usuario
+                    // Revoke all sessions for the user
                     let result = sqlx::query(
                         r#"
                         UPDATE auth.sessions
@@ -258,9 +258,9 @@ impl SessionRepository for SessionPgRepository {
                     
                     let affected = result.rows_affected();
                     
-                    // Registrar evento de seguridad
+                    // Log security event
                     if affected > 0 {
-                        tracing::info!("Revocadas {} sesiones del usuario {}", affected, user_id_clone);
+                        tracing::info!("Revoked {} sessions for user {}", affected, user_id_clone);
                     }
                     
                     Ok(affected)
@@ -269,7 +269,7 @@ impl SessionRepository for SessionPgRepository {
         ).await
     }
     
-    /// Elimina sesiones expiradas
+    /// Deletes expired sessions
     async fn delete_expired_sessions(&self) -> SessionRepositoryResult<u64> {
         let now = Utc::now();
         
@@ -288,7 +288,7 @@ impl SessionRepository for SessionPgRepository {
     }
 }
 
-// Implementación del puerto de almacenamiento para la capa de aplicación
+// Implementation of the storage port for the application layer
 #[async_trait]
 impl SessionStoragePort for SessionPgRepository {
     async fn create_session(&self, session: Session) -> Result<Session, DomainError> {

@@ -16,7 +16,7 @@ const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
 /// Threshold above which mmap is used instead of streaming (100 MB).
 const MMAP_THRESHOLD: u64 = 100 * 1024 * 1024;
 
-/// Servicio para operaciones de recuperación de archivos
+/// Service for file retrieval operations
 ///
 /// Implements a multi-tier download strategy:
 /// - Tier 0: Write-behind cache (just-uploaded files still in RAM)

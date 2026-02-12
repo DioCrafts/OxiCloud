@@ -16,16 +16,16 @@ use crate::application::ports::compression_ports::{
 use crate::domain::errors::DomainError;
 use crate::infrastructure::services::buffer_pool::BufferPool;
 
-/// Nivel de compresión para ficheros
+/// Compression level for files
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CompressionLevel {
-    /// Sin compresión (solo para transferencia)
+    /// No compression (transfer only)
     None = 0,
-    /// Compresión rápida con menor ratio
+    /// Fast compression with lower ratio
     Fast = 1,
-    /// Compresión balanceada (por defecto)
+    /// Balanced compression (default)
     Default = 6,
-    /// Compresión máxima (más lenta)
+    /// Maximum compression (slower)
     Best = 9,
 }
 
@@ -40,49 +40,49 @@ impl From<CompressionLevel> for Compression {
     }
 }
 
-/// Umbral de tamaño para decidir si se comprime o no
+/// Size threshold to decide whether to compress or not
 const COMPRESSION_SIZE_THRESHOLD: u64 = 1024 * 50; // 50KB
 
-/// Interfaz para servicios de compresión
+/// Interface for compression services
 #[async_trait]
 pub trait CompressionService: Send + Sync {
-    /// Comprime datos en memoria
+    /// Compresses data in memory
     async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> io::Result<Vec<u8>>;
     
-    /// Descomprime datos en memoria
+    /// Decompresses data in memory
     async fn decompress_data(&self, compressed_data: &[u8]) -> io::Result<Vec<u8>>;
     
-    /// Comprime un stream de datos
+    /// Compresses a data stream
     fn compress_stream<S>(&self, stream: S, level: CompressionLevel) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where
         S: Stream<Item = io::Result<Bytes>> + Send + 'static + Unpin;
     
-    /// Descomprime un stream de datos
+    /// Decompresses a data stream
     fn decompress_stream<S>(&self, compressed_stream: S) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where
         S: Stream<Item = io::Result<Bytes>> + Send + 'static + Unpin;
     
-    /// Determina si un archivo debe ser comprimido basado en su tipo MIME y tamaño
+    /// Determines whether a file should be compressed based on its MIME type and size
     fn should_compress(&self, mime_type: &str, size: u64) -> bool;
 }
 
-/// Implementación de servicios de compresión usando Gzip
+/// Gzip compression service implementation
 pub struct GzipCompressionService {
-    /// Pool de buffers para optimización de memoria
+    /// Buffer pool for memory optimization
     buffer_pool: Option<Arc<BufferPool>>,
 }
 
 impl GzipCompressionService {
-    /// Crea una nueva instancia del servicio
+    /// Creates a new service instance
     pub fn new() -> Self {
         Self {
             buffer_pool: None,
         }
     }
     
-    /// Crea una nueva instancia del servicio con buffer pool
+    /// Creates a new service instance with buffer pool
     pub fn new_with_buffer_pool(buffer_pool: Arc<BufferPool>) -> Self {
         Self {
             buffer_pool: Some(buffer_pool),
@@ -92,64 +92,64 @@ impl GzipCompressionService {
 
 #[async_trait]
 impl CompressionService for GzipCompressionService {
-    /// Comprime datos en memoria usando Gzip
+    /// Compresses data in memory using Gzip
     async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> io::Result<Vec<u8>> {
-        // Si tenemos un buffer pool, usar un buffer prestado para la compresión
+        // If we have a buffer pool, use a borrowed buffer for compression
         if let Some(pool) = &self.buffer_pool {
-            // Estimar el tamaño de la compresión (aproximadamente 80% del original para casos típicos)
+            // Estimate the compression size (approximately 80% of original for typical cases)
             let estimated_size = (data.len() as f64 * 0.8) as usize;
             
-            // Obtener un buffer del pool
+            // Get a buffer from the pool
             let buffer = pool.get_buffer().await;
             
-            // Comprobar si el buffer es suficientemente grande
+            // Check if the buffer is large enough
             if buffer.capacity() >= estimated_size {
-                // Ejecutar la compresión en un worker thread usando el buffer
+                // Run compression in a worker thread using the buffer
                 let buffer_ptr = Arc::new(tokio::sync::Mutex::new(buffer));
                 let buffer_clone = buffer_ptr.clone();
                 
-                // Comprimir datos
-                // Clonar los datos para evitar problemas de lifetime
+                // Compress data
+                // Clone the data to avoid lifetime issues
                 let data_owned = data.to_vec();
                 
                 let result = tokio::task::spawn_blocking(move || {
                     let mut encoder = GzEncoderRead::new(&data_owned[..], level.into());
                     
-                    // Intentar bloquear el mutex (no debería fallar ya que estamos en un hilo separado)
+                    // Try to lock the mutex (should not fail since we are in a separate thread)
                     let mut buffer_guard = match futures::executor::block_on(buffer_clone.lock()) {
                         buffer => buffer,
                     };
                     
-                    // Leer directamente en el buffer
+                    // Read directly into the buffer
                     let read_bytes = encoder.read(buffer_guard.as_mut_slice())?;
                     buffer_guard.set_used(read_bytes);
                     
                     Ok(()) as io::Result<()>
                 }).await;
                 
-                // Verificar resultado
+                // Verify result
                 match result {
                     Ok(Ok(())) => {
-                        // Obtener el buffer y convertirlo a Vec<u8>
+                        // Get the buffer and convert it to Vec<u8>
                         let buffer = buffer_ptr.lock().await;
                         let cloned_buffer = buffer.clone();
-                        drop(buffer); // Liberar el mutex primero
+                        drop(buffer); // Release the mutex first
                         return Ok(cloned_buffer.into_vec());
                     },
                     Ok(Err(e)) => {
-                        error!("Error en compresión con buffer pool: {}", e);
-                        // Continuar con implementación estándar
+                        error!("Compression error with buffer pool: {}", e);
+                        // Fall back to standard implementation
                     },
                     Err(e) => {
-                        error!("Error en task de compresión con buffer pool: {}", e);
-                        // Continuar con implementación estándar
+                        error!("Compression task error with buffer pool: {}", e);
+                        // Fall back to standard implementation
                     }
                 }
             }
         }
         
-        // Implementación estándar si no hay buffer pool o el buffer es insuficiente
-        // Clonar los datos para evitar problemas de lifetime
+        // Standard implementation if there is no buffer pool or the buffer is insufficient
+        // Clone the data to avoid lifetime issues
         let data_owned = data.to_vec();
         
         tokio::task::spawn_blocking(move || {
@@ -158,79 +158,79 @@ impl CompressionService for GzipCompressionService {
             encoder.read_to_end(&mut compressed)?;
             Ok(compressed)
         }).await.unwrap_or_else(|e| {
-            error!("Error en task de compresión: {}", e);
+            error!("Compression task error: {}", e);
             Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
         })
     }
     
-    /// Descomprime datos en memoria
+    /// Decompresses data in memory
     async fn decompress_data(&self, compressed_data: &[u8]) -> io::Result<Vec<u8>> {
-        // Si tenemos un buffer pool, usar un buffer prestado para la descompresión
+        // If we have a buffer pool, use a borrowed buffer for decompression
         if let Some(pool) = &self.buffer_pool {
-            // Estimar el tamaño de la descompresión (aproximadamente 5x del comprimido para casos típicos)
+            // Estimate the decompression size (approximately 5x of compressed for typical cases)
             let estimated_size = compressed_data.len() * 5;
             
-            // Obtener un buffer del pool
+            // Get a buffer from the pool
             let buffer = pool.get_buffer().await;
             
-            // Comprobar si el buffer es suficientemente grande
+            // Check if the buffer is large enough
             if buffer.capacity() >= estimated_size {
-                // Clonar datos comprimidos para mover al worker
+                // Clone compressed data to move to the worker
                 let data = compressed_data.to_vec();
                 let buffer_ptr = Arc::new(tokio::sync::Mutex::new(buffer));
                 let buffer_clone = buffer_ptr.clone();
                 
-                // Descomprimir datos
+                // Decompress data
                 let result = tokio::task::spawn_blocking(move || {
                     let mut decoder = GzDecoder::new(&data[..]);
                     
-                    // Intentar bloquear el mutex
+                    // Try to lock the mutex
                     let mut buffer_guard = match futures::executor::block_on(buffer_clone.lock()) {
                         buffer => buffer,
                     };
                     
-                    // Leer directamente en el buffer
+                    // Read directly into the buffer
                     let read_bytes = decoder.read(buffer_guard.as_mut_slice())?;
                     buffer_guard.set_used(read_bytes);
                     
                     Ok(()) as io::Result<()>
                 }).await;
                 
-                // Verificar resultado
+                // Verify result
                 match result {
                     Ok(Ok(())) => {
-                        // Obtener el buffer y convertirlo a Vec<u8>
+                        // Get the buffer and convert it to Vec<u8>
                         let buffer = buffer_ptr.lock().await;
                         let cloned_buffer = buffer.clone();
-                        drop(buffer); // Liberar el mutex primero
+                        drop(buffer); // Release the mutex first
                         return Ok(cloned_buffer.into_vec());
                     },
                     Ok(Err(e)) => {
-                        error!("Error en descompresión con buffer pool: {}", e);
-                        // Continuar con implementación estándar
+                        error!("Decompression error with buffer pool: {}", e);
+                        // Fall back to standard implementation
                     },
                     Err(e) => {
-                        error!("Error en task de descompresión con buffer pool: {}", e);
-                        // Continuar con implementación estándar
+                        error!("Decompression task error with buffer pool: {}", e);
+                        // Fall back to standard implementation
                     }
                 }
             }
         }
         
-        // Implementación estándar si no hay buffer pool o el buffer es insuficiente
-        let data = compressed_data.to_vec(); // Clonar para mover al worker
+        // Standard implementation if there is no buffer pool or the buffer is insufficient
+        let data = compressed_data.to_vec(); // Clone to move to the worker
         tokio::task::spawn_blocking(move || {
             let mut decoder = GzDecoder::new(&data[..]);
             let mut decompressed = Vec::new();
             decoder.read_to_end(&mut decompressed)?;
             Ok(decompressed)
         }).await.unwrap_or_else(|e| {
-            error!("Error en task de descompresión: {}", e);
+            error!("Decompression task error: {}", e);
             Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
         })
     }
     
-    /// Comprime un stream de bytes
+    /// Compresses a byte stream
     fn compress_stream<S>(&self, stream: S, level: CompressionLevel) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where
@@ -271,7 +271,7 @@ impl CompressionService for GzipCompressionService {
         })
     }
     
-    /// Descomprime un stream de bytes
+    /// Decompresses a byte stream
     fn decompress_stream<S>(&self, compressed_stream: S) 
         -> impl Stream<Item = io::Result<Bytes>> + Send
     where
@@ -310,14 +310,14 @@ impl CompressionService for GzipCompressionService {
         })
     }
     
-    /// Determina si un archivo debe ser comprimido basado en su tipo MIME y tamaño
+    /// Determines whether a file should be compressed based on its MIME type and size
     fn should_compress(&self, mime_type: &str, size: u64) -> bool {
-        // No comprimir archivos muy pequeños (overhead)
+        // Do not compress very small files (overhead)
         if size < COMPRESSION_SIZE_THRESHOLD {
             return false;
         }
         
-        // No comprimir archivos ya comprimidos
+        // Do not compress already compressed files
         if mime_type.starts_with("image/")
             && !mime_type.contains("svg")
             && !mime_type.contains("bmp") {
@@ -345,7 +345,7 @@ impl CompressionService for GzipCompressionService {
             return false;
         }
         
-        // Comprimir archivos de texto, documentos, y otros tipos compresibles
+        // Compress text files, documents, and other compressible types
         true
     }
 }
@@ -389,19 +389,19 @@ mod tests {
     async fn test_compress_decompress_data() {
         let service = GzipCompressionService::new();
         
-        // Datos de prueba
+        // Test data
         let data = "Hello, world! ".repeat(1000).into_bytes();
         
-        // Comprimir
+        // Compress
         let compressed = CompressionService::compress_data(&service, &data, CompressionLevel::Default).await.unwrap();
         
-        // Verificar que la compresión reduce el tamaño
+        // Verify that compression reduces the size
         assert!(compressed.len() < data.len());
         
-        // Descomprimir
+        // Decompress
         let decompressed = CompressionService::decompress_data(&service, &compressed).await.unwrap();
         
-        // Verificar que los datos originales se recuperan correctamente
+        // Verify that the original data is recovered correctly
         assert_eq!(decompressed, data);
     }
     
@@ -409,30 +409,30 @@ mod tests {
     async fn test_compress_decompress_stream() {
         let service = GzipCompressionService::new();
         
-        // Crear datos de prueba
+        // Create test data
         let chunks = vec![
             Ok(Bytes::from("Hello, ")),
             Ok(Bytes::from("world! ")),
             Ok(Bytes::from("This is a test of streaming compression.")),
         ];
         
-        // Convertir a stream
+        // Convert to stream
         let input_stream = futures::stream::iter(chunks);
         
-        // Comprimir el stream
+        // Compress the stream
         let compressed_stream = service.compress_stream(input_stream, CompressionLevel::Default);
         
-        // Recolectar los bytes comprimidos
+        // Collect the compressed bytes
         let compressed_bytes = compressed_stream
             .try_fold(Vec::new(), |mut acc, chunk| async move {
                 acc.extend_from_slice(&chunk);
                 Ok(acc)
             }).await.unwrap();
         
-        // Descomprimir los datos
+        // Decompress the data
         let decompressed = CompressionService::decompress_data(&service, &compressed_bytes).await.unwrap();
         
-        // Verificar resultado
+        // Verify result
         let expected = "Hello, world! This is a test of streaming compression.";
         assert_eq!(String::from_utf8(decompressed).unwrap(), expected);
     }
@@ -441,17 +441,17 @@ mod tests {
     fn test_should_compress() {
         let service = GzipCompressionService::new();
         
-        // Casos que no deberían comprimirse
+        // Cases that should not be compressed
         assert!(!CompressionService::should_compress(&service, "image/jpeg", 100 * 1024));
         assert!(!CompressionService::should_compress(&service, "video/mp4", 10 * 1024 * 1024));
         assert!(!CompressionService::should_compress(&service, "application/zip", 5 * 1024 * 1024));
         
-        // Casos que sí deberían comprimirse
+        // Cases that should be compressed
         assert!(CompressionService::should_compress(&service, "text/html", 100 * 1024));
         assert!(CompressionService::should_compress(&service, "application/json", 200 * 1024));
         assert!(CompressionService::should_compress(&service, "text/plain", 1024 * 1024));
         
-        // Archivos pequeños no deberían comprimirse independientemente del tipo
+        // Small files should not be compressed regardless of type
         assert!(!CompressionService::should_compress(&service, "text/html", 10 * 1024));
     }
 }

@@ -1271,7 +1271,7 @@ select:focus {
 .file-icon.doc-icon {
     width: 100px;
     height: 70px;
-    background-color: #e2e8f0; /* Fondo gris claro */
+    background-color: #e2e8f0; /* Light gray background */
     border-radius: 4px;
     position: relative;
     margin-bottom: 10px;
@@ -1436,7 +1436,7 @@ select:focus {
 .file-icon.code-icon {
     width: 100px;
     height: 70px;
-    background-color: #e2e8f0; /* Fondo gris claro */
+    background-color: #e2e8f0; /* Light gray background */
     border-radius: 4px;
     position: relative;
     margin-bottom: 10px;
@@ -1770,7 +1770,7 @@ select:focus {
     text-align: center;
 }
 
-/* Lista de archivos - Estilo mejorado */
+/* File list - Improved style */
 .files-list-view {
     display: flex;
     flex-direction: column;
@@ -1802,7 +1802,7 @@ select:focus {
     background-color: white;
 }
 
-/* Para modo papelera, ajustar columnas */
+/* For trash mode, adjust columns */
 .trash-item.file-item {
     grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 120px 100px;
 }
@@ -1851,7 +1851,7 @@ select:focus {
     display: none;
 }
 
-/* Iconos específicos para archivos en vista de lista */
+/* Specific icons for files in list view */
 .file-item .file-icon.pdf-icon {
     background-color: #fee2e2;
 }
@@ -2129,7 +2129,7 @@ select:focus {
     transition: width 0.3s;
 }
 
-/* Notificación */
+/* Notification */
 .notification {
     position: absolute;
     top: 70px;
@@ -3327,7 +3327,7 @@ header {
     }
 }
 
-/* Estilos específicos para la página Shared */
+/* Specific styles for the Shared page */
 .page-description {
     color: #718096;
     font-size: 16px;
@@ -3335,7 +3335,7 @@ header {
     margin-bottom: 25px;
 }
 
-/* Mejoras para los filtros en la página Shared */
+/* Improvements for the Shared page filters */
 .shared-filters {
     display: flex;
     justify-content: space-between;
@@ -3383,7 +3383,7 @@ header {
     width: 250px;
 }
 
-/* Mejoras en la tabla de elementos compartidos */
+/* Improvements in the shared items table */
 .shared-list-container {
     background-color: white;
     border-radius: 10px;
@@ -3412,7 +3412,7 @@ header {
     vertical-align: middle;
 }
 
-/* Estado vacío mejorado */
+/* Improved empty state */
 .empty-state {
     display: flex;
     flex-direction: column;

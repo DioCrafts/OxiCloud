@@ -110,7 +110,7 @@ impl TokenServicePort for JwtTokenService {
             DomainError::new(
                 ErrorKind::InternalError,
                 "TokenService",
-                format!("Error al generar token: {}", e)
+                format!("Error generating token: {}", e)
             )
         })
     }
@@ -126,12 +126,12 @@ impl TokenServicePort for JwtTokenService {
         .map_err(|e| {
             match e.kind() {
                 jsonwebtoken::errors::ErrorKind::ExpiredSignature => {
-                    DomainError::new(ErrorKind::AccessDenied, "TokenService", "Token expirado")
+                    DomainError::new(ErrorKind::AccessDenied, "TokenService", "Token expired")
                 },
                 _ => DomainError::new(
                     ErrorKind::AccessDenied,
                     "TokenService",
-                    format!("Token inválido: {}", e)
+                    format!("Invalid token: {}", e)
                 ),
             }
         })?;

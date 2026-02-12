@@ -67,7 +67,7 @@ pub struct RefreshTokenDto {
     pub refresh_token: String,
 }
 
-/// Datos del usuario autenticado actual (para uso en servicios de application)
+/// Authenticated current user data (for use in application services)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CurrentUser {
     pub id: String,

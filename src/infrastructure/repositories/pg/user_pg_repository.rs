@@ -9,7 +9,7 @@ use crate::application::ports::auth_ports::UserStoragePort;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::transaction_utils::with_transaction;
 
-// Implementar From<sqlx::Error> para UserRepositoryError para permitir conversiones automáticas
+// Implement From<sqlx::Error> for UserRepositoryError to allow automatic conversions
 impl From<sqlx::Error> for UserRepositoryError {
     fn from(err: sqlx::Error) -> Self {
         UserPgRepository::map_sqlx_error(err)
@@ -25,26 +25,26 @@ impl UserPgRepository {
         Self { pool }
     }
     
-    // Método auxiliar para mapear errores SQL a errores de dominio
+    // Helper method to map SQL errors to domain errors
     pub fn map_sqlx_error(err: sqlx::Error) -> UserRepositoryError {
         match err {
             sqlx::Error::RowNotFound => {
-                UserRepositoryError::NotFound("Usuario no encontrado".to_string())
+                UserRepositoryError::NotFound("User not found".to_string())
             },
             sqlx::Error::Database(db_err) => {
                 if db_err.code().map_or(false, |code| code == "23505") {
-                    // Código para violación de unicidad en PostgreSQL
+                    // PostgreSQL uniqueness violation code
                     UserRepositoryError::AlreadyExists(
-                        "Usuario o email ya existe".to_string()
+                        "User or email already exists".to_string()
                     )
                 } else {
                     UserRepositoryError::DatabaseError(
-                        format!("Error de base de datos: {}", db_err)
+                        format!("Database error: {}", db_err)
                     )
                 }
             },
             _ => UserRepositoryError::DatabaseError(
-                format!("Error de base de datos: {}", err)
+                format!("Database error: {}", err)
             ),
         }
     }
@@ -52,7 +52,7 @@ impl UserPgRepository {
 
 #[async_trait]
 impl UserRepository for UserPgRepository {
-    /// Crea un nuevo usuario utilizando una transacción
+    /// Creates a new user using a transaction
     async fn create_user(&self, user: User) -> UserRepositoryResult<User> {
         // Creamos una copia del usuario para el closure
         let user_clone = user.clone();
@@ -61,14 +61,14 @@ impl UserRepository for UserPgRepository {
             &self.pool,
             "create_user",
             |tx| {
-                // Necesitamos mover el closure a un BoxFuture para devolver dentro
-                // de la llamada with_transaction
+                // We need to move the closure into a BoxFuture to return inside
+                // the with_transaction call
                 Box::pin(async move {
-                    // Usamos los getters para extraer los valores
-                    // Convertimos user.role() a string para pasarlo como texto plano
+                    // Use getters to extract the values
+                    // Convert user.role() to string to pass it as plain text
                     let role_str = user_clone.role().to_string();
                     
-                    // Modificar el SQL para hacer un cast explícito al tipo auth.userrole
+                    // Modify the SQL to do an explicit cast to the auth.userrole type
                     let _result = sqlx::query(
                         r#"
                         INSERT INTO auth.users (
@@ -87,7 +87,7 @@ impl UserRepository for UserPgRepository {
                     .bind(user_clone.username())
                     .bind(user_clone.email())
                     .bind(user_clone.password_hash())
-                    .bind(&role_str) // Convertir a string pero con cast explícito en SQL
+                    .bind(&role_str) // Convert to string but with explicit cast in SQL
                     .bind(user_clone.storage_quota_bytes())
                     .bind(user_clone.storage_used_bytes())
                     .bind(user_clone.created_at())
@@ -100,18 +100,18 @@ impl UserRepository for UserPgRepository {
                     .await
                     .map_err(Self::map_sqlx_error)?;
                     
-                    // Podríamos realizar operaciones adicionales aquí,
-                    // como configurar permisos, roles, etc.
+                    // We could perform additional operations here,
+                    // such as configuring permissions, roles, etc.
                     
                     Ok(user_clone)
                 }) as BoxFuture<'_, UserRepositoryResult<User>>
             }
         ).await?;
         
-        Ok(user) // Devolvemos el usuario original por simplicidad
+        Ok(user) // Return the original user for simplicity
     }
     
-    /// Obtiene un usuario por ID
+    /// Gets a user by ID
     async fn get_user_by_id(&self, id: &str) -> UserRepositoryResult<User> {
         let row = sqlx::query(
             r#"
@@ -153,7 +153,7 @@ impl UserRepository for UserPgRepository {
         ))
     }
     
-    /// Obtiene un usuario por nombre de usuario
+    /// Gets a user by username
     async fn get_user_by_username(&self, username: &str) -> UserRepositoryResult<User> {
         let row = sqlx::query(
             r#"
@@ -195,7 +195,7 @@ impl UserRepository for UserPgRepository {
         ))
     }
     
-    /// Obtiene un usuario por correo electrónico
+    /// Gets a user by email
     async fn get_user_by_email(&self, email: &str) -> UserRepositoryResult<User> {
         let row = sqlx::query(
             r#"
@@ -237,9 +237,9 @@ impl UserRepository for UserPgRepository {
         ))
     }
     
-    /// Actualiza un usuario existente utilizando una transacción
+    /// Updates an existing user using a transaction
     async fn update_user(&self, user: User) -> UserRepositoryResult<User> {
-        // Creamos una copia del usuario para el closure
+        // Create a copy of the user for the closure
         let user_clone = user.clone();
         
         with_transaction(
@@ -247,7 +247,7 @@ impl UserRepository for UserPgRepository {
             "update_user",
             |tx| {
                 Box::pin(async move {
-                    // Actualizar el usuario
+                    // Update the user
                     sqlx::query(
                         r#"
                         UPDATE auth.users
@@ -278,8 +278,8 @@ impl UserRepository for UserPgRepository {
                     .await
                     .map_err(Self::map_sqlx_error)?;
                     
-                    // Podríamos realizar operaciones adicionales aquí dentro
-                    // de la misma transacción, como actualizar permisos, etc.
+                    // We could perform additional operations here inside
+                    // the same transaction, such as updating permissions, etc.
                     
                     Ok(user_clone)
                 }) as BoxFuture<'_, UserRepositoryResult<User>>
@@ -289,7 +289,7 @@ impl UserRepository for UserPgRepository {
         Ok(user)
     }
     
-    /// Actualiza solo el uso de almacenamiento de un usuario
+    /// Updates only the storage usage of a user
     async fn update_storage_usage(&self, user_id: &str, usage_bytes: i64) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -309,7 +309,7 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
     
-    /// Actualiza la fecha de último inicio de sesión
+    /// Updates the last login date
     async fn update_last_login(&self, user_id: &str) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -328,7 +328,7 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
     
-    /// Lista usuarios con paginación
+    /// Lists users with pagination
     async fn list_users(&self, limit: i64, offset: i64) -> UserRepositoryResult<Vec<User>> {
         let rows = sqlx::query(
             r#"
@@ -378,7 +378,7 @@ impl UserRepository for UserPgRepository {
         Ok(users)
     }
     
-    /// Activa o desactiva un usuario
+    /// Activates or deactivates a user
     async fn set_user_active_status(&self, user_id: &str, active: bool) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -398,7 +398,7 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
     
-    /// Cambia la contraseña de un usuario
+    /// Changes a user's password
     async fn change_password(&self, user_id: &str, password_hash: &str) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -418,9 +418,9 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
     
-    /// Cambia el rol de un usuario
+    /// Changes a user's role
     async fn change_role(&self, user_id: &str, role: UserRole) -> UserRepositoryResult<()> {
-        // Convertir el rol a string para el binding
+        // Convert the role to string for the binding
         let role_str = role.to_string();
         
         sqlx::query(
@@ -441,7 +441,7 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
     
-    /// Lista usuarios por rol
+    /// Lists users by role
     async fn list_users_by_role(&self, role: &str) -> UserRepositoryResult<Vec<User>> {
         let rows = sqlx::query(
             r#"
@@ -490,7 +490,7 @@ impl UserRepository for UserPgRepository {
         Ok(users)
     }
     
-    /// Elimina un usuario
+    /// Deletes a user
     async fn delete_user(&self, user_id: &str) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -548,7 +548,7 @@ impl UserRepository for UserPgRepository {
         ))
     }
 
-    /// Actualiza la cuota de almacenamiento de un usuario
+    /// Updates a user's storage quota
     async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
@@ -568,7 +568,7 @@ impl UserRepository for UserPgRepository {
         Ok(())
     }
 
-    /// Cuenta el número total de usuarios
+    /// Counts the total number of users
     async fn count_users(&self) -> UserRepositoryResult<i64> {
         let row = sqlx::query(
             "SELECT COUNT(*) as count FROM auth.users"
@@ -581,7 +581,7 @@ impl UserRepository for UserPgRepository {
         Ok(count)
     }
 
-    /// Obtiene estadísticas de almacenamiento agregadas
+    /// Gets aggregated storage statistics
     async fn get_storage_stats(&self) -> UserRepositoryResult<StorageStats> {
         let row = sqlx::query(
             r#"
@@ -610,7 +610,7 @@ impl UserRepository for UserPgRepository {
     }
 }
 
-// Implementación del puerto de almacenamiento para la capa de aplicación
+// Storage port implementation for the application layer
 #[async_trait]
 impl UserStoragePort for UserPgRepository {
     async fn create_user(&self, user: User) -> Result<User, DomainError> {

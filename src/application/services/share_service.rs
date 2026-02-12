@@ -80,7 +80,7 @@ impl ShareService {
         }
     }
 
-    /// Verifica que el elemento a compartir existe
+    /// Verifies that the item to share exists
     async fn verify_item_exists(
         &self,
         item_id: &str,
@@ -89,13 +89,13 @@ impl ShareService {
         match item_type {
             ShareItemType::File => {
                 self.file_repository
-                    .get_file(item_id) // Usando el método correcto del trait FileStoragePort
+                    .get_file(item_id) // Using the correct method from the FileStoragePort trait
                     .await
                     .map_err(|_| ShareServiceError::ItemNotFound(format!("File with ID {} not found", item_id)))?;
             }
             ShareItemType::Folder => {
                 self.folder_repository
-                    .get_folder(item_id) // Usando el método correcto del trait FolderStoragePort
+                    .get_folder(item_id) // Using the correct method from the FolderStoragePort trait
                     .await
                     .map_err(|_| ShareServiceError::ItemNotFound(format!("Folder with ID {} not found", item_id)))?;
             }
@@ -103,7 +103,7 @@ impl ShareService {
         Ok(())
     }
 
-    /// Hash de contraseña usando Argon2id (resistente a timing attacks y GPU attacks)
+    /// Password hash using Argon2id (resistant to timing attacks and GPU attacks)
     fn hash_password(&self, password: &str) -> String {
         use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
@@ -126,20 +126,20 @@ impl ShareUseCase for ShareService {
         user_id: &str,
         dto: CreateShareDto,
     ) -> Result<ShareDto, DomainError> {
-        // Convertir el tipo de elemento
+        // Convert the item type
         let item_type = ShareItemType::try_from(dto.item_type.as_str())
             .map_err(|e| ShareServiceError::InvalidItemType(e.to_string()))?;
 
-        // Verificar que el elemento existe
+        // Verify that the item exists
         self.verify_item_exists(&dto.item_id, &item_type).await?;
 
-        // Convertir el DTO de permisos si existe
+        // Convert the permissions DTO if it exists
         let permissions = dto.permissions.map(|p| p.to_entity());
 
-        // Hash de contraseña si existe
+        // Hash the password if provided
         let password_hash = dto.password.map(|p| self.hash_password(&p));
 
-        // Crear la entidad Share
+        // Create the Share entity
         let share = Share::new(
             dto.item_id.clone(),
             item_type,
@@ -150,48 +150,48 @@ impl ShareUseCase for ShareService {
         )
         .map_err(|e| ShareServiceError::Validation(e.to_string()))?;
 
-        // Guardar en el repositorio
+        // Save to the repository
         let saved_share = self
             .share_repository
             .save_share(&share)
             .await
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
-        // Convertir la entidad a DTO para la respuesta
+        // Convert the entity to DTO for the response
         Ok(ShareDto::from_entity(&saved_share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
     }
 
     async fn get_shared_link(&self, id: &str) -> Result<ShareDto, DomainError> {
-        // Buscar el enlace compartido por su ID
+        // Find the shared link by its ID
         let share = self
             .share_repository
             .find_share_by_id(id)
             .await
             .map_err(|e| ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e)))?;
 
-        // Verificar si ha expirado
+        // Check if it has expired
         if share.is_expired() {
             return Err(ShareServiceError::Expired.into());
         }
 
-        // Convertir la entidad a DTO para la respuesta
+        // Convert the entity to DTO for the response
         Ok(ShareDto::from_entity(&share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
     }
 
     async fn get_shared_link_by_token(&self, token: &str) -> Result<ShareDto, DomainError> {
-        // Buscar el enlace compartido por su token
+        // Find the shared link by its token
         let share = self
             .share_repository
             .find_share_by_token(token)
             .await
             .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
 
-        // Verificar si ha expirado
+        // Check if it has expired
         if share.is_expired() {
             return Err(ShareServiceError::Expired.into());
         }
 
-        // Convertir la entidad a DTO para la respuesta
+        // Convert the entity to DTO for the response
         Ok(ShareDto::from_entity(&share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
     }
 
@@ -200,17 +200,17 @@ impl ShareUseCase for ShareService {
         item_id: &str,
         item_type: &ShareItemType,
     ) -> Result<Vec<ShareDto>, DomainError> {
-        // Buscar todos los enlaces compartidos para el elemento
+        // Find all shared links for the item
         let shares = self
             .share_repository
             .find_shares_by_item(item_id, item_type)
             .await
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
-        // Filtrar los enlaces expirados
+        // Filter out expired links
         let active_shares: Vec<Share> = shares.into_iter().filter(|s| !s.is_expired()).collect();
 
-        // Convertir las entidades a DTOs para la respuesta
+        // Convert the entities to DTOs for the response
         let share_dtos = active_shares
             .iter()
             .map(|s| ShareDto::from_entity(s, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
@@ -224,14 +224,14 @@ impl ShareUseCase for ShareService {
         id: &str,
         dto: UpdateShareDto,
     ) -> Result<ShareDto, DomainError> {
-        // Buscar el enlace compartido existente
+        // Find the existing shared link
         let mut share = self
             .share_repository
             .find_share_by_id(id)
             .await
             .map_err(|e| ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e)))?;
 
-        // Actualizar permisos si se proporcionan
+        // Update permissions if provided
         if let Some(permissions_dto) = dto.permissions {
             let permissions = SharePermissions::new(
                 permissions_dto.read,
@@ -241,7 +241,7 @@ impl ShareUseCase for ShareService {
             share = share.with_permissions(permissions);
         }
 
-        // Actualizar contraseña si se proporciona
+        // Update password if provided
         if let Some(password) = dto.password {
             let password_hash = if password.is_empty() {
                 None
@@ -251,24 +251,24 @@ impl ShareUseCase for ShareService {
             share = share.with_password(password_hash);
         }
 
-        // Actualizar fecha de expiración si se proporciona
+        // Update expiration date if provided
         if dto.expires_at.is_some() {
             share = share.with_expiration(dto.expires_at);
         }
 
-        // Guardar los cambios
+        // Save the changes
         let updated_share = self
             .share_repository
             .update_share(&share)
             .await
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
-        // Convertir la entidad a DTO para la respuesta
+        // Convert the entity to DTO for the response
         Ok(ShareDto::from_entity(&updated_share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
     }
 
     async fn delete_shared_link(&self, id: &str) -> Result<(), DomainError> {
-        // Eliminar el enlace compartido
+        // Delete the shared link
         self.share_repository
             .delete_share(id)
             .await
@@ -283,23 +283,23 @@ impl ShareUseCase for ShareService {
         page: usize,
         per_page: usize,
     ) -> Result<PaginatedResponseDto<ShareDto>, DomainError> {
-        // Calcular offset para paginación
+        // Calculate offset for pagination
         let offset = (page - 1) * per_page;
 
-        // Buscar los enlaces compartidos del usuario
+        // Find the user's shared links
         let (shares, total) = self
             .share_repository
             .find_shares_by_user(user_id, offset, per_page)
             .await
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
-        // Convertir las entidades a DTOs
+        // Convert the entities to DTOs
         let share_dtos: Vec<ShareDto> = shares
             .iter()
             .map(|s| ShareDto::from_entity(s, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
             .collect();
 
-        // Crear el resultado paginado
+        // Create the paginated result
         let paginated = PaginatedResponseDto::new(
             share_dtos,
             page,
@@ -315,19 +315,19 @@ impl ShareUseCase for ShareService {
         token: &str,
         password: &str,
     ) -> Result<bool, DomainError> {
-        // Buscar el enlace compartido por su token
+        // Find the shared link by its token
         let share = self
             .share_repository
             .find_share_by_token(token)
             .await
             .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
 
-        // Verificar si ha expirado
+        // Check if it has expired
         if share.is_expired() {
             return Err(ShareServiceError::Expired.into());
         }
 
-        // Verificar la contraseña usando el port de infraestructura
+        // Verify the password using the infrastructure port
         match share.password_hash() {
             Some(hash) => {
                 self.password_hasher.verify_password(password, hash)
@@ -337,22 +337,22 @@ impl ShareUseCase for ShareService {
     }
 
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError> {
-        // Buscar el enlace compartido por su token
+        // Find the shared link by its token
         let share = self
             .share_repository
             .find_share_by_token(token)
             .await
             .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
 
-        // Verificar si ha expirado
+        // Check if it has expired
         if share.is_expired() {
             return Err(ShareServiceError::Expired.into());
         }
 
-        // Incrementar el contador de accesos
+        // Increment the access counter
         let updated_share = share.increment_access_count();
 
-        // Guardar los cambios
+        // Save the changes
         self.share_repository
             .update_share(&updated_share)
             .await

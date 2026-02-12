@@ -1,12 +1,12 @@
-//! Puerto de persistencia del dominio para la entidad File.
+//! Domain persistence port for the File entity.
 //!
-//! Define el contrato que cualquier implementación de almacenamiento de archivos
-//! debe cumplir. Este trait vive en el dominio porque File es una entidad core
-//! del sistema y sus contratos de persistencia pertenecen a la capa de dominio,
-//! siguiendo los principios de Clean/Hexagonal Architecture.
+//! Defines the contract that any file storage implementation must fulfill.
+//! This trait lives in the domain because File is a core entity of the system
+//! and its persistence contracts belong to the domain layer, following
+//! Clean/Hexagonal Architecture principles.
 //!
-//! Las implementaciones concretas (filesystem, PostgreSQL, S3, etc.) viven en
-//! la capa de infraestructura.
+//! Concrete implementations (filesystem, PostgreSQL, S3, etc.) live in
+//! the infrastructure layer.
 
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -20,31 +20,31 @@ use crate::domain::services::path_service::StoragePath;
 use crate::common::errors::DomainError;
 
 // ─────────────────────────────────────────────────────
-// FileReadRepository — operaciones de lectura/consulta
+// FileReadRepository — read/query operations
 // ─────────────────────────────────────────────────────
 
-/// Puerto del dominio para **lectura** de archivos.
+/// Domain port for file **reading**.
 ///
-/// Encapsula toda operación que consulta estado sin modificarlo:
-/// obtener, listar, contenido, stream, mmap, rango, resolución de rutas.
+/// Encapsulates every operation that queries state without modifying it:
+/// get, list, content, stream, mmap, range, path resolution.
 #[async_trait]
 pub trait FileReadRepository: Send + Sync + 'static {
-    /// Obtiene un archivo por su ID.
+    /// Gets a file by its ID.
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
 
-    /// Lista archivos en una carpeta.
+    /// Lists files in a folder.
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
 
-    /// Obtiene contenido completo como bytes (solo archivos pequeños/medianos).
+    /// Gets full content as bytes (only for small/medium files).
     async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
 
-    /// Obtiene contenido como stream (ideal para archivos grandes).
+    /// Gets content as a stream (ideal for large files).
     async fn get_file_stream(
         &self,
         id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
-    /// Stream de un rango de bytes (HTTP Range Requests, video seek).
+    /// Stream of a byte range (HTTP Range Requests, video seek).
     async fn get_file_range_stream(
         &self,
         id: &str,
@@ -52,27 +52,27 @@ pub trait FileReadRepository: Send + Sync + 'static {
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
-    /// Memory-map de archivo para acceso zero-copy (10–100 MB).
+    /// Memory-mapped file for zero-copy access (10–100 MB).
     async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError>;
 
-    /// Obtiene la ruta de almacenamiento lógica de un archivo.
+    /// Gets the logical storage path of a file.
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;
 
-    /// Obtiene el ID de la carpeta padre a partir de una ruta (WebDAV).
+    /// Gets the parent folder ID from a path (WebDAV).
     async fn get_parent_folder_id(&self, path: &str) -> Result<String, DomainError>;
 }
 
 // ─────────────────────────────────────────────────────
-// FileWriteRepository — operaciones de escritura/mutación
+// FileWriteRepository — write/mutation operations
 // ─────────────────────────────────────────────────────
 
-/// Puerto del dominio para **escritura** de archivos.
+/// Domain port for file **writing**.
 ///
-/// Cubre: upload (buffered + streaming), move, delete, update,
-/// y el registro diferido para write-behind cache.
+/// Covers: upload (buffered + streaming), move, delete, update,
+/// and deferred registration for write-behind cache.
 #[async_trait]
 pub trait FileWriteRepository: Send + Sync + 'static {
-    /// Guarda un nuevo archivo desde bytes.
+    /// Saves a new file from bytes.
     async fn save_file(
         &self,
         name: String,
@@ -81,7 +81,7 @@ pub trait FileWriteRepository: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<File, DomainError>;
 
-    /// Upload en streaming — escribe chunks a disco sin acumular en RAM.
+    /// Streaming upload — writes chunks to disk without accumulating in RAM.
     async fn save_file_from_stream(
         &self,
         name: String,
@@ -90,30 +90,30 @@ pub trait FileWriteRepository: Send + Sync + 'static {
         stream: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
     ) -> Result<File, DomainError>;
 
-    /// Mueve un archivo a otra carpeta.
+    /// Moves a file to another folder.
     async fn move_file(
         &self,
         file_id: &str,
         target_folder_id: Option<String>,
     ) -> Result<File, DomainError>;
 
-    /// Renombra un archivo (same folder, different name).
+    /// Renames a file (same folder, different name).
     async fn rename_file(
         &self,
         file_id: &str,
         new_name: &str,
     ) -> Result<File, DomainError>;
 
-    /// Elimina un archivo.
+    /// Deletes a file.
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
-    /// Actualiza el contenido de un archivo existente.
+    /// Updates the content of an existing file.
     async fn update_file_content(&self, file_id: &str, content: Vec<u8>) -> Result<(), DomainError>;
 
-    /// Registra metadatos de archivo SIN escribir contenido a disco (write-behind).
+    /// Registers file metadata WITHOUT writing content to disk (write-behind).
     ///
-    /// Devuelve `(File, PathBuf)` donde `PathBuf` es la ruta destino para la
-    /// escritura diferida que realizará el `WriteBehindCache`.
+    /// Returns `(File, PathBuf)` where `PathBuf` is the destination path for
+    /// the deferred write that the `WriteBehindCache` will perform.
     async fn register_file_deferred(
         &self,
         name: String,
@@ -124,27 +124,27 @@ pub trait FileWriteRepository: Send + Sync + 'static {
 
     // ── Trash operations ──
 
-    /// Mueve un archivo a la papelera
+    /// Moves a file to the trash
     async fn move_to_trash(&self, file_id: &str) -> Result<(), DomainError>;
 
-    /// Restaura un archivo desde la papelera a su ubicación original
+    /// Restores a file from the trash to its original location
     async fn restore_from_trash(&self, file_id: &str, original_path: &str) -> Result<(), DomainError>;
 
-    /// Elimina un archivo permanentemente (usado por la papelera)
+    /// Permanently deletes a file (used by the trash)
     async fn delete_file_permanently(&self, file_id: &str) -> Result<(), DomainError>;
 }
 
 // ─────────────────────────────────────────────────────
-// FileRepository — supertrait unificado
+// FileRepository — unified supertrait
 // ─────────────────────────────────────────────────────
 
-/// Puerto unificado para persistencia de archivos.
+/// Unified port for file persistence.
 ///
-/// Es un supertrait de `FileReadRepository + FileWriteRepository`.
-/// Cualquier tipo que implemente ambos ports obtiene `FileRepository`
-/// automáticamente vía blanket impl.
+/// It is a supertrait of `FileReadRepository + FileWriteRepository`.
+/// Any type that implements both ports gets `FileRepository`
+/// automatically via blanket impl.
 pub trait FileRepository: FileReadRepository + FileWriteRepository {}
 
-/// Blanket implementation: cualquier tipo que implemente ambos ports
-/// es automáticamente un FileRepository.
+/// Blanket implementation: any type that implements both ports
+/// is automatically a FileRepository.
 impl<T: FileReadRepository + FileWriteRepository> FileRepository for T {}

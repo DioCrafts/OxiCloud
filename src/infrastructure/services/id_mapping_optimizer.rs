@@ -179,7 +179,7 @@ impl IdMappingOptimizer {
         {
             let cache = self.path_to_id_cache.read().await;
             if let Some((id, _)) = cache.get(&path_str) {
-                // Actualizar estadísticas
+                // Update statistics
                 {
                     let mut stats = self.stats.write().await;
                     stats.get_id_hits += 1;
@@ -189,19 +189,19 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Si no está en caché, agregar a la cola de batch
+        // If not in cache, add to batch queue
         {
             let mut batch_queue = self.pending_batch.lock().await;
             batch_queue.path_to_id_requests.insert(path_str);
         }
         
-        // No encontrado en caché, debe procesarse en batch
+        // Not found in cache, must be processed in batch
         Ok(None)
     }
     
-    /// Procesa las solicitudes pendientes en batch
+    /// Processes pending requests in batch
     async fn process_batch(&self) -> Result<BatchResult, IdMappingError> {
-        // Adquirir permiso para operación batch
+        // Acquire permit for batch operation
         let _permit = self.batch_limiter.acquire().await.unwrap();
         
         // Get pending requests
@@ -214,13 +214,13 @@ impl IdMappingOptimizer {
             (paths, ids)
         };
         
-        // Crear resultados
+        // Create results
         let mut result = BatchResult {
             path_to_id: HashMap::with_capacity(path_requests.len()),
             id_to_path: HashMap::with_capacity(id_requests.len()),
         };
         
-        // Procesar solicitudes path->id en batch
+        // Process path->id requests in batch
         for path_str in path_requests {
             let path = StoragePath::from_string(&path_str);
             match self.base_service.get_or_create_id(&path).await {
@@ -230,12 +230,12 @@ impl IdMappingOptimizer {
                 },
                 Err(e) => {
                     error!("Error batch-processing path {}: {}", path_str, e);
-                    // Continuar con las demás solicitudes
+                    // Continue with remaining requests
                 }
             }
         }
         
-        // Procesar solicitudes id->path en batch
+        // Process id->path requests in batch
         for id in id_requests {
             match self.base_service.get_path_by_id(&id).await {
                 Ok(path) => {
@@ -245,7 +245,7 @@ impl IdMappingOptimizer {
                 },
                 Err(e) => {
                     error!("Error batch-processing ID {}: {}", id, e);
-                    // Continuar con las demás solicitudes
+                    // Continue with remaining requests
                 }
             }
         }
@@ -266,14 +266,14 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Actualizar estadísticas
+        // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.batch_operations += 1;
             stats.batch_items_processed += result.path_to_id.len() + result.id_to_path.len();
         }
         
-        // Guardar los cambios al disco en segundo plano
+        // Save changes to disk in the background
         let service_clone = self.base_service.clone();
         tokio::spawn(async move {
             if let Err(e) = service_clone.save_pending_changes().await {
@@ -284,15 +284,15 @@ impl IdMappingOptimizer {
         Ok(result)
     }
     
-    /// Fuerza el procesamiento de solicitudes pendientes si hay suficientes
+    /// Forces processing of pending requests if there are enough
     async fn trigger_batch_if_needed(&self, min_batch_size: usize) -> Result<(), IdMappingError> {
-        // Verificar si hay suficientes solicitudes pendientes
+        // Check if there are enough pending requests
         let should_process = {
             let batch_queue = self.pending_batch.lock().await;
             batch_queue.path_to_id_requests.len() + batch_queue.id_to_path_requests.len() >= min_batch_size
         };
         
-        // Procesar si es necesario
+        // Process if necessary
         if should_process {
             self.process_batch().await?;
         }
@@ -300,17 +300,17 @@ impl IdMappingOptimizer {
         Ok(())
     }
     
-    /// Precargar un conjunto de rutas para obtener sus IDs en batch
+    /// Preload a set of paths to get their IDs in batch
     pub async fn preload_paths(&self, paths: Vec<StoragePath>) -> Result<(), IdMappingError> {
-        // Solo proceder si hay rutas para cargar
+        // Only proceed if there are paths to load
         if paths.is_empty() {
             return Ok(());
         }
         
-        // Rutas que debemos cargar (las que no están en caché)
+        // Paths we need to load (those not in cache)
         let mut paths_to_load = Vec::new();
         
-        // Verificar primero el caché
+        // Check cache first
         {
             let cache = self.path_to_id_cache.read().await;
             for path in paths {
@@ -321,12 +321,12 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Si todos estaban en caché, terminar
+        // If all were in cache, finish
         if paths_to_load.is_empty() {
             return Ok(());
         }
         
-        // Agregar rutas a la cola para procesamiento batch
+        // Add paths to queue for batch processing
         {
             let mut batch_queue = self.pending_batch.lock().await;
             for path in paths_to_load {
@@ -334,23 +334,23 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Ejecutar procesamiento batch inmediatamente
+        // Execute batch processing immediately
         self.process_batch().await?;
         
         Ok(())
     }
     
-    /// Precargar un conjunto de IDs para obtener sus rutas en batch
+    /// Preload a set of IDs to get their paths in batch
     pub async fn preload_ids(&self, ids: Vec<String>) -> Result<(), IdMappingError> {
-        // Solo proceder si hay IDs para cargar
+        // Only proceed if there are IDs to load
         if ids.is_empty() {
             return Ok(());
         }
         
-        // IDs que debemos cargar (los que no están en caché)
+        // IDs we need to load (those not in cache)
         let mut ids_to_load = Vec::new();
         
-        // Verificar primero el caché
+        // Check cache first
         {
             let cache = self.id_to_path_cache.read().await;
             for id in ids {
@@ -360,12 +360,12 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Si todos estaban en caché, terminar
+        // If all were in cache, finish
         if ids_to_load.is_empty() {
             return Ok(());
         }
         
-        // Agregar IDs a la cola para procesamiento batch
+        // Add IDs to queue for batch processing
         {
             let mut batch_queue = self.pending_batch.lock().await;
             for id in ids_to_load {
@@ -373,7 +373,7 @@ impl IdMappingOptimizer {
             }
         }
         
-        // Ejecutar procesamiento batch inmediatamente
+        // Execute batch processing immediately
         self.process_batch().await?;
         
         Ok(())
@@ -383,7 +383,7 @@ impl IdMappingOptimizer {
 #[async_trait]
 impl IdMappingPort for IdMappingOptimizer {
     async fn get_or_create_id(&self, path: &StoragePath) -> Result<String, DomainError> {
-        // Actualizar estadísticas
+        // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.get_id_queries += 1;
@@ -391,7 +391,7 @@ impl IdMappingPort for IdMappingOptimizer {
         
         let path_str = path.to_string();
         
-        // Verificar primero en el caché
+        // Check cache first
         {
             let cache = self.path_to_id_cache.read().await;
             if let Some((id, _)) = cache.get(&path_str) {
@@ -443,7 +443,7 @@ impl IdMappingPort for IdMappingOptimizer {
     }
     
     async fn get_path_by_id(&self, id: &str) -> Result<StoragePath, DomainError> {
-        // Actualizar estadísticas
+        // Update statistics
         {
             let mut stats = self.stats.write().await;
             stats.path_by_id_queries += 1;
@@ -493,21 +493,21 @@ impl IdMappingPort for IdMappingOptimizer {
     }
     
     async fn update_path(&self, id: &str, new_path: &StoragePath) -> Result<(), DomainError> {
-        // Invalidar caché para este ID
+        // Invalidate cache for this ID
         {
             let mut id_cache = self.id_to_path_cache.write().await;
             let mut path_cache = self.path_to_id_cache.write().await;
             
-            // Eliminar la entrada del ID
+            // Remove the ID entry
             if let Some((old_path, _)) = id_cache.remove(id) {
                 path_cache.remove(&old_path);
             }
         }
         
-        // Actualizar en el servicio base
+        // Update in the base service
         let result = self.base_service.update_path(id, new_path).await?;
         
-        // Actualizar caché con el nuevo mapeo
+        // Update cache with new mapping
         {
             let mut id_cache = self.id_to_path_cache.write().await;
             let mut path_cache = self.path_to_id_cache.write().await;
@@ -523,25 +523,25 @@ impl IdMappingPort for IdMappingOptimizer {
     }
     
     async fn remove_id(&self, id: &str) -> Result<(), DomainError> {
-        // Invalidar caché para este ID
+        // Invalidate cache for this ID
         {
             let mut id_cache = self.id_to_path_cache.write().await;
             let mut path_cache = self.path_to_id_cache.write().await;
             
-            // Eliminar la entrada del ID
+            // Remove the ID entry
             if let Some((path, _)) = id_cache.remove(id) {
                 path_cache.remove(&path);
             }
         }
         
-        // Eliminar en el servicio base
+        // Remove from the base service
         self.base_service.remove_id(id).await?;
         
         Ok(())
     }
     
     async fn save_changes(&self) -> Result<(), DomainError> {
-        // Delegar al servicio base
+        // Delegate to the base service
         self.base_service.save_changes().await?;
         
         Ok(())
@@ -569,15 +569,15 @@ mod tests {
         
         let path = StoragePath::from_string("/test/file.txt");
         
-        // Primera llamada debería usar el servicio base
+        // First call should use the base service
         let id = optimizer.get_or_create_id(&path).await.unwrap();
         assert!(!id.is_empty(), "ID should not be empty");
         
-        // Segunda llamada debería usar caché
+        // Second call should use cache
         let id2 = optimizer.get_or_create_id(&path).await.unwrap();
         assert_eq!(id, id2, "Same path should return same ID");
         
-        // Verificar estadísticas de caché
+        // Verify cache statistics
         let stats = optimizer.get_stats().await;
         assert_eq!(stats.get_id_queries, 2, "Should have 2 queries");
         assert_eq!(stats.get_id_hits, 1, "Should have 1 hit");
@@ -587,27 +587,27 @@ mod tests {
     async fn test_batch_processing() {
         let (_, optimizer) = create_test_service().await;
         
-        // Crear un lote de rutas
+        // Create a batch of paths
         let mut paths = Vec::new();
         for i in 0..50 {
             paths.push(StoragePath::from_string(&format!("/test/batch/file{}.txt", i)));
         }
         
-        // Precargar las rutas
+        // Preload the paths
         optimizer.preload_paths(paths.clone()).await.unwrap();
         
-        // Verificar que todas están en caché
+        // Verify all are in cache
         for path in &paths {
             let id = optimizer.get_or_create_id(path).await.unwrap();
             assert!(!id.is_empty(), "ID should be available for path");
         }
         
-        // Verificar estadísticas
+        // Verify statistics
         let stats = optimizer.get_stats().await;
         assert_eq!(stats.batch_operations, 1, "Should have 1 batch operation");
         assert!(stats.batch_items_processed >= 50, "Should have processed at least 50 items");
         
-        // Verificar que todas las consultas posteriores son hits en caché
+        // Verify all subsequent queries are cache hits
         assert_eq!(stats.get_id_hits, 50, "All subsequente queries should be cache hits");
     }
     
@@ -615,21 +615,21 @@ mod tests {
     async fn test_cache_cleanup() {
         let (_, optimizer) = create_test_service().await;
         
-        // Crear algunas entradas
+        // Create some entries
         let path = StoragePath::from_string("/test/cleanup.txt");
         let id = optimizer.get_or_create_id(&path).await.unwrap();
         
-        // Verificar estadísticas iniciales
+        // Verify initial statistics
         {
             let stats = optimizer.get_stats().await;
             assert_eq!(stats.get_id_queries, 1, "Should have 1 query");
             assert_eq!(stats.get_id_hits, 0, "Should have 0 hits");
         }
         
-        // Ejecutar limpieza (no debería eliminar nada todavía)
+        // Run cleanup (should not remove anything yet)
         optimizer.cleanup_cache().await;
         
-        // Verificar que el caché sigue funcionando
+        // Verify cache is still working
         let id2 = optimizer.get_or_create_id(&path).await.unwrap();
         assert_eq!(id, id2, "Cache should still work after cleanup");
         

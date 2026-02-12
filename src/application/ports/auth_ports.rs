@@ -65,49 +65,49 @@ pub trait TokenServicePort: Send + Sync + 'static {
 
 #[async_trait]
 pub trait UserStoragePort: Send + Sync + 'static {
-    /// Crea un nuevo usuario 
+    /// Creates a new user 
     async fn create_user(&self, user: User) -> Result<User, DomainError>;
     
-    /// Obtiene un usuario por ID
+    /// Gets a user by ID
     async fn get_user_by_id(&self, id: &str) -> Result<User, DomainError>;
     
-    /// Obtiene un usuario por nombre de usuario
+    /// Gets a user by username
     async fn get_user_by_username(&self, username: &str) -> Result<User, DomainError>;
     
-    /// Obtiene un usuario por correo electrónico
+    /// Gets a user by email
     async fn get_user_by_email(&self, email: &str) -> Result<User, DomainError>;
     
-    /// Actualiza un usuario existente
+    /// Updates an existing user
     async fn update_user(&self, user: User) -> Result<User, DomainError>;
     
-    /// Actualiza solo el uso de almacenamiento de un usuario
+    /// Updates only the storage usage of a user
     async fn update_storage_usage(&self, user_id: &str, usage_bytes: i64) -> Result<(), DomainError>;
     
-    /// Lista usuarios con paginación
+    /// Lists users with pagination
     async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<User>, DomainError>;
     
-    /// Lista usuarios por rol (por ejemplo, "admin" o "user")
+    /// Lists users by role (e.g., "admin" or "user")
     async fn list_users_by_role(&self, role: &str) -> Result<Vec<User>, DomainError>;
     
-    /// Elimina un usuario por su ID
+    /// Deletes a user by their ID
     async fn delete_user(&self, user_id: &str) -> Result<(), DomainError>;
     
-    /// Cambia la contraseña de un usuario
+    /// Changes a user's password
     async fn change_password(&self, user_id: &str, password_hash: &str) -> Result<(), DomainError>;
 
     /// Finds a user by OIDC provider + subject pair
     async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> Result<User, DomainError>;
 
-    /// Activa o desactiva un usuario
+    /// Activates or deactivates a user
     async fn set_user_active_status(&self, user_id: &str, active: bool) -> Result<(), DomainError>;
 
-    /// Cambia el rol de un usuario
+    /// Changes a user's role
     async fn change_role(&self, user_id: &str, role: &str) -> Result<(), DomainError>;
 
-    /// Actualiza la cuota de almacenamiento de un usuario
+    /// Updates a user's storage quota
     async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> Result<(), DomainError>;
 
-    /// Cuenta el número total de usuarios
+    /// Counts the total number of users
     async fn count_users(&self) -> Result<i64, DomainError>;
 }
 
@@ -156,15 +156,15 @@ pub trait OidcServicePort: Send + Sync + 'static {
 
 #[async_trait]
 pub trait SessionStoragePort: Send + Sync + 'static {
-    /// Crea una nueva sesión
+    /// Creates a new session
     async fn create_session(&self, session: Session) -> Result<Session, DomainError>;
     
-    /// Obtiene una sesión por token de actualización
+    /// Gets a session by refresh token
     async fn get_session_by_refresh_token(&self, refresh_token: &str) -> Result<Session, DomainError>;
     
-    /// Revoca una sesión específica
+    /// Revokes a specific session
     async fn revoke_session(&self, session_id: &str) -> Result<(), DomainError>;
     
-    /// Revoca todas las sesiones de un usuario
+    /// Revokes all sessions of a user
     async fn revoke_all_user_sessions(&self, user_id: &str) -> Result<u64, DomainError>;
 }

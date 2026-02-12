@@ -53,10 +53,10 @@ use crate::common::stubs::{
     StubSearchUseCase,
 };
 
-/// Fábrica para los diferentes componentes de la aplicación
+/// Factory for the different application components
 /// 
-/// Esta fábrica centraliza la creación de todos los servicios de la aplicación,
-/// garantizando el orden correcto de inicialización y resolviendo dependencias circulares.
+/// This factory centralizes the creation of all application services,
+/// ensuring the correct initialization order and resolving circular dependencies.
 pub struct AppServiceFactory {
     storage_path: PathBuf,
     locales_path: PathBuf,
@@ -64,7 +64,7 @@ pub struct AppServiceFactory {
 }
 
 impl AppServiceFactory {
-    /// Crea una nueva fábrica de servicios
+    /// Creates a new service factory
     pub fn new(storage_path: PathBuf, locales_path: PathBuf) -> Self {
         Self {
             storage_path,
@@ -73,7 +73,7 @@ impl AppServiceFactory {
         }
     }
     
-    /// Crea una nueva fábrica de servicios con configuración personalizada
+    /// Creates a new service factory with custom configuration
     pub fn with_config(storage_path: PathBuf, locales_path: PathBuf, config: AppConfig) -> Self {
         Self {
             storage_path,
@@ -82,17 +82,17 @@ impl AppServiceFactory {
         }
     }
     
-    /// Obtiene la configuración
+    /// Gets the configuration
     pub fn config(&self) -> &AppConfig {
         &self.config
     }
     
-    /// Obtiene la ruta de almacenamiento
+    /// Gets the storage path
     pub fn storage_path(&self) -> &PathBuf {
         &self.storage_path
     }
     
-    /// Inicializa los servicios base del sistema
+    /// Initializes the core system services
     pub async fn create_core_services(&self) -> Result<CoreServices, DomainError> {
         // Path service
         let path_service = Arc::new(PathService::new(self.storage_path.clone()));
@@ -105,57 +105,57 @@ impl AppServiceFactory {
         }));
         tracing::info!("FileContentCache initialized: max 10MB/file, 512MB total, 10k entries");
         
-        // ID mapping service para carpetas
+        // ID mapping service for folders
         let folder_id_mapping_path = self.storage_path.join("folder_ids.json");
         let folder_id_mapping_service = Arc::new(
             IdMappingService::new(folder_id_mapping_path).await?
         );
         
-        // ID mapping service para archivos
+        // ID mapping service for files
         let file_id_mapping_path = self.storage_path.join("file_ids.json");
         let file_id_mapping_service = Arc::new(
             IdMappingService::new(file_id_mapping_path).await?
         );
         
-        // Optimizer con batch processing y caching
+        // Optimizer with batch processing and caching
         let id_mapping_optimizer = Arc::new(
             IdMappingOptimizer::new(folder_id_mapping_service.clone())
         );
         
-        // Iniciar tarea de limpieza del optimizer
+        // Start optimizer cleanup task
         IdMappingOptimizer::start_cleanup_task(id_mapping_optimizer.clone());
         
-        // Thumbnail service para generación de miniaturas
+        // Thumbnail service for thumbnail generation
         let thumbnail_service = Arc::new(
             crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
                 &self.storage_path,
-                5000,  // max 5000 thumbnails en cache
-                100 * 1024 * 1024,  // max 100MB de cache
+                5000,  // max 5000 thumbnails in cache
+                100 * 1024 * 1024,  // max 100MB cache
             )
         );
-        // Inicializar directorios de thumbnails
+        // Initialize thumbnail directories
         thumbnail_service.initialize().await?;
         
-        // Write-behind cache para uploads instantáneos de archivos pequeños
+        // Write-behind cache for instant uploads of small files
         let write_behind_cache = crate::infrastructure::services::write_behind_cache::WriteBehindCache::new();
         
-        // Chunked upload service para archivos grandes (>10MB)
+        // Chunked upload service for large files (>10MB)
         let chunked_temp_dir = std::path::PathBuf::from(&self.storage_path).join(".uploads");
         let chunked_upload_service = Arc::new(
             crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(chunked_temp_dir)
         );
         
-        // Image transcoding service para conversión automática a WebP
+        // Image transcoding service for automatic WebP conversion
         let image_transcode_service = Arc::new(
             crate::infrastructure::services::image_transcode_service::ImageTranscodeService::new(
                 &self.storage_path,
-                2000,  // max 2000 imágenes transcodificadas en cache
-                50 * 1024 * 1024,  // max 50MB de cache en memoria
+                2000,  // max 2000 transcoded images in cache
+                50 * 1024 * 1024,  // max 50MB in-memory cache
             )
         );
         image_transcode_service.initialize().await?;
         
-        // Deduplication service para eliminar archivos duplicados
+        // Deduplication service for removing duplicate files
         let dedup_service = Arc::new(
             crate::infrastructure::services::dedup_service::DedupService::new(&self.storage_path)
         );
@@ -189,7 +189,7 @@ impl AppServiceFactory {
         })
     }
     
-    /// Inicializa los servicios de repositorio
+    /// Initializes the repository services
     pub fn create_repository_services(&self, core: &CoreServices) -> RepositoryServices {
         // Storage mediator - uses stub initially, will be replaced after folder repo is ready
         let storage_mediator_stub: Arc<dyn StorageMediator> = Arc::new(
@@ -216,13 +216,13 @@ impl AppServiceFactory {
             FileMetadataCache::default_with_config(core.config.clone())
         );
         
-        // Iniciar tarea de limpieza de metadata cache
+        // Start metadata cache cleanup task
         let cache_clone = metadata_cache.clone();
         tokio::spawn(async move {
             FileMetadataCache::start_cleanup_task(cache_clone).await;
         });
         
-        // Buffer pool para optimización de memoria
+        // Buffer pool for memory optimization
         let buffer_pool = BufferPool::new(256 * 1024, 50, 120); // 256KB buffers, 50 max, 2 min TTL
         BufferPool::start_cleaner(buffer_pool.clone());
         
@@ -232,7 +232,7 @@ impl AppServiceFactory {
             buffer_pool.clone()
         ));
         
-        // File repositories separados para lectura y escritura
+        // Separate file repositories for reading and writing
         let file_read_repository = Arc::new(FileFsReadRepository::new(
             self.storage_path.clone(),
             storage_mediator.clone(),
@@ -281,19 +281,19 @@ impl AppServiceFactory {
         }
     }
     
-    /// Inicializa los servicios de aplicación
+    /// Initializes the application services
     pub fn create_application_services(
         &self,
         core: &CoreServices,
         repos: &RepositoryServices,
         trash_service: Option<Arc<dyn TrashUseCase>>,
     ) -> ApplicationServices {
-        // Servicios principales
+        // Main services
         let folder_service = Arc::new(FolderService::new(
             repos.folder_repository.clone()
         ));
         
-        // Servicios refactorizados con todos los puertos de infraestructura
+        // Refactored services with all infrastructure ports
         let file_upload_service = Arc::new(FileUploadService::new_full(
             repos.file_write_repository.clone(),
             repos.file_read_repository.clone(),
@@ -308,7 +308,7 @@ impl AppServiceFactory {
             core.image_transcode_service.clone(),
         ));
         
-        // FileManagementService con dedup y trash
+        // FileManagementService with dedup and trash
         let file_management_service = Arc::new(FileManagementService::new_full(
             repos.file_write_repository.clone(),
             repos.file_read_repository.clone(),
@@ -325,7 +325,7 @@ impl AppServiceFactory {
             repos.i18n_repository.clone()
         ));
         
-        // Search service con caché
+        // Search service with cache
         let search_service: Option<Arc<dyn SearchUseCase>> = Some(Arc::new(SearchService::new(
             repos.file_read_repository.clone(),
             repos.folder_repository.clone(),
@@ -336,9 +336,9 @@ impl AppServiceFactory {
         tracing::info!("Application services initialized");
         
         ApplicationServices {
-            // Tipos concretos para handlers que los necesitan
+            // Concrete types for handlers that need them
             folder_service_concrete: folder_service.clone(),
-            // Traits para abstracción
+            // Traits for abstraction
             folder_service,
             file_upload_service,
             file_retrieval_service,
@@ -347,13 +347,13 @@ impl AppServiceFactory {
             i18n_service,
             trash_service, // Already set via parameter
             search_service,
-            share_service: None, // Se configura después con create_share_service
-            favorites_service: None, // Se configura después con create_favorites_service
-            recent_service: None, // Se configura después con create_recent_service
+            share_service: None, // Configured later with create_share_service
+            favorites_service: None, // Configured later with create_favorites_service
+            recent_service: None, // Configured later with create_recent_service
         }
     }
     
-    /// Crea el servicio de papelera
+    /// Creates the trash service
     pub async fn create_trash_service(
         &self,
         repos: &RepositoryServices,
@@ -374,7 +374,7 @@ impl AppServiceFactory {
             self.config.storage.trash_retention_days,
         ));
         
-        // Inicializar servicio de limpieza
+        // Initialize cleanup service
         let cleanup_service = TrashCleanupService::new(
             service.clone(),
             trash_repo.clone(),
@@ -387,7 +387,7 @@ impl AppServiceFactory {
         Some(service as Arc<dyn TrashUseCase>)
     }
     
-    /// Crea el servicio de compartición
+    /// Creates the sharing service
     pub fn create_share_service(
         &self,
         repos: &RepositoryServices,
@@ -417,7 +417,7 @@ impl AppServiceFactory {
         Some(service)
     }
     
-    /// Crea el servicio de favoritos (requiere base de datos)
+    /// Creates the favorites service (requires database)
     pub fn create_favorites_service(
         &self,
         db_pool: &Arc<PgPool>,
@@ -430,7 +430,7 @@ impl AppServiceFactory {
         service
     }
     
-    /// Crea el servicio de elementos recientes (requiere base de datos)
+    /// Creates the recent items service (requires database)
     pub fn create_recent_service(
         &self,
         db_pool: &Arc<PgPool>,
@@ -446,7 +446,7 @@ impl AppServiceFactory {
         service
     }
     
-    /// Precarga traducciones
+    /// Preloads translations
     pub async fn preload_translations(&self, i18n_service: &I18nApplicationService) {
         use crate::domain::services::i18n_service::Locale;
         
@@ -468,7 +468,7 @@ impl AppServiceFactory {
         tracing::info!("Translations preloaded");
     }
     
-    /// Precarga directorios en caché
+    /// Preloads directories into cache
     pub async fn preload_cache(&self, metadata_cache: &FileMetadataCache) {
         tracing::info!("Preloading common directories to warm up cache...");
         if let Ok(count) = metadata_cache.preload_directory(&self.storage_path, true, 1).await {
@@ -476,7 +476,7 @@ impl AppServiceFactory {
         }
     }
 
-    /// Crea el servicio de uso de almacenamiento (requiere base de datos)
+    /// Creates the storage usage service (requires database)
     pub fn create_storage_usage_service(
         &self,
         repos: &RepositoryServices,
@@ -495,9 +495,9 @@ impl AppServiceFactory {
         service
     }
 
-    /// Construye el AppState completo usando todos los servicios de la fábrica.
+    /// Builds the complete AppState using all factory services.
     ///
-    /// Este es el punto de entrada principal que reemplaza toda la lógica manual de `main.rs`.
+    /// This is the main entry point that replaces all manual logic in `main.rs`.
     pub async fn build_app_state(
         &self,
         db_pool: Option<Arc<PgPool>>,
@@ -677,7 +677,7 @@ impl AppServiceFactory {
     }
 }
 
-/// Contenedor para servicios base
+/// Container for core services
 #[derive(Clone)]
 pub struct CoreServices {
     pub path_service: Arc<PathService>,
@@ -695,7 +695,7 @@ pub struct CoreServices {
     pub config: AppConfig,
 }
 
-/// Contenedor para servicios de repositorio
+/// Container for repository services
 #[derive(Clone)]
 pub struct RepositoryServices {
     pub folder_repository: Arc<dyn FolderStoragePort>,
@@ -707,12 +707,12 @@ pub struct RepositoryServices {
     pub trash_repository: Option<Arc<dyn crate::domain::repositories::trash_repository::TrashRepository>>,
 }
 
-/// Contenedor para servicios de aplicación
+/// Container for application services
 #[derive(Clone)]
 pub struct ApplicationServices {
-    // Tipos concretos para compatibilidad con handlers existentes
+    // Concrete types for compatibility with existing handlers
     pub folder_service_concrete: Arc<FolderService>,
-    // Traits para abstracción
+    // Traits for abstraction
     pub folder_service: Arc<dyn FolderUseCase>,
     pub file_upload_service: Arc<dyn FileUploadUseCase>,
     pub file_retrieval_service: Arc<dyn FileRetrievalUseCase>,
@@ -726,14 +726,14 @@ pub struct ApplicationServices {
     pub recent_service: Option<Arc<dyn RecentItemsUseCase>>,
 }
 
-/// Contenedor para servicios de autenticación
+/// Container for authentication services
 #[derive(Clone)]
 pub struct AuthServices {
     pub token_service: Arc<dyn crate::application::ports::auth_ports::TokenServicePort>,
     pub auth_application_service: Arc<AuthApplicationService>,
 }
 
-/// Estado global de la aplicación para dependency injection
+/// Global application state for dependency injection
 #[derive(Clone)]
 pub struct AppState {
     pub core: CoreServices,

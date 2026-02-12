@@ -30,7 +30,7 @@ const contextMenus = {
                     window.favorites.removeFromFavorites(folder.id, 'folder');
                     // Update menu item text
                     document.getElementById('favorite-folder-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.favorite') : 'Añadir a favoritos';
+                        window.i18n ? window.i18n.t('actions.favorite') : 'Add to favorites';
                 } else {
                     // Add to favorites
                     window.favorites.addToFavorites(
@@ -41,7 +41,7 @@ const contextMenus = {
                     );
                     // Update menu item text
                     document.getElementById('favorite-folder-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Quitar de favoritos';
+                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Remove from favorites';
                 }
             }
             window.ui.closeContextMenu();
@@ -143,7 +143,7 @@ const contextMenus = {
                     window.favorites.removeFromFavorites(file.id, 'file');
                     // Update menu item text
                     document.getElementById('favorite-file-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.favorite') : 'Añadir a favoritos';
+                        window.i18n ? window.i18n.t('actions.favorite') : 'Add to favorites';
                 } else {
                     // Add to favorites
                     window.favorites.addToFavorites(
@@ -154,7 +154,7 @@ const contextMenus = {
                     );
                     // Update menu item text
                     document.getElementById('favorite-file-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Quitar de favoritos';
+                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Remove from favorites';
                 }
             }
             window.ui.closeFileContextMenu();
@@ -246,7 +246,7 @@ const contextMenus = {
         renameInput.value = folder.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_folder') : 'Renombrar carpeta';
+        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_folder') : 'Rename folder';
         renameDialog.style.display = 'flex';
         renameInput.focus();
         renameInput.select();
@@ -264,7 +264,7 @@ const contextMenus = {
         renameInput.value = file.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_file') : 'Renombrar archivo';
+        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_file') : 'Rename file';
         renameDialog.style.display = 'flex';
         renameInput.focus();
         renameInput.select();
@@ -293,8 +293,8 @@ const contextMenus = {
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
         const titleText = mode === 'file' ?
-            (window.i18n ? window.i18n.t('dialogs.move_file') : 'Mover archivo') :
-            (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Mover carpeta');
+            (window.i18n ? window.i18n.t('dialogs.move_file') : 'Move file') :
+            (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
 
         // Load all available folders
@@ -319,7 +319,7 @@ const contextMenus = {
     async renameItem() {
         const newName = document.getElementById('rename-input').value.trim();
         if (!newName) {
-            alert(window.i18n ? window.i18n.t('errors.empty_name') : 'El nombre no puede estar vacío');
+            alert(window.i18n ? window.i18n.t('errors.empty_name') : 'Name cannot be empty');
             return;
         }
 
@@ -361,7 +361,7 @@ const contextMenus = {
                 // Clear container except root option
                 folderSelectContainer.innerHTML = `
                     <div class="folder-select-item selected" data-folder-id="">
-                        <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Raíz</span>
+                        <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
                     </div>
                 `;
 
@@ -438,8 +438,8 @@ const contextMenus = {
         
         // Update dialog content
         dialogHeader.textContent = itemType === 'file' ?
-            (window.i18n ? window.i18n.t('dialogs.share_file') : 'Compartir archivo') :
-            (window.i18n ? window.i18n.t('dialogs.share_folder') : 'Compartir carpeta');
+            (window.i18n ? window.i18n.t('dialogs.share_file') : 'Share file') :
+            (window.i18n ? window.i18n.t('dialogs.share_folder') : 'Share folder');
         
         itemName.textContent = item.name;
         
@@ -470,21 +470,21 @@ const contextMenus = {
                 shareEl.className = 'existing-share-item';
                 
                 const expiresText = share.expires_at ? 
-                    `Vence: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 
-                    'Sin vencimiento';
+                    `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 
+                    'No expiration';
                 
                 shareEl.innerHTML = `
                     <div class="share-url">${share.url}</div>
                     <div class="share-info">
-                        ${share.password_protected ? '<span class="share-protected"><i class="fas fa-lock"></i> Con contraseña</span>' : ''}
+                        ${share.password_protected ? '<span class="share-protected"><i class="fas fa-lock"></i> Password protected</span>' : ''}
                         <span class="share-expiration">${expiresText}</span>
                     </div>
                     <div class="share-actions">
                         <button class="btn btn-small copy-link-btn" data-share-url="${share.url}">
-                            <i class="fas fa-copy"></i> Copiar
+                            <i class="fas fa-copy"></i> Copy
                         </button>
                         <button class="btn btn-small btn-danger delete-link-btn" data-share-id="${share.id}">
-                            <i class="fas fa-trash"></i> Eliminar
+                            <i class="fas fa-trash"></i> Delete
                         </button>
                     </div>
                 `;
@@ -507,9 +507,9 @@ const contextMenus = {
                     const shareId = btn.getAttribute('data-share-id');
                     
                     showConfirmDialog({
-                        title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Eliminar enlace',
-                        message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : '¿Estás seguro de que quieres eliminar este enlace compartido?',
-                        confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+                        title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
+                        message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
+                        confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
                     }).then(confirmed => {
                         if (confirmed) {
                             window.fileSharing.removeSharedLink(shareId);
@@ -534,7 +534,7 @@ const contextMenus = {
      */
     createSharedLink() {
         if (!window.app.shareDialogItem || !window.app.shareDialogItemType) {
-            window.ui.showNotification('Error', 'No se pudo compartir el elemento');
+            window.ui.showNotification('Error', 'Could not share the item');
             return;
         }
         
@@ -577,14 +577,14 @@ const contextMenus = {
             shareUrl.select();
             
             // Show success message
-            window.ui.showNotification('Enlace creado', 'Enlace compartido creado correctamente');
+            window.ui.showNotification('Link created', 'Shared link created successfully');
             
             // Reload existing shares
             this.showShareDialog(item, itemType);
             
         } catch (error) {
             console.error('Error creating shared link:', error);
-            window.ui.showNotification('Error', 'No se pudo crear el enlace compartido');
+            window.ui.showNotification('Error', 'Could not create shared link');
         }
     },
     
@@ -614,14 +614,14 @@ const contextMenus = {
         const shareUrl = window.app.notificationShareUrl;
         
         if (!email || !shareUrl) {
-            window.ui.showNotification('Error', 'Por favor, ingresa un correo electrónico válido');
+            window.ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
         
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            window.ui.showNotification('Error', 'Por favor, ingresa un correo electrónico válido');
+            window.ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
         
@@ -630,7 +630,7 @@ const contextMenus = {
             document.getElementById('notification-dialog').style.display = 'none';
         } catch (error) {
             console.error('Error sending notification:', error);
-            window.ui.showNotification('Error', 'No se pudo enviar la notificación');
+            window.ui.showNotification('Error', 'Could not send notification');
         }
     },
     

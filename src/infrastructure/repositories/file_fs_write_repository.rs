@@ -21,9 +21,9 @@ use crate::infrastructure::services::path_service::PathService;
 use crate::domain::services::path_service::StoragePath;
 use crate::common::config::AppConfig;
 
-/// Implementación de repositorio para operaciones de **escritura** de archivos.
+/// Repository implementation for file **write** operations.
 ///
-/// Implementa `FileWritePort`:
+/// Implements `FileWritePort`:
 /// save_file, save_file_from_stream, move_file, delete_file,
 /// update_file_content, register_file_deferred.
 pub struct FileFsWriteRepository {
@@ -37,7 +37,7 @@ pub struct FileFsWriteRepository {
 }
 
 impl FileFsWriteRepository {
-    /// Constructor completo con todas las dependencias.
+    /// Full constructor with all dependencies.
     pub fn new(
         root_path: PathBuf,
         storage_mediator: Arc<dyn StorageMediator>,
@@ -50,7 +50,7 @@ impl FileFsWriteRepository {
         Self { root_path, storage_mediator, id_mapping_service, path_service, metadata_cache, config, parallel_processor }
     }
 
-    /// Stub para pruebas (no realiza I/O real).
+    /// Stub for testing (does not perform real I/O).
     pub fn default_stub() -> Self {
         Self {
             root_path: PathBuf::from("./storage"),

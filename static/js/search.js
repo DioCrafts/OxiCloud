@@ -52,7 +52,7 @@ const search = {
             }
         } catch (error) {
             console.error('Error performing search:', error);
-            window.ui.showNotification('Error', 'Error al realizar la búsqueda');
+            window.ui.showNotification('Error', 'Error performing search');
             return { files: [], folders: [], total_count: 0 };
         }
     },
@@ -91,7 +91,7 @@ const search = {
             }
         } catch (error) {
             console.error('Error performing advanced search:', error);
-            window.ui.showNotification('Error', 'Error al realizar la búsqueda avanzada');
+            window.ui.showNotification('Error', 'Error performing advanced search');
             return { files: [], folders: [], total_count: 0 };
         }
     },
@@ -109,10 +109,10 @@ const search = {
         filesGrid.innerHTML = '';
         filesListView.innerHTML = `
             <div class="list-header">
-                <div data-i18n="files.name">Nombre</div>
-                <div data-i18n="files.type">Tipo</div>
-                <div data-i18n="files.size">Tamaño</div>
-                <div data-i18n="files.modified">Modificado</div>
+                <div data-i18n="files.name">Name</div>
+                <div data-i18n="files.type">Type</div>
+                <div data-i18n="files.size">Size</div>
+                <div data-i18n="files.modified">Modified</div>
             </div>
         `;
         
@@ -120,9 +120,9 @@ const search = {
         const searchHeader = document.createElement('div');
         searchHeader.className = 'search-results-header';
         searchHeader.innerHTML = `
-            <h3>Resultados de búsqueda (${results.total_count || (results.files.length + results.folders.length)})</h3>
+            <h3>Search results (${results.total_count || (results.files.length + results.folders.length)})</h3>
             <button class="btn btn-secondary" id="clear-search-btn">
-                <i class="fas fa-times"></i> Limpiar búsqueda
+                <i class="fas fa-times"></i> Clear search
             </button>
         `;
         filesGrid.appendChild(searchHeader);
@@ -147,7 +147,7 @@ const search = {
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
                 <i class="fas fa-search" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
-                <p>No se encontraron resultados para esta búsqueda</p>
+                <p>No results found for this search</p>
             `;
             filesGrid.appendChild(emptyState);
             return;
@@ -178,15 +178,15 @@ const search = {
             });
             
             if (response.ok) {
-                window.ui.showNotification('Caché limpiada', 'Caché de búsqueda limpiada correctamente');
+                window.ui.showNotification('Cache cleared', 'Search cache cleared successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error al limpiar la caché de búsqueda');
+                window.ui.showNotification('Error', 'Error clearing search cache');
                 return false;
             }
         } catch (error) {
             console.error('Error clearing search cache:', error);
-            window.ui.showNotification('Error', 'Error al limpiar la caché de búsqueda');
+            window.ui.showNotification('Error', 'Error clearing search cache');
             return false;
         }
     }

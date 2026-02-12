@@ -1,11 +1,11 @@
-//! Errores puros de entidades de dominio
+//! Pure domain entity errors
 //!
-//! Este módulo define los errores específicos de las entidades de dominio
-//! sin dependencias de frameworks externos, siguiendo los principios de
-//! Clean Architecture.
+//! This module defines domain entity-specific errors
+//! without external framework dependencies, following
+//! Clean Architecture principles.
 //!
-//! Los errores implementan manualmente `std::error::Error` y `std::fmt::Display`
-//! para mantener el dominio libre de dependencias externas.
+//! Errors manually implement `std::error::Error` and `std::fmt::Display`
+//! to keep the domain free of external dependencies.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
@@ -14,12 +14,12 @@ use std::fmt::{Display, Formatter, Result as FmtResult};
 // FILE ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades File
+/// Errors that can occur during File entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FileError {
-    /// Ocurre cuando el nombre de archivo contiene caracteres inválidos o está vacío
+    /// Occurs when the file name contains invalid characters or is empty
     InvalidFileName(String),
-    /// Ocurre cuando falla la validación de cualquier atributo de la entidad
+    /// Occurs when validation of any entity attribute fails
     ValidationError(String),
 }
 
@@ -34,19 +34,19 @@ impl Display for FileError {
 
 impl Error for FileError {}
 
-/// Alias de tipo para resultados de operaciones con entidades File
+/// Type alias for File entity operation results
 pub type FileResult<T> = Result<T, FileError>;
 
 // ============================================================================
 // FOLDER ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades Folder
+/// Errors that can occur during Folder entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FolderError {
-    /// Ocurre cuando el nombre de carpeta contiene caracteres inválidos o está vacío
+    /// Occurs when the folder name contains invalid characters or is empty
     InvalidFolderName(String),
-    /// Ocurre cuando falla la validación de cualquier atributo de la entidad
+    /// Occurs when validation of any entity attribute fails
     ValidationError(String),
 }
 
@@ -61,54 +61,54 @@ impl Display for FolderError {
 
 impl Error for FolderError {}
 
-/// Alias de tipo para resultados de operaciones con entidades Folder
+/// Type alias for Folder entity operation results
 pub type FolderResult<T> = Result<T, FolderError>;
 
 // ============================================================================
 // USER ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades User
+/// Errors that can occur during User entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserError {
-    /// Nombre de usuario inválido
+    /// Invalid username
     InvalidUsername(String),
-    /// Contraseña inválida
+    /// Invalid password
     InvalidPassword(String),
-    /// Error de validación general
+    /// General validation error
     ValidationError(String),
-    /// Error de autenticación
+    /// Authentication error
     AuthenticationError(String),
 }
 
 impl Display for UserError {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            UserError::InvalidUsername(msg) => write!(f, "Username inválido: {}", msg),
-            UserError::InvalidPassword(msg) => write!(f, "Password inválido: {}", msg),
-            UserError::ValidationError(msg) => write!(f, "Error en la validación: {}", msg),
-            UserError::AuthenticationError(msg) => write!(f, "Error en la autenticación: {}", msg),
+            UserError::InvalidUsername(msg) => write!(f, "Invalid username: {}", msg),
+            UserError::InvalidPassword(msg) => write!(f, "Invalid password: {}", msg),
+            UserError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            UserError::AuthenticationError(msg) => write!(f, "Authentication error: {}", msg),
         }
     }
 }
 
 impl Error for UserError {}
 
-/// Alias de tipo para resultados de operaciones con entidades User
+/// Type alias for User entity operation results
 pub type UserResult<T> = Result<T, UserError>;
 
 // ============================================================================
 // SHARE ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades Share
+/// Errors that can occur during Share entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShareError {
-    /// Token de compartición inválido
+    /// Invalid share token
     InvalidToken(String),
-    /// Fecha de expiración inválida
+    /// Invalid expiration date
     InvalidExpiration(String),
-    /// Error de validación general
+    /// General validation error
     ValidationError(String),
 }
 
@@ -124,21 +124,21 @@ impl Display for ShareError {
 
 impl Error for ShareError {}
 
-/// Alias de tipo para resultados de operaciones con entidades Share
+/// Type alias for Share entity operation results
 pub type ShareResult<T> = Result<T, ShareError>;
 
 // ============================================================================
 // CALENDAR ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades Calendar
+/// Errors that can occur during Calendar entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalendarError {
-    /// Nombre de calendario inválido
+    /// Invalid calendar name
     InvalidName(String),
-    /// Código de color inválido
+    /// Invalid color code
     InvalidColor(String),
-    /// ID de propietario inválido
+    /// Invalid owner ID
     InvalidOwnerId(String),
 }
 
@@ -154,23 +154,23 @@ impl Display for CalendarError {
 
 impl Error for CalendarError {}
 
-/// Alias de tipo para resultados de operaciones con entidades Calendar
+/// Type alias for Calendar entity operation results
 pub type CalendarResult<T> = Result<T, CalendarError>;
 
 // ============================================================================
 // CALENDAR EVENT ERRORS
 // ============================================================================
 
-/// Errores que pueden ocurrir durante operaciones con entidades CalendarEvent
+/// Errors that can occur during CalendarEvent entity operations
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CalendarEventError {
-    /// Resumen/título de evento inválido
+    /// Invalid event summary/title
     InvalidSummary(String),
-    /// Fechas de evento inválidas
+    /// Invalid event dates
     InvalidDates(String),
-    /// Regla de recurrencia inválida
+    /// Invalid recurrence rule
     InvalidRecurrence(String),
-    /// Datos iCalendar inválidos
+    /// Invalid iCalendar data
     InvalidICalData(String),
 }
 
@@ -187,7 +187,7 @@ impl Display for CalendarEventError {
 
 impl Error for CalendarEventError {}
 
-/// Alias de tipo para resultados de operaciones con entidades CalendarEvent
+/// Type alias for CalendarEvent entity operation results
 pub type CalendarEventResult<T> = Result<T, CalendarEventError>;
 
 // ============================================================================
@@ -216,10 +216,10 @@ mod tests {
     #[test]
     fn test_user_error_display() {
         let err = UserError::InvalidUsername("".to_string());
-        assert_eq!(err.to_string(), "Username inválido: ");
+        assert_eq!(err.to_string(), "Invalid username: ");
         
         let err = UserError::AuthenticationError("invalid credentials".to_string());
-        assert_eq!(err.to_string(), "Error en la autenticación: invalid credentials");
+        assert_eq!(err.to_string(), "Authentication error: invalid credentials");
     }
 
     #[test]

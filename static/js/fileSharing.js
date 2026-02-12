@@ -214,11 +214,11 @@ const fileSharing = {
     copyLinkToClipboard(url) {
         try {
             navigator.clipboard.writeText(url);
-            window.ui.showNotification('Enlace copiado', 'Enlace copiado al portapapeles');
+            window.ui.showNotification('Link copied', 'Link copied to clipboard');
             return true;
         } catch (error) {
             console.error('Error copying to clipboard:', error);
-            window.ui.showNotification('Error', 'No se pudo copiar el enlace');
+            window.ui.showNotification('Error', 'Could not copy link');
             return false;
         }
     },
@@ -229,7 +229,7 @@ const fileSharing = {
      * @returns {string} - Formatted date string
      */
     formatExpirationDate(dateString) {
-        if (!dateString) return 'Sin vencimiento';
+        if (!dateString) return 'No expiration';
         
         const date = new Date(dateString);
         return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
@@ -252,11 +252,11 @@ const fileSharing = {
             // Simulate network delay
             //await new Promise(resolve => setTimeout(resolve, 800));
             
-            window.ui.showNotification('Notificación enviada', `Se envió notificación a ${recipientEmail}`);
+            window.ui.showNotification('Notification sent', `Notification sent to ${recipientEmail}`);
             return true;
         } catch (error) {
             console.error('Error sending share notification:', error);
-            window.ui.showNotification('Error', 'No se pudo enviar la notificación');
+            window.ui.showNotification('Error', 'Could not send notification');
             return false;
         }
     },

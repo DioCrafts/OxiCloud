@@ -4,28 +4,28 @@ use crate::common::errors::DomainError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum UserRepositoryError {
-    #[error("Usuario no encontrado: {0}")]
+    #[error("User not found: {0}")]
     NotFound(String),
     
-    #[error("Usuario ya existe: {0}")]
+    #[error("User already exists: {0}")]
     AlreadyExists(String),
     
-    #[error("Error de base de datos: {0}")]
+    #[error("Database error: {0}")]
     DatabaseError(String),
     
-    #[error("Error de validación: {0}")]
+    #[error("Validation error: {0}")]
     ValidationError(String),
     
-    #[error("Error de tiempo de espera: {0}")]
+    #[error("Timeout error: {0}")]
     Timeout(String),
     
-    #[error("Operación no permitida: {0}")]
+    #[error("Operation not allowed: {0}")]
     OperationNotAllowed(String),
 }
 
 pub type UserRepositoryResult<T> = Result<T, UserRepositoryError>;
 
-// Conversión de UserRepositoryError a DomainError
+// Conversion from UserRepositoryError to DomainError
 impl From<UserRepositoryError> for DomainError {
     fn from(err: UserRepositoryError) -> Self {
         match err {
@@ -53,59 +53,59 @@ impl From<UserRepositoryError> for DomainError {
 
 #[async_trait]
 pub trait UserRepository: Send + Sync + 'static {
-    /// Crea un nuevo usuario
+    /// Creates a new user
     async fn create_user(&self, user: User) -> UserRepositoryResult<User>;
     
-    /// Obtiene un usuario por ID
+    /// Gets a user by ID
     async fn get_user_by_id(&self, id: &str) -> UserRepositoryResult<User>;
     
-    /// Obtiene un usuario por nombre de usuario
+    /// Gets a user by username
     async fn get_user_by_username(&self, username: &str) -> UserRepositoryResult<User>;
     
-    /// Obtiene un usuario por correo electrónico
+    /// Gets a user by email
     async fn get_user_by_email(&self, email: &str) -> UserRepositoryResult<User>;
     
-    /// Actualiza un usuario existente
+    /// Updates an existing user
     async fn update_user(&self, user: User) -> UserRepositoryResult<User>;
     
-    /// Actualiza solo el uso de almacenamiento de un usuario
+    /// Updates only a user's storage usage
     async fn update_storage_usage(&self, user_id: &str, usage_bytes: i64) -> UserRepositoryResult<()>;
     
-    /// Actualiza la fecha de último inicio de sesión
+    /// Updates the last login date
     async fn update_last_login(&self, user_id: &str) -> UserRepositoryResult<()>;
     
-    /// Lista usuarios con paginación
+    /// Lists users with pagination
     async fn list_users(&self, limit: i64, offset: i64) -> UserRepositoryResult<Vec<User>>;
     
-    /// Activa o desactiva un usuario
+    /// Activates or deactivates a user
     async fn set_user_active_status(&self, user_id: &str, active: bool) -> UserRepositoryResult<()>;
     
-    /// Cambia la contraseña de un usuario
+    /// Changes a user's password
     async fn change_password(&self, user_id: &str, password_hash: &str) -> UserRepositoryResult<()>;
     
-    /// Cambia el rol de un usuario
+    /// Changes a user's role
     async fn change_role(&self, user_id: &str, role: UserRole) -> UserRepositoryResult<()>;
     
-    /// Lista usuarios por rol (admin o user)
+    /// Lists users by role (admin or user)
     async fn list_users_by_role(&self, role: &str) -> UserRepositoryResult<Vec<User>>;
     
-    /// Elimina un usuario
+    /// Deletes a user
     async fn delete_user(&self, user_id: &str) -> UserRepositoryResult<()>;
 
     /// Finds a user by OIDC provider + subject pair
     async fn get_user_by_oidc_subject(&self, provider: &str, subject: &str) -> UserRepositoryResult<User>;
 
-    /// Actualiza la cuota de almacenamiento de un usuario
+    /// Updates a user's storage quota
     async fn update_storage_quota(&self, user_id: &str, quota_bytes: i64) -> UserRepositoryResult<()>;
 
-    /// Cuenta el número total de usuarios
+    /// Counts the total number of users
     async fn count_users(&self) -> UserRepositoryResult<i64>;
 
-    /// Obtiene estadísticas de almacenamiento agregadas
+    /// Gets aggregated storage statistics
     async fn get_storage_stats(&self) -> UserRepositoryResult<StorageStats>;
 }
 
-/// Estadísticas de almacenamiento agregadas
+/// Aggregated storage statistics
 #[derive(Debug, Clone)]
 pub struct StorageStats {
     pub total_users: i64,

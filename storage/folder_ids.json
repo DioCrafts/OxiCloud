@@ -1,11 +1,19 @@
 {
   "path_to_id": {
+    "/Mi Carpeta - testuser999": "7c1afffd-867f-4649-a0f6-4cc8a9979af4",
     "/Mi Carpeta - test": "edfc23e0-d9f9-4cc7-b1dc-6369568b19e6",
-    "/Mi Carpeta - testuser": "304384d6-9a7e-4b22-a659-287957e8b667"
+    "/Mi Carpeta - user1": "b775c641-a698-458b-a561-42ae93073c74",
+    "/Mi Carpeta - testadmin": "02aed53b-f194-4e28-8680-2cc81a3584b3",
+    "/Mi Carpeta - testuser": "304384d6-9a7e-4b22-a659-287957e8b667",
+    "/Mi Carpeta - admin": "562e90aa-a3fc-4672-a0fd-9187fef5d4f1"
   },
   "id_to_path": {
+    "562e90aa-a3fc-4672-a0fd-9187fef5d4f1": "/Mi Carpeta - admin",
+    "7c1afffd-867f-4649-a0f6-4cc8a9979af4": "/Mi Carpeta - testuser999",
+    "02aed53b-f194-4e28-8680-2cc81a3584b3": "/Mi Carpeta - testadmin",
     "304384d6-9a7e-4b22-a659-287957e8b667": "/Mi Carpeta - testuser",
+    "b775c641-a698-458b-a561-42ae93073c74": "/Mi Carpeta - user1",
     "edfc23e0-d9f9-4cc7-b1dc-6369568b19e6": "/Mi Carpeta - test"
   },
-  "version": 2
+  "version": 6
 }

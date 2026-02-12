@@ -29,7 +29,7 @@ fn extract_username_from_path(path: &str) -> Option<String> {
     Some(parts[1].trim().to_string())
 }
 
-/// Servicio para operaciones de subida de archivos
+/// Service for file upload operations
 ///
 /// Encapsulates the three-tier upload strategy:
 /// 1. **Write-Behind** (<256 KB): store in RAM, respond instantly, flush async.
@@ -78,7 +78,7 @@ impl FileUploadService {
         }
     }
 
-    /// Configura el servicio de uso de almacenamiento
+    /// Configures the storage usage service
     pub fn with_storage_usage_service(
         mut self,
         storage_usage_service: Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>,

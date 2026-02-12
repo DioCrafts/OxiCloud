@@ -17,39 +17,39 @@ use std::future::Future;
 use bytes::Bytes;
 use tracing::{debug, info};
 
-const MAX_CACHE_ENTRIES: usize = 1000;  // Máximo número de entradas en caché
-const DEFAULT_MAX_AGE: u64 = 60;        // Tiempo de vida por defecto en segundos
+const MAX_CACHE_ENTRIES: usize = 1000;  // Maximum number of cache entries
+const DEFAULT_MAX_AGE: u64 = 60;        // Default time-to-live in seconds
 
-// Definición de tipos para mayor claridad
+// Type definitions for clarity
 type CacheKey = String;
 type EntityTag = String;
 
-/// Un valor almacenado en caché
+/// A cached value
 #[derive(Clone)]
 struct CacheEntry {
-    /// El ETag calculado para este valor
+    /// The ETag calculated for this value
     etag: EntityTag,
-    /// Los datos serializados en bytes
+    /// The serialized data in bytes
     data: Option<Bytes>,
-    /// Las cabeceras originales
+    /// The original headers
     headers: HeaderMap,
-    /// Timestamp de cuando fue almacenado
+    /// Timestamp of when it was stored
     timestamp: SystemTime,
-    /// Tiempo de vida en segundos
+    /// Time-to-live in seconds
     max_age: u64,
 }
 
-/// Cache para respuestas HTTP con soporte para ETag
+/// Cache for HTTP responses with ETag support
 #[derive(Clone)]
 pub struct HttpCache {
-    /// Almacenamiento de entradas en caché
+    /// Cache entry storage
     cache: Arc<Mutex<HashMap<CacheKey, CacheEntry>>>,
-    /// Tiempo de vida por defecto para las entradas
+    /// Default time-to-live for entries
     default_max_age: u64,
 }
 
 impl HttpCache {
-    /// Crea una nueva instancia del caché
+    /// Creates a new cache instance
     pub fn new() -> Self {
         Self {
             cache: Arc::new(Mutex::new(HashMap::with_capacity(100))),
@@ -57,7 +57,7 @@ impl HttpCache {
         }
     }
     
-    /// Crea una nueva instancia con un tiempo de vida especificado
+    /// Creates a new instance with a specified time-to-live
     pub fn with_max_age(max_age: u64) -> Self {
         Self {
             cache: Arc::new(Mutex::new(HashMap::with_capacity(100))),
@@ -65,12 +65,12 @@ impl HttpCache {
         }
     }
     
-    /// Obtiene estadísticas del caché
+    /// Gets cache statistics
     pub fn stats(&self) -> (usize, usize) {
         let lock = self.cache.lock().unwrap();
         let total = lock.len();
         
-        // Contar entradas válidas
+        // Count valid entries
         let _now = SystemTime::now();
         let valid = lock.values().filter(|entry| {
             match entry.timestamp.elapsed() {
@@ -82,12 +82,12 @@ impl HttpCache {
         (total, valid)
     }
     
-    /// Limpia entradas expiradas
+    /// Cleans up expired entries
     pub fn cleanup(&self) -> usize {
         let mut lock = self.cache.lock().unwrap();
         let initial_count = lock.len();
         
-        // Eliminar entradas expiradas
+        // Remove expired entries
         let _now = SystemTime::now();
         lock.retain(|_, entry| {
             match entry.timestamp.elapsed() {
@@ -102,18 +102,18 @@ impl HttpCache {
         removed
     }
     
-    /// Establece una entrada en el caché
+    /// Sets an entry in the cache
     fn set(&self, key: &str, etag: EntityTag, data: Option<Bytes>, headers: HeaderMap, max_age: Option<u64>) {
         let mut lock = self.cache.lock().unwrap();
         
-        // Aplicar política de eviction si el caché está lleno
+        // Apply eviction policy if the cache is full
         if lock.len() >= MAX_CACHE_ENTRIES {
             debug!("Cache full, removing oldest entries");
-            // Eliminar el 10% de las entradas más antiguas
+            // Remove the oldest 10% of entries
             self.evict_oldest(&mut lock, MAX_CACHE_ENTRIES / 10);
         }
         
-        // Almacenar la nueva entrada
+        // Store the new entry
         lock.insert(key.to_string(), CacheEntry {
             etag,
             data,
@@ -123,30 +123,30 @@ impl HttpCache {
         });
     }
     
-    /// Elimina las entradas más antiguas del caché
+    /// Removes the oldest entries from the cache
     fn evict_oldest(&self, cache: &mut HashMap<CacheKey, CacheEntry>, count: usize) {
-        // Ordenar por timestamp
+        // Sort by timestamp
         let mut entries: Vec<(CacheKey, SystemTime)> = cache
             .iter()
             .map(|(key, entry)| (key.clone(), entry.timestamp))
             .collect();
         
-        // Ordenar por timestamp (más antiguo primero)
+        // Sort by timestamp (oldest first)
         entries.sort_by(|a, b| a.1.cmp(&b.1));
         
-        // Eliminar las entradas más antiguas
+        // Remove the oldest entries
         for (key, _) in entries.iter().take(count) {
             cache.remove(key);
         }
     }
     
-    /// Obtiene una entrada del caché
+    /// Gets an entry from the cache
     fn get(&self, key: &str) -> Option<CacheEntry> {
         let lock = self.cache.lock().unwrap();
         
-        // Buscar la entrada
+        // Look up the entry
         if let Some(entry) = lock.get(key) {
-            // Verificar si ha expirado
+            // Check if it has expired
             match entry.timestamp.elapsed() {
                 Ok(elapsed) if elapsed.as_secs() < entry.max_age => {
                     // Entry is still valid
@@ -162,9 +162,9 @@ impl HttpCache {
         None
     }
     
-    /// Genera un ETag simple para un bloque de bytes
+    /// Generates a simple ETag for a block of bytes
     fn calculate_etag_for_bytes(&self, bytes: &[u8]) -> EntityTag {
-        // Calcular hash
+        // Calculate hash
         let mut hasher = DefaultHasher::new();
         bytes.hash(&mut hasher);
         let hash = hasher.finish();
@@ -173,7 +173,7 @@ impl HttpCache {
     }
 }
 
-/// Middleware de caché HTTP
+/// HTTP cache middleware
 pub async fn cache_middleware<T>(
     cache: HttpCache,
     cache_key: &str,
@@ -184,65 +184,65 @@ pub async fn cache_middleware<T>(
 where 
     T: Serialize
 {
-    // Solo aplicar caché para solicitudes GET
+    // Only apply cache for GET requests
     if req.method() != Method::GET {
         return Ok(next.run(req).await);
     }
     
-    // Verificar si la respuesta está en caché
+    // Check if the response is cached
     let if_none_match = req.headers()
         .get("if-none-match")
         .and_then(|v| v.to_str().ok());
     
-    // Si hay una entrada en caché
+    // If there is a cache entry
     if let Some(cache_entry) = cache.get(cache_key) {
-        // Comprobar si el cliente ya tiene la versión actualizada
+        // Check if the client already has the updated version
         if let Some(client_etag) = if_none_match {
             if client_etag == cache_entry.etag {
-                // El cliente tiene la versión más reciente, enviar 304 Not Modified
+                // The client has the most recent version, send 304 Not Modified
                 debug!("Cache hit (304) for key: {}", cache_key);
                 return Ok(create_not_modified_response(&cache_entry));
             }
         }
         
-        // El cliente necesita la versión actualizada
+        // The client needs the updated version
         if let Some(data) = &cache_entry.data {
             debug!("Cache hit (200) for key: {}", cache_key);
             
-            // Crear respuesta con los datos en caché
+            // Create response with cached data
             let mut response = Response::new(Body::from(data.clone()));
             
-            // Copiar cabeceras originales
+            // Copy original headers
             for (key, value) in &cache_entry.headers {
                 if !key.as_str().eq_ignore_ascii_case("transfer-encoding") {
                     response.headers_mut().insert(key.clone(), value.clone());
                 }
             }
             
-            // Añadir cabeceras de caché
+            // Add cache headers
             set_cache_headers(&mut response, &cache_entry.etag, max_age.unwrap_or(cache_entry.max_age));
             
             return Ok(response);
         }
     }
     
-    // No está en caché o ha expirado, continuar con el middleware
+    // Not cached or expired, continue with the middleware
     debug!("Cache miss for key: {}", cache_key);
     let response = next.run(req).await;
     
-    // No cachear errores
+    // Don't cache errors
     if !response.status().is_success() {
         return Ok(response);
     }
     
-    // Convertir la respuesta para calcular el ETag
+    // Convert the response to calculate the ETag
     let (parts, _body) = response.into_parts();
     let bytes = axum::body::to_bytes(_body, 1024 * 1024 * 10).await.unwrap_or_default();
     
-    // Calcular ETag
+    // Calculate ETag
     let etag = cache.calculate_etag_for_bytes(&bytes);
     
-    // Guardar en caché
+    // Save to cache
     cache.set(
         cache_key, 
         etag.clone(), 
@@ -251,26 +251,26 @@ where
         max_age
     );
     
-    // Crear la respuesta con ETag
+    // Create the response with ETag
     let mut response = Response::from_parts(parts, Body::from(bytes));
     set_cache_headers(&mut response, &etag, max_age.unwrap_or(cache.default_max_age));
     
     Ok(response)
 }
 
-/// Crea una respuesta 304 Not Modified
+/// Creates a 304 Not Modified response
 fn create_not_modified_response(entry: &CacheEntry) -> Response<Body> {
     let mut response = Response::builder()
         .status(StatusCode::NOT_MODIFIED)
         .body(Body::empty())
         .unwrap();
     
-    // Copiar cabeceras de caché
+    // Copy cache headers
     if let Some(cache_control) = entry.headers.get("cache-control") {
         response.headers_mut().insert("cache-control", cache_control.clone());
     }
     
-    // Añadir ETag
+    // Add ETag
     response.headers_mut().insert(
         "etag", 
         HeaderValue::from_str(&entry.etag).unwrap_or(HeaderValue::from_static(""))
@@ -279,22 +279,22 @@ fn create_not_modified_response(entry: &CacheEntry) -> Response<Body> {
     response
 }
 
-/// Configura las cabeceras de caché para una respuesta
+/// Configures cache headers for a response
 fn set_cache_headers(response: &mut Response<Body>, etag: &str, max_age: u64) {
-    // Añadir ETag
+    // Add ETag
     response.headers_mut().insert(
         "etag", 
         HeaderValue::from_str(etag).unwrap_or(HeaderValue::from_static(""))
     );
     
-    // Configurar Cache-Control
+    // Configure Cache-Control
     let cache_control = format!("public, max-age={}", max_age);
     response.headers_mut().insert(
         "cache-control",
         HeaderValue::from_str(&cache_control).unwrap_or(HeaderValue::from_static(""))
     );
     
-    // Añadir cabecera Last-Modified
+    // Add Last-Modified header
     let now: DateTime<Utc> = Utc::now();
     let last_modified = now.format("%a, %d %b %Y %H:%M:%S GMT").to_string();
     response.headers_mut().insert(
@@ -303,7 +303,7 @@ fn set_cache_headers(response: &mut Response<Body>, etag: &str, max_age: u64) {
     );
 }
 
-/// Layer para aplicar middleware de caché
+/// Layer for applying cache middleware
 #[derive(Clone)]
 pub struct HttpCacheLayer {
     cache: HttpCache,
@@ -311,7 +311,7 @@ pub struct HttpCacheLayer {
 }
 
 impl HttpCacheLayer {
-    /// Crea una nueva capa de caché
+    /// Creates a new cache layer
     pub fn new(cache: HttpCache) -> Self {
         Self {
             cache,
@@ -319,7 +319,7 @@ impl HttpCacheLayer {
         }
     }
     
-    /// Establece el tiempo de vida máximo
+    /// Sets the maximum time-to-live
     pub fn with_max_age(mut self, max_age: u64) -> Self {
         self.max_age = Some(max_age);
         self
@@ -338,7 +338,7 @@ impl<S> Layer<S> for HttpCacheLayer {
     }
 }
 
-/// Servicio que implementa la lógica de caché
+/// Service that implements cache logic
 #[derive(Clone)]
 pub struct HttpCacheService<S> {
     inner: S,
@@ -365,10 +365,10 @@ where
     }
     
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        // Generar clave de caché
+        // Generate cache key
         let cache_key = req.uri().path().to_string();
         
-        // Solo aplicar caché para solicitudes GET
+        // Only apply cache for GET requests
         if req.method() != Method::GET {
             let future = self.inner.call(req);
             return Box::pin(async move {
@@ -377,42 +377,42 @@ where
             });
         }
         
-        // Obtener ETag del cliente
+        // Get client ETag
         let if_none_match = req.headers()
             .get("if-none-match")
             .and_then(|v| v.to_str().ok());
         
-        // Verificar si hay una entrada en caché
+        // Check if there is a cache entry
         let cache_clone = self.cache.clone();
         let max_age = self.max_age;
         let entry = cache_clone.get(&cache_key);
         
         match entry {
             Some(cache_entry) if if_none_match == Some(&cache_entry.etag) => {
-                // El cliente tiene la versión correcta, enviar 304
+                // The client has the correct version, send 304
                 debug!("Cache HIT (304): {}", cache_key);
                 let response = create_not_modified_response(&cache_entry);
                 return Box::pin(async move { Ok(response) });
             },
             Some(cache_entry) if cache_entry.data.is_some() => {
-                // El cliente necesita la versión actualizada
+                // The client needs the updated version
                 debug!("Cache HIT (200): {}", cache_key);
                 let mut response = Response::new(Body::from(cache_entry.data.clone().unwrap()));
                 
-                // Copiar cabeceras originales
+                // Copy original headers
                 for (key, value) in &cache_entry.headers {
                     if !key.as_str().eq_ignore_ascii_case("transfer-encoding") {
                         response.headers_mut().insert(key.clone(), value.clone());
                     }
                 }
                 
-                // Añadir cabeceras de caché
+                // Add cache headers
                 set_cache_headers(&mut response, &cache_entry.etag, max_age.unwrap_or(cache_entry.max_age));
                 
                 return Box::pin(async move { Ok(response) });
             },
             _ => {
-                // No está en caché o ha expirado
+                // Not cached or expired
                 debug!("Cache MISS: {}", cache_key);
                 let future = self.inner.call(req);
                 let cache_clone = self.cache.clone();
@@ -423,19 +423,19 @@ where
                     let response = future.await.map_err(|e| e.into())?;
                     let response = response_map_body(response).await;
                     
-                    // No cachear errores
+                    // Don't cache errors
                     if !response.status().is_success() {
                         return Ok(response);
                     }
                     
-                    // Obtener el cuerpo y calcular ETag
+                    // Get the body and calculate ETag
                     let (parts, body) = response.into_parts();
                     let bytes = axum::body::to_bytes(body, 1024 * 1024 * 10).await?;
                     
-                    // Calcular ETag
+                    // Calculate ETag
                     let etag = cache_clone.calculate_etag_for_bytes(&bytes);
                     
-                    // Guardar en caché
+                    // Save to cache
                     cache_clone.set(
                         &cache_key, 
                         etag.clone(), 
@@ -444,7 +444,7 @@ where
                         max_age
                     );
                     
-                    // Crear la respuesta con ETag
+                    // Create the response with ETag
                     let mut response = Response::from_parts(parts, Body::from(bytes));
                     set_cache_headers(&mut response, &etag, max_age.unwrap_or(cache_clone.default_max_age));
                     
@@ -455,9 +455,9 @@ where
     }
 }
 
-// Función auxiliar para convertir cualquier cuerpo en Body preservando su contenido.
-// Anteriormente esta función descartaba el body con Body::empty(), causando
-// pérdida de datos en respuestas no cacheadas.
+// Helper function to convert any body into Body preserving its content.
+// Previously this function discarded the body with Body::empty(), causing
+// data loss in non-cached responses.
 async fn response_map_body<B>(response: Response<B>) -> Response<Body>
 where
     B: http_body::Body + Send + 'static,
@@ -478,10 +478,10 @@ where
     Response::from_parts(parts, Body::from(collected))
 }
 
-/// Inicia una tarea de limpieza periódica para el caché
+/// Starts a periodic cleanup task for the cache
 pub fn start_cache_cleanup_task(cache: HttpCache) {
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(300)); // Cada 5 minutos
+        let mut interval = tokio::time::interval(Duration::from_secs(300)); // Every 5 minutes
         
         loop {
             interval.tick().await;
@@ -516,10 +516,10 @@ mod tests {
         let etag2 = cache.calculate_etag_for_bytes(&data2);
         let etag3 = cache.calculate_etag_for_bytes(&data3);
         
-        // Mismos datos deben generar mismo ETag
+        // Same data should generate the same ETag
         assert_eq!(etag1, etag2);
         
-        // Datos diferentes deben generar ETags diferentes
+        // Different data should generate different ETags
         assert_ne!(etag1, etag3);
     }
     
@@ -527,19 +527,19 @@ mod tests {
     async fn test_cache_hit_miss() {
         let cache = HttpCache::new();
         
-        // Crear datos de prueba directamente como Bytes
+        // Create test data directly as Bytes
         let bytes1 = Bytes::from(r#"{"id":1,"name":"Test"}"#);
         let headers1 = HeaderMap::new();
         
         let etag1 = cache.calculate_etag_for_bytes(&bytes1);
         cache.set("test", etag1.clone(), Some(bytes1.clone()), headers1, None);
         
-        // Verificar cache hit
+        // Verify cache hit
         let entry = cache.get("test").unwrap();
         assert_eq!(entry.etag, etag1);
         assert_eq!(entry.data.unwrap(), bytes1);
         
-        // Verificar cache miss
+        // Verify cache miss
         assert!(cache.get("nonexistent").is_none());
     }
 }

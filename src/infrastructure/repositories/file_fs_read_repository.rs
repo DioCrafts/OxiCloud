@@ -21,9 +21,9 @@ use crate::infrastructure::services::path_service::PathService;
 use crate::domain::services::path_service::StoragePath;
 use crate::common::config::AppConfig;
 
-/// Implementación de repositorio para operaciones de **lectura** de archivos.
+/// Repository implementation for file **read** operations.
 ///
-/// Implementa `FileReadPort`:
+/// Implements `FileReadPort`:
 /// get_file, list_files, get_file_content, get_file_stream,
 /// get_file_range_stream, get_file_mmap, get_file_path, get_parent_folder_id.
 pub struct FileFsReadRepository {
@@ -37,7 +37,7 @@ pub struct FileFsReadRepository {
 }
 
 impl FileFsReadRepository {
-    /// Constructor completo con todas las dependencias de infraestructura.
+    /// Full constructor with all infrastructure dependencies.
     pub fn new(
         root_path: PathBuf,
         storage_mediator: Arc<dyn StorageMediator>,
@@ -58,7 +58,7 @@ impl FileFsReadRepository {
         }
     }
 
-    /// Stub para pruebas (no realiza I/O real).
+    /// Stub for testing (does not perform real I/O).
     pub fn default_stub() -> Self {
         Self {
             root_path: PathBuf::from("./storage"),
@@ -75,7 +75,7 @@ impl FileFsReadRepository {
         }
     }
 
-    // ─── helpers internos ────────────────────────────────────
+    // ─── internal helpers ─────────────────────────────────────
 
     fn resolve_storage_path(&self, storage_path: &StoragePath) -> PathBuf {
         self.path_service.resolve_path(storage_path)

@@ -6,14 +6,14 @@ use crate::application::services::file_retrieval_service::FileRetrievalService;
 use crate::application::services::file_management_service::FileManagementService;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 
-/// Factory para crear implementaciones de casos de uso de archivos
+/// Factory for creating file use case implementations
 pub struct AppFileUseCaseFactory {
     file_read_repository: Arc<dyn FileReadPort>,
     file_write_repository: Arc<dyn FileWritePort>,
 }
 
 impl AppFileUseCaseFactory {
-    /// Crea una nueva factory para casos de uso de archivos
+    /// Creates a new factory for file use cases
     pub fn new(
         file_read_repository: Arc<dyn FileReadPort>,
         file_write_repository: Arc<dyn FileWritePort>

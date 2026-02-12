@@ -1,9 +1,9 @@
-//! PathService - Servicio de infraestructura para manejo de rutas de almacenamiento
+//! PathService - Infrastructure service for storage path management
 //! 
-//! Este servicio fue movido desde domain/services porque implementa traits de application
-//! (StoragePort, StorageMediator) y tiene dependencias de sistema de archivos (tokio::fs).
+//! This service was moved from domain/services because it implements application traits
+//! (StoragePort, StorageMediator) and has file system dependencies (tokio::fs).
 //! 
-//! StoragePath (Value Object) permanece en domain/services/path_service.rs
+//! StoragePath (Value Object) remains in domain/services/path_service.rs
 
 use std::path::{Path, PathBuf};
 use async_trait::async_trait;
@@ -15,18 +15,18 @@ use crate::application::services::storage_mediator::{StorageMediator, StorageMed
 use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
 
-/// Servicio de infraestructura para manejar operaciones con rutas de almacenamiento
+/// Infrastructure service for handling storage path operations
 pub struct PathService {
     root_path: PathBuf,
 }
 
 impl PathService {
-    /// Crea un nuevo servicio de rutas con una raíz específica
+    /// Creates a new path service with a specific root
     pub fn new(root_path: PathBuf) -> Self {
         Self { root_path }
     }
     
-    /// Convierte una ruta del dominio a una ruta física absoluta
+    /// Converts a domain path to an absolute physical path
     pub fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf {
         let mut path = self.root_path.clone();
         for segment in storage_path.segments() {
@@ -35,7 +35,7 @@ impl PathService {
         path
     }
     
-    /// Convierte una ruta física a una ruta de dominio
+    /// Converts a physical path to a domain path
     pub fn to_storage_path(&self, physical_path: &Path) -> Option<StoragePath> {
         physical_path.strip_prefix(&self.root_path).ok().map(|rel_path| {
             let segments: Vec<String> = rel_path
@@ -49,12 +49,12 @@ impl PathService {
         })
     }
     
-    /// Crea una ruta de archivo dentro de una carpeta
+    /// Creates a file path within a folder
     pub fn create_file_path(&self, folder_path: &StoragePath, file_name: &str) -> StoragePath {
         folder_path.join(file_name)
     }
     
-    /// Verifica si una ruta es directamente hija de otra
+    /// Checks if a path is a direct child of another
     pub fn is_direct_child(&self, parent_path: &StoragePath, potential_child: &StoragePath) -> bool {
         if let Some(child_parent) = potential_child.parent() {
             &child_parent == parent_path
@@ -63,7 +63,7 @@ impl PathService {
         }
     }
     
-    /// Verifica si una ruta está en la raíz
+    /// Checks if a path is at the root
     pub fn is_in_root(&self, path: &StoragePath) -> bool {
         path.parent().map_or(true, |p| p.is_empty())
     }
@@ -73,9 +73,9 @@ impl PathService {
         &self.root_path
     }
     
-    /// Valida una ruta para asegurar que no contiene componentes peligrosos
+    /// Validates a path to ensure it doesn't contain dangerous components
     pub fn validate_path(&self, path: &StoragePath) -> Result<(), DomainError> {
-        // Verificar que no haya segmentos vacíos
+        // Check for empty segments
         if path.segments().iter().any(|s| s.is_empty()) {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
@@ -84,7 +84,7 @@ impl PathService {
             ));
         }
         
-        // Verificar que no haya caracteres peligrosos
+        // Check for dangerous characters
         let dangerous_chars = ['\\', ':', '*', '?', '"', '<', '>', '|'];
         for segment in path.segments() {
             if segment.contains(&dangerous_chars[..]) {
@@ -95,7 +95,7 @@ impl PathService {
                 ));
             }
             
-            // Verificar que no empiece con . (oculto en Unix)
+            // Check that it doesn't start with . (hidden in Unix)
             if segment.starts_with('.') && segment != ".well-known" {
                 return Err(DomainError::new(
                     ErrorKind::InvalidInput,
@@ -120,13 +120,13 @@ impl StoragePort for PathService {
     }
     
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError> {
-        // Primero validar la ruta
+        // First validate the path
         self.validate_path(storage_path)?;
         
-        // Resolver a ruta física
+        // Resolve to physical path
         let physical_path = self.resolve_path(storage_path);
         
-        // Crear directorios si no existen
+        // Create directories if they don't exist
         if !physical_path.exists() {
             fs::create_dir_all(&physical_path).await
                 .map_err(|e| DomainError::new(

@@ -8,7 +8,7 @@ use crate::application::dtos::recent_dto::RecentItemDto;
 use crate::application::ports::recent_ports::RecentItemsRepositoryPort;
 use crate::common::errors::{Result, DomainError, ErrorKind};
 
-/// Implementación PostgreSQL del puerto de persistencia de elementos recientes.
+/// PostgreSQL implementation of the recent items persistence port.
 pub struct RecentItemsPgRepository {
     db_pool: Arc<PgPool>,
 }

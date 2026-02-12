@@ -12,7 +12,7 @@ use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
 use crate::domain::repositories::trash_repository::TrashRepository;
 use crate::application::ports::outbound::IdMappingPort;
 
-/// Estructura para almacenar elementos en la papelera en formato JSON
+/// Structure for storing trash items in JSON format
 #[derive(Debug, Serialize, Deserialize)]
 struct TrashedItemEntry {
     id: String,
@@ -25,7 +25,7 @@ struct TrashedItemEntry {
     deletion_date: String,
 }
 
-/// Implementación del repositorio de papelera usando el sistema de archivos
+/// Trash repository implementation using the file system
 pub struct TrashFsRepository {
     trash_dir: PathBuf,
     trash_index_path: PathBuf,
@@ -45,7 +45,7 @@ impl TrashFsRepository {
         }
     }
     
-    /// Asegura que existe el directorio de papelera
+    /// Ensures the trash directory exists
     async fn ensure_trash_dir(&self) -> Result<()> {
         debug!("Checking if trash directory exists: {}", self.trash_dir.display());
         if !self.trash_dir.exists() {
@@ -105,7 +105,7 @@ impl TrashFsRepository {
         Ok(())
     }
     
-    /// Obtiene todas las entradas del índice de papelera
+    /// Gets all entries from the trash index
     async fn get_trash_entries(&self) -> Result<Vec<TrashedItemEntry>> {
         self.ensure_trash_dir().await?;
         
@@ -134,7 +134,7 @@ impl TrashFsRepository {
         Ok(entries)
     }
     
-    /// Guarda todas las entradas en el índice de papelera
+    /// Saves all entries to the trash index
     async fn save_trash_entries(&self, entries: Vec<TrashedItemEntry>) -> Result<()> {
         self.ensure_trash_dir().await?;
         
@@ -155,7 +155,7 @@ impl TrashFsRepository {
         Ok(())
     }
     
-    /// Convierte una entrada JSON a entidad TrashedItem
+    /// Converts a JSON entry to a TrashedItem entity
     fn entry_to_trashed_item(&self, entry: TrashedItemEntry) -> Result<TrashedItem> {
         let item_type = match entry.item_type.as_str() {
             "file" => TrashedItemType::File,
@@ -206,7 +206,7 @@ impl TrashFsRepository {
         ))
     }
     
-    /// Convierte una entidad TrashedItem a entrada JSON
+    /// Converts a TrashedItem entity to a JSON entry
     fn trashed_item_to_entry(&self, item: &TrashedItem) -> TrashedItemEntry {
         TrashedItemEntry {
             id: item.id().to_string(),
@@ -228,9 +228,9 @@ impl TrashFsRepository {
 impl TrashRepository for TrashFsRepository {
     #[instrument(skip(self))]
     async fn add_to_trash(&self, item: &TrashedItem) -> Result<()> {
-        debug!("Añadiendo elemento a la papelera: id={}, user={}", item.id(), item.user_id());
+        debug!("Adding item to trash: id={}, user={}", item.id(), item.user_id());
         
-        // Aseguramos que existe el directorio de la papelera para este usuario
+        // Ensure the trash directory exists for this user
         let user_trash_dir = self.trash_dir.join("files").join(item.user_id().to_string());
         debug!("User trash directory path: {}", user_trash_dir.display());
         
@@ -268,7 +268,7 @@ impl TrashRepository for TrashFsRepository {
 
     #[instrument(skip(self))]
     async fn get_trash_items(&self, user_id: &Uuid) -> Result<Vec<TrashedItem>> {
-        debug!("Obteniendo elementos en papelera para usuario: {}", user_id);
+        debug!("Getting trash items for user: {}", user_id);
         
         let entries = self.get_trash_entries().await?;
         
@@ -290,7 +290,7 @@ impl TrashRepository for TrashFsRepository {
 
     #[instrument(skip(self))]
     async fn get_trash_item(&self, id: &Uuid, user_id: &Uuid) -> Result<Option<TrashedItem>> {
-        debug!("Buscando elemento en papelera: id={}, user={}", id, user_id);
+        debug!("Looking for item in trash: id={}, user={}", id, user_id);
         
         let entries = self.get_trash_entries().await?;
         
@@ -311,7 +311,7 @@ impl TrashRepository for TrashFsRepository {
 
     #[instrument(skip(self))]
     async fn restore_from_trash(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
-        debug!("Restaurando elemento de la papelera: id={}, user={}", id, user_id);
+        debug!("Restoring item from trash: id={}, user={}", id, user_id);
         
         let mut entries = self.get_trash_entries().await?;
         
@@ -333,16 +333,16 @@ impl TrashRepository for TrashFsRepository {
 
     #[instrument(skip(self))]
     async fn delete_permanently(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
-        debug!("Eliminando permanentemente elemento de la papelera: id={}, user={}", id, user_id);
+        debug!("Permanently deleting item from trash: id={}, user={}", id, user_id);
         
-        // Simplemente eliminamos la entrada del índice
-        // Los archivos físicos se eliminarán a través del repositorio correspondiente
+        // Simply remove the entry from the index
+        // Physical files will be deleted through the corresponding repository
         self.restore_from_trash(id, user_id).await
     }
 
     #[instrument(skip(self))]
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()> {
-        debug!("Limpiando papelera para usuario: {}", user_id);
+        debug!("Clearing trash for user: {}", user_id);
         
         let mut entries = self.get_trash_entries().await?;
         let user_id_str = user_id.to_string();
@@ -355,7 +355,7 @@ impl TrashRepository for TrashFsRepository {
 
     #[instrument(skip(self))]
     async fn get_expired_items(&self) -> Result<Vec<TrashedItem>> {
-        debug!("Buscando elementos de papelera expirados");
+        debug!("Looking for expired trash items");
         
         let entries = self.get_trash_entries().await?;
         let now = Utc::now();

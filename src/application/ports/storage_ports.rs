@@ -17,28 +17,28 @@ pub use crate::domain::repositories::folder_repository::FolderRepository;
 // FileReadPort — application-layer alias for FileReadRepository
 // ─────────────────────────────────────────────────────
 
-/// Puerto secundario para **lectura** de archivos.
+/// Secondary port for file **reading**.
 ///
-/// Encapsula toda operación que consulta estado sin modificarlo:
-/// get, list, content, stream, mmap, range, resolución de rutas.
+/// Encapsulates every operation that queries state without modifying it:
+/// get, list, content, stream, mmap, range, path resolution.
 #[async_trait]
 pub trait FileReadPort: Send + Sync + 'static {
-    /// Obtiene un archivo por su ID.
+    /// Gets a file by its ID.
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
 
-    /// Lista archivos en una carpeta.
+    /// Lists files in a folder.
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
 
-    /// Obtiene contenido completo como bytes (solo archivos pequeños/medianos).
+    /// Gets the full content as bytes (small/medium files only).
     async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
 
-    /// Obtiene contenido como stream (ideal para archivos grandes).
+    /// Gets content as a stream (ideal for large files).
     async fn get_file_stream(
         &self,
         id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
-    /// Stream de un rango de bytes (HTTP Range Requests, video seek).
+    /// Stream of a byte range (HTTP Range Requests, video seek).
     async fn get_file_range_stream(
         &self,
         id: &str,
@@ -46,13 +46,13 @@ pub trait FileReadPort: Send + Sync + 'static {
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
-    /// Memory-map de archivo para acceso zero-copy (10–100 MB).
+    /// Memory-map of a file for zero-copy access (10–100 MB).
     async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError>;
 
-    /// Obtiene la ruta de almacenamiento lógica de un archivo.
+    /// Gets the logical storage path of a file.
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;
 
-    /// Obtiene el ID de la carpeta padre a partir de una ruta (WebDAV).
+    /// Gets the parent folder ID from a path (WebDAV).
     async fn get_parent_folder_id(&self, path: &str) -> Result<String, DomainError>;
 }
 
@@ -60,13 +60,13 @@ pub trait FileReadPort: Send + Sync + 'static {
 // FileWritePort — all write / mutate operations
 // ─────────────────────────────────────────────────────
 
-/// Puerto secundario para **escritura** de archivos.
+/// Secondary port for file **writing**.
 ///
-/// Cubre: upload (buffered + streaming), move, delete, update,
-/// y el registro diferido para write-behind cache.
+/// Covers: upload (buffered + streaming), move, delete, update,
+/// and deferred registration for the write-behind cache.
 #[async_trait]
 pub trait FileWritePort: Send + Sync + 'static {
-    /// Guarda un nuevo archivo desde bytes.
+    /// Saves a new file from bytes.
     async fn save_file(
         &self,
         name: String,
@@ -75,7 +75,7 @@ pub trait FileWritePort: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<File, DomainError>;
 
-    /// Upload en streaming — escribe chunks a disco sin acumular en RAM.
+    /// Streaming upload — writes chunks to disk without accumulating in RAM.
     async fn save_file_from_stream(
         &self,
         name: String,
@@ -84,30 +84,30 @@ pub trait FileWritePort: Send + Sync + 'static {
         stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
     ) -> Result<File, DomainError>;
 
-    /// Mueve un archivo a otra carpeta.
+    /// Moves a file to another folder.
     async fn move_file(
         &self,
         file_id: &str,
         target_folder_id: Option<String>,
     ) -> Result<File, DomainError>;
 
-    /// Renombra un archivo (same folder, different name).
+    /// Renames a file (same folder, different name).
     async fn rename_file(
         &self,
         file_id: &str,
         new_name: &str,
     ) -> Result<File, DomainError>;
 
-    /// Elimina un archivo.
+    /// Deletes a file.
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
-    /// Actualiza el contenido de un archivo existente.
+    /// Updates the content of an existing file.
     async fn update_file_content(&self, file_id: &str, content: Vec<u8>) -> Result<(), DomainError>;
 
-    /// Registra metadatos de archivo SIN escribir contenido a disco (write-behind).
+    /// Registers file metadata WITHOUT writing content to disk (write-behind).
     ///
-    /// Devuelve `(File, PathBuf)` donde `PathBuf` es la ruta destino para la
-    /// escritura diferida que realizará el `WriteBehindCache`.
+    /// Returns `(File, PathBuf)` where `PathBuf` is the destination path for the
+    /// deferred write that the `WriteBehindCache` will perform.
     async fn register_file_deferred(
         &self,
         name: String,
@@ -118,13 +118,13 @@ pub trait FileWritePort: Send + Sync + 'static {
 
     // ── Trash operations ──
 
-    /// Mueve un archivo a la papelera
+    /// Moves a file to the trash
     async fn move_to_trash(&self, file_id: &str) -> Result<(), DomainError>;
 
-    /// Restaura un archivo desde la papelera a su ubicación original
+    /// Restores a file from the trash to its original location
     async fn restore_from_trash(&self, file_id: &str, original_path: &str) -> Result<(), DomainError>;
 
-    /// Elimina un archivo permanentemente (usado por la papelera)
+    /// Permanently deletes a file (used by the trash)
     async fn delete_file_permanently(&self, file_id: &str) -> Result<(), DomainError>;
 }
 
@@ -132,40 +132,40 @@ pub trait FileWritePort: Send + Sync + 'static {
 // Auxiliary ports (unchanged)
 // ─────────────────────────────────────────────────────
 
-/// Puerto secundario para resolución de rutas de archivos
+/// Secondary port for file path resolution
 #[async_trait]
 pub trait FilePathResolutionPort: Send + Sync + 'static {
-    /// Obtiene la ruta de almacenamiento de un archivo
+    /// Gets the storage path of a file
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;
 
-    /// Resuelve una ruta de dominio a una ruta física
+    /// Resolves a domain path to a physical path
     fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf;
 }
 
-/// Puerto secundario para verificación de existencia de archivos/directorios
+/// Secondary port for file/directory existence verification
 #[async_trait]
 pub trait StorageVerificationPort: Send + Sync + 'static {
-    /// Verifica si existe un archivo en la ruta dada
+    /// Checks whether a file exists at the given path
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
 
-    /// Verifica si existe un directorio en la ruta dada
+    /// Checks whether a directory exists at the given path
     async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
 }
 
-/// Puerto secundario para gestión de directorios
+/// Secondary port for directory management
 #[async_trait]
 pub trait DirectoryManagementPort: Send + Sync + 'static {
-    /// Crea directorios si no existen
+    /// Creates directories if they do not exist
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError>;
 }
 
-/// Puerto secundario para gestión de uso de almacenamiento
+/// Secondary port for storage usage management
 #[async_trait]
 pub trait StorageUsagePort: Send + Sync + 'static {
-    /// Actualiza estadísticas de uso de almacenamiento para un usuario
+    /// Updates storage usage statistics for a user
     async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError>;
 
-    /// Actualiza estadísticas de uso de almacenamiento para todos los usuarios
+    /// Updates storage usage statistics for all users
     async fn update_all_users_storage_usage(&self) -> Result<(), DomainError>;
 }
 

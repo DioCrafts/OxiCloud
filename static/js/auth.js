@@ -34,7 +34,7 @@ const LANGUAGE_TEXTS = {
         subtitle: 'Por favor, selecciona tu idioma',
         continue: 'Continuar',
         autodetected: 'Hemos detectado tu idioma',
-        moreLanguages: 'Más idiomas...',
+        moreLanguages: 'More languages...',
         modalTitle: 'Seleccionar idioma',
         searchPlaceholder: 'Buscar idioma...'
     },
@@ -494,8 +494,8 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error showing initial panel:', err);
     });
     
-    // Siempre limpiar los contadores al cargar la página de login
-    // para asegurar que no quedamos atrapados en un bucle
+    // Always clear counters when loading the login page
+    // to ensure we don't get trapped in a loop
     console.log('Login page loaded, clearing all counters');
     sessionStorage.removeItem('redirect_count');
     localStorage.removeItem('refresh_attempts');
@@ -589,14 +589,14 @@ if (isLoginPage && loginForm) {
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
         
-        // Extraer fecha de expiración desde el token JWT
+        // Extract expiration date from the JWT token
         let parsedExpiry = false;
         const tokenParts = token.split('.');
         if (tokenParts.length === 3) {
             try {
                 const payload = JSON.parse(atob(tokenParts[1]));
                 if (payload.exp) {
-                    // payload.exp está en segundos desde epoch
+                    // payload.exp is in seconds since epoch
                     const expiryDate = new Date(payload.exp * 1000);
                     
                     // Verify the date is valid
@@ -642,7 +642,7 @@ if (isLoginPage && loginForm) {
         // Redirect to main app
         redirectToMainApp();
     } catch (error) {
-        loginError.textContent = error.message || 'Error al iniciar sesión';
+        loginError.textContent = error.message || 'Error logging in';
         loginError.style.display = 'block';
     }
 });
@@ -664,7 +664,7 @@ if (isLoginPage && registerForm) {
     
     // Validate passwords match
     if (password !== confirmPassword) {
-        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Las contraseñas no coinciden';
+        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
         registerError.textContent = errorMsg;
         registerError.style.display = 'block';
         return;
@@ -674,7 +674,7 @@ if (isLoginPage && registerForm) {
         const data = await register(username, email, password);
         
         // Show success message
-        const successMsg = window.i18n ? window.i18n.t('auth.account_success') : '¡Cuenta creada con éxito! Puedes iniciar sesión ahora.';
+        const successMsg = window.i18n ? window.i18n.t('auth.account_success') : 'Account created successfully! You can now log in.';
         registerSuccess.textContent = successMsg;
         registerSuccess.style.display = 'block';
         
@@ -687,7 +687,7 @@ if (isLoginPage && registerForm) {
             registerPanel.style.display = 'none';
         }, 2000);
     } catch (error) {
-        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error al registrar cuenta';
+        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error registering account';
         registerError.textContent = error.message || errorMsg;
         registerError.style.display = 'block';
     }
@@ -710,7 +710,7 @@ if (isLoginPage && adminSetupForm) {
     
     // Validate passwords match
     if (password !== confirmPassword) {
-        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Las contraseñas no coinciden';
+        const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
         adminSetupError.textContent = errorMsg;
         adminSetupError.style.display = 'block';
         return;
@@ -721,7 +721,7 @@ if (isLoginPage && adminSetupForm) {
         const data = await register('admin', email, password, 'admin');
         
         // Show success message in the GUI instead of alert
-        const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : '¡Cuenta de administrador creada con éxito! Ahora puedes iniciar sesión.';
+        const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
         
         if (adminSetupSuccess) {
             adminSetupSuccess.textContent = successMsg;
@@ -736,7 +736,7 @@ if (isLoginPage && adminSetupForm) {
         }, 2000);
         
     } catch (error) {
-        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error al crear cuenta de administrador';
+        const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error creating admin account';
         adminSetupError.textContent = error.message || errorMsg;
         adminSetupError.style.display = 'block';
     }
@@ -792,10 +792,10 @@ async function login(username, password) {
         if (!response.ok) {
             try {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Falló la autenticación');
+                throw new Error(errorData.error || 'Authentication failed');
             } catch (jsonError) {
                 // If the error response is not valid JSON
-                throw new Error(`Error de autenticación (${response.status}): ${response.statusText}`);
+                throw new Error(`Authentication error (${response.status}): ${response.statusText}`);
             }
         }
         
@@ -806,7 +806,7 @@ async function login(username, password) {
             return data;
         } catch (jsonError) {
             console.error('Error parsing login response:', jsonError);
-            throw new Error('Error al procesar la respuesta del servidor');
+            throw new Error('Error processing server response');
         }
     } catch (error) {
         console.error('Login error:', error);
@@ -848,10 +848,10 @@ async function register(username, email, password, role = 'user') {
         if (!response.ok) {
             try {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Error en el registro');
+                throw new Error(errorData.error || 'Registration error');
             } catch (jsonError) {
                 // If the error response is not valid JSON
-                throw new Error(`Error de registro (${response.status}): ${response.statusText}`);
+                throw new Error(`Registration error (${response.status}): ${response.statusText}`);
             }
         }
         
@@ -862,7 +862,7 @@ async function register(username, email, password, role = 'user') {
             return data;
         } catch (jsonError) {
             console.error('Error parsing registration response:', jsonError);
-            throw new Error('Error al procesar la respuesta del servidor');
+            throw new Error('Error processing server response');
         }
     } catch (error) {
         console.error('Registration error:', error);
@@ -883,7 +883,7 @@ async function fetchUserData(token) {
         });
         
         if (!response.ok) {
-            throw new Error('Error al obtener datos del usuario');
+            throw new Error('Error fetching user data');
         }
         
         return await response.json();
@@ -1092,7 +1092,7 @@ function redirectToMainApp() {
             window.location.href = '/login.html?error=redirect_fatal';
         } catch (e) {
             // Nothing more we can do
-            alert('Error crítico en la redirección. Por favor, recarga la página e intenta nuevamente.');
+            alert('Critical redirect error. Please reload the page and try again.');
         }
     }
     

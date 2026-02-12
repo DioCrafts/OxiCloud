@@ -15,7 +15,7 @@ use crate::application::dtos::user_dto::{
 use crate::interfaces::errors::AppError;
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
-    // Rutas que NO requieren autenticación
+    // Routes that do NOT require authentication
     let public_routes = Router::new()
         .route("/register", post(register))
         .route("/login", post(login))
@@ -27,14 +27,14 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
         .route("/oidc/callback", get(oidc_callback))
         .route("/oidc/exchange", post(oidc_exchange));
     
-    // Rutas que SÍ requieren autenticación - usamos route_layer para aplicar middleware
-    // El middleware usará el state que se pase con .with_state() desde main.rs
+    // Routes that DO require authentication - we use route_layer to apply middleware
+    // The middleware will use the state passed with .with_state() from main.rs
     let protected_routes = Router::new()
         .route("/me", get(get_current_user))
         .route("/change-password", put(change_password))
         .route("/logout", post(logout));
     
-    // Combinar rutas públicas y protegidas
+    // Combine public and protected routes
     public_routes.merge(protected_routes)
 }
 
@@ -53,7 +53,7 @@ async fn register(
         },
         None => {
             tracing::error!("Auth service not configured");
-            return Err(AppError::internal_error("Servicio de autenticación no configurado"));
+            return Err(AppError::internal_error("Authentication service not configured"));
         }
     };
 
@@ -153,7 +153,7 @@ async fn login(
         },
         None => {
             tracing::error!("Auth service not configured");
-            return Err(AppError::internal_error("Servicio de autenticación no configurado"));
+            return Err(AppError::internal_error("Authentication service not configured"));
         }
     };
 
@@ -174,7 +174,7 @@ async fn login(
             // Ensure the response has the expected fields
             if auth_response.access_token.is_empty() || auth_response.refresh_token.is_empty() {
                 tracing::error!("Login response contains empty tokens for user: {}", dto.username);
-                return Err(AppError::internal_error("Error generando tokens de autenticación"));
+                return Err(AppError::internal_error("Error generating authentication tokens"));
             }
             
             Ok((StatusCode::OK, Json(auth_response)))
@@ -198,7 +198,7 @@ async fn refresh_token(
     
     // Normal process for real tokens
     let auth_service = state.auth_service.as_ref()
-        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
     
     let auth_response = auth_service.auth_application_service.refresh_token(dto).await?;
     
@@ -214,37 +214,37 @@ async fn get_current_user(
 ) -> Result<impl IntoResponse, AppError> {
     // Normal process for all users
     let auth_service = state.auth_service.as_ref()
-        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
     
-    // Extraer y validar el token directamente
+    // Extract and validate the token directly
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
     
-    // Validar el token y obtener claims
+    // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
     
     let user_id = claims.sub;
     
-    // Primero, actualizar las estadísticas de uso de almacenamiento
-    // IMPORTANTE: Esperamos el cálculo para devolver datos actualizados
+    // First, update the storage usage statistics
+    // IMPORTANT: We await the calculation to return updated data
     if let Some(storage_usage_service) = state.storage_usage_service.as_ref() {
-        // Calcular storage de forma síncrona (esperamos el resultado)
+        // Calculate storage synchronously (we await the result)
         match storage_usage_service.update_user_storage_usage(&user_id).await {
             Ok(usage) => {
                 tracing::info!("Updated storage usage for user {}: {} bytes", user_id, usage);
             },
             Err(e) => {
-                // Solo log de warning, no fallar la petición completa
+                // Only log a warning, don't fail the entire request
                 tracing::warn!("Failed to update storage usage for user {}: {}", user_id, e);
             }
         }
     }
     
-    // Ahora obtener los datos del usuario CON el almacenamiento actualizado
+    // Now get the user data WITH the updated storage
     let user = auth_service.auth_application_service.get_user_by_id(&user_id).await?;
     
     Ok((StatusCode::OK, Json(user)))
@@ -256,18 +256,18 @@ async fn change_password(
     Json(dto): Json<ChangePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state.auth_service.as_ref()
-        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
     
-    // Extraer y validar el token directamente
+    // Extract and validate the token directly
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
     
-    // Validar el token y obtener claims
+    // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
     
     auth_service.auth_application_service.change_password(&claims.sub, dto).await?;
     
@@ -279,18 +279,18 @@ async fn logout(
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state.auth_service.as_ref()
-        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
     
-    // Extraer y validar el token directamente
+    // Extract and validate the token directly
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Token de autorización no encontrado"))?;
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
     
-    // Validar el token y obtener claims
+    // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Token inválido: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
     
     // Use access token for logout (we don't have refresh token in headers)
     auth_service.auth_application_service.logout(&claims.sub, token).await?;
@@ -314,7 +314,7 @@ async fn get_system_status(
     State(state): State<Arc<AppState>>,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state.auth_service.as_ref()
-        .ok_or_else(|| AppError::internal_error("Servicio de autenticación no configurado"))?;
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
     
     // Count admin users to determine if system is initialized
     let admin_count = auth_service.auth_application_service.count_admin_users().await

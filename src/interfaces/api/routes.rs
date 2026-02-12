@@ -90,14 +90,14 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     let favorites_service = app_state.favorites_service.clone();
     let recent_service = app_state.recent_service.clone();
 
-    // Inicializar el servicio de operaciones por lotes
+    // Initialize the batch operations service
     let batch_service = Arc::new(BatchOperationService::default(
         file_retrieval_service.clone(),
         file_management_service.clone(),
         folder_service.clone()
     ));
     
-    // Crear estado para el manejador de operaciones por lotes
+    // Create state for the batch operations handler
     let batch_handler_state = BatchHandlerState {
         batch_service: batch_service.clone(),
     };
@@ -154,14 +154,14 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     // Merge the routers
     let files_router = basic_file_router.merge(file_operations_router);
     
-    // Crear rutas para operaciones por lotes
+    // Create routes for batch operations
     let batch_router = Router::new()
-        // Operaciones de archivos
+        // File operations
         .route("/files/move", post(batch_handler::move_files_batch))
         .route("/files/copy", post(batch_handler::copy_files_batch))
         .route("/files/delete", post(batch_handler::delete_files_batch))
         .route("/files/get", post(batch_handler::get_files_batch))
-        // Operaciones de carpetas
+        // Folder operations
         .route("/folders/delete", post(batch_handler::delete_folders_batch))
         .route("/folders/create", post(batch_handler::create_folders_batch))
         .route("/folders/get", post(batch_handler::get_folders_batch))
@@ -183,7 +183,7 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         Router::new()
     };
     
-    // Implementaciones directas de handlers para compartir, sin depender de ShareHandler
+    // Direct handler implementations for sharing, without depending on ShareHandler
     
     // Create routes for shared resources management (requires auth)
     let share_router = if let Some(share_service) = share_service.clone() {

@@ -5,10 +5,10 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Configurar logging
+    // Configure logging
     tracing_subscriber::fmt::init();
     
-    // Cargar variables de entorno (primero .env.local, luego .env)
+    // Load environment variables (.env.local first, then .env)
     if let Ok(path) = env::var("DOTENV_PATH") {
         dotenv::from_path(Path::new(&path)).ok();
     } else {
@@ -16,34 +16,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         dotenv::dotenv().ok();
     }
     
-    // Obtener DATABASE_URL desde variables de entorno
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL debe estar configurada");
+    // Get DATABASE_URL from environment variables
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be configured");
     
-    println!("Conectando a la base de datos...");
+    println!("Connecting to the database...");
     
-    // Crear pool de conexiones
+    // Create connection pool
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .acquire_timeout(Duration::from_secs(10))
         .connect(&database_url)
         .await?;
     
-    // Ejecutar migraciones
-    println!("Ejecutando migraciones...");
+    // Run migrations
+    println!("Running migrations...");
     
-    // Obtenemos el directorio desde una variable de entorno o usamos un valor por defecto
+    // Get the directory from an environment variable or use a default value
     let migrations_dir = env::var("MIGRATIONS_DIR").unwrap_or_else(|_| "./migrations".to_string());
-    println!("Directorio de migraciones: {}", migrations_dir);
+    println!("Migrations directory: {}", migrations_dir);
     
-    // Crear un migrator
+    // Create a migrator
     let migrator = sqlx::migrate::Migrator::new(Path::new(&migrations_dir))
         .await
-        .expect("No se pudo crear el migrator");
+        .expect("Could not create the migrator");
     
-    // Ejecutar todas las migraciones pendientes
+    // Run all pending migrations
     migrator.run(&pool).await?;
     
-    println!("Migraciones aplicadas correctamente");
+    println!("Migrations applied successfully");
     
     Ok(())
 }

@@ -2,22 +2,22 @@ use std::future::Future;
 use std::pin::Pin;
 use crate::common::errors::{DomainError, ErrorKind};
 
-/// Tipo para operaciones y rollbacks asíncronos
+/// Type for async operations and rollbacks
 type TransactionOp = Pin<Box<dyn Future<Output = Result<(), DomainError>> + Send>>;
 
-/// Transacción para operaciones de almacenamiento
-/// Permite definir un conjunto de operaciones y sus rollbacks correspondientes
+/// Transaction for storage operations
+/// Allows defining a set of operations and their corresponding rollbacks
 pub struct StorageTransaction {
-    /// Operaciones a ejecutar
+    /// Operations to execute
     operations: Vec<Box<dyn FnOnce() -> TransactionOp + Send>>,
-    /// Operaciones de rollback para revertir cambios en caso de error
+    /// Rollback operations to revert changes in case of error
     rollbacks: Vec<Box<dyn FnOnce() -> TransactionOp + Send>>,
-    /// Nombre de la transacción para logging
+    /// Transaction name for logging
     name: String,
 }
 
 impl StorageTransaction {
-    /// Crea una nueva transacción
+    /// Creates a new transaction
     pub fn new(name: &str) -> Self {
         Self {
             operations: Vec::new(),
@@ -26,7 +26,7 @@ impl StorageTransaction {
         }
     }
     
-    /// Añade una operación a la transacción con su correspondiente rollback
+    /// Adds an operation to the transaction with its corresponding rollback
     pub fn add_operation<F, R>(&mut self, operation: F, rollback: R)
     where
         F: Future<Output = Result<(), DomainError>> + Send + 'static,
@@ -36,74 +36,74 @@ impl StorageTransaction {
         self.rollbacks.push(Box::new(move || Box::pin(rollback)));
     }
     
-    /// Añade una operación sin rollback (para limpieza o logging)
+    /// Adds an operation without rollback (for cleanup or logging)
     pub fn add_finalizer<F>(&mut self, finalizer: F)
     where
         F: Future<Output = Result<(), DomainError>> + Send + 'static,
     {
-        // El rollback es una operación nula
+        // The rollback is a no-op
         let noop = async { Ok(()) };
         
         self.operations.push(Box::new(move || Box::pin(finalizer)));
         self.rollbacks.push(Box::new(move || Box::pin(noop)));
     }
     
-    /// Ejecuta la transacción aplicando todas las operaciones en orden
-    /// Si alguna falla, ejecuta los rollbacks en orden inverso
+    /// Executes the transaction by applying all operations in order
+    /// If any fails, executes rollbacks in reverse order
     pub async fn commit(mut self) -> Result<(), DomainError> {
-        tracing::debug!("Iniciando transacción: {}", self.name);
+        tracing::debug!("Starting transaction: {}", self.name);
         
         let mut completed_ops = Vec::new();
         
-        // Extraer operaciones para evitar problemas de propiedad
+        // Extract operations to avoid ownership issues
         let operations = std::mem::take(&mut self.operations);
         let transaction_name = self.name.clone();
         
-        // Ejecutar operaciones
+        // Execute operations
         for (i, op) in operations.into_iter().enumerate() {
             match op().await {
                 Ok(()) => {
                     completed_ops.push(i);
-                    tracing::trace!("Operación {} completada en transacción: {}", i, transaction_name);
+                    tracing::trace!("Operation {} completed in transaction: {}", i, transaction_name);
                 }
                 Err(e) => {
-                    tracing::error!("Error en operación {} de transacción {}: {}", i, transaction_name, e);
+                    tracing::error!("Error in operation {} of transaction {}: {}", i, transaction_name, e);
                     
-                    // Ejecutar rollbacks para las operaciones completadas en orden inverso
+                    // Execute rollbacks for completed operations in reverse order
                     self.rollback(completed_ops).await?;
                     
                     return Err(DomainError::new(
                         ErrorKind::InternalError,
                         "Transaction",
-                        format!("Falló la transacción '{}': {}", transaction_name, e)
+                        format!("Transaction '{}' failed: {}", transaction_name, e)
                     ).with_source(e));
                 }
             }
         }
         
-        tracing::debug!("Transacción completada exitosamente: {}", transaction_name);
+        tracing::debug!("Transaction completed successfully: {}", transaction_name);
         Ok(())
     }
     
-    /// Ejecuta rollbacks para las operaciones completadas
+    /// Executes rollbacks for completed operations
     async fn rollback(mut self, completed_ops: Vec<usize>) -> Result<(), DomainError> {
-        tracing::warn!("Iniciando rollback para transacción: {}", self.name);
+        tracing::warn!("Starting rollback for transaction: {}", self.name);
         
         let mut rollback_errors = Vec::new();
         
-        // Extraer rollbacks para evitar problemas de propiedad
+        // Extract rollbacks to avoid ownership issues
         let mut rollbacks = Vec::new();
         std::mem::swap(&mut rollbacks, &mut self.rollbacks);
         
-        // Ejecutar rollbacks en orden inverso
+        // Execute rollbacks in reverse order
         for i in completed_ops.into_iter().rev() {
             if i < rollbacks.len() {
-                // Tomar propiedad del rollback (obtener una referencia mutable)
+                // Take ownership of the rollback (get a mutable reference)
                 if let Some(rb) = rollbacks.get_mut(i) {
-                    // Intercambiar con una función vacía
+                    // Swap with an empty function
                     let rollback = std::mem::replace(rb, Box::new(|| Box::pin(async { Ok(()) })));
                     if let Err(e) = rollback().await {
-                        tracing::error!("Error en rollback de operación {} en transacción {}: {}", 
+                        tracing::error!("Error in rollback of operation {} in transaction {}: {}", 
                                       i, self.name, e);
                         rollback_errors.push(e);
                     }
@@ -111,20 +111,20 @@ impl StorageTransaction {
             }
         }
         
-        // Si hubo errores en el rollback, reportarlos
+        // If there were errors during rollback, report them
         if !rollback_errors.is_empty() {
-            tracing::error!("Errores durante rollback de transacción {}: {} errores", 
+            tracing::error!("Errors during transaction rollback {}: {} errors", 
                            self.name, rollback_errors.len());
             
             return Err(DomainError::new(
                 ErrorKind::InternalError,
                 "Transaction",
-                format!("Errores durante rollback de transacción '{}': {} errores", 
+                format!("Errors during transaction '{}' rollback: {} errors", 
                        self.name, rollback_errors.len())
             ));
         }
         
-        tracing::info!("Rollback de transacción completado: {}", self.name);
+        tracing::info!("Transaction rollback completed: {}", self.name);
         Ok(())
     }
 }

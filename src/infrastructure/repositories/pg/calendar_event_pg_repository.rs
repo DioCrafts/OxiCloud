@@ -20,9 +20,9 @@ impl CalendarEventPgRepository {
 #[async_trait]
 impl CalendarEventRepository for CalendarEventPgRepository {
     async fn create_event(&self, event: CalendarEvent) -> CalendarEventRepositoryResult<CalendarEvent> {
-        // Este método necesitaría una implementación completa que construya el CalendarEvent
-        // desde el resultado de la query, utilizando métodos del constructor
-        // Para esta demostración, vamos a retornar el mismo evento
+        // This method would need a full implementation that builds the CalendarEvent
+        // from the query result, using constructor methods
+        // For this demonstration, we return the same event
         
         sqlx::query(
             r#"
@@ -50,7 +50,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create calendar event: {}", e)))?;
 
-        // Devolvemos el mismo evento en vez de un resultado
+        // We return the same event instead of a result
         Ok(event)
     }
 
@@ -86,8 +86,8 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update calendar event: {}", e)))?;
 
-        // En una implementación completa, recuperaríamos el evento actualizado
-        // Por simplicidad, devolvemos el mismo evento que recibimos
+        // In a full implementation, we would retrieve the updated event
+        // For simplicity, we return the same event we received
         Ok(event)
     }
 
@@ -176,9 +176,9 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         .map_err(|e| DomainError::database_error(format!("Failed to get calendar event by id: {}", e)))?
         .ok_or_else(|| DomainError::not_found("Calendar Event", id.to_string()))?;
 
-        // En una implementación real, construiríamos un objeto CalendarEvent completo
-        // Por simplicidad, creamos un objeto con valores predeterminados para
-        // demostrar el enfoque sin macros
+        // In a real implementation, we would build a complete CalendarEvent object
+        // For simplicity, we create an object with default values to
+        // demonstrate the approach without macros
         
         let event = CalendarEvent::with_id(
             row.get("id"),

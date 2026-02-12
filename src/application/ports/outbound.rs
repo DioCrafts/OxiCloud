@@ -9,71 +9,71 @@ pub use crate::domain::repositories::folder_repository::FolderRepository;
 
 use super::storage_ports::{FileReadPort, FileWritePort};
 
-/// Puerto secundario para operaciones de almacenamiento
+/// Secondary port for storage operations
 #[async_trait]
 pub trait StoragePort: Send + Sync + 'static {
-    /// Resuelve una ruta de dominio a una ruta física
+    /// Resolves a domain path to a physical path
     fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf;
     
-    /// Crea directorios si no existen
+    /// Creates directories if they don't exist
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError>;
     
-    /// Verifica si existe un archivo en la ruta dada
+    /// Checks if a file exists at the given path
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
     
-    /// Verifica si existe un directorio en la ruta dada
+    /// Checks if a directory exists at the given path
     async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
 }
 
-/// Puerto unificado para persistencia de archivos (backward-compatible).
+/// Unified port for file persistence (backward-compatible).
 ///
-/// Ahora es un **supertrait** de `FileReadPort + FileWritePort`.
-/// Cualquier tipo que implemente ambos ports obtiene `FileStoragePort`
-/// automáticamente via blanket impl. Esto permite migrar consumidores
-/// gradualmente a los ports granulares mientras los existentes siguen
-/// funcionando sin cambios.
+/// Now it is a **supertrait** of `FileReadPort + FileWritePort`.
+/// Any type that implements both ports gets `FileStoragePort`
+/// automatically via blanket impl. This allows consumers to be migrated
+/// gradually to granular ports while existing ones continue
+/// working without changes.
 pub trait FileStoragePort: FileReadPort + FileWritePort {}
 
-/// Blanket implementation: cualquier tipo que implemente ambos ports
-/// es automáticamente un FileStoragePort.
+/// Blanket implementation: any type that implements both ports
+/// is automatically a FileStoragePort.
 impl<T: FileReadPort + FileWritePort> FileStoragePort for T {}
 
-/// Puerto secundario para persistencia de carpetas (application layer).
+/// Secondary port for folder persistence (application layer).
 ///
-/// Tiene la misma firma que `FolderRepository` del dominio.
-/// Las implementaciones concretas deben implementar `FolderRepository`,
-/// obteniendo `FolderStoragePort` automáticamente vía blanket impl.
+/// Has the same signature as the domain's `FolderRepository`.
+/// Concrete implementations must implement `FolderRepository`,
+/// getting `FolderStoragePort` automatically via blanket impl.
 pub trait FolderStoragePort: FolderRepository {}
 
-/// Blanket implementation: cualquier tipo que implemente FolderRepository
-/// es automáticamente un FolderStoragePort.
+/// Blanket implementation: any type that implements FolderRepository
+/// is automatically a FolderStoragePort.
 impl<T: FolderRepository> FolderStoragePort for T {}
 
-/// Puerto secundario para mapeo de IDs
+/// Secondary port for ID mapping
 #[async_trait]
 pub trait IdMappingPort: Send + Sync + 'static {
-    /// Obtiene o crea un ID para una ruta
+    /// Gets or creates an ID for a path
     async fn get_or_create_id(&self, path: &StoragePath) -> Result<String, DomainError>;
     
-    /// Obtiene una ruta por su ID
+    /// Gets a path by its ID
     async fn get_path_by_id(&self, id: &str) -> Result<StoragePath, DomainError>;
     
-    /// Actualiza la ruta para un ID existente
+    /// Updates the path for an existing ID
     async fn update_path(&self, id: &str, new_path: &StoragePath) -> Result<(), DomainError>;
     
-    /// Elimina un ID del mapeo
+    /// Removes an ID from the mapping
     async fn remove_id(&self, id: &str) -> Result<(), DomainError>;
     
-    /// Guarda cambios pendientes
+    /// Saves pending changes
     async fn save_changes(&self) -> Result<(), DomainError>;
     
-    /// Obtiene la ruta de archivo como PathBuf
+    /// Gets the file path as a PathBuf
     async fn get_file_path(&self, file_id: &str) -> Result<PathBuf, DomainError> {
         let storage_path = self.get_path_by_id(file_id).await?;
         Ok(PathBuf::from(storage_path.to_string()))
     }
     
-    /// Actualiza la ruta de un archivo
+    /// Updates a file's path
     async fn update_file_path(&self, file_id: &str, new_path: &PathBuf) -> Result<(), DomainError> {
         let storage_path = StoragePath::from_string(&new_path.to_string_lossy().to_string());
         self.update_path(file_id, &storage_path).await

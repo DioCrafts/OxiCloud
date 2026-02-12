@@ -1,35 +1,35 @@
-//! Errores del dominio
+//! Domain errors
 //!
-//! Este módulo contiene los tipos de error propios del dominio.
-//! DomainError es el error base que se usa en toda la capa de dominio.
+//! This module contains domain-specific error types.
+//! DomainError is the base error used throughout the domain layer.
 
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::error::Error as StdError;
 use thiserror::Error;
 
-/// Tipo Result común para el dominio con DomainError como error estándar
+/// Common Result type for the domain with DomainError as the standard error
 pub type Result<T> = std::result::Result<T, DomainError>;
 
-/// Tipos de errores del dominio
+/// Domain error types
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorKind {
-    /// Entidad no encontrada
+    /// Entity not found
     NotFound,
-    /// Entidad ya existe
+    /// Entity already exists
     AlreadyExists,
-    /// Entrada inválida o validación fallida
+    /// Invalid input or failed validation
     InvalidInput,
-    /// Error de acceso o permisos
+    /// Access or permissions error
     AccessDenied,
-    /// Tiempo de espera agotado
+    /// Timeout expired
     Timeout,
-    /// Error interno del sistema
+    /// Internal system error
     InternalError,
-    /// Funcionalidad no implementada
+    /// Functionality not implemented
     NotImplemented,
-    /// Operación no soportada
+    /// Unsupported operation
     UnsupportedOperation,
-    /// Error de base de datos
+    /// Database error
     DatabaseError,
 }
 
@@ -49,25 +49,25 @@ impl Display for ErrorKind {
     }
 }
 
-/// Error base de dominio que proporciona contexto detallado
+/// Base domain error that provides detailed context
 #[derive(Error, Debug)]
 #[error("{kind}: {message}")]
 pub struct DomainError {
-    /// Tipo de error
+    /// Error type
     pub kind: ErrorKind,
-    /// Tipo de entidad afectada (ej: "File", "Folder")
+    /// Affected entity type (e.g.: "File", "Folder")
     pub entity_type: &'static str,
-    /// Identificador de la entidad si está disponible
+    /// Entity identifier if available
     pub entity_id: Option<String>,
-    /// Mensaje descriptivo del error
+    /// Descriptive error message
     pub message: String,
-    /// Error fuente (opcional)
+    /// Source error (optional)
     #[source]
     pub source: Option<Box<dyn StdError + Send + Sync>>,
 }
 
 impl DomainError {
-    /// Crea un nuevo error de dominio
+    /// Creates a new domain error
     pub fn new<S: Into<String>>(
         kind: ErrorKind,
         entity_type: &'static str,
@@ -82,7 +82,7 @@ impl DomainError {
         }
     }
 
-    /// Crea un error de entidad no encontrada
+    /// Creates an entity not found error
     pub fn not_found<S: Into<String>>(entity_type: &'static str, entity_id: S) -> Self {
         let id = entity_id.into();
         Self {
@@ -94,7 +94,7 @@ impl DomainError {
         }
     }
 
-    /// Crea un error de entidad ya existente
+    /// Creates an entity already exists error
     pub fn already_exists<S: Into<String>>(entity_type: &'static str, entity_id: S) -> Self {
         let id = entity_id.into();
         Self {
@@ -106,7 +106,7 @@ impl DomainError {
         }
     }
 
-    /// Crea un error para operaciones no soportadas
+    /// Creates an error for unsupported operations
     pub fn operation_not_supported<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self::new(
             ErrorKind::UnsupportedOperation,
@@ -115,7 +115,7 @@ impl DomainError {
         )
     }
 
-    /// Crea un error de tiempo agotado
+    /// Creates a timeout error
     pub fn timeout<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
             kind: ErrorKind::Timeout,
@@ -126,7 +126,7 @@ impl DomainError {
         }
     }
     
-    /// Crea un error interno
+    /// Creates an internal error
     pub fn internal_error<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
             kind: ErrorKind::InternalError,
@@ -137,7 +137,7 @@ impl DomainError {
         }
     }
     
-    /// Crea un error de acceso denegado
+    /// Creates an access denied error
     pub fn access_denied<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
             kind: ErrorKind::AccessDenied,
@@ -159,7 +159,7 @@ impl DomainError {
         }
     }
     
-    /// Crea un error de base de datos
+    /// Creates a database error
     pub fn database_error<S: Into<String>>(message: S) -> Self {
         Self {
             kind: ErrorKind::DatabaseError, 
@@ -170,7 +170,7 @@ impl DomainError {
         }
     }
     
-    /// Crea un error de validación
+    /// Creates a validation error
     pub fn validation_error<S: Into<String>>(message: S) -> Self {
         Self {
             kind: ErrorKind::InvalidInput,
@@ -181,7 +181,7 @@ impl DomainError {
         }
     }
     
-    /// Crea un error de funcionalidad no implementada
+    /// Creates a not implemented error
     pub fn not_implemented<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
             kind: ErrorKind::NotImplemented,
@@ -192,20 +192,20 @@ impl DomainError {
         }
     }
 
-    /// Establece el ID de la entidad
+    /// Sets the entity ID
     pub fn with_id<S: Into<String>>(mut self, entity_id: S) -> Self {
         self.entity_id = Some(entity_id.into());
         self
     }
 
-    /// Establece el error fuente
+    /// Sets the source error
     pub fn with_source<E: StdError + Send + Sync + 'static>(mut self, source: E) -> Self {
         self.source = Some(Box::new(source));
         self
     }
 }
 
-/// Trait para añadir contexto a los errores
+/// Trait for adding context to errors
 pub trait ErrorContext<T, E> {
     fn with_context<C, F>(self, context: F) -> std::result::Result<T, DomainError>
     where
@@ -245,7 +245,7 @@ impl<T, E: StdError + Send + Sync + 'static> ErrorContext<T, E> for std::result:
     }
 }
 
-// Implementaciones From para errores estándar (sin dependencias externas de infra)
+// From implementations for standard errors (without external infrastructure dependencies)
 impl From<std::io::Error> for DomainError {
     fn from(err: std::io::Error) -> Self {
         DomainError {

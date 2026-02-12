@@ -68,13 +68,13 @@ impl AuthApplicationService {
         }
     }
     
-    /// Configura el servicio de carpetas, necesario para crear carpetas personales
+    /// Configures the folder service, needed to create personal folders
     pub fn with_folder_service(mut self, folder_service: Arc<dyn FolderUseCase>) -> Self {
         self.folder_service = Some(folder_service);
         self
     }
 
-    /// Configura el servicio OIDC
+    /// Configures the OIDC service
     pub fn with_oidc(self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) -> Self {
         {
             let mut state = self.oidc.write().unwrap();
@@ -123,12 +123,12 @@ impl AuthApplicationService {
     }
     
     pub async fn register(&self, dto: RegisterDto) -> Result<UserDto, DomainError> {
-        // Verificar usuario duplicado
+        // Check for duplicate user
         if self.user_storage.get_user_by_username(&dto.username).await.is_ok() {
             return Err(DomainError::new(
                 ErrorKind::AlreadyExists,
                 "User",
-                format!("El usuario '{}' ya existe", dto.username)
+                format!("User '{}' already exists", dto.username)
             ));
         }
         
@@ -136,62 +136,62 @@ impl AuthApplicationService {
             return Err(DomainError::new(
                 ErrorKind::AlreadyExists,
                 "User",
-                format!("El email '{}' ya está registrado", dto.email)
+                format!("Email '{}' is already registered", dto.email)
             ));
         }
         
-        // Verificar si el usuario quiere crear un admin
+        // Check if the user wants to create an admin
         let is_admin_request = dto.username.to_lowercase() == "admin" || 
             (dto.role.is_some() && dto.role.as_ref().unwrap().to_lowercase() == "admin");
             
-        // Si está intentando crear un admin, verificar si ya existen admins en el sistema
+        // If trying to create an admin, check if admins already exist in the system
         if is_admin_request {
             match self.count_admin_users().await {
                 Ok(admin_count) => {
-                    // Si ya hay admins en el sistema y no estamos en instalación limpia,
-                    // no permitimos crear otro admin desde el registro
+                    // If there are already admins in the system and this is not a clean install,
+                    // we do not allow creating another admin from registration
                     if admin_count > 0 {
-                        // Verificar si es una instalación limpia (solo el admin predeterminado)
+                        // Check if this is a clean install (only the default admin)
                         match self.count_all_users().await {
                             Ok(user_count) => {
-                                // Si hay más de 2 usuarios (admin + test), no es instalación limpia
+                                // If there are more than 2 users (admin + test), it is not a clean install
                                 if user_count > 2 {
-                                    tracing::warn!("Intento de crear admin adicional rechazado: ya existe al menos un admin");
+                                    tracing::warn!("Attempt to create additional admin rejected: at least one admin already exists");
                                     return Err(DomainError::new(
                                         ErrorKind::AccessDenied,
                                         "User",
-                                        "No se permite crear usuarios admin adicionales desde la página de registro"
+                                        "Creating additional admin users from the registration page is not allowed"
                                     ));
                                 }
-                                // En caso contrario, es instalación limpia y se permite el primer admin
-                                tracing::info!("Permitiendo creación de admin en instalación limpia");
+                                // Otherwise, it is a clean install and the first admin is allowed
+                                tracing::info!("Allowing admin creation on clean install");
                             },
                             Err(e) => {
-                                tracing::error!("Error al contar usuarios: {}", e);
-                                // Por seguridad, si no podemos verificar, rechazamos la creación de admin
+                                tracing::error!("Error counting users: {}", e);
+                                // For security, if we cannot verify, we reject admin creation
                                 return Err(DomainError::new(
                                     ErrorKind::AccessDenied,
                                     "User",
-                                    "No se permite crear usuarios admin adicionales"
+                                    "Creating additional admin users is not allowed"
                                 ));
                             }
                         }
                     }
                 },
                 Err(e) => {
-                    tracing::error!("Error al contar usuarios admin: {}", e);
-                    // Por seguridad, si no podemos verificar, rechazamos la creación de admin
+                    tracing::error!("Error counting admin users: {}", e);
+                    // For security, if we cannot verify, we reject admin creation
                     return Err(DomainError::new(
                         ErrorKind::AccessDenied,
                         "User",
-                        "No se permite crear usuarios admin adicionales"
+                        "Creating additional admin users is not allowed"
                     ));
                 }
             }
         }
         
-        // Determinar rol y cuota según el tipo de usuario
-        // Si se proporciona un rol explícito de "admin", usar rol de administrador
+        // Determine role and quota based on user type
+        // If an explicit "admin" role is provided, use the administrator role
         let role = if let Some(role_str) = &dto.role {
             if role_str.to_lowercase() == "admin" {
                 UserRole::Admin
@@ -199,7 +199,7 @@ impl AuthApplicationService {
                 UserRole::User
             }
         } else {
-            // Caso especial: si el nombre es "admin", asignar rol de admin aunque no se especifique
+            // Special case: if the username is "admin", assign admin role even if not specified
             if dto.username.to_lowercase() == "admin" {
                 UserRole::Admin
             } else {
@@ -207,26 +207,26 @@ impl AuthApplicationService {
             }
         };
         
-        // Cuota según el rol: 100GB para admin, 1GB para usuarios normales
+        // Quota based on role: 100GB for admin, 1GB for regular users
         let quota = if role == UserRole::Admin {
-            107374182400 // 100GB para admin
+            107374182400 // 100GB for admin
         } else {
-            1024 * 1024 * 1024 // 1GB para usuarios normales
+            1024 * 1024 * 1024 // 1GB for regular users
         };
         
-        // Validar longitud de password antes de hashear
+        // Validate password length before hashing
         if dto.password.len() < 8 {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "User",
-                "Password debe tener al menos 8 caracteres"
+                "Password must be at least 8 characters long"
             ));
         }
         
-        // Hashear el password usando el servicio de infraestructura
+        // Hash the password using the infrastructure service
         let password_hash = self.password_hasher.hash_password(&dto.password)?;
         
-        // Crear usuario con el hash pre-generado
+        // Create user with the pre-generated hash
         let user = User::new(
             dto.username.clone(),
             dto.email,
@@ -236,13 +236,13 @@ impl AuthApplicationService {
         ).map_err(|e| DomainError::new(
             ErrorKind::InvalidInput,
             "User",
-            format!("Error al crear usuario: {}", e)
+            format!("Error creating user: {}", e)
         ))?;
         
-        // Guardar usuario
+        // Save user
         let created_user = self.user_storage.create_user(user).await?;
         
-        // Crear carpeta personal para el usuario
+        // Create personal folder for the user
         if let Some(folder_service) = &self.folder_service {
             let folder_name = format!("Mi Carpeta - {}", dto.username);
             
@@ -252,20 +252,20 @@ impl AuthApplicationService {
             }).await {
                 Ok(folder) => {
                     tracing::info!(
-                        "Carpeta personal creada para el usuario {}: {} (ID: {})", 
+                        "Personal folder created for user {}: {} (ID: {})", 
                         created_user.id(), 
                         folder.name, 
                         folder.id
                     );
                     
-                    // Aquí se podría guardar la asociación de la carpeta al usuario
-                    // por ejemplo, en una tabla de relación carpeta-usuario
+                    // Here we could save the folder-to-user association,
+                    // for example, in a folder-user relationship table
                 },
                 Err(e) => {
-                    // No fallamos el registro por un error en la creación de la carpeta
-                    // pero lo registramos para investigación
+                    // We don't fail registration due to a folder creation error,
+                    // but we log it for investigation
                     tracing::error!(
-                        "No se pudo crear la carpeta personal para el usuario {}: {}", 
+                        "Could not create personal folder for user {}: {}", 
                         created_user.id(), 
                         e
                     );
@@ -273,67 +273,67 @@ impl AuthApplicationService {
             }
         } else {
             tracing::warn!(
-                "No se configuró el servicio de carpetas, no se puede crear carpeta personal para el usuario: {}", 
+                "Folder service not configured, cannot create personal folder for user: {}", 
                 created_user.id()
             );
         }
         
-        tracing::info!("Usuario registrado: {}", created_user.id());
+        tracing::info!("User registered: {}", created_user.id());
         Ok(UserDto::from(created_user))
     }
     
     pub async fn login(&self, dto: LoginDto) -> Result<AuthResponseDto, DomainError> {
-        // Buscar usuario
+        // Find user
         let mut user = self.user_storage
             .get_user_by_username(&dto.username)
             .await
             .map_err(|_| DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Credenciales inválidas"
+                "Invalid credentials"
             ))?;
         
-        // Verificar si usuario está activo
+        // Check if user is active
         if !user.is_active() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Cuenta desactivada"
+                "Account deactivated"
             ));
         }
         
-        // Verificar contraseña usando el hasher inyectado
+        // Verify password using the injected hasher
         let is_valid = self.password_hasher.verify_password(&dto.password, user.password_hash())?;
             
         if !is_valid {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Credenciales inválidas"
+                "Invalid credentials"
             ));
         }
         
-        // Actualizar último login
+        // Update last login
         user.register_login();
         self.user_storage.update_user(user.clone()).await?;
         
-        // Generar tokens usando el servicio de tokens inyectado
+        // Generate tokens using the injected token service
         let access_token = self.token_service.generate_access_token(&user)?;
         
         let refresh_token = self.token_service.generate_refresh_token();
         
-        // Guardar sesión
+        // Save session
         let session = Session::new(
             user.id().to_string(),
             refresh_token.clone(),
-            None, // IP (se puede añadir desde la capa HTTP)
-            None, // User-Agent (se puede añadir desde la capa HTTP)
+            None, // IP (can be added from the HTTP layer)
+            None, // User-Agent (can be added from the HTTP layer)
             self.token_service.refresh_token_expiry_days(),
         );
         
         self.session_storage.create_session(session).await?;
         
-        // Respuesta de autenticación
+        // Authentication response
         Ok(AuthResponseDto {
             user: UserDto::from(user),
             access_token,
@@ -344,43 +344,43 @@ impl AuthApplicationService {
     }
     
     pub async fn refresh_token(&self, dto: RefreshTokenDto) -> Result<AuthResponseDto, DomainError> {
-        // Obtener sesión válida
+        // Get valid session
         let session = self.session_storage
             .get_session_by_refresh_token(&dto.refresh_token)
             .await?;
         
-        // Verificar si la sesión está expirada o revocada
+        // Check if the session is expired or revoked
         if session.is_expired() || session.is_revoked() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Sesión expirada o inválida"
+                "Session expired or invalid"
             ));
         }
         
-        // Obtener usuario
+        // Get user
         let user = self.user_storage
             .get_user_by_id(session.user_id())
             .await?;
         
-        // Verificar si usuario está activo
+        // Check if user is active
         if !user.is_active() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Cuenta desactivada"
+                "Account deactivated"
             ));
         }
         
-        // Revocar sesión actual
+        // Revoke current session
         self.session_storage.revoke_session(session.id()).await?;
         
-        // Generar nuevos tokens
+        // Generate new tokens
         let access_token = self.token_service.generate_access_token(&user)?;
         
         let new_refresh_token = self.token_service.generate_refresh_token();
         
-        // Crear nueva sesión
+        // Create new session
         let new_session = Session::new(
             user.id().to_string(),
             new_refresh_token.clone(),
@@ -401,67 +401,67 @@ impl AuthApplicationService {
     }
     
     pub async fn logout(&self, user_id: &str, refresh_token: &str) -> Result<(), DomainError> {
-        // Obtener sesión
+        // Get session
         let session = match self.session_storage.get_session_by_refresh_token(refresh_token).await {
             Ok(s) => s,
-            // Si la sesión no existe, consideramos el logout como exitoso
+            // If the session doesn't exist, we consider the logout successful
             Err(_) => return Ok(()),
         };
         
-        // Verificar que la sesión pertenece al usuario
+        // Verify that the session belongs to the user
         if session.user_id() != user_id {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "La sesión no pertenece al usuario"
+                "The session does not belong to the user"
             ));
         }
         
-        // Revocar sesión
+        // Revoke session
         self.session_storage.revoke_session(session.id()).await?;
         
         Ok(())
     }
     
     pub async fn logout_all(&self, user_id: &str) -> Result<u64, DomainError> {
-        // Revocar todas las sesiones del usuario
+        // Revoke all user sessions
         let revoked_count = self.session_storage.revoke_all_user_sessions(user_id).await?;
         
         Ok(revoked_count)
     }
     
     pub async fn change_password(&self, user_id: &str, dto: ChangePasswordDto) -> Result<(), DomainError> {
-        // Obtener usuario
+        // Get user
         let mut user = self.user_storage.get_user_by_id(user_id).await?;
         
-        // Verificar contraseña actual usando el hasher inyectado
+        // Verify current password using the injected hasher
         let is_valid = self.password_hasher.verify_password(&dto.current_password, user.password_hash())?;
             
         if !is_valid {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Auth",
-                "Contraseña actual incorrecta"
+                "Current password is incorrect"
             ));
         }
         
-        // Validar nueva contraseña
+        // Validate new password
         if dto.new_password.len() < 8 {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "User",
-                "Password debe tener al menos 8 caracteres"
+                "Password must be at least 8 characters long"
             ));
         }
         
-        // Hashear nueva contraseña y actualizar usuario
+        // Hash new password and update user
         let new_hash = self.password_hasher.hash_password(&dto.new_password)?;
         user.update_password_hash(new_hash);
         
-        // Guardar usuario actualizado
+        // Save updated user
         self.user_storage.update_user(user).await?;
         
-        // Opcional: revocar todas las sesiones para forzar re-login con nueva contraseña
+        // Optional: revoke all sessions to force re-login with new password
         self.session_storage.revoke_all_user_sessions(user_id).await?;
         
         Ok(())
@@ -492,7 +492,7 @@ impl AuthApplicationService {
             .map_err(|e| DomainError::new(
                 ErrorKind::InternalError,
                 "User",
-                format!("Error al contar usuarios administradores: {}", e)
+                format!("Error counting admin users: {}", e)
             ))?;
         
         Ok(admin_users.len() as i64)
@@ -506,7 +506,7 @@ impl AuthApplicationService {
             .map_err(|e| DomainError::new(
                 ErrorKind::InternalError,
                 "User", 
-                format!("Error al contar usuarios: {}", e)
+                format!("Error counting users: {}", e)
             ))?;
             
         Ok(all_users.len() as i64)
@@ -523,7 +523,7 @@ impl AuthApplicationService {
                     .map_err(|e| DomainError::new(
                         ErrorKind::InternalError,
                         "User",
-                        format!("Error al eliminar usuario admin predeterminado: {}", e)
+                        format!("Error deleting default admin user: {}", e)
                     ))
             },
             Err(_) => {
@@ -545,7 +545,7 @@ impl AuthApplicationService {
             .map_err(|e| DomainError::new(
                 ErrorKind::InternalError,
                 "User",
-                format!("Error al eliminar usuario admin predeterminado: {}", e)
+                format!("Error deleting default admin user: {}", e)
             ))?;
             
         // 3. Create new admin user with the provided credentials but admin role
@@ -564,7 +564,7 @@ impl AuthApplicationService {
         ).map_err(|e| DomainError::new(
             ErrorKind::InvalidInput,
             "User",
-            format!("Error al crear usuario admin: {}", e)
+            format!("Error creating admin user: {}", e)
         ))?;
         
         // 4. Save the new admin user
@@ -580,7 +580,7 @@ impl AuthApplicationService {
             }).await {
                 Ok(folder) => {
                     tracing::info!(
-                        "Carpeta personal creada para el admin {}: {} (ID: {})", 
+                        "Personal folder created for admin {}: {} (ID: {})", 
                         created_user.id(), 
                         folder.name, 
                         folder.id
@@ -588,7 +588,7 @@ impl AuthApplicationService {
                 },
                 Err(e) => {
                     tracing::error!(
-                        "No se pudo crear la carpeta personal para el admin {}: {}", 
+                        "Could not create personal folder for admin {}: {}", 
                         created_user.id(), 
                         e
                     );
@@ -596,7 +596,7 @@ impl AuthApplicationService {
             }
         }
         
-        tracing::info!("Admin personalizado creado: {}", created_user.id());
+        tracing::info!("Custom admin created: {}", created_user.id());
         Ok(UserDto::from(created_user))
     }
     

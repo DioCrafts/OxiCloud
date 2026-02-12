@@ -8,7 +8,7 @@ use crate::application::dtos::favorites_dto::FavoriteItemDto;
 use crate::application::ports::favorites_ports::FavoritesRepositoryPort;
 use crate::common::errors::{Result, DomainError, ErrorKind};
 
-/// Implementación PostgreSQL del puerto de persistencia de favoritos.
+/// PostgreSQL implementation of the favorites persistence port.
 pub struct FavoritesPgRepository {
     db_pool: Arc<PgPool>,
 }

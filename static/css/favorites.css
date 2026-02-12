@@ -1,6 +1,6 @@
-/* Estilos para la funcionalidad de favoritos */
+/* Styles for the favorites feature */
 
-/* Indicador de favorito */
+/* Favorite indicator */
 .favorite-indicator {
     position: absolute;
     top: 10px;
@@ -31,12 +31,12 @@
     text-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
 }
 
-/* Estilos para los elementos de la vista de favoritos */
+/* Styles for the favorites view items */
 .favorite-item {
     position: relative;
 }
 
-/* Ajustes para la vista de cuadrícula */
+/* Adjustments for grid view */
 .file-card.favorite-item {
     border-left: 3px solid #ffc107;
 
@@ -46,7 +46,7 @@
     }
 }
 
-/* Ajustes para la vista de lista */
+/* Adjustments for list view */
 .file-item.favorite-item {
     position: relative;
     grid-template-columns: 30px minmax(200px, 2fr) 1fr 1fr 120px;
@@ -60,7 +60,7 @@
     height: 30px;
 }
 
-/* Estilos para el estado vacío específico de favoritos */
+/* Styles for the favorites-specific empty state */
 .favorites-empty-state {
     display: flex;
     flex-direction: column;
@@ -83,7 +83,7 @@
     max-width: 400px;
 }
 
-/* Animación para la estrella de favorito */
+/* Animation for the favorite star */
 @keyframes favorite-pulse {
     0% { transform: scale(1); }
     50% { transform: scale(1.2); }

@@ -11,24 +11,24 @@ use crate::common::di::AppState;
 // Re-export CurrentUser from application layer for use in handlers
 pub use crate::application::dtos::user_dto::CurrentUser;
 
-// Estructura para usar en extractores de Axum
+// Structure for use in Axum extractors
 #[derive(Clone, Debug)]
 pub struct AuthUser {
     pub id: String,
     pub username: String,
 }
 
-/// Extractor reutilizable que obtiene el user_id del usuario autenticado.
-/// Se extrae automáticamente del `CurrentUser` insertado por el auth middleware.
+/// Reusable extractor that gets the user_id of the authenticated user.
+/// Automatically extracted from the `CurrentUser` inserted by the auth middleware.
 ///
-/// Uso en handlers:
+/// Usage in handlers:
 /// ```ignore
 /// async fn my_handler(CurrentUserId(user_id): CurrentUserId) -> impl IntoResponse { ... }
 /// ```
 #[derive(Clone, Debug)]
 pub struct CurrentUserId(pub String);
 
-// Implementar FromRequestParts para AuthUser — permite usar `auth_user: AuthUser` en handlers
+// Implement FromRequestParts for AuthUser — allows using `auth_user: AuthUser` in handlers
 impl<S> FromRequestParts<S> for AuthUser
 where
     S: Send + Sync,
@@ -47,7 +47,7 @@ where
     }
 }
 
-// Implementar FromRequestParts para CurrentUserId — extractor ligero solo para el user_id
+// Implement FromRequestParts for CurrentUserId — lightweight extractor for user_id only
 impl<S> FromRequestParts<S> for CurrentUserId
 where
     S: Send + Sync,
@@ -63,37 +63,37 @@ where
     }
 }
 
-// Error para las operaciones de autenticación
+// Error for authentication operations
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
-    #[error("Token no proporcionado")]
+    #[error("Token not provided")]
     TokenNotProvided,
     
-    #[error("Token inválido: {0}")]
+    #[error("Invalid token: {0}")]
     InvalidToken(String),
     
-    #[error("Token expirado")]
+    #[error("Token expired")]
     TokenExpired,
     
-    #[error("Usuario no encontrado")]
+    #[error("User not found")]
     UserNotFound,
     
-    #[error("Acceso denegado: {0}")]
+    #[error("Access denied: {0}")]
     AccessDenied(String),
     
-    #[error("Servicio de autenticación no disponible")]
+    #[error("Authentication service unavailable")]
     AuthServiceUnavailable,
 }
 
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AuthError::TokenNotProvided => (StatusCode::UNAUTHORIZED, "Token no proporcionado".to_string()),
+            AuthError::TokenNotProvided => (StatusCode::UNAUTHORIZED, "Token not provided".to_string()),
             AuthError::InvalidToken(msg) => (StatusCode::UNAUTHORIZED, msg),
-            AuthError::TokenExpired => (StatusCode::UNAUTHORIZED, "Token expirado".to_string()),
-            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "Usuario no encontrado".to_string()),
+            AuthError::TokenExpired => (StatusCode::UNAUTHORIZED, "Token expired".to_string()),
+            AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string()),
             AuthError::AccessDenied(msg) => (StatusCode::FORBIDDEN, msg),
-            AuthError::AuthServiceUnavailable => (StatusCode::INTERNAL_SERVER_ERROR, "Servicio de autenticación no disponible".to_string()),
+            AuthError::AuthServiceUnavailable => (StatusCode::INTERNAL_SERVER_ERROR, "Authentication service unavailable".to_string()),
         };
 
         let body = axum::Json(serde_json::json!({
@@ -104,24 +104,24 @@ impl IntoResponse for AuthError {
     }
 }
 
-/// Middleware de autenticación seguro.
+/// Secure authentication middleware.
 ///
-/// Valida el token JWT contra el servicio de autenticación configurado.
-/// No acepta bypasses, tokens mock, ni parámetros de URL para saltar validación.
+/// Validates the JWT token against the configured authentication service.
+/// Does not accept bypasses, mock tokens, or URL parameters to skip validation.
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
-    // Extraer el token Bearer del header Authorization
+    // Extract the Bearer token from the Authorization header
     let token_str = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .ok_or(AuthError::TokenNotProvided)?;
     
-    // Validar que el token no esté vacío
+    // Validate that the token is not empty
     let token_str = token_str.trim();
     if token_str.is_empty() {
         return Err(AuthError::TokenNotProvided);
@@ -129,7 +129,7 @@ pub async fn auth_middleware(
     
     tracing::debug!("Processing authentication token");
     
-    // Validar el token usando el servicio de autenticación
+    // Validate the token using the authentication service
     if let Some(auth_service) = state.auth_service.as_ref() {
         let token_service = &auth_service.token_service;
         match token_service.validate_token(token_str) {
@@ -146,25 +146,25 @@ pub async fn auth_middleware(
             },
             Err(e) => {
                 tracing::warn!("Token validation failed: {}", e);
-                return Err(AuthError::InvalidToken(format!("Token inválido: {}", e)));
+                return Err(AuthError::InvalidToken(format!("Invalid token: {}", e)));
             }
         }
     }
     
-    // Si no hay servicio de autenticación disponible, denegar acceso
+    // If no authentication service is available, deny access
     tracing::error!("Auth middleware invoked but auth service is not configured");
     Err(AuthError::AuthServiceUnavailable)
 }
 
-/// Middleware para verificar que el usuario autenticado tiene rol de administrador.
+/// Middleware to verify that the authenticated user has an admin role.
 ///
-/// Debe aplicarse DESPUÉS del auth_middleware, ya que depende de que
-/// `CurrentUser` esté presente en las extensiones de la request.
+/// Must be applied AFTER auth_middleware, as it depends on
+/// `CurrentUser` being present in the request extensions.
 pub async fn require_admin(
     request: Request,
     next: Next,
 ) -> Response {
-    // Obtener el CurrentUser insertado por auth_middleware
+    // Get the CurrentUser inserted by auth_middleware
     if let Some(current_user) = request.extensions().get::<CurrentUser>() {
         if current_user.role == "admin" {
             tracing::debug!("Admin access granted for user: {}", current_user.username);
@@ -175,7 +175,7 @@ pub async fn require_admin(
         tracing::warn!("Admin check failed: no authenticated user in request");
     }
     
-    // Acceso denegado
-    let error = AuthError::AccessDenied("Se requiere rol de administrador".to_string());
+    // Access denied
+    let error = AuthError::AccessDenied("Admin role required".to_string());
     error.into_response()
 }

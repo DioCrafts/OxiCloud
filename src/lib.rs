@@ -1,11 +1,11 @@
-// Exportar los módulos principales del proyecto
+// Export the main project modules
 pub mod common;
 pub mod domain;
 pub mod application;
 pub mod infrastructure;
 pub mod interfaces;
 
-// Re-exportaciones públicas comunes
+// Common public re-exports
 pub use application::services::folder_service::FolderService;
 pub use application::services::i18n_application_service::I18nApplicationService;
 pub use application::services::storage_mediator::{StorageMediator, FileSystemStorageMediator};

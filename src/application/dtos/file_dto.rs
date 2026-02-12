@@ -44,12 +44,12 @@ impl From<File> for FileDto {
     }
 }
 
-// Para convertir de FileDto a File para los batch handlers
+// To convert from FileDto to File for batch handlers
 impl From<FileDto> for File {
     fn from(dto: FileDto) -> Self {
-        // Usar constructor para crear una entidad desde DTO
-        // Nota: esto debe simplificarse si File tiene un constructor adecuado
-        // Si no, deberías hacer la conversión de la mejor manera posible
+        // Use constructor to create an entity from DTO
+        // Note: this should be simplified if File has a proper constructor
+        // If not, make the conversion as best as possible
         File::from_dto(
             dto.id, 
             dto.name, 

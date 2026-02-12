@@ -49,8 +49,8 @@ const fileOps = {
             try {
                 console.log(`Uploading file to folder: ${targetFolderId || 'root'}`);
                 
-                // Usamos la URL correcta para la subida de archivos
-                console.log('Formulario a enviar:', {
+                // We use the correct URL for file upload
+                console.log('Form to submit:', {
                     file: file.name,
                     size: file.size,
                     folder_id: targetFolderId || 'root'
@@ -59,16 +59,16 @@ const fileOps = {
                 const response = await fetch('/api/files/upload', {
                     method: 'POST',
                     body: formData,
-                    // Añadir cache: 'no-store' para evitar problemas de caché durante la subida
+                    // Add cache: 'no-store' to avoid cache issues during upload
                     cache: 'no-store',
                     headers: {
                         ...getAuthHeaders(),
-                        // Agregar este encabezado para forzar recargas frescas
+                        // Add this header to force fresh reloads
                         'Cache-Control': 'no-cache, no-store, must-revalidate'
                     }
                 });
                 
-                console.log('Respuesta del servidor:', {
+                console.log('Server response:', {
                     status: response.status,
                     statusText: response.statusText
                 });
@@ -83,11 +83,11 @@ const fileOps = {
                     console.log(`Successfully uploaded ${file.name}`, responseData);
                     
                     // Show success notification immediately
-                    window.ui.showNotification('Archivo subido', `${file.name} completado`);
+                    window.ui.showNotification('File uploaded', `${file.name} completed`);
 
                     if (i === totalFiles - 1) {
                         // Last file uploaded - wait and reload once
-                        console.log('Último archivo subido, esperando antes de recargar...');
+                        console.log('Last file uploaded, waiting before reloading...');
                         
                         // Wait for backend to persist
                         await new Promise(resolve => setTimeout(resolve, 800));
@@ -96,7 +96,7 @@ const fileOps = {
                         try {
                             await window.loadFiles({forceRefresh: true});
                         } catch (reloadError) {
-                            console.error("Error recargando archivos:", reloadError);
+                            console.error("Error reloading files:", reloadError);
                         }
                         
                         // Hide upload UI
@@ -109,11 +109,11 @@ const fileOps = {
                 } else {
                     const errorData = await response.text();
                     console.error('Upload error:', errorData);
-                    window.ui.showNotification('Error', `Error al subir el archivo: ${file.name}`);
+                    window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
                 }
             } catch (error) {
                 console.error('Network error during upload:', error);
-                window.ui.showNotification('Error', `Error de red al subir el archivo: ${file.name}`);
+                window.ui.showNotification('Error', `Network error uploading file: ${file.name}`);
             }
         }
     },
@@ -181,7 +181,7 @@ const fileOps = {
                     console.log(`Created folder: ${folderPath} -> ${folder.id}`);
                 } else {
                     console.error(`Error creating folder ${folderPath}:`, await response.text());
-                    window.ui.showNotification('Error', `Error creando carpeta: ${folderName}`);
+                    window.ui.showNotification('Error', `Error creating folder: ${folderName}`);
                 }
             } catch (error) {
                 console.error(`Network error creating folder ${folderPath}:`, error);
@@ -228,7 +228,7 @@ const fileOps = {
         }
         
         // Finish up
-        window.ui.showNotification('Carpeta subida', `${uploadedCount} archivos subidos correctamente`);
+        window.ui.showNotification('Folder uploaded', `${uploadedCount} files uploaded successfully`);
         
         await new Promise(resolve => setTimeout(resolve, 800));
         
@@ -253,7 +253,7 @@ const fileOps = {
         try {
             console.log('Creating folder with name:', name);
             
-            // Enviar la solicitud real al backend para crear la carpeta
+            // Send the actual request to the backend to create the folder
             const response = await fetch('/api/folders', {
                 method: 'POST',
                 headers: {
@@ -268,28 +268,28 @@ const fileOps = {
             });
 
             if (response.ok) {
-                // Obtener la carpeta creada del backend
+                // Get the created folder from the backend
                 const folder = await response.json();
                 console.log('Folder created successfully:', folder);
                 
-                // Añadir la carpeta a la vista de inmediato para feedback instantáneo
+                // Add the folder to the view immediately for instant feedback
                 window.ui.addFolderToView(folder);
                 
-                // Esperar para permitir que el backend guarde los cambios
+                // Wait to allow the backend to save the changes
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 
-                // Recargar los archivos para refrescar la vista
+                // Reload files to refresh the view
                 await window.loadFiles({forceRefresh: true});
                 
-                window.ui.showNotification('Carpeta creada', `"${name}" creada correctamente`);
+                window.ui.showNotification('Folder created', `"${name}" created successfully`);
             } else {
                 const errorData = await response.text();
                 console.error('Create folder error:', errorData);
-                window.ui.showNotification('Error', 'Error al crear la carpeta');
+                window.ui.showNotification('Error', 'Error creating the folder');
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            window.ui.showNotification('Error', 'Error al crear la carpeta');
+            window.ui.showNotification('Error', 'Error creating the folder');
         }
     },
 
@@ -315,22 +315,22 @@ const fileOps = {
             if (response.ok) {
                 // Reload files after moving
                 await window.loadFiles();
-                window.ui.showNotification('Archivo movido', 'Archivo movido correctamente');
+                window.ui.showNotification('File moved', 'File moved successfully');
                 return true;
             } else {
-                let errorMessage = 'Error desconocido';
+                let errorMessage = 'Unknown error';
                 try {
                     const errorData = await response.json();
-                    errorMessage = errorData.error || 'Error desconocido';
+                    errorMessage = errorData.error || 'Unknown error';
                 } catch (e) {
-                    errorMessage = 'Error al procesar la respuesta del servidor';
+                    errorMessage = 'Error processing server response';
                 }
-                window.ui.showNotification('Error', `Error al mover el archivo: ${errorMessage}`);
+                window.ui.showNotification('Error', `Error moving the file: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error moving file:', error);
-            window.ui.showNotification('Error', 'Error al mover el archivo');
+            window.ui.showNotification('Error', 'Error moving the file');
             return false;
         }
     },
@@ -357,22 +357,22 @@ const fileOps = {
             if (response.ok) {
                 // Reload files after moving
                 await window.loadFiles();
-                window.ui.showNotification('Carpeta movida', 'Carpeta movida correctamente');
+                window.ui.showNotification('Folder moved', 'Folder moved successfully');
                 return true;
             } else {
-                let errorMessage = 'Error desconocido';
+                let errorMessage = 'Unknown error';
                 try {
                     const errorData = await response.json();
-                    errorMessage = errorData.error || 'Error desconocido';
+                    errorMessage = errorData.error || 'Unknown error';
                 } catch (e) {
-                    errorMessage = 'Error al procesar la respuesta del servidor';
+                    errorMessage = 'Error processing server response';
                 }
-                window.ui.showNotification('Error', `Error al mover la carpeta: ${errorMessage}`);
+                window.ui.showNotification('Error', `Error moving the folder: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error moving folder:', error);
-            window.ui.showNotification('Error', 'Error al mover la carpeta');
+            window.ui.showNotification('Error', 'Error moving the folder');
             return false;
         }
     },
@@ -400,26 +400,26 @@ const fileOps = {
 
             if (response.ok) {
                 window.ui.showNotification(
-                    window.i18n ? window.i18n.t('notifications.file_renamed') : 'Archivo renombrado',
-                    window.i18n ? window.i18n.t('notifications.file_renamed_to', { name: newName }) : `Archivo renombrado a "${newName}"`
+                    window.i18n ? window.i18n.t('notifications.file_renamed') : 'File renamed',
+                    window.i18n ? window.i18n.t('notifications.file_renamed_to', { name: newName }) : `File renamed to "${newName}"`
                 );
                 return true;
             } else {
                 const errorText = await response.text();
                 console.error('Error response:', errorText);
-                let errorMessage = 'Error desconocido';
+                let errorMessage = 'Unknown error';
                 try {
                     const errorData = JSON.parse(errorText);
                     errorMessage = errorData.error || response.statusText;
                 } catch (e) {
                     errorMessage = errorText || response.statusText;
                 }
-                window.ui.showNotification('Error', `Error al renombrar el archivo: ${errorMessage}`);
+                window.ui.showNotification('Error', `Error renaming the file: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error renaming file:', error);
-            window.ui.showNotification('Error', 'Error al renombrar el archivo');
+            window.ui.showNotification('Error', 'Error renaming the file');
             return false;
         }
     },
@@ -446,13 +446,13 @@ const fileOps = {
             console.log('Response status:', response.status);
 
             if (response.ok) {
-                window.ui.showNotification('Carpeta renombrada', `Carpeta renombrada a "${newName}"`);
+                window.ui.showNotification('Folder renamed', `Folder renamed to "${newName}"`);
                 return true;
             } else {
                 const errorText = await response.text();
                 console.error('Error response:', errorText);
 
-                let errorMessage = 'Error desconocido';
+                let errorMessage = 'Unknown error';
                 try {
                     // Try to parse as JSON
                     const errorData = JSON.parse(errorText);
@@ -462,12 +462,12 @@ const fileOps = {
                     errorMessage = errorText || response.statusText;
                 }
 
-                window.ui.showNotification('Error', `Error al renombrar la carpeta: ${errorMessage}`);
+                window.ui.showNotification('Error', `Error renaming the folder: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error renaming folder:', error);
-            window.ui.showNotification('Error', 'Error al renombrar la carpeta');
+            window.ui.showNotification('Error', 'Error renaming the folder');
             return false;
         }
     },
@@ -480,9 +480,9 @@ const fileOps = {
      */
     async deleteFile(fileId, fileName) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Mover a papelera',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `¿Estás seguro de que quieres mover a la papelera el archivo "${fileName}"?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `Are you sure you want to move the file "${fileName}" to trash?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
         });
         if (!confirmed) return false;
         
@@ -495,7 +495,7 @@ const fileOps = {
 
             if (response.ok) {
                 window.loadFiles();
-                window.ui.showNotification('Archivo movido a papelera', `"${fileName}" movido a la papelera`);
+                window.ui.showNotification('File moved to trash', `"${fileName}" moved to trash`);
                 return true;
             } else {
                 // Fallback to direct deletion if trash fails
@@ -506,16 +506,16 @@ const fileOps = {
                 
                 if (fallbackResponse.ok) {
                     window.loadFiles();
-                    window.ui.showNotification('Archivo eliminado', `"${fileName}" eliminado correctamente`);
+                    window.ui.showNotification('File deleted', `"${fileName}" deleted successfully`);
                     return true;
                 } else {
-                    window.ui.showNotification('Error', 'Error al eliminar el archivo');
+                    window.ui.showNotification('Error', 'Error deleting the file');
                     return false;
                 }
             }
         } catch (error) {
             console.error('Error deleting file:', error);
-            window.ui.showNotification('Error', 'Error al eliminar el archivo');
+            window.ui.showNotification('Error', 'Error deleting the file');
             return false;
         }
     },
@@ -528,9 +528,9 @@ const fileOps = {
      */
     async deleteFolder(folderId, folderName) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Mover a papelera',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName }) : `¿Estás seguro de que quieres mover a la papelera la carpeta "${folderName}" y todo su contenido?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Eliminar',
+            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName }) : `Are you sure you want to move the folder "${folderName}" and all its contents to trash?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
         });
         if (!confirmed) return false;
         
@@ -548,7 +548,7 @@ const fileOps = {
                     window.ui.updateBreadcrumb('');
                 }
                 window.loadFiles();
-                window.ui.showNotification('Carpeta movida a papelera', `"${folderName}" movida a la papelera`);
+                window.ui.showNotification('Folder moved to trash', `"${folderName}" moved to trash`);
                 return true;
             } else {
                 // Fallback to direct deletion if trash fails
@@ -564,23 +564,23 @@ const fileOps = {
                         window.ui.updateBreadcrumb('');
                     }
                     window.loadFiles();
-                    window.ui.showNotification('Carpeta eliminada', `"${folderName}" eliminada correctamente`);
+                    window.ui.showNotification('Folder deleted', `"${folderName}" deleted successfully`);
                     return true;
                 } else {
-                    window.ui.showNotification('Error', 'Error al eliminar la carpeta');
+                    window.ui.showNotification('Error', 'Error deleting the folder');
                     return false;
                 }
             }
         } catch (error) {
             console.error('Error deleting folder:', error);
-            window.ui.showNotification('Error', 'Error al eliminar la carpeta');
+            window.ui.showNotification('Error', 'Error deleting the folder');
             return false;
         }
     },
     
     /**
-     * Obtener elementos de la papelera
-     * @returns {Promise<Array>} - Lista de elementos en la papelera
+     * Get trash items
+     * @returns {Promise<Array>} - List of trash items
      */
     async getTrashItems() {
         try {
@@ -601,9 +601,9 @@ const fileOps = {
     },
     
     /**
-     * Restaurar un elemento desde la papelera
-     * @param {string} trashId - ID del elemento en la papelera
-     * @returns {Promise<boolean>} - Éxito de la operación
+     * Restore an item from trash
+     * @param {string} trashId - Trash item ID
+     * @returns {Promise<boolean>} - Operation success
      */
     async restoreFromTrash(trashId) {
         try {
@@ -617,29 +617,29 @@ const fileOps = {
             });
             
             if (response.ok) {
-                window.ui.showNotification('Elemento restaurado', 'Elemento restaurado correctamente');
+                window.ui.showNotification('Item restored', 'Item restored successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error al restaurar el elemento');
+                window.ui.showNotification('Error', 'Error restoring the item');
                 return false;
             }
         } catch (error) {
             console.error('Error restoring item from trash:', error);
-            window.ui.showNotification('Error', 'Error al restaurar el elemento');
+            window.ui.showNotification('Error', 'Error restoring the item');
             return false;
         }
     },
     
     /**
-     * Eliminar permanentemente un elemento de la papelera
-     * @param {string} trashId - ID del elemento en la papelera
-     * @returns {Promise<boolean>} - Éxito de la operación
+     * Permanently delete a trash item
+     * @param {string} trashId - Trash item ID
+     * @returns {Promise<boolean>} - Operation success
      */
     async deletePermanently(trashId) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete') : 'Eliminar permanentemente',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete_msg') : '¿Estás seguro de que quieres eliminar permanentemente este elemento? Esta acción no se puede deshacer.',
-            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Eliminar permanentemente',
+            title: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete') : 'Delete permanently',
+            message: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete_msg') : 'Are you sure you want to permanently delete this item? This action cannot be undone.',
+            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Delete permanently',
         });
         if (!confirmed) return false;
         
@@ -650,28 +650,28 @@ const fileOps = {
             });
             
             if (response.ok) {
-                window.ui.showNotification('Elemento eliminado', 'Elemento eliminado permanentemente');
+                window.ui.showNotification('Item deleted', 'Item permanently deleted');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error al eliminar el elemento');
+                window.ui.showNotification('Error', 'Error deleting the item');
                 return false;
             }
         } catch (error) {
             console.error('Error deleting item permanently:', error);
-            window.ui.showNotification('Error', 'Error al eliminar el elemento');
+            window.ui.showNotification('Error', 'Error deleting the item');
             return false;
         }
     },
     
     /**
-     * Vaciar la papelera
-     * @returns {Promise<boolean>} - Éxito de la operación
+     * Empty the trash
+     * @returns {Promise<boolean>} - Operation success
      */
     async emptyTrash() {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_empty_trash') : 'Vaciar papelera',
-            message: window.i18n ? window.i18n.t('trash.empty_confirm') : '¿Estás seguro de que quieres vaciar la papelera? Esta acción eliminará permanentemente todos los elementos.',
-            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Vaciar papelera',
+            title: window.i18n ? window.i18n.t('dialogs.confirm_empty_trash') : 'Empty trash',
+            message: window.i18n ? window.i18n.t('trash.empty_confirm') : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
+            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Empty trash',
         });
         if (!confirmed) return false;
         
@@ -682,23 +682,23 @@ const fileOps = {
             });
             
             if (response.ok) {
-                window.ui.showNotification('Papelera vaciada', 'La papelera ha sido vaciada correctamente');
+                window.ui.showNotification('Trash emptied', 'The trash has been emptied successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error al vaciar la papelera');
+                window.ui.showNotification('Error', 'Error emptying the trash');
                 return false;
             }
         } catch (error) {
             console.error('Error emptying trash:', error);
-            window.ui.showNotification('Error', 'Error al vaciar la papelera');
+            window.ui.showNotification('Error', 'Error emptying the trash');
             return false;
         }
     },
     
     /**
-     * Descargar un archivo
-     * @param {string} fileId - ID del archivo
-     * @param {string} fileName - Nombre del archivo
+     * Download a file
+     * @param {string} fileId - File ID
+     * @param {string} fileName - File name
      */
     async downloadFile(fileId, fileName) {
         try {
@@ -716,23 +716,23 @@ const fileOps = {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             } else {
-                window.ui.showNotification('Error', 'Error al descargar el archivo');
+                window.ui.showNotification('Error', 'Error downloading the file');
             }
         } catch (error) {
             console.error('Error downloading file:', error);
-            window.ui.showNotification('Error', 'Error al descargar el archivo');
+            window.ui.showNotification('Error', 'Error downloading the file');
         }
     },
     
     /**
-     * Descargar una carpeta como ZIP
-     * @param {string} folderId - ID de la carpeta
-     * @param {string} folderName - Nombre de la carpeta
+     * Download a folder as ZIP
+     * @param {string} folderId - Folder ID
+     * @param {string} folderName - Folder name
      */
     async downloadFolder(folderId, folderName) {
         try {
             // Show notification to user
-            window.ui.showNotification('Preparando descarga', 'Preparando la carpeta para descargar...');
+            window.ui.showNotification('Preparing download', 'Preparing the folder for download...');
             
             const response = await fetch(`/api/folders/${folderId}/download?format=zip`, {
                 headers: getAuthHeaders()
@@ -748,11 +748,11 @@ const fileOps = {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             } else {
-                window.ui.showNotification('Error', 'Error al descargar la carpeta');
+                window.ui.showNotification('Error', 'Error downloading the folder');
             }
         } catch (error) {
             console.error('Error downloading folder:', error);
-            window.ui.showNotification('Error', 'Error al descargar la carpeta');
+            window.ui.showNotification('Error', 'Error downloading the folder');
         }
     }
 };

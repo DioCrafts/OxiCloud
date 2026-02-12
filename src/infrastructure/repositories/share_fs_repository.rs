@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-// Estructura para almacenar en el sistema de archivos
+// Structure for storing in the file system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ShareRecord {
     id: String,
@@ -38,12 +38,12 @@ impl ShareFsRepository {
         Self { config }
     }
 
-    /// Obtiene la ruta del archivo JSON donde se almacenan los enlaces compartidos
+    /// Gets the path to the JSON file where shared links are stored
     fn get_shares_path(&self) -> String {
         format!("{}/shares.json", self.config.storage_path.display())
     }
 
-    /// Lee todos los enlaces compartidos del archivo JSON
+    /// Reads all shared links from the JSON file
     async fn read_shares(&self) -> Result<Vec<ShareRecord>, io::Error> {
         let path = self.get_shares_path();
         let path = Path::new(&path);
@@ -58,12 +58,12 @@ impl ShareFsRepository {
         Ok(shares)
     }
 
-    /// Guarda todos los enlaces compartidos en el archivo JSON
+    /// Saves all shared links to the JSON file
     async fn write_shares(&self, shares: &[ShareRecord]) -> Result<(), io::Error> {
         let path = self.get_shares_path();
         let json = serde_json::to_string_pretty(shares)?;
 
-        // Asegúrate de que el directorio existe
+        // Make sure the directory exists
         let dir = Path::new(&path).parent().unwrap();
         if !dir.exists() {
             fs::create_dir_all(dir).await?
@@ -72,7 +72,7 @@ impl ShareFsRepository {
         fs::write(path, json).await
     }
 
-    /// Convierte un registro del sistema de archivos a una entidad de dominio
+    /// Converts a file system record to a domain entity
     fn to_entity(&self, record: &ShareRecord) -> Share {
         let item_type = ShareItemType::try_from(record.item_type.as_str())
             .unwrap_or(ShareItemType::File);
@@ -97,7 +97,7 @@ impl ShareFsRepository {
         )
     }
 
-    /// Convierte una entidad de dominio a un registro para el sistema de archivos
+    /// Converts a domain entity to a file system record
     fn to_record(&self, share: &Share) -> ShareRecord {
         ShareRecord {
             id: share.id().to_string(),
@@ -122,16 +122,16 @@ impl ShareStoragePort for ShareFsRepository {
         let mut shares = self.read_shares().await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
-        // Verifica si el enlace ya existe
+        // Check if the link already exists
         let existing_index = shares.iter().position(|s| s.id == share.id());
 
         let record = self.to_record(share);
 
         if let Some(index) = existing_index {
-            // Actualización
+            // Update
             shares[index] = record;
         } else {
-            // Inserción
+            // Insert
             shares.push(record);
         }
 
@@ -190,16 +190,16 @@ impl ShareStoragePort for ShareFsRepository {
         let mut shares = self.read_shares().await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
-        // Busca el índice del enlace a actualizar
+        // Find the index of the link to update
         let index = shares.iter().position(|s| s.id == share.id())
             .ok_or_else(|| {
                 DomainError::not_found("Share", format!("Share with ID {} not found for update", share.id()))
             })?;
 
-        // Actualiza el registro
+        // Update the record
         shares[index] = self.to_record(share);
 
-        // Guarda los cambios
+        // Save changes
         self.write_shares(&shares).await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
@@ -210,16 +210,16 @@ impl ShareStoragePort for ShareFsRepository {
         let mut shares = self.read_shares().await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
-        // Encuentra el índice del enlace a eliminar
+        // Find the index of the link to delete
         let initial_len = shares.len();
         shares.retain(|s| s.id != id);
 
-        // Si no se eliminó ningún enlace, significa que no existía
+        // If no link was deleted, it means it didn't exist
         if shares.len() == initial_len {
             return Err(DomainError::not_found("Share", format!("Share with ID {} not found for deletion", id)));
         }
 
-        // Guarda los cambios
+        // Save changes
         self.write_shares(&shares).await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
@@ -230,15 +230,15 @@ impl ShareStoragePort for ShareFsRepository {
         let shares = self.read_shares().await
             .map_err(|e| DomainError::internal_error("Share", e.to_string()))?;
 
-        // Filtra los enlaces del usuario
+        // Filter the user's links
         let user_shares: Vec<ShareRecord> = shares.into_iter()
             .filter(|s| s.created_by == user_id)
             .collect();
 
-        // Calcula el total
+        // Calculate the total
         let total = user_shares.len();
 
-        // Aplica la paginación
+        // Apply pagination
         let paginated: Vec<Share> = user_shares.iter()
             .skip(offset)
             .take(limit)

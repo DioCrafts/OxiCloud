@@ -1,29 +1,29 @@
-//! StoragePath - Value Object del dominio para representar rutas de almacenamiento
+//! StoragePath - Domain Value Object for representing storage paths
 //! 
-//! Este módulo contiene solo el Value Object StoragePath que es parte del dominio puro.
-//! PathService (que implementa StoragePort y StorageMediator) fue movido a 
-//! infrastructure/services/path_service.rs porque tiene dependencias de sistema de archivos.
+//! This module contains only the StoragePath Value Object which is part of the pure domain.
+//! PathService (which implements StoragePort and StorageMediator) was moved to 
+//! infrastructure/services/path_service.rs because it has file system dependencies.
 
 use std::path::PathBuf;
 
-/// Representa una ruta de almacenamiento en el dominio (Value Object)
+/// Represents a storage path in the domain (Value Object)
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct StoragePath {
     segments: Vec<String>,
 }
 
 impl StoragePath {
-    /// Crea una nueva ruta de almacenamiento
+    /// Creates a new storage path
     pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
     
-    /// Crea una ruta vacía (raíz)
+    /// Creates an empty path (root)
     pub fn root() -> Self {
         Self { segments: Vec::new() }
     }
     
-    /// Crea una ruta a partir de una cadena con segmentos separados por /
+    /// Creates a path from a string with segments separated by /
     pub fn from_string(path: &str) -> Self {
         let segments = path
             .split('/')
@@ -33,7 +33,7 @@ impl StoragePath {
         Self { segments }
     }
     
-    /// Crea una ruta a partir de un PathBuf
+    /// Creates a path from a PathBuf
     pub fn from(path_buf: PathBuf) -> Self {
         let segments = path_buf
             .components()
@@ -45,19 +45,19 @@ impl StoragePath {
         Self { segments }
     }
     
-    /// Añade un segmento a la ruta
+    /// Appends a segment to the path
     pub fn join(&self, segment: &str) -> Self {
         let mut new_segments = self.segments.clone();
         new_segments.push(segment.to_string());
         Self { segments: new_segments }
     }
     
-    /// Obtiene el nombre del archivo (último segmento)
+    /// Gets the file name (last segment)
     pub fn file_name(&self) -> Option<String> {
         self.segments.last().cloned()
     }
     
-    /// Obtiene la ruta del directorio padre
+    /// Gets the parent directory path
     pub fn parent(&self) -> Option<Self> {
         if self.segments.is_empty() {
             None
@@ -67,12 +67,12 @@ impl StoragePath {
         }
     }
     
-    /// Verifica si la ruta está vacía (es la raíz)
+    /// Checks if the path is empty (is the root)
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
     
-    /// Convierte la ruta a una cadena con formato "/segment1/segment2/..."
+    /// Converts the path to a string with format "/segment1/segment2/..."
     pub fn to_string(&self) -> String {
         if self.segments.is_empty() {
             "/".to_string()
@@ -81,15 +81,15 @@ impl StoragePath {
         }
     }
     
-    /// Devuelve la representación de la ruta como cadena
+    /// Returns the path representation as a string
     pub fn as_str(&self) -> &str {
-        // Nota: La implementación realmente debería almacenar la cadena,
-        // pero aquí hacemos una implementación temporal que siempre devuelve "/"
-        // Esto se usa solo para la implementación de get_folder_path_str
+        // Note: The implementation should really store the string,
+        // but here we do a temporary implementation that always returns "/"
+        // This is only used for the get_folder_path_str implementation
         "/"
     }
     
-    /// Obtiene los segmentos de la ruta
+    /// Gets the path segments
     pub fn segments(&self) -> &[String] {
         &self.segments
     }

@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-// Re-exportar errores de entidad desde el módulo centralizado
+// Re-export entity errors from the centralized module
 pub use super::entity_errors::ShareError;
 
 #[derive(Debug, Clone, PartialEq)]

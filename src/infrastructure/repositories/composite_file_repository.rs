@@ -10,11 +10,11 @@ use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
 
-/// Composite que envuelve `Arc<dyn FileReadPort>` + `Arc<dyn FileWritePort>`
-/// y delega cada método al port correspondiente.
+/// Composite that wraps `Arc<dyn FileReadPort>` + `Arc<dyn FileWritePort>`
+/// and delegates each method to the corresponding port.
 ///
-/// Gracias al blanket impl `impl<T: FileReadPort + FileWritePort> FileStoragePort for T {}`
-/// este tipo obtiene `FileStoragePort` automáticamente.
+/// Thanks to the blanket impl `impl<T: FileReadPort + FileWritePort> FileStoragePort for T {}`
+/// this type automatically gets `FileStoragePort`.
 pub struct CompositeFileRepository {
     read: Arc<dyn FileReadPort>,
     write: Arc<dyn FileWritePort>,

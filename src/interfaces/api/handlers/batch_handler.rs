@@ -13,86 +13,86 @@ use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
 use crate::interfaces::api::handlers::ApiResult;
 
-/// Estado compartido para el handler de batch
+/// Shared state for the batch handler
 #[derive(Clone)]
 pub struct BatchHandlerState {
     pub batch_service: Arc<BatchOperationService>,
 }
 
-/// DTO para las solicitudes de operaciones en lote de archivos
+/// DTO for batch file operation requests
 #[derive(Debug, Deserialize)]
 pub struct BatchFileOperationRequest {
-    /// IDs de los archivos a procesar
+    /// IDs of the files to process
     pub file_ids: Vec<String>,
-    /// ID de la carpeta destino (opcional)
+    /// Target folder ID (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_folder_id: Option<String>,
 }
 
-/// DTO para las solicitudes de operaciones en lote de carpetas
+/// DTO for batch folder operation requests
 #[derive(Debug, Deserialize)]
 pub struct BatchFolderOperationRequest {
-    /// IDs de las carpetas a procesar
+    /// IDs of the folders to process
     pub folder_ids: Vec<String>,
-    /// Si la operación debe ser recursiva
+    /// Whether the operation should be recursive
     #[serde(default)]
     pub recursive: bool,
-    /// ID de la carpeta destino (opcional)
+    /// Target folder ID (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target_folder_id: Option<String>,
 }
 
-/// DTO para las solicitudes de creación en lote de carpetas
+/// DTO for batch folder creation requests
 #[derive(Debug, Deserialize)]
 pub struct BatchCreateFoldersRequest {
-    /// Detalles de las carpetas a crear
+    /// Details of the folders to create
     pub folders: Vec<CreateFolderDetail>,
 }
 
-/// Detalle para creación de una carpeta
+/// Detail for folder creation
 #[derive(Debug, Deserialize)]
 pub struct CreateFolderDetail {
-    /// Nombre de la carpeta
+    /// Folder name
     pub name: String,
-    /// ID de la carpeta padre (opcional)
+    /// Parent folder ID (optional)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent_id: Option<String>,
 }
 
-/// DTO para los resultados de operaciones en lote
+/// DTO for batch operation results
 #[derive(Debug, Serialize)]
 pub struct BatchOperationResponse<T> {
-    /// Entidades procesadas exitosamente
+    /// Successfully processed entities
     pub successful: Vec<T>,
-    /// Operaciones fallidas con sus mensajes de error
+    /// Failed operations with their error messages
     pub failed: Vec<FailedOperation>,
-    /// Estadísticas de la operación
+    /// Operation statistics
     pub stats: BatchOperationStats,
 }
 
-/// Operación fallida en un lote
+/// Failed operation in a batch
 #[derive(Debug, Serialize)]
 pub struct FailedOperation {
-    /// Identificador de la entidad que falló
+    /// Identifier of the entity that failed
     pub id: String,
-    /// Mensaje de error
+    /// Error message
     pub error: String,
 }
 
-/// Estadísticas de una operación por lotes
+/// Statistics for a batch operation
 #[derive(Debug, Serialize)]
 pub struct BatchOperationStats {
-    /// Número total de operaciones
+    /// Total number of operations
     pub total: usize,
-    /// Número de operaciones exitosas
+    /// Number of successful operations
     pub successful: usize,
-    /// Número de operaciones fallidas
+    /// Number of failed operations
     pub failed: usize,
-    /// Tiempo total de ejecución en milisegundos
+    /// Total execution time in milliseconds
     pub execution_time_ms: u128,
 }
 
-/// Convierte BatchStats del dominio a DTO
+/// Converts domain BatchStats to DTO
 impl From<BatchStats> for BatchOperationStats {
     fn from(stats: BatchStats) -> Self {
         Self {
@@ -104,7 +104,7 @@ impl From<BatchStats> for BatchOperationStats {
     }
 }
 
-/// Convierte BatchResult<T> del dominio a DTO
+/// Converts domain BatchResult<T> to DTO
 impl<T, U> From<BatchResult<T>> for BatchOperationResponse<U>
 where
     U: From<T>,
@@ -124,12 +124,12 @@ where
     }
 }
 
-/// Handler para mover múltiples archivos en lote
+/// Handler for moving multiple files in batch
 pub async fn move_files_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay archivos para procesar
+    // Verify there are files to process
     if request.file_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -139,35 +139,35 @@ pub async fn move_files_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .move_files(request.file_ids, request.target_folder_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Convertir resultado a DTO
+    // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para copiar múltiples archivos en lote
+/// Handler for copying multiple files in batch
 pub async fn copy_files_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay archivos para procesar
+    // Verify there are files to process
     if request.file_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -177,35 +177,35 @@ pub async fn copy_files_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .copy_files(request.file_ids, request.target_folder_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Convertir resultado a DTO
+    // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para eliminar múltiples archivos en lote
+/// Handler for deleting multiple files in batch
 pub async fn delete_files_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay archivos para procesar
+    // Verify there are files to process
     if request.file_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -215,13 +215,13 @@ pub async fn delete_files_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .delete_files(request.file_ids)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Crear respuesta personalizada para IDs de string
+    // Create custom response for string IDs
     let response = BatchOperationResponse {
         successful: result.successful,
         failed: result.failed.into_iter()
@@ -230,26 +230,26 @@ pub async fn delete_files_batch(
         stats: result.stats.into(),
     };
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para eliminar múltiples carpetas en lote
+/// Handler for deleting multiple folders in batch
 pub async fn delete_folders_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFolderOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay carpetas para procesar
+    // Verify there are folders to process
     if request.folder_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -259,13 +259,13 @@ pub async fn delete_folders_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .delete_folders(request.folder_ids, request.recursive)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Crear respuesta personalizada para IDs de string
+    // Create custom response for string IDs
     let response = BatchOperationResponse {
         successful: result.successful,
         failed: result.failed.into_iter()
@@ -274,26 +274,26 @@ pub async fn delete_folders_batch(
         stats: result.stats.into(),
     };
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para crear múltiples carpetas en lote
+/// Handler for creating multiple folders in batch
 pub async fn create_folders_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchCreateFoldersRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay carpetas para procesar
+    // Verify there are folders to process
     if request.folders.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -303,41 +303,41 @@ pub async fn create_folders_batch(
         ).into_response());
     }
     
-    // Transformar el formato para el servicio
+    // Transform the format for the service
     let folders = request.folders
         .into_iter()
         .map(|detail| (detail.name, detail.parent_id))
         .collect();
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .create_folders(folders)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Convertir resultado a DTO
+    // Convert result to DTO
     let response: BatchOperationResponse<FolderDto> = result.into();
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::CREATED // Todas exitosas
+        StatusCode::CREATED // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para obtener múltiples archivos en lote
+/// Handler for getting multiple files in batch
 pub async fn get_files_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay archivos para procesar
+    // Verify there are files to process
     if request.file_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -347,35 +347,35 @@ pub async fn get_files_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .get_multiple_files(request.file_ids)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Convertir resultado a DTO
+    // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler para obtener múltiples carpetas en lote
+/// Handler for getting multiple folders in batch
 pub async fn get_folders_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchFolderOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
-    // Verificar que hay carpetas para procesar
+    // Verify there are folders to process
     if request.folder_ids.is_empty() {
         return Ok((
             StatusCode::BAD_REQUEST,
@@ -385,24 +385,24 @@ pub async fn get_folders_batch(
         ).into_response());
     }
     
-    // Ejecutar operación de lote
+    // Execute batch operation
     let result = state.batch_service
         .get_multiple_folders(request.folder_ids)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     
-    // Convertir resultado a DTO
+    // Convert result to DTO
     let response: BatchOperationResponse<FolderDto> = result.into();
     
-    // Determinar código de estado basado en los resultados
+    // Determine status code based on results
     let status_code = if response.stats.failed > 0 {
         if response.stats.successful > 0 {
-            StatusCode::PARTIAL_CONTENT // Algunas operaciones exitosas, otras fallidas
+            StatusCode::PARTIAL_CONTENT // Some operations successful, others failed
         } else {
-            StatusCode::BAD_REQUEST // Todas fallaron
+            StatusCode::BAD_REQUEST // All failed
         }
     } else {
-        StatusCode::OK // Todas exitosas
+        StatusCode::OK // All successful
     };
     
     Ok((status_code, Json(response)).into_response())

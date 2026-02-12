@@ -10,34 +10,34 @@ use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::di::AppState;
 
 /**
- * Manejador para las operaciones de búsqueda a través de la API.
+ * Handler for search operations through the API.
  * 
- * Este manejador expone endpoints relacionados con la funcionalidad de búsqueda,
- * permitiendo a los usuarios buscar archivos y carpetas usando diversos criterios.
+ * This handler exposes endpoints related to search functionality,
+ * allowing users to search for files and folders using various criteria.
  */
 pub struct SearchHandler;
 
 impl SearchHandler {
     /**
-     * Realiza una búsqueda basada en los criterios proporcionados como parámetros de consulta.
+     * Performs a search based on the criteria provided as query parameters.
      * 
-     * Este endpoint permite búsquedas simples directamente con parámetros URL.
+     * This endpoint allows simple searches directly with URL parameters.
      * 
-     * @param state Estado de la aplicación con servicios
-     * @param query_params Parámetros de búsqueda como query string
-     * @return Respuesta HTTP con los resultados de la búsqueda
+     * @param state Application state with services
+     * @param query_params Search parameters as query string
+     * @return HTTP response with the search results
      */
     pub async fn search_files_get(
         State(state): State<AppState>,
         Query(params): Query<SearchParams>,
     ) -> impl IntoResponse {
-        info!("API: Búsqueda de archivos con parámetros: {:?}", params);
+        info!("API: File search with parameters: {:?}", params);
         
-        // Extraer el servicio de búsqueda o devolver error si no está disponible
+        // Extract the search service or return error if not available
         let search_service = match &state.applications.search_service {
             Some(service) => service,
             None => {
-                error!("Servicio de búsqueda no disponible");
+                error!("Search service not available");
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
                     Json(json!({
@@ -47,7 +47,7 @@ impl SearchHandler {
             }
         };
         
-        // Convertir parámetros de búsqueda a DTO
+        // Convert search parameters to DTO
         let search_criteria = SearchCriteriaDto {
             name_contains: params.query,
             file_types: params.type_filter.map(|t| t.split(',').map(|s| s.trim().to_string()).collect()),
@@ -63,15 +63,15 @@ impl SearchHandler {
             offset: params.offset.unwrap_or(0),
         };
         
-        // Realizar la búsqueda
+        // Perform the search
         match search_service.search(search_criteria).await {
             Ok(results) => {
-                info!("Búsqueda completada, {} archivos y {} carpetas encontrados", 
+                info!("Search completed, {} files and {} folders found", 
                      results.files.len(), results.folders.len());
                 (StatusCode::OK, Json(results)).into_response()
             },
             Err(err) => {
-                error!("Error en búsqueda: {}", err);
+                error!("Search error: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({
@@ -83,26 +83,26 @@ impl SearchHandler {
     }
     
     /**
-     * Realiza una búsqueda avanzada basada en un objeto de criterios JSON completo.
+     * Performs an advanced search based on a complete JSON criteria object.
      * 
-     * Este endpoint permite búsquedas más complejas con todos los criterios posibles
-     * proporcionados en el cuerpo de la solicitud.
+     * This endpoint allows more complex searches with all possible criteria
+     * provided in the request body.
      * 
-     * @param state Estado de la aplicación con servicios
-     * @param criteria Criterios de búsqueda completos
-     * @return Respuesta HTTP con los resultados de la búsqueda
+     * @param state Application state with services
+     * @param criteria Complete search criteria
+     * @return HTTP response with the search results
      */
     pub async fn search_files_post(
         State(state): State<AppState>,
         Json(criteria): Json<SearchCriteriaDto>,
     ) -> impl IntoResponse {
-        info!("API: Búsqueda avanzada de archivos");
+        info!("API: Advanced file search");
         
-        // Extraer el servicio de búsqueda o devolver error si no está disponible
+        // Extract the search service or return error if not available
         let search_service = match &state.applications.search_service {
             Some(service) => service,
             None => {
-                error!("Servicio de búsqueda no disponible");
+                error!("Search service not available");
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
                     Json(json!({
@@ -112,15 +112,15 @@ impl SearchHandler {
             }
         };
         
-        // Realizar la búsqueda
+        // Perform the search
         match search_service.search(criteria).await {
             Ok(results) => {
-                info!("Búsqueda completada, {} archivos y {} carpetas encontrados", 
+                info!("Search completed, {} files and {} folders found", 
                      results.files.len(), results.folders.len());
                 (StatusCode::OK, Json(results)).into_response()
             },
             Err(err) => {
-                error!("Error en búsqueda: {}", err);
+                error!("Search error: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({
@@ -132,24 +132,24 @@ impl SearchHandler {
     }
     
     /**
-     * Limpia la caché de resultados de búsqueda.
+     * Clears the search results cache.
      * 
-     * Este endpoint es útil para forzar búsquedas frescas después de cambios
-     * significativos en el sistema de archivos.
+     * This endpoint is useful for forcing fresh searches after significant
+     * changes in the file system.
      * 
-     * @param state Estado de la aplicación con servicios
-     * @return Respuesta HTTP indicando éxito o error
+     * @param state Application state with services
+     * @return HTTP response indicating success or error
      */
     pub async fn clear_search_cache(
         State(state): State<AppState>,
     ) -> impl IntoResponse {
-        info!("API: Limpiando caché de búsqueda");
+        info!("API: Clearing search cache");
         
-        // Extraer el servicio de búsqueda o devolver error si no está disponible
+        // Extract the search service or return error if not available
         let search_service = match &state.applications.search_service {
             Some(service) => service,
             None => {
-                error!("Servicio de búsqueda no disponible");
+                error!("Search service not available");
                 return (
                     StatusCode::SERVICE_UNAVAILABLE,
                     Json(json!({
@@ -159,10 +159,10 @@ impl SearchHandler {
             }
         };
         
-        // Limpiar la caché
+        // Clear the cache
         match search_service.clear_search_cache().await {
             Ok(_) => {
-                info!("Caché de búsqueda limpiada correctamente");
+                info!("Search cache cleared successfully");
                 (
                     StatusCode::OK,
                     Json(json!({
@@ -171,7 +171,7 @@ impl SearchHandler {
                 ).into_response()
             },
             Err(err) => {
-                error!("Error al limpiar caché de búsqueda: {}", err);
+                error!("Error clearing search cache: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({
@@ -183,43 +183,43 @@ impl SearchHandler {
     }
 }
 
-/// Parámetros de búsqueda para el endpoint GET
+/// Search parameters for the GET endpoint
 #[derive(Debug, serde::Deserialize)]
 pub struct SearchParams {
-    /// Texto a buscar en nombres de archivos y carpetas
+    /// Text to search for in file and folder names
     pub query: Option<String>,
     
-    /// Filtro por tipos de archivo (extensiones separadas por comas)
+    /// Filter by file types (comma-separated extensions)
     #[serde(rename = "type")]
     pub type_filter: Option<String>,
     
-    /// Filtrar elementos creados después de esta fecha (timestamp)
+    /// Filter items created after this date (timestamp)
     pub created_after: Option<u64>,
     
-    /// Filtrar elementos creados antes de esta fecha (timestamp)
+    /// Filter items created before this date (timestamp)
     pub created_before: Option<u64>,
     
-    /// Filtrar elementos modificados después de esta fecha (timestamp)
+    /// Filter items modified after this date (timestamp)
     pub modified_after: Option<u64>,
     
-    /// Filtrar elementos modificados antes de esta fecha (timestamp)
+    /// Filter items modified before this date (timestamp)
     pub modified_before: Option<u64>,
     
-    /// Tamaño mínimo en bytes
+    /// Minimum size in bytes
     pub min_size: Option<u64>,
     
-    /// Tamaño máximo en bytes
+    /// Maximum size in bytes
     pub max_size: Option<u64>,
     
-    /// ID de carpeta para limitar la búsqueda
+    /// Folder ID to limit the search scope
     pub folder_id: Option<String>,
     
-    /// Búsqueda recursiva en subcarpetas
+    /// Recursive search in subfolders
     pub recursive: Option<bool>,
     
-    /// Límite de resultados para paginación
+    /// Result limit for pagination
     pub limit: Option<usize>,
     
-    /// Desplazamiento para paginación
+    /// Offset for pagination
     pub offset: Option<usize>,
 }

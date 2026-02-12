@@ -1,6 +1,6 @@
 use crate::domain::services::path_service::StoragePath;
 
-// Re-exportar errores de entidad desde el módulo centralizado
+// Re-export entity errors from the centralized module
 pub use super::entity_errors::{FileError, FileResult};
 
 /**
@@ -366,6 +366,6 @@ mod tests {
         assert!(renamed.is_ok());
         let renamed = renamed.unwrap();
         assert_eq!(renamed.name(), "newname.txt");
-        assert_eq!(renamed.id(), "123"); // El ID no cambia
+        assert_eq!(renamed.id(), "123"); // The ID does not change
     }
 }

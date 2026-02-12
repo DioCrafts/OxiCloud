@@ -1,21 +1,21 @@
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-/// DTO para elementos recientes
+/// DTO for recent items
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecentItemDto {
-    /// Identificador único para el elemento reciente
+    /// Unique identifier for the recent item
     pub id: String,
     
-    /// ID del usuario propietario
+    /// Owner user ID
     pub user_id: String,
     
-    /// ID del elemento (archivo o carpeta)
+    /// Item ID (file or folder)
     pub item_id: String,
     
-    /// Tipo del elemento ('file' o 'folder')
+    /// Item type ('file' or 'folder')
     pub item_type: String,
     
-    /// Cuándo se accedió al elemento
+    /// When the item was accessed
     pub accessed_at: DateTime<Utc>,
 }

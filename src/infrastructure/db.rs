@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::common::config::AppConfig;
 
 pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
-    tracing::info!("Inicializando conexión a PostgreSQL con URL: {}", 
+    tracing::info!("Initializing PostgreSQL connection with URL: {}", 
                   config.database.connection_string.replace("postgres://", "postgres://[user]:[pass]@"));
     
     // Add a more robust connection attempt with retries
@@ -13,9 +13,9 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
     
     while attempt < MAX_ATTEMPTS {
         attempt += 1;
-        tracing::info!("Intento de conexión a PostgreSQL #{}", attempt);
+        tracing::info!("PostgreSQL connection attempt #{}", attempt);
         
-        // Crear el pool de conexiones con las opciones de configuración
+        // Create the connection pool with configuration options
         match PgPoolOptions::new()
             .max_connections(config.database.max_connections)
             .min_connections(config.database.min_connections)
@@ -25,10 +25,10 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
             .connect(&config.database.connection_string)
             .await {
                 Ok(pool) => {
-                    // Verificar la conexión
+                    // Verify the connection
                     match sqlx::query("SELECT 1").execute(&pool).await {
                         Ok(_) => {
-                            tracing::info!("Conexión a PostgreSQL establecida correctamente");
+                            tracing::info!("PostgreSQL connection established successfully");
                             
                             // Verify if migrations have been applied
                             let migration_check = sqlx::query("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'auth' AND tablename = 'users')")
@@ -39,34 +39,34 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
                                 Ok(row) => {
                                     let tables_exist: bool = row.get(0);
                                     if !tables_exist {
-                                        tracing::warn!("Las tablas de la base de datos no existen. Por favor, ejecuta las migraciones con: cargo run --bin migrate --features migrations");
+                                        tracing::warn!("Database tables do not exist. Please run migrations with: cargo run --bin migrate --features migrations");
                                     }
                                 },
                                 Err(_) => {
-                                    tracing::warn!("No se pudo verificar el estado de las migraciones. Por favor, ejecuta las migraciones con: cargo run --bin migrate --features migrations");
+                                    tracing::warn!("Could not verify migration status. Please run migrations with: cargo run --bin migrate --features migrations");
                                 }
                             }
                             
                             return Ok(pool);
                         },
                         Err(e) => {
-                            tracing::error!("Error al verificar conexión: {}", e);
-                            tracing::warn!("La base de datos parece no estar configurada. Por favor, ejecuta las migraciones con: cargo run --bin migrate --features migrations");
+                            tracing::error!("Error verifying connection: {}", e);
+                            tracing::warn!("The database appears to not be configured. Please run migrations with: cargo run --bin migrate --features migrations");
                             if attempt >= MAX_ATTEMPTS {
-                                return Err(anyhow::anyhow!("Error al verificar la conexión a PostgreSQL: {}", e));
+                                return Err(anyhow::anyhow!("Error verifying PostgreSQL connection: {}", e));
                             }
                         }
                     }
                 },
                 Err(e) => {
-                    tracing::error!("Error al conectar a PostgreSQL: {}", e);
+                    tracing::error!("Error connecting to PostgreSQL: {}", e);
                     if attempt >= MAX_ATTEMPTS {
-                        return Err(anyhow::anyhow!("Error en la conexión a PostgreSQL: {}", e));
+                        return Err(anyhow::anyhow!("Error in PostgreSQL connection: {}", e));
                     }
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
     }
     
-    Err(anyhow::anyhow!("No se pudo establecer la conexión a PostgreSQL después de {} intentos", MAX_ATTEMPTS))
+    Err(anyhow::anyhow!("Could not establish PostgreSQL connection after {} attempts", MAX_ATTEMPTS))
 }

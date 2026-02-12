@@ -17,21 +17,21 @@ pub async fn create_auth_services(
     pool: Arc<PgPool>,
     folder_service: Option<Arc<FolderService>>
 ) -> Result<AuthServices> {
-    // Crear servicio de tokens JWT (implementación de TokenServicePort)
+    // Create JWT token service (TokenServicePort implementation)
     let token_service: Arc<dyn TokenServicePort> = Arc::new(JwtTokenService::new(
         config.auth.jwt_secret.clone(),
         config.auth.access_token_expiry_secs,
         config.auth.refresh_token_expiry_secs,
     ));
     
-    // Crear servicio de hashing de contraseñas
+    // Create password hashing service
     let password_hasher = Arc::new(Argon2PasswordHasher::new());
     
-    // Crear repositorios PostgreSQL
+    // Create PostgreSQL repositories
     let user_repository = Arc::new(UserPgRepository::new(pool.clone()));
     let session_repository = Arc::new(SessionPgRepository::new(pool.clone()));
     
-    // Crear servicio de aplicación de autenticación
+    // Create authentication application service
     let mut auth_app_service = AuthApplicationService::new(
         user_repository,
         session_repository,
@@ -39,7 +39,7 @@ pub async fn create_auth_services(
         token_service.clone(),
     );
     
-    // Configurar servicio de carpetas si está disponible
+    // Configure folder service if available
     if let Some(folder_svc) = folder_service {
         auth_app_service = auth_app_service.with_folder_service(folder_svc);
     }
@@ -57,7 +57,7 @@ pub async fn create_auth_services(
         }
     }
     
-    // Empaquetar servicio en Arc
+    // Package service in Arc
     let auth_application_service = Arc::new(auth_app_service);
     
     Ok(AuthServices {

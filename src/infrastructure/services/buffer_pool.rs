@@ -5,71 +5,71 @@ use tokio::sync::{Mutex, Semaphore};
 use std::time::{Duration, Instant};
 use tracing::debug;
 
-/// Tamaño por defecto de los buffers en el pool
+/// Default buffer size in the pool
 pub const DEFAULT_BUFFER_SIZE: usize = 64 * 1024; // 64KB
 
-/// Número máximo por defecto de buffers en el pool
+/// Default maximum number of buffers in the pool
 pub const DEFAULT_MAX_BUFFERS: usize = 100;
 
-/// Tiempo de vida por defecto de un buffer inactivo (en segundos)
+/// Default time-to-live for an inactive buffer (in seconds)
 pub const DEFAULT_BUFFER_TTL: u64 = 60;
 
-/// Buffer pooling para optimizar operaciones de lectura/escritura
+/// Buffer pooling to optimize read/write operations
 pub struct BufferPool {
-    /// Pool de buffers disponibles
+    /// Pool of available buffers
     pool: Mutex<VecDeque<PooledBuffer>>,
-    /// Semáforo para limitar el número máximo de buffers
+    /// Semaphore to limit the maximum number of buffers
     limit: Semaphore,
-    /// Tamaño de los buffers en el pool
+    /// Size of buffers in the pool
     buffer_size: usize,
-    /// Estadísticas del pool
+    /// Pool statistics
     stats: Mutex<BufferPoolStats>,
-    /// Tiempo de vida de un buffer inactivo
+    /// Time-to-live for an inactive buffer
     buffer_ttl: Duration,
 }
 
-/// Estructura para tracking de estadísticas del pool
+/// Structure for tracking pool statistics
 #[derive(Debug, Clone, Default)]
 pub struct BufferPoolStats {
-    /// Número total de operaciones de get
+    /// Total number of get operations
     pub gets: usize,
-    /// Número de hits del pool (reutilización exitosa)
+    /// Number of pool hits (successful reuse)
     pub hits: usize,
-    /// Número de misses (creación de nuevo buffer)
+    /// Number of misses (new buffer creation)
     pub misses: usize,
-    /// Número de retornos al pool
+    /// Number of returns to the pool
     pub returns: usize,
-    /// Número de eviction por TTL
+    /// Number of TTL evictions
     pub evictions: usize,
-    /// Número máximo de buffers alcanzado
+    /// Maximum number of buffers reached
     pub max_buffers_reached: usize,
-    /// Esperas por semáforo
+    /// Semaphore waits
     pub waits: usize,
 }
 
-/// Buffer del pool con metadatos para gestión
+/// Pool buffer with management metadata
 struct PooledBuffer {
-    /// Buffer real de bytes
+    /// Actual byte buffer
     buffer: Vec<u8>,
-    /// Timestamp de cuándo se añadió/retornó al pool
+    /// Timestamp of when it was added/returned to the pool
     last_used: Instant,
 }
 
-/// Buffer prestado del pool con cleanup automático
+/// Borrowed buffer from the pool with automatic cleanup
 #[derive(Clone)]
 pub struct BorrowedBuffer {
-    /// Buffer actual
+    /// Current buffer
     buffer: Vec<u8>,
-    /// Tamaño real utilizado del buffer
+    /// Actual used size of the buffer
     used_size: usize,
-    /// Referencia al pool para retornar
+    /// Reference to the pool for returning
     pool: Arc<BufferPool>,
-    /// Si el buffer debe o no retornarse al pool
+    /// Whether the buffer should be returned to the pool or not
     return_to_pool: bool,
 }
 
 impl BufferPool {
-    /// Crea un nuevo pool de buffers
+    /// Creates a new buffer pool
     pub fn new(buffer_size: usize, max_buffers: usize, buffer_ttl_secs: u64) -> Arc<Self> {
         Arc::new(Self {
             pool: Mutex::new(VecDeque::with_capacity(max_buffers)),
@@ -80,7 +80,7 @@ impl BufferPool {
         })
     }
     
-    /// Crea un pool con configuración por defecto
+    /// Creates a pool with default configuration
     pub fn default() -> Arc<Self> {
         Self::new(
             DEFAULT_BUFFER_SIZE,
@@ -89,25 +89,25 @@ impl BufferPool {
         )
     }
     
-    /// Obtiene un buffer del pool o crea uno nuevo si es necesario.
+    /// Gets a buffer from the pool or creates a new one if needed.
     /// This version takes an Arc<Self> to ensure the BorrowedBuffer keeps a proper
     /// reference to the shared pool (not a clone).
     #[allow(unused_variables)]
     pub async fn get_buffer(self: &Arc<Self>) -> BorrowedBuffer {
-        // Incrementar contador de gets
+        // Increment get counter
         {
             let mut stats = self.stats.lock().await;
             stats.gets += 1;
         }
         
-        // Control de concurrencia
+        // Concurrency control
         // Acquire a semaphore permit. If none available, wait.
         // We forget() the permit so it doesn't auto-release on drop.
         // Instead, the permit is manually released in return_buffer/Drop via add_permits(1).
         match self.limit.try_acquire() {
             Ok(permit) => permit.forget(),
             Err(_) => {
-                // No hay permisos disponibles, esperamos
+                // No permits available, waiting
                 {
                     let mut stats = self.stats.lock().await;
                     stats.waits += 1;
@@ -121,15 +121,15 @@ impl BufferPool {
             }
         };
         
-        // Intentar obtener un buffer existente del pool
+        // Try to get an existing buffer from the pool
         let mut pool_locked = self.pool.lock().await;
         
         let pool_arc = Arc::clone(self);
         
         if let Some(mut pooled_buffer) = pool_locked.pop_front() {
-            // Verificar si el buffer ha expirado
+            // Check if the buffer has expired
             if pooled_buffer.last_used.elapsed() > self.buffer_ttl {
-                // Buffer expirado, descartamos y creamos uno nuevo
+                // Expired buffer, discard and create a new one
                 let mut stats = self.stats.lock().await;
                 stats.evictions += 1;
                 stats.misses += 1;
@@ -137,8 +137,8 @@ impl BufferPool {
                 
                 debug!("Buffer pool: evicted expired buffer");
                 
-                // Crear nuevo buffer (reutilizando el permiso)
-                drop(pool_locked); // Liberar el lock antes de retornar
+                // Create new buffer (reusing the permit)
+                drop(pool_locked); // Release the lock before returning
                 
                 BorrowedBuffer {
                     buffer: vec![0; self.buffer_size],
@@ -147,15 +147,15 @@ impl BufferPool {
                     return_to_pool: true,
                 }
             } else {
-                // Buffer válido, lo reutilizamos
+                // Valid buffer, reuse it
                 let mut stats = self.stats.lock().await;
                 stats.hits += 1;
                 drop(stats);
                 
-                // Liberar el lock antes de retornar
+                // Release the lock before returning
                 drop(pool_locked);
                 
-                // Limpiar buffer por seguridad
+                // Clear buffer for security
                 pooled_buffer.buffer.fill(0);
                 
                 BorrowedBuffer {
@@ -166,12 +166,12 @@ impl BufferPool {
                 }
             }
         } else {
-            // No hay buffers disponibles, creamos uno nuevo
+            // No buffers available, create a new one
             let mut stats = self.stats.lock().await;
             stats.misses += 1;
             drop(stats);
             
-            // Liberar el lock antes de retornar
+            // Release the lock before returning
             drop(pool_locked);
             
             debug!("Buffer pool: creating new buffer");
@@ -185,9 +185,9 @@ impl BufferPool {
         }
     }
     
-    /// Retorna un buffer al pool
+    /// Returns a buffer to the pool
     async fn return_buffer(&self, mut buffer: Vec<u8>) {
-        // Si el buffer es del tamaño incorrecto, lo descartamos
+        // If the buffer is the wrong size, discard it
         if buffer.capacity() != self.buffer_size {
             debug!("Buffer pool: discarding buffer of wrong size: {} (expected {})", 
                  buffer.capacity(), self.buffer_size);
@@ -196,10 +196,10 @@ impl BufferPool {
             return;
         }
         
-        // Resize para asegurar capacidad correcta
+        // Resize to ensure correct capacity
         buffer.resize(self.buffer_size, 0);
         
-        // Añadir al pool
+        // Add to the pool
         let mut pool_locked = self.pool.lock().await;
         
         pool_locked.push_back(PooledBuffer {
@@ -207,7 +207,7 @@ impl BufferPool {
             last_used: Instant::now(),
         });
         
-        // Actualizar estadísticas
+        // Update statistics
         let mut stats = self.stats.lock().await;
         stats.returns += 1;
         
@@ -217,24 +217,24 @@ impl BufferPool {
         self.limit.add_permits(1);
     }
     
-    /// Limpia buffers expirados del pool
+    /// Cleans expired buffers from the pool
     pub async fn clean_expired_buffers(&self) {
         let _now = Instant::now();
         let mut pool_locked = self.pool.lock().await;
         
-        // Contar expirados
+        // Count expired
         let count_before = pool_locked.len();
         
-        // Filtrar manteniendo solo los no expirados
+        // Filter keeping only non-expired
         pool_locked.retain(|buffer| {
             buffer.last_used.elapsed() <= self.buffer_ttl
         });
         
-        // Contar cuántos se eliminaron
+        // Count how many were removed
         let removed = count_before - pool_locked.len();
         
         if removed > 0 {
-            // Actualizar estadísticas
+            // Update statistics
             let mut stats = self.stats.lock().await;
             stats.evictions += removed;
             
@@ -242,21 +242,21 @@ impl BufferPool {
         }
     }
     
-    /// Obtiene estadísticas actuales del pool
+    /// Gets current pool statistics
     pub async fn get_stats(&self) -> BufferPoolStats {
         self.stats.lock().await.clone()
     }
     
-    /// Inicia la tarea periódica de limpieza
+    /// Starts the periodic cleanup task
     pub fn start_cleaner(pool: Arc<Self>) {
         tokio::spawn(async move {
-            let interval = Duration::from_secs(30); // Limpiar cada 30 segundos
+            let interval = Duration::from_secs(30); // Clean every 30 seconds
             
             loop {
                 tokio::time::sleep(interval).await;
                 pool.clean_expired_buffers().await;
                 
-                // Loguear estadísticas periódicamente
+                // Log statistics periodically
                 let stats = pool.get_stats().await;
                 debug!("Buffer pool stats: gets={}, hits={}, misses={}, hit_ratio={:.2}%, returns={}, \
                       evictions={}, max_reached={}, waits={}",
@@ -286,31 +286,31 @@ impl Clone for BufferPool {
 }
 
 impl BorrowedBuffer {
-    /// Accede al buffer interno
+    /// Accesses the internal buffer
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         &mut self.buffer
     }
     
-    /// Obtiene una referencia a los datos utilizados
+    /// Gets a reference to the used data
     pub fn as_slice(&self) -> &[u8] {
         &self.buffer[..self.used_size]
     }
     
-    /// Establece cuántos bytes se utilizaron realmente
+    /// Sets how many bytes were actually used
     pub fn set_used(&mut self, size: usize) {
         self.used_size = min(size, self.buffer.len());
     }
     
-    /// Convierte en un Vec<u8> que incluye solo los datos utilizados
+    /// Converts into a Vec<u8> that includes only the used data
     pub fn into_vec(mut self) -> Vec<u8> {
-        // Marcar para no devolver al pool
+        // Mark to not return to pool
         self.return_to_pool = false;
         
-        // Crear un nuevo vector solo con los datos utilizados
+        // Create a new vector with only the used data
         self.buffer[..self.used_size].to_vec()
     }
     
-    /// Copia datos a este buffer y actualiza el tamaño usado
+    /// Copies data to this buffer and updates the used size
     pub fn copy_from_slice(&mut self, data: &[u8]) -> usize {
         let copy_size = min(data.len(), self.buffer.len());
         self.buffer[..copy_size].copy_from_slice(&data[..copy_size]);
@@ -318,32 +318,32 @@ impl BorrowedBuffer {
         copy_size
     }
     
-    /// Impide que el buffer se devuelva al pool al destruirse
+    /// Prevents the buffer from being returned to the pool on destruction
     pub fn do_not_return(mut self) -> Self {
         self.return_to_pool = false;
         self
     }
     
-    /// Obtiene el tamaño total del buffer
+    /// Gets the total buffer size
     pub fn capacity(&self) -> usize {
         self.buffer.len()
     }
     
-    /// Obtiene el tamaño usado del buffer
+    /// Gets the used buffer size
     pub fn used_size(&self) -> usize {
         self.used_size
     }
 }
 
-// Cuando se hace drop de un BorrowedBuffer, lo devuelve al pool
+// When a BorrowedBuffer is dropped, it is returned to the pool
 impl Drop for BorrowedBuffer {
     fn drop(&mut self) {
         if self.return_to_pool {
-            // Tomar posesión del buffer y crear un clone del pool
+            // Take ownership of the buffer and create a clone of the pool
             let buffer = std::mem::take(&mut self.buffer);
             let pool = self.pool.clone();
             
-            // Spawn del return para que el drop no bloquee
+            // Spawn the return so that drop doesn't block
             // return_buffer will release the semaphore permit
             tokio::spawn(async move {
                 pool.return_buffer(buffer).await;
@@ -361,39 +361,39 @@ mod tests {
     
     #[tokio::test]
     async fn test_buffer_pooling() {
-        // Crear pool pequeño para testing
+        // Create small pool for testing
         let pool = BufferPool::new(1024, 5, 60);
         
-        // Obtener un buffer
+        // Get a buffer
         let mut buffer1 = pool.get_buffer().await;
         buffer1.copy_from_slice(b"test data");
         assert_eq!(buffer1.as_slice(), b"test data");
         
-        // Obtener otro buffer
+        // Get another buffer
         let buffer2 = pool.get_buffer().await;
         
-        // Verificar stats
+        // Verify stats
         let stats = pool.get_stats().await;
         assert_eq!(stats.gets, 2);
-        assert_eq!(stats.hits, 0); // sin hits todavía
-        assert_eq!(stats.misses, 2); // todos son misses
+        assert_eq!(stats.hits, 0); // no hits yet
+        assert_eq!(stats.misses, 2); // all are misses
         
-        // Devolver buffer1 al pool (implícitamente por drop)
+        // Return buffer1 to pool (implicitly via drop)
         drop(buffer1);
         
-        // Permitir que el return asíncrono ocurra
+        // Allow the async return to occur
         tokio::time::sleep(Duration::from_millis(10)).await;
         
-        // Obtener otro buffer (debería reutilizar el retornado)
+        // Get another buffer (should reuse the returned one)
         let buffer3 = pool.get_buffer().await;
         
-        // Verificar stats actualizados
+        // Verify updated stats
         let stats = pool.get_stats().await;
         assert_eq!(stats.gets, 3);
-        assert_eq!(stats.hits, 1); // ahora debería haber un hit
-        assert_eq!(stats.returns, 1); // un buffer retornado
+        assert_eq!(stats.hits, 1); // now there should be a hit
+        assert_eq!(stats.returns, 1); // one buffer returned
         
-        // Limpiar
+        // Cleanup
         drop(buffer2);
         drop(buffer3);
     }
@@ -402,19 +402,19 @@ mod tests {
     async fn test_buffer_operations() {
         let pool = BufferPool::new(1024, 10, 60);
         
-        // Obtener buffer
+        // Get buffer
         let mut buffer = pool.get_buffer().await;
         
-        // Escribir datos
+        // Write data
         buffer.copy_from_slice(b"Hello, world!");
         assert_eq!(buffer.used_size(), 13);
         assert_eq!(buffer.as_slice(), b"Hello, world!");
         
-        // Convertir a vec y verificar
-        let vec = buffer.into_vec(); // Esto impide retornar al pool
+        // Convert to vec and verify
+        let vec = buffer.into_vec(); // This prevents returning to pool
         assert_eq!(vec, b"Hello, world!");
         
-        // Verificar que no se incrementan los returns (buffer no retornado)
+        // Verify that returns are not incremented (buffer not returned)
         tokio::time::sleep(Duration::from_millis(10)).await;
         let stats = pool.get_stats().await;
         assert_eq!(stats.returns, 0);
@@ -422,76 +422,76 @@ mod tests {
     
     #[tokio::test]
     async fn test_pool_limit() {
-        // Pool con solo 3 buffers
+        // Pool with only 3 buffers
         let pool = BufferPool::new(1024, 3, 60);
         
-        // Obtener 3 buffers (alcanza el límite)
+        // Get 3 buffers (reaches the limit)
         let buffer1 = pool.get_buffer().await;
         let buffer2 = pool.get_buffer().await;
         let buffer3 = pool.get_buffer().await;
         
-        // Verificar stats
+        // Verify stats
         let stats = pool.get_stats().await;
         assert_eq!(stats.gets, 3);
-        assert_eq!(stats.waits, 0); // sin esperas todavía
+        assert_eq!(stats.waits, 0); // no waits yet
         
-        // Intentar obtener un 4º buffer en una tarea separada (debería esperar)
+        // Try to get a 4th buffer in a separate task (should wait)
         let pool_clone = pool.clone();
         let handle = tokio::spawn(async move {
             let _buffer4 = pool_clone.get_buffer().await;
             true
         });
         
-        // Dar tiempo para que la tarea intente tomar el buffer
+        // Give time for the task to try to take the buffer
         tokio::time::sleep(Duration::from_millis(50)).await;
         
-        // Verificar que hay una espera
+        // Verify there is a wait
         let stats = pool.get_stats().await;
         assert_eq!(stats.waits, 1);
         
-        // Liberar un buffer
+        // Release a buffer
         drop(buffer1);
         
-        // Dar tiempo para el retorno asíncrono y para que la tarea en espera obtenga su buffer
+        // Give time for the async return and for the waiting task to get its buffer
         tokio::time::sleep(Duration::from_millis(50)).await;
         
-        // Verificar que la tarea pudo continuar
+        // Verify the task was able to continue
         assert!(handle.await.unwrap());
         
-        // Limpiar
+        // Cleanup
         drop(buffer2);
         drop(buffer3);
     }
     
     #[tokio::test]
     async fn test_ttl_expiration() {
-        // Pool con TTL muy corto para testing
-        let pool = BufferPool::new(1024, 5, 1); // 1 segundo TTL
+        // Pool with very short TTL for testing
+        let pool = BufferPool::new(1024, 5, 1); // 1 second TTL
         
-        // Obtener y devolver un buffer
+        // Get and return a buffer
         let buffer = pool.get_buffer().await;
         drop(buffer);
         
-        // Permitir que el return asíncrono ocurra
+        // Allow the async return to occur
         tokio::time::sleep(Duration::from_millis(50)).await;
         
-        // Verificar que hay un buffer en el pool
+        // Verify there is a buffer in the pool
         let stats = pool.get_stats().await;
         assert_eq!(stats.returns, 1);
         
-        // Esperar a que expire el TTL
+        // Wait for the TTL to expire
         tokio::time::sleep(Duration::from_secs(2)).await;
         
-        // Limpiar expirados
+        // Clean expired
         pool.clean_expired_buffers().await;
         
-        // Obtener otro buffer (debería ser un miss ya que el anterior expiró)
+        // Get another buffer (should be a miss since the previous one expired)
         let _buffer2 = pool.get_buffer().await;
         
-        // Verificar stats
+        // Verify stats
         let stats = pool.get_stats().await;
-        assert_eq!(stats.evictions, 1); // un buffer expirado
-        assert_eq!(stats.hits, 0); // sin hits (el buffer expiró)
-        assert_eq!(stats.misses, 2); // dos misses (1er y 3er get)
+        assert_eq!(stats.evictions, 1); // one expired buffer
+        assert_eq!(stats.hits, 0); // no hits (the buffer expired)
+        assert_eq!(stats.misses, 2); // two misses (1st and 3rd get)
     }
 }

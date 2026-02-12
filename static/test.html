@@ -8,17 +8,17 @@
 <body>
     <h1>OxiCloud Test Page</h1>
     <div id="result"></div>
-    <button id="createBtn">Crear carpeta nueva</button>
-    <button id="listBtn">Listar carpetas</button>
+    <button id="createBtn">Create new folder</button>
+    <button id="listBtn">List folders</button>
     
     <script>
-        // Función para mostrar resultados
+        // Function to show results
         function showResult(data) {
             document.getElementById('result').innerHTML = 
                 '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
         }
         
-        // Función para crear carpeta
+        // Function to create folder
         async function createFolder() {
             try {
                 const response = await fetch('/api/folders', {
@@ -33,34 +33,34 @@
                 });
                 
                 const data = await response.json();
-                console.log('Respuesta de creación de carpeta:', data);
+                console.log('Folder creation response:', data);
                 showResult(data);
                 
                 return data;
             } catch (error) {
-                console.error('Error al crear carpeta:', error);
+                console.error('Error creating folder:', error);
                 showResult({error: error.message});
                 return null;
             }
         }
 
-        // Función para listar carpetas
+        // Function to list folders
         async function listFolders() {
             try {
                 const response = await fetch('/api/folders');
                 const data = await response.json();
-                console.log('Listado de carpetas:', data);
+                console.log('Folder listing:', data);
                 showResult(data);
                 
                 return data;
             } catch (error) {
-                console.error('Error al listar carpetas:', error);
+                console.error('Error listing folders:', error);
                 showResult({error: error.message});
                 return [];
             }
         }
         
-        // Asignar eventos a botones
+        // Assign events to buttons
         document.getElementById('createBtn').addEventListener('click', createFolder);
         document.getElementById('listBtn').addEventListener('click', listFolders);
     </script>

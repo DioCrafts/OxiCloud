@@ -7,69 +7,69 @@ use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
 use crate::application::ports::outbound::{IdMappingPort, StoragePort, FolderStoragePort};
 
-/// Errores específicos del mediador de almacenamiento
+/// Storage mediator specific errors
 #[derive(Debug, Error)]
 pub enum StorageMediatorError {
-    #[error("Entidad no encontrada: {0}")]
+    #[error("Entity not found: {0}")]
     NotFound(String),
     
-    #[error("Entidad ya existe: {0}")]
+    #[error("Entity already exists: {0}")]
     AlreadyExists(String),
     
-    #[error("Ruta inválida: {0}")]
+    #[error("Invalid path: {0}")]
     InvalidPath(String),
     
-    #[error("Error de acceso: {0}")]
+    #[error("Access error: {0}")]
     AccessError(String),
     
-    #[error("Error interno: {0}")]
+    #[error("Internal error: {0}")]
     InternalError(String),
     
-    #[error("Error de dominio: {0}")]
+    #[error("Domain error: {0}")]
     DomainError(#[from] crate::common::errors::DomainError),
 }
 
-/// Tipo de resultado para las operaciones del mediador
+/// Result type for mediator operations
 pub type StorageMediatorResult<T> = Result<T, StorageMediatorError>;
 
-/// Interfaz del servicio mediador entre repositorios de archivos y carpetas
+/// Interface for the mediator service between file and folder repositories
 #[async_trait]
 pub trait StorageMediator: Send + Sync + 'static {
-    /// Obtiene la ruta de una carpeta por su ID
+    /// Gets the path of a folder by its ID
     async fn get_folder_path(&self, folder_id: &str) -> StorageMediatorResult<PathBuf>;
     
-    /// Obtiene la ruta de dominio de una carpeta por su ID
+    /// Gets the domain path of a folder by its ID
     async fn get_folder_storage_path(&self, folder_id: &str) -> StorageMediatorResult<StoragePath>;
     
-    /// Obtiene todos los detalles de una carpeta por su ID
+    /// Gets all details of a folder by its ID
     async fn get_folder(&self, folder_id: &str) -> StorageMediatorResult<Folder>;
     
-    /// Verifica si existe un archivo en una ruta específica
+    /// Checks if a file exists at a specific path
     async fn file_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool>;
     
-    /// Verifica si existe un archivo en una ruta de dominio específica
+    /// Checks if a file exists at a specific domain path
     async fn file_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool>;
     
-    /// Verifica si existe una carpeta en una ruta específica
+    /// Checks if a folder exists at a specific path
     async fn folder_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool>;
     
-    /// Verifica si existe una carpeta en una ruta de dominio específica
+    /// Checks if a folder exists at a specific domain path
     async fn folder_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool>;
     
-    /// Resuelve una ruta relativa a absoluta (legacy)
+    /// Resolves a relative path to absolute (legacy)
     fn resolve_path(&self, relative_path: &Path) -> PathBuf;
     
-    /// Resuelve una ruta de dominio a una ruta física absoluta
+    /// Resolves a domain path to an absolute physical path
     fn resolve_storage_path(&self, storage_path: &StoragePath) -> PathBuf;
     
-    /// Crea un directorio si no existe (legacy)
+    /// Creates a directory if it does not exist (legacy)
     async fn ensure_directory(&self, path: &Path) -> StorageMediatorResult<()>;
     
-    /// Crea un directorio si no existe
+    /// Creates a directory if it does not exist
     async fn ensure_storage_directory(&self, storage_path: &StoragePath) -> StorageMediatorResult<()>;
 }
 
-/// Implementación concreta del mediador de almacenamiento
+/// Concrete implementation of the storage mediator
 pub struct FileSystemStorageMediator {
     pub folder_storage_port: Arc<dyn FolderStoragePort>,
     pub path_service: Arc<dyn StoragePort>,
@@ -189,7 +189,7 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn file_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(path);
         
-        // Verificar si existe como archivo (no como directorio)
+        // Check if it exists as a file (not as a directory)
         let exists = abs_path.exists() && abs_path.is_file();
         
         Ok(exists)
@@ -198,7 +198,7 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn file_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_storage_path(storage_path);
         
-        // Verificar si existe como archivo (no como directorio)
+        // Check if it exists as a file (not as a directory)
         let exists = abs_path.exists() && abs_path.is_file();
         
         Ok(exists)
@@ -207,7 +207,7 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn folder_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(path);
         
-        // Verificar si existe como directorio
+        // Check if it exists as a directory
         let exists = abs_path.exists() && abs_path.is_dir();
         
         Ok(exists)
@@ -216,7 +216,7 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn folder_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_storage_path(storage_path);
         
-        // Verificar si existe como directorio
+        // Check if it exists as a directory
         let exists = abs_path.exists() && abs_path.is_dir();
         
         Ok(exists)
@@ -236,13 +236,13 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn ensure_directory(&self, path: &Path) -> StorageMediatorResult<()> {
         let abs_path = self.resolve_path(path);
         
-        // Crear directorios si no existen
+        // Create directories if they don't exist
         if !abs_path.exists() {
             tokio::fs::create_dir_all(&abs_path).await
-                .map_err(|e| StorageMediatorError::AccessError(format!("No se pudo crear el directorio: {}", e)))?;
+                .map_err(|e| StorageMediatorError::AccessError(format!("Could not create directory: {}", e)))?;
         } else if !abs_path.is_dir() {
             return Err(StorageMediatorError::InvalidPath(
-                format!("La ruta existe pero no es un directorio: {}", abs_path.display())
+                format!("Path exists but is not a directory: {}", abs_path.display())
             ));
         }
         
@@ -252,13 +252,13 @@ impl StorageMediator for FileSystemStorageMediator {
     async fn ensure_storage_directory(&self, storage_path: &StoragePath) -> StorageMediatorResult<()> {
         let abs_path = self.resolve_storage_path(storage_path);
         
-        // Crear directorios si no existen
+        // Create directories if they don't exist
         if !abs_path.exists() {
             tokio::fs::create_dir_all(&abs_path).await
-                .map_err(|e| StorageMediatorError::AccessError(format!("No se pudo crear el directorio: {}", e)))?;
+                .map_err(|e| StorageMediatorError::AccessError(format!("Could not create directory: {}", e)))?;
         } else if !abs_path.is_dir() {
             return Err(StorageMediatorError::InvalidPath(
-                format!("La ruta existe pero no es un directorio: {}", abs_path.display())
+                format!("Path exists but is not a directory: {}", abs_path.display())
             ));
         }
         

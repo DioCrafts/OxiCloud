@@ -32,14 +32,14 @@ impl CalendarRepository for CalendarPgRepository {
         .bind(calendar.owner_id())
         .bind(calendar.description())
         .bind(calendar.color())
-        .bind(false) // is_public no existe como campo
+        .bind(false) // is_public doesn't exist as a field
         .bind(calendar.created_at())
         .bind(calendar.updated_at())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create calendar: {}", e)))?;
         
-        // Construir el objeto Calendar utilizando su constructor with_id
+        // Build the Calendar object using its with_id constructor
         let result = Calendar::with_id(
             row.get("id"),
             row.get("name"),
@@ -66,14 +66,14 @@ impl CalendarRepository for CalendarPgRepository {
         .bind(calendar.name())
         .bind(calendar.description())
         .bind(calendar.color())
-        .bind(false) // is_public no existe como campo
+        .bind(false) // is_public doesn't exist as a field
         .bind(now)
         .bind(calendar.id())
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update calendar: {}", e)))?;
         
-        // Construir el objeto Calendar utilizando su constructor with_id
+        // Build the Calendar object using its with_id constructor
         let result = Calendar::with_id(
             row.get("id"),
             row.get("name"),

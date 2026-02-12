@@ -22,10 +22,10 @@ pub enum UploadStrategy {
     Streaming,
 }
 
-/// Puerto primario para operaciones de subida de archivos
+/// Primary port for file upload operations
 #[async_trait]
 pub trait FileUploadUseCase: Send + Sync + 'static {
-    /// Sube un nuevo archivo desde bytes
+    /// Uploads a new file from bytes
     async fn upload_file(
         &self,
         name: String,
@@ -47,10 +47,10 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         total_size: usize,
     ) -> Result<(FileDto, UploadStrategy), DomainError>;
 
-    /// Crea un nuevo archivo en la ruta especificada (para WebDAV)
+    /// Creates a new file at the specified path (for WebDAV)
     async fn create_file(&self, parent_path: &str, filename: &str, content: &[u8], content_type: &str) -> Result<FileDto, DomainError>;
 
-    /// Actualiza el contenido de un archivo existente (para WebDAV)
+    /// Updates the content of an existing file (for WebDAV)
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError>;
 }
 
@@ -76,22 +76,22 @@ pub enum OptimizedFileContent {
     Stream(Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>),
 }
 
-/// Puerto primario para operaciones de recuperación de archivos
+/// Primary port for file retrieval operations
 #[async_trait]
 pub trait FileRetrievalUseCase: Send + Sync + 'static {
-    /// Obtiene un archivo por su ID
+    /// Gets a file by its ID
     async fn get_file(&self, id: &str) -> Result<FileDto, DomainError>;
     
-    /// Obtiene un archivo por su ruta (para WebDAV)
+    /// Gets a file by its path (for WebDAV)
     async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError>;
     
-    /// Lista archivos en una carpeta
+    /// Lists files in a folder
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError>;
     
-    /// Obtiene contenido de archivo como bytes (para archivos pequeños)
+    /// Gets file content as bytes (for small files)
     async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
     
-    /// Obtiene contenido de archivo como stream (para archivos grandes)
+    /// Gets file content as a stream (for large files)
     async fn get_file_stream(&self, id: &str) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
     /// Optimized multi-tier download.
@@ -119,16 +119,16 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
 // Management port (delete, move)
 // ─────────────────────────────────────────────────────
 
-/// Puerto primario para operaciones de gestión de archivos
+/// Primary port for file management operations
 #[async_trait]
 pub trait FileManagementUseCase: Send + Sync + 'static {
-    /// Mueve un archivo a otra carpeta
+    /// Moves a file to another folder
     async fn move_file(&self, file_id: &str, folder_id: Option<String>) -> Result<FileDto, DomainError>;
     
-    /// Renombra un archivo
+    /// Renames a file
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
     
-    /// Elimina un archivo
+    /// Deletes a file
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
     /// Smart delete: trash-first with dedup reference cleanup.
@@ -145,7 +145,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     ) -> Result<bool, DomainError>;
 }
 
-/// Factory para crear implementaciones de casos de uso de archivos
+/// Factory for creating file use case implementations
 pub trait FileUseCaseFactory: Send + Sync + 'static {
     fn create_file_upload_use_case(&self) -> Arc<dyn FileUploadUseCase>;
     fn create_file_retrieval_use_case(&self) -> Arc<dyn FileRetrievalUseCase>;

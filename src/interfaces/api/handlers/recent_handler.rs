@@ -11,14 +11,14 @@ use tracing::{error, info};
 use crate::application::ports::recent_ports::RecentItemsUseCase;
 use crate::interfaces::middleware::auth::AuthUser;
 
-/// Parámetros de consulta para obtener elementos recientes
+/// Query parameters for getting recent items
 #[derive(Deserialize)]
 pub struct GetRecentParams {
     #[serde(default)]
     limit: Option<i32>,
 }
 
-/// Obtener elementos recientes del usuario
+/// Get user's recent items
 pub async fn get_recent_items(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
     auth_user: AuthUser,
@@ -28,22 +28,22 @@ pub async fn get_recent_items(
     
     match recent_service.get_recent_items(user_id, params.limit).await {
         Ok(items) => {
-            info!("Recuperados {} elementos recientes para usuario", items.len());
+            info!("Retrieved {} recent items for user", items.len());
             (StatusCode::OK, Json(items)).into_response()
         },
         Err(err) => {
-            error!("Error al recuperar elementos recientes: {}", err);
+            error!("Error retrieving recent items: {}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR, 
                 Json(serde_json::json!({
-                    "error": format!("Fallo al recuperar elementos recientes: {}", err)
+                    "error": format!("Failed to retrieve recent items: {}", err)
                 }))
             ).into_response()
         }
     }
 }
 
-/// Registrar acceso a un elemento
+/// Record access to an item
 pub async fn record_item_access(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
     auth_user: AuthUser,
@@ -51,39 +51,39 @@ pub async fn record_item_access(
 ) -> impl IntoResponse {
     let user_id = &auth_user.id;
     
-    // Validar tipo de elemento
+    // Validate item type
     if item_type != "file" && item_type != "folder" {
         return (
             StatusCode::BAD_REQUEST, 
             Json(serde_json::json!({
-                "error": "El tipo de elemento debe ser 'file' o 'folder'"
+                "error": "Item type must be 'file' or 'folder'"
             }))
         ).into_response();
     }
     
     match recent_service.record_item_access(user_id, &item_id, &item_type).await {
         Ok(_) => {
-            info!("Registrado acceso a {} '{}' en recientes", item_type, item_id);
+            info!("Recorded access to {} '{}' in recents", item_type, item_id);
             (
                 StatusCode::OK, 
                 Json(serde_json::json!({
-                    "message": "Acceso registrado correctamente"
+                    "message": "Access recorded successfully"
                 }))
             ).into_response()
         },
         Err(err) => {
-            error!("Error al registrar acceso en recientes: {}", err);
+            error!("Error recording access in recents: {}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR, 
                 Json(serde_json::json!({
-                    "error": format!("Fallo al registrar acceso: {}", err)
+                    "error": format!("Failed to record access: {}", err)
                 }))
             ).into_response()
         }
     }
 }
 
-/// Eliminar un elemento de recientes
+/// Remove an item from recents
 pub async fn remove_from_recent(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
     auth_user: AuthUser,
@@ -94,36 +94,36 @@ pub async fn remove_from_recent(
     match recent_service.remove_from_recent(user_id, &item_id, &item_type).await {
         Ok(removed) => {
             if removed {
-                info!("Eliminado {} '{}' de recientes", item_type, item_id);
+                info!("Removed {} '{}' from recents", item_type, item_id);
                 (
                     StatusCode::OK, 
                     Json(serde_json::json!({
-                        "message": "Elemento eliminado de recientes"
+                        "message": "Item removed from recents"
                     }))
                 ).into_response()
             } else {
-                info!("Elemento {} '{}' no estaba en recientes", item_type, item_id);
+                info!("Item {} '{}' was not in recents", item_type, item_id);
                 (
                     StatusCode::NOT_FOUND, 
                     Json(serde_json::json!({
-                        "message": "Elemento no estaba en recientes"
+                        "message": "Item was not in recents"
                     }))
                 ).into_response()
             }
         },
         Err(err) => {
-            error!("Error al eliminar de recientes: {}", err);
+            error!("Error removing from recents: {}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR, 
                 Json(serde_json::json!({
-                    "error": format!("Fallo al eliminar de recientes: {}", err)
+                    "error": format!("Failed to remove from recents: {}", err)
                 }))
             ).into_response()
         }
     }
 }
 
-/// Limpiar todos los elementos recientes
+/// Clear all recent items
 pub async fn clear_recent_items(
     State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
     auth_user: AuthUser,
@@ -132,20 +132,20 @@ pub async fn clear_recent_items(
     
     match recent_service.clear_recent_items(user_id).await {
         Ok(_) => {
-            info!("Limpiados todos los elementos recientes para usuario");
+            info!("Cleared all recent items for user");
             (
                 StatusCode::OK, 
                 Json(serde_json::json!({
-                    "message": "Elementos recientes limpiados correctamente"
+                    "message": "Recent items cleared successfully"
                 }))
             ).into_response()
         },
         Err(err) => {
-            error!("Error al limpiar elementos recientes: {}", err);
+            error!("Error clearing recent items: {}", err);
             (
                 StatusCode::INTERNAL_SERVER_ERROR, 
                 Json(serde_json::json!({
-                    "error": format!("Fallo al limpiar elementos recientes: {}", err)
+                    "error": format!("Failed to clear recent items: {}", err)
                 }))
             ).into_response()
         }
