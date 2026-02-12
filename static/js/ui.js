@@ -435,6 +435,24 @@ const ui = {
     },
 
     /**
+     * Check if a file can be previewed in the viewer
+     * @param {Object} file - File object with mime_type property
+     * @returns {boolean}
+     */
+    isViewableFile(file) {
+        if (!file || !file.mime_type) return false;
+        if (file.mime_type.startsWith('image/')) return true;
+        if (file.mime_type === 'application/pdf') return true;
+        if (file.mime_type.startsWith('text/')) return true;
+        const textTypes = [
+            'application/json', 'application/xml', 'application/javascript',
+            'application/x-sh', 'application/x-yaml', 'application/toml',
+            'application/x-toml', 'application/sql',
+        ];
+        return textTypes.includes(file.mime_type);
+    },
+
+    /**
      * Show notification
      * @param {string} title - Notification title
      * @param {string} message - Notification message
@@ -957,17 +975,16 @@ const ui = {
             }
             
             // Check if it's a viewable file type
-            if ((file.mime_type && file.mime_type.startsWith('image/')) || 
-                (file.mime_type && file.mime_type === 'application/pdf')) {
+            if (this.isViewableFile(file)) {
                 if (window.inlineViewer) {
                     window.inlineViewer.openFile(file);
                 } else if (window.fileViewer) {
                     window.fileViewer.open(file);
                 } else {
-                    window.location.href = `/api/files/${file.id}`;
+                    window.fileOps.downloadFile(file.id, file.name);
                 }
             } else {
-                window.location.href = `/api/files/${file.id}`;
+                window.fileOps.downloadFile(file.id, file.name);
             }
         });
 
@@ -1051,8 +1068,7 @@ const ui = {
             }
             
             // Check if it's a viewable file type
-            if ((file.mime_type && file.mime_type.startsWith('image/')) || 
-                (file.mime_type && file.mime_type === 'application/pdf')) {
+            if (this.isViewableFile(file)) {
                 // Open in the inline viewer
                 if (window.inlineViewer) {
                     window.inlineViewer.openFile(file);
@@ -1061,11 +1077,11 @@ const ui = {
                     window.fileViewer.open(file);
                 } else {
                     // No viewer available, download directly
-                    window.location.href = `/api/files/${file.id}`;
+                    window.fileOps.downloadFile(file.id, file.name);
                 }
             } else {
                 // For other file types, download directly
-                window.location.href = `/api/files/${file.id}`;
+                window.fileOps.downloadFile(file.id, file.name);
             }
         });
 

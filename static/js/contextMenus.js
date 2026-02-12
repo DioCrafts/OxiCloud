@@ -88,9 +88,8 @@ const contextMenus = {
                 })
                     .then(response => response.json())
                     .then(fileDetails => {
-                        // Check if viewable file type
-                        if ((fileDetails.mime_type && fileDetails.mime_type.startsWith('image/')) || 
-                            (fileDetails.mime_type && fileDetails.mime_type === 'application/pdf')) {
+                        // Check if viewable file type (images, PDFs, text files)
+                        if (window.ui && window.ui.isViewableFile(fileDetails)) {
                             // Open with inline viewer
                             if (window.inlineViewer) {
                                 window.inlineViewer.openFile(fileDetails);

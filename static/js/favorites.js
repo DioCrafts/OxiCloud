@@ -609,9 +609,13 @@ const favorites = {
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
 
-        // Download on click
+        // View or download on click
         fileGridElement.addEventListener('click', () => {
-            window.location.href = `/api/files/${file.id}`;
+            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
+                window.inlineViewer.openFile(file);
+            } else if (window.fileOps) {
+                window.fileOps.downloadFile(file.id, file.name);
+            }
         });
 
         // Context menu
@@ -654,9 +658,13 @@ const favorites = {
             <div class="date-cell">${formattedDate}</div>
         `;
 
-        // Download on click
+        // View or download on click
         fileListElement.addEventListener('click', () => {
-            window.location.href = `/api/files/${file.id}`;
+            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
+                window.inlineViewer.openFile(file);
+            } else if (window.fileOps) {
+                window.fileOps.downloadFile(file.id, file.name);
+            }
         });
 
         // Context menu

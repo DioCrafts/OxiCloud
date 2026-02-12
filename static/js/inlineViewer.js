@@ -133,6 +133,19 @@ class InlineViewer {
       // Create PDF viewer using object tag with blob URL
       this.createBlobUrlViewer(file, 'pdf', container, loader);
     } 
+    else if (file.mime_type && this.isTextViewable(file.mime_type)) {
+      // Hide zoom controls for text files
+      controls.style.display = 'none';
+      
+      // Show loading indicator
+      const loader = document.createElement('div');
+      loader.className = 'inline-viewer-loader';
+      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      container.appendChild(loader);
+      
+      // Create text viewer using authenticated fetch
+      this.createTextViewer(file, container, loader);
+    }
     else {
       // Hide zoom controls for unsupported files
       controls.style.display = 'none';
@@ -143,8 +156,8 @@ class InlineViewer {
       message.innerHTML = `
         <div class="inline-viewer-icon"><i class="fas fa-file"></i></div>
         <div class="inline-viewer-text">
-          <p>Este tipo de archivo no puede ser previsualizado.</p>
-          <p>Haz clic en "Descargar" para obtener el archivo.</p>
+          <p>This file type cannot be previewed.</p>
+          <p>Click "Download" to get the file.</p>
         </div>
       `;
       container.appendChild(message);
@@ -152,6 +165,63 @@ class InlineViewer {
     
     // Show modal
     modal.classList.add('active');
+  }
+  
+  // Check if a MIME type is text-viewable
+  isTextViewable(mimeType) {
+    if (!mimeType) return false;
+    if (mimeType.startsWith('text/')) return true;
+    const textTypes = [
+      'application/json',
+      'application/xml',
+      'application/javascript',
+      'application/x-sh',
+      'application/x-yaml',
+      'application/toml',
+      'application/x-toml',
+      'application/sql',
+    ];
+    return textTypes.includes(mimeType);
+  }
+  
+  // Creates a text viewer using authenticated fetch
+  async createTextViewer(file, container, loader) {
+    try {
+      console.log('Creating text viewer for:', file.name);
+      
+      const token = localStorage.getItem('oxicloud_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { headers });
+      
+      if (!response.ok) {
+        throw new Error(`Error fetching file: ${response.status} ${response.statusText}`);
+      }
+      
+      const text = await response.text();
+      
+      // Remove loader
+      if (loader && loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+      
+      // Create text viewer element
+      const pre = document.createElement('pre');
+      pre.className = 'inline-viewer-text-content';
+      pre.textContent = text;
+      container.appendChild(pre);
+      
+      console.log('Text viewer created successfully');
+    } catch (error) {
+      console.error('Error creating text viewer:', error);
+      
+      // Remove loader
+      if (loader && loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+      
+      this.showErrorMessage(container);
+    }
   }
   
   // Creates a viewer using a Blob URL to avoid content-disposition header
@@ -269,8 +339,8 @@ class InlineViewer {
     message.innerHTML = `
       <div class="inline-viewer-icon"><i class="fas fa-exclamation-triangle"></i></div>
       <div class="inline-viewer-text">
-        <p>Error al cargar el archivo.</p>
-        <p>Intenta descargarlo directamente.</p>
+        <p>Error loading the file.</p>
+        <p>Try downloading it directly.</p>
       </div>
     `;
     container.appendChild(message);

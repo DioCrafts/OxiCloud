@@ -304,8 +304,10 @@ class FileRenderer {
           window.inlineViewer.openFile(item);
         } else {
           console.warn('Inline viewer not available, downloading directly');
-          // Fallback to direct download if viewer is not available
-          window.location.href = `/api/files/${item.id}`;
+          // Fallback to authenticated download if viewer is not available
+          if (window.fileOps) {
+            window.fileOps.downloadFile(item.id, item.name);
+          }
         }
       });
     }
@@ -448,8 +450,10 @@ class FileRenderer {
           window.inlineViewer.openFile(item);
         } else {
           console.warn('Inline viewer not available, downloading directly');
-          // Fallback to direct download if viewer is not available
-          window.location.href = `/api/files/${item.id}`;
+          // Fallback to authenticated download if viewer is not available
+          if (window.fileOps) {
+            window.fileOps.downloadFile(item.id, item.name);
+          }
         }
       });
     }

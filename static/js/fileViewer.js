@@ -128,6 +128,9 @@ class FileViewer {
     } else if (fileData.mime_type && fileData.mime_type === 'application/pdf') {
       console.log('FileViewer: Loading PDF viewer');
       this.loadPdfViewer(fileData.id, viewerArea);
+    } else if (fileData.mime_type && this.isTextViewable(fileData.mime_type)) {
+      console.log('FileViewer: Loading text viewer');
+      this.loadTextViewer(fileData.id, viewerArea);
     } else {
       console.log('FileViewer: Unsupported file type', fileData.mime_type);
       // For unsupported files, show download prompt
@@ -141,25 +144,37 @@ class FileViewer {
    * @param {HTMLElement} container - Container element to render into
    */
   loadImageViewer(fileId, container) {
-    // Create image element
-    const img = document.createElement('img');
-    img.className = 'file-viewer-image';
-    img.src = `/api/files/${fileId}`;
-    img.alt = this.fileData.name;
-    
     // Create loader
     const loader = document.createElement('div');
     loader.className = 'file-viewer-loader';
     loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     container.appendChild(loader);
     
-    // When image loads, remove loader
-    img.onload = () => {
-      container.removeChild(loader);
-    };
-    
-    // Add image to container
-    container.appendChild(img);
+    // Fetch image with auth header and create blob URL
+    this.fetchFileAsBlob(fileId).then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      this.currentBlobUrl = blobUrl;
+      
+      const img = document.createElement('img');
+      img.className = 'file-viewer-image';
+      img.src = blobUrl;
+      img.alt = this.fileData.name;
+      
+      img.onload = () => {
+        if (loader.parentNode) container.removeChild(loader);
+      };
+      
+      img.onerror = () => {
+        if (loader.parentNode) container.removeChild(loader);
+        this.showErrorMessage(container);
+      };
+      
+      container.appendChild(img);
+    }).catch(error => {
+      console.error('Error loading image:', error);
+      if (loader.parentNode) container.removeChild(loader);
+      this.showErrorMessage(container);
+    });
     
     // Add zoom controls to toolbar
     const toolbar = this.viewerContainer.querySelector('.file-viewer-toolbar');
@@ -220,25 +235,87 @@ class FileViewer {
    * @param {HTMLElement} container - Container element to render into
    */
   loadPdfViewer(fileId, container) {
-    // Create iframe for PDF viewer
-    const iframe = document.createElement('iframe');
-    iframe.className = 'file-viewer-pdf';
-    iframe.src = `/api/files/${fileId}`;
-    iframe.title = this.fileData.name;
-    
     // Create loader
     const loader = document.createElement('div');
     loader.className = 'file-viewer-loader';
     loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
     container.appendChild(loader);
     
-    // When iframe loads, remove loader
-    iframe.onload = () => {
-      container.removeChild(loader);
-    };
+    // Fetch PDF with auth header and create blob URL
+    this.fetchFileAsBlob(fileId).then(blob => {
+      const blobUrl = URL.createObjectURL(blob);
+      this.currentBlobUrl = blobUrl;
+      
+      const iframe = document.createElement('iframe');
+      iframe.className = 'file-viewer-pdf';
+      iframe.src = blobUrl;
+      iframe.title = this.fileData.name;
+      
+      iframe.onload = () => {
+        if (loader.parentNode) container.removeChild(loader);
+      };
+      
+      container.appendChild(iframe);
+    }).catch(error => {
+      console.error('Error loading PDF:', error);
+      if (loader.parentNode) container.removeChild(loader);
+      this.showErrorMessage(container);
+    });
+  }
+  
+  /**
+   * Load the text viewer
+   */
+  async loadTextViewer(fileId, container) {
+    const loader = document.createElement('div');
+    loader.className = 'file-viewer-loader';
+    loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    container.appendChild(loader);
     
-    // Add iframe to container
-    container.appendChild(iframe);
+    try {
+      const token = localStorage.getItem('oxicloud_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`/api/files/${fileId}?inline=true`, { headers });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      const text = await response.text();
+      if (loader.parentNode) container.removeChild(loader);
+      
+      const pre = document.createElement('pre');
+      pre.className = 'file-viewer-text-content';
+      pre.textContent = text;
+      container.appendChild(pre);
+    } catch (error) {
+      console.error('Error loading text:', error);
+      if (loader.parentNode) container.removeChild(loader);
+      this.showErrorMessage(container);
+    }
+  }
+  
+  /**
+   * Check if a MIME type is text-viewable
+   */
+  isTextViewable(mimeType) {
+    if (!mimeType) return false;
+    if (mimeType.startsWith('text/')) return true;
+    const textTypes = [
+      'application/json', 'application/xml', 'application/javascript',
+      'application/x-sh', 'application/x-yaml', 'application/toml',
+      'application/x-toml', 'application/sql',
+    ];
+    return textTypes.includes(mimeType);
+  }
+  
+  /**
+   * Fetch a file as blob with auth headers
+   */
+  async fetchFileAsBlob(fileId) {
+    const token = localStorage.getItem('oxicloud_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const response = await fetch(`/api/files/${fileId}?inline=true`, { headers });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.blob();
   }
   
   /**
@@ -251,10 +328,10 @@ class FileViewer {
     
     message.innerHTML = `
       <i class="fas fa-file-download"></i>
-      <p>${window.i18n ? window.i18n.t('viewer.unsupported_file') : 'Este tipo de archivo no se puede previsualizar.'}</p>
+      <p>${window.i18n ? window.i18n.t('viewer.unsupported_file') : 'This file type cannot be previewed.'}</p>
       <button class="btn btn-primary download-btn">
         <i class="fas fa-download"></i>
-        ${window.i18n ? window.i18n.t('viewer.download_file') : 'Descargar archivo'}
+        ${window.i18n ? window.i18n.t('viewer.download_file') : 'Download file'}
       </button>
     `;
     
@@ -272,14 +349,39 @@ class FileViewer {
   downloadFile() {
     if (!this.fileData) return;
     
-    // Create a link and simulate click
-    const link = document.createElement('a');
-    link.href = `/api/files/${this.fileData.id}`;
-    link.download = this.fileData.name;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Download with auth headers
+    const token = localStorage.getItem('oxicloud_token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
+    fetch(`/api/files/${this.fileData.id}`, { headers })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = this.fileData.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      })
+      .catch(err => console.error('Download error:', err));
+  }
+  
+  /**
+   * Show error message
+   */
+  showErrorMessage(container) {
+    const message = document.createElement('div');
+    message.className = 'file-viewer-unsupported';
+    message.innerHTML = `
+      <i class="fas fa-exclamation-triangle"></i>
+      <p>Error loading the file. Try downloading it directly.</p>
+    `;
+    container.appendChild(message);
   }
   
   /**
@@ -289,6 +391,12 @@ class FileViewer {
     this.isOpen = false;
     this.fileData = null;
     this.viewerContainer.classList.remove('active');
+    
+    // Clean up blob URL if exists
+    if (this.currentBlobUrl) {
+      URL.revokeObjectURL(this.currentBlobUrl);
+      this.currentBlobUrl = null;
+    }
     
     // Reset toolbar (remove zoom controls)
     const toolbar = this.viewerContainer.querySelector('.file-viewer-toolbar');

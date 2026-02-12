@@ -207,9 +207,13 @@ const recent = {
             <div class="file-info">Accessed ${formattedDate.split(' ')[0]}</div>
         `;
 
-        // Download on click
+        // View or download on click
         fileGridElement.addEventListener('click', () => {
-            window.location.href = `/api/files/${file.id}`;
+            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
+                window.inlineViewer.openFile(file);
+            } else if (window.fileOps) {
+                window.fileOps.downloadFile(file.id, file.name);
+            }
             
             // Dispatch custom event to update recent files
             document.dispatchEvent(new CustomEvent('file-accessed', {
@@ -257,9 +261,13 @@ const recent = {
             <div class="date-cell">${formattedDate}</div>
         `;
 
-        // Download on click
+        // View or download on click
         fileListElement.addEventListener('click', () => {
-            window.location.href = `/api/files/${file.id}`;
+            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
+                window.inlineViewer.openFile(file);
+            } else if (window.fileOps) {
+                window.fileOps.downloadFile(file.id, file.name);
+            }
             
             // Dispatch custom event to update recent files
             document.dispatchEvent(new CustomEvent('file-accessed', {
