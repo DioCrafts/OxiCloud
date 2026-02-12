@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     
     let app_state = factory.build_app_state(db_pool).await
-        .expect("Failed to build application state");
+        .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
 
     // Build application router
     let api_routes = create_api_routes(&app_state);

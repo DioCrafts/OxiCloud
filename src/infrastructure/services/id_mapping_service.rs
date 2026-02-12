@@ -181,11 +181,11 @@ impl IdMappingService {
             }
         }
         
-        // Write empty map to file
+        // Write empty map to file (best-effort: the in-memory map is valid even if disk write fails)
         match serde_json::to_string_pretty(&empty_map) {
             Ok(json) => {
                 if let Err(e) = fs::write(map_path, json).await {
-                    tracing::error!("Failed to write initial empty ID map: {}", e);
+                    tracing::warn!("Could not write initial empty ID map (will retry on next save): {}", e);
                 } else {
                     tracing::info!("Created initial empty ID map at {}", map_path.display());
                 }

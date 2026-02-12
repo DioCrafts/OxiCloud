@@ -37,8 +37,9 @@ LABEL org.opencontainers.image.title="OxiCloud" \
       org.opencontainers.image.licenses="MIT"
 
 # Install only necessary runtime dependencies and update packages
+# su-exec is needed by the entrypoint to drop privileges after fixing volume permissions
 RUN apk --no-cache upgrade && \
-    apk add --no-cache libgcc ca-certificates libpq tzdata
+    apk add --no-cache libgcc ca-certificates libpq tzdata su-exec
 
 # Create non-root user
 RUN addgroup -g 1001 -S oxicloud && \
@@ -48,12 +49,16 @@ RUN addgroup -g 1001 -S oxicloud && \
 COPY --from=builder /app/target/release/oxicloud /usr/local/bin/
 RUN chmod +x /usr/local/bin/oxicloud
 
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # Copy static files and other resources needed at runtime
 COPY --chown=oxicloud:oxicloud static /app/static
 COPY --chown=oxicloud:oxicloud db /app/db
 
 # Create storage directory with proper permissions
-RUN mkdir -p /app/storage && chown oxicloud:oxicloud /app/storage
+RUN mkdir -p /app/storage && chown -R oxicloud:oxicloud /app/storage
 
 # Set working directory
 WORKDIR /app
@@ -61,8 +66,8 @@ WORKDIR /app
 # Expose application port
 EXPOSE 8086
 
-# Run as non-root user
-USER oxicloud
-
-# Run the application
+# Entrypoint fixes volume permissions then drops to oxicloud user.
+# The container starts as root so it can chown mounted volumes,
+# then su-exec drops privileges before running the application.
+ENTRYPOINT ["entrypoint.sh"]
 CMD ["oxicloud"]
