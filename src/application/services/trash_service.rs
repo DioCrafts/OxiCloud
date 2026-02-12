@@ -304,6 +304,16 @@ impl TrashUseCase for TrashService {
         };
         
         // Get the trash item
+        info!("Retrieving trash item from repository: ID={}", trash_id);
+        let item_result = self.trash_repository.get_trash_item(&trash_uuid, &user_uuid).await;
+
+        match item_result {
+            Ok(Some(item)) => {
+                info!("Found item in trash: ID={}, Type={:?}, OriginalID={}",
+                    trash_id, item.item_type(), item.original_id());
+
+                // Restore based on type
+                match item.item_type() {
                     TrashedItemType::File => {
                         // Restore the file to its original location
                         let file_id = item.original_id().to_string();
