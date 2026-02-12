@@ -59,7 +59,7 @@ impl RecentItemsUseCase for RecentService {
         info!("Removing {} '{}' from recent for user {}", item_type, item_id, user_id);
         let removed = self.repo.remove_item(user_id, item_id, item_type).await?;
         info!(
-            "{} {} '{}' de recientes para usuario {}",
+            "{} {} '{}' from recent items for user {}",
             if removed { "Successfully removed" } else { "Not found" },
             item_type, item_id, user_id
         );

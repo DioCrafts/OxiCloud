@@ -57,16 +57,17 @@ impl StorageUsageService {
         let all_folders = self.file_repository.list_files(None).await
             .map_err(|e| DomainError::internal_error("File repository", e.to_string()))?;
         
-        // Find the user's home folder (usually named "Mi Carpeta - {username}")
-        let home_folder_name = format!("Mi Carpeta - {}", username);
-        debug!("Looking for home folder: {}", home_folder_name);
+        // Find the user's home folder (named "My Folder - {username}" or legacy "Mi Carpeta - {username}")
+        let home_folder_name = format!("My Folder - {}", username);
+        let legacy_folder_name = format!("Mi Carpeta - {}", username);
+        debug!("Looking for home folder: {} or {}", home_folder_name, legacy_folder_name);
         
         let mut total_usage: i64 = 0;
         let mut home_folder_id = None;
         
-        // Find the home folder ID
+        // Find the home folder ID (check both new and legacy names)
         for folder in &all_folders {
-            if folder.name() == home_folder_name {
+            if folder.name() == home_folder_name || folder.name() == legacy_folder_name {
                 home_folder_id = Some(folder.id().to_string());
                 debug!("Found home folder for user {}: ID={}", username, folder.id());
                 break;

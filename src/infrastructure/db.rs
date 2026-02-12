@@ -39,11 +39,29 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
                                 Ok(row) => {
                                     let tables_exist: bool = row.get(0);
                                     if !tables_exist {
-                                        tracing::warn!("Database tables do not exist. Please run migrations with: cargo run --bin migrate --features migrations");
+                                        tracing::warn!("Database tables do not exist. Auto-applying schema...");
+                                        let schema_sql = include_str!("../../db/schema.sql");
+                                        match sqlx::raw_sql(schema_sql).execute(&pool).await {
+                                            Ok(_) => {
+                                                tracing::info!("Database schema applied successfully");
+                                            },
+                                            Err(e) => {
+                                                tracing::error!("Failed to auto-apply database schema: {}. You may need to run: psql -f db/schema.sql", e);
+                                            }
+                                        }
                                     }
                                 },
                                 Err(_) => {
-                                    tracing::warn!("Could not verify migration status. Please run migrations with: cargo run --bin migrate --features migrations");
+                                    tracing::warn!("Could not verify migration status. Attempting to auto-apply schema...");
+                                    let schema_sql = include_str!("../../db/schema.sql");
+                                    match sqlx::raw_sql(schema_sql).execute(&pool).await {
+                                        Ok(_) => {
+                                            tracing::info!("Database schema applied successfully");
+                                        },
+                                        Err(e) => {
+                                            tracing::error!("Failed to auto-apply database schema: {}. You may need to run: psql -f db/schema.sql", e);
+                                        }
+                                    }
                                 }
                             }
                             

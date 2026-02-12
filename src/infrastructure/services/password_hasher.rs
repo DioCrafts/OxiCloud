@@ -43,7 +43,7 @@ impl PasswordHasherPort for Argon2PasswordHasher {
             .map_err(|e| DomainError::new(
                 ErrorKind::InternalError,
                 "PasswordHasher",
-                format!("Error al generar hash de password: {}", e)
+                format!("Error generating password hash: {}", e)
             ))
     }
     
@@ -52,7 +52,7 @@ impl PasswordHasherPort for Argon2PasswordHasher {
             .map_err(|e| DomainError::new(
                 ErrorKind::InternalError,
                 "PasswordHasher",
-                format!("Error al procesar hash: {}", e)
+                format!("Error processing password hash: {}", e)
             ))?;
         
         Ok(Argon2::default().verify_password(password.as_bytes(), &parsed_hash).is_ok())

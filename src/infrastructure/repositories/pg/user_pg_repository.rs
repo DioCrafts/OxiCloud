@@ -54,7 +54,7 @@ impl UserPgRepository {
 impl UserRepository for UserPgRepository {
     /// Creates a new user using a transaction
     async fn create_user(&self, user: User) -> UserRepositoryResult<User> {
-        // Creamos una copia del usuario para el closure
+        // Create a copy of the user for the closure
         let user_clone = user.clone();
         
         with_transaction(

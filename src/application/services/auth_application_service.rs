@@ -179,13 +179,20 @@ impl AuthApplicationService {
                     }
                 },
                 Err(e) => {
-                    tracing::error!("Error counting admin users: {}", e);
-                    // For security, if we cannot verify, we reject admin creation
-                    return Err(DomainError::new(
-                        ErrorKind::AccessDenied,
-                        "User",
-                        "Creating additional admin users is not allowed"
-                    ));
+                    let err_msg = e.to_string();
+                    // If the table doesn't exist, this is a fresh install - allow admin creation
+                    if err_msg.contains("does not exist") || err_msg.contains("relation") {
+                        tracing::info!("Database tables not yet ready, treating as fresh install - allowing admin creation");
+                        // Continue with registration - this is a fresh install
+                    } else {
+                        tracing::error!("Error counting admin users: {}", e);
+                        // For security, if we cannot verify, we reject admin creation
+                        return Err(DomainError::new(
+                            ErrorKind::AccessDenied,
+                            "User",
+                            "Creating additional admin users is not allowed"
+                        ));
+                    }
                 }
             }
         }
@@ -244,7 +251,7 @@ impl AuthApplicationService {
         
         // Create personal folder for the user
         if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("Mi Carpeta - {}", dto.username);
+            let folder_name = format!("My Folder - {}", dto.username);
             
             match folder_service.create_folder(CreateFolderDto {
                 name: folder_name,
@@ -572,7 +579,7 @@ impl AuthApplicationService {
         
         // 5. Create personal folder for the new admin if folder service is available
         if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("Mi Carpeta - {}", dto.username);
+            let folder_name = format!("My Folder - {}", dto.username);
             
             match folder_service.create_folder(CreateFolderDto {
                 name: folder_name,
@@ -951,7 +958,7 @@ impl AuthApplicationService {
     /// Helper to create a personal folder for a new user
     async fn create_personal_folder(&self, username: &str, user_id: &str) {
         if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("Mi Carpeta - {}", username);
+            let folder_name = format!("My Folder - {}", username);
             match folder_service.create_folder(CreateFolderDto {
                 name: folder_name.clone(),
                 parent_id: None,

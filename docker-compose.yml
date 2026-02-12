@@ -31,7 +31,8 @@ services:
     networks:
       - oxicloud
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - "OXICLOUD_DB_CONNECTION_STRING=postgres://postgres:postgres@postgres/oxicloud"
       - "DATABASE_URL=postgres://postgres:postgres@postgres/oxicloud"
