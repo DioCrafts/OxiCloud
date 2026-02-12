@@ -1,13 +1,13 @@
-# Arquitectura de Integración OIDC en OxiCloud
+# 29 - OIDC Architecture
 
-Este documento describe la arquitectura y el flujo de autenticación OpenID Connect (OIDC) en OxiCloud.
+OpenID Connect (OIDC) authentication follows the Authorization Code Flow. The system supports multiple identity providers (Authentik, Authelia, KeyCloak) through a single configurable integration point.
 
-## Diagrama de Arquitectura
+## Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
-│                          PROVEEDOR DE IDENTIDAD                         │
+│                          IDENTITY PROVIDER                              │
 │                                                                         │
 │    ┌───────────────┐      ┌───────────────┐      ┌───────────────┐     │
 │    │               │      │               │      │               │     │
@@ -16,12 +16,12 @@ Este documento describe la arquitectura y el flujo de autenticación OpenID Conn
 │    └───────┬───────┘      └───────┬───────┘      └───────┬───────┘     │
 │            │                      │                      │             │
 └────────────┼──────────────────────┼──────────────────────┼─────────────┘
-             │                      │                      │              
-             │                      │                      │              
-             │                      │                      │              
-             │                     OIDC                    │              
-             │                      │                      │              
-             │                      │                      │              
+             │                      │                      │
+             │                      │                      │
+             │                      │                      │
+             │                     OIDC                    │
+             │                      │                      │
+             │                      │                      │
 ┌────────────┼──────────────────────┼──────────────────────┼─────────────┐
 │            │                      │                      │             │
 │            ▼                      ▼                      ▼             │
@@ -59,15 +59,15 @@ Este documento describe la arquitectura y el flujo de autenticación OpenID Conn
                            │
 ┌────────────────────────────────────────────────────────────────────────┐
 │                                                                        │
-│                           NAVEGADOR WEB                                │
+│                           WEB BROWSER                                  │
 │                                                                        │
 │    ┌───────────────────────────────────────────────────────────────┐   │
 │    │                                                               │   │
-│    │                    Interfaz de Usuario                        │   │
+│    │                    User Interface                             │   │
 │    │                                                               │   │
 │    │    ┌──────────────┐        ┌──────────────┐                   │   │
 │    │    │              │        │              │                   │   │
-│    │    │ Login.html   │        │ oidcAuth.js  │                   │   │
+│    │    │ Login.html   │        │   auth.js    │                   │   │
 │    │    │              │        │              │                   │   │
 │    │    └──────────────┘        └──────────────┘                   │   │
 │    │                                                               │   │
@@ -76,87 +76,74 @@ Este documento describe la arquitectura y el flujo de autenticación OpenID Conn
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Flujo de Autenticación OIDC
+## OIDC Authentication Flow
 
-El flujo de autenticación OIDC en OxiCloud sigue el flujo de código de autorización (Authorization Code Flow):
+The flow follows the standard Authorization Code Flow:
 
-1. **Inicio de la Autenticación**:
-   - El usuario hace clic en "Login con [Proveedor]" en la página de inicio de sesión.
-   - El frontend genera un estado aleatorio para protección CSRF.
-   - El frontend solicita a OxiCloud una URL de autorización.
+1. **Authentication Start** -- the user clicks "Login with [Provider]" on the login page. The frontend generates a random state for CSRF protection and requests an authorization URL from the backend.
 
-2. **Redirección al Proveedor de Identidad**:
-   - OxiCloud genera una URL de autorización y la devuelve al frontend.
-   - El navegador redirige al usuario a la página de inicio de sesión del proveedor de identidad.
+2. **Redirect to Identity Provider** -- the backend generates and returns the authorization URL. The browser redirects the user to the provider's login page.
 
-3. **Autenticación en el Proveedor**:
-   - El usuario se autentica en el proveedor de identidad (con contraseña, 2FA, etc.).
-   - El proveedor redirige al usuario de vuelta a OxiCloud con un código de autorización.
+3. **Authentication at the Provider** -- the user authenticates (password, 2FA, etc.). The provider redirects back with an authorization code.
 
-4. **Intercambio del Código de Autorización**:
-   - El frontend de OxiCloud recibe el código de autorización y lo envía al backend.
-   - OxiCloud intercambia el código por tokens de acceso e ID con el proveedor de identidad.
-   - OxiCloud verifica el token de ID y extrae la información del usuario.
+4. **Authorization Code Exchange** -- the frontend sends the authorization code to the backend. The backend exchanges it for access and ID tokens with the provider, then verifies the ID token and extracts user info.
 
-5. **Creación/Recuperación de Usuario**:
-   - OxiCloud busca un usuario existente con el ID externo del proveedor.
-   - Si no existe y la creación automática está habilitada, se crea un nuevo usuario.
-   - Si no existe y la creación automática está deshabilitada, se devuelve un error.
+5. **User Creation/Retrieval** -- the backend looks up an existing user by the provider's external ID. If none exists and auto-provisioning is enabled, a new user is created. If disabled, an error is returned.
 
-6. **Generación de Tokens de Sesión**:
-   - OxiCloud genera sus propios tokens de acceso y actualización para el usuario.
-   - Estos tokens se utilizan para autenticar las solicitudes subsiguientes a la API de OxiCloud.
+6. **Session Token Generation** -- the backend generates its own access and refresh tokens for the user. These tokens authenticate subsequent API requests.
 
-7. **Respuesta al Cliente**:
-   - OxiCloud devuelve los tokens y la información del usuario al frontend.
-   - El frontend almacena los tokens y redirige al usuario a la página principal.
+7. **Response to Client** -- tokens and user info are returned to the frontend. The frontend stores them and redirects to the main page.
 
-## Componentes Principales
+## Main Components
 
-### 1. OidcService
+### OidcService
 
-Este servicio gestiona la comunicación con los proveedores OIDC:
-- Descubre los endpoints OIDC de los proveedores
-- Genera URLs de autorización
-- Intercambia códigos de autorización por tokens
-- Verifica tokens y extrae información de usuario
+Handles communication with OIDC providers:
+- Discovers provider OIDC endpoints
+- Generates authorization URLs
+- Exchanges authorization codes for tokens
+- Verifies tokens and extracts user info
 
-### 2. AuthApplicationService
+### AuthApplicationService
 
-Coordina el proceso de autenticación:
-- Proporciona una interfaz entre la capa de API y los servicios de dominio
-- Gestiona el proceso de creación/recuperación de usuarios
-- Coordina la generación de tokens de acceso para OxiCloud
+Coordinates the authentication process:
+- Acts as interface between the API layer and domain services
+- Manages user creation/retrieval
+- Coordinates access token generation
 
-### 3. Auth Handler
+### Auth Handler
 
-Expone endpoints HTTP para el flujo de autenticación OIDC:
-- `/api/auth/oidc/providers` - Lista los proveedores OIDC disponibles
-- `/api/auth/oidc/auth` - Genera una URL de autorización para un proveedor
-- `/api/auth/oidc/callback` - Procesa la respuesta del proveedor y completa la autenticación
+Exposes HTTP endpoints for the OIDC auth flow:
+- `GET /api/auth/oidc/providers` -- lists available OIDC providers
+- `GET /api/auth/oidc/authorize` -- generates an authorization URL for the OIDC provider
+- `GET /api/auth/oidc/callback` -- receives the redirect from the provider with the authorization code
+- `POST /api/auth/oidc/exchange` -- exchanges the authorization code for session tokens
 
-### 4. Frontend (oidcAuth.js)
+### Frontend (login.html + auth.js)
 
-Gestiona la parte del cliente del flujo de autenticación:
-- Muestra botones para los proveedores OIDC
-- Inicia el flujo de autenticación
-- Maneja la redirección de retorno del proveedor
-- Procesa y almacena los tokens de sesión
+Handles the client-side of the auth flow:
+- Shows SSO button for the configured OIDC provider in `login.html`
+- Initiates the authentication flow via `auth.js`
+- Handles the return redirect from the provider
+- Processes and stores session tokens
 
-## Configuración Multi-Proveedor
+## Provider Configuration
 
-OxiCloud permite configurar múltiples proveedores OIDC simultáneamente:
+One OIDC provider is configured per instance via environment variables prefixed with **OXICLOUD_OIDC_***:
 
-1. **Configuración Separada**: Cada proveedor tiene su propia configuración independiente.
-2. **Selección de Proveedor**: Los usuarios pueden elegir con qué proveedor autenticarse.
-3. **Mapeo de Identidades**: OxiCloud mapea identidades de diferentes proveedores a usuarios internos.
+1. **Single provider** per instance.
+2. **Environment variables**: **OXICLOUD_OIDC_ENABLED**, **OXICLOUD_OIDC_ISSUER_URL**, **OXICLOUD_OIDC_CLIENT_ID**, **OXICLOUD_OIDC_CLIENT_SECRET**, etc.
+3. **Auto-provisioning**: users can be created automatically on first OIDC login (**OXICLOUD_OIDC_AUTO_PROVISION**).
+4. **Role mapping**: admin groups are configured via **OXICLOUD_OIDC_ADMIN_GROUPS**.
 
-## Seguridad
+See `oidc-config-examples.md` for provider-specific configuration examples.
 
-La implementación OIDC en OxiCloud incluye varias medidas de seguridad:
+## Security
 
-1. **Protección CSRF**: Utiliza un estado aleatorio para prevenir ataques CSRF.
-2. **Validación de Tokens**: Verifica firmas y vigencia de los tokens JWT.
-3. **Código de Autorización**: Utiliza el flujo de código de autorización, que es más seguro que el flujo implícito.
-4. **HTTPS**: Requiere conexiones HTTPS para todas las comunicaciones OIDC.
-5. **Secretos del Cliente**: Los secretos del cliente se almacenan de forma segura y nunca se exponen al frontend.
+The OIDC implementation includes several security measures:
+
+1. **CSRF protection** -- random state parameter prevents CSRF attacks.
+2. **Token validation** -- JWT signatures and expiration are verified.
+3. **Authorization Code Flow** -- more secure than the implicit flow.
+4. **HTTPS** -- required for all OIDC communications.
+5. **Client secrets** -- stored securely, never exposed to the frontend.

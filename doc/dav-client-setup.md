@@ -1,23 +1,19 @@
-# DAV Client Setup Guide for OxiCloud
+# 25 - DAV Client Setup
 
-This document provides detailed instructions for connecting clients to OxiCloud using WebDAV, CalDAV, and CardDAV protocols, enabling seamless integration with your operating system's file browser, calendar, and contacts applications.
+Step-by-step instructions for connecting native OS clients via WebDAV, CalDAV, and CardDAV. Covers Windows, macOS, Linux, iOS, and Android.
 
 ## Table of Contents
 
 - [WebDAV Setup](#webdav-setup) (File Access)
-- [CalDAV Setup](#caldav-setup) (Calendar Synchronization)
-- [CardDAV Setup](#carddav-setup) (Contact Synchronization)
+- [CalDAV Setup](#caldav-setup) (Calendar Sync)
+- [CardDAV Setup](#carddav-setup) (Contact Sync)
 - [Troubleshooting](#troubleshooting)
 
 ---
 
 ## WebDAV Setup
 
-WebDAV (Web Distributed Authoring and Versioning) is an extension of the HTTP protocol that allows users to collaboratively edit and manage files on remote web servers.
-
 ### Connection Information
-
-Use the following details to connect to OxiCloud via WebDAV:
 
 - **Server URL**: `https://[your-oxicloud-server]/webdav/`
 - **Username**: Your OxiCloud username
@@ -32,13 +28,13 @@ Use the following details to connect to OxiCloud via WebDAV:
 3. Click "Next"
 4. Select "Choose a custom network location" and click "Next"
 5. Enter the WebDAV URL: `https://[your-oxicloud-server]/webdav/`
-6. When prompted, enter your OxiCloud username and password
+6. When prompted, enter your username and password
 7. Give the connection a name (e.g., "OxiCloud") and click "Next"
 8. Click "Finish"
 
-Your OxiCloud files will now appear as a network drive in File Explorer.
+Files now appear as a network drive in File Explorer.
 
-#### Alternative Method: Map Network Drive
+#### Alternative: Map Network Drive
 
 1. Open File Explorer
 2. Right-click on "This PC" and select "Map network drive"
@@ -46,19 +42,19 @@ Your OxiCloud files will now appear as a network drive in File Explorer.
 4. Enter the WebDAV URL: `https://[your-oxicloud-server]/webdav/`
 5. Check "Connect using different credentials"
 6. Click "Finish"
-7. Enter your OxiCloud username and password
+7. Enter your username and password
 
-**Troubleshooting Windows Connections:**
+**Windows Troubleshooting:**
 
-If you experience issues connecting on Windows:
+If connections fail on Windows:
 
 1. Open Registry Editor (regedit.exe)
 2. Navigate to `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters`
-3. Modify `BasicAuthLevel` to value `2`
-4. Restart the WebClient service or restart your computer
+3. Modify **BasicAuthLevel** to value `2`
+4. Restart the WebClient service or reboot
 
-You may also need to increase the file size limit:
-1. In the same registry location, modify `FileSizeLimitInBytes` to a higher value (e.g., `4294967295` for 4GB)
+To increase the file size limit:
+1. In the same registry location, modify **FileSizeLimitInBytes** to a higher value (e.g., `4294967295` for 4GB)
 2. Restart the WebClient service
 
 ### macOS
@@ -66,39 +62,39 @@ You may also need to increase the file size limit:
 #### Finder
 
 1. Open Finder
-2. From the menu bar, click "Go" > "Connect to Server" (or press ⌘K)
+2. From the menu bar, click "Go" > "Connect to Server" (or press Cmd+K)
 3. Enter the WebDAV URL: `https://[your-oxicloud-server]/webdav/`
 4. Click "Connect"
-5. Enter your OxiCloud username and password
+5. Enter your username and password
 6. Click "Connect"
 
-Your OxiCloud files will now appear as a mounted drive in Finder.
+Files appear as a mounted drive in Finder.
 
 ### Linux
 
-#### GNOME (Nautilus File Manager)
+#### GNOME (Nautilus)
 
 1. Open Files (Nautilus)
 2. Click the "+" button in the sidebar or press Ctrl+L
-3. Enter the WebDAV URL: `davs://[your-oxicloud-server]/webdav/`
-4. Enter your credentials when prompted
+3. Enter: `davs://[your-oxicloud-server]/webdav/`
+4. Enter credentials when prompted
 5. Click "Connect"
 
-#### KDE (Dolphin File Manager)
+#### KDE (Dolphin)
 
 1. Open Dolphin
 2. In the address bar, enter: `webdavs://[your-oxicloud-server]/webdav/`
-3. Enter your credentials when prompted
+3. Enter credentials when prompted
 4. Click "Connect"
 
 #### Command Line (davfs2)
 
-1. Install davfs2: `sudo apt-get install davfs2` (Debian/Ubuntu) or equivalent for your distribution
+1. Install davfs2: `sudo apt-get install davfs2` (Debian/Ubuntu) or equivalent
 2. Create a mount point: `sudo mkdir /mnt/oxicloud`
 3. Edit `/etc/davfs2/secrets` and add: `/mnt/oxicloud [username] [password]`
-4. Mount the WebDAV share: `sudo mount -t davfs https://[your-oxicloud-server]/webdav/ /mnt/oxicloud`
+4. Mount: `sudo mount -t davfs https://[your-oxicloud-server]/webdav/ /mnt/oxicloud`
 
-To automatically mount at boot, add to `/etc/fstab`:
+To auto-mount at boot, add to `/etc/fstab`:
 ```
 https://[your-oxicloud-server]/webdav/ /mnt/oxicloud davfs user,rw,auto 0 0
 ```
@@ -107,15 +103,13 @@ https://[your-oxicloud-server]/webdav/ /mnt/oxicloud davfs user,rw,auto 0 0
 
 ## CalDAV Setup
 
-CalDAV is an extension of WebDAV specifically designed for calendar access, allowing you to synchronize calendars between different devices and applications.
-
 ### Apple Calendar (macOS/iOS)
 
 #### macOS:
 
 1. Open the Calendar app
 2. Go to **Calendar** > **Add Account** > **Other CalDAV Account**
-3. Enter the following information:
+3. Enter:
    - **Account Type**: Advanced
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
@@ -127,11 +121,11 @@ CalDAV is an extension of WebDAV specifically designed for calendar access, allo
 
 1. Go to **Settings** > **Calendar** > **Accounts** > **Add Account** > **Other**
 2. Tap **Add CalDAV Account**
-3. Enter the following information:
+3. Enter:
    - **Server**: `https://[your-oxicloud-server]/caldav`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
-   - **Description**: OxiCloud Calendar (or any name you prefer)
+   - **Description**: OxiCloud Calendar (or any name)
 4. Tap **Next**
 5. Turn on **Calendars** and tap **Save**
 
@@ -145,14 +139,14 @@ CalDAV is an extension of WebDAV specifically designed for calendar access, allo
 6. Click **Next**
 7. Enter a name for the calendar and choose a color
 8. Click **Next** and then **Finish**
-9. When prompted, enter your OxiCloud username and password
+9. When prompted, enter your username and password
 
-### Android (DAVx⁵)
+### Android (DAVx5)
 
-1. Install [DAVx⁵](https://play.google.com/store/apps/details?id=at.bitfire.davdroid) from Google Play Store
-2. Open DAVx⁵ and tap the **+** button
+1. Install [DAVx5](https://play.google.com/store/apps/details?id=at.bitfire.davdroid) from Google Play Store
+2. Open DAVx5 and tap the **+** button
 3. Select **Login with URL and username**
-4. Enter the following information:
+4. Enter:
    - **Base URL**: `https://[your-oxicloud-server]/caldav`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
@@ -166,8 +160,8 @@ CalDAV is an extension of WebDAV specifically designed for calendar access, allo
 2. Open Outlook and navigate to the **CalDAV Synchronizer** tab
 3. Click **Synchronization Profiles**
 4. Click **Add** to create a new profile
-5. Enter the following information:
-   - **Profile Name**: OxiCloud Calendar (or any name you prefer)
+5. Enter:
+   - **Profile Name**: OxiCloud Calendar (or any name)
    - **CalDAV URL**: `https://[your-oxicloud-server]/caldav/calendars/your-calendar-id`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
@@ -179,8 +173,6 @@ CalDAV is an extension of WebDAV specifically designed for calendar access, allo
 
 ## CardDAV Setup
 
-CardDAV is an extension of WebDAV for address book access, allowing you to synchronize contacts between different devices and applications.
-
 ### Apple Contacts (macOS/iOS)
 
 #### macOS:
@@ -188,22 +180,22 @@ CardDAV is an extension of WebDAV for address book access, allowing you to synch
 1. Open the Contacts app
 2. Go to **Contacts** > **Add Account** > **Other contacts account**
 3. Select **CardDAV account**
-4. Enter the following information:
+4. Enter:
    - **Server**: `https://[your-oxicloud-server]/carddav`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
-   - **Description**: OxiCloud Contacts (or any name you prefer)
+   - **Description**: OxiCloud Contacts (or any name)
 5. Click **Sign In**
 
 #### iOS:
 
 1. Go to **Settings** > **Contacts** > **Accounts** > **Add Account** > **Other**
 2. Tap **Add CardDAV Account**
-3. Enter the following information:
+3. Enter:
    - **Server**: `https://[your-oxicloud-server]/carddav`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
-   - **Description**: OxiCloud Contacts (or any name you prefer)
+   - **Description**: OxiCloud Contacts (or any name)
 4. Tap **Next**
 5. Turn on **Contacts** and tap **Save**
 
@@ -212,18 +204,18 @@ CardDAV is an extension of WebDAV for address book access, allowing you to synch
 1. Open Thunderbird and go to the **Address Book**
 2. Click on **Tools** > **Address Book**
 3. Go to **File** > **New** > **Remote Address Book**
-4. Enter the following information:
-   - **Name**: OxiCloud Contacts (or any name you prefer)
+4. Enter:
+   - **Name**: OxiCloud Contacts (or any name)
    - **URL**: `https://[your-oxicloud-server]/carddav/address-books/your-address-book-id`
 5. Click **OK**
-6. When prompted, enter your OxiCloud username and password
+6. When prompted, enter your username and password
 
-### Android (DAVx⁵)
+### Android (DAVx5)
 
-1. Install [DAVx⁵](https://play.google.com/store/apps/details?id=at.bitfire.davdroid) from Google Play Store
-2. Open DAVx⁵ and tap the **+** button
+1. Install [DAVx5](https://play.google.com/store/apps/details?id=at.bitfire.davdroid) from Google Play Store
+2. Open DAVx5 and tap the **+** button
 3. Select **Login with URL and username**
-4. Enter the following information:
+4. Enter:
    - **Base URL**: `https://[your-oxicloud-server]/carddav`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
@@ -233,13 +225,13 @@ CardDAV is an extension of WebDAV for address book access, allowing you to synch
 
 ### Windows (Outlook)
 
-1. Download and install [CardDAV Synchronizer](https://caldavsynchronizer.org/) (same tool as for CalDAV)
+1. Download and install [CardDAV Synchronizer](https://caldavsynchronizer.org/) (same tool as CalDAV)
 2. Open Outlook and navigate to the **CardDAV Synchronizer** tab
 3. Click **Synchronization Profiles**
 4. Click **Add** to create a new profile
 5. Select **CardDAV** as the synchronization resource
-6. Enter the following information:
-   - **Profile Name**: OxiCloud Contacts (or any name you prefer)
+6. Enter:
+   - **Profile Name**: OxiCloud Contacts (or any name)
    - **CardDAV URL**: `https://[your-oxicloud-server]/carddav/address-books/your-address-book-id`
    - **Username**: Your OxiCloud username
    - **Password**: Your OxiCloud password
@@ -255,70 +247,63 @@ CardDAV is an extension of WebDAV for address book access, allowing you to synch
 
 #### WebDAV Connection Issues
 
-- Verify the server URL is correct and includes the `/webdav/` path
-- Ensure your username and password are entered correctly
-- Check if your network blocks WebDAV connections (ports 80/443)
-- Verify that your OxiCloud server has WebDAV enabled
+- Verify the server URL includes the `/webdav/` path
+- Double-check username and password
+- Check if your network blocks ports 80/443
+- Confirm WebDAV is enabled on the server
 
 #### Calendar/Contact Sync Issues
 
-- Verify the server URL is correct and includes the full path (`/caldav` or `/carddav`)
-- Check that your OxiCloud server is accessible from your network
-- Verify that your username and password are correct
-- Check that the calendar or address book ID is correct
-- Verify you have proper permissions to access the resource
+- Verify the server URL includes the full path (`/caldav` or `/carddav`)
+- Confirm the server is reachable from your network
+- Verify the calendar or address book ID is correct
+- Check you have proper permissions for the resource
 
 #### Calendar Not Showing
 
-- Verify the calendar is enabled in your client
+- Confirm the calendar is enabled in your client
 - Check if the calendar is shared with your account
-- Ensure your client supports the CalDAV protocol version
+- Ensure your client supports the CalDAV protocol version in use
 
 #### Contact Photos Not Syncing
 
-- Some clients have limitations with contact photo syncing
+- Some clients have photo sync limitations
 - Verify the photo is in a supported format (usually JPEG)
-- Check the size of the photo (some clients limit photo size)
+- Check photo size limits on the client side
 
 ### Client-Specific Issues
 
 #### Windows File Explorer
 
-For WebDAV issues on Windows:
-- Make sure the WebClient service is running
+- Make sure the **WebClient** service is running
 - Increase timeout values in the registry
-- Try using a third-party WebDAV client like Cyberduck
+- Try a third-party WebDAV client like Cyberduck
 
 #### iOS Devices
 
-- If you're having trouble connecting, try going to **Settings** > **Accounts & Passwords** and manually add the account from there
-- For persistent issues, remove the account and add it again
+- If connection fails, try **Settings** > **Accounts & Passwords** and add the account manually
+- For persistent issues, remove the account and re-add it
 
 #### Android
 
-- DAVx⁵ requires battery optimization to be disabled for reliable background sync
-- Go to **Settings** > **Apps** > **DAVx⁵** > **Battery** > **Unrestricted**
+- DAVx5 requires battery optimization to be disabled for reliable background sync
+- Go to **Settings** > **Apps** > **DAVx5** > **Battery** > **Unrestricted**
 
 #### Outlook
 
 - Make sure you have the latest version of CalDAV/CardDAV Synchronizer
-- The plugin might need to be reactivated after Outlook updates
+- The plugin may need reactivation after Outlook updates
 
-### Performance Considerations
+### Performance Tips
 
-For optimal performance when using WebDAV:
-
-1. **Large Files**: When working with files larger than 100MB, consider downloading them locally before editing
-2. **Slow Connections**: Enable offline caching in your client when available
-3. **File Locking**: Some clients support WebDAV locking to prevent conflicts
+1. **Large Files** -- for files over 100MB, download locally before editing
+2. **Slow Connections** -- enable offline caching in your client when available
+3. **File Locking** -- some clients support WebDAV locking to prevent conflicts
 
 ### Getting Help
 
-If you continue to experience issues, please:
+If issues persist:
 
-1. Check the OxiCloud logs for error messages
-2. Capture screenshots of the error messages
-3. Contact support with details about:
-   - Your client application and version
-   - Steps to reproduce the issue
-   - Any error messages displayed
+1. Check the server logs for error messages
+2. Capture screenshots of any errors
+3. Contact support with details about your client application, version, steps to reproduce, and error messages

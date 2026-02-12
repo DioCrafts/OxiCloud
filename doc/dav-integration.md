@@ -1,31 +1,31 @@
-# Integración de WebDAV, CalDAV y CardDAV en OxiCloud
+# 23 - DAV Integration
 
-Este documento describe el diseño e implementación de los protocolos WebDAV, CalDAV y CardDAV en OxiCloud, extendiendo la plataforma para soportar clientes y dispositivos que utilizan estos estándares.
+WebDAV, CalDAV, and CardDAV extend the platform to support clients and devices that speak these standard protocols. The implementation follows the existing hexagonal architecture -- each protocol gets its own adapter, service, and domain layer.
 
-## Tabla de Contenidos
+## Table of Contents
 
-1. [Introducción](#introducción)
-2. [Arquitectura de la Implementación](#arquitectura-de-la-implementación)
+1. [Introduction](#introduction)
+2. [Implementation Architecture](#implementation-architecture)
 3. [WebDAV](#webdav)
 4. [CalDAV](#caldav)
 5. [CardDAV](#carddav)
-6. [Consideraciones de Seguridad](#consideraciones-de-seguridad)
-7. [Pruebas y Compatibilidad](#pruebas-y-compatibilidad)
+6. [Security Considerations](#security-considerations)
+7. [Testing and Compatibility](#testing-and-compatibility)
 
-## Introducción
+## Introduction
 
 ### WebDAV (Web Distributed Authoring and Versioning)
-WebDAV es una extensión del protocolo HTTP que permite a los clientes realizar operaciones sobre archivos en un servidor remoto, como crear, modificar, mover y eliminar archivos y directorios.
+An HTTP extension that lets clients create, modify, move, and delete files and directories on a remote server.
 
 ### CalDAV (Calendaring Extensions to WebDAV)
-CalDAV es un protocolo basado en WebDAV que permite a los clientes acceder y gestionar datos de calendario, como eventos y tareas.
+A WebDAV-based protocol for accessing and managing calendar data (events and tasks).
 
 ### CardDAV (vCard Extensions to WebDAV)
-CardDAV es un protocolo que extiende WebDAV para permitir el acceso y gestión de datos de contactos en formato vCard.
+Extends WebDAV to allow access and management of contact data in vCard format.
 
-## Arquitectura de la Implementación
+## Implementation Architecture
 
-La implementación de los protocolos DAV se integra en la arquitectura hexagonal existente de OxiCloud:
+DAV protocols plug into the existing hexagonal architecture:
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -38,22 +38,22 @@ La implementación de los protocolos DAV se integra en la arquitectura hexagonal
 │  └───────┬───────┘  └───────┬───────┘  └───────────┬───────────┘  │
 │          │                  │                      │              │
 └──────────┼──────────────────┼──────────────────────┼──────────────┘
-           │                  │                      │               
-           ▼                  ▼                      ▼               
+           │                  │                      │
+           ▼                  ▼                      ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                          APLICACIÓN                              │
+│                          APPLICATION                             │
 │                                                                  │
 │  ┌───────────┐  ┌────────────┐  ┌───────────┐  ┌──────────────┐ │
 │  │           │  │            │  │           │  │              │ │
-│  │FileService│  │FolderService│  │CalService │  │ContactService│ │
+│  │FileService│  │FolderService│  │CalendarSvc│  │ContactService│ │
 │  │           │  │            │  │           │  │              │ │
 │  └─────┬─────┘  └──────┬─────┘  └─────┬─────┘  └──────┬───────┘ │
 │        │               │              │               │         │
 └────────┼───────────────┼──────────────┼───────────────┼─────────┘
-         │               │              │               │          
-         ▼               ▼              ▼               ▼          
+         │               │              │               │
+         ▼               ▼              ▼               ▼
 ┌────────────────────────────────────────────────────────────────┐
-│                          DOMINIO                               │
+│                          DOMAIN                                │
 │                                                                │
 │  ┌─────────┐  ┌──────────┐  ┌────────────┐  ┌───────────────┐ │
 │  │         │  │          │  │            │  │               │ │
@@ -64,41 +64,41 @@ La implementación de los protocolos DAV se integra en la arquitectura hexagonal
 └────────────────────────────────────────────────────────────────┘
 ```
 
-### Componentes Principales
+### Main Components
 
-1. **Adaptadores DAV**: Convertirán entre las especificaciones DAV y los modelos de OxiCloud
-2. **Servicios de Aplicación**: Se extenderán para incluir funcionalidades específicas DAV
-3. **Modelos de Dominio**: Se añadirán nuevas entidades para Calendar y Contact
-4. **Repositorios**: Implementaciones de almacenamiento para calendarios y contactos
+1. **DAV Adapters** -- convert between DAV specs and internal models
+2. **Application Services** -- extended to include DAV-specific functionality
+3. **Domain Models** -- new entities for **Calendar** and **Contact**
+4. **Repositories** -- storage implementations for calendars and contacts
 
 ## WebDAV
 
-### Endpoints Requeridos
+### Required Endpoints
 
-| Método HTTP | Endpoint | Descripción |
+| HTTP Method | Endpoint | Description |
 |-------------|----------|-------------|
-| OPTIONS | /webdav/{path} | Indica las capacidades WebDAV soportadas |
-| PROPFIND | /webdav/{path} | Recupera propiedades de recursos |
-| PROPPATCH | /webdav/{path} | Modifica propiedades de recursos |
-| MKCOL | /webdav/{path} | Crea colecciones (directorios) |
-| GET | /webdav/{path} | Recupera contenido de recursos |
-| HEAD | /webdav/{path} | Recupera metadatos de recursos |
-| PUT | /webdav/{path} | Crea o actualiza recursos |
-| DELETE | /webdav/{path} | Elimina recursos |
-| COPY | /webdav/{path} | Copia recursos |
-| MOVE | /webdav/{path} | Mueve recursos |
-| LOCK | /webdav/{path} | Bloquea recursos |
-| UNLOCK | /webdav/{path} | Desbloquea recursos |
+| OPTIONS | /webdav/{path} | Reports supported WebDAV capabilities |
+| PROPFIND | /webdav/{path} | Retrieves resource properties |
+| PROPPATCH | /webdav/{path} | Modifies resource properties |
+| MKCOL | /webdav/{path} | Creates collections (directories) |
+| GET | /webdav/{path} | Retrieves resource content |
+| HEAD | /webdav/{path} | Retrieves resource metadata |
+| PUT | /webdav/{path} | Creates or updates resources |
+| DELETE | /webdav/{path} | Deletes resources |
+| COPY | /webdav/{path} | Copies resources |
+| MOVE | /webdav/{path} | Moves resources |
+| LOCK | /webdav/{path} | Locks resources |
+| UNLOCK | /webdav/{path} | Unlocks resources |
 
-### Implementación
+### Implementation
 
-1. **Manejador WebDAV**:
+1. **WebDAV Handler**:
 
 ```rust
 // src/interfaces/api/handlers/webdav_handler.rs
 use std::sync::Arc;
 use axum::{
-    Router, 
+    Router,
     routing::get,
     extract::{Path, State, Request, Extension},
     http::StatusCode,
@@ -129,10 +129,10 @@ pub fn webdav_routes() -> Router<Arc<AppState>> {
         ))
 }
 
-// Implementar funciones para cada método WebDAV...
+// Implement functions for each WebDAV method...
 ```
 
-2. **Adaptador WebDAV**:
+2. **WebDAV Adapter**:
 
 ```rust
 // src/application/adapters/webdav_adapter.rs
@@ -142,45 +142,45 @@ use std::io::{Read, Write};
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
 
-/// Convierte entre objetos de OxiCloud y representaciones WebDAV
+/// Converts between internal objects and WebDAV representations
 pub struct WebDavAdapter;
 
 impl WebDavAdapter {
-    /// Convierte una propiedad PROPFIND en XML a un objeto de solicitud
+    /// Parses a PROPFIND XML property into a request object
     pub fn parse_propfind<R: Read>(reader: R) -> Result<PropFindRequest, Error> {
-        // Implementación...
+        // Implementation...
     }
-    
-    /// Genera respuesta XML para PROPFIND basada en archivos y carpetas
+
+    /// Generates PROPFIND XML response from files and folders
     pub fn generate_propfind_response<W: Write>(
         writer: W,
         files: &[FileDto],
         folders: &[FolderDto],
         base_url: &str,
     ) -> Result<(), Error> {
-        // Implementación...
+        // Implementation...
     }
-    
-    // Otros métodos para manejar diferentes operaciones WebDAV...
+
+    // Other methods for different WebDAV operations...
 }
 ```
 
 ## CalDAV
 
-### Endpoints Requeridos
+### Required Endpoints
 
-| Método HTTP | Endpoint | Descripción |
+| HTTP Method | Endpoint | Description |
 |-------------|----------|-------------|
-| PROPFIND | /caldav/{calendar} | Recupera propiedades del calendario |
-| REPORT | /caldav/{calendar} | Consulta eventos del calendario |
-| MKCALENDAR | /caldav/{calendar} | Crea un nuevo calendario |
-| PUT | /caldav/{calendar}/{event}.ics | Crea o actualiza un evento |
-| GET | /caldav/{calendar}/{event}.ics | Recupera un evento |
-| DELETE | /caldav/{calendar}/{event}.ics | Elimina un evento |
+| PROPFIND | /caldav/{calendar} | Retrieves calendar properties |
+| REPORT | /caldav/{calendar} | Queries calendar events |
+| MKCALENDAR | /caldav/{calendar} | Creates a new calendar |
+| PUT | /caldav/{calendar}/{event}.ics | Creates or updates an event |
+| GET | /caldav/{calendar}/{event}.ics | Retrieves an event |
+| DELETE | /caldav/{calendar}/{event}.ics | Deletes an event |
 
-### Implementación
+### Implementation
 
-1. **Nuevas Entidades de Dominio**:
+1. **Domain Entities**:
 
 ```rust
 // src/domain/entities/calendar.rs
@@ -212,14 +212,14 @@ pub struct CalendarEvent {
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
     all_day: bool,
-    rrule: Option<String>,  // Regla de recurrencia
-    ical_data: String,      // Datos iCalendar completos
+    rrule: Option<String>,  // Recurrence rule
+    ical_data: String,      // Full iCalendar data
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 ```
 
-2. **Repositorios**:
+2. **Repositories**:
 
 ```rust
 // src/domain/repositories/calendar_repository.rs
@@ -260,47 +260,34 @@ pub trait CalendarEventRepository: Send + Sync {
 }
 ```
 
-3. **Servicio CalDAV**:
+3. **CalDAV Service**:
 
 ```rust
-// src/application/services/caldav_service.rs
+// src/application/services/calendar_service.rs
 use std::sync::Arc;
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
-use crate::domain::repositories::calendar_repository::CalendarRepository;
-use crate::domain::repositories::calendar_event_repository::CalendarEventRepository;
-use crate::domain::entities::calendar::Calendar;
-use crate::domain::entities::calendar_event::CalendarEvent;
-use crate::application::dtos::calendar_dto::{CalendarDto, CalendarEventDto};
-use crate::common::errors::{Result, DomainError};
+use crate::application::ports::calendar_ports::CalendarStoragePort;
+use crate::application::dtos::calendar_dto::*;
 
-pub struct CalDavService {
-    calendar_repository: Arc<dyn CalendarRepository>,
-    event_repository: Arc<dyn CalendarEventRepository>,
+pub struct CalendarService {
+    storage: Arc<dyn CalendarStoragePort>,
 }
 
-impl CalDavService {
-    pub fn new(
-        calendar_repository: Arc<dyn CalendarRepository>,
-        event_repository: Arc<dyn CalendarEventRepository>,
-    ) -> Self {
-        Self {
-            calendar_repository,
-            event_repository,
-        }
+impl CalendarService {
+    pub fn new(storage: Arc<dyn CalendarStoragePort>) -> Self {
+        Self { storage }
     }
-    
-    // Implementar métodos para operaciones CalDAV...
+
+    // Implements CalendarUseCase for calendar and event operations...
 }
 ```
 
-4. **Manejador CalDAV**:
+4. **CalDAV Handler**:
 
 ```rust
 // src/interfaces/api/handlers/caldav_handler.rs
 use std::sync::Arc;
 use axum::{
-    Router, 
+    Router,
     routing::{get, put, delete},
     extract::{Path, State, Request, Extension},
     http::StatusCode,
@@ -327,30 +314,28 @@ pub fn caldav_routes() -> Router<Arc<AppState>> {
         .route("/caldav/:calendar/:event", delete(delete_event))
 }
 
-// Implementar funciones para cada método CalDAV...
+// Implement functions for each CalDAV method...
 ```
 
 ## CardDAV
 
-### Endpoints Requeridos
+### Required Endpoints
 
-| Método HTTP | Endpoint | Descripción |
+| HTTP Method | Endpoint | Description |
 |-------------|----------|-------------|
-| PROPFIND | /carddav/addressbooks/{addressbook} | Recupera propiedades de la libreta de direcciones |
-| REPORT | /carddav/addressbooks/{addressbook} | Consulta contactos |
-| MKCOL | /carddav/addressbooks/{addressbook} | Crea una nueva libreta de direcciones |
-| PUT | /carddav/addressbooks/{addressbook}/{contact}.vcf | Crea o actualiza un contacto |
-| GET | /carddav/addressbooks/{addressbook}/{contact}.vcf | Recupera un contacto |
-| DELETE | /carddav/addressbooks/{addressbook}/{contact}.vcf | Elimina un contacto |
+| PROPFIND | /carddav/addressbooks/{addressbook} | Retrieves address book properties |
+| REPORT | /carddav/addressbooks/{addressbook} | Queries contacts |
+| MKCOL | /carddav/addressbooks/{addressbook} | Creates a new address book |
+| PUT | /carddav/addressbooks/{addressbook}/{contact}.vcf | Creates or updates a contact |
+| GET | /carddav/addressbooks/{addressbook}/{contact}.vcf | Retrieves a contact |
+| DELETE | /carddav/addressbooks/{addressbook}/{contact}.vcf | Deletes a contact |
 
-### Implementación
+### Implementation
 
-1. **Nuevas Entidades de Dominio**:
+1. **Domain Entities**:
 
 ```rust
-// src/domain/entities/address_book.rs
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
+// Note: AddressBook and Contact are both defined in src/domain/entities/contact.rs
 
 #[derive(Debug, Clone)]
 pub struct AddressBook {
@@ -358,32 +343,38 @@ pub struct AddressBook {
     name: String,
     owner_id: String,
     description: Option<String>,
+    color: Option<String>,
+    is_public: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
-
-// src/domain/entities/contact.rs
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone)]
 pub struct Contact {
     id: Uuid,
     address_book_id: Uuid,
-    full_name: String,
+    uid: String,
+    full_name: Option<String>,
     first_name: Option<String>,
     last_name: Option<String>,
-    email: Option<String>,
-    phone: Option<String>,
-    address: Option<String>,
+    nickname: Option<String>,
+    email: Vec<Email>,        // Struct with email, type, is_primary
+    phone: Vec<Phone>,        // Struct with number, type, is_primary
+    address: Vec<Address>,    // Struct with street, city, state, postal_code, country, type, is_primary
     organization: Option<String>,
-    vcard_data: String,      // Datos vCard completos
+    title: Option<String>,
+    notes: Option<String>,
+    photo_url: Option<String>,
+    birthday: Option<NaiveDate>,
+    anniversary: Option<NaiveDate>,
+    vcard: String,            // Full vCard data
+    etag: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 ```
 
-2. **Repositorios**:
+2. **Repositories**:
 
 ```rust
 // src/domain/repositories/address_book_repository.rs
@@ -418,46 +409,31 @@ pub trait ContactRepository: Send + Sync {
 }
 ```
 
-3. **Servicio CardDAV**:
+3. **CardDAV Service**:
 
 ```rust
-// src/application/services/carddav_service.rs
+// src/application/services/contact_service.rs
 use std::sync::Arc;
-use uuid::Uuid;
-use crate::domain::repositories::address_book_repository::AddressBookRepository;
-use crate::domain::repositories::contact_repository::ContactRepository;
-use crate::domain::entities::address_book::AddressBook;
-use crate::domain::entities::contact::Contact;
-use crate::application::dtos::address_book_dto::{AddressBookDto, ContactDto};
-use crate::common::errors::{Result, DomainError};
+use crate::application::dtos::contact_dto::*;
+use crate::application::dtos::address_book_dto::*;
 
-pub struct CardDavService {
-    address_book_repository: Arc<dyn AddressBookRepository>,
-    contact_repository: Arc<dyn ContactRepository>,
+pub struct ContactService {
+    // Implements AddressBookUseCase and ContactUseCase
+    // Uses ContactStorageAdapter as infrastructure
 }
 
-impl CardDavService {
-    pub fn new(
-        address_book_repository: Arc<dyn AddressBookRepository>,
-        contact_repository: Arc<dyn ContactRepository>,
-    ) -> Self {
-        Self {
-            address_book_repository,
-            contact_repository,
-        }
-    }
-    
-    // Implementar métodos para operaciones CardDAV...
+impl ContactService {
+    // Implements methods for CardDAV operations...
 }
 ```
 
-4. **Manejador CardDAV**:
+4. **CardDAV Handler**:
 
 ```rust
 // src/interfaces/api/handlers/carddav_handler.rs
 use std::sync::Arc;
 use axum::{
-    Router, 
+    Router,
     routing::{get, put, delete},
     extract::{Path, State, Request, Extension},
     http::StatusCode,
@@ -484,26 +460,30 @@ pub fn carddav_routes() -> Router<Arc<AppState>> {
         .route("/carddav/addressbooks/:addressbook/:contact", delete(delete_contact))
 }
 
-// Implementar funciones para cada método CardDAV...
+// Implement functions for each CardDAV method...
 ```
 
-## Esquema de Base de Datos
+## Database Schema
 
 ```sql
--- Esquema para CalDAV
-CREATE TABLE calendar (
+-- CalDAV schema
+CREATE SCHEMA IF NOT EXISTS caldav;
+
+CREATE TABLE IF NOT EXISTS caldav.calendars (
     id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    owner_id VARCHAR(255) NOT NULL,
+    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     description TEXT,
     color VARCHAR(50),
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    ctag VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE calendar_event (
+CREATE TABLE IF NOT EXISTS caldav.calendar_events (
     id UUID PRIMARY KEY,
-    calendar_id UUID NOT NULL REFERENCES calendar(id) ON DELETE CASCADE,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
     summary VARCHAR(255) NOT NULL,
     description TEXT,
     location TEXT,
@@ -513,91 +493,145 @@ CREATE TABLE calendar_event (
     rrule TEXT,
     ical_uid VARCHAR(255) NOT NULL,
     ical_data TEXT NOT NULL,
+    etag VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Esquema para CardDAV
-CREATE TABLE address_book (
+CREATE TABLE IF NOT EXISTS caldav.calendar_shares (
+    id SERIAL PRIMARY KEY,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    access_level VARCHAR(20) NOT NULL DEFAULT 'read',
+    UNIQUE(calendar_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS caldav.calendar_properties (
+    id SERIAL PRIMARY KEY,
+    calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
+    property_name VARCHAR(255) NOT NULL,
+    property_value TEXT,
+    UNIQUE(calendar_id, property_name)
+);
+
+-- CardDAV schema
+CREATE SCHEMA IF NOT EXISTS carddav;
+
+CREATE TABLE IF NOT EXISTS carddav.address_books (
     id UUID PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    owner_id VARCHAR(255) NOT NULL,
+    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     description TEXT,
+    color VARCHAR(50),
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    ctag VARCHAR(255),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(owner_id, name)
 );
 
-CREATE TABLE contact (
+CREATE TABLE IF NOT EXISTS carddav.contacts (
     id UUID PRIMARY KEY,
-    address_book_id UUID NOT NULL REFERENCES address_book(id) ON DELETE CASCADE,
-    full_name VARCHAR(255) NOT NULL,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    uid VARCHAR(255) NOT NULL,
+    full_name VARCHAR(255),
     first_name VARCHAR(255),
     last_name VARCHAR(255),
-    email VARCHAR(255),
-    phone VARCHAR(100),
-    address TEXT,
+    nickname VARCHAR(255),
     organization VARCHAR(255),
-    vcard_uid VARCHAR(255) NOT NULL,
-    vcard_data TEXT NOT NULL,
+    title VARCHAR(255),
+    notes TEXT,
+    photo_url TEXT,
+    birthday DATE,
+    anniversary DATE,
+    email JSONB,
+    phone JSONB,
+    address JSONB,
+    vcard TEXT NOT NULL,
+    etag VARCHAR(255) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(address_book_id, uid)
+);
+
+CREATE TABLE IF NOT EXISTS carddav.address_book_shares (
+    id SERIAL PRIMARY KEY,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    can_write BOOLEAN NOT NULL DEFAULT FALSE,
+    UNIQUE(address_book_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS carddav.contact_groups (
+    id UUID PRIMARY KEY,
+    address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Índices para búsqueda eficiente
-CREATE INDEX idx_calendar_owner ON calendar(owner_id);
-CREATE INDEX idx_calendar_event_calendar ON calendar_event(calendar_id);
-CREATE INDEX idx_address_book_owner ON address_book(owner_id);
-CREATE INDEX idx_contact_address_book ON contact(address_book_id);
-CREATE INDEX idx_contact_name ON contact(full_name);
+CREATE TABLE IF NOT EXISTS carddav.group_memberships (
+    id SERIAL PRIMARY KEY,
+    group_id UUID NOT NULL REFERENCES carddav.contact_groups(id) ON DELETE CASCADE,
+    contact_id UUID NOT NULL REFERENCES carddav.contacts(id) ON DELETE CASCADE,
+    UNIQUE(group_id, contact_id)
+);
+
+-- Indexes for efficient lookup
+CREATE INDEX IF NOT EXISTS idx_calendars_owner ON caldav.calendars(owner_id);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_calendar ON caldav.calendar_events(calendar_id);
+CREATE INDEX IF NOT EXISTS idx_address_books_owner ON carddav.address_books(owner_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_address_book ON carddav.contacts(address_book_id);
+CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON carddav.contacts(full_name);
 ```
 
-## Consideraciones de Seguridad
+## Security Considerations
 
-1. **Autenticación**
-   - Utilizar la autenticación existente de OxiCloud
-   - Soportar autenticación HTTP Basic para clientes DAV
-   - Implementar el esquema de autenticación Digest si es necesario
+1. **Authentication**
+   - Uses existing authentication
+   - Supports HTTP Basic Authentication for DAV clients
+   - Digest authentication can be added if needed
 
-2. **Autorización**
-   - Verificar permisos de usuario para acceder a recursos
-   - Implementar control de acceso basado en propietario y permisos compartidos
-   - Asegurar que los usuarios solo puedan acceder a sus propios calendarios y libretas de direcciones
+2. **Authorization**
+   - Verify user permissions before granting resource access
+   - Owner-based and shared-permission access control
+   - Users can only access their own calendars and address books
 
-3. **Prevención de Ataques**
-   - Validar y sanitizar todas las entradas XML
-   - Limitar tamaño máximo de carga útil
-   - Implementar rate limiting en endpoints DAV
+3. **Attack Prevention**
+   - Validate and sanitize all XML input
+   - Limit maximum payload size
+   - Rate limiting on DAV endpoints
 
-## Pruebas y Compatibilidad
+## Testing and Compatibility
 
-### Clientes a Probar
+### Clients to Test
 
 1. **WebDAV**
    - Windows Explorer
    - macOS Finder
    - Cyberduck
-   - FileZilla (con extensión WebDAV)
+   - FileZilla (with WebDAV extension)
 
 2. **CalDAV**
    - Apple Calendar
    - Mozilla Thunderbird (Lightning)
-   - Microsoft Outlook (con complemento CalDAV)
-   - Google Calendar (mediante sincronización)
+   - Microsoft Outlook (with CalDAV add-in)
+   - Google Calendar (via sync)
 
 3. **CardDAV**
    - Apple Contacts
    - Mozilla Thunderbird
-   - Microsoft Outlook (con complemento CardDAV)
-   - Google Contacts (mediante sincronización)
+   - Microsoft Outlook (with CardDAV add-in)
+   - Google Contacts (via sync)
 
-### Pruebas de Cumplimiento
+### Compliance Testing
 
-- Utilizar la suite de pruebas CalDAVTester para verificar la conformidad con el estándar
-- Validar cumplimiento de RFC para cada protocolo
-- Pruebas de stress para evaluar rendimiento bajo carga
+- Use the **CalDAVTester** suite to verify standards conformance
+- Validate RFC compliance for each protocol
+- Stress tests to evaluate performance under load
 
-### Depuración
+### Debugging
 
-- Implementar logging detallado para operaciones DAV
-- Crear herramientas de diagnóstico para depurar solicitudes DAV complejas
-- Proporcionar mensajes de error claros para ayudar en la resolución de problemas
+- Detailed logging for DAV operations
+- Diagnostic tools for debugging complex DAV requests
+- Clear error messages for troubleshooting

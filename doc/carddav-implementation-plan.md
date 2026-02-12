@@ -1,125 +1,80 @@
-# CardDAV Implementation Plan
+# 28 - CardDAV Implementation Plan
 
-## Introduction
-
-This document outlines the plan for implementing CardDAV support in OxiCloud. CardDAV is an open protocol for synchronizing address books/contacts between different applications and devices.
+CardDAV is an open protocol for syncing address books and contacts across applications and devices. This plan breaks the implementation into five phases over five weeks.
 
 ## Implementation Roadmap
 
-The implementation will follow these steps:
-
 ### Phase 1: Core Infrastructure (Week 1)
 
-#### Database Schema
-- Create new migration for CardDAV tables:
-  - `address_books` - For storing address book collections
-  - `contacts` - For storing contact information
-  - `address_book_shares` - For sharing address books between users
-  - `contact_groups` - For organizing contacts into groups
-  - `group_memberships` - For associating contacts with groups
+**Database Schema** -- new migration for CardDAV tables:
+- **address_books** -- stores address book collections
+- **contacts** -- stores contact data
+- **address_book_shares** -- sharing between users
+- **contact_groups** -- organizing contacts into groups
+- **group_memberships** -- associating contacts with groups
 
-#### Domain Layer
-- Define entity models:
-  - `Contact` - Core contact entity
-  - `AddressBook` - Collection entity
-  - `ContactGroup` - For grouping contacts
-- Create repository interfaces:
-  - `ContactRepository` - For contact CRUD operations
-  - `AddressBookRepository` - For address book management
-  - `ContactGroupRepository` - For group management
+**Domain Layer** -- entity models:
+- **Contact** -- core contact entity
+- **AddressBook** -- collection entity
+- **ContactGroup** -- grouping contacts
 
-#### Testing
-- Unit tests for entity models
-- Repository interface contract tests
+Repository interfaces:
+- **ContactRepository** -- contact CRUD
+- **AddressBookRepository** -- address book management
+- **ContactGroupRepository** -- group management
+
+**Testing** -- unit tests for entity models and repository interface contract tests.
 
 ### Phase 2: Infrastructure Layer (Week 2)
 
-#### Repository Implementations
-- Implement PostgreSQL repositories:
-  - `ContactPgRepository`
-  - `AddressBookPgRepository`
-  - `ContactGroupPgRepository`
-- Implement vCard parsing and generation utilities
-- Create data migration tools (if needed)
+**Repository Implementations** -- PostgreSQL:
+- **ContactPgRepository**
+- **AddressBookPgRepository**
+- **ContactGroupPgRepository**
 
-#### Integration
-- Update dependency injection system to include new repositories
-- Connect with existing auth system
+Also implement vCard parsing/generation utilities and any data migration tools needed.
 
-#### Testing
-- Repository implementation tests
-- vCard parsing/generation tests
-- Integration tests with database
+**Integration** -- update DI system to include new repositories and connect with existing auth system.
+
+**Testing** -- repository implementation tests, vCard parsing/generation tests, integration tests with the database.
 
 ### Phase 3: Application Layer (Week 3)
 
-#### Services
-- Implement business logic services:
-  - `ContactService` - Contact management
-  - `AddressBookService` - Address book management
-  - `ContactGroupService` - Group management
+**Services** -- business logic:
+- **ContactService** -- contact management
+- **AddressBookService** -- address book management
+- **ContactGroupService** -- group management
 
-#### DTOs and Ports
-- Create DTOs for contact operations
-- Define service interface ports
-- Implement request/response mapping
+**DTOs and Ports** -- create DTOs for contact operations, define service interface ports, implement request/response mapping.
 
-#### CardDAV Adapter
-- Create adapter for CardDAV protocol translation
-- Implement vCard conversion logic
-- Create XML parsing and generation utilities
+**CardDAV Adapter** -- protocol translation adapter with vCard conversion logic and XML parsing/generation utilities.
 
-#### Testing
-- Service unit tests
-- Integration tests for adapter
+**Testing** -- service unit tests and integration tests for the adapter.
 
 ### Phase 4: Interface Layer (Week 4)
 
-#### REST API
-- Create REST endpoints for address book operations
-- Implement contact management endpoints
-- Add contact group endpoints
-- Document API with OpenAPI
+**REST API** -- endpoints for address book operations, contact management, contact groups. Document with OpenAPI.
 
-#### CardDAV Protocol Endpoints
-- Implement WebDAV method handlers:
-  - PROPFIND - For discovery and property retrieval
-  - REPORT - For querying contacts
-  - MKCOL - For creating address books
-  - GET/PUT/DELETE - For contact operations
-- Add CardDAV-specific XML handling
+**CardDAV Protocol Endpoints** -- WebDAV method handlers:
+- PROPFIND -- discovery and property retrieval
+- REPORT -- querying contacts
+- MKCOL -- creating address books
+- GET/PUT/DELETE -- contact operations
+- CardDAV-specific XML handling
 
-#### Integration
-- Connect all layers
-- Perform end-to-end testing
-- Test with various CardDAV clients
+**Integration** -- connect all layers, end-to-end testing, test with various CardDAV clients.
 
-#### Testing
-- API endpoint tests
-- CardDAV protocol compliance tests
-- Client compatibility tests
+**Testing** -- API endpoint tests, CardDAV protocol compliance tests, client compatibility tests.
 
 ### Phase 5: Refinement and Optimization (Week 5)
 
-#### Performance Optimization
-- Add caching for frequently accessed resources
-- Optimize database queries
-- Implement efficient synchronization mechanisms
+**Performance** -- caching for frequently accessed resources, query optimization, efficient sync mechanisms.
 
-#### Security Hardening
-- Review authentication and authorization
-- Validate input and output
-- Add rate limiting
+**Security** -- review auth, validate I/O, add rate limiting.
 
-#### Final Testing
-- Stress testing with large address books
-- Security testing
-- User acceptance testing
+**Final Testing** -- stress testing with large address books, security testing, user acceptance testing.
 
-#### Documentation
-- Update API documentation
-- Create user guides
-- Document client setup procedures
+**Documentation** -- update API docs, user guides, client setup procedures.
 
 ## Technical Specifications
 
@@ -227,36 +182,34 @@ CREATE TABLE IF NOT EXISTS carddav.group_memberships (
 ## Resources Required
 
 - Developer time: 1 full-time developer for 5 weeks
-- Testing resources: Multiple CardDAV clients (Apple Contacts, Thunderbird, Android)
-- Server resources: Test environment with PostgreSQL
+- Testing resources: multiple CardDAV clients (Apple Contacts, Thunderbird, Android)
+- Server resources: test environment with PostgreSQL
 
 ## Success Criteria
-
-The implementation will be considered successful when:
 
 1. Users can create, update, and delete address books
 2. Contacts can be managed within address books
 3. Address books can be shared between users
-4. Standard CardDAV clients can synchronize with the server
-5. Performance is acceptable with large address books (1000+ contacts)
-6. Security measures are properly implemented
+4. Standard CardDAV clients can sync with the server
+5. Acceptable performance with large address books (1000+ contacts)
+6. Security measures properly implemented
 
 ## Client Setup Guides
 
-After implementation, we will create setup guides for:
+After implementation, setup guides will be created for:
 
 - Apple Contacts (macOS/iOS)
 - Thunderbird/Evolution
-- Android (using DAVx⁵)
+- Android (using DAVx5)
 - Other common CardDAV clients
+
+See `dav-client-setup.md` for general DAV client configuration.
 
 ## Future Enhancements
 
-After the initial implementation, we may consider:
-
-1. Advanced contact search capabilities
+1. Advanced contact search
 2. Contact merging for duplicate detection
-3. Bulk import/export options
+3. Bulk import/export
 4. Contact photo management
-5. Extended fields for specialized contact information
-6. Integration with other systems (e.g., LDAP directories)
+5. Extended fields for specialized contact info
+6. Integration with external systems (e.g., LDAP directories)

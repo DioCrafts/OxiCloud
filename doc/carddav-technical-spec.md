@@ -1,14 +1,10 @@
-# CardDAV Integration Technical Specification
+# 27 - CardDAV Technical Spec
 
-## Overview
-
-This document outlines the technical specification for implementing CardDAV support in OxiCloud, allowing users to synchronize their contacts across various devices and applications.
-
-CardDAV (Card Distributed Authoring and Versioning) is an address book client/server protocol designed to allow users to access and share contact data on a server. It's an extension of WebDAV (RFC 4918) and is defined in RFC 6352.
+CardDAV (RFC 6352) enables contact synchronization across devices and applications. It extends WebDAV (RFC 4918) to manage address books and vCard-formatted contacts.
 
 ## Architecture
 
-The CardDAV implementation will follow the established hexagonal architecture pattern used throughout OxiCloud:
+The CardDAV implementation follows the hexagonal architecture pattern:
 
 ```
 ┌───────────────────┐     ┌────────────────────┐     ┌────────────────────┐
@@ -32,25 +28,23 @@ The CardDAV implementation will follow the established hexagonal architecture pa
 ### Components
 
 1. **Domain Layer**
-   - `Contact` entity - Represents a contact with properties like name, email, phone, etc.
-   - `AddressBook` entity - Represents a collection of contacts
+   - **Contact** entity -- name, email, phone, etc.
+   - **AddressBook** entity -- a collection of contacts
    - Repository interfaces for contact management
 
 2. **Application Layer**
-   - `ContactService` - Business logic for managing contacts
-   - `CardDAVAdapter` - Converts between CardDAV protocol requests/responses and domain objects
+   - **ContactService** -- business logic for managing contacts
+   - **CardDAVAdapter** -- converts between CardDAV protocol requests/responses and domain objects
 
 3. **Infrastructure Layer**
-   - `ContactPgRepository` - PostgreSQL implementation of contact repositories
-   - `AddressBookPgRepository` - PostgreSQL implementation of address book repositories
+   - **ContactPgRepository** -- PostgreSQL implementation of contact repositories
+   - **AddressBookPgRepository** -- PostgreSQL implementation of address book repositories
 
 4. **Interface Layer**
    - REST API endpoints for contact management
    - CardDAV protocol endpoints (WebDAV extension)
 
 ## Database Schema
-
-The following database schema will be used to store contact information:
 
 ```sql
 -- Address books table
@@ -120,8 +114,6 @@ CREATE TABLE IF NOT EXISTS carddav.group_memberships (
 
 ### REST API
 
-The following REST endpoints will be implemented for managing contacts:
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/address-books` | List all address books |
@@ -139,12 +131,10 @@ The following REST endpoints will be implemented for managing contacts:
 
 ### CardDAV Protocol Endpoints
 
-The following CardDAV protocol endpoints will be implemented:
-
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | PROPFIND | `/carddav/` | List all address books |
-| PROPFIND | `/carddav/:addressBookId/` | Get address book information |
+| PROPFIND | `/carddav/:addressBookId/` | Get address book info |
 | REPORT | `/carddav/:addressBookId/` | Query contacts in an address book |
 | GET | `/carddav/:addressBookId/:contactId.vcf` | Get a specific contact (vCard) |
 | PUT | `/carddav/:addressBookId/:contactId.vcf` | Create or update a contact |
@@ -225,7 +215,7 @@ pub struct AddressBook {
 
 ## Repositories
 
-### Contact Repository Interface
+### ContactRepository Interface
 
 ```rust
 #[async_trait]
@@ -241,7 +231,7 @@ pub trait ContactRepository: Send + Sync + 'static {
 }
 ```
 
-### AddressBook Repository Interface
+### AddressBookRepository Interface
 
 ```rust
 #[async_trait]
@@ -259,51 +249,47 @@ pub trait AddressBookRepository: Send + Sync + 'static {
 }
 ```
 
-## CardDAV Protocol Implementation
+## CardDAV Protocol Features
 
-The CardDAV implementation will support the following features:
-
-1. **Address Book Discovery** - Allow clients to discover available address books
-2. **Address Book Collection** - Manage contacts within address books
-3. **vCard Support** - Store and retrieve contacts in vCard format (3.0 and 4.0)
-4. **Query Support** - Filter contacts by properties
-5. **Multiget Support** - Retrieve multiple contacts in a single request
-6. **Sync-Collection** - Efficient synchronization of changes
+1. **Address Book Discovery** -- clients discover available address books
+2. **Address Book Collection** -- manage contacts within address books
+3. **vCard Support** -- store and retrieve contacts in vCard format (3.0 and 4.0)
+4. **Query Support** -- filter contacts by properties
+5. **Multiget Support** -- retrieve multiple contacts in a single request
+6. **Sync-Collection** -- efficient incremental synchronization
 
 ### CardDAV Adapter
 
-The CardDAV adapter will handle:
+The **CardDAVAdapter** handles:
 
 1. Parsing CardDAV XML requests
-2. Converting between vCard and Contact entities
+2. Converting between vCard and **Contact** entities
 3. Generating CardDAV XML responses
-4. Supporting PROPFIND, REPORT, and other WebDAV methods
-5. Implementing the proper WebDAV properties for CardDAV
+4. Supporting **PROPFIND**, **REPORT**, and other WebDAV methods
+5. Implementing proper WebDAV properties for CardDAV
 
 ## Integration Points
 
-The CardDAV implementation will integrate with:
-
-1. **Authentication System** - Reuse existing auth mechanisms
-2. **WebDAV Infrastructure** - Extend the existing WebDAV implementation
-3. **Database Layer** - Store contacts in PostgreSQL
-4. **User Management** - Connect contacts with user accounts
+1. **Authentication** -- reuses existing auth mechanisms
+2. **WebDAV Infrastructure** -- extends the existing WebDAV implementation
+3. **Database Layer** -- stores contacts in PostgreSQL
+4. **User Management** -- connects contacts with user accounts
 
 ## Client Compatibility
 
-The implementation should be compatible with the following clients:
+Target clients:
 
 - Apple Contacts
 - Google Contacts
 - Thunderbird
 - Outlook
-- Android DAVx⁵
+- Android DAVx5
 - iOS native contacts app
 - Evolution
 
-## Implementation Phases
+See `dav-client-setup.md` for detailed connection instructions.
 
-The implementation will be divided into the following phases:
+## Implementation Phases
 
 ### Phase 1: Core Infrastructure
 - Database schema creation
@@ -322,7 +308,7 @@ The implementation will be divided into the following phases:
 - Contact group endpoints
 
 ### Phase 4: CardDAV Protocol
-- CardDAV adapter implementation
+- **CardDAVAdapter** implementation
 - WebDAV method handlers
 - XML parsing and generation
 - Protocol compliance testing
@@ -332,32 +318,26 @@ The implementation will be divided into the following phases:
 - Performance optimization
 - Edge case handling
 
-## Security Considerations
+## Security
 
-The CardDAV implementation must address the following security concerns:
+1. **Authentication** -- proper authentication for all operations
+2. **Authorization** -- verify permissions for each address book operation
+3. **Data Validation** -- validate vCard input to prevent injection attacks
+4. **Resource Limits** -- limits to prevent abuse
+5. **Error Handling** -- appropriate error responses without leaking sensitive data
 
-1. **Authentication** - Ensure proper authentication for all operations
-2. **Authorization** - Verify permissions for each address book operation
-3. **Data Validation** - Validate vCard input to prevent injection attacks
-4. **Resource Limits** - Implement limits to prevent abuse
-5. **Error Handling** - Provide appropriate error responses without revealing sensitive information
+## Performance
 
-## Performance Considerations
-
-To ensure good performance:
-
-1. **Indexing** - Proper database indexes for contact queries
-2. **Caching** - Cache frequently accessed address books and contacts
-3. **Pagination** - Support pagination for large address books
-4. **Incremental Sync** - Efficient synchronization with client devices
-5. **ETags** - Use ETags to prevent unnecessary data transfers
+1. **Indexing** -- proper database indexes for contact queries
+2. **Caching** -- cache frequently accessed address books and contacts
+3. **Pagination** -- support pagination for large address books
+4. **Incremental Sync** -- efficient sync with client devices
+5. **ETags** -- prevent unnecessary data transfers
 
 ## Testing Strategy
 
-The CardDAV implementation will be tested using:
-
-1. **Unit Tests** - Test individual components in isolation
-2. **Integration Tests** - Test the interaction between components
-3. **Protocol Compliance Tests** - Verify adherence to the CardDAV specification
-4. **Client Compatibility Tests** - Test with various CardDAV clients
-5. **Performance Tests** - Measure performance with large address books
+1. **Unit Tests** -- test individual components in isolation
+2. **Integration Tests** -- test component interactions
+3. **Protocol Compliance Tests** -- verify adherence to the CardDAV spec (RFC 6352)
+4. **Client Compatibility Tests** -- test with various CardDAV clients
+5. **Performance Tests** -- measure performance with large address books

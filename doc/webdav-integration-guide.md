@@ -1,6 +1,6 @@
-# WebDAV Integration Guide for OxiCloud
+# 22 - WebDAV Integration Guide
 
-This guide provides developers with information on how to interact with OxiCloud's WebDAV interface programmatically and how to extend the WebDAV functionality.
+The WebDAV interface exposes file operations over HTTP at a single base path. All standard WebDAV methods are supported: **PROPFIND**, **GET**, **PUT**, **MKCOL**, **MOVE**, **COPY**, **DELETE**. Authentication is HTTP Basic over TLS.
 
 ## Table of Contents
 
@@ -20,13 +20,13 @@ This guide provides developers with information on how to interact with OxiCloud
 
 ## Base URL and Endpoints
 
-The WebDAV interface is available at:
+The WebDAV interface lives at:
 
 ```
 https://[your-oxicloud-server]/webdav/
 ```
 
-All file and folder operations are performed under this base path. Resource paths are appended to this URL.
+All file and folder operations hang off this base path. Append the resource path to the URL.
 
 Examples:
 - Root folder: `https://[your-oxicloud-server]/webdav/`
@@ -36,23 +36,23 @@ Examples:
 
 ## Authentication
 
-OxiCloud's WebDAV interface supports HTTP Basic Authentication. When making requests, include the `Authorization` header with base64-encoded credentials:
+WebDAV uses HTTP Basic Authentication. Include the `Authorization` header with base64-encoded credentials:
 
 ```
 Authorization: Basic base64(username:password)
 ```
 
-For security reasons, always use HTTPS when connecting to WebDAV.
+Always use HTTPS.
 
 ## Common Operations
 
 ### Listing Directories
 
-To list the contents of a directory, use the `PROPFIND` method with an appropriate `Depth` header:
+Use the **PROPFIND** method with a **Depth** header:
 
-- `Depth: 0` - Returns information about the resource itself
-- `Depth: 1` - Returns information about the resource and its immediate children (recommended)
-- `Depth: infinity` - Returns information about the resource and all descendants (use carefully with large directories)
+- `Depth: 0` -- info about the resource itself
+- `Depth: 1` -- the resource and its immediate children (recommended)
+- `Depth: infinity` -- the resource and all descendants (careful with large trees)
 
 Request:
 ```http
@@ -92,7 +92,7 @@ Content-Type: application/xml; charset=utf-8
 
 ### Downloading Files
 
-To download a file, use the standard HTTP `GET` method:
+Standard HTTP **GET**:
 
 ```http
 GET /webdav/projects/document.pdf HTTP/1.1
@@ -100,7 +100,7 @@ Host: your-oxicloud-server
 Authorization: Basic [credentials]
 ```
 
-The server will respond with the file content and appropriate headers:
+Response:
 
 ```http
 HTTP/1.1 200 OK
@@ -114,7 +114,7 @@ ETag: "abc123"
 
 ### Uploading Files
 
-To upload or update a file, use the HTTP `PUT` method:
+Use HTTP **PUT** to upload or update a file:
 
 ```http
 PUT /webdav/projects/document.pdf HTTP/1.1
@@ -126,21 +126,11 @@ Authorization: Basic [credentials]
 [File content]
 ```
 
-For new files, the server responds with:
-
-```http
-HTTP/1.1 201 Created
-```
-
-For updated files, the server responds with:
-
-```http
-HTTP/1.1 204 No Content
-```
+New files return `201 Created`. Updates return `204 No Content`.
 
 ### Creating Folders
 
-To create a folder, use the WebDAV `MKCOL` method:
+Use the **MKCOL** method:
 
 ```http
 MKCOL /webdav/projects/new-folder HTTP/1.1
@@ -148,15 +138,11 @@ Host: your-oxicloud-server
 Authorization: Basic [credentials]
 ```
 
-Successful response:
-
-```http
-HTTP/1.1 201 Created
-```
+Returns `201 Created` on success.
 
 ### Moving and Copying
 
-To move resources, use the WebDAV `MOVE` method:
+**MOVE** a resource:
 
 ```http
 MOVE /webdav/old-location.pdf HTTP/1.1
@@ -165,7 +151,7 @@ Destination: https://your-oxicloud-server/webdav/new-location.pdf
 Authorization: Basic [credentials]
 ```
 
-To copy resources, use the WebDAV `COPY` method:
+**COPY** a resource:
 
 ```http
 COPY /webdav/original.pdf HTTP/1.1
@@ -174,15 +160,11 @@ Destination: https://your-oxicloud-server/webdav/copy.pdf
 Authorization: Basic [credentials]
 ```
 
-For both operations, a successful response is:
-
-```http
-HTTP/1.1 204 No Content
-```
+Both return `204 No Content` on success.
 
 ### Deleting Resources
 
-To delete a file or folder, use the HTTP `DELETE` method:
+Use HTTP **DELETE**:
 
 ```http
 DELETE /webdav/projects/document.pdf HTTP/1.1
@@ -190,11 +172,7 @@ Host: your-oxicloud-server
 Authorization: Basic [credentials]
 ```
 
-Successful response:
-
-```http
-HTTP/1.1 204 No Content
-```
+Returns `204 No Content` on success.
 
 ## XML Schemas
 
@@ -278,10 +256,10 @@ body = '''<?xml version="1.0" encoding="utf-8" ?>
 </D:propfind>'''
 
 response = requests.request(
-    'PROPFIND', 
-    f'{base_url}/projects/', 
-    headers=headers, 
-    data=body, 
+    'PROPFIND',
+    f'{base_url}/projects/',
+    headers=headers,
+    data=body,
     auth=auth
 )
 
@@ -291,17 +269,17 @@ if response.status_code == 207:  # Multi-Status
     for response_elem in root.findall('.//{DAV:}response'):
         href = response_elem.find('.//{DAV:}href').text
         print(f"Resource: {href}")
-        
+
         # Get displayname if available
         displayname = response_elem.find('.//{DAV:}displayname')
         if displayname is not None and displayname.text:
             print(f"  Name: {displayname.text}")
-            
+
         # Check if it's a collection (folder)
         resourcetype = response_elem.find('.//{DAV:}resourcetype')
         is_collection = resourcetype is not None and resourcetype.find('.//{DAV:}collection') is not None
         print(f"  Type: {'Folder' if is_collection else 'File'}")
-        
+
         # Get size if it's a file
         if not is_collection:
             contentlength = response_elem.find('.//{DAV:}getcontentlength')
@@ -311,7 +289,7 @@ if response.status_code == 207:  # Multi-Status
 # 2. Upload a file
 with open('local-file.pdf', 'rb') as f:
     file_content = f.read()
-    
+
 response = requests.put(
     f'{base_url}/projects/document.pdf',
     data=file_content,
@@ -368,7 +346,7 @@ if response.status_code == 204:
 
 ### JavaScript Example
 
-Using browser's `fetch` API:
+Using the browser `fetch` API:
 
 ```javascript
 // Base configuration
@@ -392,29 +370,29 @@ async function listDirectory(path) {
   <D:allprop/>
 </D:propfind>`
   });
-  
+
   if (response.status === 207) {
     const text = await response.text();
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(text, 'text/xml');
-    
+
     const responses = xmlDoc.getElementsByTagNameNS('DAV:', 'response');
     const resources = [];
-    
+
     for (let i = 0; i < responses.length; i++) {
       const response = responses[i];
       const href = response.getElementsByTagNameNS('DAV:', 'href')[0].textContent;
-      
+
       let displayName = '';
       const displayNameElems = response.getElementsByTagNameNS('DAV:', 'displayname');
       if (displayNameElems.length > 0) {
         displayName = displayNameElems[0].textContent;
       }
-      
+
       // Check if resource is a collection (folder)
       const resourceTypeElem = response.getElementsByTagNameNS('DAV:', 'resourcetype')[0];
       const isCollection = resourceTypeElem.getElementsByTagNameNS('DAV:', 'collection').length > 0;
-      
+
       // Get file size if it's a file
       let size = null;
       if (!isCollection) {
@@ -423,7 +401,7 @@ async function listDirectory(path) {
           size = parseInt(contentLengthElems[0].textContent, 10);
         }
       }
-      
+
       resources.push({
         href,
         displayName,
@@ -431,7 +409,7 @@ async function listDirectory(path) {
         size
       });
     }
-    
+
     return resources;
   } else {
     throw new Error(`Failed to list directory: ${response.status}`);
@@ -448,7 +426,7 @@ async function uploadFile(path, fileContent) {
     },
     body: fileContent
   });
-  
+
   return response.status === 201 || response.status === 204;
 }
 
@@ -468,7 +446,7 @@ async function downloadFile(path) {
     method: 'GET',
     headers
   });
-  
+
   if (response.status === 200) {
     return await response.blob();
   } else {
@@ -481,13 +459,13 @@ async function downloadAndSave(path, filename) {
   try {
     const blob = await downloadFile(path);
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    
+
     // Clean up
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
@@ -502,7 +480,7 @@ async function createFolder(path) {
     method: 'MKCOL',
     headers
   });
-  
+
   return response.status === 201;
 }
 
@@ -515,7 +493,7 @@ async function moveResource(fromPath, toPath) {
       'Destination': `${baseUrl}${toPath}`
     }
   });
-  
+
   return response.status === 204;
 }
 
@@ -525,7 +503,7 @@ async function deleteResource(path) {
     method: 'DELETE',
     headers
   });
-  
+
   return response.status === 204;
 }
 ```
@@ -544,18 +522,18 @@ class WebDavClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _baseUrl;
-    
+
     public WebDavClient(string baseUrl, string username, string password)
     {
         _baseUrl = baseUrl.TrimEnd('/') + "/webdav";
         _httpClient = new HttpClient();
-        
+
         // Set Basic Authentication
         var credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{username}:{password}"));
-        _httpClient.DefaultRequestHeaders.Authorization = 
+        _httpClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Basic", credentials);
     }
-    
+
     public async Task<XDocument> ListDirectoryAsync(string path)
     {
         var request = new HttpRequestMessage(new HttpMethod("PROPFIND"), $"{_baseUrl}/{path.TrimStart('/')}");
@@ -568,63 +546,63 @@ class WebDavClient
             Encoding.UTF8,
             "application/xml"
         );
-        
+
         var response = await _httpClient.SendAsync(request);
-        
+
         if (response.StatusCode == System.Net.HttpStatusCode.MultiStatus)
         {
             var content = await response.Content.ReadAsStringAsync();
             return XDocument.Parse(content);
         }
-        
+
         throw new Exception($"Failed to list directory: {response.StatusCode}");
     }
-    
+
     public async Task<bool> UploadFileAsync(string path, byte[] content)
     {
         var request = new HttpRequestMessage(HttpMethod.Put, $"{_baseUrl}/{path.TrimStart('/')}");
         request.Content = new ByteArrayContent(content);
-        
+
         var response = await _httpClient.SendAsync(request);
-        
-        return response.StatusCode == System.Net.HttpStatusCode.Created || 
+
+        return response.StatusCode == System.Net.HttpStatusCode.Created ||
                response.StatusCode == System.Net.HttpStatusCode.NoContent;
     }
-    
+
     public async Task<byte[]> DownloadFileAsync(string path)
     {
         var response = await _httpClient.GetAsync($"{_baseUrl}/{path.TrimStart('/')}");
-        
+
         if (response.IsSuccessStatusCode)
         {
             return await response.Content.ReadAsByteArrayAsync();
         }
-        
+
         throw new Exception($"Failed to download file: {response.StatusCode}");
     }
-    
+
     public async Task<bool> CreateFolderAsync(string path)
     {
         var request = new HttpRequestMessage(new HttpMethod("MKCOL"), $"{_baseUrl}/{path.TrimStart('/')}");
         var response = await _httpClient.SendAsync(request);
-        
+
         return response.StatusCode == System.Net.HttpStatusCode.Created;
     }
-    
+
     public async Task<bool> MoveResourceAsync(string fromPath, string toPath)
     {
         var request = new HttpRequestMessage(new HttpMethod("MOVE"), $"{_baseUrl}/{fromPath.TrimStart('/')}");
         request.Headers.Add("Destination", $"{_baseUrl}/{toPath.TrimStart('/')}");
-        
+
         var response = await _httpClient.SendAsync(request);
-        
+
         return response.StatusCode == System.Net.HttpStatusCode.NoContent;
     }
-    
+
     public async Task<bool> DeleteResourceAsync(string path)
     {
         var response = await _httpClient.DeleteAsync($"{_baseUrl}/{path.TrimStart('/')}");
-        
+
         return response.StatusCode == System.Net.HttpStatusCode.NoContent;
     }
 }
@@ -633,7 +611,7 @@ class WebDavClient
 async Task RunExampleAsync()
 {
     var client = new WebDavClient("https://your-oxicloud-server", "username", "password");
-    
+
     // List directory
     try
     {
@@ -645,7 +623,7 @@ async Task RunExampleAsync()
     {
         Console.WriteLine($"Error listing directory: {ex.Message}");
     }
-    
+
     // Upload a file
     try
     {
@@ -657,7 +635,7 @@ async Task RunExampleAsync()
     {
         Console.WriteLine($"Error uploading file: {ex.Message}");
     }
-    
+
     // Download a file
     try
     {
@@ -678,9 +656,9 @@ async Task RunExampleAsync()
 
 To support custom WebDAV properties:
 
-1. Define your XML namespace for custom properties
-2. Implement storage for these properties (database table recommended)
-3. Update the WebDAV adapter to handle these properties
+1. Define your XML namespace for custom properties.
+2. Implement storage for them (database table recommended).
+3. Update the WebDAV adapter to handle these properties.
 
 Example adapter code for custom properties:
 
@@ -692,7 +670,7 @@ fn handle_custom_property(name: &QualifiedName, value: Option<&str>) -> Result<b
         // ...
         return Ok(true);
     }
-    
+
     // Property not handled
     Ok(false)
 }
@@ -700,12 +678,14 @@ fn handle_custom_property(name: &QualifiedName, value: Option<&str>) -> Result<b
 
 ### Supporting CalDAV/CardDAV
 
-To extend OxiCloud with CalDAV/CardDAV support:
+To extend with CalDAV/CardDAV support:
 
-1. Create additional adapters for calendar and contact data
-2. Implement the additional XML namespaces required
-3. Create handlers for the specialized methods
-4. Integrate with calendar and contacts storage
+1. Create additional adapters for calendar and contact data.
+2. Implement the additional XML namespaces required.
+3. Create handlers for the specialized methods.
+4. Integrate with calendar and contacts storage.
+
+See `caldav-technical-spec.md` and `carddav-technical-spec.md` for details.
 
 ## Troubleshooting
 
@@ -715,33 +695,3 @@ To extend OxiCloud with CalDAV/CardDAV support:
    - Check credentials are correctly Base64-encoded
    - Ensure the Authorization header is formatted correctly
    - Verify the user has the necessary permissions
-
-2. **Path Resolution Problems**
-   - Ensure paths are properly URL-encoded
-   - Check for leading/trailing slashes as appropriate
-   - Verify resource exists at the specified path
-
-3. **XML Parsing Errors**
-   - Validate XML structure against WebDAV specifications
-   - Ensure proper namespace declarations
-   - Check for special characters that might need encoding
-
-### Debugging
-
-For debugging WebDAV operations:
-
-1. **Enable debug logging** in OxiCloud configuration
-2. **Use WebDAV-specific tools** like:
-   - cadaver (command-line WebDAV client)
-   - DAVExplorer (Java-based GUI client)
-   - Wireshark with HTTP filtering
-3. **Check server logs** for detailed error information
-
-### Performance Optimization
-
-To optimize WebDAV performance:
-
-1. **Limit Depth usage** - Avoid "Depth: infinity" for large directories
-2. **Use efficient property requests** - Request only needed properties
-3. **Consider caching** - Implement client-side caching using ETags
-4. **Compress responses** - Enable HTTP compression for WebDAV responses

@@ -21,6 +21,7 @@ COPY --from=cacher /usr/local/cargo/registry /usr/local/cargo/registry
 COPY Cargo.toml Cargo.lock ./
 COPY src src
 COPY static static
+COPY db db
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
 RUN DATABASE_URL="${DATABASE_URL}" cargo build --release
