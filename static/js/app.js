@@ -752,7 +752,7 @@ async function loadFiles(options = {}) {
             }
             
             // Skip other users' folders when at root
-            if (!app.currentPath && folder.name.startsWith('Mi Carpeta - ') && !folder.name.includes(username)) {
+            if (!app.currentPath && folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
                 return false;
             }
             
@@ -1709,7 +1709,7 @@ async function findUserHomeFolder(username) {
         // This prevents loops when the folder can't be found
         const defaultFolder = {
             id: 'default-folder',
-            name: `Mi Carpeta - ${username}`,
+            name: `My Folder - ${username}`,
             parent_id: null,
             created_at: Date.now() / 1000,
             updated_at: Date.now() / 1000

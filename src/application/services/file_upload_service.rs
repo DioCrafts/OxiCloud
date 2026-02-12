@@ -19,15 +19,10 @@ const WRITE_BEHIND_THRESHOLD: usize = 256 * 1024;
 
 /// Helper function to extract username from folder path string
 fn extract_username_from_path(path: &str) -> Option<String> {
-    // Support both new ("My Folder - ") and legacy ("Mi Carpeta - ") prefixes
-    let prefix = if path.contains("My Folder - ") {
-        "My Folder - "
-    } else if path.contains("Mi Carpeta - ") {
-        "Mi Carpeta - "
-    } else {
+    if !path.contains("My Folder - ") {
         return None;
-    };
-    let parts: Vec<&str> = path.split(prefix).collect();
+    }
+    let parts: Vec<&str> = path.split("My Folder - ").collect();
     if parts.len() <= 1 {
         return None;
     }

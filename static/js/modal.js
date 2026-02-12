@@ -124,11 +124,11 @@ const Modal = {
         const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         
         return this.prompt({
-            title: t('dialogs.new_folder_title') || 'Nueva carpeta',
-            label: t('dialogs.folder_name') || 'Nombre de la carpeta',
-            placeholder: t('dialogs.folder_placeholder') || 'Mi carpeta',
+            title: t('dialogs.new_folder_title') || 'New folder',
+            label: t('dialogs.folder_name') || 'Folder name',
+            placeholder: t('dialogs.folder_placeholder') || 'My folder',
             icon: 'fa-folder-plus',
-            confirmText: t('actions.create') || 'Crear'
+            confirmText: t('actions.create') || 'Create'
         });
     },
     
