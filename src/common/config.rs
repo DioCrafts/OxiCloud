@@ -464,12 +464,12 @@ impl AppConfig {
             let generated_secret: String = key.iter().map(|b| format!("{:02x}", b)).collect();
             config.auth.jwt_secret = generated_secret;
             
-            tracing::error!("==========================================================");
-            tracing::error!("SECURITY WARNING: OXICLOUD_JWT_SECRET is not set!");
-            tracing::error!("A random secret has been generated for this session.");
-            tracing::error!("All tokens will be INVALIDATED on restart.");
-            tracing::error!("Set OXICLOUD_JWT_SECRET env var for production use.");
-            tracing::error!("==========================================================");
+            tracing::warn!("==========================================================");
+            tracing::warn!("OXICLOUD_JWT_SECRET is not set.");
+            tracing::warn!("A random secret has been generated for this session.");
+            tracing::warn!("All tokens will be INVALIDATED on restart.");
+            tracing::warn!("Set OXICLOUD_JWT_SECRET env var for production use.");
+            tracing::warn!("==========================================================");
         }
             
         if let Ok(access_token_expiry) = env::var("OXICLOUD_ACCESS_TOKEN_EXPIRY_SECS")

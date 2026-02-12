@@ -294,7 +294,5 @@ impl CalendarStoragePort for CalendarStorageAdapter {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    
     // Tests would go here using mock repositories
 }

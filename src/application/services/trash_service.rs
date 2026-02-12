@@ -80,7 +80,7 @@ impl TrashService {
     /// Validates that the given user owns the trashed item.
     /// Returns an error if the item does not exist or belongs to a different user.
     #[instrument(skip(self))]
-    async fn validate_user_ownership(&self, item_id: &str, user_id: &str) -> Result<()> {
+    async fn _validate_user_ownership(&self, item_id: &str, user_id: &str) -> Result<()> {
         let item_uuid = Uuid::parse_str(item_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid item ID: {}", e)))?;
         let user_uuid = Uuid::parse_str(user_id)

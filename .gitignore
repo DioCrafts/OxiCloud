@@ -61,3 +61,4 @@ logs/
 *.bak
 *.swp
 *.swo
+nohup.out

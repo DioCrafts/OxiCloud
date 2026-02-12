@@ -382,7 +382,6 @@ impl CompressionPort for GzipCompressionService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio_stream::StreamExt;
     use futures::TryStreamExt;
     
     #[tokio::test]
