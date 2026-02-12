@@ -66,66 +66,8 @@ async fn register(
         ));
     }
     
-    // Check if this is a fresh install
-    tracing::info!("New user registration detected, checking if it's a fresh install");
-    
-    // Detect if we're in a fresh install with just the default admin user
-    match auth_service.auth_application_service.count_admin_users().await {
-        Ok(admin_count) => {
-            // If we have exactly one admin user (the default one from migrations)
-            if admin_count == 1 {
-                tracing::info!("Found one admin user - checking if it's the default admin");
-                
-                // Verify it's truly a fresh install by counting all users
-                match auth_service.auth_application_service.count_all_users().await {
-                    Ok(user_count) => {
-                        // In a fresh install with only the default admin (and possibly test user)
-                        if user_count <= 2 { // Allow for admin + test user from migrations
-                            tracing::info!("This appears to be a fresh install with just default users");
-                            
-                            // Check if the user is trying to create an admin user (via role field or username)
-                            let is_admin_registration = 
-                                dto.username.to_lowercase() == "admin" || 
-                                (dto.role.is_some() && dto.role.as_ref().unwrap().to_lowercase() == "admin");
-                            
-                            // If we're registering an admin user in a fresh install
-                            if is_admin_registration {
-                                tracing::info!("Admin user registration detected in fresh install");
-                                
-                                // Remove the default admin user and create the new customized one
-                                match auth_service.auth_application_service.delete_default_admin().await {
-                                    Ok(_) => {
-                                        tracing::info!("Successfully deleted default admin");
-                                        
-                                        // Proceed with normal registration (now that default admin is removed)
-                                        // Normal registration will continue below
-                                    },
-                                    Err(err) => {
-                                        tracing::error!("Failed to delete default admin: {}", err);
-                                        // Continue anyway - worst case we'll get an error during registration
-                                        // if there's a username conflict
-                                    }
-                                }
-                            } else {
-                                // Non-admin user registration in fresh install, proceed normally
-                                tracing::info!("Regular user registration in fresh install, proceeding normally");
-                            }
-                        }
-                    },
-                    Err(err) => {
-                        tracing::error!("Error counting users: {}", err);
-                        // Not critical, continue with registration
-                    }
-                }
-            }
-        },
-        Err(err) => {
-            tracing::error!("Error counting admin users: {}", err);
-            // Not critical, continue with registration
-        }
-    }
-    
-    // Try the normal registration process
+    // Registration logic (admin detection, fresh-install handling, duplicate
+    // checks) is all inside the service layer. Call it directly.
     match auth_service.auth_application_service.register(dto.clone()).await {
         Ok(user) => {
             tracing::info!("Registration successful for user: {}", dto.username);

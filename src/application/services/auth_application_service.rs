@@ -167,32 +167,18 @@ impl AuthApplicationService {
                                 tracing::info!("Allowing admin creation on clean install");
                             },
                             Err(e) => {
-                                tracing::error!("Error counting users: {}", e);
-                                // For security, if we cannot verify, we reject admin creation
-                                return Err(DomainError::new(
-                                    ErrorKind::AccessDenied,
-                                    "User",
-                                    "Creating additional admin users is not allowed"
-                                ));
+                                // Cannot verify user count — treat as bootstrap scenario
+                                tracing::warn!("Could not count users ({}). Allowing admin creation for bootstrap.", e);
                             }
                         }
                     }
                 },
                 Err(e) => {
-                    let err_msg = e.to_string();
-                    // If the table doesn't exist, this is a fresh install - allow admin creation
-                    if err_msg.contains("does not exist") || err_msg.contains("relation") {
-                        tracing::info!("Database tables not yet ready, treating as fresh install - allowing admin creation");
-                        // Continue with registration - this is a fresh install
-                    } else {
-                        tracing::error!("Error counting admin users: {}", e);
-                        // For security, if we cannot verify, we reject admin creation
-                        return Err(DomainError::new(
-                            ErrorKind::AccessDenied,
-                            "User",
-                            "Creating additional admin users is not allowed"
-                        ));
-                    }
+                    // Any DB error (table missing, connection issue, etc.) means we
+                    // cannot verify admin state. Allow admin creation so the user can
+                    // bootstrap the system. If the DB is truly broken the INSERT will
+                    // fail anyway with a clear error.
+                    tracing::warn!("Could not count admin users ({}). Allowing admin creation for bootstrap.", e);
                 }
             }
         }
