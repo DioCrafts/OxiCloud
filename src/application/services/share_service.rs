@@ -158,7 +158,7 @@ impl ShareUseCase for ShareService {
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
         // Convert the entity to DTO for the response
-        Ok(ShareDto::from_entity(&saved_share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+        Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
     }
 
     async fn get_shared_link(&self, id: &str) -> Result<ShareDto, DomainError> {
@@ -175,7 +175,7 @@ impl ShareUseCase for ShareService {
         }
 
         // Convert the entity to DTO for the response
-        Ok(ShareDto::from_entity(&share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+        Ok(ShareDto::from_entity(&share, &self.config.base_url()))
     }
 
     async fn get_shared_link_by_token(&self, token: &str) -> Result<ShareDto, DomainError> {
@@ -192,7 +192,7 @@ impl ShareUseCase for ShareService {
         }
 
         // Convert the entity to DTO for the response
-        Ok(ShareDto::from_entity(&share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+        Ok(ShareDto::from_entity(&share, &self.config.base_url()))
     }
 
     async fn get_shared_links_for_item(
@@ -213,7 +213,7 @@ impl ShareUseCase for ShareService {
         // Convert the entities to DTOs for the response
         let share_dtos = active_shares
             .iter()
-            .map(|s| ShareDto::from_entity(s, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+            .map(|s| ShareDto::from_entity(s, &self.config.base_url()))
             .collect();
 
         Ok(share_dtos)
@@ -264,7 +264,7 @@ impl ShareUseCase for ShareService {
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
         // Convert the entity to DTO for the response
-        Ok(ShareDto::from_entity(&updated_share, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+        Ok(ShareDto::from_entity(&updated_share, &self.config.base_url()))
     }
 
     async fn delete_shared_link(&self, id: &str) -> Result<(), DomainError> {
@@ -296,7 +296,7 @@ impl ShareUseCase for ShareService {
         // Convert the entities to DTOs
         let share_dtos: Vec<ShareDto> = shares
             .iter()
-            .map(|s| ShareDto::from_entity(s, &format!("http://{}:{}", self.config.server_host, self.config.server_port)))
+            .map(|s| ShareDto::from_entity(s, &self.config.base_url()))
             .collect();
 
         // Create the paginated result

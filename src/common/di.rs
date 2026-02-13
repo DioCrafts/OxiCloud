@@ -594,9 +594,7 @@ impl AppServiceFactory {
             let settings_repo = Arc::new(
                 crate::infrastructure::repositories::pg::SettingsPgRepository::new(pool.clone())
             );
-            let server_base_url = std::env::var("OXICLOUD_BASE_URL").unwrap_or_else(|_| {
-                format!("http://{}:{}", self.config.server_host, self.config.server_port)
-            });
+            let server_base_url = self.config.base_url();
 
             // Load OIDC config from env vars (the snapshot from startup)
             let env_oidc = crate::common::config::OidcConfig::from_env();

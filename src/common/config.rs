@@ -580,6 +580,28 @@ impl AppConfig {
     pub fn auth_enabled(&self) -> bool {
         self.features.enable_auth
     }
+
+    /// Build the public base URL for generating share links and other external URLs.
+    ///
+    /// Priority:
+    /// 1. `OXICLOUD_BASE_URL` env var (used as-is)
+    /// 2. If `server_host` already contains a scheme (`http://` or `https://`),
+    ///    treat it as a full origin and do **not** prepend a scheme or append a port.
+    /// 3. Otherwise, fall back to `http://{server_host}:{server_port}`.
+    pub fn base_url(&self) -> String {
+        if let Ok(explicit) = std::env::var("OXICLOUD_BASE_URL") {
+            return explicit.trim_end_matches('/').to_string();
+        }
+
+        let host = self.server_host.trim_end_matches('/');
+
+        if host.starts_with("http://") || host.starts_with("https://") {
+            // The user already provided a full origin — use it directly.
+            host.to_string()
+        } else {
+            format!("http://{}:{}", host, self.server_port)
+        }
+    }
 }
 
 /// Gets a default global configuration
