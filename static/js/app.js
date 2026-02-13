@@ -754,8 +754,10 @@ async function loadFiles(options = {}) {
                 return false;
             }
             
-            // Skip other users' folders when at root
-            if (!app.currentPath && folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
+            // Skip other users' folders when at root (both naming conventions)
+            if (!app.currentPath && 
+                (folder.name.startsWith('My Folder - ') || folder.name.startsWith('Mi Carpeta - ')) && 
+                !folder.name.includes(username)) {
                 return false;
             }
             
@@ -1835,26 +1837,30 @@ async function findUserHomeFolder(username) {
                 console.log(`Found ${folderList.length} folders at root`);
                 
                 // Look for a folder with a name pattern that matches the user's home folder
-                // Only exact match "Mi Carpeta - username"
-                const homeFolderPattern = `Mi Carpeta - ${username}`;
+                // Match both naming conventions (English and Spanish)
+                const homeFolderPatternEn = `My Folder - ${username}`;
+                const homeFolderPatternEs = `Mi Carpeta - ${username}`;
                 
-                // Filter first to remove system folders like .trash that shouldn't be visible
+                // Filter first to remove system folders and other users' folders
                 const visibleFolders = folderList.filter(folder => {
                     // Skip system folders (starting with dot)
                     if (folder.name.startsWith('.')) {
                         return false;
                     }
                     
-                    // Skip other users' folders
-                    if (folder.name.startsWith('Mi Carpeta - ') && !folder.name.includes(username)) {
+                    // Skip other users' home folders (both naming conventions)
+                    if ((folder.name.startsWith('Mi Carpeta - ') || folder.name.startsWith('My Folder - ')) 
+                        && !folder.name.includes(username)) {
                         return false;
                     }
                     
                     return true;
                 });
                 
-                // Find the user's home folder from filtered list
-                let homeFolder = visibleFolders.find(folder => folder.name === homeFolderPattern);
+                // Find the user's home folder from filtered list (try both patterns)
+                let homeFolder = visibleFolders.find(folder => 
+                    folder.name === homeFolderPatternEn || folder.name === homeFolderPatternEs
+                );
                 
                 if (homeFolder) {
                     console.log(`Found user's home folder: ${homeFolder.name} (${homeFolder.id})`);
@@ -1870,28 +1876,15 @@ async function findUserHomeFolder(username) {
                     loadFiles();
                     return; // Success! Exit function
                 } else {
-                    console.warn("Could not find user's home folder, fallback to first folder or root");
+                    console.warn("Could not find user's home folder");
                     
-                    // If we can't find a specific home folder but there are folders, 
-                    // use the first folder as the user's home
-                    if (folderList.length > 0) {
-                        const fallbackFolder = folderList[0];
-                        console.log(`Using first folder as fallback: ${fallbackFolder.name} (${fallbackFolder.id})`);
-                        
-                        app.userHomeFolderId = fallbackFolder.id;
-                        app.userHomeFolderName = fallbackFolder.name;
-                        app.currentPath = fallbackFolder.id;
-                        ui.updateBreadcrumb(fallbackFolder.name);
-                        loadFiles();
-                        return; // Success with fallback! Exit function
-                    } else {
-                        // No folders at all - this is an edge case
-                        console.warn("No folders found, using root");
-                        app.currentPath = '';
-                        ui.updateBreadcrumb('');
-                        loadFiles();
-                        return; // Success with root! Exit function
-                    }
+                    // SECURITY: Never fall back to another user's folder.
+                    // If user's own folder doesn't exist, show root (empty state).
+                    console.log('User home folder not found, showing root');
+                    app.currentPath = '';
+                    ui.updateBreadcrumb('');
+                    loadFiles();
+                    return;
                 }
                 
                 // If we get here, we've successfully processed the response

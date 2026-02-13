@@ -13,7 +13,7 @@ use crate::application::dtos::pagination::PaginationRequestDto;
 use crate::common::errors::ErrorKind;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState as GlobalAppState;
-use crate::interfaces::middleware::auth::OptionalAuthUser;
+use crate::interfaces::middleware::auth::{OptionalAuthUser, AuthUser};
 
 type AppState = Arc<FolderService>;
 
@@ -59,10 +59,12 @@ impl FolderHandler {
     }
     
     /// Lists root folders (no parent ID)
+    /// Non-admin users only see their own home folder.
     pub async fn list_root_folders(
         State(service): State<AppState>,
+        auth_user: AuthUser,
     ) -> impl IntoResponse {
-        Self::list_folders(State(service), None).await
+        Self::list_folders_for_user(State(service), None, &auth_user).await
     }
 
     /// Lists contents of a specific folder by its ID
@@ -76,9 +78,12 @@ impl FolderHandler {
     /// Lists root folders with pagination support
     pub async fn list_root_folders_paginated(
         State(service): State<AppState>,
-        pagination: Query<PaginationRequestDto>,
+        auth_user: AuthUser,
+        _pagination: Query<PaginationRequestDto>,
     ) -> impl IntoResponse {
-        Self::list_folders_paginated(State(service), pagination, None).await
+        // For paginated root listing, filter by user as well
+        // Delegate to non-paginated user-filtered listing for now
+        Self::list_folders_for_user(State(service), None, &auth_user).await
     }
 
     /// Lists contents of a specific folder with pagination
@@ -90,16 +95,25 @@ impl FolderHandler {
         Self::list_folders_paginated(State(service), pagination, Some(&id)).await
     }
 
+    /// Checks if a folder name matches the user home-folder convention.
+    fn is_user_home_folder(folder_name: &str) -> bool {
+        folder_name.starts_with("My Folder - ") || folder_name.starts_with("Mi Carpeta - ")
+    }
+
+    /// Checks if a folder belongs to the given user.
+    fn folder_belongs_to_user(folder_name: &str, username: &str) -> bool {
+        let expected_en = format!("My Folder - {}", username);
+        let expected_es = format!("Mi Carpeta - {}", username);
+        folder_name == expected_en || folder_name == expected_es
+    }
+
     /// Lists folders, optionally filtered by parent ID
     pub async fn list_folders(
         State(service): State<AppState>,
         parent_id: Option<&str>,
     ) -> impl IntoResponse {
-        // Parent ID is already a &str
-        
         match service.list_folders(parent_id).await {
             Ok(folders) => {
-                // Always return an array even if empty
                 (StatusCode::OK, Json(folders)).into_response()
             },
             Err(err) => {
@@ -108,7 +122,46 @@ impl FolderHandler {
                     _ => StatusCode::INTERNAL_SERVER_ERROR,
                 };
                 
-                // Return a JSON error response
+                (status, Json(serde_json::json!({
+                    "error": err.to_string()
+                }))).into_response()
+            }
+        }
+    }
+
+    /// Lists folders with user-based filtering for root listings.
+    /// Non-admin users only see their own home folder at the root level.
+    pub async fn list_folders_for_user(
+        State(service): State<AppState>,
+        parent_id: Option<&str>,
+        auth_user: &AuthUser,
+    ) -> impl IntoResponse {
+        match service.list_folders(parent_id).await {
+            Ok(folders) => {
+                // Only filter at root level (parent_id == None)
+                let filtered = if parent_id.is_none() {
+                    folders.into_iter().filter(|f| {
+                        // Skip hidden/system folders
+                        if f.name.starts_with('.') {
+                            return false;
+                        }
+                        // If it's a user home folder, only show if it belongs to this user
+                        if Self::is_user_home_folder(&f.name) {
+                            return Self::folder_belongs_to_user(&f.name, &auth_user.username);
+                        }
+                        // Non-home folders are visible to everyone
+                        true
+                    }).collect()
+                } else {
+                    folders
+                };
+                (StatusCode::OK, Json(filtered)).into_response()
+            },
+            Err(err) => {
+                let status = match err.kind {
+                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
+                    _ => StatusCode::INTERNAL_SERVER_ERROR,
+                };
                 (status, Json(serde_json::json!({
                     "error": err.to_string()
                 }))).into_response()
