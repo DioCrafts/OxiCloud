@@ -2,6 +2,7 @@
 name = "oxicloud"
 version = "0.3.4"
 edition = "2021"
+default-run = "oxicloud"
 
 
 [dependencies]
