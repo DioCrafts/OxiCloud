@@ -334,7 +334,7 @@ async fn oidc_authorize(
     }
 
     // Prepare OIDC authorization flow (generates CSRF state, PKCE pair, nonce)
-    let authorize_url = auth_app.prepare_oidc_authorize()?;
+    let authorize_url = auth_app.prepare_oidc_authorize().await?;
 
     tracing::info!("OIDC authorize redirect generated");
 

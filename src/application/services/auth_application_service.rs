@@ -785,7 +785,7 @@ impl AuthApplicationService {
 
     /// Prepare the OIDC authorization flow: generates CSRF state, PKCE pair,
     /// nonce, stores them in pending_oidc_flows, and returns the authorize URL.
-    pub fn prepare_oidc_authorize(&self) -> Result<String, DomainError> {
+    pub async fn prepare_oidc_authorize(&self) -> Result<String, DomainError> {
         let oidc = self.oidc_service().ok_or_else(|| DomainError::new(
             ErrorKind::InternalError, "OIDC", "OIDC service not configured",
         ))?;
@@ -826,7 +826,7 @@ impl AuthApplicationService {
         }
 
         // Build authorization URL with state, nonce, and PKCE challenge
-        let authorize_url = oidc.get_authorize_url(&state_token, &nonce, &pkce_challenge)?;
+        let authorize_url = oidc.get_authorize_url(&state_token, &nonce, &pkce_challenge).await?;
 
         tracing::info!("OIDC authorize flow prepared (state={}...)", &state_token[..8]);
 

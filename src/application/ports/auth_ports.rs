@@ -138,7 +138,8 @@ pub struct OidcIdClaims {
 pub trait OidcServicePort: Send + Sync + 'static {
     /// Get the authorization URL for redirecting the user to the IdP.
     /// Includes PKCE code_challenge (S256) and nonce for ID token binding.
-    fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError>;
+    /// This is async because it may need to fetch the OIDC discovery document.
+    async fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError>;
 
     /// Exchange an authorization code for tokens, providing PKCE code_verifier.
     async fn exchange_code(&self, code: &str, pkce_verifier: &str) -> Result<OidcTokenSet, DomainError>;

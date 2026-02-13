@@ -238,22 +238,10 @@ impl OidcService {
 
 #[async_trait]
 impl OidcServicePort for OidcService {
-    fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError> {
-        // We need the authorization_endpoint. If not cached, we'll construct it from issuer.
-        // In practice, the discovery should be pre-fetched during startup.
-        let auth_endpoint = {
-            let cache = self.discovery.read().map_err(|_| DomainError::new(
-                ErrorKind::InternalError, "OIDC", "Lock poisoned",
-            ))?;
-            match &*cache {
-                Some(disc) => disc.authorization_endpoint.clone(),
-                None => {
-                    // Fallback: construct typical endpoint
-                    let issuer = self.config.issuer_url.trim_end_matches('/');
-                    format!("{}/authorize", issuer)
-                }
-            }
-        };
+    async fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError> {
+        // Fetch or use cached discovery to get the correct authorization_endpoint
+        let discovery = self.get_discovery().await?;
+        let auth_endpoint = discovery.authorization_endpoint;
 
         let scopes = self.config.scopes.replace(',', " ");
         let url = format!(
