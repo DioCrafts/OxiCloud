@@ -813,6 +813,7 @@ const ui = {
 
         // Improved: Structure and classes for list view
         folderListElement.innerHTML = `
+            <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon folder-icon">
                     <i class="fas fa-folder"></i>
@@ -825,8 +826,15 @@ const ui = {
             <div class="date-cell">${formattedDate}</div>
         `;
 
+        // Checkbox click in list view
+        folderListElement.querySelector('.item-checkbox').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCardSelection(folderListElement, e);
+        });
+
         // Click to navigate
-        folderListElement.addEventListener('click', () => {
+        folderListElement.addEventListener('click', (e) => {
+            if (e.target.closest('.list-item-checkbox')) return;
             window.app.currentPath = folder.id;
             this.updateBreadcrumb(folder.name);
             window.loadFiles();
@@ -1043,6 +1051,7 @@ const ui = {
         fileListElement.dataset.folderId = file.folder_id || "";
 
         fileListElement.innerHTML = `
+            <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
                     <i class="${iconClass}"></i>
@@ -1054,6 +1063,12 @@ const ui = {
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;
+
+        // Checkbox click in list view
+        fileListElement.querySelector('.item-checkbox').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleCardSelection(fileListElement, e);
+        });
 
         // Make draggable (list view)
         fileListElement.setAttribute('draggable', 'true');
@@ -1071,7 +1086,8 @@ const ui = {
         });
 
         // View or download on click
-        fileListElement.addEventListener('click', () => {
+        fileListElement.addEventListener('click', (e) => {
+            if (e.target.closest('.list-item-checkbox')) return;
             // Track this file access for recent files
             if (window.recent) {
                 document.dispatchEvent(new CustomEvent('file-accessed', {
@@ -1121,10 +1137,14 @@ const ui = {
 
 /**
  * Toggle selection state of a file/folder card.
- * Each click toggles that card independently (multi-select by default).
+ * Routes through the multiSelect module so batch actions know about selected items.
  */
 function toggleCardSelection(card, event) {
-    card.classList.toggle('selected');
+    if (window.multiSelect) {
+        window.multiSelect.handleItemClick(card, event);
+    } else {
+        card.classList.toggle('selected');
+    }
 }
 
 /**

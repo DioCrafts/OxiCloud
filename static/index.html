@@ -21,6 +21,7 @@
     <script src="/js/ui.js"></script>
     <script src="/js/contextMenus.js"></script>
     <script src="/js/fileOperations.js"></script>
+    <script src="/js/multiSelect.js"></script>
     <script src="/js/search.js"></script>
     <script src="/js/favorites.js"></script>
     <script src="/js/recent.js"></script>
@@ -222,6 +223,7 @@
                 <!-- List View (hidden by default) -->
                 <div class="files-list-view" id="files-list-view" style="display: none;">
                     <div class="list-header">
+                        <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                         <div data-i18n="files.name">Name</div>
                         <div data-i18n="files.type">Type</div>
                         <div data-i18n="files.size">Size</div>

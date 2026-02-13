@@ -91,6 +91,12 @@ function initApp() {
         console.warn('Recent files module not available or not initializable');
     }
     
+    // Initialize multi-select / batch actions
+    if (window.multiSelect && window.multiSelect.init) {
+        console.log('Initializing multi-select module');
+        window.multiSelect.init();
+    }
+    
     // Wait for translations to load before checking authentication
     if (window.i18n && window.i18n.isLoaded && window.i18n.isLoaded()) {
         // Translations already loaded, proceed with authentication
@@ -617,8 +623,10 @@ function setupEventListeners() {
         }
 
         // Deselect all cards when clicking empty area (not on a card, menu, or modal)
-        if (!e.target.closest('.file-card') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal')) {
+        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-action-bar')) {
             document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.file-item.selected').forEach(c => c.classList.remove('selected'));
+            if (window.multiSelect) window.multiSelect.clear();
         }
     });
 }
@@ -714,6 +722,7 @@ async function loadFiles(options = {}) {
             elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
             elements.filesListView.innerHTML = `
                 <div class="list-header">
+                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                     <div>Name</div>
                     <div>Type</div>
                     <div>Size</div>
@@ -729,15 +738,23 @@ async function loadFiles(options = {}) {
         const folders = await response.json();
         
         // Clear existing files in both views
+        if (window.multiSelect) window.multiSelect.clear();
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
             <div class="list-header">
+                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                 <div data-i18n="files.name">Name</div>
                 <div data-i18n="files.type">Type</div>
                 <div data-i18n="files.size">Size</div>
                 <div data-i18n="files.modified">Modified</div>
             </div>
         `;
+
+        // Re-wire select-all checkbox after DOM rebuild
+        const selectAllCb = document.getElementById('select-all-checkbox');
+        if (selectAllCb && window.multiSelect) {
+            selectAllCb.addEventListener('change', () => window.multiSelect.toggleAll());
+        }
         
         // Translate the header if i18n is available
         if (window.i18n && window.i18n.translatePage) {
@@ -844,9 +861,11 @@ function formatFileSize(bytes) {
 async function loadTrashItems() {
     try {
         // Clear existing content
+        if (window.multiSelect) window.multiSelect.clear();
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
             <div class="list-header">
+                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                 <div data-i18n="files.name">Name</div>
                 <div data-i18n="files.type">Type</div>
                 <div data-i18n="trash.original_location">Original location</div>

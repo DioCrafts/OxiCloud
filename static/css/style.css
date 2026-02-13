@@ -1783,23 +1783,32 @@ select:focus {
 
 .list-header {
     display: grid;
-    grid-template-columns: minmax(200px, 2fr) 1fr 1fr 120px;
+    grid-template-columns: 36px minmax(200px, 2fr) 1fr 1fr 120px;
     padding: 15px;
     font-weight: 600;
     color: #2d3748;
     background-color: #f8f9fa;
     border-bottom: 1px solid #e0e6ed;
+    align-items: center;
 }
 
 .file-item {
     display: grid;
-    grid-template-columns: minmax(200px, 2fr) 1fr 1fr 120px;
+    grid-template-columns: 36px minmax(200px, 2fr) 1fr 1fr 120px;
     padding: 12px 15px;
     border-bottom: 1px solid #f0f0f0;
     align-items: center;
     cursor: pointer;
     transition: background-color 0.2s;
     background-color: white;
+}
+
+.file-item.selected {
+    background-color: #fff8f6;
+}
+
+.file-item.selected:hover {
+    background-color: #fff0ec;
 }
 
 /* For trash mode, adjust columns */
@@ -3601,4 +3610,131 @@ html[dir='rtl'] .fa-sign-out-alt {
 .upload-toast-stats {
     font-size: 12px;
     color: #888;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Multi-Select – checkboxes & batch action bar
+   ═══════════════════════════════════════════════════════════ */
+
+/* -- List-view checkbox column -- */
+.list-header-checkbox,
+.list-item-checkbox {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.list-header-checkbox input[type="checkbox"],
+.list-item-checkbox input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: #ff5e3a;
+    border-radius: 4px;
+}
+
+/* Sync checkbox state visually with .selected */
+.file-item.selected .item-checkbox {
+    /* Checked via JS */
+}
+
+/* -- Batch action bar -- */
+.batch-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 12px;
+    margin: 0 0 12px;
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition: opacity 0.2s, max-height 0.25s, transform 0.2s, margin 0.2s, padding 0.2s;
+    pointer-events: none;
+}
+
+.batch-action-bar.visible {
+    opacity: 1;
+    max-height: 60px;
+    transform: translateY(0);
+    pointer-events: auto;
+    padding: 10px 20px;
+    margin: 0 0 12px;
+}
+
+.batch-bar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.batch-bar-close {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.batch-bar-close:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.batch-bar-count {
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.batch-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.batch-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+}
+
+.batch-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.batch-btn-danger {
+    background: rgba(239,68,68,0.25);
+    color: #fca5a5;
+}
+
+.batch-btn-danger:hover {
+    background: rgba(239,68,68,0.4);
+    color: #fff;
+}
+
+/* Responsive: hide button text on small screens */
+@media (max-width: 640px) {
+    .batch-btn span {
+        display: none;
+    }
+    .batch-btn {
+        padding: 7px 10px;
+    }
 }

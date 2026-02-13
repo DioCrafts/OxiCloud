@@ -202,6 +202,41 @@ const contextMenus = {
 
         moveCancelBtn.addEventListener('click', this.closeMoveDialog);
         moveConfirmBtn.addEventListener('click', async () => {
+            // Batch move mode (from multiSelect)
+            if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
+                const targetId = window.app.selectedTargetFolderId;
+                const items = window.app.batchMoveItems || [];
+                let success = 0, errors = 0;
+
+                for (const item of items) {
+                    try {
+                        if (item.type === 'folder') {
+                            if (item.id === targetId) continue;
+                            const ok = await window.fileOps.moveFolder(item.id, targetId);
+                            if (ok) success++; else errors++;
+                        } else {
+                            const ok = await window.fileOps.moveFile(item.id, targetId);
+                            if (ok) success++; else errors++;
+                        }
+                    } catch (err) {
+                        console.error('Error moving item:', item, err);
+                        errors++;
+                    }
+                }
+
+                this.closeMoveDialog();
+                window.multiSelect.clear();
+                window.loadFiles();
+
+                if (errors > 0) {
+                    window.ui.showNotification('Batch move', `${success} moved, ${errors} failed`);
+                } else {
+                    window.ui.showNotification('Items moved',
+                        `${success} item${success !== 1 ? 's' : ''} moved successfully`);
+                }
+                return;
+            }
+
             if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
                 const success = await window.fileOps.moveFile(
                     window.app.contextMenuTargetFile.id, 
