@@ -28,8 +28,8 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
   box-shadow:0 3px 10px rgba(255,94,58,.35);
 }
 .profile-logo svg{width:20px;height:20px;fill:#fff}
-.profile-title{font-size:17px;font-weight:700;color:#fff;letter-spacing:.3px}
-.profile-title span{color:rgba(255,255,255,.5);font-weight:400;margin-left:6px}
+.profile-title-text{font-size:17px;font-weight:700;color:#fff;letter-spacing:.3px}
+.profile-title-separator{font-size:17px;color:rgba(255,255,255,.5);font-weight:400;margin-left:6px}
 .profile-header-right a{
   color:rgba(255,255,255,.65);text-decoration:none;font-size:13px;font-weight:500;
   display:flex;align-items:center;gap:6px;transition:color .2s;
@@ -125,12 +125,15 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
 <!-- Header -->
 <div class="profile-header">
   <div class="profile-header-left">
-    <a href="/" class="profile-logo" style="text-decoration:none">
-      <svg viewBox="0 0 500 500">
-        <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"/>
-      </svg>
+    <a href="/" class="profile-logo-link" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:14px">
+      <div class="profile-logo">
+        <svg viewBox="0 0 500 500">
+          <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"/>
+        </svg>
+      </div>
+      <span class="profile-title-text">OxiCloud</span>
     </a>
-    <div class="profile-title">OxiCloud <span>· Profile</span></div>
+    <span class="profile-title-separator">· Profile</span>
   </div>
   <div class="profile-header-right">
     <a href="/"><i class="fas fa-arrow-left"></i> Back to OxiCloud</a>
