@@ -188,11 +188,14 @@ function setupUserMenu() {
         });
     }
     
-    // Theme toggle (dark mode placeholder — toggles pill visually)
+    // Theme toggle (dark mode)
     if (themeBtn) {
         const pill = document.getElementById('theme-toggle-pill');
         const isDark = localStorage.getItem('oxicloud_theme') === 'dark';
-        if (isDark && pill) pill.classList.add('active');
+        if (isDark) {
+            if (pill) pill.classList.add('active');
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
         
         themeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -200,10 +203,10 @@ function setupUserMenu() {
                 pill.classList.toggle('active');
                 const dark = pill.classList.contains('active');
                 localStorage.setItem('oxicloud_theme', dark ? 'dark' : 'light');
-                // Theme switching could be expanded here in the future
+                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
                 window.ui.showNotification(
                     dark ? '🌙' : '☀️',
-                    dark ? 'Dark mode enabled (coming soon)' : 'Light mode enabled'
+                    dark ? 'Dark mode enabled' : 'Light mode enabled'
                 );
             }
         });

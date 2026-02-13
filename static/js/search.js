@@ -34,7 +34,9 @@ const search = {
             console.log(`Performing search with URL: ${url}`);
             
             // Perform the search request
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                headers: getAuthHeaders()
+            });
             
             if (response.ok) {
                 return await response.json();
@@ -70,7 +72,8 @@ const search = {
             const response = await fetch('/api/search', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders()
                 },
                 body: JSON.stringify(criteria)
             });
@@ -109,6 +112,7 @@ const search = {
         filesGrid.innerHTML = '';
         filesListView.innerHTML = `
             <div class="list-header">
+                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                 <div data-i18n="files.name">Name</div>
                 <div data-i18n="files.type">Type</div>
                 <div data-i18n="files.size">Size</div>
@@ -174,7 +178,8 @@ const search = {
     async clearSearchCache() {
         try {
             const response = await fetch('/api/search/cache', {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: getAuthHeaders()
             });
             
             if (response.ok) {
