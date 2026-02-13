@@ -590,7 +590,7 @@ impl AppServiceFactory {
         };
         
         // 10b. Wire admin settings service when auth + DB are available
-        if let (Some(ref auth_svc), Some(ref pool)) = (&app_state.auth_service, &db_pool) {
+        if let (Some(auth_svc), Some(pool)) = (&app_state.auth_service, &db_pool) {
             let settings_repo = Arc::new(
                 crate::infrastructure::repositories::pg::SettingsPgRepository::new(pool.clone())
             );

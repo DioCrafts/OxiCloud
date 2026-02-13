@@ -555,15 +555,15 @@ pub fn contact_to_vcard(contact: &ContactDto) -> String {
     
     vcard.push_str(&format!("UID:{}\r\n", contact.uid));
     
-    if let (Some(ref last), Some(ref first)) = (&contact.last_name, &contact.first_name) {
+    if let (Some(last), Some(first)) = (&contact.last_name, &contact.first_name) {
         vcard.push_str(&format!("N:{};{};;;\r\n", last, first));
-    } else if let Some(ref last) = &contact.last_name {
+    } else if let Some(last) = &contact.last_name {
         vcard.push_str(&format!("N:{};;;;\r\n", last));
-    } else if let Some(ref first) = &contact.first_name {
+    } else if let Some(first) = &contact.first_name {
         vcard.push_str(&format!("N:;{};;;\r\n", first));
     }
     
-    if let Some(ref fn_name) = contact.full_name {
+    if let Some(fn_name) = &contact.full_name {
         vcard.push_str(&format!("FN:{}\r\n", fn_name));
     } else {
         // FN is mandatory in vCard 3.0
@@ -578,7 +578,7 @@ pub fn contact_to_vcard(contact: &ContactDto) -> String {
         }
     }
     
-    if let Some(ref nickname) = contact.nickname {
+    if let Some(nickname) = &contact.nickname {
         vcard.push_str(&format!("NICKNAME:{}\r\n", nickname));
     }
     
@@ -601,19 +601,19 @@ pub fn contact_to_vcard(contact: &ContactDto) -> String {
         vcard.push_str(&format!("ADR;TYPE={}:{}\r\n", addr.r#type.to_uppercase(), adr));
     }
     
-    if let Some(ref org) = contact.organization {
+    if let Some(org) = &contact.organization {
         vcard.push_str(&format!("ORG:{}\r\n", org));
     }
-    if let Some(ref title) = contact.title {
+    if let Some(title) = &contact.title {
         vcard.push_str(&format!("TITLE:{}\r\n", title));
     }
-    if let Some(ref notes) = contact.notes {
+    if let Some(notes) = &contact.notes {
         vcard.push_str(&format!("NOTE:{}\r\n", notes.replace('\n', "\\n")));
     }
-    if let Some(ref bday) = contact.birthday {
+    if let Some(bday) = &contact.birthday {
         vcard.push_str(&format!("BDAY:{}\r\n", bday.format("%Y-%m-%d")));
     }
-    if let Some(ref photo) = contact.photo_url {
+    if let Some(photo) = &contact.photo_url {
         vcard.push_str(&format!("PHOTO;VALUE=URI:{}\r\n", photo));
     }
     

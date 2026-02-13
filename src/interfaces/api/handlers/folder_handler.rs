@@ -63,16 +63,16 @@ impl FolderHandler {
     pub async fn list_root_folders(
         State(service): State<AppState>,
         auth_user: AuthUser,
-    ) -> impl IntoResponse {
-        Self::list_folders_for_user(State(service), None, &auth_user).await
+    ) -> axum::response::Response {
+        Self::list_folders_for_user(service, None, &auth_user).await
     }
 
     /// Lists contents of a specific folder by its ID
     pub async fn list_folder_contents(
         State(service): State<AppState>,
         Path(id): Path<String>,
-    ) -> impl IntoResponse {
-        Self::list_folders(State(service), Some(&id)).await
+    ) -> axum::response::Response {
+        Self::list_folders_inner(service, Some(&id)).await
     }
 
     /// Lists root folders with pagination support
@@ -80,10 +80,9 @@ impl FolderHandler {
         State(service): State<AppState>,
         auth_user: AuthUser,
         _pagination: Query<PaginationRequestDto>,
-    ) -> impl IntoResponse {
+    ) -> axum::response::Response {
         // For paginated root listing, filter by user as well
-        // Delegate to non-paginated user-filtered listing for now
-        Self::list_folders_for_user(State(service), None, &auth_user).await
+        Self::list_folders_for_user(service, None, &auth_user).await
     }
 
     /// Lists contents of a specific folder with pagination
@@ -91,8 +90,8 @@ impl FolderHandler {
         State(service): State<AppState>,
         Path(id): Path<String>,
         pagination: Query<PaginationRequestDto>,
-    ) -> impl IntoResponse {
-        Self::list_folders_paginated(State(service), pagination, Some(&id)).await
+    ) -> axum::response::Response {
+        Self::list_folders_paginated_inner(service, pagination, Some(&id)).await
     }
 
     /// Checks if a folder name matches the user home-folder convention.
@@ -106,11 +105,11 @@ impl FolderHandler {
         folder_name == expected
     }
 
-    /// Lists folders, optionally filtered by parent ID
-    pub async fn list_folders(
-        State(service): State<AppState>,
+    /// Lists folders, optionally filtered by parent ID (internal helper)
+    async fn list_folders_inner(
+        service: AppState,
         parent_id: Option<&str>,
-    ) -> impl IntoResponse {
+    ) -> axum::response::Response {
         match service.list_folders(parent_id).await {
             Ok(folders) => {
                 (StatusCode::OK, Json(folders)).into_response()
@@ -130,11 +129,11 @@ impl FolderHandler {
 
     /// Lists folders with user-based filtering for root listings.
     /// Non-admin users only see their own home folder at the root level.
-    pub async fn list_folders_for_user(
-        State(service): State<AppState>,
+    async fn list_folders_for_user(
+        service: AppState,
         parent_id: Option<&str>,
         auth_user: &AuthUser,
-    ) -> impl IntoResponse {
+    ) -> axum::response::Response {
         match service.list_folders(parent_id).await {
             Ok(folders) => {
                 // Only filter at root level (parent_id == None)
@@ -168,12 +167,12 @@ impl FolderHandler {
         }
     }
     
-    /// Lists folders with pagination support
-    pub async fn list_folders_paginated(
-        State(service): State<AppState>,
+    /// Lists folders with pagination support (internal helper)
+    async fn list_folders_paginated_inner(
+        service: AppState,
         Query(pagination): Query<PaginationRequestDto>,
         parent_id: Option<&str>,
-    ) -> impl IntoResponse {
+    ) -> axum::response::Response {
         match service.list_folders_paginated(parent_id, &pagination).await {
             Ok(paginated_result) => {
                 (StatusCode::OK, Json(paginated_result)).into_response()
