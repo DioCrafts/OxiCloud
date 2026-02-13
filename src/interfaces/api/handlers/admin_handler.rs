@@ -11,6 +11,7 @@ use crate::application::dtos::settings_dto::{
     SaveOidcSettingsDto, TestOidcConnectionDto,
     UpdateUserRoleDto, UpdateUserActiveDto, UpdateUserQuotaDto,
     ListUsersQueryDto, DashboardStatsDto,
+    AdminCreateUserDto, AdminResetPasswordDto,
 };
 use crate::interfaces::errors::AppError;
 
@@ -26,11 +27,16 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/dashboard", get(get_dashboard_stats))
         // User management
         .route("/users", get(list_users))
+        .route("/users", post(create_user))
         .route("/users/{id}", get(get_user))
         .route("/users/{id}", delete(delete_user))
         .route("/users/{id}/role", put(update_user_role))
         .route("/users/{id}/active", put(update_user_active))
         .route("/users/{id}/quota", put(update_user_quota))
+        .route("/users/{id}/password", put(reset_user_password))
+        // Registration control
+        .route("/settings/registration", get(get_registration_setting))
+        .route("/settings/registration", put(set_registration_setting))
 }
 
 /// Validate JWT and require admin role. Returns (user_id, role).
@@ -191,6 +197,13 @@ async fn get_dashboard_stats(
         storage_usage_percent: (usage_percent * 100.0).round() / 100.0,
         users_over_80_percent: stats_row.get("users_over_80"),
         users_over_quota: stats_row.get("users_over_quota"),
+        registration_enabled: {
+            if let Some(svc) = state.admin_settings_service.as_ref() {
+                svc.get_registration_enabled().await
+            } else {
+                true // default: enabled
+            }
+        },
     };
 
     Ok(Json(stats))
@@ -349,5 +362,103 @@ async fn update_user_quota(
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": "User quota updated",
         "quota_bytes": dto.quota_bytes,
+    }))))
+}
+
+// ============================================================================
+// Admin User Creation & Password Reset
+// ============================================================================
+
+/// POST /api/admin/users — create a new user (admin only)
+async fn create_user(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(dto): Json<AdminCreateUserDto>,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let auth = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    let user = auth.auth_application_service.admin_create_user(dto).await
+        .map_err(|e| AppError::new(
+            StatusCode::BAD_REQUEST,
+            &format!("Failed to create user: {}", e),
+            "CreateUserFailed",
+        ))?;
+
+    Ok((StatusCode::CREATED, Json(user)))
+}
+
+/// PUT /api/admin/users/:id/password — reset a user's password (admin only)
+async fn reset_user_password(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(dto): Json<AdminResetPasswordDto>,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let auth = state.auth_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
+
+    auth.auth_application_service.admin_reset_password(&id, &dto.new_password).await
+        .map_err(|e| AppError::new(
+            StatusCode::BAD_REQUEST,
+            &format!("Failed to reset password: {}", e),
+            "ResetPasswordFailed",
+        ))?;
+
+    Ok((StatusCode::OK, Json(serde_json::json!({
+        "message": "Password reset successfully"
+    }))))
+}
+
+// ============================================================================
+// Registration Control
+// ============================================================================
+
+/// GET /api/admin/settings/registration — check if public registration is enabled
+async fn get_registration_setting(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let svc = state.admin_settings_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
+
+    let val = svc.get_registration_enabled().await;
+
+    Ok(Json(serde_json::json!({
+        "registration_enabled": val,
+    })))
+}
+
+/// PUT /api/admin/settings/registration — enable/disable public registration
+async fn set_registration_setting(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(body): Json<serde_json::Value>,
+) -> Result<impl IntoResponse, AppError> {
+    let (admin_id, _) = admin_guard(&state, &headers).await?;
+
+    let enabled = body.get("registration_enabled")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| AppError::new(
+            StatusCode::BAD_REQUEST,
+            "Missing boolean field 'registration_enabled'",
+            "InvalidInput",
+        ))?;
+
+    let svc = state.admin_settings_service.as_ref()
+        .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
+
+    svc.set_registration_enabled(enabled, &admin_id).await
+        .map_err(|e| AppError::internal_error(&format!("Failed to save setting: {}", e)))?;
+
+    Ok((StatusCode::OK, Json(serde_json::json!({
+        "message": format!("Public registration {}", if enabled { "enabled" } else { "disabled" }),
+        "registration_enabled": enabled,
     }))))
 }

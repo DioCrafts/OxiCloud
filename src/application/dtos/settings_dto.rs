@@ -80,6 +80,27 @@ pub struct UpdateUserQuotaDto {
     pub quota_bytes: i64,
 }
 
+/// Request body for admin-created users
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AdminCreateUserDto {
+    pub username: String,
+    pub password: String,
+    /// Optional — if omitted, a placeholder email is generated
+    pub email: Option<String>,
+    /// "admin" or "user"; defaults to "user"
+    pub role: Option<String>,
+    /// Storage quota in bytes; 0 = unlimited. If omitted, uses role default.
+    pub quota_bytes: Option<i64>,
+    /// Whether the account is active; defaults to true
+    pub active: Option<bool>,
+}
+
+/// Request body for admin password reset
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AdminResetPasswordDto {
+    pub new_password: String,
+}
+
 /// Query parameters for listing users
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ListUsersQueryDto {
@@ -105,4 +126,5 @@ pub struct DashboardStatsDto {
     pub storage_usage_percent: f64,
     pub users_over_80_percent: i64,
     pub users_over_quota: i64,
+    pub registration_enabled: bool,
 }

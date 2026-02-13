@@ -65,6 +65,17 @@ async fn register(
             "PasswordRegistrationDisabled",
         ));
     }
+
+    // Check if public registration has been disabled by the admin
+    if let Some(admin_svc) = state.admin_settings_service.as_ref() {
+        if !admin_svc.get_registration_enabled().await {
+            return Err(AppError::new(
+                StatusCode::FORBIDDEN,
+                "Public registration has been disabled by the administrator.",
+                "RegistrationDisabled",
+            ));
+        }
+    }
     
     // Registration logic (admin detection, fresh-install handling, duplicate
     // checks) is all inside the service layer. Call it directly.

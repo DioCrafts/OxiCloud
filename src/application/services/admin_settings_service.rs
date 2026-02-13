@@ -267,4 +267,37 @@ impl AdminSettingsService {
             provider_name_suggestion: suggestion,
         })
     }
+
+    // ========================================================================
+    // Registration Control
+    // ========================================================================
+
+    /// Check if public self-registration is enabled.
+    /// Priority: env var `OXICLOUD_DISABLE_REGISTRATION` > DB setting > default (true).
+    pub async fn get_registration_enabled(&self) -> bool {
+        // Env var override takes priority
+        if let Ok(val) = std::env::var("OXICLOUD_DISABLE_REGISTRATION") {
+            return !matches!(val.to_lowercase().as_str(), "true" | "1" | "yes");
+        }
+        // Check DB setting
+        match self.settings_repo.get("registration_enabled").await {
+            Ok(Some(val)) => val == "true",
+            _ => true, // default: enabled
+        }
+    }
+
+    /// Enable or disable public self-registration.
+    pub async fn set_registration_enabled(
+        &self,
+        enabled: bool,
+        updated_by: &str,
+    ) -> Result<(), DomainError> {
+        self.settings_repo.set(
+            "registration_enabled",
+            if enabled { "true" } else { "false" },
+            "general",
+            false,
+            Some(updated_by),
+        ).await
+    }
 }

@@ -602,6 +602,124 @@ impl AuthApplicationService {
     // Admin User Management Methods
     // ========================================================================
 
+    /// Admin-only: create a user bypassing registration guards.
+    pub async fn admin_create_user(
+        &self,
+        dto: crate::application::dtos::settings_dto::AdminCreateUserDto,
+    ) -> Result<UserDto, DomainError> {
+        // Validate username length
+        if dto.username.len() < 3 || dto.username.len() > 32 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput, "User",
+                "Username must be between 3 and 32 characters".to_string(),
+            ));
+        }
+
+        // Check for duplicate username
+        if self.user_storage.get_user_by_username(&dto.username).await.is_ok() {
+            return Err(DomainError::new(
+                ErrorKind::AlreadyExists, "User",
+                format!("User '{}' already exists", dto.username),
+            ));
+        }
+
+        // Email: use provided or generate placeholder
+        let email = dto.email
+            .filter(|e| !e.trim().is_empty())
+            .unwrap_or_else(|| format!("{}@oxicloud.local", dto.username));
+
+        // Check email uniqueness
+        if self.user_storage.get_user_by_email(&email).await.is_ok() {
+            return Err(DomainError::new(
+                ErrorKind::AlreadyExists, "User",
+                format!("Email '{}' is already registered", email),
+            ));
+        }
+
+        // Validate password
+        if dto.password.len() < 8 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput, "User",
+                "Password must be at least 8 characters long".to_string(),
+            ));
+        }
+
+        // Determine role
+        let role = match dto.role.as_deref() {
+            Some("admin") => UserRole::Admin,
+            _ => UserRole::User,
+        };
+
+        // Determine quota
+        let quota = dto.quota_bytes.unwrap_or_else(|| {
+            if role == UserRole::Admin { 107_374_182_400 } else { 1_073_741_824 }
+        });
+
+        // Hash password
+        let password_hash = self.password_hasher.hash_password(&dto.password)?;
+
+        // Create domain entity
+        let user = User::new(
+            dto.username.clone(),
+            email,
+            password_hash,
+            role,
+            quota,
+        ).map_err(|e| DomainError::new(
+            ErrorKind::InvalidInput, "User",
+            format!("Error creating user: {}", e),
+        ))?;
+
+        // Persist
+        let created = self.user_storage.create_user(user).await?;
+
+        // Deactivate if requested (User::new always sets active=true)
+        if let Some(false) = dto.active {
+            self.user_storage.set_user_active_status(created.id(), false).await?;
+        }
+
+        // Create personal folder
+        if let Some(folder_service) = &self.folder_service {
+            let folder_name = format!("My Folder - {}", dto.username);
+            match folder_service.create_folder(CreateFolderDto {
+                name: folder_name,
+                parent_id: None,
+            }).await {
+                Ok(folder) => {
+                    tracing::info!(
+                        "Personal folder created for admin-created user {}: {} (ID: {})",
+                        created.id(), folder.name, folder.id
+                    );
+                },
+                Err(e) => {
+                    tracing::error!(
+                        "Could not create personal folder for user {}: {}",
+                        created.id(), e
+                    );
+                }
+            }
+        }
+
+        tracing::info!("Admin created user: {} ({})", dto.username, created.id());
+        Ok(UserDto::from(created))
+    }
+
+    /// Admin-only: reset a user's password.
+    pub async fn admin_reset_password(
+        &self,
+        user_id: &str,
+        new_password: &str,
+    ) -> Result<(), DomainError> {
+        if new_password.len() < 8 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput, "User",
+                "Password must be at least 8 characters long".to_string(),
+            ));
+        }
+        let hash = self.password_hasher.hash_password(new_password)?;
+        self.user_storage.change_password(user_id, &hash).await
+    }
+
     /// Get a single user by ID (for admin panel)
     pub async fn get_user_admin(&self, user_id: &str) -> Result<UserDto, DomainError> {
         let user = self.user_storage.get_user_by_id(user_id).await?;

@@ -262,13 +262,18 @@ details[open] summary{margin-bottom:14px;color:#ff5e3a}
           <div class="stat-card"><div class="stat-value" id="ds-oidc">—</div><div class="stat-label">OIDC</div></div>
           <div class="stat-card"><div class="stat-value" id="ds-quotas-flag">—</div><div class="stat-label">Quotas</div></div>
         </div>
+        <div class="toggle-row" style="margin-top:10px;padding:12px 0;border-top:1px solid #e2e8f0">
+          <label><i class="fas fa-user-plus" style="color:#64748b;margin-right:6px"></i> Allow public self-registration</label>
+          <label class="switch"><input type="checkbox" id="ds-registration" checked onchange="toggleRegistration(this.checked)"><span class="slider"></span></label>
+        </div>
+        <div class="warning" id="registration-warning" style="display:none"><i class="fas fa-exclamation-triangle"></i> Public registration is disabled. Only admins can create new users.</div>
       </div>
     </div>
 
     <!-- ======== USERS TAB ======== -->
     <div id="tab-users" class="tab-content">
       <div class="admin-card">
-        <h2><i class="fas fa-users-cog"></i> User Management</h2>
+        <h2 style="justify-content:space-between"><span><i class="fas fa-users-cog"></i> User Management</span><button class="btn btn-primary" onclick="openCreateUserModal()"><i class="fas fa-user-plus"></i> Create User</button></h2>
         <div class="table-wrap">
           <table>
             <thead>
@@ -383,6 +388,66 @@ details[open] summary{margin-bottom:14px;color:#ff5e3a}
   </div>
 </div>
 
+<!-- Create User Modal -->
+<div id="create-user-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h3><i class="fas fa-user-plus" style="color:#ff5e3a;margin-right:8px"></i> Create New User</h3>
+    <div class="form-group">
+      <label>Username *</label>
+      <input type="text" id="cu-username" placeholder="johndoe" minlength="3" maxlength="32">
+      <small>3–32 characters</small>
+    </div>
+    <div class="form-group">
+      <label>Password *</label>
+      <input type="password" id="cu-password" placeholder="Min 8 characters" minlength="8">
+    </div>
+    <div class="form-group">
+      <label>Email <small style="font-weight:400;color:#94a3b8">(optional)</small></label>
+      <input type="text" id="cu-email" placeholder="user@example.com (auto-generated if empty)">
+    </div>
+    <div style="display:flex;gap:14px">
+      <div class="form-group" style="flex:1">
+        <label>Role</label>
+        <select id="cu-role" style="width:100%;padding:10px 14px;border:2px solid #e2e8f0;border-radius:10px;font-size:14px;background:#f8fafc">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Quota</label>
+        <div style="display:flex;gap:6px">
+          <input type="number" id="cu-quota-value" min="0" step="1" value="1" style="flex:1">
+          <select id="cu-quota-unit" style="width:70px;padding:10px 8px;border:2px solid #e2e8f0;border-radius:10px;font-size:13px;background:#f8fafc"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
+        </div>
+      </div>
+    </div>
+    <div id="cu-error" class="alert" style="margin-top:0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
+      <button class="btn btn-primary" id="cu-submit" onclick="submitCreateUser()"><i class="fas fa-user-plus"></i> Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="reset-pw-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <h3><i class="fas fa-key" style="color:#ff5e3a;margin-right:8px"></i> Reset Password</h3>
+    <div class="form-group">
+      <label>User: <strong id="rp-username"></strong></label>
+    </div>
+    <div class="form-group">
+      <label>New Password</label>
+      <input type="password" id="rp-password" placeholder="Min 8 characters" minlength="8">
+    </div>
+    <div id="rp-error" class="alert" style="margin-top:0"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Cancel</button>
+      <button class="btn btn-primary" id="rp-submit" onclick="submitResetPassword()"><i class="fas fa-save"></i> Reset</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '/api';
 const token = localStorage.getItem('oxicloud_token') || localStorage.getItem('token') || localStorage.getItem('access_token');
@@ -444,6 +509,12 @@ async function loadDashboard() {
     document.getElementById('ds-oidc').textContent = d.oidc_configured ? 'Active' : 'Off';
     document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? 'Enabled' : 'Disabled';
 
+    // Registration toggle
+    if (typeof d.registration_enabled !== 'undefined') {
+      document.getElementById('ds-registration').checked = d.registration_enabled;
+      document.getElementById('registration-warning').style.display = d.registration_enabled ? 'none' : 'flex';
+    }
+
     if (d.users_over_80_percent > 0) {
       document.getElementById('ds-warn-card').style.display = '';
       document.getElementById('ds-over80').textContent = d.users_over_80_percent;
@@ -480,6 +551,7 @@ async function loadUsers() {
         '<td style="font-size:12px;color:#94a3b8">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
           '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + u.id + '\',\'' + u.username + '\')" title="Reset password"><i class="fas fa-key"></i></button>' +
           '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
           '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
           '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
@@ -550,6 +622,110 @@ async function saveQuota() {
     if (resp.ok) { closeQuotaModal(); loadUsers(); loadDashboard(); }
     else { const e = await resp.json(); alert(e.message || 'Failed'); }
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+// ── Create User Modal ──
+function openCreateUserModal() {
+  document.getElementById('cu-username').value = '';
+  document.getElementById('cu-password').value = '';
+  document.getElementById('cu-email').value = '';
+  document.getElementById('cu-role').value = 'user';
+  document.getElementById('cu-quota-value').value = '1';
+  document.getElementById('cu-quota-unit').value = '1073741824';
+  document.getElementById('cu-error').className = 'alert';
+  document.getElementById('cu-error').textContent = '';
+  document.getElementById('create-user-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('cu-username').focus(), 100);
+}
+function closeCreateUserModal() { document.getElementById('create-user-modal').style.display = 'none'; }
+
+async function submitCreateUser() {
+  const username = document.getElementById('cu-username').value.trim();
+  const password = document.getElementById('cu-password').value;
+  const email = document.getElementById('cu-email').value.trim() || null;
+  const role = document.getElementById('cu-role').value;
+  const quotaVal = parseFloat(document.getElementById('cu-quota-value').value) || 0;
+  const quotaUnit = parseInt(document.getElementById('cu-quota-unit').value);
+  const quotaBytes = Math.round(quotaVal * quotaUnit);
+
+  const errorEl = document.getElementById('cu-error');
+  if (username.length < 3) { errorEl.textContent = 'Username must be at least 3 characters'; errorEl.className = 'alert alert-error'; return; }
+  if (password.length < 8) { errorEl.textContent = 'Password must be at least 8 characters'; errorEl.className = 'alert alert-error'; return; }
+
+  const btn = document.getElementById('cu-submit');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating…';
+  try {
+    const resp = await fetch(API + '/admin/users', {
+      method: 'POST', headers: headers(),
+      body: JSON.stringify({ username, password, email, role, quota_bytes: quotaBytes })
+    });
+    if (resp.ok) {
+      closeCreateUserModal();
+      loadUsers();
+      loadDashboard();
+    } else {
+      const e = await resp.json().catch(() => ({}));
+      errorEl.textContent = e.message || 'Failed to create user';
+      errorEl.className = 'alert alert-error';
+    }
+  } catch (e) {
+    errorEl.textContent = 'Network error: ' + e.message;
+    errorEl.className = 'alert alert-error';
+  }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> Create';
+}
+
+// ── Reset Password Modal ──
+let resetPwUserId = '';
+function openResetPasswordModal(userId, username) {
+  resetPwUserId = userId;
+  document.getElementById('rp-username').textContent = username;
+  document.getElementById('rp-password').value = '';
+  document.getElementById('rp-error').className = 'alert';
+  document.getElementById('rp-error').textContent = '';
+  document.getElementById('reset-pw-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('rp-password').focus(), 100);
+}
+function closeResetPasswordModal() { document.getElementById('reset-pw-modal').style.display = 'none'; }
+
+async function submitResetPassword() {
+  const password = document.getElementById('rp-password').value;
+  const errorEl = document.getElementById('rp-error');
+  if (password.length < 8) { errorEl.textContent = 'Password must be at least 8 characters'; errorEl.className = 'alert alert-error'; return; }
+
+  const btn = document.getElementById('rp-submit');
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting…';
+  try {
+    const resp = await fetch(API + '/admin/users/' + resetPwUserId + '/password', {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({ new_password: password })
+    });
+    if (resp.ok) { closeResetPasswordModal(); }
+    else { const e = await resp.json().catch(() => ({})); errorEl.textContent = e.message || 'Failed'; errorEl.className = 'alert alert-error'; }
+  } catch (e) { errorEl.textContent = 'Error: ' + e.message; errorEl.className = 'alert alert-error'; }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Reset';
+}
+
+// ── Registration Toggle ──
+async function toggleRegistration(enabled) {
+  document.getElementById('registration-warning').style.display = enabled ? 'none' : 'flex';
+  try {
+    const resp = await fetch(API + '/admin/settings/registration', {
+      method: 'PUT', headers: headers(),
+      body: JSON.stringify({ registration_enabled: enabled })
+    });
+    if (!resp.ok) {
+      // Revert toggle on failure
+      document.getElementById('ds-registration').checked = !enabled;
+      document.getElementById('registration-warning').style.display = !enabled ? 'flex' : 'none';
+      const e = await resp.json().catch(() => ({}));
+      alert(e.message || 'Failed to update registration setting');
+    }
+  } catch (e) {
+    document.getElementById('ds-registration').checked = !enabled;
+    document.getElementById('registration-warning').style.display = !enabled ? 'flex' : 'none';
+    alert('Error: ' + e.message);
+  }
 }
 
 // ── OIDC settings ──
