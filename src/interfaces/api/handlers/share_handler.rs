@@ -15,7 +15,7 @@ use crate::{
         ports::share_ports::ShareUseCase
     },
     common::errors::ErrorKind,
-    interfaces::middleware::auth::AuthUser,
+    interfaces::middleware::auth::OptionalAuthUser,
 };
 
 #[derive(Debug, Deserialize)]
@@ -32,10 +32,10 @@ pub struct VerifyPasswordRequest {
 /// Create a new shared link
 pub async fn create_shared_link(
     State(share_use_case): State<Arc<dyn ShareUseCase>>,
-    auth_user: AuthUser,
+    auth_user: OptionalAuthUser,
     Json(dto): Json<CreateShareDto>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.0.map(|u| u.id).unwrap_or_else(|| "anonymous".to_string());
     match share_use_case.create_shared_link(&user_id, dto).await {
         Ok(share) => (StatusCode::CREATED, Json(share)).into_response(),
         Err(err) => {
@@ -69,10 +69,10 @@ pub async fn get_shared_link(
 /// Get all shared links created by the current user
 pub async fn get_user_shares(
     State(share_use_case): State<Arc<dyn ShareUseCase>>,
-    auth_user: AuthUser,
+    auth_user: OptionalAuthUser,
     Query(query): Query<GetSharesQuery>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.0.map(|u| u.id).unwrap_or_else(|| "anonymous".to_string());
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(20);
     

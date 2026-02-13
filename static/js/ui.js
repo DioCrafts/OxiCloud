@@ -204,8 +204,8 @@ const ui = {
                 contextMenus.closeShareDialog();
             });
             
-            document.getElementById('share-confirm-btn').addEventListener('click', () => {
-                contextMenus.createSharedLink();
+            document.getElementById('share-confirm-btn').addEventListener('click', async () => {
+                await contextMenus.createSharedLink();
             });
             
             document.getElementById('copy-share-btn').addEventListener('click', async () => {

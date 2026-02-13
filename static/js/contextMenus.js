@@ -62,8 +62,9 @@ const contextMenus = {
         });
         
         document.getElementById('share-folder-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFolder) {
-                this.showShareDialog(window.app.contextMenuTargetFolder, 'folder');
+            const folder = window.app.contextMenuTargetFolder;
+            if (folder) {
+                this.showShareDialog(folder, 'folder');
             }
             window.ui.closeContextMenu();
         });
@@ -165,8 +166,9 @@ const contextMenus = {
         });
 
         document.getElementById('share-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                this.showShareDialog(window.app.contextMenuTargetFile, 'file');
+            const file = window.app.contextMenuTargetFile;
+            if (file) {
+                this.showShareDialog(file, 'file');
             }
             window.ui.closeFileContextMenu();
         });
@@ -433,23 +435,42 @@ const contextMenus = {
      * @param {string} itemType - 'file' or 'folder'
      */
     showShareDialog(item, itemType) {
-        // Update dialog title based on item type
-        const dialogHeader = document.getElementById('share-dialog').querySelector('.share-dialog-header');
+        try {
+        const shareDialog = document.getElementById('share-dialog');
+        if (!shareDialog) {
+            console.error('Share dialog element not found in DOM');
+            window.ui.showNotification('Error', 'Share dialog not available');
+            return;
+        }
+
+        // Update dialog title — use the <span> inside header to preserve <i> icon
+        const dialogHeader = shareDialog.querySelector('.share-dialog-header');
+        if (dialogHeader) {
+            const headerSpan = dialogHeader.querySelector('span');
+            const titleText = itemType === 'file' ?
+                (window.i18n ? window.i18n.t('dialogs.share_file') : 'Share file') :
+                (window.i18n ? window.i18n.t('dialogs.share_folder') : 'Share folder');
+            if (headerSpan) {
+                headerSpan.textContent = titleText;
+            } else {
+                dialogHeader.textContent = titleText;
+            }
+        }
+
         const itemName = document.getElementById('shared-item-name');
-        
-        // Update dialog content
-        dialogHeader.textContent = itemType === 'file' ?
-            (window.i18n ? window.i18n.t('dialogs.share_file') : 'Share file') :
-            (window.i18n ? window.i18n.t('dialogs.share_folder') : 'Share folder');
-        
-        itemName.textContent = item.name;
+        if (itemName) itemName.textContent = item.name;
         
         // Reset form
-        document.getElementById('share-password').value = '';
-        document.getElementById('share-expiration').value = '';
-        document.getElementById('share-permission-read').checked = true;
-        document.getElementById('share-permission-write').checked = false;
-        document.getElementById('share-permission-reshare').checked = false;
+        const pwField = document.getElementById('share-password');
+        const expField = document.getElementById('share-expiration');
+        if (pwField) pwField.value = '';
+        if (expField) expField.value = '';
+        const permRead = document.getElementById('share-permission-read');
+        const permWrite = document.getElementById('share-permission-write');
+        const permReshare = document.getElementById('share-permission-reshare');
+        if (permRead) permRead.checked = true;
+        if (permWrite) permWrite.checked = false;
+        if (permReshare) permReshare.checked = false;
         
         // Store the current item and type for use when creating the share
         window.app.shareDialogItem = item;
@@ -526,14 +547,23 @@ const contextMenus = {
             document.getElementById('existing-shares-section').style.display = 'none';
         }
         
+        // Hide new-share section from previous use
+        const newShareSection = document.getElementById('new-share-section');
+        if (newShareSection) newShareSection.style.display = 'none';
+
         // Show dialog
-        document.getElementById('share-dialog').style.display = 'flex';
+        shareDialog.style.display = 'flex';
+        console.log('Share dialog opened for', itemType, item.name);
+        } catch (error) {
+            console.error('Error opening share dialog:', error);
+            window.ui.showNotification('Error', 'Could not open share dialog');
+        }
     },
     
     /**
      * Create a shared link with the configured options
      */
-    createSharedLink() {
+    async createSharedLink() {
         if (!window.app.shareDialogItem || !window.app.shareDialogItemType) {
             window.ui.showNotification('Error', 'Could not share the item');
             return;
@@ -546,46 +576,74 @@ const contextMenus = {
         const permissionWrite = document.getElementById('share-permission-write').checked;
         const permissionReshare = document.getElementById('share-permission-reshare').checked;
         
-        // Prepare options
-        const options = {
+        const item = window.app.shareDialogItem;
+        const itemType = window.app.shareDialogItemType;
+
+        // Build DTO for backend API
+        const createDto = {
+            item_id: item.id,
+            item_type: itemType,
             password: password || null,
-            expirationDate: expirationDate || null,
+            expires_at: expirationDate ? Math.floor(new Date(expirationDate).getTime() / 1000) : null,
             permissions: {
                 read: permissionRead,
                 write: permissionWrite,
                 reshare: permissionReshare
             }
         };
-        
+
         try {
-            const item = window.app.shareDialogItem;
-            const itemType = window.app.shareDialogItemType;
+            const token = localStorage.getItem('oxicloud_token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            const response = await fetch('/api/shares', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(createDto)
+            });
+
+            if (!response.ok) {
+                const errBody = await response.json().catch(() => ({}));
+                throw new Error(errBody.error || `Server error ${response.status}`);
+            }
+
+            const shareInfo = await response.json();
             
-            // Create share
-            const shareInfo = window.fileSharing.generateSharedLink(
-                item.id, 
-                itemType, 
-                options
-            );
-            
+            // Also save to localStorage for offline / shared-view compatibility
+            window.fileSharing.saveSharedLink({
+                id: shareInfo.id,
+                type: shareInfo.item_type,
+                itemId: shareInfo.item_id,
+                url: shareInfo.url,
+                token: shareInfo.token,
+                password_protected: shareInfo.has_password,
+                expires_at: shareInfo.expires_at ? new Date(shareInfo.expires_at * 1000).toISOString() : null,
+                permissions: shareInfo.permissions,
+                created_at: new Date(shareInfo.created_at * 1000).toISOString(),
+                access_count: shareInfo.access_count || 0,
+                name: item.name,
+                dateShared: new Date().toISOString()
+            });
+
             // Update UI with new share
             const shareUrl = document.getElementById('generated-share-url');
-            shareUrl.value = shareInfo.url;
-            document.getElementById('new-share-section').style.display = 'block';
-            
-            // Focus and select for easy copying
-            shareUrl.focus();
-            shareUrl.select();
+            if (shareUrl) {
+                shareUrl.value = shareInfo.url;
+                document.getElementById('new-share-section').style.display = 'block';
+                shareUrl.focus();
+                shareUrl.select();
+            }
             
             // Show success message
-            window.ui.showNotification('Link created', 'Shared link created successfully');
-            
-            // Reload existing shares
-            this.showShareDialog(item, itemType);
+            window.ui.showNotification(
+                window.i18n ? window.i18n.t('notifications.link_created') : 'Link created',
+                window.i18n ? window.i18n.t('notifications.share_success') : 'Shared link created successfully'
+            );
             
         } catch (error) {
             console.error('Error creating shared link:', error);
-            window.ui.showNotification('Error', 'Could not create shared link');
+            window.ui.showNotification('Error', error.message || 'Could not create shared link');
         }
     },
     
@@ -639,7 +697,8 @@ const contextMenus = {
      * Close share dialog
      */
     closeShareDialog() {
-        document.getElementById('share-dialog').style.display = 'none';
+        const dialog = document.getElementById('share-dialog');
+        if (dialog) dialog.style.display = 'none';
         window.app.shareDialogItem = null;
         window.app.shareDialogItemType = null;
     },
