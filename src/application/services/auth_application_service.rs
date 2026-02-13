@@ -3,6 +3,7 @@ use std::sync::RwLock;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Instant;
+use std::path::PathBuf;
 use crate::domain::entities::user::{User, UserRole};
 use crate::domain::entities::session::Session;
 use crate::application::ports::auth_ports::{UserStoragePort, SessionStoragePort, PasswordHasherPort, TokenServicePort, OidcServicePort, OidcIdClaims};
@@ -36,12 +37,18 @@ struct OidcState {
     config: Option<OidcConfig>,
 }
 
+/// Default quota: 100 GB
+const DEFAULT_ADMIN_QUOTA: i64 = 107_374_182_400;
+const DEFAULT_USER_QUOTA: i64 = 1_073_741_824; // 1 GB
+
 pub struct AuthApplicationService {
     user_storage: Arc<dyn UserStoragePort>,
     session_storage: Arc<dyn SessionStoragePort>,
     password_hasher: Arc<dyn PasswordHasherPort>,
     token_service: Arc<dyn TokenServicePort>,
     folder_service: Option<Arc<dyn FolderUseCase>>,
+    /// Path to the storage directory, used for disk-space–aware quota calculation
+    storage_path: PathBuf,
     oidc: RwLock<OidcState>,
     /// Pending OIDC authorization flows keyed by state token (CSRF + PKCE + nonce)
     pending_oidc_flows: Mutex<HashMap<String, PendingOidcFlow>>,
@@ -55,6 +62,7 @@ impl AuthApplicationService {
         session_storage: Arc<dyn SessionStoragePort>,
         password_hasher: Arc<dyn PasswordHasherPort>,
         token_service: Arc<dyn TokenServicePort>,
+        storage_path: PathBuf,
     ) -> Self {
         Self {
             user_storage,
@@ -62,9 +70,52 @@ impl AuthApplicationService {
             password_hasher,
             token_service,
             folder_service: None,
+            storage_path,
             oidc: RwLock::new(OidcState { service: None, config: None }),
             pending_oidc_flows: Mutex::new(HashMap::new()),
             pending_oidc_tokens: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Returns the default quota for the given role, capped to the available
+    /// disk space on the filesystem that hosts the storage directory.
+    fn capped_quota(&self, role: &UserRole) -> i64 {
+        let base_quota = match role {
+            UserRole::Admin => DEFAULT_ADMIN_QUOTA,
+            _ => DEFAULT_USER_QUOTA,
+        };
+
+        match Self::available_disk_space(&self.storage_path) {
+            Some(avail) => {
+                let avail_i64 = avail as i64;
+                if avail_i64 < base_quota {
+                    tracing::info!(
+                        "Available disk space ({} bytes) is less than default {} quota ({} bytes) — capping quota",
+                        avail_i64,
+                        if *role == UserRole::Admin { "admin" } else { "user" },
+                        base_quota,
+                    );
+                    avail_i64
+                } else {
+                    base_quota
+                }
+            }
+            None => {
+                tracing::warn!("Could not determine available disk space, using default quota");
+                base_quota
+            }
+        }
+    }
+
+    /// Query the available space on the filesystem that contains `path`.
+    fn available_disk_space(path: &std::path::Path) -> Option<u64> {
+        use fs2::available_space;
+        match available_space(path) {
+            Ok(space) => Some(space),
+            Err(e) => {
+                tracing::warn!("Failed to query disk space for {:?}: {}", path, e);
+                None
+            }
         }
     }
     
@@ -200,12 +251,8 @@ impl AuthApplicationService {
             }
         };
         
-        // Quota based on role: 100GB for admin, 1GB for regular users
-        let quota = if role == UserRole::Admin {
-            107374182400 // 100GB for admin
-        } else {
-            1024 * 1024 * 1024 // 1GB for regular users
-        };
+        // Quota based on role, capped to available disk space
+        let quota = self.capped_quota(&role);
         
         // Validate password length before hashing
         if dto.password.len() < 8 {
@@ -544,8 +591,8 @@ impl AuthApplicationService {
         // 3. Create new admin user with the provided credentials but admin role
         let admin_role = UserRole::Admin;
         
-        // Use 100GB for admin quota
-        let admin_quota = 107374182400;
+        // Admin quota, capped to available disk space
+        let admin_quota = self.capped_quota(&admin_role);
         
         // Create the new admin user
         let user = User::new(
@@ -937,11 +984,7 @@ impl AuthApplicationService {
                 // Determine role from OIDC groups
                 let role = self.map_oidc_role(&claims.groups, &oidc_config);
 
-                let quota = if role == UserRole::Admin {
-                    107374182400 // 100GB
-                } else {
-                    1024 * 1024 * 1024 // 1GB
-                };
+                let quota = self.capped_quota(&role);
 
                 // Sanitize username (max 32 chars, ensure uniqueness)
                 let mut username = oidc_username.chars().take(32).collect::<String>();

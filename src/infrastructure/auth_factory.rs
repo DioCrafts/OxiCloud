@@ -37,6 +37,7 @@ pub async fn create_auth_services(
         session_repository,
         password_hasher,
         token_service.clone(),
+        config.storage_path.clone(),
     );
     
     // Configure folder service if available
