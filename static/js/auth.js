@@ -68,7 +68,7 @@ const ALL_LANGUAGES = [
     { code: 'fr', name: 'French',     nativeName: 'Français',   flag: '🇫🇷', popular: true },
     { code: 'de', name: 'German',     nativeName: 'Deutsch',    flag: '🇩🇪', popular: true },
     { code: 'pt', name: 'Portuguese', nativeName: 'Português',  flag: '🇧🇷', popular: true },
-    { code: 'it', name: 'Italian',    nativeName: 'Italiano',   flag: '🇮🇹', popular: false },
+    { code: 'it', name: 'Italian',    nativeName: 'Italiano',   flag: '🇮🇹', popular: true },
     { code: 'ru', name: 'Russian',    nativeName: 'Русский',    flag: '🇷🇺', popular: false },
     { code: 'ja', name: 'Japanese',   nativeName: '日本語',      flag: '🇯🇵', popular: false },
     { code: 'ko', name: 'Korean',     nativeName: '한국어',      flag: '🇰🇷', popular: false },

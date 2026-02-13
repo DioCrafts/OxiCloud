@@ -16,7 +16,8 @@ function getAvailableLanguages() {
         { code: 'fa', name: 'فارسی', flag: '🇮🇷' },
         { code: 'fr', name: 'Français', flag: '🇫🇷' },
         { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-        { code: 'pt', name: 'Português', flag: '🇧🇷' }
+        { code: 'pt', name: 'Português', flag: '🇧🇷' },
+        { code: 'it', name: 'Italiano', flag: '🇮🇹' }
     ];
 }
 

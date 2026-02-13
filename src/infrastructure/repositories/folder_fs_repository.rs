@@ -90,8 +90,12 @@ impl FolderFsRepository {
                 let mut entries = result.map_err(|e| FolderRepositoryError::StorageError(e.to_string()))?;
                 let mut count = 0;
                 
-                // Count entries manually
-                while let Ok(Some(_)) = entries.next_entry().await {
+                // Count entries manually, skipping hidden/system directories
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with('.') {
+                        continue;
+                    }
                     count += 1;
                 }
                 
@@ -474,6 +478,12 @@ impl FolderRepository for FolderFsRepository {
             }
             
             let folder_name = entry.file_name().to_string_lossy().to_string();
+            
+            // Skip hidden/system directories (e.g. .blobs, .trash, .dedup_temp)
+            if folder_name.starts_with('.') {
+                continue;
+            }
+            
             let folder_storage_path = parent_storage_path.join(&folder_name);
             
             let get_folder_timeout = Duration::from_secs(5);
@@ -598,6 +608,13 @@ impl FolderRepository for FolderFsRepository {
             };
             
             if !file_type.is_dir() {
+                current_idx += 1;
+                continue;
+            }
+            
+            // Skip hidden/system directories (e.g. .blobs, .trash, .dedup_temp)
+            let dir_name = entry.file_name().to_string_lossy().to_string();
+            if dir_name.starts_with('.') {
                 current_idx += 1;
                 continue;
             }
