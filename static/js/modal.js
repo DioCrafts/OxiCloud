@@ -19,6 +19,9 @@ const Modal = {
     onConfirm: null,
     onCancel: null,
     
+    // Rename mode: select only name without extension
+    _selectNameOnly: false,
+    
     /**
      * Initialize modal system
      */
@@ -141,6 +144,9 @@ const Modal = {
     promptRename(currentName, isFolder = false) {
         const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
         
+        // For files, we want to select only the name part (without extension)
+        this._selectNameOnly = !isFolder;
+        
         return this.prompt({
             title: t('dialogs.rename_title') || 'Renombrar',
             label: t('dialogs.new_name') || 'Nuevo nombre',
@@ -168,7 +174,20 @@ const Modal = {
         // Focus input after animation
         setTimeout(() => {
             this.input.focus();
-            this.input.select();
+            
+            if (this._selectNameOnly) {
+                // Select only the filename, excluding the extension
+                const value = this.input.value;
+                const lastDot = value.lastIndexOf('.');
+                if (lastDot > 0) {
+                    this.input.setSelectionRange(0, lastDot);
+                } else {
+                    this.input.select();
+                }
+                this._selectNameOnly = false;
+            } else {
+                this.input.select();
+            }
         }, 100);
     },
     
