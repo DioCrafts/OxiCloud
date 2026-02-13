@@ -304,6 +304,19 @@ async function init() {
       document.getElementById('password-section').style.display = 'none';
     }
 
+    // Also check OIDC config: hide password form when password login is disabled
+    try {
+      const oidcResp = await fetch(API + '/auth/oidc/providers');
+      if (oidcResp.ok) {
+        const oidcInfo = await oidcResp.json();
+        if (!oidcInfo.password_login_enabled) {
+          document.getElementById('password-section').style.display = 'none';
+        }
+      }
+    } catch (oidcErr) {
+      // Ignore — if OIDC endpoint is unavailable, password login is implicitly enabled
+    }
+
     document.getElementById('loading').style.display = 'none';
     document.getElementById('main-content').style.display = 'block';
   } catch (e) {
