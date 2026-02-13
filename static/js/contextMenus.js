@@ -70,13 +70,11 @@ const contextMenus = {
         });
 
         document.getElementById('delete-folder-option').addEventListener('click', async () => {
-            if (window.app.contextMenuTargetFolder) {
-                await window.fileOps.deleteFolder(
-                    window.app.contextMenuTargetFolder.id, 
-                    window.app.contextMenuTargetFolder.name
-                );
-            }
+            const folder = window.app.contextMenuTargetFolder;
             window.ui.closeContextMenu();
+            if (folder) {
+                await window.fileOps.deleteFolder(folder.id, folder.name);
+            }
         });
 
         // File context menu options
@@ -174,13 +172,11 @@ const contextMenus = {
         });
 
         document.getElementById('delete-file-option').addEventListener('click', async () => {
-            if (window.app.contextMenuTargetFile) {
-                await window.fileOps.deleteFile(
-                    window.app.contextMenuTargetFile.id,
-                    window.app.contextMenuTargetFile.name
-                );
-            }
+            const file = window.app.contextMenuTargetFile;
             window.ui.closeFileContextMenu();
+            if (file) {
+                await window.fileOps.deleteFile(file.id, file.name);
+            }
         });
 
         // Rename dialog events

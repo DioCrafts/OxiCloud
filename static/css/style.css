@@ -2489,6 +2489,11 @@ select:focus {
     animation: modalFadeIn 0.2s ease;
 }
 
+.confirm-dialog.active {
+    display: flex;
+    opacity: 1;
+}
+
 .confirm-dialog-content {
     background: white;
     border-radius: 16px;
