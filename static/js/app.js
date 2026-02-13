@@ -1518,7 +1518,7 @@ function showUserProfileModal() {
 /**
  * Check if user is authenticated and load user's home folder
  */
-function checkAuthentication() {
+async function checkAuthentication() {
     // COMPLETE BREAK FOR AUTHENTICATION LOOPS: 
     // Always allow app to load with minimal authentication
     // This is an emergency fix to stop the redirect loops
