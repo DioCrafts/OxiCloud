@@ -1783,7 +1783,7 @@ select:focus {
 
 .list-header {
     display: grid;
-    grid-template-columns: 36px minmax(200px, 2fr) 1fr 1fr 120px;
+    grid-template-columns: 36px minmax(200px, 2fr) 100px 110px 160px;
     padding: 15px;
     font-weight: 600;
     color: #2d3748;
@@ -1794,7 +1794,7 @@ select:focus {
 
 .file-item {
     display: grid;
-    grid-template-columns: 36px minmax(200px, 2fr) 1fr 1fr 120px;
+    grid-template-columns: 36px minmax(200px, 2fr) 100px 110px 160px;
     padding: 12px 15px;
     border-bottom: 1px solid #f0f0f0;
     align-items: center;
