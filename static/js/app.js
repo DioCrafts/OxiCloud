@@ -1597,11 +1597,85 @@ function checkAuthentication() {
     try {
         // Simplified authentication check - just verify token exists
         const TOKEN_KEY = 'oxicloud_token';
+        const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
+        const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
         const USER_DATA_KEY = 'oxicloud_user';
         
         // Reset counters to prevent loops
         sessionStorage.removeItem('redirect_count');
         localStorage.setItem('refresh_attempts', '0');
+        
+        // --- OIDC exchange code handling ---
+        // After OIDC login, the backend redirects here with ?oidc_code=...
+        const urlParams = new URLSearchParams(window.location.search);
+        const oidcCode = urlParams.get('oidc_code');
+        
+        if (oidcCode) {
+            console.log('OIDC exchange code detected, exchanging for tokens...');
+            try {
+                const exchangeResponse = await fetch('/api/auth/oidc/exchange', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: oidcCode })
+                });
+                
+                if (!exchangeResponse.ok) {
+                    const errText = await exchangeResponse.text();
+                    console.error('OIDC token exchange failed:', exchangeResponse.status, errText);
+                    window.location.href = '/login.html?source=oidc_error';
+                    return;
+                }
+                
+                const data = await exchangeResponse.json();
+                console.log('OIDC token exchange successful');
+                
+                // Store tokens (same logic as password login in auth.js)
+                const token = data.access_token || data.token;
+                const refreshToken = data.refresh_token || data.refreshToken;
+                
+                if (token) {
+                    localStorage.setItem(TOKEN_KEY, token);
+                    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+                    
+                    // Parse JWT expiry
+                    let parsedExpiry = false;
+                    const tokenParts = token.split('.');
+                    if (tokenParts.length === 3) {
+                        try {
+                            const payload = JSON.parse(atob(tokenParts[1]));
+                            if (payload.exp) {
+                                const expiryDate = new Date(payload.exp * 1000);
+                                if (!isNaN(expiryDate.getTime())) {
+                                    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
+                                    parsedExpiry = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error parsing JWT:', e);
+                        }
+                    }
+                    if (!parsedExpiry) {
+                        const expiry = new Date();
+                        expiry.setDate(expiry.getDate() + 30);
+                        localStorage.setItem(TOKEN_EXPIRY_KEY, expiry.toISOString());
+                    }
+                    
+                    // Store user data
+                    if (data.user) {
+                        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
+                    }
+                    
+                    // Clean URL and reload without the oidc_code param
+                    window.history.replaceState({}, document.title, '/');
+                    window.location.reload();
+                    return;
+                }
+            } catch (err) {
+                console.error('OIDC exchange error:', err);
+                window.location.href = '/login.html?source=oidc_error';
+                return;
+            }
+        }
         
         // Simple token check - just verify it exists
         const token = localStorage.getItem(TOKEN_KEY);

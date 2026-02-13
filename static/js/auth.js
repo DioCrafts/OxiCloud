@@ -531,6 +531,62 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
     
+    // --- OIDC exchange code handling (fallback if landing on login page) ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const oidcCode = urlParams.get('oidc_code');
+    
+    if (oidcCode) {
+        console.log('OIDC exchange code detected on login page, exchanging...');
+        (async () => {
+            try {
+                const resp = await fetch('/api/auth/oidc/exchange', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ code: oidcCode })
+                });
+                
+                if (!resp.ok) {
+                    console.error('OIDC exchange failed:', resp.status);
+                    return; // Fall through to normal login page
+                }
+                
+                const data = await resp.json();
+                const token = data.access_token || data.token;
+                const refreshToken = data.refresh_token || data.refreshToken;
+                
+                if (token) {
+                    localStorage.setItem(TOKEN_KEY, token);
+                    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+                    
+                    // Parse JWT expiry
+                    const tokenParts = token.split('.');
+                    if (tokenParts.length === 3) {
+                        try {
+                            const payload = JSON.parse(atob(tokenParts[1]));
+                            if (payload.exp) {
+                                const expiryDate = new Date(payload.exp * 1000);
+                                if (!isNaN(expiryDate.getTime())) {
+                                    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
+                                }
+                            }
+                        } catch (e) { /* ignore parse errors */ }
+                    }
+                    
+                    if (data.user) {
+                        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
+                    }
+                    
+                    // Redirect to main app
+                    window.location.href = '/?no_redirect=true';
+                    return;
+                }
+            } catch (err) {
+                console.error('OIDC exchange error:', err);
+            }
+        })();
+        return; // Don't initialize login page while exchanging
+    }
+    
     if (authInitialized) {
         console.log('Auth already initialized, skipping');
         return;
