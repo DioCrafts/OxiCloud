@@ -283,7 +283,10 @@
     "admin_success": "Compte administrateur créé avec succès ! Vous pouvez maintenant vous connecter.",
     "account_success": "Compte créé avec succès ! Vous pouvez maintenant vous connecter.",
     "passwords_mismatch": "Les mots de passe ne correspondent pas",
-    "admin_create_error": "Erreur lors de la création du compte administrateur"
+    "admin_create_error": "Erreur lors de la création du compte administrateur",
+    "or": "ou",
+    "sso_login": "Se connecter avec SSO",
+    "sso_login_provider": "Se connecter avec {{provider}}"
   },
   "storage": {
     "title": "Stockage",

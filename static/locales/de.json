@@ -283,7 +283,10 @@
     "admin_success": "Administratorkonto erfolgreich erstellt! Sie können sich jetzt anmelden.",
     "account_success": "Konto erfolgreich erstellt! Sie können sich jetzt anmelden.",
     "passwords_mismatch": "Die Passwörter stimmen nicht überein",
-    "admin_create_error": "Fehler beim Erstellen des Administratorkontos"
+    "admin_create_error": "Fehler beim Erstellen des Administratorkontos",
+    "or": "oder",
+    "sso_login": "Mit SSO anmelden",
+    "sso_login_provider": "Mit {{provider}} anmelden"
   },
   "storage": {
     "title": "Speicher",

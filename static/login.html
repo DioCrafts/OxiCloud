@@ -94,6 +94,17 @@
                 <button type="submit" class="auth-button" data-i18n="auth.login_button">Log in</button>
             </form>
             
+            <!-- SSO / OIDC login section (hidden by default, shown dynamically) -->
+            <div id="oidc-login-section" style="display: none;">
+                <div class="auth-divider" id="auth-divider">
+                    <span data-i18n="auth.or">or</span>
+                </div>
+                <button type="button" class="auth-button auth-button-oidc" id="oidc-login-btn">
+                    <i class="fas fa-key"></i>
+                    <span data-i18n="auth.sso_login">Sign in with SSO</span>
+                </button>
+            </div>
+            
             <div class="auth-toggle">
                 <span data-i18n="auth.no_account">Don't have an account?</span>
                 <span class="auth-toggle-link" id="show-register" data-i18n="auth.register">Sign up</span>

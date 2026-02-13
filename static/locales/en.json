@@ -283,7 +283,10 @@
     "admin_success": "Administrator account created successfully! You can now sign in.",
     "account_success": "Account created successfully! You can now sign in.",
     "passwords_mismatch": "Passwords do not match",
-    "admin_create_error": "Error creating administrator account"
+    "admin_create_error": "Error creating administrator account",
+    "or": "or",
+    "sso_login": "Sign in with SSO",
+    "sso_login_provider": "Sign in with {{provider}}"
   },
   "storage": {
     "title": "Storage",

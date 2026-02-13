@@ -126,6 +126,50 @@
     cursor: not-allowed;
 }
 
+/* SSO / OIDC button */
+.auth-button-oidc {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+    box-shadow: 0 4px 12px rgba(45, 55, 72, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.auth-button-oidc:hover {
+    box-shadow: 0 6px 20px rgba(45, 55, 72, 0.4);
+}
+
+.auth-button-oidc i {
+    font-size: 14px;
+}
+
+/* Divider between password and SSO login */
+.auth-divider {
+    display: flex;
+    align-items: center;
+    margin: 20px 0;
+    color: #a0aec0;
+    font-size: 13px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e2e8f0;
+}
+
+.auth-divider span {
+    padding: 0 12px;
+}
+
+/* OIDC-only mode: hide password form */
+.auth-form.hidden {
+    display: none;
+}
+
 .auth-toggle {
     margin-top: 20px;
     font-size: 14px;

@@ -283,7 +283,10 @@
     "admin_success": "Conta de administrador criada com sucesso! Agora você pode entrar.",
     "account_success": "Conta criada com sucesso! Agora você pode entrar.",
     "passwords_mismatch": "As senhas não coincidem",
-    "admin_create_error": "Erro ao criar conta de administrador"
+    "admin_create_error": "Erro ao criar conta de administrador",
+    "or": "ou",
+    "sso_login": "Entrar com SSO",
+    "sso_login_provider": "Entrar com {{provider}}"
   },
   "storage": {
     "title": "Armazenamento",

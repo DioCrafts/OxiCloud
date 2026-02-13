@@ -283,7 +283,10 @@
  "admin_success": "Account amministratore creato con successo! Ora puoi accedere.",
  "account_success": "Account creato con successo! Ora puoi accedere.",
  "passwords_mismatch": "Le password non corrispondono",
- "admin_create_error": "Errore durante la creazione dell'account amministratore"
+ "admin_create_error": "Errore durante la creazione dell'account amministratore",
+ "or": "o",
+ "sso_login": "Accedi con SSO",
+ "sso_login_provider": "Accedi con {{provider}}"
  },
  "storage": {
  "title": "Archiviazione",
@@ -308,7 +311,7 @@
  "fa": "Persiano",
  "fr": "Francese",
  "de": "Tedesco",
- "pt": "Portoghese"
+ "pt": "Portoghese",
  "it": "Italiano"
  }
  },

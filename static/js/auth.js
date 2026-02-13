@@ -282,6 +282,8 @@ function initLanguageSelector() {
             }
         } else {
             document.getElementById('login-panel').style.display = 'block';
+            // Configure OIDC login UI if SSO is enabled
+            await configureOidcLoginUI();
         }
         
         // Translate the page with new locale
@@ -357,6 +359,55 @@ async function showInitialPanel() {
     const showAdminSetupLink = document.getElementById('show-admin-setup');
     if (showAdminSetupLink && systemStatus.admin_count > 0) {
         showAdminSetupLink.parentElement.style.display = 'none';
+    }
+    
+    // Check for OIDC/SSO configuration and update login panel accordingly
+    await configureOidcLoginUI();
+}
+
+// Fetch OIDC provider info and configure the login UI
+async function configureOidcLoginUI() {
+    try {
+        const response = await fetch('/api/auth/oidc/providers');
+        if (!response.ok) return;
+        
+        const oidcInfo = await response.json();
+        if (!oidcInfo.enabled) return;
+        
+        const oidcSection = document.getElementById('oidc-login-section');
+        const oidcBtn = document.getElementById('oidc-login-btn');
+        const loginForm = document.getElementById('login-form');
+        const authDivider = document.getElementById('auth-divider');
+        const showRegisterToggle = document.getElementById('show-register');
+        
+        if (!oidcSection || !oidcBtn) return;
+        
+        // Update button text with provider name
+        const btnTextEl = oidcBtn.querySelector('span');
+        if (btnTextEl && oidcInfo.provider_name) {
+            const template = (window.i18n && window.i18n.t)
+                ? window.i18n.t('auth.sso_login_provider')
+                : 'Sign in with {{provider}}';
+            btnTextEl.textContent = template.replace('{{provider}}', oidcInfo.provider_name);
+        }
+        
+        // Redirect to OIDC authorize endpoint on click
+        oidcBtn.addEventListener('click', () => {
+            window.location.href = oidcInfo.authorize_endpoint;
+        });
+        
+        if (!oidcInfo.password_login_enabled) {
+            // OIDC-only mode: hide password form and divider, show only SSO button
+            if (loginForm) loginForm.style.display = 'none';
+            if (authDivider) authDivider.style.display = 'none';
+            if (showRegisterToggle) showRegisterToggle.parentElement.style.display = 'none';
+            oidcSection.style.display = 'block';
+        } else {
+            // Both password and OIDC enabled: show divider + SSO button
+            oidcSection.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('Failed to fetch OIDC provider info:', err);
     }
 }
 

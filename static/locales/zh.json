@@ -231,7 +231,10 @@
     "admin_success": "管理员账号创建成功！您现在可以登录。",
     "account_success": "账号创建成功！您现在可以登录。",
     "passwords_mismatch": "密码不匹配",
-    "admin_create_error": "创建管理员账号时出错"
+    "admin_create_error": "创建管理员账号时出错",
+    "or": "或",
+    "sso_login": "使用 SSO 登录",
+    "sso_login_provider": "使用 {{provider}} 登录"
   },
   "storage": {
     "title": "存储空间",
