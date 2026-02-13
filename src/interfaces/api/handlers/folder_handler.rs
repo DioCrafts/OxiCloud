@@ -97,14 +97,13 @@ impl FolderHandler {
 
     /// Checks if a folder name matches the user home-folder convention.
     fn is_user_home_folder(folder_name: &str) -> bool {
-        folder_name.starts_with("My Folder - ") || folder_name.starts_with("Mi Carpeta - ")
+        folder_name.starts_with("My Folder - ")
     }
 
     /// Checks if a folder belongs to the given user.
     fn folder_belongs_to_user(folder_name: &str, username: &str) -> bool {
-        let expected_en = format!("My Folder - {}", username);
-        let expected_es = format!("Mi Carpeta - {}", username);
-        folder_name == expected_en || folder_name == expected_es
+        let expected = format!("My Folder - {}", username);
+        folder_name == expected
     }
 
     /// Lists folders, optionally filtered by parent ID

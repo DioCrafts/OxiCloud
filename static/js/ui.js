@@ -394,7 +394,7 @@ const ui = {
         if (isUserHomeFolder) {
             // If the current folder is the user's home folder, label it as "Home"
             homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
-        } else if (folderName && folderName.startsWith('Mi Carpeta')) {
+        } else if (folderName && folderName.startsWith('My Folder')) {
             // If viewing a root folder but not the user's home folder, use its full name
             homeItem.textContent = folderName;
         } else {

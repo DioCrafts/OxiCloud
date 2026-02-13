@@ -754,10 +754,8 @@ async function loadFiles(options = {}) {
                 return false;
             }
             
-            // Skip other users' folders when at root (both naming conventions)
-            if (!app.currentPath && 
-                (folder.name.startsWith('My Folder - ') || folder.name.startsWith('Mi Carpeta - ')) && 
-                !folder.name.includes(username)) {
+            // Skip other users' folders when at root
+            if (!app.currentPath && folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
                 return false;
             }
             
@@ -1837,9 +1835,7 @@ async function findUserHomeFolder(username) {
                 console.log(`Found ${folderList.length} folders at root`);
                 
                 // Look for a folder with a name pattern that matches the user's home folder
-                // Match both naming conventions (English and Spanish)
-                const homeFolderPatternEn = `My Folder - ${username}`;
-                const homeFolderPatternEs = `Mi Carpeta - ${username}`;
+                const homeFolderPattern = `My Folder - ${username}`;
                 
                 // Filter first to remove system folders and other users' folders
                 const visibleFolders = folderList.filter(folder => {
@@ -1848,19 +1844,16 @@ async function findUserHomeFolder(username) {
                         return false;
                     }
                     
-                    // Skip other users' home folders (both naming conventions)
-                    if ((folder.name.startsWith('Mi Carpeta - ') || folder.name.startsWith('My Folder - ')) 
-                        && !folder.name.includes(username)) {
+                    // Skip other users' home folders
+                    if (folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
                         return false;
                     }
                     
                     return true;
                 });
                 
-                // Find the user's home folder from filtered list (try both patterns)
-                let homeFolder = visibleFolders.find(folder => 
-                    folder.name === homeFolderPatternEn || folder.name === homeFolderPatternEs
-                );
+                // Find the user's home folder from filtered list
+                let homeFolder = visibleFolders.find(folder => folder.name === homeFolderPattern);
                 
                 if (homeFolder) {
                     console.log(`Found user's home folder: ${homeFolder.name} (${homeFolder.id})`);
