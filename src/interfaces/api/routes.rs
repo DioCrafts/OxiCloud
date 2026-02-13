@@ -2,6 +2,7 @@ use std::sync::Arc;
 use axum::{
     routing::{get, post, put, delete},
     Router,
+    extract::DefaultBodyLimit,
     response::Json as AxumJson,
 };
 use serde_json::json;
@@ -143,6 +144,7 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         .route("/upload", post(FileHandler::upload_file_with_thumbnails))
         .route("/{id}", get(FileHandler::download_file))
         .route("/{id}/thumbnail/{size}", get(FileHandler::get_thumbnail))
+        .layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)) // 10 GB for file uploads
         .with_state(app_state.clone());
     
     // File operations with trash support

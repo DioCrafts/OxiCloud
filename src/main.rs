@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -152,6 +153,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Apply the redirect middleware for legacy routes
     use oxicloud::interfaces::middleware::redirect::redirect_middleware;
     app = app.layer(axum::middleware::from_fn(redirect_middleware));
+    
+    // Increase the default body limit to 10 GB to allow large file uploads.
+    // Without this Axum caps Multipart bodies at 2 MB.
+    app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
     
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 8086));
