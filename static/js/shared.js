@@ -15,7 +15,7 @@ function checkAuthentication() {
     
     if (!token || !tokenExpiry || new Date(tokenExpiry) < new Date()) {
         // No token or expired token
-        window.location.href = '/login.html';
+        window.location.href = '/login';
         return;
     }
     

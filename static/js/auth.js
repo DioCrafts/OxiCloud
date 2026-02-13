@@ -1189,14 +1189,14 @@ function redirectToMainApp() {
                 // Ultimate fallback - clear everything and go to a special error page
                 localStorage.clear();
                 sessionStorage.clear();
-                window.location.href = '/login.html?critical=redirect_error';
+                window.location.href = '/login?critical=redirect_error';
             }
         }, 50);
     } catch (error) {
         console.error('Fatal error in redirectToMainApp:', error);
         // Emergency fallback
         try {
-            window.location.href = '/login.html?error=redirect_fatal';
+            window.location.href = '/login?error=redirect_fatal';
         } catch (e) {
             // Nothing more we can do
             alert('Critical redirect error. Please reload the page and try again.');
@@ -1215,5 +1215,5 @@ function logout() {
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);
     localStorage.removeItem(USER_DATA_KEY);
-    window.location.href = '/login.html';
+    window.location.href = '/login';
 }

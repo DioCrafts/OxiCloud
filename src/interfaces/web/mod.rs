@@ -14,8 +14,11 @@ pub fn create_web_routes() -> Router<AppState> {
     let static_path = config.static_path.clone();
 
     Router::new()
-        // Add specific route for login
+        // Add specific routes for clean URLs (without .html)
         .route("/login", get(serve_login_page))
+        .route("/profile", get(serve_profile_page))
+        .route("/admin", get(serve_admin_page))
+        .route("/shared", get(serve_shared_page))
         // Serve static files
         .fallback_service(
             ServeDir::new(static_path)
@@ -25,4 +28,19 @@ pub fn create_web_routes() -> Router<AppState> {
 /// Serve the login page
 async fn serve_login_page() -> Html<&'static str> {
     Html(include_str!("../../../static/login.html"))
+}
+
+/// Serve the profile page
+async fn serve_profile_page() -> Html<&'static str> {
+    Html(include_str!("../../../static/profile.html"))
+}
+
+/// Serve the admin page
+async fn serve_admin_page() -> Html<&'static str> {
+    Html(include_str!("../../../static/admin.html"))
+}
+
+/// Serve the shared page
+async fn serve_shared_page() -> Html<&'static str> {
+    Html(include_str!("../../../static/shared.html"))
 }

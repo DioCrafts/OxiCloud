@@ -207,7 +207,7 @@ function setupUserMenu() {
     if (adminBtn) {
         adminBtn.addEventListener('click', () => {
             wrapper.classList.remove('open');
-            window.location.href = '/admin.html';
+            window.location.href = '/admin';
         });
     }
     
@@ -215,7 +215,7 @@ function setupUserMenu() {
     if (profileBtn) {
         profileBtn.addEventListener('click', () => {
             wrapper.classList.remove('open');
-            window.location.href = '/profile.html';
+            window.location.href = '/profile';
         });
     }
     
@@ -1627,7 +1627,7 @@ async function checkAuthentication() {
                 if (!exchangeResponse.ok) {
                     const errText = await exchangeResponse.text();
                     console.error('OIDC token exchange failed:', exchangeResponse.status, errText);
-                    window.location.href = '/login.html?source=oidc_error';
+                    window.location.href = '/login?source=oidc_error';
                     return;
                 }
                 
@@ -1677,7 +1677,7 @@ async function checkAuthentication() {
                 }
             } catch (err) {
                 console.error('OIDC exchange error:', err);
-                window.location.href = '/login.html?source=oidc_error';
+                window.location.href = '/login?source=oidc_error';
                 return;
             }
         }
@@ -1688,7 +1688,7 @@ async function checkAuthentication() {
         if (!token) {
             console.log('No token found, redirecting to login');
             // Avoid potential loop by adding a parameter
-            const redirectUrl = '/login.html?source=app';
+            const redirectUrl = '/login?source=app';
             window.location.href = redirectUrl;
             return;
         }
@@ -1931,7 +1931,7 @@ function logout() {
     sessionStorage.removeItem('redirect_count');
     
     // Redirect to login page with correct path
-    window.location.href = '/login.html';
+    window.location.href = '/login';
 }
 
 /**

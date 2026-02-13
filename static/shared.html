@@ -25,7 +25,7 @@
                 <i class="fas fa-folder"></i>
                 <span data-i18n="nav.files">Files</span>
             </a>
-            <a href="/shared.html" class="nav-item active">
+            <a href="/shared" class="nav-item active">
                 <i class="fas fa-share-alt"></i>
                 <span data-i18n="nav.shared">Shared</span>
             </a>
@@ -250,7 +250,7 @@
         (function() {
             const token = localStorage.getItem('oxicloud_token');
             if (!token) {
-                window.location.href = '/auth/login.html';
+                window.location.href = '/login';
                 return;
             }
             // Set user avatar initials
@@ -281,7 +281,7 @@
                 logoutBtn.addEventListener('click', () => {
                     localStorage.removeItem('oxicloud_token');
                     localStorage.removeItem('oxicloud_user');
-                    window.location.href = '/auth/login.html';
+                    window.location.href = '/login';
                 });
             }
         })();
