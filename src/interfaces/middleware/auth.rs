@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::convert::Infallible;
 use axum::{
     extract::{State, Request, FromRequestParts},
     http::{StatusCode, HeaderMap, header, request::Parts},
@@ -60,6 +61,45 @@ where
             .get::<CurrentUser>()
             .map(|cu| CurrentUserId(cu.id.clone()))
             .ok_or(AuthError::UserNotFound)
+    }
+}
+
+/// Optional user ID extractor – never fails.
+/// Yields `Some(id)` when auth middleware ran, `None` otherwise.
+#[derive(Clone, Debug)]
+pub struct OptionalUserId(pub Option<String>);
+
+impl<S> FromRequestParts<S> for OptionalUserId
+where
+    S: Send + Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(OptionalUserId(
+            parts.extensions.get::<CurrentUser>().map(|cu| cu.id.clone()),
+        ))
+    }
+}
+
+/// Optional auth user extractor – never fails.
+/// Yields `Some(AuthUser)` when auth middleware ran, `None` otherwise.
+#[derive(Clone, Debug)]
+pub struct OptionalAuthUser(pub Option<AuthUser>);
+
+impl<S> FromRequestParts<S> for OptionalAuthUser
+where
+    S: Send + Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        Ok(OptionalAuthUser(
+            parts.extensions.get::<CurrentUser>().map(|cu| AuthUser {
+                id: cu.id.clone(),
+                username: cu.username.clone(),
+            }),
+        ))
     }
 }
 

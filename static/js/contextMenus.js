@@ -81,11 +81,11 @@ const contextMenus = {
         // File context menu options
         document.getElementById('view-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
-                // Fetch file details to get the mime type
+                // Capture reference before context menu cleanup nullifies it
+                const file = window.app.contextMenuTargetFile;
                 const token = localStorage.getItem('oxicloud_token');
-                fetch(`/api/files/${window.app.contextMenuTargetFile.id}?metadata=true`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
+                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+                fetch(`/api/files/${file.id}?metadata=true`, { headers })
                     .then(response => response.json())
                     .then(fileDetails => {
                         // Check if viewable file type (images, PDFs, text files)
@@ -97,26 +97,17 @@ const contextMenus = {
                                 window.fileViewer.open(fileDetails);
                             } else {
                                 // If no viewer is available, download directly
-                                window.fileOps.downloadFile(
-                                    window.app.contextMenuTargetFile.id,
-                                    window.app.contextMenuTargetFile.name
-                                );
+                                window.fileOps.downloadFile(file.id, file.name);
                             }
                         } else {
                             // For non-viewable files, download
-                            window.fileOps.downloadFile(
-                                window.app.contextMenuTargetFile.id,
-                                window.app.contextMenuTargetFile.name
-                            );
+                            window.fileOps.downloadFile(file.id, file.name);
                         }
                     })
                     .catch(error => {
                         console.error('Error fetching file details:', error);
                         // On error, fallback to download
-                        window.fileOps.downloadFile(
-                            window.app.contextMenuTargetFile.id,
-                            window.app.contextMenuTargetFile.name
-                        );
+                        window.fileOps.downloadFile(file.id, file.name);
                     });
             }
             window.ui.closeFileContextMenu();
@@ -242,6 +233,8 @@ const contextMenus = {
         const renameDialog = document.getElementById('rename-dialog');
 
         window.app.renameMode = 'folder';
+        // Store the folder reference so it survives context menu cleanup
+        window.app.renameTarget = folder;
         renameInput.value = folder.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
@@ -260,6 +253,8 @@ const contextMenus = {
         const renameDialog = document.getElementById('rename-dialog');
 
         window.app.renameMode = 'file';
+        // Store the file reference so it survives context menu cleanup
+        window.app.renameTarget = file;
         renameInput.value = file.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
@@ -275,6 +270,7 @@ const contextMenus = {
     closeRenameDialog() {
         document.getElementById('rename-dialog').style.display = 'none';
         window.app.contextMenuTargetFolder = null;
+        window.app.renameTarget = null;
     },
 
     /**
@@ -322,14 +318,21 @@ const contextMenus = {
             return;
         }
 
-        if (window.app.renameMode === 'file' && window.app.contextMenuTargetFile) {
-            const success = await window.fileOps.renameFile(window.app.contextMenuTargetFile.id, newName);
+        // Use renameTarget which was saved before the context menu was closed
+        const target = window.app.renameTarget;
+        if (!target) {
+            console.error('No rename target available');
+            return;
+        }
+
+        if (window.app.renameMode === 'file') {
+            const success = await window.fileOps.renameFile(target.id, newName);
             if (success) {
                 contextMenus.closeRenameDialog();
                 window.loadFiles();
             }
-        } else if (window.app.contextMenuTargetFolder) {
-            const success = await window.fileOps.renameFolder(window.app.contextMenuTargetFolder.id, newName);
+        } else if (window.app.renameMode === 'folder') {
+            const success = await window.fileOps.renameFolder(target.id, newName);
             if (success) {
                 contextMenus.closeRenameDialog();
                 window.loadFiles();
@@ -350,9 +353,8 @@ const contextMenus = {
     async loadAllFolders(itemId, mode) {
         try {
             const token = localStorage.getItem('oxicloud_token');
-            const response = await fetch('/api/folders', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const response = await fetch('/api/folders', { headers });
             if (response.ok) {
                 const folders = await response.json();
                 const folderSelectContainer = document.getElementById('folder-select-container');

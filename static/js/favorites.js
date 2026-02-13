@@ -31,11 +31,11 @@ const favorites = {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
             
+            const favToken = localStorage.getItem('oxicloud_token');
+            const favHeaders = favToken ? { 'Authorization': `Bearer ${favToken}` } : {};
             const response = await fetch('/api/favorites', {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('oxicloud_token')}`
-                },
+                headers: favHeaders,
                 signal: controller.signal
             }).catch(err => {
                 console.warn('Network error checking favorites API:', err);
@@ -67,10 +67,10 @@ const favorites = {
     async syncWithServer() {
         try {
             // Get server favorites
+            const syncToken = localStorage.getItem('oxicloud_token');
+            const syncHeaders = syncToken ? { 'Authorization': `Bearer ${syncToken}` } : {};
             const response = await fetch('/api/favorites', {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('oxicloud_token')}`
-                }
+                headers: syncHeaders
             });
             
             if (!response.ok) {
@@ -149,12 +149,12 @@ const favorites = {
      */
     async addToServerFavorites(id, type) {
         try {
+            const addToken = localStorage.getItem('oxicloud_token');
+            const addHeaders = { 'Content-Type': 'application/json' };
+            if (addToken) addHeaders['Authorization'] = `Bearer ${addToken}`;
             const response = await fetch(`/api/favorites/${type}/${id}`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('oxicloud_token')}`,
-                    'Content-Type': 'application/json'
-                }
+                headers: addHeaders
             });
             
             if (!response.ok) {
@@ -175,11 +175,11 @@ const favorites = {
      */
     async removeFromServerFavorites(id, type) {
         try {
+            const rmToken = localStorage.getItem('oxicloud_token');
+            const rmHeaders = rmToken ? { 'Authorization': `Bearer ${rmToken}` } : {};
             const response = await fetch(`/api/favorites/${type}/${id}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('oxicloud_token')}`
-                }
+                headers: rmHeaders
             });
             
             if (!response.ok) {

@@ -13,7 +13,7 @@ use crate::application::dtos::pagination::PaginationRequestDto;
 use crate::common::errors::ErrorKind;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState as GlobalAppState;
-use crate::interfaces::middleware::auth::AuthUser;
+use crate::interfaces::middleware::auth::OptionalAuthUser;
 
 type AppState = Arc<FolderService>;
 
@@ -205,15 +205,16 @@ impl FolderHandler {
     /// Deletes a folder with trash functionality
     pub async fn delete_folder_with_trash(
         State(state): State<GlobalAppState>,
-        auth_user: AuthUser,
+        OptionalAuthUser(auth_user): OptionalAuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
+        let user_id = auth_user.as_ref().map(|u| u.id.as_str()).unwrap_or("anonymous");
         // Check if trash service is available
         if let Some(trash_service) = &state.trash_service {
             tracing::info!("Moving folder to trash: {}", id);
             
             // Try to move to trash first
-            match trash_service.move_to_trash(&id, "folder", &auth_user.id).await {
+            match trash_service.move_to_trash(&id, "folder", user_id).await {
                 Ok(_) => {
                     tracing::info!("Folder successfully moved to trash: {}", id);
                     return StatusCode::NO_CONTENT.into_response();

@@ -680,12 +680,15 @@ async function loadFiles(options = {}) {
         }
         
         const token = localStorage.getItem('oxicloud_token');
+        const headers = {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
         const requestOptions = {
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache'
-            },
+            headers,
             cache: 'no-store'  // Instruct the browser not to use cache
         };
         
@@ -1727,10 +1730,10 @@ async function findUserHomeFolder(username) {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout to 3 seconds
                 
+                const folderToken = localStorage.getItem('oxicloud_token');
+                const folderHeaders = folderToken ? { 'Authorization': `Bearer ${folderToken}` } : {};
                 const response = await fetch('/api/folders', {
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('oxicloud_token')}`
-                    },
+                    headers: folderHeaders,
                     signal: controller.signal
                 });
                 

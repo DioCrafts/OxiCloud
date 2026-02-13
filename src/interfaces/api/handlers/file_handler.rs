@@ -13,7 +13,7 @@ use http_range_header::parse_range_header;
 use crate::application::ports::compression_ports::{CompressionPort, CompressionLevel};
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::CurrentUserId;
+use crate::interfaces::middleware::auth::OptionalUserId;
 
 /**
  * Type aliases for dependency injection state.
@@ -506,22 +506,35 @@ impl FileHandler {
     ///
     /// All logic (trash fallback, dedup ref-count, hash computation) is handled
     /// by `FileManagementUseCase::delete_with_cleanup`.
+    ///
+    /// When auth is available, uses trash-first deletion; otherwise falls back
+    /// to permanent delete so the endpoint works with or without auth.
     pub async fn delete_file(
         State(state): State<GlobalState>,
-        CurrentUserId(user_id): CurrentUserId,
+        OptionalUserId(user_id): OptionalUserId,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
         let mgmt = &state.applications.file_management_service;
 
-        match mgmt.delete_with_cleanup(&id, &user_id).await {
-            Ok(was_trashed) => {
+        let result = if let Some(uid) = user_id {
+            // Auth available: trash-first with dedup cleanup
+            mgmt.delete_with_cleanup(&id, &uid).await.map(|was_trashed| {
                 if was_trashed {
                     tracing::info!("File moved to trash: {}", id);
                 } else {
                     tracing::info!("File permanently deleted: {}", id);
                 }
-                StatusCode::NO_CONTENT.into_response()
-            }
+            })
+        } else {
+            // No auth: permanent delete
+            tracing::warn!("No auth context – permanently deleting file: {}", id);
+            mgmt.delete_file(&id).await.map(|_| {
+                tracing::info!("File permanently deleted (no auth): {}", id);
+            })
+        };
+
+        match result {
+            Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(err) => {
                 tracing::error!("Error deleting file: {}", err);
                 let status = if err.to_string().contains("not found") || err.to_string().contains("NotFound") {

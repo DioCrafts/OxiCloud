@@ -431,6 +431,13 @@ impl FileWritePort for FileFsWriteRepository {
         }
 
         self.delete_file_non_blocking(abs_path).await.map_err(map_repo_err)?;
+
+        // Clean up the ID mapping so we don't leave orphaned entries
+        if let Err(e) = self.id_mapping_service.remove_id(id).await {
+            tracing::warn!("Failed to remove ID mapping for deleted file {}: {}", id, e);
+        }
+        let _ = self.id_mapping_service.save_changes().await;
+
         Ok(())
     }
 

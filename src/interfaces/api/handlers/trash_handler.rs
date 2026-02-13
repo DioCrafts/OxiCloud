@@ -6,7 +6,7 @@ use tracing::{debug, error, warn, instrument};
 
 // use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::AuthUser;
+use crate::interfaces::middleware::auth::{AuthUser, OptionalAuthUser};
 
 /// Gets all items in the trash for the current user
 #[instrument(skip_all)]
@@ -50,11 +50,12 @@ pub async fn get_trash_items(
 #[instrument(skip_all)]
 pub async fn move_to_trash(
     State(state): State<AppState>,
-    auth_user: AuthUser,
+    OptionalAuthUser(auth_user): OptionalAuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    let user_id = auth_user.as_ref().map(|u| u.id.as_str()).unwrap_or("anonymous");
     debug!("Request to move to trash: type={}, id={}, user={}", 
-           item_type, item_id, auth_user.id);
+           item_type, item_id, user_id);
     
     let trash_service = match state.trash_service.as_ref() {
         Some(service) => service,
@@ -64,7 +65,7 @@ pub async fn move_to_trash(
             })));
         }
     };
-    let result = trash_service.move_to_trash(&item_id, &item_type, &auth_user.id).await;
+    let result = trash_service.move_to_trash(&item_id, &item_type, user_id).await;
     
     match result {
         Ok(_) => {
@@ -87,11 +88,12 @@ pub async fn move_to_trash(
 #[instrument(skip_all)]
 pub async fn move_file_to_trash(
     State(state): State<AppState>,
-    auth_user: AuthUser,
+    OptionalAuthUser(auth_user): OptionalAuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    let user_id = auth_user.as_ref().map(|u| u.id.as_str()).unwrap_or("anonymous");
     debug!("Request to move file to trash: id={}, user={}", 
-           item_id, auth_user.id);
+           item_id, user_id);
     
     let trash_service = match state.trash_service.as_ref() {
         Some(service) => service,
@@ -103,7 +105,7 @@ pub async fn move_file_to_trash(
     };
     
     // Specify that it is a file
-    let result = trash_service.move_to_trash(&item_id, "file", &auth_user.id).await;
+    let result = trash_service.move_to_trash(&item_id, "file", user_id).await;
     
     match result {
         Ok(_) => {
@@ -126,11 +128,12 @@ pub async fn move_file_to_trash(
 #[instrument(skip_all)]
 pub async fn move_folder_to_trash(
     State(state): State<AppState>,
-    auth_user: AuthUser,
+    OptionalAuthUser(auth_user): OptionalAuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
+    let user_id = auth_user.as_ref().map(|u| u.id.as_str()).unwrap_or("anonymous");
     debug!("Request to move folder to trash: id={}, user={}", 
-           item_id, auth_user.id);
+           item_id, user_id);
     
     let trash_service = match state.trash_service.as_ref() {
         Some(service) => service,
@@ -142,7 +145,7 @@ pub async fn move_folder_to_trash(
     };
     
     // Specify that it is a folder
-    let result = trash_service.move_to_trash(&item_id, "folder", &auth_user.id).await;
+    let result = trash_service.move_to_trash(&item_id, "folder", user_id).await;
     
     match result {
         Ok(_) => {
