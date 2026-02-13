@@ -96,11 +96,11 @@
 
 /* ── Star badge on file/folder cards (normal view) ── */
 
-/* Grid view: star in top-left corner */
+/* Grid view: star below the checkbox */
 .file-card .favorite-star {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 10px;
+    right: 38px;
     font-size: 14px;
     color: #ffc107;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
@@ -108,8 +108,8 @@
     pointer-events: none;
 
     [dir='rtl'] & {
-        left: unset;
-        right: 8px;
+        right: unset;
+        left: 38px;
     }
 }
 
