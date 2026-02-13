@@ -18,104 +18,217 @@ function getAuthHeaders() {
 
 // File Operations Module
 const fileOps = {
+
+    // ========================================================================
+    // Upload progress toast helpers
+    // ========================================================================
+
+    /** Show the upload progress toast and reset its contents */
+    _initUploadToast(totalFiles) {
+        const toast = document.getElementById('upload-toast');
+        const body  = document.getElementById('upload-toast-body');
+        const title = document.getElementById('upload-toast-title');
+        const stats = document.getElementById('upload-toast-stats');
+        const fill  = document.getElementById('upload-toast-overall-fill');
+        const closeBtn = document.getElementById('upload-toast-close');
+
+        body.innerHTML = '';
+        fill.style.width = '0%';
+        const uploadingText = (window.i18n && window.i18n.t) ? window.i18n.t('upload.uploading') : 'Uploading...';
+        title.textContent = uploadingText;
+        stats.textContent = `0 / ${totalFiles}`;
+        toast.classList.add('visible');
+
+        // Allow user to minimise (hide) the toast; it will re-appear on next upload
+        closeBtn.onclick = () => toast.classList.remove('visible');
+    },
+
+    /** Add a file row to the toast and return its element references */
+    _addToastFileRow(fileName) {
+        const body = document.getElementById('upload-toast-body');
+        const row = document.createElement('div');
+        row.className = 'upload-toast-file';
+        row.innerHTML = `
+            <span class="upload-toast-file-icon"><i class="fas fa-spinner fa-spin"></i></span>
+            <div class="upload-toast-file-info">
+                <div class="upload-toast-file-name" title="${fileName}">${fileName}</div>
+                <div class="upload-toast-file-bar"><div class="upload-toast-file-fill"></div></div>
+            </div>
+            <span class="upload-toast-file-pct">0%</span>
+        `;
+        body.appendChild(row);
+        // Auto-scroll to bottom
+        body.scrollTop = body.scrollHeight;
+        return {
+            row,
+            icon: row.querySelector('.upload-toast-file-icon'),
+            fill: row.querySelector('.upload-toast-file-fill'),
+            pct:  row.querySelector('.upload-toast-file-pct'),
+        };
+    },
+
+    /** Update the overall progress in the toast footer */
+    _updateOverallProgress(completedCount, totalFiles) {
+        const fill  = document.getElementById('upload-toast-overall-fill');
+        const stats = document.getElementById('upload-toast-stats');
+        const pct = totalFiles > 0 ? Math.round((completedCount / totalFiles) * 100) : 0;
+        fill.style.width = pct + '%';
+        stats.textContent = `${completedCount} / ${totalFiles}`;
+    },
+
+    /** Mark upload toast as fully complete and auto-hide after a delay */
+    _finishUploadToast(successCount, totalFiles) {
+        const title = document.getElementById('upload-toast-title');
+        const fill  = document.getElementById('upload-toast-overall-fill');
+        fill.style.width = '100%';
+
+        const completeText = (window.i18n && window.i18n.t)
+            ? window.i18n.t('upload.complete', { count: successCount, total: totalFiles })
+            : `${successCount} / ${totalFiles} uploaded`;
+        title.textContent = completeText;
+
+        setTimeout(() => {
+            const toast = document.getElementById('upload-toast');
+            toast.classList.remove('visible');
+        }, 4000);
+    },
+
     /**
-     * Upload files to the server
+     * Upload a single file via XMLHttpRequest with progress events.
+     * Returns a promise that resolves with { ok, data? }.
+     */
+    _uploadFileXHR(formData, fileRowElements) {
+        return new Promise((resolve) => {
+            const xhr = new XMLHttpRequest();
+
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable && fileRowElements) {
+                    const pct = Math.round((e.loaded / e.total) * 100);
+                    fileRowElements.fill.style.width = pct + '%';
+                    fileRowElements.pct.textContent = pct + '%';
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    if (fileRowElements) {
+                        fileRowElements.fill.style.width = '100%';
+                        fileRowElements.fill.classList.add('done');
+                        fileRowElements.pct.textContent = '100%';
+                        fileRowElements.icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+                        fileRowElements.icon.classList.add('done');
+                    }
+                    let data = null;
+                    try { data = JSON.parse(xhr.responseText); } catch (_) {}
+                    resolve({ ok: true, data });
+                } else {
+                    if (fileRowElements) {
+                        fileRowElements.fill.classList.add('error');
+                        fileRowElements.pct.textContent = 'ERR';
+                        fileRowElements.icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+                        fileRowElements.icon.classList.add('error');
+                    }
+                    resolve({ ok: false });
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                if (fileRowElements) {
+                    fileRowElements.fill.classList.add('error');
+                    fileRowElements.pct.textContent = 'ERR';
+                    fileRowElements.icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+                    fileRowElements.icon.classList.add('error');
+                }
+                resolve({ ok: false });
+            });
+
+            xhr.open('POST', '/api/files/upload');
+
+            // Set auth header
+            const token = localStorage.getItem('oxicloud_token');
+            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+            xhr.send(formData);
+        });
+    },
+
+    // ========================================================================
+    // Upload files (via button or drag-and-drop)
+    // ========================================================================
+
+    /**
+     * Upload files to the server with real-time progress indication
      * @param {FileList} files - Files to upload
      */
     async uploadFiles(files) {
+        const totalFiles = files.length;
+        if (totalFiles === 0) return;
+
+        // Legacy progress bar (inside dropzone) — keep working for drag-drop
         const progressBar = document.querySelector('.progress-fill');
         const uploadProgressDiv = document.querySelector('.upload-progress');
-        uploadProgressDiv.style.display = 'block';
-        progressBar.style.width = '0%';
+        if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
+        if (progressBar) { progressBar.style.width = '0%'; }
+
+        // Show upload toast
+        this._initUploadToast(totalFiles);
 
         let uploadedCount = 0;
-        const totalFiles = files.length;
+        let successCount = 0;
 
         for (let i = 0; i < totalFiles; i++) {
             const file = files[i];
             const formData = new FormData();
-            
-            // IMPORTANT: folder_id MUST be added BEFORE file for multipart processing
-            // The backend reads fields in order, and needs folder_id before processing the file
+
             const targetFolderId = window.app.currentPath || window.app.userHomeFolderId;
-            
-            if (targetFolderId) {
-                formData.append('folder_id', targetFolderId);
-            }
-            
-            // Add the file AFTER folder_id
+            if (targetFolderId) formData.append('folder_id', targetFolderId);
             formData.append('file', file);
 
-            try {
-                console.log(`Uploading file to folder: ${targetFolderId || 'root'}`);
-                
-                // We use the correct URL for file upload
-                console.log('Form to submit:', {
-                    file: file.name,
-                    size: file.size,
-                    folder_id: targetFolderId || 'root'
-                });
-                
-                const response = await fetch('/api/files/upload', {
-                    method: 'POST',
-                    body: formData,
-                    // Add cache: 'no-store' to avoid cache issues during upload
-                    cache: 'no-store',
-                    headers: {
-                        ...getAuthHeaders(),
-                        // Add this header to force fresh reloads
-                        'Cache-Control': 'no-cache, no-store, must-revalidate'
-                    }
-                });
-                
-                console.log('Server response:', {
-                    status: response.status,
-                    statusText: response.statusText
-                });
+            console.log(`Uploading file to folder: ${targetFolderId || 'root'}`, {
+                file: file.name, size: file.size
+            });
 
-                // Update progress
-                uploadedCount++;
-                const percentComplete = (uploadedCount / totalFiles) * 100;
-                progressBar.style.width = percentComplete + '%';
+            // Add row to toast
+            const rowEls = this._addToastFileRow(file.name);
 
-                if (response.ok) {
-                    const responseData = await response.json();
-                    console.log(`Successfully uploaded ${file.name}`, responseData);
-                    
-                    // Show success notification immediately
-                    window.ui.showNotification('File uploaded', `${file.name} completed`);
+            const result = await this._uploadFileXHR(formData, rowEls);
 
-                    if (i === totalFiles - 1) {
-                        // Last file uploaded - wait and reload once
-                        console.log('Last file uploaded, waiting before reloading...');
-                        
-                        // Wait for backend to persist
-                        await new Promise(resolve => setTimeout(resolve, 800));
-                        
-                        // Single reload with force refresh
-                        try {
-                            await window.loadFiles({forceRefresh: true});
-                        } catch (reloadError) {
-                            console.error("Error reloading files:", reloadError);
-                        }
-                        
-                        // Hide upload UI
-                        setTimeout(() => {
-                            const dropzone = document.getElementById('dropzone');
-                            if (dropzone) dropzone.style.display = 'none';
-                            uploadProgressDiv.style.display = 'none';
-                        }, 500);
-                    }
-                } else {
-                    const errorData = await response.text();
-                    console.error('Upload error:', errorData);
-                    window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
-                }
-            } catch (error) {
-                console.error('Network error during upload:', error);
-                window.ui.showNotification('Error', `Network error uploading file: ${file.name}`);
+            uploadedCount++;
+
+            // Legacy dropzone bar
+            if (progressBar) {
+                progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
+            }
+            // Toast overall bar
+            this._updateOverallProgress(uploadedCount, totalFiles);
+
+            if (result.ok) {
+                successCount++;
+                console.log(`Successfully uploaded ${file.name}`, result.data);
+            } else {
+                console.error(`Upload error for ${file.name}`);
+                window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
             }
         }
+
+        // All done
+        this._finishUploadToast(successCount, totalFiles);
+
+        // Wait for backend to persist, then reload
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        try {
+            await window.loadFiles({ forceRefresh: true });
+        } catch (reloadError) {
+            console.error('Error reloading files:', reloadError);
+        }
+
+        setTimeout(() => {
+            const dropzone = document.getElementById('dropzone');
+            if (dropzone) dropzone.style.display = 'none';
+            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+        }, 500);
     },
 
     /**
@@ -128,33 +241,29 @@ const fileOps = {
         
         const progressBar = document.querySelector('.progress-fill');
         const uploadProgressDiv = document.querySelector('.upload-progress');
-        uploadProgressDiv.style.display = 'block';
-        progressBar.style.width = '0%';
+        if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
+        if (progressBar) { progressBar.style.width = '0%'; }
 
         const currentFolderId = window.app.currentPath || window.app.userHomeFolderId;
         
         // Build folder structure from relative paths
-        // webkitRelativePath looks like: "folderName/subfolder/file.txt"
-        const folderMap = new Map(); // path -> folder_id
-        folderMap.set('', currentFolderId); // root = current folder
+        const folderMap = new Map();
+        folderMap.set('', currentFolderId);
         
-        // Collect all unique folder paths
         const folderPaths = new Set();
         for (const file of files) {
             const parts = file.webkitRelativePath.split('/');
-            // Remove filename, keep folder parts
             for (let i = 1; i < parts.length; i++) {
                 const path = parts.slice(0, i).join('/');
                 folderPaths.add(path);
             }
         }
         
-        // Sort paths by depth so parents are created first
         const sortedPaths = [...folderPaths].sort((a, b) => 
             a.split('/').length - b.split('/').length
         );
         
-        // Create folders
+        // Create folders first (no progress toast for folder creation)
         for (const folderPath of sortedPaths) {
             const parts = folderPath.split('/');
             const folderName = parts[parts.length - 1];
@@ -188,9 +297,12 @@ const fileOps = {
             }
         }
         
-        // Upload files into their respective folders
-        let uploadedCount = 0;
+        // Upload files with progress toast
         const totalFiles = files.length;
+        this._initUploadToast(totalFiles);
+
+        let uploadedCount = 0;
+        let successCount = 0;
         
         for (let i = 0; i < totalFiles; i++) {
             const file = files[i];
@@ -201,34 +313,28 @@ const fileOps = {
             const formData = new FormData();
             formData.append('folder_id', targetFolderId);
             formData.append('file', file);
+
+            const displayName = file.webkitRelativePath || file.name;
+            const rowEls = this._addToastFileRow(displayName);
+
+            const result = await this._uploadFileXHR(formData, rowEls);
             
-            try {
-                const response = await fetch('/api/files/upload', {
-                    method: 'POST',
-                    body: formData,
-                    cache: 'no-store',
-                    headers: {
-                        ...getAuthHeaders(),
-                        'Cache-Control': 'no-cache, no-store, must-revalidate'
-                    }
-                });
+            uploadedCount++;
+            if (progressBar) {
+                progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
+            }
+            this._updateOverallProgress(uploadedCount, totalFiles);
                 
-                uploadedCount++;
-                const percentComplete = (uploadedCount / totalFiles) * 100;
-                progressBar.style.width = percentComplete + '%';
-                
-                if (response.ok) {
-                    console.log(`Uploaded: ${file.webkitRelativePath}`);
-                } else {
-                    console.error(`Error uploading ${file.webkitRelativePath}:`, await response.text());
-                }
-            } catch (error) {
-                console.error(`Network error uploading ${file.webkitRelativePath}:`, error);
+            if (result.ok) {
+                successCount++;
+                console.log(`Uploaded: ${file.webkitRelativePath}`);
+            } else {
+                console.error(`Error uploading ${file.webkitRelativePath}`);
             }
         }
         
-        // Finish up
-        window.ui.showNotification('Folder uploaded', `${uploadedCount} files uploaded successfully`);
+        // Finish
+        this._finishUploadToast(successCount, totalFiles);
         
         await new Promise(resolve => setTimeout(resolve, 800));
         
@@ -241,7 +347,7 @@ const fileOps = {
         setTimeout(() => {
             const dropzone = document.getElementById('dropzone');
             if (dropzone) dropzone.style.display = 'none';
-            uploadProgressDiv.style.display = 'none';
+            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
         }, 500);
     },
 

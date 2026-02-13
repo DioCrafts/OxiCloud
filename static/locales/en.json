@@ -16,6 +16,8 @@
     "upload": "Upload",
     "upload_files": "Upload files",
     "upload_folder": "Upload folder",
+    "upload.uploading": "Uploading...",
+    "upload.complete": "{count} / {total} uploaded",
     "rename": "Rename",
     "move": "Move to...",
     "move_to": "Move to",

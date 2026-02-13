@@ -16,6 +16,8 @@
     "upload": "Téléverser",
     "upload_files": "Téléverser des fichiers",
     "upload_folder": "Téléverser un dossier",
+    "upload.uploading": "Envoi en cours...",
+    "upload.complete": "{count} / {total} envoyés",
     "rename": "Renommer",
     "move": "Déplacer vers...",
     "move_to": "Déplacer vers",

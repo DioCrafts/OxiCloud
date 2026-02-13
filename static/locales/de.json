@@ -16,6 +16,8 @@
     "upload": "Hochladen",
     "upload_files": "Dateien hochladen",
     "upload_folder": "Ordner hochladen",
+    "upload.uploading": "Wird hochgeladen...",
+    "upload.complete": "{count} / {total} hochgeladen",
     "rename": "Umbenennen",
     "move": "Verschieben nach...",
     "move_to": "Verschieben nach",

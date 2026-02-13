@@ -16,6 +16,8 @@
  "upload": "Carica",
  "upload_files": "Carica file",
  "upload_folder": "Carica cartella",
+ "upload.uploading": "Caricamento...",
+ "upload.complete": "{count} / {total} caricati",
  "rename": "Rinomina",
  "move": "Sposta in...",
  "move_to": "Sposta in",
@@ -311,7 +313,7 @@
  "fa": "Persiano",
  "fr": "Francese",
  "de": "Tedesco",
- "pt": "Portoghese",
+ "pt": "Portoghese"
  "it": "Italiano"
  }
  },

@@ -16,6 +16,8 @@
     "upload": "بارگذاری",
     "upload_files": "بارگذاری پرونده‌ها",
     "upload_folder": "بارگذاری پوشه",
+    "upload.uploading": "...در حال بارگذاری",
+    "upload.complete": "{count} / {total} بارگذاری شد",
     "rename": "تغییر نام",
     "move": "انتقال به...",
     "move_to": "انتقال به",
