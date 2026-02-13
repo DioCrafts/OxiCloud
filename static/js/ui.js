@@ -666,9 +666,14 @@ const ui = {
         folderGridElement.dataset.folderId = folder.id;
         folderGridElement.dataset.folderName = folder.name;
         folderGridElement.dataset.parentId = folder.parent_id || "";
+
+        // Check if folder is a favorite
+        const isFolderFav = window.favorites && window.favorites.isFavorite(folder.id, 'folder');
+
         folderGridElement.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
+            ${isFolderFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
@@ -813,6 +818,7 @@ const ui = {
                     <i class="fas fa-folder"></i>
                 </div>
                 <span>${folder.name}</span>
+                ${isFolderFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
@@ -927,9 +933,14 @@ const ui = {
         // Grid view element
         const fileGridElement = document.createElement('div');
         fileGridElement.className = 'file-card';
+
+        // Check if file is a favorite
+        const isFileFav = window.favorites && window.favorites.isFavorite(file.id, 'file');
+
         fileGridElement.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
+            ${isFileFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
             <div class="file-icon">
                 <i class="${iconClass}"></i>
             </div>
@@ -1037,6 +1048,7 @@ const ui = {
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${file.name}</span>
+                ${isFileFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>

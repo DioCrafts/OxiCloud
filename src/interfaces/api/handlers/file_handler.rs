@@ -270,6 +270,20 @@ impl FileHandler {
             }
         };
 
+        // ── Metadata-only request ────────────────────────────────────
+        if params.get("metadata").map_or(false, |v| v == "true" || v == "1") {
+            return (StatusCode::OK, Json(serde_json::json!({
+                "id": file_dto.id,
+                "name": file_dto.name,
+                "path": file_dto.path,
+                "size": file_dto.size,
+                "mime_type": file_dto.mime_type,
+                "folder_id": file_dto.folder_id,
+                "created_at": file_dto.created_at,
+                "modified_at": file_dto.modified_at
+            }))).into_response();
+        }
+
         let etag = format!("\"{}-{}\"", id, file_dto.modified_at);
 
         // ── ETag (304 Not Modified) ──────────────────────────────────

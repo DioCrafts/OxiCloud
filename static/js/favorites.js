@@ -234,6 +234,11 @@ const favorites = {
                 `"${name}" added to favorites`
             );
             
+            // Refresh file view to show star icon
+            if (window.app.currentSection === 'files' && typeof window.loadFiles === 'function') {
+                window.loadFiles();
+            }
+            
             return true;
         } catch (error) {
             console.error('Error adding to favorites:', error);
@@ -275,6 +280,12 @@ const favorites = {
                         `"${item.name}" removed from favorites`
                     );
                 }
+                
+                // Refresh file view to remove star icon
+                if (window.app.currentSection === 'files' && typeof window.loadFiles === 'function') {
+                    window.loadFiles();
+                }
+                
                 return true;
             }
             
@@ -371,7 +382,9 @@ const favorites = {
      */
     async loadFolderDetails(favorite, filesGrid, filesListView) {
         try {
-            const response = await fetch(`/api/folders/${favorite.id}`);
+            const token = localStorage.getItem('oxicloud_token');
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const response = await fetch(`/api/folders/${favorite.id}`, { headers });
             
             if (response.ok) {
                 const folder = await response.json();
@@ -398,30 +411,14 @@ const favorites = {
      */
     async loadFileDetails(favorite, filesGrid, filesListView) {
         try {
-            const response = await fetch(`/api/files/${favorite.id}`);
+            const token = localStorage.getItem('oxicloud_token');
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+            const response = await fetch(`/api/files/${favorite.id}?metadata=true`, { headers });
             
             if (response.ok) {
-                // Check if the response is JSON or binary data like a PDF
-                const contentType = response.headers.get('content-type');
-                
-                if (contentType && contentType.includes('application/json')) {
-                    const file = await response.json();
-                    
-                    // Create UI element with favorite indicator
-                    this.createFavoriteFileElement(file, filesGrid, filesListView);
-                } else {
-                    // For non-JSON responses (like PDFs or other binary files)
-                    // Create a simplified file element with minimal information
-                    const file = {
-                        id: favorite.id,
-                        name: favorite.name || `File ${favorite.id}`,
-                        mime_type: contentType || 'application/octet-stream',
-                        size: 0, // We don't know the size from this response
-                        modified_at: Math.floor(Date.now() / 1000) // Current time in seconds
-                    };
-                    
-                    this.createFavoriteFileElement(file, filesGrid, filesListView);
-                }
+                const file = await response.json();
+                // Create UI element with favorite indicator
+                this.createFavoriteFileElement(file, filesGrid, filesListView);
             } else if (response.status === 404) {
                 // File not found, might be deleted
                 console.log(`Favorite file ${favorite.id} not found, removing from favorites`);
