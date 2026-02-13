@@ -242,6 +242,11 @@ function setupUserMenu() {
                 aboutOverlay.classList.remove('show');
             }
         });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && aboutOverlay.classList.contains('show')) {
+                aboutOverlay.classList.remove('show');
+            }
+        });
     }
     
     // Fetch version from backend (centralized in Cargo.toml)
