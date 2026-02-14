@@ -48,34 +48,3 @@ pub trait FolderStoragePort: FolderRepository {}
 /// Blanket implementation: any type that implements FolderRepository
 /// is automatically a FolderStoragePort.
 impl<T: FolderRepository> FolderStoragePort for T {}
-
-/// Secondary port for ID mapping
-#[async_trait]
-pub trait IdMappingPort: Send + Sync + 'static {
-    /// Gets or creates an ID for a path
-    async fn get_or_create_id(&self, path: &StoragePath) -> Result<String, DomainError>;
-
-    /// Gets a path by its ID
-    async fn get_path_by_id(&self, id: &str) -> Result<StoragePath, DomainError>;
-
-    /// Updates the path for an existing ID
-    async fn update_path(&self, id: &str, new_path: &StoragePath) -> Result<(), DomainError>;
-
-    /// Removes an ID from the mapping
-    async fn remove_id(&self, id: &str) -> Result<(), DomainError>;
-
-    /// Saves pending changes
-    async fn save_changes(&self) -> Result<(), DomainError>;
-
-    /// Gets the file path as a PathBuf
-    async fn get_file_path(&self, file_id: &str) -> Result<PathBuf, DomainError> {
-        let storage_path = self.get_path_by_id(file_id).await?;
-        Ok(PathBuf::from(storage_path.to_string()))
-    }
-
-    /// Updates a file's path
-    async fn update_file_path(&self, file_id: &str, new_path: &PathBuf) -> Result<(), DomainError> {
-        let storage_path = StoragePath::from_string(new_path.to_string_lossy().as_ref());
-        self.update_path(file_id, &storage_path).await
-    }
-}

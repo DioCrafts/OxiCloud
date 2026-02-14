@@ -13,7 +13,6 @@ pub mod i18n_application_service;
 pub mod recent_service;
 pub mod search_service;
 pub mod share_service;
-pub mod storage_mediator;
 pub mod storage_usage_service;
 pub mod trash_service;
 

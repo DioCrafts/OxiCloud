@@ -1,7 +1,7 @@
 //! PathService - Infrastructure service for storage path management
 //!
 //! This service was moved from domain/services because it implements application traits
-//! (StoragePort, StorageMediator) and has file system dependencies (tokio::fs).
+//! (StoragePort) and has file system dependencies (tokio::fs).
 //!
 //! StoragePath (Value Object) remains in domain/services/path_service.rs
 
@@ -10,11 +10,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 
 use crate::application::ports::outbound::StoragePort;
-use crate::application::services::storage_mediator::{
-    StorageMediator, StorageMediatorError, StorageMediatorResult,
-};
 use crate::common::errors::{DomainError, ErrorKind};
-use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
 
 /// Infrastructure service for handling storage path operations
@@ -175,109 +171,6 @@ impl StoragePort for PathService {
 
         let exists = physical_path.exists() && physical_path.is_dir();
         Ok(exists)
-    }
-}
-
-#[async_trait]
-impl StorageMediator for PathService {
-    async fn get_folder_path(&self, folder_id: &str) -> StorageMediatorResult<PathBuf> {
-        // This is a simplified implementation since PathService doesn't have direct
-        // access to folder repository. It's typically used through a proxy.
-        Err(StorageMediatorError::NotFound(format!(
-            "Folder with ID {} not found",
-            folder_id
-        )))
-    }
-
-    async fn get_folder_storage_path(&self, folder_id: &str) -> StorageMediatorResult<StoragePath> {
-        // Simplified implementation - should be overridden by actual implementations
-        Err(StorageMediatorError::NotFound(format!(
-            "Folder with ID {} not found",
-            folder_id
-        )))
-    }
-
-    async fn get_folder(&self, folder_id: &str) -> StorageMediatorResult<Folder> {
-        // Simplified implementation - should be overridden by actual implementations
-        Err(StorageMediatorError::NotFound(format!(
-            "Folder with ID {} not found",
-            folder_id
-        )))
-    }
-
-    async fn file_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
-        let abs_path = self.resolve_path(&StoragePath::from_string(&path.to_string_lossy()));
-        Ok(abs_path.exists() && abs_path.is_file())
-    }
-
-    async fn file_exists_at_storage_path(
-        &self,
-        storage_path: &StoragePath,
-    ) -> StorageMediatorResult<bool> {
-        let abs_path = self.resolve_path(storage_path);
-        Ok(abs_path.exists() && abs_path.is_file())
-    }
-
-    async fn folder_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
-        let abs_path = self.resolve_path(&StoragePath::from_string(&path.to_string_lossy()));
-        Ok(abs_path.exists() && abs_path.is_dir())
-    }
-
-    async fn folder_exists_at_storage_path(
-        &self,
-        storage_path: &StoragePath,
-    ) -> StorageMediatorResult<bool> {
-        let abs_path = self.resolve_path(storage_path);
-        Ok(abs_path.exists() && abs_path.is_dir())
-    }
-
-    fn resolve_path(&self, relative_path: &Path) -> PathBuf {
-        // Convert path to storage path then resolve
-        let path_str = relative_path.to_string_lossy().to_string();
-        let storage_path = StoragePath::from_string(&path_str);
-        PathService::resolve_path(self, &storage_path)
-    }
-
-    fn resolve_storage_path(&self, storage_path: &StoragePath) -> PathBuf {
-        PathService::resolve_path(self, storage_path)
-    }
-
-    async fn ensure_directory(&self, path: &Path) -> StorageMediatorResult<()> {
-        let abs_path =
-            PathService::resolve_path(self, &StoragePath::from_string(&path.to_string_lossy()));
-
-        if !abs_path.exists() {
-            fs::create_dir_all(&abs_path).await.map_err(|e| {
-                StorageMediatorError::AccessError(format!("Failed to create directory: {}", e))
-            })?;
-        } else if !abs_path.is_dir() {
-            return Err(StorageMediatorError::InvalidPath(format!(
-                "Path exists but is not a directory: {}",
-                abs_path.display()
-            )));
-        }
-
-        Ok(())
-    }
-
-    async fn ensure_storage_directory(
-        &self,
-        storage_path: &StoragePath,
-    ) -> StorageMediatorResult<()> {
-        let abs_path = PathService::resolve_path(self, storage_path);
-
-        if !abs_path.exists() {
-            fs::create_dir_all(&abs_path).await.map_err(|e| {
-                StorageMediatorError::AccessError(format!("Failed to create directory: {}", e))
-            })?;
-        } else if !abs_path.is_dir() {
-            return Err(StorageMediatorError::InvalidPath(format!(
-                "Path exists but is not a directory: {}",
-                abs_path.display()
-            )));
-        }
-
-        Ok(())
     }
 }
 

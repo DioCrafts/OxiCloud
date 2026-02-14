@@ -10,5 +10,4 @@ pub mod password_hasher;
 pub mod path_service;
 pub mod thumbnail_service;
 pub mod trash_cleanup_service;
-pub mod write_behind_cache;
 pub mod zip_service;
