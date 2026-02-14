@@ -1,7 +1,8 @@
 //! OpenID Connect (OIDC) service implementation.
 //!
 //! Handles OIDC discovery, authorization URL generation, code exchange,
-//! ID token validation (RS256 via JWKS), and UserInfo fetching.
+//! ID token validation (RS256/ES256 via JWKS), and UserInfo fetching.
+//! Supports both RSA (RS256, RS384, RS512) and EC (ES256, ES384) algorithms.
 //! Compatible with Authentik, Keycloak, and any standard OIDC provider.
 
 use async_trait::async_trait;
@@ -26,23 +27,12 @@ struct OidcDiscovery {
 }
 
 // ============================================================================
-// JWKS structures for RS256 validation
+// JWKS parsing using jsonwebtoken (enabled via rust_crypto feature)
 // ============================================================================
 
 #[derive(Debug, Clone, Deserialize)]
 struct JwksDocument {
-    keys: Vec<JwkKey>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct JwkKey {
-    kty: String,
-    #[serde(rename = "use")]
-    key_use: Option<String>,
-    kid: Option<String>,
-    alg: Option<String>,
-    n: Option<String>, // RSA modulus (base64url)
-    e: Option<String>, // RSA exponent (base64url)
+    keys: Vec<serde_json::Value>,
 }
 
 // ============================================================================
@@ -105,7 +95,7 @@ pub struct OidcService {
     http_client: reqwest::Client,
     /// Cached discovery document
     discovery: RwLock<Option<OidcDiscovery>>,
-    /// Cached JWKS
+    /// Cached JWKS (raw JSON values)
     jwks: RwLock<Option<JwksDocument>>,
 }
 
@@ -234,12 +224,20 @@ impl OidcService {
         Ok(jwks)
     }
 
-    /// Find the right RSA key from JWKS by kid header
-    fn find_rsa_key<'a>(jwks: &'a JwksDocument, kid: Option<&str>) -> Option<&'a JwkKey> {
+    /// Find a suitable key from JWKS by kid header (filters out encryption keys)
+    fn find_key<'a>(jwks: &'a JwksDocument, kid: Option<&str>) -> Option<&'a serde_json::Value> {
         jwks.keys.iter().find(|k| {
-            k.kty == "RSA"
-                && k.key_use.as_deref() != Some("enc") // exclude encryption keys
-                && (kid.is_none() || k.kid.as_deref() == kid)
+            // Exclude encryption keys (only use signature keys)
+            let use_field = k.get("use").and_then(|v| v.as_str());
+            if use_field == Some("enc") {
+                return false;
+            }
+            // Match kid if provided
+            if let Some(target_kid) = kid {
+                return k.get("kid").and_then(|v| v.as_str()) == Some(target_kid);
+            }
+            // No kid specified, include this key
+            true
         })
     }
 
@@ -369,44 +367,40 @@ impl OidcServicePort for OidcService {
         // Extract kid from JWT header
         let kid = Self::extract_jwt_kid(id_token);
 
-        // Find the matching RSA key
-        let jwk = Self::find_rsa_key(&jwks, kid.as_deref()).ok_or_else(|| {
+        // Find the matching key from JWKS
+        let jwk_value = Self::find_key(&jwks, kid.as_deref()).ok_or_else(|| {
             DomainError::new(
                 ErrorKind::AccessDenied,
                 "OIDC",
-                "No suitable RSA key found in JWKS for ID token validation",
+                "No suitable key found in JWKS for ID token validation",
             )
         })?;
 
-        let n = jwk.n.as_ref().ok_or_else(|| {
+        // Use jsonwebtoken's from_jwk to automatically handle key type and algorithm detection
+        let jwk: jsonwebtoken::jwk::Jwk = serde_json::from_value(jwk_value.clone()).map_err(|e| {
             DomainError::new(
                 ErrorKind::InternalError,
                 "OIDC",
-                "JWKS key missing 'n' component",
-            )
-        })?;
-        let e = jwk.e.as_ref().ok_or_else(|| {
-            DomainError::new(
-                ErrorKind::InternalError,
-                "OIDC",
-                "JWKS key missing 'e' component",
+                format!("Failed to parse JWK: {}", e),
             )
         })?;
 
-        // Build decoding key from RSA components
-        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_components(n, e).map_err(|err| {
+        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(&jwk).map_err(|e| {
             DomainError::new(
                 ErrorKind::InternalError,
                 "OIDC",
-                format!("Failed to build RSA decoding key: {}", err),
+                format!("Failed to create decoding key from JWK: {}", e),
             )
         })?;
 
-        // Determine algorithm from JWKS (default RS256)
-        let alg = match jwk.alg.as_deref() {
-            Some("RS384") => jsonwebtoken::Algorithm::RS384,
-            Some("RS512") => jsonwebtoken::Algorithm::RS512,
-            _ => jsonwebtoken::Algorithm::RS256,
+        // Get algorithm from JWK - convert KeyAlgorithm to Algorithm
+        let alg = match jwk.common.key_algorithm {
+            Some(jsonwebtoken::jwk::KeyAlgorithm::RS256) => jsonwebtoken::Algorithm::RS256,
+            Some(jsonwebtoken::jwk::KeyAlgorithm::RS384) => jsonwebtoken::Algorithm::RS384,
+            Some(jsonwebtoken::jwk::KeyAlgorithm::RS512) => jsonwebtoken::Algorithm::RS512,
+            Some(jsonwebtoken::jwk::KeyAlgorithm::ES256) => jsonwebtoken::Algorithm::ES256,
+            Some(jsonwebtoken::jwk::KeyAlgorithm::ES384) => jsonwebtoken::Algorithm::ES384,
+            _ => jsonwebtoken::Algorithm::RS256, // default
         };
 
         // Build validation: check expiry and issuer
