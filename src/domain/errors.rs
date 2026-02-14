@@ -31,6 +31,8 @@ pub enum ErrorKind {
     UnsupportedOperation,
     /// Database error
     DatabaseError,
+    /// Storage quota exceeded
+    QuotaExceeded,
 }
 
 impl Display for ErrorKind {
@@ -45,6 +47,7 @@ impl Display for ErrorKind {
             ErrorKind::NotImplemented => write!(f, "Not Implemented"),
             ErrorKind::UnsupportedOperation => write!(f, "Unsupported Operation"),
             ErrorKind::DatabaseError => write!(f, "Database Error"),
+            ErrorKind::QuotaExceeded => write!(f, "Quota Exceeded"),
         }
     }
 }
@@ -156,6 +159,17 @@ impl DomainError {
         Self {
             kind: ErrorKind::DatabaseError,
             entity_type: "Database",
+            entity_id: None,
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    /// Creates a storage quota exceeded error
+    pub fn quota_exceeded<S: Into<String>>(message: S) -> Self {
+        Self {
+            kind: ErrorKind::QuotaExceeded,
+            entity_type: "Storage",
             entity_id: None,
             message: message.into(),
             source: None,

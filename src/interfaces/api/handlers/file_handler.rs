@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::OptionalUserId;
+use crate::interfaces::middleware::auth::{AuthUser, OptionalUserId};
 
 /**
  * Type aliases for dependency injection state.
@@ -121,6 +121,7 @@ impl FileHandler {
     /// optimal tier and handles deduplication internally.
     pub async fn upload_file_with_cache(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         mut multipart: Multipart,
     ) -> impl IntoResponse {
         let upload_service = &state.applications.file_upload_service;
@@ -165,6 +166,23 @@ impl FileHandler {
                         Ok(file) => Self::created_json_response(&file).into_response(),
                         Err(err) => Self::domain_error_response(err).into_response(),
                     };
+                }
+
+                // ── Quota enforcement ────────────────────────────────────
+                if let Some(storage_svc) = state.storage_usage_service.as_ref() {
+                    if let Err(err) = storage_svc
+                        .check_storage_quota(&auth_user.id, total_size as u64)
+                        .await
+                    {
+                        tracing::warn!(
+                            "⛔ UPLOAD REJECTED (quota): user={}, file={}, size={} — {}",
+                            auth_user.username,
+                            filename,
+                            total_size,
+                            err
+                        );
+                        return Self::quota_error_response(err).into_response();
+                    }
                 }
 
                 // Delegate to smart_upload (handles write-behind, dedup, streaming)
@@ -531,10 +549,12 @@ impl FileHandler {
     /// a background task to generate all thumbnail sizes.
     pub async fn upload_file_with_thumbnails(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         multipart: Multipart,
     ) -> impl IntoResponse {
         // Use the smart upload handler
-        let response = Self::upload_file_with_cache(State(state.clone()), multipart).await;
+        let response =
+            Self::upload_file_with_cache(State(state.clone()), auth_user, multipart).await;
 
         // Try to extract file info for thumbnail generation
         if let Ok(body_bytes) =
@@ -827,6 +847,7 @@ impl FileHandler {
     fn domain_error_response(err: crate::common::errors::DomainError) -> Response<Body> {
         let status = match err.kind {
             crate::common::errors::ErrorKind::NotFound => StatusCode::NOT_FOUND,
+            crate::common::errors::ErrorKind::QuotaExceeded => StatusCode::INSUFFICIENT_STORAGE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
         Response::builder()
@@ -834,6 +855,21 @@ impl FileHandler {
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(
                 serde_json::json!({ "error": format!("Error: {}", err) }).to_string(),
+            ))
+            .unwrap()
+    }
+
+    /// Build a quota-specific error response with 507 status and structured body.
+    fn quota_error_response(err: crate::common::errors::DomainError) -> Response<Body> {
+        Response::builder()
+            .status(StatusCode::INSUFFICIENT_STORAGE)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(
+                serde_json::json!({
+                    "error": err.message,
+                    "error_type": "QuotaExceeded"
+                })
+                .to_string(),
             ))
             .unwrap()
     }

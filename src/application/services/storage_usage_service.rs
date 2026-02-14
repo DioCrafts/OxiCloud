@@ -149,6 +149,32 @@ impl StorageUsageService {
         let repo_clone = Arc::clone(&self.file_repository);
         inner_calculate_size(repo_clone, folder_id).await
     }
+
+    /// Calculates and updates storage usage for a user identified by username.
+    pub async fn update_user_storage_usage_by_username(
+        &self,
+        username: &str,
+    ) -> Result<i64, DomainError> {
+        info!("Updating storage usage for username: {}", username);
+
+        let user = self.user_repository.get_user_by_username(username).await?;
+        let user_id = user.id().to_string();
+
+        // Reuse the existing calculation logic
+        let total_usage = self.calculate_user_storage_usage(username).await?;
+
+        // Update the user's storage usage in the database
+        self.user_repository
+            .update_storage_usage(&user_id, total_usage)
+            .await?;
+
+        info!(
+            "Updated storage usage for username {} (id={}) to {} bytes",
+            username, user_id, total_usage
+        );
+
+        Ok(total_usage)
+    }
 }
 
 /**
@@ -159,6 +185,13 @@ impl StorageUsageService {
 impl StorageUsagePort for StorageUsageService {
     async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError> {
         StorageUsageService::update_user_storage_usage(self, user_id).await
+    }
+
+    async fn update_user_storage_usage_by_username(
+        &self,
+        username: &str,
+    ) -> Result<i64, DomainError> {
+        StorageUsageService::update_user_storage_usage_by_username(self, username).await
     }
 
     async fn update_all_users_storage_usage(&self) -> Result<(), DomainError> {
@@ -203,6 +236,51 @@ impl StorageUsagePort for StorageUsageService {
         info!("Completed batch update of all users' storage usage");
         Ok(())
     }
+
+    async fn check_storage_quota(
+        &self,
+        user_id: &str,
+        additional_bytes: u64,
+    ) -> Result<(), DomainError> {
+        let user = self.user_repository.get_user_by_id(user_id).await?;
+        let quota = user.storage_quota_bytes();
+        let used = user.storage_used_bytes();
+
+        // Quota of 0 means unlimited
+        if quota <= 0 {
+            return Ok(());
+        }
+
+        let additional = additional_bytes as i64;
+
+        // Case 1: the single file alone exceeds the entire quota
+        if additional > quota {
+            let quota_fmt = format_bytes(quota);
+            let file_fmt = format_bytes(additional);
+            return Err(DomainError::quota_exceeded(format!(
+                "File size ({}) exceeds your total storage quota ({})",
+                file_fmt, quota_fmt
+            )));
+        }
+
+        // Case 2: the upload would push usage over the quota
+        if used + additional > quota {
+            let available = (quota - used).max(0);
+            let avail_fmt = format_bytes(available);
+            let file_fmt = format_bytes(additional);
+            return Err(DomainError::quota_exceeded(format!(
+                "Not enough storage space. File size: {}, available: {}",
+                file_fmt, avail_fmt
+            )));
+        }
+
+        Ok(())
+    }
+
+    async fn get_user_storage_info(&self, user_id: &str) -> Result<(i64, i64), DomainError> {
+        let user = self.user_repository.get_user_by_id(user_id).await?;
+        Ok((user.storage_used_bytes(), user.storage_quota_bytes()))
+    }
 }
 
 // Make StorageUsageService cloneable to support spawning concurrent tasks
@@ -212,5 +290,22 @@ impl Clone for StorageUsageService {
             file_repository: Arc::clone(&self.file_repository),
             user_repository: Arc::clone(&self.user_repository),
         }
+    }
+}
+
+/// Format bytes into human-readable units for error messages.
+fn format_bytes(bytes: i64) -> String {
+    const KB: i64 = 1024;
+    const MB: i64 = KB * 1024;
+    const GB: i64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
     }
 }

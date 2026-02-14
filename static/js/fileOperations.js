@@ -128,7 +128,15 @@ const fileOps = {
                         fileRowElements.icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
                         fileRowElements.icon.classList.add('error');
                     }
-                    resolve({ ok: false });
+                    // Parse error body for quota-exceeded or other messages
+                    let errorMsg = null;
+                    let isQuotaError = false;
+                    try {
+                        const errBody = JSON.parse(xhr.responseText);
+                        errorMsg = errBody.error || null;
+                        isQuotaError = errBody.error_type === 'QuotaExceeded' || xhr.status === 507;
+                    } catch (_) {}
+                    resolve({ ok: false, errorMsg, isQuotaError });
                 }
             });
 
@@ -208,7 +216,14 @@ const fileOps = {
                 console.log(`Successfully uploaded ${file.name}`, result.data);
             } else {
                 console.error(`Upload error for ${file.name}`);
-                window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
+                if (result.isQuotaError) {
+                    const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
+                    window.ui.showNotification('Error', `${file.name}: ${msg}`);
+                    // Stop uploading remaining files — quota is full
+                    break;
+                } else {
+                    window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
+                }
             }
         }
 
@@ -217,6 +232,11 @@ const fileOps = {
 
         // Wait for backend to persist, then reload
         await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Refresh storage usage display
+        if (typeof window.refreshUserData === 'function') {
+            try { await window.refreshUserData(); } catch (_) {}
+        }
 
         try {
             await window.loadFiles({ forceRefresh: true });
@@ -330,6 +350,11 @@ const fileOps = {
                 console.log(`Uploaded: ${file.webkitRelativePath}`);
             } else {
                 console.error(`Error uploading ${file.webkitRelativePath}`);
+                if (result.isQuotaError) {
+                    const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
+                    window.ui.showNotification('Error', `${file.name}: ${msg}`);
+                    break;
+                }
             }
         }
         
@@ -337,6 +362,11 @@ const fileOps = {
         this._finishUploadToast(successCount, totalFiles);
         
         await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Refresh storage usage display
+        if (typeof window.refreshUserData === 'function') {
+            try { await window.refreshUserData(); } catch (_) {}
+        }
         
         try {
             await window.loadFiles({ forceRefresh: true });

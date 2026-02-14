@@ -109,6 +109,7 @@ impl From<DomainError> for AppError {
             ErrorKind::NotImplemented => StatusCode::NOT_IMPLEMENTED,
             ErrorKind::UnsupportedOperation => StatusCode::METHOD_NOT_ALLOWED,
             ErrorKind::DatabaseError => StatusCode::INTERNAL_SERVER_ERROR,
+            ErrorKind::QuotaExceeded => StatusCode::INSUFFICIENT_STORAGE,
         };
 
         Self {

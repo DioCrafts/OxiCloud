@@ -17,7 +17,8 @@ const STREAMING_UPLOAD_THRESHOLD: usize = 1024 * 1024;
 /// Threshold for write-behind cache (files < 256KB get instant response)
 const WRITE_BEHIND_THRESHOLD: usize = 256 * 1024;
 
-/// Helper function to extract username from folder path string
+/// Helper function to extract username from folder path string.
+/// e.g. "My Folder - user1/subfolder/file.txt" → "user1"
 fn extract_username_from_path(path: &str) -> Option<String> {
     if !path.contains("My Folder - ") {
         return None;
@@ -26,7 +27,14 @@ fn extract_username_from_path(path: &str) -> Option<String> {
     if parts.len() <= 1 {
         return None;
     }
-    Some(parts[1].trim().to_string())
+    // Take only the first segment (username), not any subfolders
+    let remainder = parts[1].trim();
+    let username = remainder.split('/').next().unwrap_or(remainder);
+    let username = username.trim();
+    if username.is_empty() {
+        return None;
+    }
+    Some(username.to_string())
 }
 
 /// Service for file upload operations
@@ -125,7 +133,10 @@ impl FileUploadService {
             if let Some(username) = extract_username_from_path(&file_path) {
                 let service_clone = Arc::clone(storage_service);
                 tokio::spawn(async move {
-                    match service_clone.update_user_storage_usage(&username).await {
+                    match service_clone
+                        .update_user_storage_usage_by_username(&username)
+                        .await
+                    {
                         Ok(usage) => debug!(
                             "Updated storage usage for user {} to {} bytes",
                             username, usage

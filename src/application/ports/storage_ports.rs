@@ -168,8 +168,26 @@ pub trait StorageUsagePort: Send + Sync + 'static {
     /// Updates storage usage statistics for a user
     async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError>;
 
+    /// Updates storage usage statistics for a user, looked up by username
+    async fn update_user_storage_usage_by_username(
+        &self,
+        username: &str,
+    ) -> Result<i64, DomainError>;
+
     /// Updates storage usage statistics for all users
     async fn update_all_users_storage_usage(&self) -> Result<(), DomainError>;
+
+    /// Checks if a user has enough quota for an additional upload.
+    /// Returns Ok(()) if the upload is allowed, or Err(QuotaExceeded) with a
+    /// descriptive message otherwise.
+    async fn check_storage_quota(
+        &self,
+        user_id: &str,
+        additional_bytes: u64,
+    ) -> Result<(), DomainError>;
+
+    /// Returns (used_bytes, quota_bytes) for a user.
+    async fn get_user_storage_info(&self, user_id: &str) -> Result<(i64, i64), DomainError>;
 }
 
 /// Generic storage service interface for calendar and contact services

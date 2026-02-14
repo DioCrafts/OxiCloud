@@ -20,6 +20,7 @@ use std::sync::Arc;
 use crate::application::ports::chunked_upload_ports::DEFAULT_CHUNK_SIZE;
 use crate::common::di::AppState;
 use crate::domain::errors::ErrorKind;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Request body for creating an upload session
 #[derive(Debug, Deserialize)]
@@ -75,6 +76,7 @@ impl ChunkedUploadHandler {
     /// ```
     pub async fn create_upload(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Json(request): Json<CreateUploadRequest>,
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
@@ -98,6 +100,30 @@ impl ChunkedUploadHandler {
                 })),
             )
                 .into_response();
+        }
+
+        // ── Quota enforcement ────────────────────────────────────
+        if let Some(storage_svc) = state.storage_usage_service.as_ref() {
+            if let Err(err) = storage_svc
+                .check_storage_quota(&auth_user.id, request.total_size)
+                .await
+            {
+                tracing::warn!(
+                    "⛔ CHUNKED UPLOAD REJECTED (quota): user={}, file={}, size={} — {}",
+                    auth_user.username,
+                    request.filename,
+                    request.total_size,
+                    err.message
+                );
+                return (
+                    StatusCode::INSUFFICIENT_STORAGE,
+                    Json(serde_json::json!({
+                        "error": err.message,
+                        "error_type": "QuotaExceeded"
+                    })),
+                )
+                    .into_response();
+            }
         }
 
         // Validate chunk size if provided
