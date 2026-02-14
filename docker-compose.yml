@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:17.4-alpine
+    image: postgres:18.2-alpine3.23
     restart: always
     environment:
       POSTGRES_USER: postgres
