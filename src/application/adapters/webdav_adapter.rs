@@ -222,7 +222,7 @@ impl WebDavAdapter {
         
         // Add response for current folder if provided
         if let Some(folder) = folder {
-            Self::write_folder_response(&mut xml_writer, folder, request, &format!("{}", base_href))?;
+            Self::write_folder_response(&mut xml_writer, folder, request, base_href)?;
         }
         
         // If depth allows, add responses for files and subfolders
@@ -396,7 +396,7 @@ impl WebDavAdapter {
         
         // Convert u64 timestamp to DateTime
         let created_at = chrono::DateTime::<Utc>::from_timestamp(folder.created_at as i64, 0)
-            .unwrap_or_else(|| Utc::now());
+            .unwrap_or_else(Utc::now);
         
         xml_writer.write_event(Event::Text(BytesText::new(&created_at.to_rfc3339())))?;
         xml_writer.write_event(Event::End(BytesEnd::new("D:creationdate")))?;
@@ -406,7 +406,7 @@ impl WebDavAdapter {
         
         // Convert u64 timestamp to DateTime
         let modified_at = chrono::DateTime::<Utc>::from_timestamp(folder.modified_at as i64, 0)
-            .unwrap_or_else(|| Utc::now());
+            .unwrap_or_else(Utc::now);
         
         xml_writer.write_event(Event::Text(BytesText::new(&modified_at.to_rfc2822())))?;
         xml_writer.write_event(Event::End(BytesEnd::new("D:getlastmodified")))?;
@@ -457,7 +457,7 @@ impl WebDavAdapter {
         
         // Convert u64 timestamp to DateTime
         let created_at = chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
-            .unwrap_or_else(|| Utc::now());
+            .unwrap_or_else(Utc::now);
         
         xml_writer.write_event(Event::Text(BytesText::new(&created_at.to_rfc3339())))?;
         xml_writer.write_event(Event::End(BytesEnd::new("D:creationdate")))?;
@@ -467,7 +467,7 @@ impl WebDavAdapter {
         
         // Convert u64 timestamp to DateTime
         let modified_at = chrono::DateTime::<Utc>::from_timestamp(file.modified_at as i64, 0)
-            .unwrap_or_else(|| Utc::now());
+            .unwrap_or_else(Utc::now);
         
         xml_writer.write_event(Event::Text(BytesText::new(&modified_at.to_rfc2822())))?;
         xml_writer.write_event(Event::End(BytesEnd::new("D:getlastmodified")))?;
@@ -536,7 +536,7 @@ impl WebDavAdapter {
                         
                         // Convert u64 timestamp to DateTime
                         let created_at = chrono::DateTime::<Utc>::from_timestamp(folder.created_at as i64, 0)
-                            .unwrap_or_else(|| Utc::now());
+                            .unwrap_or_else(Utc::now);
                         
                         xml_writer.write_event(Event::Text(BytesText::new(&created_at.to_rfc3339())))?;
                         xml_writer.write_event(Event::End(BytesEnd::new("D:creationdate")))?;
@@ -546,7 +546,7 @@ impl WebDavAdapter {
                         
                         // Convert u64 timestamp to DateTime
                         let modified_at = chrono::DateTime::<Utc>::from_timestamp(folder.modified_at as i64, 0)
-                            .unwrap_or_else(|| Utc::now());
+                            .unwrap_or_else(Utc::now);
                         
                         xml_writer.write_event(Event::Text(BytesText::new(&modified_at.to_rfc2822())))?;
                         xml_writer.write_event(Event::End(BytesEnd::new("D:getlastmodified")))?;
@@ -568,12 +568,12 @@ impl WebDavAdapter {
                     },
                     _ => {
                         // Property not supported - write empty element
-                        xml_writer.write_event(Event::Empty(BytesStart::new(&format!("D:{}", prop.name))))?;
+                        xml_writer.write_event(Event::Empty(BytesStart::new(format!("D:{}", prop.name))))?;
                     }
                 }
             } else {
                 // Non-DAV namespace, not supported
-                xml_writer.write_event(Event::Empty(BytesStart::new(&format!("{}:{}", prop.namespace, prop.name))))?;
+                xml_writer.write_event(Event::Empty(BytesStart::new(format!("{}:{}", prop.namespace, prop.name))))?;
             }
         }
         
@@ -612,7 +612,7 @@ impl WebDavAdapter {
                         
                         // Convert u64 timestamp to DateTime
                         let created_at = chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
-                            .unwrap_or_else(|| Utc::now());
+                            .unwrap_or_else(Utc::now);
                         
                         xml_writer.write_event(Event::Text(BytesText::new(&created_at.to_rfc3339())))?;
                         xml_writer.write_event(Event::End(BytesEnd::new("D:creationdate")))?;
@@ -622,7 +622,7 @@ impl WebDavAdapter {
                         
                         // Convert u64 timestamp to DateTime
                         let modified_at = chrono::DateTime::<Utc>::from_timestamp(file.modified_at as i64, 0)
-                            .unwrap_or_else(|| Utc::now());
+                            .unwrap_or_else(Utc::now);
                         
                         xml_writer.write_event(Event::Text(BytesText::new(&modified_at.to_rfc2822())))?;
                         xml_writer.write_event(Event::End(BytesEnd::new("D:getlastmodified")))?;
@@ -634,12 +634,12 @@ impl WebDavAdapter {
                     },
                     _ => {
                         // Property not supported - write empty element
-                        xml_writer.write_event(Event::Empty(BytesStart::new(&format!("D:{}", prop.name))))?;
+                        xml_writer.write_event(Event::Empty(BytesStart::new(format!("D:{}", prop.name))))?;
                     }
                 }
             } else {
                 // Non-DAV namespace, not supported
-                xml_writer.write_event(Event::Empty(BytesStart::new(&format!("{}:{}", prop.namespace, prop.name))))?;
+                xml_writer.write_event(Event::Empty(BytesStart::new(format!("{}:{}", prop.namespace, prop.name))))?;
             }
         }
         
@@ -997,22 +997,20 @@ impl WebDavAdapter {
     
     /// Helper method to extract namespace from tag name
     pub fn extract_namespace(name: &str) -> String {
-        if let Some(idx) = name.rfind(':') {
-            if idx > 0 {
+        if let Some(idx) = name.rfind(':')
+            && idx > 0 {
                 return name[..idx].to_string();
             }
-        }
         // Default namespace for WebDAV
         "DAV:".to_string()
     }
     
     /// Helper method to extract local name from tag name
     pub fn extract_local_name(name: &str) -> String {
-        if let Some(idx) = name.rfind(':') {
-            if idx > 0 && idx < name.len() - 1 {
+        if let Some(idx) = name.rfind(':')
+            && idx > 0 && idx < name.len() - 1 {
                 return name[idx+1..].to_string();
             }
-        }
         name.to_string()
     }
 }

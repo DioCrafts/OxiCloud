@@ -80,7 +80,7 @@ pub struct UploadSession {
 impl UploadSession {
     /// Calculate number of chunks needed
     pub fn calculate_chunk_count(total_size: u64, chunk_size: usize) -> usize {
-        ((total_size as usize + chunk_size - 1) / chunk_size).max(1)
+        (total_size as usize).div_ceil(chunk_size).max(1)
     }
     
     /// Get upload progress (0.0 - 1.0)
@@ -212,14 +212,12 @@ impl ChunkedUploadService {
                         let sessions = sessions.read().await;
                         if !sessions.contains_key(dir_name) {
                             // Check if directory is old (>24h)
-                            if let Ok(metadata) = fs::metadata(&path).await {
-                                if let Ok(modified) = metadata.modified() {
-                                    if modified.elapsed().unwrap_or_default() > SESSION_EXPIRATION {
+                            if let Ok(metadata) = fs::metadata(&path).await
+                                && let Ok(modified) = metadata.modified()
+                                    && modified.elapsed().unwrap_or_default() > SESSION_EXPIRATION {
                                         let _ = fs::remove_dir_all(&path).await;
                                         tracing::info!("🧹 Cleaned orphaned upload dir: {:?}", path);
                                     }
-                                }
-                            }
                         }
                     }
                 }
@@ -283,7 +281,7 @@ impl ChunkedUploadService {
             bytes_received: 0,
         };
         
-        let expires_at = (SESSION_EXPIRATION.as_secs()) as u64;
+        let expires_at = SESSION_EXPIRATION.as_secs();
         
         {
             let mut sessions = self.sessions.write().await;

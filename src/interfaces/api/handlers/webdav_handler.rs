@@ -409,7 +409,7 @@ async fn handle_get(
         .header(header::CONTENT_LENGTH, content.len())
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(header::LAST_MODIFIED, chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
             .to_rfc2822())
         .body(Body::from(content))
         .unwrap())
@@ -463,7 +463,7 @@ async fn handle_head(
         .header(header::CONTENT_LENGTH, content.len())
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(header::LAST_MODIFIED, chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
             .to_rfc2822())
         .body(Body::empty())
         .unwrap())
@@ -573,7 +573,7 @@ async fn handle_mkcol(
     }
     
     // Extract folder name from path
-    let folder_name = path.split('/').last().unwrap_or("unnamed");
+    let folder_name = path.split('/').next_back().unwrap_or("unnamed");
     
     // Get parent folder path
     let parent_path = if let Some(idx) = path.rfind('/') {
@@ -715,7 +715,7 @@ async fn handle_move(
     
     if let Ok(folder) = folder_result {
         // Move folder
-        let dest_folder_name = destination_path.split('/').last().unwrap_or(&destination_path);
+        let dest_folder_name = destination_path.split('/').next_back().unwrap_or(&destination_path);
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {
@@ -753,7 +753,7 @@ async fn handle_move(
             AppError::not_found(format!("Resource not found: {}", source_path))
         })?;
         
-        let dest_filename = destination_path.split('/').last().unwrap_or(&destination_path);
+        let dest_filename = destination_path.split('/').next_back().unwrap_or(&destination_path);
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {
@@ -854,7 +854,7 @@ async fn handle_copy(
         // Copy folder
         let recursive = depth != "0";
         
-        let dest_folder_name = destination_path.split('/').last().unwrap_or(&destination_path);
+        let dest_folder_name = destination_path.split('/').next_back().unwrap_or(&destination_path);
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {
@@ -908,7 +908,7 @@ async fn handle_copy(
         })?;
         
         // Get destination parent path and filename
-        let dest_filename = destination_path.split('/').last().unwrap_or(&destination_path);
+        let dest_filename = destination_path.split('/').next_back().unwrap_or(&destination_path);
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {

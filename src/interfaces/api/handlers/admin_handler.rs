@@ -51,7 +51,7 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, S
         .ok_or_else(|| AppError::unauthorized("Authorization token required"))?;
 
     let claims = auth.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
 
     if claims.role != "admin" {
         return Err(AppError::new(
@@ -75,7 +75,7 @@ async fn get_oidc_settings(
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
     let settings = svc.get_oidc_settings().await
-        .map_err(|e| AppError::internal_error(&format!("Failed to load settings: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to load settings: {}", e)))?;
 
     Ok(Json(settings))
 }
@@ -92,7 +92,7 @@ async fn save_oidc_settings(
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
     svc.save_oidc_settings(dto, &user_id).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to save settings: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to save settings: {}", e)))?;
 
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": "OIDC settings saved and applied successfully"
@@ -111,7 +111,7 @@ async fn test_oidc_connection(
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
     let result = svc.test_oidc_connection(dto).await
-        .map_err(|e| AppError::internal_error(&format!("Connection test failed: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Connection test failed: {}", e)))?;
 
     Ok(Json(result))
 }
@@ -173,7 +173,7 @@ async fn get_dashboard_stats(
     )
     .fetch_one(db_pool.as_ref())
     .await
-    .map_err(|e| AppError::internal_error(&format!("Database query failed: {}", e)))?;
+    .map_err(|e| AppError::internal_error(format!("Database query failed: {}", e)))?;
 
     use sqlx::Row;
     let total_quota: i64 = stats_row.get("total_quota_bytes");
@@ -228,7 +228,7 @@ async fn list_users(
     let offset = query.offset.unwrap_or(0);
 
     let users = auth.auth_application_service.list_users(limit, offset).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to list users: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to list users: {}", e)))?;
 
     let total = auth.auth_application_service.count_users_efficient().await.unwrap_or(0);
 
@@ -252,7 +252,7 @@ async fn get_user(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     let user = auth.auth_application_service.get_user_admin(&id).await
-        .map_err(|e| AppError::not_found(&format!("User not found: {}", e)))?;
+        .map_err(|e| AppError::not_found(format!("User not found: {}", e)))?;
 
     Ok(Json(user))
 }
@@ -278,7 +278,7 @@ async fn delete_user(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service.delete_user_admin(&id).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to delete user: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to delete user: {}", e)))?;
 
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": "User deleted successfully"
@@ -307,7 +307,7 @@ async fn update_user_role(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service.change_user_role(&id, &dto.role).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to change role: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to change role: {}", e)))?;
 
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": format!("User role updated to '{}'", dto.role)
@@ -336,7 +336,7 @@ async fn update_user_active(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service.set_user_active(&id, dto.active).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to update user status: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to update user status: {}", e)))?;
 
     let status = if dto.active { "activated" } else { "deactivated" };
     Ok((StatusCode::OK, Json(serde_json::json!({
@@ -357,7 +357,7 @@ async fn update_user_quota(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service.update_user_quota(&id, dto.quota_bytes).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to update quota: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to update quota: {}", e)))?;
 
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": "User quota updated",
@@ -383,7 +383,7 @@ async fn create_user(
     let user = auth.auth_application_service.admin_create_user(dto).await
         .map_err(|e| AppError::new(
             StatusCode::BAD_REQUEST,
-            &format!("Failed to create user: {}", e),
+            format!("Failed to create user: {}", e),
             "CreateUserFailed",
         ))?;
 
@@ -405,7 +405,7 @@ async fn reset_user_password(
     auth.auth_application_service.admin_reset_password(&id, &dto.new_password).await
         .map_err(|e| AppError::new(
             StatusCode::BAD_REQUEST,
-            &format!("Failed to reset password: {}", e),
+            format!("Failed to reset password: {}", e),
             "ResetPasswordFailed",
         ))?;
 
@@ -455,7 +455,7 @@ async fn set_registration_setting(
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
     svc.set_registration_enabled(enabled, &admin_id).await
-        .map_err(|e| AppError::internal_error(&format!("Failed to save setting: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to save setting: {}", e)))?;
 
     Ok((StatusCode::OK, Json(serde_json::json!({
         "message": format!("Public registration {}", if enabled { "enabled" } else { "disabled" }),

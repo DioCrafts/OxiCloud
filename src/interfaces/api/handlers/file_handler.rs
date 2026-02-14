@@ -271,7 +271,7 @@ impl FileHandler {
         };
 
         // ── Metadata-only request ────────────────────────────────────
-        if params.get("metadata").map_or(false, |v| v == "true" || v == "1") {
+        if params.get("metadata").is_some_and(|v| v == "true" || v == "1") {
             return (StatusCode::OK, Json(serde_json::json!({
                 "id": file_dto.id,
                 "name": file_dto.name,
@@ -287,9 +287,9 @@ impl FileHandler {
         let etag = format!("\"{}-{}\"", id, file_dto.modified_at);
 
         // ── ETag (304 Not Modified) ──────────────────────────────────
-        if let Some(inm) = headers.get(header::IF_NONE_MATCH) {
-            if let Ok(client_etag) = inm.to_str() {
-                if client_etag == etag || client_etag == "*" {
+        if let Some(inm) = headers.get(header::IF_NONE_MATCH)
+            && let Ok(client_etag) = inm.to_str()
+                && (client_etag == etag || client_etag == "*") {
                     return Response::builder()
                         .status(StatusCode::NOT_MODIFIED)
                         .header(header::ETAG, &etag)
@@ -297,13 +297,11 @@ impl FileHandler {
                         .unwrap()
                         .into_response();
                 }
-            }
-        }
 
         // ── Range Requests ───────────────────────────────────────────
-        if let Some(range_header) = headers.get(header::RANGE) {
-            if let Ok(range_str) = range_header.to_str() {
-                if let Ok(ranges) = parse_range_header(range_str) {
+        if let Some(range_header) = headers.get(header::RANGE)
+            && let Ok(range_str) = range_header.to_str()
+                && let Ok(ranges) = parse_range_header(range_str) {
                     let validated = ranges.validate(file_dto.size);
                     if let Ok(valid_ranges) = validated {
                         if let Some(range) = valid_ranges.first() {
@@ -342,16 +340,14 @@ impl FileHandler {
                             .into_response();
                     }
                 }
-            }
-        }
 
         // ── Normal download (delegated to service) ───────────────────
         let disposition = Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
 
         let accept_webp = headers.get(header::ACCEPT)
             .and_then(|v| v.to_str().ok())
-            .map_or(false, |a| a.contains("image/webp"));
-        let prefer_original = params.get("original").map_or(false, |v| v == "true" || v == "1");
+            .is_some_and(|a| a.contains("image/webp"));
+        let prefer_original = params.get("original").is_some_and(|v| v == "true" || v == "1");
 
         match retrieval.get_file_optimized(&id, accept_webp, prefer_original).await {
             Ok((_file, content)) => match content {
@@ -447,9 +443,9 @@ impl FileHandler {
         if let Ok(body_bytes) = axum::body::to_bytes(
             response.into_response().into_body(),
             10 * 1024,
-        ).await {
-            if let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&body_bytes) {
-                if let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
+        ).await
+            && let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&body_bytes)
+                && let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
                     file_info.get("id").and_then(|v| v.as_str()),
                     file_info.get("mime_type").and_then(|v| v.as_str()),
                     file_info.get("path").and_then(|v| v.as_str()),
@@ -477,8 +473,6 @@ impl FileHandler {
                         .unwrap()
                         .into_response();
                 }
-            }
-        }
 
         // Fallback for errors
         (StatusCode::INTERNAL_SERVER_ERROR, "Upload processing error").into_response()
@@ -676,7 +670,7 @@ impl FileHandler {
 
     /// Build a Content-Disposition header value.
     fn content_disposition(name: &str, mime: &str, params: &HashMap<String, String>) -> String {
-        let force_inline = params.get("inline").map_or(false, |v| v == "true" || v == "1");
+        let force_inline = params.get("inline").is_some_and(|v| v == "true" || v == "1");
         if force_inline
             || mime.starts_with("image/")
             || mime == "application/pdf"
@@ -750,7 +744,7 @@ impl FileHandler {
             .header(header::VARY, "Accept-Encoding");
 
         if should_compress {
-            match compression_service.compress_data(&content.to_vec(), compression_level).await {
+            match compression_service.compress_data(&content, compression_level).await {
                 Ok(compressed) => {
                     builder
                         .header(header::CONTENT_TYPE, mime_type)

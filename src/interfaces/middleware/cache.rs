@@ -197,13 +197,12 @@ where
     // If there is a cache entry
     if let Some(cache_entry) = cache.get(cache_key) {
         // Check if the client already has the updated version
-        if let Some(client_etag) = if_none_match {
-            if client_etag == cache_entry.etag {
+        if let Some(client_etag) = if_none_match
+            && client_etag == cache_entry.etag {
                 // The client has the most recent version, send 304 Not Modified
                 debug!("Cache hit (304) for key: {}", cache_key);
                 return Ok(create_not_modified_response(&cache_entry));
             }
-        }
         
         // The client needs the updated version
         if let Some(data) = &cache_entry.data {
@@ -392,7 +391,7 @@ where
                 // The client has the correct version, send 304
                 debug!("Cache HIT (304): {}", cache_key);
                 let response = create_not_modified_response(&cache_entry);
-                return Box::pin(async move { Ok(response) });
+                Box::pin(async move { Ok(response) })
             },
             Some(cache_entry) if cache_entry.data.is_some() => {
                 // The client needs the updated version
@@ -409,7 +408,7 @@ where
                 // Add cache headers
                 set_cache_headers(&mut response, &cache_entry.etag, max_age.unwrap_or(cache_entry.max_age));
                 
-                return Box::pin(async move { Ok(response) });
+                Box::pin(async move { Ok(response) })
             },
             _ => {
                 // Not cached or expired
@@ -419,7 +418,7 @@ where
                 let max_age = self.max_age;
                 let cache_key = cache_key.clone();
                 
-                return Box::pin(async move {
+                Box::pin(async move {
                     let response = future.await.map_err(|e| e.into())?;
                     let response = response_map_body(response).await;
                     
@@ -449,7 +448,7 @@ where
                     set_cache_headers(&mut response, &etag, max_age.unwrap_or(cache_clone.default_max_age));
                     
                     Ok(response)
-                });
+                })
             }
         }
     }

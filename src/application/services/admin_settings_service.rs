@@ -139,11 +139,10 @@ impl AdminSettingsService {
         self.settings_repo.set("oidc.issuer_url", &dto.issuer_url, cat, false, by).await?;
         self.settings_repo.set("oidc.client_id", &dto.client_id, cat, false, by).await?;
 
-        if let Some(ref secret) = dto.client_secret {
-            if !secret.is_empty() {
+        if let Some(ref secret) = dto.client_secret
+            && !secret.is_empty() {
                 self.settings_repo.set("oidc.client_secret", secret, cat, true, by).await?;
             }
-        }
         if let Some(ref v) = dto.scopes {
             self.settings_repo.set("oidc.scopes", v, cat, false, by).await?;
         }

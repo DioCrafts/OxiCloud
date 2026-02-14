@@ -73,8 +73,7 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
 async fn tables_exist(pool: &PgPool) -> bool {
     sqlx::query("SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'auth' AND tablename = 'users')")
         .fetch_one(pool)
-        .await
-        .and_then(|row| Ok(row.get::<bool, _>(0)))
+        .await.map(|row| row.get::<bool, _>(0))
         .unwrap_or(false)
 }
 

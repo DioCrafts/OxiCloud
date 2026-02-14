@@ -57,21 +57,19 @@ impl TrashRepository for MockTrashRepository {
 
     async fn restore_from_trash(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
-        if let Some(item) = items.get(id) {
-            if item.user_id() == *user_id {
+        if let Some(item) = items.get(id)
+            && item.user_id() == *user_id {
                 items.remove(id);
             }
-        }
         Ok(())
     }
 
     async fn delete_permanently(&self, id: &Uuid, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
-        if let Some(item) = items.get(id) {
-            if item.user_id() == *user_id {
+        if let Some(item) = items.get(id)
+            && item.user_id() == *user_id {
                 items.remove(id);
             }
-        }
         Ok(())
     }
 

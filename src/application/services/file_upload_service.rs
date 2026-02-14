@@ -13,7 +13,7 @@ use crate::common::errors::DomainError;
 use tracing::{debug, info, warn};
 
 /// Threshold for using streaming upload (files >= 1MB use streaming)
-const STREAMING_UPLOAD_THRESHOLD: usize = 1 * 1024 * 1024;
+const STREAMING_UPLOAD_THRESHOLD: usize = 1024 * 1024;
 /// Threshold for write-behind cache (files < 256KB get instant response)
 const WRITE_BEHIND_THRESHOLD: usize = 256 * 1024;
 
@@ -168,9 +168,9 @@ impl FileUploadUseCase for FileUploadService {
         }
 
         // ─── TIER 1: Write-Behind (<256 KB) ──────────────────
-        if total_size < WRITE_BEHIND_THRESHOLD {
-            if let Some(wb) = &self.write_behind {
-                if wb.is_eligible_size(total_size) {
+        if total_size < WRITE_BEHIND_THRESHOLD
+            && let Some(wb) = &self.write_behind
+                && wb.is_eligible_size(total_size) {
                     let data: Bytes = if chunks.len() == 1 {
                         chunks.into_iter().next().unwrap()
                     } else {
@@ -198,12 +198,10 @@ impl FileUploadUseCase for FileUploadService {
                     self.maybe_update_storage_usage(&dto);
                     return Ok((dto, UploadStrategy::WriteBehind));
                 }
-            }
-        }
 
         // ─── TIER 2: Streaming (≥1 MB) ──────────────────────
         if total_size >= STREAMING_UPLOAD_THRESHOLD {
-            let chunk_stream = stream::iter(chunks.into_iter().map(|c| Ok::<_, std::io::Error>(c)));
+            let chunk_stream = stream::iter(chunks.into_iter().map(Ok::<_, std::io::Error>));
             let pinned_stream: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>> =
                 Box::pin(chunk_stream);
 

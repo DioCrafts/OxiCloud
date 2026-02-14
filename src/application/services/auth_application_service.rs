@@ -152,13 +152,13 @@ impl AuthApplicationService {
     /// Returns whether OIDC is configured and enabled
     pub fn oidc_enabled(&self) -> bool {
         let state = self.oidc.read().unwrap();
-        state.service.is_some() && state.config.as_ref().map_or(false, |c| c.enabled)
+        state.service.is_some() && state.config.as_ref().is_some_and(|c| c.enabled)
     }
 
     /// Returns whether password login is disabled (OIDC-only mode)
     pub fn password_login_disabled(&self) -> bool {
         let state = self.oidc.read().unwrap();
-        state.config.as_ref().map_or(false, |c| c.disable_password_login)
+        state.config.as_ref().is_some_and(|c| c.disable_password_login)
     }
 
     /// Returns a clone of the OIDC config if available

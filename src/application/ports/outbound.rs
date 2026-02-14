@@ -75,7 +75,7 @@ pub trait IdMappingPort: Send + Sync + 'static {
     
     /// Updates a file's path
     async fn update_file_path(&self, file_id: &str, new_path: &PathBuf) -> Result<(), DomainError> {
-        let storage_path = StoragePath::from_string(&new_path.to_string_lossy().to_string());
+        let storage_path = StoragePath::from_string(new_path.to_string_lossy().as_ref());
         self.update_path(file_id, &storage_path).await
     }
 }

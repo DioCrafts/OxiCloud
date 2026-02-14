@@ -24,10 +24,10 @@ use crate::domain::errors::{DomainError, ErrorKind};
 #[macro_export]
 macro_rules! impl_infra_error_to_domain {
     ($error_type:ty, $entity_type:expr) => {
-        impl From<$error_type> for crate::domain::errors::DomainError {
+        impl From<$error_type> for $crate::domain::errors::DomainError {
             fn from(err: $error_type) -> Self {
-                crate::domain::errors::DomainError {
-                    kind: crate::domain::errors::ErrorKind::InternalError,
+                $crate::domain::errors::DomainError {
+                    kind: $crate::domain::errors::ErrorKind::InternalError,
                     entity_type: $entity_type,
                     entity_id: None,
                     message: format!("{}", err),
@@ -81,7 +81,7 @@ impl IntoDomainError for sqlx::Error {
             }
             sqlx::Error::Database(db_err) => {
                 // Handle specific PostgreSQL error codes
-                if db_err.code().map_or(false, |c| c == "23505") {
+                if db_err.code().is_some_and(|c| c == "23505") {
                     DomainError::already_exists(entity_type, "Record already exists")
                 } else {
                     DomainError::new(

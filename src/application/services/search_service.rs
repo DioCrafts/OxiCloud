@@ -154,8 +154,8 @@ impl SearchService {
             return None;
         }
         
-        if let Ok(cache) = self.search_cache.lock() {
-            if let Some(cached_result) = cache.get(key) {
+        if let Ok(cache) = self.search_cache.lock()
+            && let Some(cached_result) = cache.get(key) {
                 let now = Instant::now();
                 let ttl = Duration::from_secs(self.cache_ttl);
                 
@@ -164,7 +164,6 @@ impl SearchService {
                     return Some(cached_result.results.clone());
                 }
             }
-        }
         
         None
     }
@@ -183,14 +182,13 @@ impl SearchService {
         
         if let Ok(mut cache) = self.search_cache.lock() {
             // If the cache is full, remove the oldest entry
-            if cache.len() >= self.max_cache_size {
-                if let Some((oldest_key, _)) = cache
+            if cache.len() >= self.max_cache_size
+                && let Some((oldest_key, _)) = cache
                     .iter()
                     .min_by_key(|(_, result)| result.timestamp) {
                     let key_to_remove = oldest_key.clone();
                     cache.remove(&key_to_remove);
                 }
-            }
             
             // Store the new result
             cache.insert(key, CachedSearchResult {
@@ -211,15 +209,14 @@ impl SearchService {
         files.into_iter()
             .filter(|file| {
                 // Filter by name
-                if let Some(name_query) = &criteria.name_contains {
-                    if !file.name.to_lowercase().contains(&name_query.to_lowercase()) {
+                if let Some(name_query) = &criteria.name_contains
+                    && !file.name.to_lowercase().contains(&name_query.to_lowercase()) {
                         return false;
                     }
-                }
                 
                 // Filter by file type (extension)
                 if let Some(file_types) = &criteria.file_types {
-                    if let Some(extension) = file.name.split('.').last() {
+                    if let Some(extension) = file.name.split('.').next_back() {
                         if !file_types.iter().any(|ext| ext.eq_ignore_ascii_case(extension)) {
                             return false;
                         }
@@ -230,43 +227,37 @@ impl SearchService {
                 }
                 
                 // Filter by creation date
-                if let Some(created_after) = criteria.created_after {
-                    if file.created_at < created_after {
+                if let Some(created_after) = criteria.created_after
+                    && file.created_at < created_after {
                         return false;
                     }
-                }
                 
-                if let Some(created_before) = criteria.created_before {
-                    if file.created_at > created_before {
+                if let Some(created_before) = criteria.created_before
+                    && file.created_at > created_before {
                         return false;
                     }
-                }
                 
                 // Filter by modification date
-                if let Some(modified_after) = criteria.modified_after {
-                    if file.modified_at < modified_after {
+                if let Some(modified_after) = criteria.modified_after
+                    && file.modified_at < modified_after {
                         return false;
                     }
-                }
                 
-                if let Some(modified_before) = criteria.modified_before {
-                    if file.modified_at > modified_before {
+                if let Some(modified_before) = criteria.modified_before
+                    && file.modified_at > modified_before {
                         return false;
                     }
-                }
                 
                 // Filter by size
-                if let Some(min_size) = criteria.min_size {
-                    if file.size < min_size {
+                if let Some(min_size) = criteria.min_size
+                    && file.size < min_size {
                         return false;
                     }
-                }
                 
-                if let Some(max_size) = criteria.max_size {
-                    if file.size > max_size {
+                if let Some(max_size) = criteria.max_size
+                    && file.size > max_size {
                         return false;
                     }
-                }
                 
                 true
             })
@@ -284,37 +275,32 @@ impl SearchService {
         folders.into_iter()
             .filter(|folder| {
                 // Filter by name
-                if let Some(name_query) = &criteria.name_contains {
-                    if !folder.name.to_lowercase().contains(&name_query.to_lowercase()) {
+                if let Some(name_query) = &criteria.name_contains
+                    && !folder.name.to_lowercase().contains(&name_query.to_lowercase()) {
                         return false;
                     }
-                }
                 
                 // Filter by creation date
-                if let Some(created_after) = criteria.created_after {
-                    if folder.created_at < created_after {
+                if let Some(created_after) = criteria.created_after
+                    && folder.created_at < created_after {
                         return false;
                     }
-                }
                 
-                if let Some(created_before) = criteria.created_before {
-                    if folder.created_at > created_before {
+                if let Some(created_before) = criteria.created_before
+                    && folder.created_at > created_before {
                         return false;
                     }
-                }
                 
                 // Filter by modification date
-                if let Some(modified_after) = criteria.modified_after {
-                    if folder.modified_at < modified_after {
+                if let Some(modified_after) = criteria.modified_after
+                    && folder.modified_at < modified_after {
                         return false;
                     }
-                }
                 
-                if let Some(modified_before) = criteria.modified_before {
-                    if folder.modified_at > modified_before {
+                if let Some(modified_before) = criteria.modified_before
+                    && folder.modified_at > modified_before {
                         return false;
                     }
-                }
                 
                 true
             })
@@ -438,10 +424,8 @@ impl SearchUseCase for SearchService {
                 if idx < found_folders.len() {
                     paginated_folders.push(found_folders[idx].clone());
                 }
-            } else {
-                if idx < found_files.len() {
-                    paginated_files.push(found_files[idx].clone());
-                }
+            } else if idx < found_files.len() {
+                paginated_files.push(found_files[idx].clone());
             }
         }
         

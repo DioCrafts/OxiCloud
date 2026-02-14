@@ -67,15 +67,14 @@ async fn register(
     }
 
     // Check if public registration has been disabled by the admin
-    if let Some(admin_svc) = state.admin_settings_service.as_ref() {
-        if !admin_svc.get_registration_enabled().await {
+    if let Some(admin_svc) = state.admin_settings_service.as_ref()
+        && !admin_svc.get_registration_enabled().await {
             return Err(AppError::new(
                 StatusCode::FORBIDDEN,
                 "Public registration has been disabled by the administrator.",
                 "RegistrationDisabled",
             ));
         }
-    }
     
     // Registration logic (admin detection, fresh-install handling, duplicate
     // checks) is all inside the service layer. Call it directly.
@@ -178,7 +177,7 @@ async fn get_current_user(
     
     // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
     
     let user_id = claims.sub;
     
@@ -220,7 +219,7 @@ async fn change_password(
     
     // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
     
     auth_service.auth_application_service.change_password(&claims.sub, dto).await?;
     
@@ -243,7 +242,7 @@ async fn logout(
     
     // Validate the token and get claims
     let claims = auth_service.token_service.validate_token(token)
-        .map_err(|e| AppError::unauthorized(&format!("Invalid token: {}", e)))?;
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
     
     // Use access token for logout (we don't have refresh token in headers)
     auth_service.auth_application_service.logout(&claims.sub, token).await?;

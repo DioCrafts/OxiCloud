@@ -101,11 +101,10 @@ impl FileFsWriteRepository {
     }
 
     async fn get_file_metadata_raw(&self, abs_path: &PathBuf) -> FileRepositoryResult<(u64, u64, u64)> {
-        if let Some(cached) = self.metadata_cache.get_metadata(abs_path).await {
-            if let (Some(s), Some(c), Some(m)) = (cached.size, cached.created_at, cached.modified_at) {
+        if let Some(cached) = self.metadata_cache.get_metadata(abs_path).await
+            && let (Some(s), Some(c), Some(m)) = (cached.size, cached.created_at, cached.modified_at) {
                 return Ok((s, c, m));
             }
-        }
         let meta = time::timeout(self.config.timeouts.file_timeout(), fs::metadata(abs_path))
             .await
             .map_err(|_| FileRepositoryError::StorageError(format!("Timeout: {}", abs_path.display())))?
@@ -177,11 +176,10 @@ impl FileFsWriteRepository {
         for attempt in 1..=3 {
             match self.id_mapping_service.save_changes().await {
                 Ok(_) => {
-                    if let Ok(verified) = self.id_mapping_service.get_path_by_id(id).await {
-                        if verified.to_string() == expected_path {
+                    if let Ok(verified) = self.id_mapping_service.get_path_by_id(id).await
+                        && verified.to_string() == expected_path {
                             return Ok(());
                         }
-                    }
                     if attempt == 3 {
                         return Err(FileRepositoryError::Other("Failed to verify ID mapping after 3 attempts".into()));
                     }

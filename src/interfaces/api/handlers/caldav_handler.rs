@@ -320,7 +320,7 @@ async fn handle_mkcalendar(
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
     
     let (name, description, color) = if body_bytes.is_empty() {
-        let name = path.split('/').last().unwrap_or("New Calendar").to_string();
+        let name = path.split('/').next_back().unwrap_or("New Calendar").to_string();
         (name, None, None)
     } else {
         CalDavAdapter::parse_mkcalendar(body_bytes.reader())

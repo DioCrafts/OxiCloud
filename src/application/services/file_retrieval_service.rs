@@ -145,12 +145,12 @@ impl FileRetrievalUseCase for FileRetrievalService {
         let mime_type = dto.mime_type.clone();
         let file_size = dto.size;
         let file_name = dto.name.clone();
-        let modified_at = dto.modified_at.clone();
+        let modified_at = dto.modified_at;
         let do_transcode = accept_webp && !prefer_original;
 
         // ── Tier 0: Write-behind cache ───────────────────────
-        if let Some(wb) = &self.write_behind {
-            if let Some(pending) = wb.get_pending(id).await {
+        if let Some(wb) = &self.write_behind
+            && let Some(pending) = wb.get_pending(id).await {
                 debug!("⚡ TIER 0 Write-Behind HIT: {} ({} bytes)", file_name, pending.len());
                 let (data, mime) = if do_transcode {
                     if let Some((t, m)) = self.try_transcode(id, &pending, &mime_type, file_size, true).await {
@@ -167,30 +167,27 @@ impl FileRetrievalUseCase for FileRetrievalService {
                     was_transcoded: do_transcode,
                 }));
             }
-        }
 
         // ── Tier 1: Hot cache + transcode (<10 MB) ──────────
         if file_size < CACHE_THRESHOLD {
             // Check content cache first
-            if let Some(cache) = &self.content_cache {
-                if let Some((cached, _etag, _ct)) = cache.get(id).await {
+            if let Some(cache) = &self.content_cache
+                && let Some((cached, _etag, _ct)) = cache.get(id).await {
                     debug!("🔥 TIER 1 Cache HIT: {} ({} bytes)", file_name, cached.len());
-                    if do_transcode {
-                        if let Some((t, m)) = self.try_transcode(id, &cached, &mime_type, file_size, true).await {
+                    if do_transcode
+                        && let Some((t, m)) = self.try_transcode(id, &cached, &mime_type, file_size, true).await {
                             return Ok((dto, OptimizedFileContent::Bytes {
                                 data: t,
                                 mime_type: m,
                                 was_transcoded: true,
                             }));
                         }
-                    }
                     return Ok((dto, OptimizedFileContent::Bytes {
                         data: cached,
                         mime_type: mime_type.clone(),
                         was_transcoded: false,
                     }));
                 }
-            }
 
             // Cache miss – load from disk
             debug!("💾 TIER 1 Cache MISS: {} – loading from disk", file_name);
@@ -203,15 +200,14 @@ impl FileRetrievalUseCase for FileRetrievalService {
                 cache.put(id.to_string(), content_bytes.clone(), etag, mime_type.clone()).await;
             }
 
-            if do_transcode {
-                if let Some((t, m)) = self.try_transcode(id, &content_bytes, &mime_type, file_size, true).await {
+            if do_transcode
+                && let Some((t, m)) = self.try_transcode(id, &content_bytes, &mime_type, file_size, true).await {
                     return Ok((dto, OptimizedFileContent::Bytes {
                         data: t,
                         mime_type: m,
                         was_transcoded: true,
                     }));
                 }
-            }
             return Ok((dto, OptimizedFileContent::Bytes {
                 data: content_bytes,
                 mime_type: mime_type.clone(),

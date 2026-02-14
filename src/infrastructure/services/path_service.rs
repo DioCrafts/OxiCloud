@@ -65,7 +65,7 @@ impl PathService {
     
     /// Checks if a path is at the root
     pub fn is_in_root(&self, path: &StoragePath) -> bool {
-        path.parent().map_or(true, |p| p.is_empty())
+        path.parent().is_none_or(|p| p.is_empty())
     }
     
     /// Gets the root path used by this service

@@ -173,13 +173,11 @@ impl IdMappingService {
         };
         
         // Ensure directory exists
-        if let Some(parent) = map_path.parent() {
-            if !parent.exists() {
-                if let Err(e) = fs::create_dir_all(parent).await {
+        if let Some(parent) = map_path.parent()
+            && !parent.exists()
+                && let Err(e) = fs::create_dir_all(parent).await {
                     tracing::error!("Failed to create directory for ID map: {}", e);
                 }
-            }
-        }
         
         // Write empty map to file (best-effort: the in-memory map is valid even if disk write fails)
         match serde_json::to_string_pretty(&empty_map) {
@@ -413,8 +411,7 @@ impl IdMappingService {
                         // Try a second save if verification fails
                         if let Err(retry_err) = self.save_id_map().await {
                             tracing::error!("Second save attempt also failed: {}", retry_err);
-                            return Err(IdMappingError::IoError(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            return Err(IdMappingError::IoError(std::io::Error::other(
                                 format!("Failed to verify and retry save: {}", retry_err)
                             )));
                         }
@@ -435,8 +432,7 @@ impl IdMappingService {
                     },
                     Err(retry_e) => {
                         tracing::error!("Second save attempt also failed: {}", retry_e);
-                        Err(IdMappingError::IoError(std::io::Error::new(
-                            std::io::ErrorKind::Other, 
+                        Err(IdMappingError::IoError(std::io::Error::other(
                             format!("Failed to save ID mappings after retry: {}", retry_e)
                         )))
                     }

@@ -25,8 +25,7 @@ impl FileSystemUtils {
             Ok(file) => file,
             Err(e) => {
                 error!("Failed to create temporary file in {}: {}", dir.display(), e);
-                return Err(IoError::new(std::io::ErrorKind::Other, 
-                    format!("Failed to create temporary file: {}", e)));
+                return Err(IoError::other(format!("Failed to create temporary file: {}", e)));
             }
         };
         

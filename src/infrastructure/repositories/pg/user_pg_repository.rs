@@ -32,7 +32,7 @@ impl UserPgRepository {
                 UserRepositoryError::NotFound("User not found".to_string())
             },
             sqlx::Error::Database(db_err) => {
-                if db_err.code().map_or(false, |code| code == "23505") {
+                if db_err.code().is_some_and(|code| code == "23505") {
                     // PostgreSQL uniqueness violation code
                     UserRepositoryError::AlreadyExists(
                         "User or email already exists".to_string()
@@ -268,7 +268,7 @@ impl UserRepository for UserPgRepository {
                     .bind(user_clone.username())
                     .bind(user_clone.email())
                     .bind(user_clone.password_hash())
-                    .bind(&user_clone.role().to_string())
+                    .bind(user_clone.role().to_string())
                     .bind(user_clone.storage_quota_bytes())
                     .bind(user_clone.storage_used_bytes())
                     .bind(user_clone.updated_at())

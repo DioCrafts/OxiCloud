@@ -262,9 +262,9 @@ mod tests {
         assert_eq!(share.item_id(), "test_file_id");
         assert_eq!(*share.item_type(), ShareItemType::File);
         assert_eq!(share.created_by(), "user123");
-        assert_eq!(share.permissions().read(), true);
-        assert_eq!(share.permissions().write(), false);
-        assert_eq!(share.permissions().reshare(), false);
+        assert!(share.permissions().read());
+        assert!(!share.permissions().write());
+        assert!(!share.permissions().reshare());
         assert!(!share.has_password());
         assert!(share.expires_at().is_none());
         assert_eq!(share.access_count(), 0);

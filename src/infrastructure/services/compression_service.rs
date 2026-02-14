@@ -159,7 +159,7 @@ impl CompressionService for GzipCompressionService {
             Ok(compressed)
         }).await.unwrap_or_else(|e| {
             error!("Compression task error: {}", e);
-            Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            Err(io::Error::other(e.to_string()))
         })
     }
     
@@ -226,7 +226,7 @@ impl CompressionService for GzipCompressionService {
             Ok(decompressed)
         }).await.unwrap_or_else(|e| {
             error!("Decompression task error: {}", e);
-            Err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            Err(io::Error::other(e.to_string()))
         })
     }
     

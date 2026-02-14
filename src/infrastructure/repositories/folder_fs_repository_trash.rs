@@ -94,15 +94,14 @@ impl FolderFsRepository {
         let original_path_buf = PathBuf::from(original_path);
         
         // Ensure the destination parent directory exists
-        if let Some(parent) = original_path_buf.parent() {
-            if !parent.exists() {
+        if let Some(parent) = original_path_buf.parent()
+            && !parent.exists() {
                 fs::create_dir_all(parent).await
                     .map_err(|e| {
                         error!("Error creating parent directory for restoration: {}", e);
                         FolderRepositoryError::StorageError(e.to_string())
                     })?;
             }
-        }
         
         // Move the folder from the trash to its original location
         match fs::rename(&current_path, &original_path_buf).await {

@@ -59,21 +59,15 @@ impl User {
     ) -> UserResult<Self> {
         // Validations
         if username.is_empty() || username.len() < 3 || username.len() > 32 {
-            return Err(UserError::InvalidUsername(format!(
-                "Username must be between 3 and 32 characters"
-            )));
+            return Err(UserError::InvalidUsername("Username must be between 3 and 32 characters".to_string()));
         }
         
         if !email.contains('@') || email.len() < 5 {
-            return Err(UserError::ValidationError(format!(
-                "Invalid email"
-            )));
+            return Err(UserError::ValidationError("Invalid email".to_string()));
         }
         
         if password_hash.is_empty() {
-            return Err(UserError::InvalidPassword(format!(
-                "Password hash cannot be empty"
-            )));
+            return Err(UserError::InvalidPassword("Password hash cannot be empty".to_string()));
         }
         
         let now = Utc::now();

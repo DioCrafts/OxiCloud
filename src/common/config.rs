@@ -142,8 +142,7 @@ impl ResourceConfig {
         }
         
         // Calculate the number of chunks based on size
-        let chunk_count = (size_bytes as usize + config.parallel_chunk_size_bytes - 1) 
-                         / config.parallel_chunk_size_bytes;
+        let chunk_count = (size_bytes as usize).div_ceil(config.parallel_chunk_size_bytes);
                          
         // Limit to the maximum number of parallel chunks
         chunk_count.min(config.max_parallel_chunks)
@@ -156,7 +155,7 @@ impl ResourceConfig {
         }
         
         // Distribute the size evenly among the chunks
-        ((file_size as usize) + chunk_count - 1) / chunk_count
+        (file_size as usize).div_ceil(chunk_count)
     }
 }
 
@@ -421,11 +420,10 @@ impl AppConfig {
             config.static_path = PathBuf::from(static_path);
         }
             
-        if let Ok(server_port) = env::var("OXICLOUD_SERVER_PORT") {
-            if let Ok(port) = server_port.parse::<u16>() {
+        if let Ok(server_port) = env::var("OXICLOUD_SERVER_PORT")
+            && let Ok(port) = server_port.parse::<u16>() {
                 config.server_port = port;
             }
-        }
             
         if let Ok(server_host) = env::var("OXICLOUD_SERVER_HOST") {
             config.server_host = server_host;
@@ -437,18 +435,16 @@ impl AppConfig {
         }
             
         if let Ok(max_connections) = env::var("OXICLOUD_DB_MAX_CONNECTIONS")
-            .map(|v| v.parse::<u32>()) {
-            if let Ok(val) = max_connections {
+            .map(|v| v.parse::<u32>())
+            && let Ok(val) = max_connections {
                 config.database.max_connections = val;
             }
-        }
             
         if let Ok(min_connections) = env::var("OXICLOUD_DB_MIN_CONNECTIONS")
-            .map(|v| v.parse::<u32>()) {
-            if let Ok(val) = min_connections {
+            .map(|v| v.parse::<u32>())
+            && let Ok(val) = min_connections {
                 config.database.min_connections = val;
             }
-        }
         
         // Auth configuration
         if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
@@ -473,54 +469,47 @@ impl AppConfig {
         }
             
         if let Ok(access_token_expiry) = env::var("OXICLOUD_ACCESS_TOKEN_EXPIRY_SECS")
-            .map(|v| v.parse::<i64>()) {
-            if let Ok(val) = access_token_expiry {
+            .map(|v| v.parse::<i64>())
+            && let Ok(val) = access_token_expiry {
                 config.auth.access_token_expiry_secs = val;
             }
-        }
             
         if let Ok(refresh_token_expiry) = env::var("OXICLOUD_REFRESH_TOKEN_EXPIRY_SECS")
-            .map(|v| v.parse::<i64>()) {
-            if let Ok(val) = refresh_token_expiry {
+            .map(|v| v.parse::<i64>())
+            && let Ok(val) = refresh_token_expiry {
                 config.auth.refresh_token_expiry_secs = val;
             }
-        }
         
         // Feature flags
         if let Ok(enable_auth) = env::var("OXICLOUD_ENABLE_AUTH")
-            .map(|v| v.parse::<bool>()) {
-            if let Ok(val) = enable_auth {
+            .map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_auth {
                 config.features.enable_auth = val;
             }
-        }
         
         if let Ok(enable_user_storage_quotas) = env::var("OXICLOUD_ENABLE_USER_STORAGE_QUOTAS")
-            .map(|v| v.parse::<bool>()) {
-            if let Ok(val) = enable_user_storage_quotas {
+            .map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_user_storage_quotas {
                 config.features.enable_user_storage_quotas = val;
             }
-        }
         
         if let Ok(enable_file_sharing) = env::var("OXICLOUD_ENABLE_FILE_SHARING")
-            .map(|v| v.parse::<bool>()) {
-            if let Ok(val) = enable_file_sharing {
+            .map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_file_sharing {
                 config.features.enable_file_sharing = val;
             }
-        }
         
         if let Ok(enable_trash) = env::var("OXICLOUD_ENABLE_TRASH")
-            .map(|v| v.parse::<bool>()) {
-            if let Ok(val) = enable_trash {
+            .map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_trash {
                 config.features.enable_trash = val;
             }
-        }
         
         if let Ok(enable_search) = env::var("OXICLOUD_ENABLE_SEARCH")
-            .map(|v| v.parse::<bool>()) {
-            if let Ok(val) = enable_search {
+            .map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_search {
                 config.features.enable_search = val;
             }
-        }
         
         // OIDC configuration
         if let Ok(v) = env::var("OXICLOUD_OIDC_ENABLED") {
@@ -558,12 +547,11 @@ impl AppConfig {
         }
 
         // Validate OIDC config when enabled
-        if config.oidc.enabled {
-            if config.oidc.issuer_url.is_empty() || config.oidc.client_id.is_empty() || config.oidc.client_secret.is_empty() {
+        if config.oidc.enabled
+            && (config.oidc.issuer_url.is_empty() || config.oidc.client_id.is_empty() || config.oidc.client_secret.is_empty()) {
                 tracing::error!("OIDC is enabled but OXICLOUD_OIDC_ISSUER_URL, OXICLOUD_OIDC_CLIENT_ID, or OXICLOUD_OIDC_CLIENT_SECRET are not set");
                 config.oidc.enabled = false;
             }
-        }
 
         config
     }

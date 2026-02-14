@@ -51,13 +51,11 @@ impl FileSystemI18nService {
             }
         }
         
-        if let Some(last_part) = parts.last() {
-            if let Some(value) = current.get(last_part) {
-                if value.is_string() {
+        if let Some(last_part) = parts.last()
+            && let Some(value) = current.get(last_part)
+                && value.is_string() {
                     return value.as_str().map(|s| s.to_string());
                 }
-            }
-        }
         
         None
     }
@@ -75,13 +73,11 @@ impl I18nService for FileSystemI18nService {
                 }
                 
                 // Try to use English as fallback if we couldn't find the key
-                if locale != Locale::English {
-                    if let Some(english_translations) = cache.get(&Locale::English) {
-                        if let Some(value) = self.get_nested_value(english_translations, key) {
+                if locale != Locale::English
+                    && let Some(english_translations) = cache.get(&Locale::English)
+                        && let Some(value) = self.get_nested_value(english_translations, key) {
                             return Ok(value);
                         }
-                    }
-                }
                 
                 return Err(I18nError::KeyNotFound(key.to_string()));
             }
@@ -98,13 +94,11 @@ impl I18nService for FileSystemI18nService {
                 }
                 
                 // Try to use English as fallback
-                if locale != Locale::English {
-                    if let Some(english_translations) = cache.get(&Locale::English) {
-                        if let Some(value) = self.get_nested_value(english_translations, key) {
+                if locale != Locale::English
+                    && let Some(english_translations) = cache.get(&Locale::English)
+                        && let Some(value) = self.get_nested_value(english_translations, key) {
                             return Ok(value);
                         }
-                    }
-                }
             }
         }
         

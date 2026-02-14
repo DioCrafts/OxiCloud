@@ -256,13 +256,12 @@ impl WriteBehindCache {
                         pending.get(&file_id).cloned()
                     };
                     
-                    if let Some(entry) = entry {
-                        if let Err(e) = self.flush_single(&file_id, &entry).await {
+                    if let Some(entry) = entry
+                        && let Err(e) = self.flush_single(&file_id, &entry).await {
                             tracing::error!("Failed to flush {}: {}", file_id, e);
                             // Keep in cache for retry
                             continue;
                         }
-                    }
                 }
                 FlushCommand::FlushAll => {
                     let entries: Vec<_> = {

@@ -360,9 +360,9 @@ impl CalDavAdapter {
         for (name, value) in &calendar.custom_properties {
             // Skip properties that start with _ - they're internal
             if !name.starts_with('_') {
-                xml_writer.write_event(Event::Start(BytesStart::new(&format!("CS:{}", name))))?;
+                xml_writer.write_event(Event::Start(BytesStart::new(format!("CS:{}", name))))?;
                 xml_writer.write_event(Event::Text(BytesText::new(value)))?;
-                xml_writer.write_event(Event::End(BytesEnd::new(&format!("CS:{}", name))))?;
+                xml_writer.write_event(Event::End(BytesEnd::new(format!("CS:{}", name))))?;
             }
         }
         

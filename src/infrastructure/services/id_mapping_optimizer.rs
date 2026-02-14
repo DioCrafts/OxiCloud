@@ -60,6 +60,7 @@ pub struct OptimizerStats {
 }
 
 /// Queue for batch operations
+#[derive(Default)]
 struct BatchQueue {
     /// Pending paths to get/create ID
     path_to_id_requests: HashSet<String>,
@@ -67,14 +68,6 @@ struct BatchQueue {
     id_to_path_requests: HashSet<String>,
 }
 
-impl Default for BatchQueue {
-    fn default() -> Self {
-        Self {
-            path_to_id_requests: HashSet::new(),
-            id_to_path_requests: HashSet::new(),
-        }
-    }
-}
 
 /// Result of a batch operation
 struct BatchResult {

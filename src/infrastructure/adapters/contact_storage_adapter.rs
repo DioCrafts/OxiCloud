@@ -380,8 +380,8 @@ impl ContactUseCase for ContactStorageAdapter {
             } else if trimmed.starts_with("NOTE:") {
                 notes = Some(trimmed[5..].trim().to_string());
             } else if trimmed.starts_with("EMAIL") {
-                if let Some(value) = trimmed.split(':').nth(1) {
-                    if !value.is_empty() {
+                if let Some(value) = trimmed.split(':').nth(1)
+                    && !value.is_empty() {
                         let email_type = if trimmed.contains("TYPE=HOME") { "home" }
                             else if trimmed.contains("TYPE=WORK") { "work" }
                             else { "other" };
@@ -391,10 +391,9 @@ impl ContactUseCase for ContactStorageAdapter {
                             is_primary: emails.is_empty(),
                         });
                     }
-                }
-            } else if trimmed.starts_with("TEL") {
-                if let Some(value) = trimmed.split(':').nth(1) {
-                    if !value.is_empty() {
+            } else if trimmed.starts_with("TEL")
+                && let Some(value) = trimmed.split(':').nth(1)
+                    && !value.is_empty() {
                         let phone_type = if trimmed.contains("TYPE=CELL") || trimmed.contains("TYPE=MOBILE") { "mobile" }
                             else if trimmed.contains("TYPE=HOME") { "home" }
                             else if trimmed.contains("TYPE=WORK") { "work" }
@@ -405,8 +404,6 @@ impl ContactUseCase for ContactStorageAdapter {
                             is_primary: phones.is_empty(),
                         });
                     }
-                }
-            }
         }
 
         let contact_uid = uid.unwrap_or_else(|| format!("{}@oxicloud", Uuid::new_v4()));

@@ -83,11 +83,10 @@ impl FileFsReadRepository {
 
     async fn get_file_metadata_raw(&self, abs_path: &PathBuf) -> FileRepositoryResult<(u64, u64, u64)> {
         // Cache first
-        if let Some(cached) = self.metadata_cache.get_metadata(abs_path).await {
-            if let (Some(s), Some(c), Some(m)) = (cached.size, cached.created_at, cached.modified_at) {
+        if let Some(cached) = self.metadata_cache.get_metadata(abs_path).await
+            && let (Some(s), Some(c), Some(m)) = (cached.size, cached.created_at, cached.modified_at) {
                 return Ok((s, c, m));
             }
-        }
         let metadata = time::timeout(self.config.timeouts.file_timeout(), fs::metadata(abs_path))
             .await
             .map_err(|_| FileRepositoryError::StorageError(format!("Timeout metadata: {}", abs_path.display())))?

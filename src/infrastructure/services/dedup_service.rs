@@ -622,14 +622,13 @@ impl DedupService {
             }
             
             // Check size
-            if let Ok(file_meta) = fs::metadata(&blob_path).await {
-                if file_meta.len() != metadata.size {
+            if let Ok(file_meta) = fs::metadata(&blob_path).await
+                && file_meta.len() != metadata.size {
                     corrupted.push(format!(
                         "{}: size mismatch (expected: {}, actual: {})",
                         hash, metadata.size, file_meta.len()
                     ));
                 }
-            }
         }
         
         if corrupted.is_empty() {

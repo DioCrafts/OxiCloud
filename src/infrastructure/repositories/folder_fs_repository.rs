@@ -135,7 +135,7 @@ impl FolderFsRepository {
     
     /// Updates a folder path in the ID mapping service
     pub async fn update_mapped_folder_path(&self, folder_id: &str, new_path: &PathBuf) -> FolderRepositoryResult<()> {
-        let storage_path = StoragePath::from_string(&new_path.to_string_lossy().to_string());
+        let storage_path = StoragePath::from_string(new_path.to_string_lossy().as_ref());
         self.id_mapping_service.update_path(folder_id, &storage_path).await
             .map_err(|e| FolderRepositoryError::StorageError(format!("Failed to update folder path: {}", e)))
     }
@@ -338,10 +338,7 @@ impl FolderRepository for FolderFsRepository {
         let parent_id: Option<String> = if parent.is_none() || parent.as_ref().unwrap().is_empty() {
             None
         } else {
-            match self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await {
-                Ok(pid) => Some(pid),
-                Err(_) => None,
-            }
+            self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await.ok()
         };
         
         // Create folder entity
@@ -377,10 +374,7 @@ impl FolderRepository for FolderFsRepository {
         let parent_id: Option<String> = if parent.is_none() || parent.as_ref().unwrap().is_empty() {
             None
         } else {
-            match self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await {
-                Ok(pid) => Some(pid),
-                Err(_) => None,
-            }
+            self.id_mapping_service.get_or_create_id(parent.as_ref().unwrap()).await.ok()
         };
         
         // Get folder metadata
@@ -651,11 +645,10 @@ impl FolderRepository for FolderFsRepository {
             current_idx += 1;
         }
         
-        if !folders.is_empty() {
-            if let Err(e) = self.id_mapping_service.save_changes().await {
+        if !folders.is_empty()
+            && let Err(e) = self.id_mapping_service.save_changes().await {
                 tracing::error!("Error saving ID mappings: {}", e);
             }
-        }
         
         Ok((folders, total_count))
     }
@@ -771,15 +764,13 @@ impl FolderRepository for FolderFsRepository {
                 tokio::task::spawn_blocking(move || {
                     if let Err(e) = std::fs::remove_dir_all(&path_for_large_removal) {
                         tracing::error!("Error removing large directory: {}", e);
-                        return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other, 
+                        return Err(std::io::Error::other(
                             format!("Failed to remove large directory: {}", e)
                         ));
                     }
                     Ok(())
                 }).await.unwrap_or_else(|e| {
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
+                    Err(std::io::Error::other(
                         format!("Task panicked during directory removal: {}", e)
                     ))
                 })

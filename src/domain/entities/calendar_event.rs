@@ -109,15 +109,14 @@ impl CalendarEvent {
         }
         
         // Validate RRULE if provided (basic validation)
-        if let Some(ref rule) = rrule {
-            if !rule.starts_with("FREQ=") {
+        if let Some(ref rule) = rrule
+            && !rule.starts_with("FREQ=") {
                 return Err(DomainError::new(
                     ErrorKind::InvalidInput,
                     "CalendarEvent",
                     "Recurrence rule must start with FREQ=",
                 ));
             }
-        }
         
         // Validate iCalendar data (basic validation)
         if !ical_data.contains("BEGIN:VEVENT") || !ical_data.contains("END:VEVENT") {
@@ -500,15 +499,14 @@ impl CalendarEvent {
      */
     pub fn update_rrule(&mut self, rrule: Option<String>) -> Result<()> {
         // Validate RRULE if provided (basic validation)
-        if let Some(ref rule) = rrule {
-            if !rule.starts_with("FREQ=") {
+        if let Some(ref rule) = rrule
+            && !rule.starts_with("FREQ=") {
                 return Err(DomainError::new(
                     ErrorKind::InvalidInput,
                     "CalendarEvent",
                     "Recurrence rule must start with FREQ=",
                 ));
             }
-        }
         
         self.rrule = rrule.clone();
         self.updated_at = Utc::now();
@@ -547,17 +545,15 @@ impl CalendarEvent {
         self.description = Self::extract_ical_property(&ical_data, "DESCRIPTION");
         self.location = Self::extract_ical_property(&ical_data, "LOCATION");
         
-        if let Some(dtstart) = Self::extract_ical_property(&ical_data, "DTSTART") {
-            if let Ok(start_time) = Self::parse_ical_datetime(&dtstart) {
+        if let Some(dtstart) = Self::extract_ical_property(&ical_data, "DTSTART")
+            && let Ok(start_time) = Self::parse_ical_datetime(&dtstart) {
                 self.start_time = start_time;
             }
-        }
         
-        if let Some(dtend) = Self::extract_ical_property(&ical_data, "DTEND") {
-            if let Ok(end_time) = Self::parse_ical_datetime(&dtend) {
+        if let Some(dtend) = Self::extract_ical_property(&ical_data, "DTEND")
+            && let Ok(end_time) = Self::parse_ical_datetime(&dtend) {
                 self.end_time = end_time;
             }
-        }
         
         // Update all-day status based on DTSTART
         if let Some(dtstart) = Self::extract_ical_property(&ical_data, "DTSTART") {
@@ -612,13 +608,13 @@ impl CalendarEvent {
                 let until_start = until_pos + 6; // "UNTIL=" is 6 chars
                 if let Some(until_end) = rrule[until_start..].find(';') {
                     let until_str = &rrule[until_start..until_start+until_end];
-                    if let Ok(until_date) = Self::parse_ical_datetime(&until_str) {
+                    if let Ok(until_date) = Self::parse_ical_datetime(until_str) {
                         return until_date >= *start;
                     }
                 } else {
                     // UNTIL is the last part of the rule
                     let until_str = &rrule[until_start..];
-                    if let Ok(until_date) = Self::parse_ical_datetime(&until_str) {
+                    if let Ok(until_date) = Self::parse_ical_datetime(until_str) {
                         return until_date >= *start;
                     }
                 }
@@ -677,7 +673,7 @@ impl CalendarEvent {
     fn parse_ical_datetime(datetime: &str) -> std::result::Result<DateTime<Utc>, String> {
         // Handle VALUE=DATE format
         if datetime.contains("VALUE=DATE") {
-            let date_str = datetime.split(':').last().unwrap_or("");
+            let date_str = datetime.split(':').next_back().unwrap_or("");
             if date_str.len() != 8 {
                 return Err("Invalid date format".to_string());
             }
@@ -696,7 +692,7 @@ impl CalendarEvent {
         }
         
         // Handle standard UTC format (20230101T120000Z)
-        let datetime_str = datetime.split(':').last().unwrap_or(datetime);
+        let datetime_str = datetime.split(':').next_back().unwrap_or(datetime);
         if datetime_str.len() < 15 || !datetime_str.ends_with('Z') {
             return Err("Invalid datetime format".to_string());
         }

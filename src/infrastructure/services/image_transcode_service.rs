@@ -200,11 +200,7 @@ impl ImageTranscodeService {
         // Calculate savings
         let original_size = original_content.len();
         let transcoded_size = transcoded_bytes.len();
-        let saved = if transcoded_size < original_size {
-            original_size - transcoded_size
-        } else {
-            0
-        };
+        let saved = original_size.saturating_sub(transcoded_size);
         
         // Only use transcoded if it's actually smaller
         if transcoded_size >= original_size {
