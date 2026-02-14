@@ -174,17 +174,17 @@ Hardcoded defaults in `src/common/config.rs`:
 
 | Feature | Requires DB | Requires Auth | Feature Flag |
 |---|---|---|---|
-| File storage | No | No | Always on |
+| File storage | Yes | No | Always on |
 | Authentication | Yes | -- | `OXICLOUD_ENABLE_AUTH` |
 | OIDC / SSO | Yes | Yes | `OXICLOUD_OIDC_ENABLED` |
 | File sharing | Yes | Yes | `OXICLOUD_ENABLE_FILE_SHARING` |
-| Trash | No | No | `OXICLOUD_ENABLE_TRASH` |
-| Search | No | No | `OXICLOUD_ENABLE_SEARCH` |
+| Trash | Yes | No | `OXICLOUD_ENABLE_TRASH` |
+| Search | Yes | No | `OXICLOUD_ENABLE_SEARCH` |
 | Favorites | Yes | Yes | Always on (when DB available) |
 | Recent items | Yes | Yes | Always on (when DB available) |
 | Storage quotas | Yes | Yes | `OXICLOUD_ENABLE_USER_STORAGE_QUOTAS` |
 | Admin panel | Yes | Yes | Always on (when auth enabled) |
-| WebDAV | No | Optional | Always on |
+| WebDAV | Yes | Optional | Always on |
 | CalDAV | Yes | Yes | Always on (when DB available) |
 | CardDAV | Yes | Yes | Always on (when DB available) |
 | Deduplication | No | No | Always on |

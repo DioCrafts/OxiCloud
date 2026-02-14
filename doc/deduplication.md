@@ -285,9 +285,12 @@ pub struct CoreServices {
     // ...
 }
 
-// Injected into application services:
-FileUploadService::new_full(... core.dedup_service.clone())
-FileManagementService::new_full(... core.dedup_service.clone())
+// Injected into blob repositories (which handle dedup internally):
+FileBlobReadRepository::new(pool, core.dedup_service.clone(), folder_repo)
+FileBlobWriteRepository::new(pool, core.dedup_service.clone(), folder_repo)
+
+// Also injected into FileManagementService for ref cleanup on delete:
+FileManagementService::new_full(write, read, trash, core.dedup_service.clone())
 ```
 
 ## Persistence

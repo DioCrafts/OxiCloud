@@ -462,7 +462,7 @@ src/
 │           └── delta_sync_handler.rs   # NUEVO: Endpoints API
 │
 └── common/
-    └── di.rs                           # Añadir: delta_sync_service a CoreServices
+    └── di.rs                           # Añadir: delta_sync_service a AppState
 ```
 
 ### Main service (delta_sync_service.rs)
@@ -1133,7 +1133,7 @@ thiserror = "1.0"     # Para errores tipados (probablemente ya existe)
 - [ ] Implement **generate_delta()**
 - [ ] Implement **apply_delta()**
 - [ ] Create handler and API endpoints
-- [ ] Integrate into DI (**CoreServices**)
+- [ ] Integrate into DI (**AppState**)
 - [ ] Add routes in `routes.rs`
 - [ ] Integrate with upload (automatic indexing)
 - [ ] Integrate with delete (signature cleanup)

@@ -134,7 +134,7 @@ Handles: shared element validation, permission management, unique link/token gen
 
 ## Infrastructure
 
-**ShareFsRepository** (`src/infrastructure/repositories/share_fs_repository.rs`) persists share links to the filesystem:
+**ShareFsRepository** (`src/infrastructure/repositories/share_fs_repository.rs`) persists share link metadata to a local JSON file:
 
 ```rust
 pub struct ShareFsRepository {
@@ -157,7 +157,9 @@ struct ShareRecord {
 }
 ```
 
-Stores shared links in a JSON file. Supports queries and updates, search by ID/token/user, and pagination.
+Stores share link records in a JSON file. Supports queries and updates, search by ID/token/user, and pagination.
+
+> **Note:** This repository stores *share link metadata* only (tokens, permissions, expiration). The actual file/folder content is accessed via `FileReadPort` / `FolderStoragePort` which use the blob storage model (PostgreSQL metadata + DedupService blobs).
 
 ## API Handlers and Routes
 
@@ -256,26 +258,30 @@ The service is instantiated via **AppServiceFactory** in `src/common/di.rs` and 
 
 ```rust
 // In AppServiceFactory::create_share_service()
-let share_service: Option<Arc<dyn ShareUseCase>> = if config.features.enable_file_sharing {
-    let share_repository = Arc::new(ShareFsRepository::new(Arc::new(config.clone())));
-    let share_service = Arc::new(ShareService::new(
-        Arc::new(config.clone()),
-        share_repository,
-        file_read_repository.clone(),
-        folder_repository.clone(),
-        password_hasher.clone(),
-    ));
-    Some(share_service)
-} else {
-    None
-};
+pub fn create_share_service(&self, repos: &RepositoryServices)
+    -> Option<Arc<dyn ShareUseCase>>
+{
+    if !self.config.features.enable_file_sharing {
+        return None;
+    }
 
-// Add to AppState
-let app_state = AppState {
-    // ...
-    share_service: share_service.clone(),
-    // ...
-};
+    let share_repository = Arc::new(ShareFsRepository::new(
+        Arc::new(self.config.clone())
+    ));
+
+    let password_hasher: Arc<dyn PasswordHasherPort> =
+        Arc::new(Argon2PasswordHasher::new());
+
+    let service = Arc::new(ShareService::new(
+        Arc::new(self.config.clone()),
+        share_repository,
+        repos.file_read_repository.clone(),   // FileBlobReadRepository
+        repos.folder_repository.clone(),       // FolderDbRepository
+        password_hasher,
+    ));
+
+    Some(service)
+}
 ```
 
 ## Workflows
@@ -353,8 +359,9 @@ HTTP status code mapping:
 
 ## Technical Notes
 
-- **Performance**: JSON file-based storage works for moderate volumes. For higher load, migrate to a database.
-- **Scalability**: the design supports horizontal scaling via distributed or cloud-based repositories.
+- **Share metadata** is stored in a local JSON file via `ShareFsRepository`. This is separate from the 100% blob storage model used for file content.
+- **File/folder lookups** during share access go through `FileReadPort` / `FolderStoragePort`, which read metadata from PostgreSQL and content from the DedupService blob store.
+- **Scalability**: for higher load, share metadata could be migrated to PostgreSQL using the same hexagonal architecture (implement `ShareRepository` with PgPool).
 - **Maintenance**: clear separation of concerns makes testing and maintenance straightforward.
 
-The sharing feature is enabled by default in the current configuration.
+The sharing feature is enabled via `OXICLOUD_ENABLE_FILE_SHARING` configuration flag.
