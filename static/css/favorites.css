@@ -47,6 +47,10 @@
 }
 
 /* Adjustments for list view */
+.list-header.favorites-header {
+    grid-template-columns: 30px minmax(200px, 2fr) 1fr 1fr 120px;
+}
+
 .file-item.favorite-item {
     position: relative;
     grid-template-columns: 30px minmax(200px, 2fr) 1fr 1fr 120px;

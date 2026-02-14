@@ -874,8 +874,7 @@ async function loadTrashItems() {
         if (window.multiSelect) window.multiSelect.clear();
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
-            <div class="list-header">
-                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
+            <div class="list-header trash-header">
                 <div data-i18n="files.name">Name</div>
                 <div data-i18n="files.type">Type</div>
                 <div data-i18n="trash.original_location">Original location</div>
@@ -924,17 +923,44 @@ async function loadTrashItems() {
  */
 function addTrashItemToView(item) {
     const isFile = item.item_type === 'file';
-    const iconClass = isFile ? 'fas fa-file' : 'fas fa-folder';
     
-    // Format date
-    const deletedDate = new Date(item.deleted_at * 1000);
+    // Format date - backend sends trashed_at as ISO 8601 string
+    const deletedDate = new Date(item.trashed_at);
     const formattedDate = deletedDate.toLocaleDateString() + ' ' +
                          deletedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                          
-    // Item type label
-    const typeLabel = isFile ? 
-        (window.i18n ? window.i18n.t('files.file_types.file') : 'File') :
-        (window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder');
+    // Determine type label and icon from extension (trash DTO has no mime_type)
+    let typeLabel;
+    let iconClass;
+    if (!isFile) {
+        iconClass = 'fas fa-folder';
+        typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
+    } else {
+        const ext = (item.name.split('.').pop() || '').toLowerCase();
+        const imageExts = ['jpg','jpeg','png','gif','bmp','svg','webp','ico','tiff'];
+        const videoExts = ['mp4','avi','mkv','mov','wmv','flv','webm'];
+        const audioExts = ['mp3','wav','ogg','flac','aac','wma','m4a'];
+        const textExts  = ['txt','md','csv','log','ini','cfg','conf'];
+        if (ext === 'pdf') {
+            iconClass = 'fas fa-file-pdf';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.pdf') : 'PDF';
+        } else if (imageExts.includes(ext)) {
+            iconClass = 'fas fa-file-image';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
+        } else if (videoExts.includes(ext)) {
+            iconClass = 'fas fa-file-video';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.video') : 'Video';
+        } else if (audioExts.includes(ext)) {
+            iconClass = 'fas fa-file-audio';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.audio') : 'Audio';
+        } else if (textExts.includes(ext)) {
+            iconClass = 'fas fa-file-alt';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
+        } else {
+            iconClass = 'fas fa-file';
+            typeLabel = window.i18n ? window.i18n.t('files.file_types.document') : 'Document';
+        }
+    }
     
     // Grid view element
     const gridElement = document.createElement('div');

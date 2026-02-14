@@ -1811,9 +1811,13 @@ select:focus {
     background-color: #fff0ec;
 }
 
-/* For trash mode, adjust columns */
+/* For trash mode, adjust columns (5 cols: name, type, path, date, actions) */
+.list-header.trash-header {
+    grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
+}
+
 .trash-item.file-item {
-    grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 120px 100px;
+    grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
 }
 
 .file-item:hover {

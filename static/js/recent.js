@@ -109,11 +109,12 @@ const recent = {
             
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
-                <div class="list-header">
+                <div class="list-header recent-header">
+                    <div></div>
                     <div data-i18n="files.name">Name</div>
                     <div data-i18n="files.type">Type</div>
                     <div data-i18n="files.size">Size</div>
-                    <div data-i18n="files.last_accessed">Last accessed</div>
+                    <div data-i18n="recent.accessed">Accessed</div>
                 </div>
             `;
             
@@ -157,7 +158,7 @@ const recent = {
         // Determine icon and type
         let iconClass = 'fas fa-file';
         let iconSpecialClass = '';
-        let typeLabel = 'Document';
+        let typeLabel = window.i18n ? window.i18n.t('files.file_types.document') : 'Document';
 
         if (file.mime_type) {
             if (file.mime_type.startsWith('image/')) {

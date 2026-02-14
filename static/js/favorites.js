@@ -320,7 +320,8 @@ const favorites = {
             
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
-                <div class="list-header">
+                <div class="list-header favorites-header">
+                    <div></div>
                     <div data-i18n="files.name">Name</div>
                     <div data-i18n="files.type">Type</div>
                     <div data-i18n="files.size">Size</div>
@@ -556,7 +557,7 @@ const favorites = {
         // Determine icon and type
         let iconClass = 'fas fa-file';
         let iconSpecialClass = '';
-        let typeLabel = 'Document';
+        let typeLabel = window.i18n ? window.i18n.t('files.file_types.document') : 'Document';
 
         if (file.mime_type) {
             if (file.mime_type.startsWith('image/')) {
