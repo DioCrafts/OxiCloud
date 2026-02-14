@@ -342,7 +342,7 @@ const fileOps = {
                 },
                 body: JSON.stringify({
                     name: name,
-                    parent_id: window.app.currentPath || null
+                    parent_id: window.app.currentPath || window.app.userHomeFolderId || null
                 })
             });
 

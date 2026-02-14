@@ -1,5 +1,5 @@
 // OxiCloud Service Worker
-const CACHE_NAME = 'oxicloud-cache-v11';
+const CACHE_NAME = 'oxicloud-cache-v12';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
