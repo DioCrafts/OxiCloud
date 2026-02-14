@@ -10,10 +10,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load environment variables (.env.local first, then .env)
     if let Ok(path) = env::var("DOTENV_PATH") {
-        dotenv::from_path(Path::new(&path)).ok();
+        dotenvy::from_path(Path::new(&path)).ok();
     } else {
-        dotenv::from_filename(".env.local").ok();
-        dotenv::dotenv().ok();
+        dotenvy::from_filename(".env.local").ok();
+        dotenvy::dotenv().ok();
     }
 
     // Get DATABASE_URL from environment variables
