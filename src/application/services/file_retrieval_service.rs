@@ -56,6 +56,21 @@ impl FileRetrievalService {
         }
     }
 
+    /// Constructor for blob-storage model: read + content cache + transcode.
+    /// No write-behind needed — dedup handled at the repository layer.
+    pub fn new_with_cache(
+        file_read: Arc<dyn FileReadPort>,
+        content_cache: Arc<dyn ContentCachePort>,
+        transcode: Arc<dyn ImageTranscodePort>,
+    ) -> Self {
+        Self {
+            file_read,
+            write_behind: None,
+            content_cache: Some(content_cache),
+            transcode: Some(transcode),
+        }
+    }
+
     // ── private helpers ──────────────────────────────────────────
 
     /// Try to transcode image content to WebP and return transcoded variant.

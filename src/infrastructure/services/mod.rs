@@ -1,13 +1,8 @@
-pub mod buffer_pool;
 pub mod chunked_upload_service;
 pub mod compression_service;
 pub mod dedup_service;
 pub mod file_content_cache;
-pub mod file_metadata_cache;
 pub mod file_system_i18n_service;
-pub mod file_system_utils;
-pub mod id_mapping_optimizer;
-pub mod id_mapping_service;
 pub mod image_transcode_service;
 pub mod jwt_service;
 pub mod oidc_service;

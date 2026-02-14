@@ -303,3 +303,78 @@ COMMENT ON TABLE carddav.contacts IS 'Contacts stored with vCard data for round-
 COMMENT ON TABLE carddav.address_book_shares IS 'Address book sharing permissions between users';
 COMMENT ON TABLE carddav.contact_groups IS 'Contact groups within address books';
 COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between contacts and groups';
+
+-- ============================================================
+-- 4. STORAGE SCHEMA — 100% Blob Storage Model
+-- ============================================================
+-- All file/folder metadata lives here. Actual file content is stored
+-- as content-addressable blobs on the filesystem via DedupService
+-- (.blobs/{prefix}/{hash}.blob). No physical directories are created
+-- for user folders — they are virtual records in this schema.
+-- ============================================================
+CREATE SCHEMA IF NOT EXISTS storage;
+
+-- Virtual folders (replaces physical directories on disk)
+CREATE TABLE IF NOT EXISTS storage.folders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    parent_id UUID REFERENCES storage.folders(id) ON DELETE CASCADE,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    is_trashed BOOLEAN NOT NULL DEFAULT FALSE,
+    trashed_at TIMESTAMP WITH TIME ZONE,
+    original_parent_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- A user cannot have two non-trashed folders with the same name in the same parent
+CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_unique_name
+    ON storage.folders(parent_id, name, user_id) WHERE NOT is_trashed AND parent_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_unique_name_root
+    ON storage.folders(name, user_id) WHERE NOT is_trashed AND parent_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_folders_user_id ON storage.folders(user_id);
+CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON storage.folders(parent_id);
+CREATE INDEX IF NOT EXISTS idx_folders_trashed ON storage.folders(user_id, is_trashed);
+
+-- Files as references to content-addressable blobs
+CREATE TABLE IF NOT EXISTS storage.files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    folder_id UUID REFERENCES storage.folders(id) ON DELETE SET NULL,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    blob_hash VARCHAR(64) NOT NULL,
+    size BIGINT NOT NULL DEFAULT 0,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    is_trashed BOOLEAN NOT NULL DEFAULT FALSE,
+    trashed_at TIMESTAMP WITH TIME ZONE,
+    original_folder_id UUID,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- A user cannot have two non-trashed files with the same name in the same folder
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_unique_name_in_folder
+    ON storage.files(folder_id, name, user_id) WHERE NOT is_trashed AND folder_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_files_unique_name_at_root
+    ON storage.files(name, user_id) WHERE NOT is_trashed AND folder_id IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_files_user_id ON storage.files(user_id);
+CREATE INDEX IF NOT EXISTS idx_files_folder_id ON storage.files(folder_id);
+CREATE INDEX IF NOT EXISTS idx_files_blob_hash ON storage.files(blob_hash);
+CREATE INDEX IF NOT EXISTS idx_files_trashed ON storage.files(user_id, is_trashed);
+CREATE INDEX IF NOT EXISTS idx_files_name_search ON storage.files(user_id, name text_pattern_ops);
+
+-- Trash view combining trashed files and folders for the TrashRepository
+CREATE OR REPLACE VIEW storage.trash_items AS
+    SELECT id, name, 'file' AS item_type, user_id, trashed_at,
+           original_folder_id AS original_parent_id, created_at
+    FROM storage.files WHERE is_trashed = TRUE
+    UNION ALL
+    SELECT id, name, 'folder' AS item_type, user_id, trashed_at,
+           original_parent_id, created_at
+    FROM storage.folders WHERE is_trashed = TRUE;
+
+COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy — no physical directories on disk';
+COMMENT ON TABLE storage.files IS 'File metadata pointing to content-addressable blobs';
+COMMENT ON VIEW storage.trash_items IS 'Unified view of all trashed files and folders';

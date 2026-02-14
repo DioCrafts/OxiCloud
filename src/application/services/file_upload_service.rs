@@ -87,6 +87,21 @@ impl FileUploadService {
         }
     }
 
+    /// Constructor for blob-storage model: write + read ports only.
+    /// Dedup is handled at the repository layer — no write-behind needed.
+    pub fn new_with_read(
+        file_write: Arc<dyn FileWritePort>,
+        file_read: Arc<dyn FileReadPort>,
+    ) -> Self {
+        Self {
+            file_write,
+            file_read: Some(file_read),
+            write_behind: None,
+            dedup: None,
+            storage_usage_service: None,
+        }
+    }
+
     /// Configures the storage usage service
     pub fn with_storage_usage_service(
         mut self,

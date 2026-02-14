@@ -25,10 +25,8 @@ use crate::application::ports::file_ports::{
     OptimizedFileContent, UploadStrategy,
 };
 use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
-use crate::application::ports::outbound::IdMappingPort;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::zip_ports::ZipPort;
-use crate::application::services::storage_mediator::{StorageMediator, StorageMediatorError};
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::entities::folder::Folder;
@@ -80,127 +78,6 @@ impl CompressionPort for StubCompressionPort {
 
     fn should_compress(&self, _mime_type: &str, _size: u64) -> bool {
         false
-    }
-}
-
-// ---------------------------------------------------------------------------
-// IdMappingPort
-// ---------------------------------------------------------------------------
-
-pub struct StubIdMappingService;
-
-#[async_trait]
-impl IdMappingPort for StubIdMappingService {
-    async fn get_or_create_id(&self, _path: &StoragePath) -> Result<String, DomainError> {
-        Ok("dummy-id".to_string())
-    }
-
-    async fn get_path_by_id(&self, _id: &str) -> Result<StoragePath, DomainError> {
-        Ok(StoragePath::from_string("/"))
-    }
-
-    async fn update_path(&self, _id: &str, _new_path: &StoragePath) -> Result<(), DomainError> {
-        Ok(())
-    }
-
-    async fn remove_id(&self, _id: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-
-    async fn save_changes(&self) -> Result<(), DomainError> {
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// StorageMediator
-// ---------------------------------------------------------------------------
-
-pub struct StubStorageMediator;
-
-#[async_trait]
-impl StorageMediator for StubStorageMediator {
-    async fn get_folder_path(&self, _folder_id: &str) -> Result<PathBuf, StorageMediatorError> {
-        Ok(PathBuf::from("/tmp"))
-    }
-
-    async fn get_folder_storage_path(
-        &self,
-        _folder_id: &str,
-    ) -> Result<StoragePath, StorageMediatorError> {
-        Ok(StoragePath::root())
-    }
-
-    async fn get_folder(&self, _folder_id: &str) -> Result<Folder, StorageMediatorError> {
-        Err(StorageMediatorError::NotFound(
-            "Stub not implemented".to_string(),
-        ))
-    }
-
-    async fn file_exists_at_path(&self, _path: &Path) -> Result<bool, StorageMediatorError> {
-        Ok(false)
-    }
-
-    async fn file_exists_at_storage_path(
-        &self,
-        _storage_path: &StoragePath,
-    ) -> Result<bool, StorageMediatorError> {
-        Ok(false)
-    }
-
-    async fn folder_exists_at_path(&self, _path: &Path) -> Result<bool, StorageMediatorError> {
-        Ok(false)
-    }
-
-    async fn folder_exists_at_storage_path(
-        &self,
-        _storage_path: &StoragePath,
-    ) -> Result<bool, StorageMediatorError> {
-        Ok(false)
-    }
-
-    fn resolve_path(&self, _relative_path: &Path) -> PathBuf {
-        PathBuf::from("/tmp")
-    }
-
-    fn resolve_storage_path(&self, _storage_path: &StoragePath) -> PathBuf {
-        PathBuf::from("/tmp")
-    }
-
-    async fn ensure_directory(&self, _path: &Path) -> Result<(), StorageMediatorError> {
-        Ok(())
-    }
-
-    async fn ensure_storage_directory(
-        &self,
-        _storage_path: &StoragePath,
-    ) -> Result<(), StorageMediatorError> {
-        Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// IdMappingPort
-// ---------------------------------------------------------------------------
-
-pub struct StubIdMappingPort;
-
-#[async_trait]
-impl IdMappingPort for StubIdMappingPort {
-    async fn get_or_create_id(&self, _path: &StoragePath) -> Result<String, DomainError> {
-        Ok("stub-id".to_string())
-    }
-    async fn get_path_by_id(&self, _id: &str) -> Result<StoragePath, DomainError> {
-        Ok(StoragePath::from_string("/"))
-    }
-    async fn update_path(&self, _id: &str, _new_path: &StoragePath) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn remove_id(&self, _id: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn save_changes(&self) -> Result<(), DomainError> {
-        Ok(())
     }
 }
 

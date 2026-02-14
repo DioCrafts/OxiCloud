@@ -6,14 +6,12 @@ use flate2::read::GzEncoder as GzEncoderRead;
 use futures::{Stream, StreamExt};
 use std::io;
 use std::io::Read;
-use std::sync::Arc;
 use tracing::error;
 
 use crate::application::ports::compression_ports::{
     CompressionLevel as PortCompressionLevel, CompressionPort,
 };
 use crate::domain::errors::DomainError;
-use crate::infrastructure::services::buffer_pool::BufferPool;
 
 /// Compression level for files
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,22 +71,12 @@ pub trait CompressionService: Send + Sync {
 }
 
 /// Gzip compression service implementation
-pub struct GzipCompressionService {
-    /// Buffer pool for memory optimization
-    buffer_pool: Option<Arc<BufferPool>>,
-}
+pub struct GzipCompressionService;
 
 impl GzipCompressionService {
     /// Creates a new service instance
     pub fn new() -> Self {
-        Self { buffer_pool: None }
-    }
-
-    /// Creates a new service instance with buffer pool
-    pub fn new_with_buffer_pool(buffer_pool: Arc<BufferPool>) -> Self {
-        Self {
-            buffer_pool: Some(buffer_pool),
-        }
+        Self
     }
 }
 
@@ -96,63 +84,6 @@ impl GzipCompressionService {
 impl CompressionService for GzipCompressionService {
     /// Compresses data in memory using Gzip
     async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> io::Result<Vec<u8>> {
-        // If we have a buffer pool, use a borrowed buffer for compression
-        if let Some(pool) = &self.buffer_pool {
-            // Estimate the compression size (approximately 80% of original for typical cases)
-            let estimated_size = (data.len() as f64 * 0.8) as usize;
-
-            // Get a buffer from the pool
-            let buffer = pool.get_buffer().await;
-
-            // Check if the buffer is large enough
-            if buffer.capacity() >= estimated_size {
-                // Run compression in a worker thread using the buffer
-                let buffer_ptr = Arc::new(tokio::sync::Mutex::new(buffer));
-                let buffer_clone = buffer_ptr.clone();
-
-                // Compress data
-                // Clone the data to avoid lifetime issues
-                let data_owned = data.to_vec();
-
-                let result = tokio::task::spawn_blocking(move || {
-                    let mut encoder = GzEncoderRead::new(&data_owned[..], level.into());
-
-                    // Try to lock the mutex (should not fail since we are in a separate thread)
-                    let mut buffer_guard = match futures::executor::block_on(buffer_clone.lock()) {
-                        buffer => buffer,
-                    };
-
-                    // Read directly into the buffer
-                    let read_bytes = encoder.read(buffer_guard.as_mut_slice())?;
-                    buffer_guard.set_used(read_bytes);
-
-                    Ok(()) as io::Result<()>
-                })
-                .await;
-
-                // Verify result
-                match result {
-                    Ok(Ok(())) => {
-                        // Get the buffer and convert it to Vec<u8>
-                        let buffer = buffer_ptr.lock().await;
-                        let cloned_buffer = buffer.clone();
-                        drop(buffer); // Release the mutex first
-                        return Ok(cloned_buffer.into_vec());
-                    }
-                    Ok(Err(e)) => {
-                        error!("Compression error with buffer pool: {}", e);
-                        // Fall back to standard implementation
-                    }
-                    Err(e) => {
-                        error!("Compression task error with buffer pool: {}", e);
-                        // Fall back to standard implementation
-                    }
-                }
-            }
-        }
-
-        // Standard implementation if there is no buffer pool or the buffer is insufficient
-        // Clone the data to avoid lifetime issues
         let data_owned = data.to_vec();
 
         tokio::task::spawn_blocking(move || {
@@ -170,61 +101,7 @@ impl CompressionService for GzipCompressionService {
 
     /// Decompresses data in memory
     async fn decompress_data(&self, compressed_data: &[u8]) -> io::Result<Vec<u8>> {
-        // If we have a buffer pool, use a borrowed buffer for decompression
-        if let Some(pool) = &self.buffer_pool {
-            // Estimate the decompression size (approximately 5x of compressed for typical cases)
-            let estimated_size = compressed_data.len() * 5;
-
-            // Get a buffer from the pool
-            let buffer = pool.get_buffer().await;
-
-            // Check if the buffer is large enough
-            if buffer.capacity() >= estimated_size {
-                // Clone compressed data to move to the worker
-                let data = compressed_data.to_vec();
-                let buffer_ptr = Arc::new(tokio::sync::Mutex::new(buffer));
-                let buffer_clone = buffer_ptr.clone();
-
-                // Decompress data
-                let result = tokio::task::spawn_blocking(move || {
-                    let mut decoder = GzDecoder::new(&data[..]);
-
-                    // Try to lock the mutex
-                    let mut buffer_guard = match futures::executor::block_on(buffer_clone.lock()) {
-                        buffer => buffer,
-                    };
-
-                    // Read directly into the buffer
-                    let read_bytes = decoder.read(buffer_guard.as_mut_slice())?;
-                    buffer_guard.set_used(read_bytes);
-
-                    Ok(()) as io::Result<()>
-                })
-                .await;
-
-                // Verify result
-                match result {
-                    Ok(Ok(())) => {
-                        // Get the buffer and convert it to Vec<u8>
-                        let buffer = buffer_ptr.lock().await;
-                        let cloned_buffer = buffer.clone();
-                        drop(buffer); // Release the mutex first
-                        return Ok(cloned_buffer.into_vec());
-                    }
-                    Ok(Err(e)) => {
-                        error!("Decompression error with buffer pool: {}", e);
-                        // Fall back to standard implementation
-                    }
-                    Err(e) => {
-                        error!("Decompression task error with buffer pool: {}", e);
-                        // Fall back to standard implementation
-                    }
-                }
-            }
-        }
-
-        // Standard implementation if there is no buffer pool or the buffer is insufficient
-        let data = compressed_data.to_vec(); // Clone to move to the worker
+        let data = compressed_data.to_vec();
         tokio::task::spawn_blocking(move || {
             let mut decoder = GzDecoder::new(&data[..]);
             let mut decompressed = Vec::new();

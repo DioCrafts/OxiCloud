@@ -11,6 +11,12 @@ mod settings_pg_repository;
 mod transaction_utils;
 mod user_pg_repository;
 
+// ── Blob-storage repositories ──
+pub mod file_blob_read_repository;
+pub mod file_blob_write_repository;
+pub mod folder_db_repository;
+pub mod trash_db_repository;
+
 pub use address_book_pg_repository::AddressBookPgRepository;
 pub use calendar_event_pg_repository::CalendarEventPgRepository;
 pub use calendar_pg_repository::CalendarPgRepository;
@@ -18,7 +24,11 @@ pub use contact_group_pg_repository::ContactGroupPgRepository;
 pub use contact_persistence_dto::*;
 pub use contact_pg_repository::ContactPgRepository;
 pub use favorites_pg_repository::FavoritesPgRepository;
+pub use file_blob_read_repository::FileBlobReadRepository;
+pub use file_blob_write_repository::FileBlobWriteRepository;
+pub use folder_db_repository::FolderDbRepository;
 pub use recent_items_pg_repository::RecentItemsPgRepository;
 pub use session_pg_repository::SessionPgRepository;
 pub use settings_pg_repository::SettingsPgRepository;
+pub use trash_db_repository::TrashDbRepository;
 pub use user_pg_repository::UserPgRepository;
