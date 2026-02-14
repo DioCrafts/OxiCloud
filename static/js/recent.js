@@ -5,27 +5,69 @@
 
 // Recent Files Module
 const recent = {
-    // Key for storing recent files in localStorage
-    STORAGE_KEY: 'oxicloud_recent_files',
+    // Base key for storing recent files in localStorage (username is appended)
+    STORAGE_KEY_PREFIX: 'oxicloud_recent_files',
+    
+    // Legacy key (pre-fix, shared across all users)
+    LEGACY_STORAGE_KEY: 'oxicloud_recent_files',
     
     // Maximum number of recent files to store
     MAX_RECENT_FILES: 20,
+    
+    /**
+     * Get the user-specific storage key for recent files.
+     * Falls back to legacy global key if username is unavailable.
+     * @returns {string} localStorage key scoped to the current user
+     */
+    getStorageKey() {
+        try {
+            const userData = JSON.parse(localStorage.getItem('oxicloud_user') || '{}');
+            if (userData.username) {
+                return `${this.STORAGE_KEY_PREFIX}_${userData.username}`;
+            }
+        } catch (e) {
+            console.warn('Could not determine current user for recent files key');
+        }
+        // Should not happen in normal flow — user must be logged in
+        return this.LEGACY_STORAGE_KEY;
+    },
     
     /**
      * Initialize recent files module
      */
     init() {
         console.log('Initializing recent files module');
+        this.migrateFromLegacyKey();
         this.ensureRecentFilesStorage();
         this.setupEventListeners();
+    },
+    
+    /**
+     * Migrate data from the old global key to the user-specific key.
+     * This runs once: if the legacy key has data and the user-specific key
+     * does not yet exist, the data is moved.
+     */
+    migrateFromLegacyKey() {
+        const userKey = this.getStorageKey();
+        // Only migrate if the key is actually user-specific
+        if (userKey === this.LEGACY_STORAGE_KEY) return;
+        
+        const legacyData = localStorage.getItem(this.LEGACY_STORAGE_KEY);
+        if (legacyData && !localStorage.getItem(userKey)) {
+            console.log('Migrating recent files from legacy global key to user-specific key');
+            localStorage.setItem(userKey, legacyData);
+        }
+        // Always remove the legacy key so other users don't see stale data
+        localStorage.removeItem(this.LEGACY_STORAGE_KEY);
     },
     
     /**
      * Make sure the recent files storage is initialized
      */
     ensureRecentFilesStorage() {
-        if (!localStorage.getItem(this.STORAGE_KEY)) {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
+        const key = this.getStorageKey();
+        if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify([]));
         }
     },
     
@@ -71,8 +113,8 @@ const recent = {
         // Keep only the most recent files (limit to MAX_RECENT_FILES)
         const trimmedFiles = recentFiles.slice(0, this.MAX_RECENT_FILES);
         
-        // Save back to localStorage
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(trimmedFiles));
+        // Save back to localStorage (user-scoped key)
+        localStorage.setItem(this.getStorageKey(), JSON.stringify(trimmedFiles));
     },
     
     /**
@@ -81,7 +123,7 @@ const recent = {
      */
     getRecentFiles() {
         try {
-            const recentFilesJson = localStorage.getItem(this.STORAGE_KEY);
+            const recentFilesJson = localStorage.getItem(this.getStorageKey());
             return recentFilesJson ? JSON.parse(recentFilesJson) : [];
         } catch (error) {
             console.error('Error loading recent files:', error);
@@ -93,7 +135,7 @@ const recent = {
      * Clear all recent files
      */
     clearRecentFiles() {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify([]));
+        localStorage.setItem(this.getStorageKey(), JSON.stringify([]));
     },
     
     /**

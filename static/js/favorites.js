@@ -5,21 +5,57 @@
 
 // Favorites Module
 const favorites = {
-    // Key for storing favorites in localStorage
-    STORAGE_KEY: 'oxicloud_favorites',
+    // Base key for storing favorites in localStorage (username is appended)
+    STORAGE_KEY_PREFIX: 'oxicloud_favorites',
+    
+    // Legacy key (pre-fix, shared across all users)
+    LEGACY_STORAGE_KEY: 'oxicloud_favorites',
     
     // Flag to indicate if backend API is available
     backendApiAvailable: false,
+    
+    /**
+     * Get the user-specific storage key for favorites.
+     * Falls back to legacy global key if username is unavailable.
+     * @returns {string} localStorage key scoped to the current user
+     */
+    getStorageKey() {
+        try {
+            const userData = JSON.parse(localStorage.getItem('oxicloud_user') || '{}');
+            if (userData.username) {
+                return `${this.STORAGE_KEY_PREFIX}_${userData.username}`;
+            }
+        } catch (e) {
+            console.warn('Could not determine current user for favorites key');
+        }
+        return this.LEGACY_STORAGE_KEY;
+    },
     
     /**
      * Initialize favorites module
      */
     init() {
         console.log('Initializing favorites module');
+        this.migrateFromLegacyKey();
         this.loadFavorites();
         
         // Check if backend favorites API is available
         this.checkBackendAvailability();
+    },
+    
+    /**
+     * Migrate data from the old global key to the user-specific key.
+     */
+    migrateFromLegacyKey() {
+        const userKey = this.getStorageKey();
+        if (userKey === this.LEGACY_STORAGE_KEY) return;
+        
+        const legacyData = localStorage.getItem(this.LEGACY_STORAGE_KEY);
+        if (legacyData && !localStorage.getItem(userKey)) {
+            console.log('Migrating favorites from legacy global key to user-specific key');
+            localStorage.setItem(userKey, legacyData);
+        }
+        localStorage.removeItem(this.LEGACY_STORAGE_KEY);
     },
     
     /**
@@ -122,7 +158,7 @@ const favorites = {
      */
     loadFavorites() {
         try {
-            const stored = localStorage.getItem(this.STORAGE_KEY);
+            const stored = localStorage.getItem(this.getStorageKey());
             return stored ? JSON.parse(stored) : [];
         } catch (error) {
             console.error('Error loading favorites:', error);
@@ -136,7 +172,7 @@ const favorites = {
      */
     saveFavorites(favorites) {
         try {
-            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(favorites));
+            localStorage.setItem(this.getStorageKey(), JSON.stringify(favorites));
         } catch (error) {
             console.error('Error saving favorites:', error);
         }
