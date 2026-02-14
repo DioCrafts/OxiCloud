@@ -44,7 +44,7 @@ use crate::common::stubs::{
     StubFileReadPort, StubFileWritePort, StubFolderStoragePort,
     StubI18nService, StubFolderUseCase, StubFileUploadUseCase,
     StubFileRetrievalUseCase, StubFileManagementUseCase, StubFileUseCaseFactory,
-    StubSearchUseCase,
+    StubSearchUseCase, StubDedupPort,
 };
 
 /// Factory for the different application components
@@ -86,8 +86,10 @@ impl AppServiceFactory {
         &self.storage_path
     }
     
-    /// Initializes the core system services
-    pub async fn create_core_services(&self) -> Result<CoreServices, DomainError> {
+    /// Initializes the core system services.
+    ///
+    /// Requires a `PgPool` because `DedupService` stores its index in PostgreSQL.
+    pub async fn create_core_services(&self, db_pool: &Arc<PgPool>) -> Result<CoreServices, DomainError> {
         // Path service (still needed for blob storage root + thumbnails)
         let path_service = Arc::new(PathService::new(self.storage_path.clone()));
         
@@ -126,9 +128,9 @@ impl AppServiceFactory {
         );
         image_transcode_service.initialize().await?;
         
-        // Deduplication service — PRIMARY blob storage engine
+        // Deduplication service — PRIMARY blob storage engine (PostgreSQL-backed index)
         let dedup_service = Arc::new(
-            crate::infrastructure::services::dedup_service::DedupService::new(&self.storage_path)
+            crate::infrastructure::services::dedup_service::DedupService::new(&self.storage_path, db_pool.clone())
         );
         dedup_service.initialize().await?;
         
@@ -416,8 +418,8 @@ impl AppServiceFactory {
             DomainError::internal_error("Database", "PostgreSQL database is required for blob storage model")
         })?;
 
-        // 1. Core services
-        let core = self.create_core_services().await?;
+        // 1. Core services (PgPool needed for DedupService index)
+        let core = self.create_core_services(&pool).await?;
 
         // 2. Repository services (requires PgPool for all metadata)
         let repos = self.create_repository_services(&core, &pool);
@@ -705,12 +707,8 @@ impl Default for AppState {
             )
         );
 
-        // Create dummy dedup service
-        let dummy_dedup_service: Arc<dyn DedupPort> = Arc::new(
-            crate::infrastructure::services::dedup_service::DedupService::new(
-                &std::path::PathBuf::from("./storage")
-            )
-        );
+        // Stub dedup service (Default is only used for routing stubs, never for real I/O)
+        let dummy_dedup_service: Arc<dyn DedupPort> = Arc::new(StubDedupPort);
 
         // Core services using stubs
         let core_services = CoreServices {

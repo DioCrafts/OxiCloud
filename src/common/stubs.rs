@@ -534,6 +534,91 @@ impl SearchUseCase for StubSearchUseCase {
 }
 
 // ---------------------------------------------------------------------------
+// DedupPort
+// ---------------------------------------------------------------------------
+
+use crate::application::ports::dedup_ports::{
+    BlobMetadataDto, DedupPort, DedupResultDto, DedupStatsDto,
+};
+
+pub struct StubDedupPort;
+
+#[async_trait]
+impl DedupPort for StubDedupPort {
+    async fn store_bytes(
+        &self,
+        _content: &[u8],
+        _content_type: Option<String>,
+    ) -> Result<DedupResultDto, DomainError> {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn store_from_file(
+        &self,
+        _source_path: &Path,
+        _content_type: Option<String>,
+    ) -> Result<DedupResultDto, DomainError> {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn blob_exists(&self, _hash: &str) -> bool {
+        false
+    }
+
+    async fn get_blob_metadata(&self, _hash: &str) -> Option<BlobMetadataDto> {
+        None
+    }
+
+    async fn read_blob(&self, _hash: &str) -> Result<Vec<u8>, DomainError> {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn read_blob_bytes(&self, _hash: &str) -> Result<Bytes, DomainError> {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn add_reference(&self, _hash: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn remove_reference(&self, _hash: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+
+    fn hash_bytes(&self, _content: &[u8]) -> String {
+        String::new()
+    }
+
+    async fn hash_file(&self, _path: &Path) -> Result<String, DomainError> {
+        Ok(String::new())
+    }
+
+    async fn get_stats(&self) -> DedupStatsDto {
+        DedupStatsDto::default()
+    }
+
+    async fn flush(&self) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
+        Ok(Vec::new())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MetadataCachePort
 // ---------------------------------------------------------------------------
 

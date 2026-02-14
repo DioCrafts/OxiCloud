@@ -308,11 +308,30 @@ COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between
 -- 4. STORAGE SCHEMA — 100% Blob Storage Model
 -- ============================================================
 -- All file/folder metadata lives here. Actual file content is stored
--- as content-addressable blobs on the filesystem via DedupService
--- (.blobs/{prefix}/{hash}.blob). No physical directories are created
--- for user folders — they are virtual records in this schema.
+-- as content-addressed blobs on the filesystem (.blobs/{prefix}/{hash}.blob).
+-- The storage.blobs table is the authoritative dedup index — no JSON
+-- files or in-memory HashMaps are used.
+-- No physical directories are created for user folders — they are
+-- virtual records in this schema.
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS storage;
+
+-- Content-addressable blob index (dedup)
+-- One row per unique content hash; multiple storage.files rows may
+-- reference the same blob via blob_hash → storage.blobs.hash.
+CREATE TABLE IF NOT EXISTS storage.blobs (
+    hash        VARCHAR(64) PRIMARY KEY,
+    size        BIGINT NOT NULL,
+    ref_count   INTEGER NOT NULL DEFAULT 1 CHECK (ref_count >= 0),
+    content_type TEXT,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Fast lookup for garbage collection (orphaned blobs with no references)
+CREATE INDEX IF NOT EXISTS idx_blobs_orphaned
+    ON storage.blobs(ref_count) WHERE ref_count = 0;
+
+COMMENT ON TABLE storage.blobs IS 'Content-addressable blob dedup index — one row per unique SHA-256 hash';
 
 -- Virtual folders (replaces physical directories on disk)
 CREATE TABLE IF NOT EXISTS storage.folders (
