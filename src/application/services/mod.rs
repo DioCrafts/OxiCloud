@@ -21,7 +21,7 @@ pub mod trash_service;
 mod trash_service_test;
 
 // Re-exportar para facilitar acceso
-pub use file_upload_service::FileUploadService;
-pub use file_retrieval_service::FileRetrievalService;
 pub use file_management_service::FileManagementService;
+pub use file_retrieval_service::FileRetrievalService;
+pub use file_upload_service::FileUploadService;
 pub use file_use_case_factory::AppFileUseCaseFactory;

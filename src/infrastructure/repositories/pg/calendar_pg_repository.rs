@@ -3,9 +3,11 @@ use chrono::Utc;
 use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
 
-use crate::domain::entities::calendar::Calendar;
-use crate::domain::repositories::calendar_repository::{CalendarRepository, CalendarRepositoryResult};
 use crate::common::errors::DomainError;
+use crate::domain::entities::calendar::Calendar;
+use crate::domain::repositories::calendar_repository::{
+    CalendarRepository, CalendarRepositoryResult,
+};
 
 pub struct CalendarPgRepository {
     pool: Arc<PgPool>,
@@ -38,7 +40,7 @@ impl CalendarRepository for CalendarPgRepository {
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to create calendar: {}", e)))?;
-        
+
         // Build the Calendar object using its with_id constructor
         let result = Calendar::with_id(
             row.get("id"),
@@ -48,7 +50,10 @@ impl CalendarRepository for CalendarPgRepository {
             row.get("color"),
             row.get("created_at"),
             row.get("updated_at"),
-        ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+        )
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to create calendar object: {}", e))
+        })?;
 
         Ok(result)
     }
@@ -61,7 +66,7 @@ impl CalendarRepository for CalendarPgRepository {
             SET name = $1, description = $2, color = $3, is_public = $4, updated_at = $5
             WHERE id = $6
             RETURNING id, name, owner_id, description, color, is_public, created_at, updated_at
-            "#
+            "#,
         )
         .bind(calendar.name())
         .bind(calendar.description())
@@ -72,7 +77,7 @@ impl CalendarRepository for CalendarPgRepository {
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| DomainError::database_error(format!("Failed to update calendar: {}", e)))?;
-        
+
         // Build the Calendar object using its with_id constructor
         let result = Calendar::with_id(
             row.get("id"),
@@ -82,7 +87,10 @@ impl CalendarRepository for CalendarPgRepository {
             row.get("color"),
             row.get("created_at"),
             row.get("updated_at"),
-        ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+        )
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to create calendar object: {}", e))
+        })?;
 
         Ok(result)
     }
@@ -92,7 +100,7 @@ impl CalendarRepository for CalendarPgRepository {
             r#"
             DELETE FROM caldav.calendars
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .execute(&*self.pool)
@@ -108,7 +116,7 @@ impl CalendarRepository for CalendarPgRepository {
             SELECT id, name, owner_id, description, color, is_public, created_at, updated_at
             FROM caldav.calendars
             WHERE id = $1
-            "#
+            "#,
         )
         .bind(id)
         .fetch_optional(&*self.pool)
@@ -124,24 +132,32 @@ impl CalendarRepository for CalendarPgRepository {
             row.get("color"),
             row.get("created_at"),
             row.get("updated_at"),
-        ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+        )
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to create calendar object: {}", e))
+        })?;
 
         Ok(calendar)
     }
 
-    async fn list_calendars_by_owner(&self, owner_id: &str) -> CalendarRepositoryResult<Vec<Calendar>> {
+    async fn list_calendars_by_owner(
+        &self,
+        owner_id: &str,
+    ) -> CalendarRepositoryResult<Vec<Calendar>> {
         let rows = sqlx::query(
             r#"
             SELECT id, name, owner_id, description, color, is_public, created_at, updated_at
             FROM caldav.calendars
             WHERE owner_id = $1
             ORDER BY name
-            "#
+            "#,
         )
         .bind(owner_id)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to get calendars by owner: {}", e)))?;
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to get calendars by owner: {}", e))
+        })?;
 
         let mut calendars = Vec::new();
         for row in rows {
@@ -153,27 +169,38 @@ impl CalendarRepository for CalendarPgRepository {
                 row.get("color"),
                 row.get("created_at"),
                 row.get("updated_at"),
-            ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+            )
+            .map_err(|e| {
+                DomainError::database_error(format!("Failed to create calendar object: {}", e))
+            })?;
             calendars.push(calendar);
         }
 
         Ok(calendars)
     }
 
-    async fn find_calendar_by_name_and_owner(&self, name: &str, owner_id: &str) -> CalendarRepositoryResult<Calendar> {
+    async fn find_calendar_by_name_and_owner(
+        &self,
+        name: &str,
+        owner_id: &str,
+    ) -> CalendarRepositoryResult<Calendar> {
         let row = sqlx::query(
             r#"
             SELECT id, name, owner_id, description, color, is_public, created_at, updated_at
             FROM caldav.calendars
             WHERE name = $1 AND owner_id = $2
-            "#
+            "#,
         )
         .bind(name)
         .bind(owner_id)
         .fetch_optional(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to find calendar by name and owner: {}", e)))?
-        .ok_or_else(|| DomainError::not_found("Calendar", format!("{} (owned by {})", name, owner_id)))?;
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to find calendar by name and owner: {}", e))
+        })?
+        .ok_or_else(|| {
+            DomainError::not_found("Calendar", format!("{} (owned by {})", name, owner_id))
+        })?;
 
         let calendar = Calendar::with_id(
             row.get("id"),
@@ -183,12 +210,18 @@ impl CalendarRepository for CalendarPgRepository {
             row.get("color"),
             row.get("created_at"),
             row.get("updated_at"),
-        ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+        )
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to create calendar object: {}", e))
+        })?;
 
         Ok(calendar)
     }
 
-    async fn list_calendars_shared_with_user(&self, user_id: &str) -> CalendarRepositoryResult<Vec<Calendar>> {
+    async fn list_calendars_shared_with_user(
+        &self,
+        user_id: &str,
+    ) -> CalendarRepositoryResult<Vec<Calendar>> {
         let rows = sqlx::query(
             r#"
             SELECT c.id, c.name, c.owner_id, c.description, c.color, c.is_public, c.created_at, c.updated_at
@@ -213,14 +246,21 @@ impl CalendarRepository for CalendarPgRepository {
                 row.get("color"),
                 row.get("created_at"),
                 row.get("updated_at"),
-            ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+            )
+            .map_err(|e| {
+                DomainError::database_error(format!("Failed to create calendar object: {}", e))
+            })?;
             calendars.push(calendar);
         }
 
         Ok(calendars)
     }
 
-    async fn list_public_calendars(&self, limit: i64, offset: i64) -> CalendarRepositoryResult<Vec<Calendar>> {
+    async fn list_public_calendars(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> CalendarRepositoryResult<Vec<Calendar>> {
         let rows = sqlx::query(
             r#"
             SELECT id, name, owner_id, description, color, is_public, created_at, updated_at
@@ -228,13 +268,15 @@ impl CalendarRepository for CalendarPgRepository {
             WHERE is_public = true
             ORDER BY name
             LIMIT $1 OFFSET $2
-            "#
+            "#,
         )
         .bind(limit)
         .bind(offset)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to get public calendars: {}", e)))?;
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to get public calendars: {}", e))
+        })?;
 
         let mut calendars = Vec::new();
         for row in rows {
@@ -243,17 +285,24 @@ impl CalendarRepository for CalendarPgRepository {
                 row.get("name"),
                 row.get("owner_id"),
                 row.get("description"),
-                row.get("color"), 
+                row.get("color"),
                 row.get("created_at"),
                 row.get("updated_at"),
-            ).map_err(|e| DomainError::database_error(format!("Failed to create calendar object: {}", e)))?;
+            )
+            .map_err(|e| {
+                DomainError::database_error(format!("Failed to create calendar object: {}", e))
+            })?;
             calendars.push(calendar);
         }
 
         Ok(calendars)
     }
 
-    async fn user_has_calendar_access(&self, calendar_id: &Uuid, user_id: &str) -> CalendarRepositoryResult<bool> {
+    async fn user_has_calendar_access(
+        &self,
+        calendar_id: &Uuid,
+        user_id: &str,
+    ) -> CalendarRepositoryResult<bool> {
         // Check if the user is the owner of the calendar or has a share
         let row = sqlx::query(
             r#"
@@ -264,31 +313,39 @@ impl CalendarRepository for CalendarPgRepository {
                 SELECT 1 FROM caldav.calendar_shares s
                 WHERE s.calendar_id = $1 AND s.user_id = $2
             ) as has_access
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(user_id)
         .fetch_one(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to check calendar access: {}", e)))?;
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to check calendar access: {}", e))
+        })?;
 
         Ok(row.get::<bool, _>("has_access"))
     }
 
-    async fn share_calendar(&self, calendar_id: &Uuid, user_id: &str, access_level: &str) -> CalendarRepositoryResult<()> {
+    async fn share_calendar(
+        &self,
+        calendar_id: &Uuid,
+        user_id: &str,
+        access_level: &str,
+    ) -> CalendarRepositoryResult<()> {
         // Validate access level
         if !["read", "write", "owner"].contains(&access_level) {
-            return Err(DomainError::validation_error(
-                format!("Invalid access level: '{}'. Must be 'read', 'write', or 'owner'", access_level)
-            ));
+            return Err(DomainError::validation_error(format!(
+                "Invalid access level: '{}'. Must be 'read', 'write', or 'owner'",
+                access_level
+            )));
         }
-        
+
         sqlx::query(
             r#"
             INSERT INTO caldav.calendar_shares (calendar_id, user_id, access_level)
             VALUES ($1, $2, $3)
             ON CONFLICT (calendar_id, user_id) DO UPDATE SET access_level = $3
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(user_id)
@@ -300,12 +357,16 @@ impl CalendarRepository for CalendarPgRepository {
         Ok(())
     }
 
-    async fn remove_calendar_sharing(&self, calendar_id: &Uuid, user_id: &str) -> CalendarRepositoryResult<()> {
+    async fn remove_calendar_sharing(
+        &self,
+        calendar_id: &Uuid,
+        user_id: &str,
+    ) -> CalendarRepositoryResult<()> {
         sqlx::query(
             r#"
             DELETE FROM caldav.calendar_shares
             WHERE calendar_id = $1 AND user_id = $2
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(user_id)
@@ -316,19 +377,24 @@ impl CalendarRepository for CalendarPgRepository {
         Ok(())
     }
 
-    async fn get_calendar_shares(&self, calendar_id: &Uuid) -> CalendarRepositoryResult<Vec<(String, String)>> {
+    async fn get_calendar_shares(
+        &self,
+        calendar_id: &Uuid,
+    ) -> CalendarRepositoryResult<Vec<(String, String)>> {
         let rows = sqlx::query(
             r#"
             SELECT user_id, access_level
             FROM caldav.calendar_shares
             WHERE calendar_id = $1
             ORDER BY user_id
-            "#
+            "#,
         )
         .bind(calendar_id)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to get calendar shares: {}", e)))?;
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to get calendar shares: {}", e))
+        })?;
 
         let mut shares = Vec::new();
         for row in rows {
@@ -337,76 +403,100 @@ impl CalendarRepository for CalendarPgRepository {
 
         Ok(shares)
     }
-    
-    async fn get_calendar_property(&self, calendar_id: &Uuid, property_name: &str) -> CalendarRepositoryResult<Option<String>> {
+
+    async fn get_calendar_property(
+        &self,
+        calendar_id: &Uuid,
+        property_name: &str,
+    ) -> CalendarRepositoryResult<Option<String>> {
         let row = sqlx::query(
             r#"
             SELECT value
             FROM caldav.calendar_properties
             WHERE calendar_id = $1 AND name = $2
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(property_name)
         .fetch_optional(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to get calendar property: {}", e)))?;
-        
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to get calendar property: {}", e))
+        })?;
+
         Ok(row.map(|r| r.get("value")))
     }
-    
-    async fn set_calendar_property(&self, calendar_id: &Uuid, property_name: &str, property_value: &str) -> CalendarRepositoryResult<()> {
+
+    async fn set_calendar_property(
+        &self,
+        calendar_id: &Uuid,
+        property_name: &str,
+        property_value: &str,
+    ) -> CalendarRepositoryResult<()> {
         sqlx::query(
             r#"
             INSERT INTO caldav.calendar_properties (calendar_id, name, value)
             VALUES ($1, $2, $3)
             ON CONFLICT (calendar_id, name) DO UPDATE SET value = $3
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(property_name)
         .bind(property_value)
         .execute(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to set calendar property: {}", e)))?;
-        
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to set calendar property: {}", e))
+        })?;
+
         Ok(())
     }
-    
-    async fn remove_calendar_property(&self, calendar_id: &Uuid, property_name: &str) -> CalendarRepositoryResult<()> {
+
+    async fn remove_calendar_property(
+        &self,
+        calendar_id: &Uuid,
+        property_name: &str,
+    ) -> CalendarRepositoryResult<()> {
         sqlx::query(
             r#"
             DELETE FROM caldav.calendar_properties
             WHERE calendar_id = $1 AND name = $2
-            "#
+            "#,
         )
         .bind(calendar_id)
         .bind(property_name)
         .execute(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to remove calendar property: {}", e)))?;
-        
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to remove calendar property: {}", e))
+        })?;
+
         Ok(())
     }
-    
-    async fn get_calendar_properties(&self, calendar_id: &Uuid) -> CalendarRepositoryResult<std::collections::HashMap<String, String>> {
+
+    async fn get_calendar_properties(
+        &self,
+        calendar_id: &Uuid,
+    ) -> CalendarRepositoryResult<std::collections::HashMap<String, String>> {
         let rows = sqlx::query(
             r#"
             SELECT name, value
             FROM caldav.calendar_properties
             WHERE calendar_id = $1
-            "#
+            "#,
         )
         .bind(calendar_id)
         .fetch_all(&*self.pool)
         .await
-        .map_err(|e| DomainError::database_error(format!("Failed to get calendar properties: {}", e)))?;
-        
+        .map_err(|e| {
+            DomainError::database_error(format!("Failed to get calendar properties: {}", e))
+        })?;
+
         let mut properties = std::collections::HashMap::new();
         for row in rows {
             properties.insert(row.get("name"), row.get("value"));
         }
-        
+
         Ok(properties)
     }
 }

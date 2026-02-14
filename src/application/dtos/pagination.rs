@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// A DTO to represent pagination information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,50 +56,42 @@ impl PaginationRequestDto {
     pub fn offset(&self) -> usize {
         self.page * self.page_size
     }
-    
+
     /// Calculates the limit for paginated queries
     pub fn limit(&self) -> usize {
         self.page_size
     }
-    
+
     /// Validates and adjusts the pagination parameters
     pub fn validate_and_adjust(&self) -> Self {
         let mut page = self.page;
         let mut page_size = self.page_size;
-        
+
         // Ensure the page is at least 0
         if page < 1 {
             page = 0;
         }
-        
+
         // Ensure the page size is between 10 and 500
         if page_size < 10 {
             page_size = 10;
         } else if page_size > 500 {
             page_size = 500;
         }
-        
-        Self {
-            page,
-            page_size,
-        }
+
+        Self { page, page_size }
     }
 }
 
 impl<T> PaginatedResponseDto<T> {
     /// Creates a new paginated response from the data and pagination information
-    pub fn new(
-        items: Vec<T>,
-        page: usize,
-        page_size: usize,
-        total_items: usize,
-    ) -> Self {
+    pub fn new(items: Vec<T>, page: usize, page_size: usize, total_items: usize) -> Self {
         let total_pages = if total_items == 0 {
             0
         } else {
             total_items.div_ceil(page_size)
         };
-        
+
         let pagination = PaginationDto {
             page,
             page_size,
@@ -108,10 +100,7 @@ impl<T> PaginatedResponseDto<T> {
             has_next: page < total_pages - 1,
             has_prev: page > 0,
         };
-        
-        Self {
-            items,
-            pagination,
-        }
+
+        Self { items, pagination }
     }
 }

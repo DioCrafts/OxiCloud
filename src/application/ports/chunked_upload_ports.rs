@@ -4,11 +4,11 @@
 //! operations, keeping the application and interface layers independent of
 //! the specific upload implementation (TUS-like protocol, S3 multipart, etc.).
 
-use std::path::PathBuf;
+use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::Serialize;
-use crate::common::errors::DomainError;
+use std::path::PathBuf;
 
 /// Default chunk size (5 MB) — optimised for parallel transfers.
 pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;
@@ -80,10 +80,7 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     ) -> Result<ChunkUploadResponseDto, DomainError>;
 
     /// Get the current status of an upload session.
-    async fn get_status(
-        &self,
-        upload_id: &str,
-    ) -> Result<UploadStatusResponseDto, DomainError>;
+    async fn get_status(&self, upload_id: &str) -> Result<UploadStatusResponseDto, DomainError>;
 
     /// Assemble all chunks into the final file.
     ///
@@ -94,16 +91,10 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     ) -> Result<(PathBuf, String, Option<String>, String, u64), DomainError>;
 
     /// Finalize upload: clean up the session and temporary files.
-    async fn finalize_upload(
-        &self,
-        upload_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn finalize_upload(&self, upload_id: &str) -> Result<(), DomainError>;
 
     /// Cancel an upload and clean up all temporary data.
-    async fn cancel_upload(
-        &self,
-        upload_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn cancel_upload(&self, upload_id: &str) -> Result<(), DomainError>;
 
     /// Check if a file size qualifies for chunked upload.
     fn should_use_chunked(&self, size: u64) -> bool;

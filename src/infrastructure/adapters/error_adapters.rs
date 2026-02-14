@@ -59,7 +59,8 @@ impl IntoDomainError for std::io::Error {
             ErrorKind::InternalError,
             entity_type,
             format!("IO error: {}", self),
-        ).with_source(self)
+        )
+        .with_source(self)
     }
 }
 
@@ -69,16 +70,15 @@ impl IntoDomainError for serde_json::Error {
             ErrorKind::InternalError,
             entity_type,
             format!("Serialization error: {}", self),
-        ).with_source(self)
+        )
+        .with_source(self)
     }
 }
 
 impl IntoDomainError for sqlx::Error {
     fn into_domain_error(self, entity_type: &'static str) -> DomainError {
         match &self {
-            sqlx::Error::RowNotFound => {
-                DomainError::not_found(entity_type, "Record not found")
-            }
+            sqlx::Error::RowNotFound => DomainError::not_found(entity_type, "Record not found"),
             sqlx::Error::Database(db_err) => {
                 // Handle specific PostgreSQL error codes
                 if db_err.code().is_some_and(|c| c == "23505") {
@@ -88,14 +88,16 @@ impl IntoDomainError for sqlx::Error {
                         ErrorKind::DatabaseError,
                         entity_type,
                         format!("Database error: {}", db_err),
-                    ).with_source(self)
+                    )
+                    .with_source(self)
                 }
             }
             _ => DomainError::new(
                 ErrorKind::InternalError,
                 entity_type,
                 format!("Database error: {}", self),
-            ).with_source(self)
+            )
+            .with_source(self),
         }
     }
 }
@@ -108,7 +110,7 @@ mod tests {
     fn test_io_error_conversion() {
         let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
         let domain_error = io_error.into_domain_error("File");
-        
+
         assert_eq!(domain_error.entity_type, "File");
         assert!(domain_error.message.contains("IO error"));
     }
@@ -116,9 +118,10 @@ mod tests {
     #[test]
     fn test_serde_json_error_conversion() {
         let json_str = "{ invalid json }";
-        let serde_error: serde_json::Error = serde_json::from_str::<serde_json::Value>(json_str).unwrap_err();
+        let serde_error: serde_json::Error =
+            serde_json::from_str::<serde_json::Value>(json_str).unwrap_err();
         let domain_error = serde_error.into_domain_error("Config");
-        
+
         assert_eq!(domain_error.entity_type, "Config");
         assert!(domain_error.message.contains("Serialization error"));
     }

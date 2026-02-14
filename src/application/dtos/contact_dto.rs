@@ -1,6 +1,6 @@
+use crate::domain::entities::contact::{Address, Contact, ContactGroup, Email, Phone};
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
-use crate::domain::entities::contact::{Contact, Email, Phone, Address, ContactGroup};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailDto {

@@ -1,11 +1,11 @@
 //! Persistence DTOs for Contact entities
-//! 
+//!
 //! These DTOs are used for JSONB serialization/deserialization in PostgreSQL.
 //! They mirror the domain entities but include serde traits required for persistence.
 //! This keeps the domain layer free of infrastructure concerns (serde dependency).
 
+use crate::domain::entities::contact::{Address, Email, Phone};
 use serde::{Deserialize, Serialize};
-use crate::domain::entities::contact::{Email, Phone, Address};
 
 /// Persistence DTO for Email - used for JSONB serialization
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -44,7 +44,7 @@ pub struct UpdateShareDto {
 impl ShareDto {
     pub fn from_entity(share: &Share, base_url: &str) -> Self {
         let url = format!("{}/s/{}", base_url, share.token());
-        
+
         Self {
             id: share.id().to_string(),
             item_id: share.item_id().to_string(),
@@ -69,7 +69,7 @@ impl SharePermissionsDto {
             reshare: permissions.reshare(),
         }
     }
-    
+
     pub fn to_entity(&self) -> SharePermissions {
         SharePermissions::new(self.read, self.write, self.reshare)
     }

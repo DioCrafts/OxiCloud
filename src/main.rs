@@ -9,7 +9,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// OxiCloud - Cloud Storage Platform
 ///
-/// OxiCloud is a NextCloud-like file storage system built in Rust with a focus on 
+/// OxiCloud is a NextCloud-like file storage system built in Rust with a focus on
 /// performance, security, and clean architecture. The system provides:
 ///
 /// - File and folder management with rich metadata
@@ -30,7 +30,6 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 /// defining interfaces (ports) that low-level modules implement (adapters).
 ///
 /// @author OxiCloud Development Team
-
 use oxicloud::common;
 use oxicloud::infrastructure;
 use oxicloud::interfaces;
@@ -51,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Load configuration from environment variables
     let config = common::config::AppConfig::from_env();
-    
+
     // Ensure storage and locales directories exist
     let storage_path = config.storage_path.clone();
     if !storage_path.exists() {
@@ -61,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !locales_path.exists() {
         std::fs::create_dir_all(&locales_path).expect("Failed to create locales directory");
     }
-    
+
     // Initialize database pool if auth is enabled
     let db_pool = if config.features.enable_auth {
         match create_database_pool(&config).await {
@@ -77,14 +76,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         None
     };
-    
+
     // Build all services via the factory
-    let factory = AppServiceFactory::with_config(
-        storage_path,
-        locales_path,
-        config.clone(),
-    );
-    
+    let factory = AppServiceFactory::with_config(storage_path, locales_path, config.clone());
+
     let app_state = factory.build_app_state(db_pool).await
         .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
 
@@ -92,9 +87,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_routes = create_api_routes(&app_state);
     let public_api_routes = create_public_api_routes(&app_state);
     let web_routes = create_web_routes();
-    
+
     let mut app;
-    
+
     // Build CalDAV / CardDAV / WebDAV protocol routers (merged at top-level, not under /api)
     use oxicloud::interfaces::api::handlers::caldav_handler;
     use oxicloud::interfaces::api::handlers::carddav_handler;
@@ -107,22 +102,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if config.features.enable_auth && app_state.auth_service.is_some() {
         use interfaces::api::handlers::auth_handler::auth_routes;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
-        
+
         let app_state_arc = Arc::new(app_state.clone());
         let auth_router = auth_routes().with_state(app_state_arc.clone());
-        
+
         // Protected API routes — require valid JWT token
-        let protected_api = api_routes
-            .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
-        
+        let protected_api = api_routes.layer(axum::middleware::from_fn_with_state(
+            app_state_arc.clone(),
+            auth_middleware,
+        ));
+
         // CalDAV/CardDAV/WebDAV with auth middleware (merged, not nested)
-        let caldav_protected = caldav_router
-            .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
-        let carddav_protected = carddav_router
-            .layer(axum::middleware::from_fn_with_state(app_state_arc.clone(), auth_middleware));
-        let webdav_protected = webdav_router
-            .layer(axum::middleware::from_fn_with_state(app_state_arc, auth_middleware));
-        
+        let caldav_protected = caldav_router.layer(axum::middleware::from_fn_with_state(
+            app_state_arc.clone(),
+            auth_middleware,
+        ));
+        let carddav_protected = carddav_router.layer(axum::middleware::from_fn_with_state(
+            app_state_arc.clone(),
+            auth_middleware,
+        ));
+        let webdav_protected = webdav_router.layer(axum::middleware::from_fn_with_state(
+            app_state_arc,
+            auth_middleware,
+        ));
+
         app = Router::new()
             // Auth endpoints (login, register, refresh) are public — no middleware
             .nest("/api/auth", auth_router)
@@ -153,22 +156,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Apply the redirect middleware for legacy routes
     use oxicloud::interfaces::middleware::redirect::redirect_middleware;
     app = app.layer(axum::middleware::from_fn(redirect_middleware));
-    
+
     // Increase the default body limit to 10 GB to allow large file uploads.
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
-    
+
     // Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], 8086));
     tracing::info!("Starting OxiCloud server on http://{}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    
+
     // Provide the fully-built state to the router
     let app = app.with_state(app_state);
-    
+
     axum::serve(listener, app).await?;
     tracing::info!("Server shutdown completed");
-    
+
     Ok(())
 }

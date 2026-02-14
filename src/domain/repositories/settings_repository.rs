@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use async_trait::async_trait;
 use crate::common::errors::DomainError;
+use async_trait::async_trait;
+use std::collections::HashMap;
 
 /// Repository for platform settings stored in the database.
 /// Settings are key-value pairs organized by category (e.g., "oidc", "general").
@@ -10,7 +10,8 @@ pub trait SettingsRepository: Send + Sync + 'static {
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError>;
 
     /// Get all settings for a given category
-    async fn get_by_category(&self, category: &str) -> Result<HashMap<String, String>, DomainError>;
+    async fn get_by_category(&self, category: &str)
+    -> Result<HashMap<String, String>, DomainError>;
 
     /// Set a setting value (upsert)
     async fn set(

@@ -1,8 +1,8 @@
-use std::sync::Arc;
-use std::pin::Pin;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use std::pin::Pin;
+use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::common::errors::DomainError;
@@ -48,7 +48,13 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
     ) -> Result<(FileDto, UploadStrategy), DomainError>;
 
     /// Creates a new file at the specified path (for WebDAV)
-    async fn create_file(&self, parent_path: &str, filename: &str, content: &[u8], content_type: &str) -> Result<FileDto, DomainError>;
+    async fn create_file(
+        &self,
+        parent_path: &str,
+        filename: &str,
+        content: &[u8],
+        content_type: &str,
+    ) -> Result<FileDto, DomainError>;
 
     /// Updates the content of an existing file (for WebDAV)
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError>;
@@ -81,18 +87,21 @@ pub enum OptimizedFileContent {
 pub trait FileRetrievalUseCase: Send + Sync + 'static {
     /// Gets a file by its ID
     async fn get_file(&self, id: &str) -> Result<FileDto, DomainError>;
-    
+
     /// Gets a file by its path (for WebDAV)
     async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError>;
-    
+
     /// Lists files in a folder
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError>;
-    
+
     /// Gets file content as bytes (for small files)
     async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
-    
+
     /// Gets file content as a stream (for large files)
-    async fn get_file_stream(&self, id: &str) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
+    async fn get_file_stream(
+        &self,
+        id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
     /// Optimized multi-tier download.
     ///
@@ -123,11 +132,15 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
 #[async_trait]
 pub trait FileManagementUseCase: Send + Sync + 'static {
     /// Moves a file to another folder
-    async fn move_file(&self, file_id: &str, folder_id: Option<String>) -> Result<FileDto, DomainError>;
-    
+    async fn move_file(
+        &self,
+        file_id: &str,
+        folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError>;
+
     /// Renames a file
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
-    
+
     /// Deletes a file
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
@@ -138,11 +151,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     /// 3. Decrements the dedup reference count for the content hash.
     ///
     /// Returns `Ok(true)` when trashed, `Ok(false)` when permanently deleted.
-    async fn delete_with_cleanup(
-        &self,
-        id: &str,
-        user_id: &str,
-    ) -> Result<bool, DomainError>;
+    async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError>;
 }
 
 /// Factory for creating file use case implementations

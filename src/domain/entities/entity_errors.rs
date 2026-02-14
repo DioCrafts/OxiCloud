@@ -179,8 +179,12 @@ impl Display for CalendarEventError {
         match self {
             CalendarEventError::InvalidSummary(msg) => write!(f, "Invalid event summary: {}", msg),
             CalendarEventError::InvalidDates(msg) => write!(f, "Invalid event dates: {}", msg),
-            CalendarEventError::InvalidRecurrence(msg) => write!(f, "Invalid recurrence rule: {}", msg),
-            CalendarEventError::InvalidICalData(msg) => write!(f, "Invalid iCalendar data: {}", msg),
+            CalendarEventError::InvalidRecurrence(msg) => {
+                write!(f, "Invalid recurrence rule: {}", msg)
+            }
+            CalendarEventError::InvalidICalData(msg) => {
+                write!(f, "Invalid iCalendar data: {}", msg)
+            }
         }
     }
 }
@@ -202,7 +206,7 @@ mod tests {
     fn test_file_error_display() {
         let err = FileError::InvalidFileName("test.txt".to_string());
         assert_eq!(err.to_string(), "Invalid file name: test.txt");
-        
+
         let err = FileError::ValidationError("size too large".to_string());
         assert_eq!(err.to_string(), "Validation error: size too large");
     }
@@ -217,7 +221,7 @@ mod tests {
     fn test_user_error_display() {
         let err = UserError::InvalidUsername("".to_string());
         assert_eq!(err.to_string(), "Invalid username: ");
-        
+
         let err = UserError::AuthenticationError("invalid credentials".to_string());
         assert_eq!(err.to_string(), "Authentication error: invalid credentials");
     }
@@ -243,7 +247,7 @@ mod tests {
     #[test]
     fn test_errors_implement_error_trait() {
         fn assert_error<E: Error>() {}
-        
+
         assert_error::<FileError>();
         assert_error::<FolderError>();
         assert_error::<UserError>();

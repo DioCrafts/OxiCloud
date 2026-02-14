@@ -2,24 +2,26 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tokio::{fs, time};
-use tokio::fs::File as TokioFile;
-use tokio_util::codec::{BytesCodec, FramedRead};
-use futures::{Stream, StreamExt};
 use bytes::Bytes;
-use tokio::task;
+use futures::{Stream, StreamExt};
 use mime_guess::from_path;
+use tokio::fs::File as TokioFile;
+use tokio::task;
+use tokio::{fs, time};
+use tokio_util::codec::{BytesCodec, FramedRead};
 
-use crate::domain::entities::file::File;
-use crate::application::ports::storage_ports::FileReadPort;
-use crate::common::errors::DomainError;
-use crate::infrastructure::repositories::repository_errors::{FileRepositoryResult, FileRepositoryError};
-use crate::infrastructure::repositories::parallel_file_processor::ParallelFileProcessor;
 use crate::application::ports::cache_ports::MetadataCachePort;
+use crate::application::ports::storage_ports::FileReadPort;
 use crate::application::services::storage_mediator::StorageMediator;
-use crate::infrastructure::services::path_service::PathService;
-use crate::domain::services::path_service::StoragePath;
 use crate::common::config::AppConfig;
+use crate::common::errors::DomainError;
+use crate::domain::entities::file::File;
+use crate::domain::services::path_service::StoragePath;
+use crate::infrastructure::repositories::parallel_file_processor::ParallelFileProcessor;
+use crate::infrastructure::repositories::repository_errors::{
+    FileRepositoryError, FileRepositoryResult,
+};
+use crate::infrastructure::services::path_service::PathService;
 
 /// Repository implementation for file **read** operations.
 ///
@@ -63,12 +65,13 @@ impl FileFsReadRepository {
         Self {
             root_path: PathBuf::from("./storage"),
             storage_mediator: Arc::new(
-                crate::application::services::storage_mediator::FileSystemStorageMediator::new_stub(),
+                crate::application::services::storage_mediator::FileSystemStorageMediator::new_stub(
+                ),
             ),
             id_mapping_service: Arc::new(crate::common::stubs::StubIdMappingPort),
             path_service: Arc::new(PathService::new(PathBuf::from("./storage"))),
             metadata_cache: Arc::new(
-                crate::infrastructure::services::file_metadata_cache::FileMetadataCache::default()
+                crate::infrastructure::services::file_metadata_cache::FileMetadataCache::default(),
             ) as Arc<dyn MetadataCachePort>,
             config: AppConfig::default(),
             parallel_processor: None,
@@ -81,36 +84,61 @@ impl FileFsReadRepository {
         self.path_service.resolve_path(storage_path)
     }
 
-    async fn get_file_metadata_raw(&self, abs_path: &PathBuf) -> FileRepositoryResult<(u64, u64, u64)> {
+    async fn get_file_metadata_raw(
+        &self,
+        abs_path: &PathBuf,
+    ) -> FileRepositoryResult<(u64, u64, u64)> {
         // Cache first
         if let Some(cached) = self.metadata_cache.get_metadata(abs_path).await
-            && let (Some(s), Some(c), Some(m)) = (cached.size, cached.created_at, cached.modified_at) {
-                return Ok((s, c, m));
-            }
+            && let (Some(s), Some(c), Some(m)) =
+                (cached.size, cached.created_at, cached.modified_at)
+        {
+            return Ok((s, c, m));
+        }
         let metadata = time::timeout(self.config.timeouts.file_timeout(), fs::metadata(abs_path))
             .await
-            .map_err(|_| FileRepositoryError::StorageError(format!("Timeout metadata: {}", abs_path.display())))?
+            .map_err(|_| {
+                FileRepositoryError::StorageError(format!(
+                    "Timeout metadata: {}",
+                    abs_path.display()
+                ))
+            })?
             .map_err(|e| FileRepositoryError::StorageError(e.to_string()))?;
         let size = metadata.len();
-        let created_at = metadata.created()
-            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+        let created_at = metadata
+            .created()
+            .map(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            })
             .unwrap_or(0);
-        let modified_at = metadata.modified()
-            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+        let modified_at = metadata
+            .modified()
+            .map(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs()
+            })
             .unwrap_or(0);
         let _ = self.metadata_cache.refresh_metadata(abs_path).await;
         Ok((size, created_at, modified_at))
     }
 
     async fn get_file_by_id(&self, id: &str) -> FileRepositoryResult<File> {
-        let storage_path = self.id_mapping_service.get_path_by_id(id).await
+        let storage_path = self
+            .id_mapping_service
+            .get_path_by_id(id)
+            .await
             .map_err(|e| FileRepositoryError::Other(e.to_string()))?;
         let abs_path = self.resolve_storage_path(&storage_path);
 
         if !abs_path.exists() || !abs_path.is_file() {
-            return Err(FileRepositoryError::NotFound(
-                format!("File {} not found at {}", id, storage_path.to_string()),
-            ));
+            return Err(FileRepositoryError::NotFound(format!(
+                "File {} not found at {}",
+                id,
+                storage_path.to_string()
+            )));
         }
 
         let (size, created_at, modified_at) = self.get_file_metadata_raw(&abs_path).await?;
@@ -120,8 +148,14 @@ impl FileFsReadRepository {
         let mime_type = from_path(&abs_path).first_or_octet_stream().to_string();
 
         File::with_timestamps(
-            id.to_string(), name, storage_path, size, mime_type, None,
-            created_at, modified_at,
+            id.to_string(),
+            name,
+            storage_path,
+            size,
+            mime_type,
+            None,
+            created_at,
+            modified_at,
         )
         .map_err(|e| FileRepositoryError::Other(e.to_string()))
     }
@@ -153,18 +187,14 @@ impl FileReadPort for FileFsReadRepository {
 
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
         let folder_storage_path = match folder_id {
-            Some(id) => {
-                match self.storage_mediator.get_folder_path(id).await {
-                    Ok(path) => {
-                        let lossy = path.to_string_lossy().to_string();
-                        let folder_name = path.file_name()
-                            .and_then(|f| f.to_str())
-                            .unwrap_or(&lossy);
-                        StoragePath::from_string(folder_name)
-                    }
-                    Err(_) => return Ok(Vec::new()),
+            Some(id) => match self.storage_mediator.get_folder_path(id).await {
+                Ok(path) => {
+                    let lossy = path.to_string_lossy().to_string();
+                    let folder_name = path.file_name().and_then(|f| f.to_str()).unwrap_or(&lossy);
+                    StoragePath::from_string(folder_name)
                 }
-            }
+                Err(_) => return Ok(Vec::new()),
+            },
             None => StoragePath::root(),
         };
 
@@ -174,16 +204,24 @@ impl FileReadPort for FileFsReadRepository {
         }
 
         let mut files_result = Vec::new();
-        let mut entries = fs::read_dir(&abs_folder_path).await
+        let mut entries = fs::read_dir(&abs_folder_path)
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
 
-        while let Some(entry) = entries.next_entry().await
+        while let Some(entry) = entries
+            .next_entry()
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?
         {
             let path = entry.path();
-            if !path.is_file() { continue; }
+            if !path.is_file() {
+                continue;
+            }
             let file_name = entry.file_name().to_string_lossy().to_string();
-            if file_name.starts_with('.') || file_name == "folder_ids.json" || file_name == "file_ids.json" {
+            if file_name.starts_with('.')
+                || file_name == "folder_ids.json"
+                || file_name == "file_ids.json"
+            {
                 continue;
             }
             let metadata = match fs::metadata(&path).await {
@@ -191,20 +229,43 @@ impl FileReadPort for FileFsReadRepository {
                 Err(_) => continue,
             };
             let file_storage_path = folder_storage_path.join(&file_name);
-            let id = match self.id_mapping_service.get_or_create_id(&file_storage_path).await {
+            let id = match self
+                .id_mapping_service
+                .get_or_create_id(&file_storage_path)
+                .await
+            {
                 Ok(id) => id,
                 Err(_) => continue,
             };
             let size = metadata.len();
-            let created_at = metadata.created()
-                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+            let created_at = metadata
+                .created()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
                 .unwrap_or(0);
-            let modified_at = metadata.modified()
-                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs())
+            let modified_at = metadata
+                .modified()
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                })
                 .unwrap_or(0);
             let mime_type = from_path(&path).first_or_octet_stream().to_string();
 
-            match File::with_timestamps(id, file_name, file_storage_path, size, mime_type, folder_id.map(String::from), created_at, modified_at) {
+            match File::with_timestamps(
+                id,
+                file_name,
+                file_storage_path,
+                size,
+                mime_type,
+                folder_id.map(String::from),
+                created_at,
+                modified_at,
+            ) {
                 Ok(file) => files_result.push(file),
                 Err(_) => continue,
             }
@@ -216,23 +277,39 @@ impl FileReadPort for FileFsReadRepository {
     }
 
     async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError> {
-        let file = self.get_file_by_id(id).await
+        let file = self
+            .get_file_by_id(id)
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let abs_path = self.resolve_storage_path(file.storage_path());
 
         let metadata = time::timeout(self.config.timeouts.file_timeout(), fs::metadata(&abs_path))
             .await
-            .map_err(|_| DomainError::internal_error("File", format!("Timeout metadata: {}", abs_path.display())))?
+            .map_err(|_| {
+                DomainError::internal_error(
+                    "File",
+                    format!("Timeout metadata: {}", abs_path.display()),
+                )
+            })?
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let file_size = metadata.len();
 
         if !self.config.resources.can_load_in_memory(file_size) {
-            return Err(DomainError::internal_error("File",
-                format!("File too large for memory: {} MB", file_size / (1024 * 1024))));
+            return Err(DomainError::internal_error(
+                "File",
+                format!(
+                    "File too large for memory: {} MB",
+                    file_size / (1024 * 1024)
+                ),
+            ));
         }
 
         // Parallel read for very large files
-        if self.config.resources.needs_parallel_processing(file_size, &self.config.concurrency) {
+        if self
+            .config
+            .resources
+            .needs_parallel_processing(file_size, &self.config.concurrency)
+        {
             let content = if let Some(processor) = &self.parallel_processor {
                 processor.read_file_parallel(&abs_path).await
             } else {
@@ -247,13 +324,14 @@ impl FileReadPort for FileFsReadRepository {
             let abs_clone = abs_path.clone();
             let chunk_size = self.config.resources.chunk_size_bytes;
             let content = task::spawn_blocking(move || -> std::io::Result<Vec<u8>> {
-                use std::io::{Read, BufReader};
+                use std::io::{BufReader, Read};
                 let file = std::fs::File::open(&abs_clone)?;
                 let mut reader = BufReader::with_capacity(chunk_size, file);
                 let mut buf = Vec::with_capacity(file_size as usize);
                 reader.read_to_end(&mut buf)?;
                 Ok(buf)
-            }).await
+            })
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
             return Ok(content);
@@ -262,7 +340,12 @@ impl FileReadPort for FileFsReadRepository {
         // Small files — async read
         time::timeout(self.config.timeouts.file_timeout(), fs::read(&abs_path))
             .await
-            .map_err(|_| DomainError::internal_error("File", format!("Timeout reading: {}", abs_path.display())))?
+            .map_err(|_| {
+                DomainError::internal_error(
+                    "File",
+                    format!("Timeout reading: {}", abs_path.display()),
+                )
+            })?
             .map_err(|e| DomainError::internal_error("File", e.to_string()))
     }
 
@@ -270,7 +353,9 @@ impl FileReadPort for FileFsReadRepository {
         &self,
         id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
-        let file = self.get_file_by_id(id).await
+        let file = self
+            .get_file_by_id(id)
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let abs_path = self.resolve_storage_path(file.storage_path());
 
@@ -281,15 +366,22 @@ impl FileReadPort for FileFsReadRepository {
         let file_size = metadata.len();
         let is_large = self.config.resources.is_large_file(file_size);
 
-        let fh = time::timeout(self.config.timeouts.file_timeout(), TokioFile::open(&abs_path))
-            .await
-            .map_err(|_| DomainError::internal_error("File", "Timeout opening file"))?
-            .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
+        let fh = time::timeout(
+            self.config.timeouts.file_timeout(),
+            TokioFile::open(&abs_path),
+        )
+        .await
+        .map_err(|_| DomainError::internal_error("File", "Timeout opening file"))?
+        .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
 
-        let chunk_size = if is_large { self.config.resources.chunk_size_bytes } else { 4096 };
+        let chunk_size = if is_large {
+            self.config.resources.chunk_size_bytes
+        } else {
+            4096
+        };
         let codec = BytesCodec::new();
-        let stream = FramedRead::with_capacity(fh, codec, chunk_size)
-            .map(|r| r.map(|bm| bm.freeze()));
+        let stream =
+            FramedRead::with_capacity(fh, codec, chunk_size).map(|r| r.map(|bm| bm.freeze()));
         Ok(Box::new(stream))
     }
 
@@ -301,7 +393,9 @@ impl FileReadPort for FileFsReadRepository {
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         use tokio::io::AsyncSeekExt;
 
-        let file = self.get_file_by_id(id).await
+        let file = self
+            .get_file_by_id(id)
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let abs_path = self.resolve_storage_path(file.storage_path());
 
@@ -311,31 +405,43 @@ impl FileReadPort for FileFsReadRepository {
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let file_size = metadata.len();
         if start >= file_size {
-            return Err(DomainError::internal_error("File",
-                format!("Range start {} beyond file size {}", start, file_size)));
+            return Err(DomainError::internal_error(
+                "File",
+                format!("Range start {} beyond file size {}", start, file_size),
+            ));
         }
         let actual_end = end.map(|e| e.min(file_size - 1)).unwrap_or(file_size - 1);
         let range_length = actual_end - start + 1;
 
-        let mut fh = time::timeout(self.config.timeouts.file_timeout(), TokioFile::open(&abs_path))
+        let mut fh = time::timeout(
+            self.config.timeouts.file_timeout(),
+            TokioFile::open(&abs_path),
+        )
+        .await
+        .map_err(|_| DomainError::internal_error("File", "Timeout opening file"))?
+        .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
+        fh.seek(std::io::SeekFrom::Start(start))
             .await
-            .map_err(|_| DomainError::internal_error("File", "Timeout opening file"))?
-            .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
-        fh.seek(std::io::SeekFrom::Start(start)).await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
 
-        let chunk_size = if range_length > 1024 * 1024 { self.config.resources.chunk_size_bytes } else { 8192 };
+        let chunk_size = if range_length > 1024 * 1024 {
+            self.config.resources.chunk_size_bytes
+        } else {
+            8192
+        };
         use tokio::io::AsyncReadExt;
         let limited = fh.take(range_length);
         let codec = BytesCodec::new();
-        let stream = FramedRead::with_capacity(limited, codec, chunk_size)
-            .map(|r| r.map(|bm| bm.freeze()));
+        let stream =
+            FramedRead::with_capacity(limited, codec, chunk_size).map(|r| r.map(|bm| bm.freeze()));
         Ok(Box::new(stream))
     }
 
     async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError> {
         use memmap2::Mmap;
-        let file = self.get_file_by_id(id).await
+        let file = self
+            .get_file_by_id(id)
+            .await
             .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
         let abs_path = self.resolve_storage_path(file.storage_path());
         let path_clone = abs_path.clone();
@@ -346,7 +452,8 @@ impl FileReadPort for FileFsReadRepository {
             let mmap = unsafe { Mmap::map(&fh) }
                 .map_err(|e| DomainError::internal_error("File", e.to_string()))?;
             Ok(Bytes::copy_from_slice(&mmap[..]))
-        }).await
+        })
+        .await
         .map_err(|e| DomainError::internal_error("File", e.to_string()))?
     }
 

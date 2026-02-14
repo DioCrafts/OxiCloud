@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
+use crate::application::ports::cache_ports::{ContentCachePort, WriteBehindCachePort};
 use crate::application::ports::file_ports::{FileRetrievalUseCase, OptimizedFileContent};
 use crate::application::ports::storage_ports::FileReadPort;
-use crate::application::ports::cache_ports::{WriteBehindCachePort, ContentCachePort};
 use crate::application::ports::transcode_ports::{ImageTranscodePort, OutputFormat};
 use crate::common::errors::DomainError;
 use tracing::{debug, info, warn};
@@ -114,7 +114,10 @@ impl FileRetrievalUseCase for FileRetrievalService {
             }
         }
 
-        Err(DomainError::not_found("File", format!("not found at path: {}", path)))
+        Err(DomainError::not_found(
+            "File",
+            format!("not found at path: {}", path),
+        ))
     }
 
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError> {
@@ -150,44 +153,69 @@ impl FileRetrievalUseCase for FileRetrievalService {
 
         // ── Tier 0: Write-behind cache ───────────────────────
         if let Some(wb) = &self.write_behind
-            && let Some(pending) = wb.get_pending(id).await {
-                debug!("⚡ TIER 0 Write-Behind HIT: {} ({} bytes)", file_name, pending.len());
-                let (data, mime) = if do_transcode {
-                    if let Some((t, m)) = self.try_transcode(id, &pending, &mime_type, file_size, true).await {
-                        (t, m)
-                    } else {
-                        (pending, mime_type.clone())
-                    }
+            && let Some(pending) = wb.get_pending(id).await
+        {
+            debug!(
+                "⚡ TIER 0 Write-Behind HIT: {} ({} bytes)",
+                file_name,
+                pending.len()
+            );
+            let (data, mime) = if do_transcode {
+                if let Some((t, m)) = self
+                    .try_transcode(id, &pending, &mime_type, file_size, true)
+                    .await
+                {
+                    (t, m)
                 } else {
                     (pending, mime_type.clone())
-                };
-                return Ok((dto, OptimizedFileContent::Bytes {
+                }
+            } else {
+                (pending, mime_type.clone())
+            };
+            return Ok((
+                dto,
+                OptimizedFileContent::Bytes {
                     data,
                     mime_type: mime,
                     was_transcoded: do_transcode,
-                }));
-            }
+                },
+            ));
+        }
 
         // ── Tier 1: Hot cache + transcode (<10 MB) ──────────
         if file_size < CACHE_THRESHOLD {
             // Check content cache first
             if let Some(cache) = &self.content_cache
-                && let Some((cached, _etag, _ct)) = cache.get(id).await {
-                    debug!("🔥 TIER 1 Cache HIT: {} ({} bytes)", file_name, cached.len());
-                    if do_transcode
-                        && let Some((t, m)) = self.try_transcode(id, &cached, &mime_type, file_size, true).await {
-                            return Ok((dto, OptimizedFileContent::Bytes {
-                                data: t,
-                                mime_type: m,
-                                was_transcoded: true,
-                            }));
-                        }
-                    return Ok((dto, OptimizedFileContent::Bytes {
+                && let Some((cached, _etag, _ct)) = cache.get(id).await
+            {
+                debug!(
+                    "🔥 TIER 1 Cache HIT: {} ({} bytes)",
+                    file_name,
+                    cached.len()
+                );
+                if do_transcode
+                    && let Some((t, m)) = self
+                        .try_transcode(id, &cached, &mime_type, file_size, true)
+                        .await
+                {
+                    return Ok((
+                        dto,
+                        OptimizedFileContent::Bytes {
+                            data: t,
+                            mime_type: m,
+                            was_transcoded: true,
+                        },
+                    ));
+                }
+                return Ok((
+                    dto,
+                    OptimizedFileContent::Bytes {
                         data: cached,
                         mime_type: mime_type.clone(),
                         was_transcoded: false,
-                    }));
-                }
+                    },
+                ));
+            }
 
             // Cache miss – load from disk
             debug!("💾 TIER 1 Cache MISS: {} – loading from disk", file_name);
@@ -197,27 +225,47 @@ impl FileRetrievalUseCase for FileRetrievalService {
             // Store in cache
             if let Some(cache) = &self.content_cache {
                 let etag = format!("\"{}-{}\"", id, modified_at);
-                cache.put(id.to_string(), content_bytes.clone(), etag, mime_type.clone()).await;
+                cache
+                    .put(
+                        id.to_string(),
+                        content_bytes.clone(),
+                        etag,
+                        mime_type.clone(),
+                    )
+                    .await;
             }
 
             if do_transcode
-                && let Some((t, m)) = self.try_transcode(id, &content_bytes, &mime_type, file_size, true).await {
-                    return Ok((dto, OptimizedFileContent::Bytes {
+                && let Some((t, m)) = self
+                    .try_transcode(id, &content_bytes, &mime_type, file_size, true)
+                    .await
+            {
+                return Ok((
+                    dto,
+                    OptimizedFileContent::Bytes {
                         data: t,
                         mime_type: m,
                         was_transcoded: true,
-                    }));
-                }
-            return Ok((dto, OptimizedFileContent::Bytes {
-                data: content_bytes,
-                mime_type: mime_type.clone(),
-                was_transcoded: false,
-            }));
+                    },
+                ));
+            }
+            return Ok((
+                dto,
+                OptimizedFileContent::Bytes {
+                    data: content_bytes,
+                    mime_type: mime_type.clone(),
+                    was_transcoded: false,
+                },
+            ));
         }
 
         // ── Tier 2: MMAP (10–100 MB) ────────────────────────
         if file_size < MMAP_THRESHOLD {
-            info!("🗺️ TIER 2 MMAP: {} ({} MB)", file_name, file_size / (1024 * 1024));
+            info!(
+                "🗺️ TIER 2 MMAP: {} ({} MB)",
+                file_name,
+                file_size / (1024 * 1024)
+            );
             match self.file_read.get_file_mmap(id).await {
                 Ok(mmap_content) => {
                     return Ok((dto, OptimizedFileContent::Mmap(mmap_content)));
@@ -230,17 +278,24 @@ impl FileRetrievalUseCase for FileRetrievalService {
         }
 
         // ── Tier 3: Streaming (≥100 MB) ─────────────────────
-        info!("📡 TIER 3 STREAMING: {} ({} MB)", file_name, file_size / (1024 * 1024));
+        info!(
+            "📡 TIER 3 STREAMING: {} ({} MB)",
+            file_name,
+            file_size / (1024 * 1024)
+        );
         match self.file_read.get_file_stream(id).await {
             Ok(stream) => Ok((dto, OptimizedFileContent::Stream(Box::into_pin(stream)))),
             Err(e) => {
                 warn!("Streaming failed, last-resort content load: {}", e);
                 let content = self.file_read.get_file_content(id).await?;
-                Ok((dto, OptimizedFileContent::Bytes {
-                    data: Bytes::from(content),
-                    mime_type: mime_type.clone(),
-                    was_transcoded: false,
-                }))
+                Ok((
+                    dto,
+                    OptimizedFileContent::Bytes {
+                        data: Bytes::from(content),
+                        mime_type: mime_type.clone(),
+                        was_transcoded: false,
+                    },
+                ))
             }
         }
     }

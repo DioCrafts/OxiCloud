@@ -1,16 +1,16 @@
 use axum::{
-    extract::{Path, State, Multipart, Query},
-    http::{StatusCode, header, HeaderMap, Response},
-    response::IntoResponse,
-    body::Body,
     Json,
+    body::Body,
+    extract::{Multipart, Path, Query, State},
+    http::{HeaderMap, Response, StatusCode, header},
+    response::IntoResponse,
 };
 use bytes::Bytes;
+use http_range_header::parse_range_header;
 use serde::Deserialize;
 use std::collections::HashMap;
-use http_range_header::parse_range_header;
 
-use crate::application::ports::compression_ports::{CompressionPort, CompressionLevel};
+use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::OptionalUserId;
@@ -23,7 +23,7 @@ type GlobalState = AppState;
 
 /**
  * API handler for file-related operations.
- * 
+ *
  * Acts as a thin HTTP adapter in the hexagonal architecture: it parses requests,
  * delegates business logic to application services, and maps results to HTTP
  * responses.  No infrastructure or strategy logic lives here.
@@ -36,7 +36,7 @@ impl FileHandler {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Uploads a file with TRUE STREAMING support and Write-Behind Cache
-    /// 
+    ///
     /// The three-tier strategy (write-behind / buffered / streaming) and dedup
     /// are fully handled by `FileUploadUseCase::smart_upload`.
     /// This handler only extracts multipart fields and maps the result to HTTP.
@@ -53,13 +53,18 @@ impl FileHandler {
 
             if name == "folder_id" {
                 let v = field.text().await.unwrap_or_default();
-                if !v.is_empty() { folder_id = Some(v); }
+                if !v.is_empty() {
+                    folder_id = Some(v);
+                }
                 continue;
             }
 
             if name == "file" {
                 let filename = field.file_name().unwrap_or("unnamed").to_string();
-                let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
+                let content_type = field
+                    .content_type()
+                    .unwrap_or("application/octet-stream")
+                    .to_string();
 
                 // Collect chunks from multipart
                 let mut chunks: Vec<Bytes> = Vec::new();
@@ -73,7 +78,10 @@ impl FileHandler {
                 // Empty file
                 if chunks.is_empty() {
                     let upload_service = &state.applications.file_upload_service;
-                    return match upload_service.upload_file(filename, folder_id, content_type, vec![]).await {
+                    return match upload_service
+                        .upload_file(filename, folder_id, content_type, vec![])
+                        .await
+                    {
                         Ok(file) => Self::created_json_response(&file).into_response(),
                         Err(err) => Self::domain_error_response(err).into_response(),
                     };
@@ -82,7 +90,10 @@ impl FileHandler {
                 // Delegate to FileService (simple path, no write-behind/dedup)
                 let upload_service = &state.applications.file_upload_service;
                 let data = Self::combine_chunks(chunks, total_size);
-                match upload_service.upload_file(filename.clone(), folder_id, content_type, data).await {
+                match upload_service
+                    .upload_file(filename.clone(), folder_id, content_type, data)
+                    .await
+                {
                     Ok(file) => {
                         tracing::info!("✅ UPLOAD COMPLETE: {} (ID: {})", filename, file.id);
                         return Self::created_json_response(&file);
@@ -95,9 +106,13 @@ impl FileHandler {
             }
         }
 
-        (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-            "error": "No file provided"
-        }))).into_response()
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "No file provided"
+            })),
+        )
+            .into_response()
     }
 
     /// Uploads a file with Write-Behind Cache + Dedup (smart strategy).
@@ -118,13 +133,18 @@ impl FileHandler {
 
             if name == "folder_id" {
                 let v = field.text().await.unwrap_or_default();
-                if !v.is_empty() { folder_id = Some(v); }
+                if !v.is_empty() {
+                    folder_id = Some(v);
+                }
                 continue;
             }
 
             if name == "file" {
                 let filename = field.file_name().unwrap_or("unnamed").to_string();
-                let content_type = field.content_type().unwrap_or("application/octet-stream").to_string();
+                let content_type = field
+                    .content_type()
+                    .unwrap_or("application/octet-stream")
+                    .to_string();
 
                 // Collect chunks
                 let mut chunks: Vec<Bytes> = Vec::new();
@@ -138,7 +158,10 @@ impl FileHandler {
                 // Empty file
                 if chunks.is_empty() {
                     let upload_svc = &state.applications.file_upload_service;
-                    return match upload_svc.upload_file(filename, folder_id, content_type, vec![]).await {
+                    return match upload_svc
+                        .upload_file(filename, folder_id, content_type, vec![])
+                        .await
+                    {
                         Ok(file) => Self::created_json_response(&file).into_response(),
                         Err(err) => Self::domain_error_response(err).into_response(),
                     };
@@ -146,13 +169,22 @@ impl FileHandler {
 
                 // Delegate to smart_upload (handles write-behind, dedup, streaming)
                 match upload_service
-                    .smart_upload(filename.clone(), folder_id, content_type, chunks, total_size)
+                    .smart_upload(
+                        filename.clone(),
+                        folder_id,
+                        content_type,
+                        chunks,
+                        total_size,
+                    )
                     .await
                 {
                     Ok((file, strategy)) => {
                         tracing::info!(
                             "✅ SMART UPLOAD: {} ({} bytes, strategy: {:?}, ID: {})",
-                            filename, total_size, strategy, file.id
+                            filename,
+                            total_size,
+                            strategy,
+                            file.id
                         );
                         return Self::created_json_response(&file).into_response();
                     }
@@ -164,9 +196,13 @@ impl FileHandler {
             }
         }
 
-        (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-            "error": "No file provided"
-        }))).into_response()
+        (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "No file provided"
+            })),
+        )
+            .into_response()
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -191,31 +227,46 @@ impl FileHandler {
             "preview" => ThumbnailSize::Preview,
             "large" => ThumbnailSize::Large,
             _ => {
-                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-                    "error": "Invalid thumbnail size. Use: icon, preview, or large"
-                }))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Invalid thumbnail size. Use: icon, preview, or large"
+                    })),
+                )
+                    .into_response();
             }
         };
 
         let file = match file_retrieval_service.get_file(&id).await {
             Ok(f) => f,
             Err(err) => {
-                return (StatusCode::NOT_FOUND, Json(serde_json::json!({
-                    "error": format!("File not found: {}", err)
-                }))).into_response();
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("File not found: {}", err)
+                    })),
+                )
+                    .into_response();
             }
         };
 
         if !thumbnail_service.is_supported_image(&file.mime_type) {
-            return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-                "error": "File is not a supported image type"
-            }))).into_response();
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": "File is not a supported image type"
+                })),
+            )
+                .into_response();
         }
 
         let storage_root = state.core.path_service.get_root_path();
         let file_path = storage_root.join(&file.path);
 
-        match thumbnail_service.get_thumbnail(&id, thumb_size, &file_path).await {
+        match thumbnail_service
+            .get_thumbnail(&id, thumb_size, &file_path)
+            .await
+        {
             Ok(data) => {
                 let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
                 Response::builder()
@@ -230,9 +281,13 @@ impl FileHandler {
             }
             Err(err) => {
                 tracing::error!("Thumbnail generation failed: {}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": format!("Failed to generate thumbnail: {}", err)
-                }))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Failed to generate thumbnail: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -259,29 +314,42 @@ impl FileHandler {
         let file_dto = match retrieval.get_file(&id).await {
             Ok(f) => f,
             Err(err) => {
-                let status = if err.to_string().contains("not found") || err.to_string().contains("NotFound") {
+                let status = if err.to_string().contains("not found")
+                    || err.to_string().contains("NotFound")
+                {
                     StatusCode::NOT_FOUND
                 } else {
                     StatusCode::INTERNAL_SERVER_ERROR
                 };
-                return (status, Json(serde_json::json!({
-                    "error": err.to_string()
-                }))).into_response();
+                return (
+                    status,
+                    Json(serde_json::json!({
+                        "error": err.to_string()
+                    })),
+                )
+                    .into_response();
             }
         };
 
         // ── Metadata-only request ────────────────────────────────────
-        if params.get("metadata").is_some_and(|v| v == "true" || v == "1") {
-            return (StatusCode::OK, Json(serde_json::json!({
-                "id": file_dto.id,
-                "name": file_dto.name,
-                "path": file_dto.path,
-                "size": file_dto.size,
-                "mime_type": file_dto.mime_type,
-                "folder_id": file_dto.folder_id,
-                "created_at": file_dto.created_at,
-                "modified_at": file_dto.modified_at
-            }))).into_response();
+        if params
+            .get("metadata")
+            .is_some_and(|v| v == "true" || v == "1")
+        {
+            return (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "id": file_dto.id,
+                    "name": file_dto.name,
+                    "path": file_dto.path,
+                    "size": file_dto.size,
+                    "mime_type": file_dto.mime_type,
+                    "folder_id": file_dto.folder_id,
+                    "created_at": file_dto.created_at,
+                    "modified_at": file_dto.modified_at
+                })),
+            )
+                .into_response();
         }
 
         let etag = format!("\"{}-{}\"", id, file_dto.modified_at);
@@ -289,112 +357,137 @@ impl FileHandler {
         // ── ETag (304 Not Modified) ──────────────────────────────────
         if let Some(inm) = headers.get(header::IF_NONE_MATCH)
             && let Ok(client_etag) = inm.to_str()
-                && (client_etag == etag || client_etag == "*") {
-                    return Response::builder()
-                        .status(StatusCode::NOT_MODIFIED)
-                        .header(header::ETAG, &etag)
-                        .body(Body::empty())
-                        .unwrap()
-                        .into_response();
-                }
+            && (client_etag == etag || client_etag == "*")
+        {
+            return Response::builder()
+                .status(StatusCode::NOT_MODIFIED)
+                .header(header::ETAG, &etag)
+                .body(Body::empty())
+                .unwrap()
+                .into_response();
+        }
 
         // ── Range Requests ───────────────────────────────────────────
         if let Some(range_header) = headers.get(header::RANGE)
             && let Ok(range_str) = range_header.to_str()
-                && let Ok(ranges) = parse_range_header(range_str) {
-                    let validated = ranges.validate(file_dto.size);
-                    if let Ok(valid_ranges) = validated {
-                        if let Some(range) = valid_ranges.first() {
-                            let start = *range.start();
-                            let end = *range.end();
-                            let range_length = end - start + 1;
-                            let disposition = Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
+            && let Ok(ranges) = parse_range_header(range_str)
+        {
+            let validated = ranges.validate(file_dto.size);
+            if let Ok(valid_ranges) = validated {
+                if let Some(range) = valid_ranges.first() {
+                    let start = *range.start();
+                    let end = *range.end();
+                    let range_length = end - start + 1;
+                    let disposition =
+                        Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
 
-                            match retrieval.get_file_range_stream(&id, start, Some(end + 1)).await {
-                                Ok(stream) => {
-                                    return Response::builder()
-                                        .status(StatusCode::PARTIAL_CONTENT)
-                                        .header(header::CONTENT_TYPE, &file_dto.mime_type)
-                                        .header(header::CONTENT_DISPOSITION, &disposition)
-                                        .header(header::CONTENT_LENGTH, range_length)
-                                        .header(header::CONTENT_RANGE, format!("bytes {}-{}/{}", start, end, file_dto.size))
-                                        .header(header::ACCEPT_RANGES, "bytes")
-                                        .header(header::ETAG, &etag)
-                                        .header(header::CACHE_CONTROL, "private, max-age=3600, must-revalidate")
-                                        .body(Body::from_stream(Box::into_pin(stream)))
-                                        .unwrap()
-                                        .into_response();
-                                }
-                                Err(err) => {
-                                    tracing::error!("Error creating range stream: {}", err);
-                                    // fall through to normal download
-                                }
-                            }
+                    match retrieval
+                        .get_file_range_stream(&id, start, Some(end + 1))
+                        .await
+                    {
+                        Ok(stream) => {
+                            return Response::builder()
+                                .status(StatusCode::PARTIAL_CONTENT)
+                                .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                                .header(header::CONTENT_DISPOSITION, &disposition)
+                                .header(header::CONTENT_LENGTH, range_length)
+                                .header(
+                                    header::CONTENT_RANGE,
+                                    format!("bytes {}-{}/{}", start, end, file_dto.size),
+                                )
+                                .header(header::ACCEPT_RANGES, "bytes")
+                                .header(header::ETAG, &etag)
+                                .header(
+                                    header::CACHE_CONTROL,
+                                    "private, max-age=3600, must-revalidate",
+                                )
+                                .body(Body::from_stream(Box::into_pin(stream)))
+                                .unwrap()
+                                .into_response();
                         }
-                    } else {
-                        return Response::builder()
-                            .status(StatusCode::RANGE_NOT_SATISFIABLE)
-                            .header(header::CONTENT_RANGE, format!("bytes */{}", file_dto.size))
-                            .body(Body::empty())
-                            .unwrap()
-                            .into_response();
+                        Err(err) => {
+                            tracing::error!("Error creating range stream: {}", err);
+                            // fall through to normal download
+                        }
                     }
                 }
+            } else {
+                return Response::builder()
+                    .status(StatusCode::RANGE_NOT_SATISFIABLE)
+                    .header(header::CONTENT_RANGE, format!("bytes */{}", file_dto.size))
+                    .body(Body::empty())
+                    .unwrap()
+                    .into_response();
+            }
+        }
 
         // ── Normal download (delegated to service) ───────────────────
         let disposition = Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
 
-        let accept_webp = headers.get(header::ACCEPT)
+        let accept_webp = headers
+            .get(header::ACCEPT)
             .and_then(|v| v.to_str().ok())
             .is_some_and(|a| a.contains("image/webp"));
-        let prefer_original = params.get("original").is_some_and(|v| v == "true" || v == "1");
+        let prefer_original = params
+            .get("original")
+            .is_some_and(|v| v == "true" || v == "1");
 
-        match retrieval.get_file_optimized(&id, accept_webp, prefer_original).await {
+        match retrieval
+            .get_file_optimized(&id, accept_webp, prefer_original)
+            .await
+        {
             Ok((_file, content)) => match content {
-                OptimizedFileContent::Bytes { data, mime_type, .. } => {
-                    Self::build_cached_response(
-                        data,
-                        &mime_type,
-                        &disposition,
-                        &etag,
-                        file_dto.size,
-                        &params,
-                        &*state.core.compression_service,
-                    ).await
-                    .into_response()
-                }
-                OptimizedFileContent::Mmap(mmap_data) => {
-                    Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, &file_dto.mime_type)
-                        .header(header::CONTENT_DISPOSITION, &disposition)
-                        .header(header::CONTENT_LENGTH, mmap_data.len())
-                        .header(header::ETAG, &etag)
-                        .header(header::CACHE_CONTROL, "private, max-age=3600, must-revalidate")
-                        .header(header::ACCEPT_RANGES, "bytes")
-                        .body(Body::from(mmap_data))
-                        .unwrap()
-                        .into_response()
-                }
-                OptimizedFileContent::Stream(pinned_stream) => {
-                    Response::builder()
-                        .status(StatusCode::OK)
-                        .header(header::CONTENT_TYPE, &file_dto.mime_type)
-                        .header(header::CONTENT_DISPOSITION, &disposition)
-                        .header(header::CONTENT_LENGTH, file_dto.size)
-                        .header(header::ETAG, &etag)
-                        .header(header::CACHE_CONTROL, "private, max-age=3600, must-revalidate")
-                        .header(header::ACCEPT_RANGES, "bytes")
-                        .body(Body::from_stream(pinned_stream))
-                        .unwrap()
-                        .into_response()
-                }
+                OptimizedFileContent::Bytes {
+                    data, mime_type, ..
+                } => Self::build_cached_response(
+                    data,
+                    &mime_type,
+                    &disposition,
+                    &etag,
+                    file_dto.size,
+                    &params,
+                    &*state.core.compression_service,
+                )
+                .await
+                .into_response(),
+                OptimizedFileContent::Mmap(mmap_data) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                    .header(header::CONTENT_DISPOSITION, &disposition)
+                    .header(header::CONTENT_LENGTH, mmap_data.len())
+                    .header(header::ETAG, &etag)
+                    .header(
+                        header::CACHE_CONTROL,
+                        "private, max-age=3600, must-revalidate",
+                    )
+                    .header(header::ACCEPT_RANGES, "bytes")
+                    .body(Body::from(mmap_data))
+                    .unwrap()
+                    .into_response(),
+                OptimizedFileContent::Stream(pinned_stream) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                    .header(header::CONTENT_DISPOSITION, &disposition)
+                    .header(header::CONTENT_LENGTH, file_dto.size)
+                    .header(header::ETAG, &etag)
+                    .header(
+                        header::CACHE_CONTROL,
+                        "private, max-age=3600, must-revalidate",
+                    )
+                    .header(header::ACCEPT_RANGES, "bytes")
+                    .body(Body::from_stream(pinned_stream))
+                    .unwrap()
+                    .into_response(),
             },
             Err(err) => {
                 tracing::error!("Error downloading file: {}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": format!("Error reading file: {}", err)
-                }))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Error reading file: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -421,9 +514,13 @@ impl FileHandler {
             }
             Err(err) => {
                 tracing::error!("Error listing files: {}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": format!("Error listing files: {}", err)
-                }))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Error listing files: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -440,39 +537,38 @@ impl FileHandler {
         let response = Self::upload_file_with_cache(State(state.clone()), multipart).await;
 
         // Try to extract file info for thumbnail generation
-        if let Ok(body_bytes) = axum::body::to_bytes(
-            response.into_response().into_body(),
-            10 * 1024,
-        ).await
+        if let Ok(body_bytes) =
+            axum::body::to_bytes(response.into_response().into_body(), 10 * 1024).await
             && let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&body_bytes)
-                && let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
-                    file_info.get("id").and_then(|v| v.as_str()),
-                    file_info.get("mime_type").and_then(|v| v.as_str()),
-                    file_info.get("path").and_then(|v| v.as_str()),
-                ) {
-                    // Generate thumbnails for images in background
-                    if state.core.thumbnail_service.is_supported_image(mime_type) {
-                        let file_id = file_id.to_string();
-                        let file_path_rel = file_path_str.to_string();
-                        let thumbnail_service = state.core.thumbnail_service.clone();
-                        let path_service = state.core.path_service.clone();
+            && let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
+                file_info.get("id").and_then(|v| v.as_str()),
+                file_info.get("mime_type").and_then(|v| v.as_str()),
+                file_info.get("path").and_then(|v| v.as_str()),
+            )
+        {
+            // Generate thumbnails for images in background
+            if state.core.thumbnail_service.is_supported_image(mime_type) {
+                let file_id = file_id.to_string();
+                let file_path_rel = file_path_str.to_string();
+                let thumbnail_service = state.core.thumbnail_service.clone();
+                let path_service = state.core.path_service.clone();
 
-                        tokio::spawn(async move {
-                            let file_path = path_service.get_root_path().join(&file_path_rel);
-                            tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                            thumbnail_service.generate_all_sizes_background(file_id, file_path);
-                        });
-                    }
+                tokio::spawn(async move {
+                    let file_path = path_service.get_root_path().join(&file_path_rel);
+                    tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
+                    thumbnail_service.generate_all_sizes_background(file_id, file_path);
+                });
+            }
 
-                    // Return the response
-                    return Response::builder()
-                        .status(StatusCode::CREATED)
-                        .header(header::CONTENT_TYPE, "application/json")
-                        .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                        .body(Body::from(body_bytes))
-                        .unwrap()
-                        .into_response();
-                }
+            // Return the response
+            return Response::builder()
+                .status(StatusCode::CREATED)
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
+                .body(Body::from(body_bytes))
+                .unwrap()
+                .into_response();
+        }
 
         // Fallback for errors
         (StatusCode::INTERNAL_SERVER_ERROR, "Upload processing error").into_response()
@@ -499,9 +595,13 @@ impl FileHandler {
             }
             Err(err) => {
                 tracing::error!("Error listing files: {}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": err.to_string()
-                }))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": err.to_string()
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -526,13 +626,15 @@ impl FileHandler {
 
         let result = if let Some(uid) = user_id {
             // Auth available: trash-first with dedup cleanup
-            mgmt.delete_with_cleanup(&id, &uid).await.map(|was_trashed| {
-                if was_trashed {
-                    tracing::info!("File moved to trash: {}", id);
-                } else {
-                    tracing::info!("File permanently deleted: {}", id);
-                }
-            })
+            mgmt.delete_with_cleanup(&id, &uid)
+                .await
+                .map(|was_trashed| {
+                    if was_trashed {
+                        tracing::info!("File moved to trash: {}", id);
+                    } else {
+                        tracing::info!("File permanently deleted: {}", id);
+                    }
+                })
         } else {
             // No auth: permanent delete
             tracing::warn!("No auth context – permanently deleting file: {}", id);
@@ -545,14 +647,20 @@ impl FileHandler {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(err) => {
                 tracing::error!("Error deleting file: {}", err);
-                let status = if err.to_string().contains("not found") || err.to_string().contains("NotFound") {
+                let status = if err.to_string().contains("not found")
+                    || err.to_string().contains("NotFound")
+                {
                     StatusCode::NOT_FOUND
                 } else {
                     StatusCode::INTERNAL_SERVER_ERROR
                 };
-                (status, Json(serde_json::json!({
-                    "error": format!("Error deleting file: {}", err)
-                }))).into_response()
+                (
+                    status,
+                    Json(serde_json::json!({
+                        "error": format!("Error deleting file: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -570,9 +678,13 @@ impl FileHandler {
         let new_name = match payload.get("name").and_then(|v| v.as_str()) {
             Some(name) if !name.trim().is_empty() => name.trim().to_string(),
             _ => {
-                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({
-                    "error": "Missing or empty 'name' field"
-                }))).into_response();
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Missing or empty 'name' field"
+                    })),
+                )
+                    .into_response();
             }
         };
 
@@ -582,16 +694,22 @@ impl FileHandler {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => {
                 tracing::error!("Error renaming file: {}", err);
-                let status = if err.to_string().contains("not found") || err.to_string().contains("NotFound") {
+                let status = if err.to_string().contains("not found")
+                    || err.to_string().contains("NotFound")
+                {
                     StatusCode::NOT_FOUND
                 } else if err.to_string().contains("already exists") {
                     StatusCode::CONFLICT
                 } else {
                     StatusCode::INTERNAL_SERVER_ERROR
                 };
-                (status, Json(serde_json::json!({
-                    "error": format!("Error renaming file: {}", err)
-                }))).into_response()
+                (
+                    status,
+                    Json(serde_json::json!({
+                        "error": format!("Error renaming file: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -608,22 +726,28 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
 
         match retrieval.get_file(&id).await {
-            Ok(_) => {
-                match mgmt.move_file(&id, payload.folder_id).await {
-                    Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-                    Err(err) => {
-                        tracing::error!("Error moving file: {}", err);
-                        (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
+            Ok(_) => match mgmt.move_file(&id, payload.folder_id).await {
+                Ok(file) => (StatusCode::OK, Json(file)).into_response(),
+                Err(err) => {
+                    tracing::error!("Error moving file: {}", err);
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({
                             "error": format!("Error moving file: {}", err)
-                        }))).into_response()
-                    }
+                        })),
+                    )
+                        .into_response()
                 }
-            }
+            },
             Err(err) => {
                 tracing::error!("File not found for move: {}", err);
-                (StatusCode::NOT_FOUND, Json(serde_json::json!({
-                    "error": format!("File with ID {} does not exist", id)
-                }))).into_response()
+                (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("File with ID {} does not exist", id)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -644,9 +768,13 @@ impl FileHandler {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => {
                 tracing::error!("Error moving file: {}", err);
-                (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({
-                    "error": format!("Error moving file: {}", err)
-                }))).into_response()
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({
+                        "error": format!("Error moving file: {}", err)
+                    })),
+                )
+                    .into_response()
             }
         }
     }
@@ -670,7 +798,9 @@ impl FileHandler {
 
     /// Build a Content-Disposition header value.
     fn content_disposition(name: &str, mime: &str, params: &HashMap<String, String>) -> String {
-        let force_inline = params.get("inline").is_some_and(|v| v == "true" || v == "1");
+        let force_inline = params
+            .get("inline")
+            .is_some_and(|v| v == "true" || v == "1");
         if force_inline
             || mime.starts_with("image/")
             || mime == "application/pdf"
@@ -720,7 +850,8 @@ impl FileHandler {
     ) -> Response<Body> {
         let compression_param = params.get("compress").map(|v| v.as_str());
         let force_compress = compression_param == Some("true") || compression_param == Some("1");
-        let force_no_compress = compression_param == Some("false") || compression_param == Some("0");
+        let force_no_compress =
+            compression_param == Some("false") || compression_param == Some("0");
 
         let should_compress = if force_no_compress {
             false
@@ -740,26 +871,28 @@ impl FileHandler {
             .status(StatusCode::OK)
             .header(header::CONTENT_DISPOSITION, disposition)
             .header(header::ETAG, etag)
-            .header(header::CACHE_CONTROL, "private, max-age=3600, must-revalidate")
+            .header(
+                header::CACHE_CONTROL,
+                "private, max-age=3600, must-revalidate",
+            )
             .header(header::VARY, "Accept-Encoding");
 
         if should_compress {
-            match compression_service.compress_data(&content, compression_level).await {
-                Ok(compressed) => {
-                    builder
-                        .header(header::CONTENT_TYPE, mime_type)
-                        .header(header::CONTENT_ENCODING, "gzip")
-                        .header(header::CONTENT_LENGTH, compressed.len())
-                        .body(Body::from(compressed))
-                        .unwrap()
-                }
-                Err(_) => {
-                    builder
-                        .header(header::CONTENT_TYPE, mime_type)
-                        .header(header::CONTENT_LENGTH, content.len())
-                        .body(Body::from(content))
-                        .unwrap()
-                }
+            match compression_service
+                .compress_data(&content, compression_level)
+                .await
+            {
+                Ok(compressed) => builder
+                    .header(header::CONTENT_TYPE, mime_type)
+                    .header(header::CONTENT_ENCODING, "gzip")
+                    .header(header::CONTENT_LENGTH, compressed.len())
+                    .body(Body::from(compressed))
+                    .unwrap(),
+                Err(_) => builder
+                    .header(header::CONTENT_TYPE, mime_type)
+                    .header(header::CONTENT_LENGTH, content.len())
+                    .body(Body::from(content))
+                    .unwrap(),
             }
         } else {
             builder

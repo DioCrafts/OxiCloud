@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::trashed_item::TrashedItem;
 use crate::common::errors::Result;
+use crate::domain::entities::trashed_item::TrashedItem;
 
 #[async_trait]
 pub trait TrashRepository: Send + Sync {

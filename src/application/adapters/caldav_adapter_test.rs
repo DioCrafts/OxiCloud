@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-    use std::collections::HashMap;
-    use chrono::{Utc, TimeZone};
     use crate::application::adapters::caldav_adapter::{CalDavAdapter, CalDavReportType};
-    use crate::application::adapters::webdav_adapter::{PropFindRequest, PropFindType, QualifiedName};
+    use crate::application::adapters::webdav_adapter::{
+        PropFindRequest, PropFindType, QualifiedName,
+    };
     use crate::application::dtos::calendar_dto::{CalendarDto, CalendarEventDto};
+    use chrono::{TimeZone, Utc};
+    use std::collections::HashMap;
+    use std::io::Cursor;
 
     fn sample_calendar() -> CalendarDto {
         CalendarDto {
@@ -56,7 +58,11 @@ mod tests {
         </C:mkcalendar>"#;
 
         let result = CalDavAdapter::parse_mkcalendar(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse MKCALENDAR: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse MKCALENDAR: {:?}",
+            result.err()
+        );
         let (name, desc, color) = result.unwrap();
         assert_eq!(name, "Work Calendar");
         assert_eq!(desc, Some("Work related events".to_string()));
@@ -105,7 +111,7 @@ mod tests {
 
         let result = CalDavAdapter::parse_report(Cursor::new(xml));
         assert!(result.is_ok(), "Failed to parse report: {:?}", result.err());
-        
+
         match result.unwrap() {
             CalDavReportType::CalendarQuery { time_range, props } => {
                 assert!(time_range.is_some(), "Time range should be parsed");
@@ -131,8 +137,12 @@ mod tests {
         </C:calendar-multiget>"#;
 
         let result = CalDavAdapter::parse_report(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse multiget: {:?}", result.err());
-        
+        assert!(
+            result.is_ok(),
+            "Failed to parse multiget: {:?}",
+            result.err()
+        );
+
         match result.unwrap() {
             CalDavReportType::CalendarMultiget { hrefs, props } => {
                 assert_eq!(hrefs.len(), 2);
@@ -162,13 +172,26 @@ mod tests {
             &request,
             "/caldav/",
         );
-        
-        assert!(result.is_ok(), "Failed to generate propfind response: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Failed to generate propfind response: {:?}",
+            result.err()
+        );
+
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8 in response");
-        assert!(xml_str.contains("multistatus"), "Response should contain multistatus element");
-        assert!(xml_str.contains("Personal"), "Response should contain calendar name");
-        assert!(xml_str.contains("cal-001"), "Response should contain calendar ID in href");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Response should contain multistatus element"
+        );
+        assert!(
+            xml_str.contains("Personal"),
+            "Response should contain calendar name"
+        );
+        assert!(
+            xml_str.contains("cal-001"),
+            "Response should contain calendar ID in href"
+        );
     }
 
     #[test]
@@ -188,9 +211,13 @@ mod tests {
             "/caldav/cal-001",
             "0",
         );
-        
-        assert!(result.is_ok(), "Failed to generate collection propfind: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Failed to generate collection propfind: {:?}",
+            result.err()
+        );
+
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
         assert!(xml_str.contains("multistatus"), "Should have multistatus");
         assert!(xml_str.contains("Personal"), "Should have calendar name");
@@ -214,14 +241,21 @@ mod tests {
             "/caldav/cal-001",
             "1",
         );
-        
-        assert!(result.is_ok(), "Failed to generate depth-1 propfind: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Failed to generate depth-1 propfind: {:?}",
+            result.err()
+        );
+
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
         assert!(xml_str.contains("multistatus"), "Should have multistatus");
         assert!(xml_str.contains("Personal"), "Should have calendar name");
         // Depth 1 should include event resources
-        assert!(xml_str.contains("evt-001"), "Depth 1 should include event resources");
+        assert!(
+            xml_str.contains("evt-001"),
+            "Depth 1 should include event resources"
+        );
     }
 
     // ========================
@@ -252,15 +286,28 @@ mod tests {
             &report,
             "/caldav/cal-001",
         );
-        
-        assert!(result.is_ok(), "Failed to generate events response: {:?}", result.err());
-        
+
+        assert!(
+            result.is_ok(),
+            "Failed to generate events response: {:?}",
+            result.err()
+        );
+
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
         assert!(xml_str.contains("multistatus"), "Should have multistatus");
         assert!(xml_str.contains("evt-001"), "Should reference event ID");
-        assert!(xml_str.contains("BEGIN:VCALENDAR"), "Should contain iCal data");
-        assert!(xml_str.contains("VEVENT"), "Should contain VEVENT component");
-        assert!(xml_str.contains("Team Meeting"), "Should contain event summary");
+        assert!(
+            xml_str.contains("BEGIN:VCALENDAR"),
+            "Should contain iCal data"
+        );
+        assert!(
+            xml_str.contains("VEVENT"),
+            "Should contain VEVENT component"
+        );
+        assert!(
+            xml_str.contains("Team Meeting"),
+            "Should contain event summary"
+        );
     }
 
     #[test]
@@ -278,9 +325,15 @@ mod tests {
             &report,
             "/caldav/cal-001",
         );
-        
-        assert!(result.is_ok(), "Empty events should still produce valid response");
+
+        assert!(
+            result.is_ok(),
+            "Empty events should still produce valid response"
+        );
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("multistatus"), "Should have multistatus even for empty");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Should have multistatus even for empty"
+        );
     }
 }

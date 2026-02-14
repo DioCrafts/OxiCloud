@@ -1,16 +1,18 @@
-use std::path::PathBuf;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 use serde_json::Value;
+use std::path::PathBuf;
 
+use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
-use crate::common::errors::DomainError;
 
 // Re-export domain repository traits for backward compatibility.
 // The canonical definitions now live in domain/repositories/.
-pub use crate::domain::repositories::file_repository::{FileReadRepository, FileWriteRepository, FileRepository};
+pub use crate::domain::repositories::file_repository::{
+    FileReadRepository, FileRepository, FileWriteRepository,
+};
 pub use crate::domain::repositories::folder_repository::FolderRepository;
 
 // ─────────────────────────────────────────────────────
@@ -92,17 +94,14 @@ pub trait FileWritePort: Send + Sync + 'static {
     ) -> Result<File, DomainError>;
 
     /// Renames a file (same folder, different name).
-    async fn rename_file(
-        &self,
-        file_id: &str,
-        new_name: &str,
-    ) -> Result<File, DomainError>;
+    async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<File, DomainError>;
 
     /// Deletes a file.
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
     /// Updates the content of an existing file.
-    async fn update_file_content(&self, file_id: &str, content: Vec<u8>) -> Result<(), DomainError>;
+    async fn update_file_content(&self, file_id: &str, content: Vec<u8>)
+    -> Result<(), DomainError>;
 
     /// Registers file metadata WITHOUT writing content to disk (write-behind).
     ///
@@ -122,7 +121,11 @@ pub trait FileWritePort: Send + Sync + 'static {
     async fn move_to_trash(&self, file_id: &str) -> Result<(), DomainError>;
 
     /// Restores a file from the trash to its original location
-    async fn restore_from_trash(&self, file_id: &str, original_path: &str) -> Result<(), DomainError>;
+    async fn restore_from_trash(
+        &self,
+        file_id: &str,
+        original_path: &str,
+    ) -> Result<(), DomainError>;
 
     /// Permanently deletes a file (used by the trash)
     async fn delete_file_permanently(&self, file_id: &str) -> Result<(), DomainError>;

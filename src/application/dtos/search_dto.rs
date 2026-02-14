@@ -1,9 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /**
  * Data Transfer Object for file search criteria.
- * 
- * This structure represents all possible search parameters that can be used 
+ *
+ * This structure represents all possible search parameters that can be used
  * to filter files and folders in the system. It supports various filter types
  * including name matching, file types, date ranges, and size constraints.
  */
@@ -12,47 +12,47 @@ pub struct SearchCriteriaDto {
     /// Optional text to search in file/folder names
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name_contains: Option<String>,
-    
+
     /// Optional list of file extensions to include (e.g., "pdf", "jpg")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub file_types: Option<Vec<String>>,
-    
+
     /// Optional minimum creation date (seconds since epoch)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_after: Option<u64>,
-    
+
     /// Optional maximum creation date (seconds since epoch)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_before: Option<u64>,
-    
+
     /// Optional minimum modification date (seconds since epoch)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modified_after: Option<u64>,
-    
+
     /// Optional maximum modification date (seconds since epoch)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub modified_before: Option<u64>,
-    
+
     /// Optional minimum file size in bytes
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_size: Option<u64>,
-    
+
     /// Optional maximum file size in bytes
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_size: Option<u64>,
-    
+
     /// Optional folder ID to limit search scope
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_id: Option<String>,
-    
+
     /// Whether to search recursively within subfolders (default: true)
     #[serde(default = "default_recursive")]
     pub recursive: bool,
-    
+
     /// Maximum number of results to return
     #[serde(default = "default_limit")]
     pub limit: usize,
-    
+
     /// Offset for pagination
     #[serde(default)]
     pub offset: usize,
@@ -89,7 +89,7 @@ impl Default for SearchCriteriaDto {
 
 /**
  * Data Transfer Object for search results.
- * 
+ *
  * This structure encapsulates the results of a search operation, including
  * both files and folders that match the search criteria, along with pagination information.
  */
@@ -97,19 +97,19 @@ impl Default for SearchCriteriaDto {
 pub struct SearchResultsDto {
     /// Files matching the search criteria
     pub files: Vec<crate::application::dtos::file_dto::FileDto>,
-    
+
     /// Folders matching the search criteria
     pub folders: Vec<crate::application::dtos::folder_dto::FolderDto>,
-    
+
     /// Total count of matching items (for pagination)
     pub total_count: Option<usize>,
-    
+
     /// Limit used in the search
     pub limit: usize,
-    
+
     /// Offset used in the search
     pub offset: usize,
-    
+
     /// Whether there are more results available
     pub has_more: bool,
 }
@@ -126,7 +126,7 @@ impl SearchResultsDto {
             has_more: false,
         }
     }
-    
+
     /// Creates a new search results object from files and folders
     pub fn new(
         files: Vec<crate::application::dtos::file_dto::FileDto>,
@@ -139,7 +139,7 @@ impl SearchResultsDto {
             Some(total) => (offset + files.len() + folders.len()) < total,
             None => false,
         };
-        
+
         Self {
             files,
             folders,

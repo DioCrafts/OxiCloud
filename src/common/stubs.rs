@@ -14,23 +14,25 @@ use bytes::Bytes;
 use futures::Stream;
 
 use crate::application::dtos::file_dto::FileDto;
-use crate::application::dtos::folder_dto::{CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto};
+use crate::application::dtos::folder_dto::{
+    CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
+};
 use crate::application::dtos::pagination::{PaginatedResponseDto, PaginationRequestDto};
 use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
 use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
-    UploadStrategy, OptimizedFileContent,
+    OptimizedFileContent, UploadStrategy,
 };
 use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
 use crate::application::ports::outbound::IdMappingPort;
-use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::zip_ports::ZipPort;
 use crate::application::services::storage_mediator::{StorageMediator, StorageMediatorError};
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::entities::folder::Folder;
+use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::services::i18n_service::{I18nResult, I18nService, Locale};
 use crate::domain::services::path_service::StoragePath;
 
@@ -89,10 +91,7 @@ pub struct StubIdMappingService;
 
 #[async_trait]
 impl IdMappingPort for StubIdMappingService {
-    async fn get_or_create_id(
-        &self,
-        _path: &StoragePath,
-    ) -> Result<String, DomainError> {
+    async fn get_or_create_id(&self, _path: &StoragePath) -> Result<String, DomainError> {
         Ok("dummy-id".to_string())
     }
 
@@ -100,11 +99,7 @@ impl IdMappingPort for StubIdMappingService {
         Ok(StoragePath::from_string("/"))
     }
 
-    async fn update_path(
-        &self,
-        _id: &str,
-        _new_path: &StoragePath,
-    ) -> Result<(), DomainError> {
+    async fn update_path(&self, _id: &str, _new_path: &StoragePath) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -125,10 +120,7 @@ pub struct StubStorageMediator;
 
 #[async_trait]
 impl StorageMediator for StubStorageMediator {
-    async fn get_folder_path(
-        &self,
-        _folder_id: &str,
-    ) -> Result<PathBuf, StorageMediatorError> {
+    async fn get_folder_path(&self, _folder_id: &str) -> Result<PathBuf, StorageMediatorError> {
         Ok(PathBuf::from("/tmp"))
     }
 
@@ -139,19 +131,13 @@ impl StorageMediator for StubStorageMediator {
         Ok(StoragePath::root())
     }
 
-    async fn get_folder(
-        &self,
-        _folder_id: &str,
-    ) -> Result<Folder, StorageMediatorError> {
+    async fn get_folder(&self, _folder_id: &str) -> Result<Folder, StorageMediatorError> {
         Err(StorageMediatorError::NotFound(
             "Stub not implemented".to_string(),
         ))
     }
 
-    async fn file_exists_at_path(
-        &self,
-        _path: &Path,
-    ) -> Result<bool, StorageMediatorError> {
+    async fn file_exists_at_path(&self, _path: &Path) -> Result<bool, StorageMediatorError> {
         Ok(false)
     }
 
@@ -162,10 +148,7 @@ impl StorageMediator for StubStorageMediator {
         Ok(false)
     }
 
-    async fn folder_exists_at_path(
-        &self,
-        _path: &Path,
-    ) -> Result<bool, StorageMediatorError> {
+    async fn folder_exists_at_path(&self, _path: &Path) -> Result<bool, StorageMediatorError> {
         Ok(false)
     }
 
@@ -184,10 +167,7 @@ impl StorageMediator for StubStorageMediator {
         PathBuf::from("/tmp")
     }
 
-    async fn ensure_directory(
-        &self,
-        _path: &Path,
-    ) -> Result<(), StorageMediatorError> {
+    async fn ensure_directory(&self, _path: &Path) -> Result<(), StorageMediatorError> {
         Ok(())
     }
 
@@ -236,10 +216,7 @@ impl FileReadPort for StubFileReadPort {
         Ok(File::default())
     }
 
-    async fn list_files(
-        &self,
-        _folder_id: Option<&str>,
-    ) -> Result<Vec<File>, DomainError> {
+    async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
         Ok(Vec::new())
     }
 
@@ -314,11 +291,7 @@ impl FileWritePort for StubFileWritePort {
         Ok(File::default())
     }
 
-    async fn rename_file(
-        &self,
-        _file_id: &str,
-        _new_name: &str,
-    ) -> Result<File, DomainError> {
+    async fn rename_file(&self, _file_id: &str, _new_name: &str) -> Result<File, DomainError> {
         Ok(File::default())
     }
 
@@ -348,7 +321,11 @@ impl FileWritePort for StubFileWritePort {
         Ok(())
     }
 
-    async fn restore_from_trash(&self, _file_id: &str, _original_path: &str) -> Result<(), DomainError> {
+    async fn restore_from_trash(
+        &self,
+        _file_id: &str,
+        _original_path: &str,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -377,17 +354,11 @@ impl FolderRepository for StubFolderStoragePort {
         Ok(Folder::default())
     }
 
-    async fn get_folder_by_path(
-        &self,
-        _storage_path: &StoragePath,
-    ) -> Result<Folder, DomainError> {
+    async fn get_folder_by_path(&self, _storage_path: &StoragePath) -> Result<Folder, DomainError> {
         Ok(Folder::default())
     }
 
-    async fn list_folders(
-        &self,
-        _parent_id: Option<&str>,
-    ) -> Result<Vec<Folder>, DomainError> {
+    async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
         Ok(Vec::new())
     }
 
@@ -401,11 +372,7 @@ impl FolderRepository for StubFolderStoragePort {
         Ok((Vec::new(), Some(0)))
     }
 
-    async fn rename_folder(
-        &self,
-        _id: &str,
-        _new_name: String,
-    ) -> Result<Folder, DomainError> {
+    async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<Folder, DomainError> {
         Ok(Folder::default())
     }
 
@@ -421,17 +388,11 @@ impl FolderRepository for StubFolderStoragePort {
         Ok(())
     }
 
-    async fn folder_exists(
-        &self,
-        _storage_path: &StoragePath,
-    ) -> Result<bool, DomainError> {
+    async fn folder_exists(&self, _storage_path: &StoragePath) -> Result<bool, DomainError> {
         Ok(false)
     }
 
-    async fn get_folder_path(
-        &self,
-        _id: &str,
-    ) -> Result<StoragePath, DomainError> {
+    async fn get_folder_path(&self, _id: &str) -> Result<StoragePath, DomainError> {
         Ok(StoragePath::from_string("/"))
     }
 
@@ -439,7 +400,11 @@ impl FolderRepository for StubFolderStoragePort {
         Ok(())
     }
 
-    async fn restore_from_trash(&self, _folder_id: &str, _original_path: &str) -> Result<(), DomainError> {
+    async fn restore_from_trash(
+        &self,
+        _folder_id: &str,
+        _original_path: &str,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -481,10 +446,7 @@ pub struct StubFolderUseCase;
 
 #[async_trait]
 impl FolderUseCase for StubFolderUseCase {
-    async fn create_folder(
-        &self,
-        _dto: CreateFolderDto,
-    ) -> Result<FolderDto, DomainError> {
+    async fn create_folder(&self, _dto: CreateFolderDto) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
@@ -492,17 +454,11 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
-    async fn get_folder_by_path(
-        &self,
-        _path: &str,
-    ) -> Result<FolderDto, DomainError> {
+    async fn get_folder_by_path(&self, _path: &str) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
-    async fn list_folders(
-        &self,
-        _parent_id: Option<&str>,
-    ) -> Result<Vec<FolderDto>, DomainError> {
+    async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<FolderDto>, DomainError> {
         Ok(Vec::new())
     }
 
@@ -522,11 +478,7 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
-    async fn move_folder(
-        &self,
-        _id: &str,
-        _dto: MoveFolderDto,
-    ) -> Result<FolderDto, DomainError> {
+    async fn move_folder(&self, _id: &str, _dto: MoveFolderDto) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
@@ -564,7 +516,13 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         Ok((FileDto::default(), UploadStrategy::Buffered))
     }
 
-    async fn create_file(&self, _parent_path: &str, _filename: &str, _content: &[u8], _content_type: &str) -> Result<FileDto, DomainError> {
+    async fn create_file(
+        &self,
+        _parent_path: &str,
+        _filename: &str,
+        _content: &[u8],
+        _content_type: &str,
+    ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }
 
@@ -585,10 +543,7 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
         Ok(FileDto::default())
     }
 
-    async fn list_files(
-        &self,
-        _folder_id: Option<&str>,
-    ) -> Result<Vec<FileDto>, DomainError> {
+    async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError> {
         Ok(Vec::new())
     }
 
@@ -610,11 +565,14 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
         _accept_webp: bool,
         _prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
-        Ok((FileDto::default(), OptimizedFileContent::Bytes {
-            data: Bytes::new(),
-            mime_type: String::new(),
-            was_transcoded: false,
-        }))
+        Ok((
+            FileDto::default(),
+            OptimizedFileContent::Bytes {
+                data: Bytes::new(),
+                mime_type: String::new(),
+                was_transcoded: false,
+            },
+        ))
     }
 
     async fn get_file_range_stream(
@@ -648,11 +606,7 @@ impl FileManagementUseCase for StubFileManagementUseCase {
         Ok(FileDto::default())
     }
 
-    async fn rename_file(
-        &self,
-        _file_id: &str,
-        _new_name: &str,
-    ) -> Result<FileDto, DomainError> {
+    async fn rename_file(&self, _file_id: &str, _new_name: &str) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }
 
@@ -660,11 +614,7 @@ impl FileManagementUseCase for StubFileManagementUseCase {
         Ok(())
     }
 
-    async fn delete_with_cleanup(
-        &self,
-        _id: &str,
-        _user_id: &str,
-    ) -> Result<bool, DomainError> {
+    async fn delete_with_cleanup(&self, _id: &str, _user_id: &str) -> Result<bool, DomainError> {
         Ok(false)
     }
 }
@@ -697,10 +647,7 @@ pub struct StubSearchUseCase;
 
 #[async_trait]
 impl SearchUseCase for StubSearchUseCase {
-    async fn search(
-        &self,
-        _criteria: SearchCriteriaDto,
-    ) -> Result<SearchResultsDto, DomainError> {
+    async fn search(&self, _criteria: SearchCriteriaDto) -> Result<SearchResultsDto, DomainError> {
         Ok(SearchResultsDto::empty())
     }
 
@@ -713,7 +660,9 @@ impl SearchUseCase for StubSearchUseCase {
 // MetadataCachePort
 // ---------------------------------------------------------------------------
 
-use crate::application::ports::cache_ports::{MetadataCachePort, CachedMetadataDto, ContentCachePort};
+use crate::application::ports::cache_ports::{
+    CachedMetadataDto, ContentCachePort, MetadataCachePort,
+};
 
 pub struct StubMetadataCachePort;
 

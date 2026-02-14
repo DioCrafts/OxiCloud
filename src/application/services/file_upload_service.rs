@@ -1,14 +1,14 @@
-use std::sync::Arc;
-use std::pin::Pin;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use std::pin::Pin;
+use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
-use crate::application::ports::file_ports::{FileUploadUseCase, UploadStrategy};
-use crate::application::ports::storage_ports::{FileWritePort, FileReadPort};
 use crate::application::ports::cache_ports::WriteBehindCachePort;
 use crate::application::ports::dedup_ports::DedupPort;
+use crate::application::ports::file_ports::{FileUploadUseCase, UploadStrategy};
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::common::errors::DomainError;
 use tracing::{debug, info, warn};
 
@@ -47,7 +47,8 @@ pub struct FileUploadService {
     /// Optional dedup service for content-addressable storage
     dedup: Option<Arc<dyn DedupPort>>,
     /// Optional storage usage tracking
-    storage_usage_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>>,
+    storage_usage_service:
+        Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>>,
 }
 
 impl FileUploadService {
@@ -92,7 +93,10 @@ impl FileUploadService {
     /// Run dedup tracking (non-fatal on failure).
     async fn run_dedup(&self, data: &[u8], content_type: &str) {
         let Some(dedup) = &self.dedup else { return };
-        match dedup.store_bytes(data, Some(content_type.to_string())).await {
+        match dedup
+            .store_bytes(data, Some(content_type.to_string()))
+            .await
+        {
             Ok(result) => {
                 if result.was_deduplicated() {
                     info!(
@@ -101,7 +105,10 @@ impl FileUploadService {
                         result.size()
                     );
                 } else {
-                    info!("💾 DEDUP: new content stored (hash: {})", &result.hash()[..12]);
+                    info!(
+                        "💾 DEDUP: new content stored (hash: {})",
+                        &result.hash()[..12]
+                    );
                 }
             }
             Err(e) => {
@@ -119,7 +126,10 @@ impl FileUploadService {
                 let service_clone = Arc::clone(storage_service);
                 tokio::spawn(async move {
                     match service_clone.update_user_storage_usage(&username).await {
-                        Ok(usage) => debug!("Updated storage usage for user {} to {} bytes", username, usage),
+                        Ok(usage) => debug!(
+                            "Updated storage usage for user {} to {} bytes",
+                            username, usage
+                        ),
                         Err(e) => warn!("Failed to update storage usage for {}: {}", username, e),
                     }
                 });
@@ -138,7 +148,10 @@ impl FileUploadUseCase for FileUploadService {
         content_type: String,
         content: Vec<u8>,
     ) -> Result<FileDto, DomainError> {
-        let file = self.file_write.save_file(name, folder_id, content_type, content).await?;
+        let file = self
+            .file_write
+            .save_file(name, folder_id, content_type, content)
+            .await?;
         let dto = FileDto::from(file);
         self.maybe_update_storage_usage(&dto);
         Ok(dto)
@@ -170,34 +183,38 @@ impl FileUploadUseCase for FileUploadService {
         // ─── TIER 1: Write-Behind (<256 KB) ──────────────────
         if total_size < WRITE_BEHIND_THRESHOLD
             && let Some(wb) = &self.write_behind
-                && wb.is_eligible_size(total_size) {
-                    let data: Bytes = if chunks.len() == 1 {
-                        chunks.into_iter().next().unwrap()
-                    } else {
-                        let mut combined = Vec::with_capacity(total_size);
-                        for chunk in chunks {
-                            combined.extend_from_slice(&chunk);
-                        }
-                        combined.into()
-                    };
-
-                    let (file, target_path) = self
-                        .file_write
-                        .register_file_deferred(name.clone(), folder_id, content_type, total_size as u64)
-                        .await?;
-                    let dto = FileDto::from(file);
-
-                    if let Err(e) = wb.put_pending(dto.id.clone(), data, target_path).await {
-                        return Err(DomainError::internal_error("file", format!(
-                            "Write-behind cache failed: {}",
-                            e
-                        )));
-                    }
-
-                    info!("⚡ WRITE-BEHIND UPLOAD: {} (ID: {}, ~0ms latency)", name, dto.id);
-                    self.maybe_update_storage_usage(&dto);
-                    return Ok((dto, UploadStrategy::WriteBehind));
+            && wb.is_eligible_size(total_size)
+        {
+            let data: Bytes = if chunks.len() == 1 {
+                chunks.into_iter().next().unwrap()
+            } else {
+                let mut combined = Vec::with_capacity(total_size);
+                for chunk in chunks {
+                    combined.extend_from_slice(&chunk);
                 }
+                combined.into()
+            };
+
+            let (file, target_path) = self
+                .file_write
+                .register_file_deferred(name.clone(), folder_id, content_type, total_size as u64)
+                .await?;
+            let dto = FileDto::from(file);
+
+            if let Err(e) = wb.put_pending(dto.id.clone(), data, target_path).await {
+                return Err(DomainError::internal_error(
+                    "file",
+                    format!("Write-behind cache failed: {}", e),
+                ));
+            }
+
+            info!(
+                "⚡ WRITE-BEHIND UPLOAD: {} (ID: {}, ~0ms latency)",
+                name, dto.id
+            );
+            self.maybe_update_storage_usage(&dto);
+            return Ok((dto, UploadStrategy::WriteBehind));
+        }
 
         // ─── TIER 2: Streaming (≥1 MB) ──────────────────────
         if total_size >= STREAMING_UPLOAD_THRESHOLD {

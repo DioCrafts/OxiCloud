@@ -1,11 +1,11 @@
-use std::sync::Arc;
-use std::convert::Infallible;
 use axum::{
-    extract::{State, Request, FromRequestParts},
-    http::{StatusCode, HeaderMap, header, request::Parts},
+    extract::{FromRequestParts, Request, State},
+    http::{HeaderMap, StatusCode, header, request::Parts},
     middleware::Next,
-    response::{Response, IntoResponse},
+    response::{IntoResponse, Response},
 };
+use std::convert::Infallible;
+use std::sync::Arc;
 
 use crate::common::di::AppState;
 
@@ -77,7 +77,10 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(OptionalUserId(
-            parts.extensions.get::<CurrentUser>().map(|cu| cu.id.clone()),
+            parts
+                .extensions
+                .get::<CurrentUser>()
+                .map(|cu| cu.id.clone()),
         ))
     }
 }
@@ -94,12 +97,12 @@ where
     type Rejection = Infallible;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(OptionalAuthUser(
-            parts.extensions.get::<CurrentUser>().map(|cu| AuthUser {
+        Ok(OptionalAuthUser(parts.extensions.get::<CurrentUser>().map(
+            |cu| AuthUser {
                 id: cu.id.clone(),
                 username: cu.username.clone(),
-            }),
-        ))
+            },
+        )))
     }
 }
 
@@ -108,19 +111,19 @@ where
 pub enum AuthError {
     #[error("Token not provided")]
     TokenNotProvided,
-    
+
     #[error("Invalid token: {0}")]
     InvalidToken(String),
-    
+
     #[error("Token expired")]
     TokenExpired,
-    
+
     #[error("User not found")]
     UserNotFound,
-    
+
     #[error("Access denied: {0}")]
     AccessDenied(String),
-    
+
     #[error("Authentication service unavailable")]
     AuthServiceUnavailable,
 }
@@ -128,12 +131,17 @@ pub enum AuthError {
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AuthError::TokenNotProvided => (StatusCode::UNAUTHORIZED, "Token not provided".to_string()),
+            AuthError::TokenNotProvided => {
+                (StatusCode::UNAUTHORIZED, "Token not provided".to_string())
+            }
             AuthError::InvalidToken(msg) => (StatusCode::UNAUTHORIZED, msg),
             AuthError::TokenExpired => (StatusCode::UNAUTHORIZED, "Token expired".to_string()),
             AuthError::UserNotFound => (StatusCode::UNAUTHORIZED, "User not found".to_string()),
             AuthError::AccessDenied(msg) => (StatusCode::FORBIDDEN, msg),
-            AuthError::AuthServiceUnavailable => (StatusCode::INTERNAL_SERVER_ERROR, "Authentication service unavailable".to_string()),
+            AuthError::AuthServiceUnavailable => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Authentication service unavailable".to_string(),
+            ),
         };
 
         let body = axum::Json(serde_json::json!({
@@ -160,15 +168,15 @@ pub async fn auth_middleware(
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Bearer "))
         .ok_or(AuthError::TokenNotProvided)?;
-    
+
     // Validate that the token is not empty
     let token_str = token_str.trim();
     if token_str.is_empty() {
         return Err(AuthError::TokenNotProvided);
     }
-    
+
     tracing::debug!("Processing authentication token");
-    
+
     // Validate the token using the authentication service
     if let Some(auth_service) = state.auth_service.as_ref() {
         let token_service = &auth_service.token_service;
@@ -183,14 +191,14 @@ pub async fn auth_middleware(
                 };
                 request.extensions_mut().insert(current_user);
                 return Ok(next.run(request).await);
-            },
+            }
             Err(e) => {
                 tracing::warn!("Token validation failed: {}", e);
                 return Err(AuthError::InvalidToken(format!("Invalid token: {}", e)));
             }
         }
     }
-    
+
     // If no authentication service is available, deny access
     tracing::error!("Auth middleware invoked but auth service is not configured");
     Err(AuthError::AuthServiceUnavailable)
@@ -200,21 +208,22 @@ pub async fn auth_middleware(
 ///
 /// Must be applied AFTER auth_middleware, as it depends on
 /// `CurrentUser` being present in the request extensions.
-pub async fn require_admin(
-    request: Request,
-    next: Next,
-) -> Response {
+pub async fn require_admin(request: Request, next: Next) -> Response {
     // Get the CurrentUser inserted by auth_middleware
     if let Some(current_user) = request.extensions().get::<CurrentUser>() {
         if current_user.role == "admin" {
             tracing::debug!("Admin access granted for user: {}", current_user.username);
             return next.run(request).await;
         }
-        tracing::warn!("Admin access denied for user: {} (role: {})", current_user.username, current_user.role);
+        tracing::warn!(
+            "Admin access denied for user: {} (role: {})",
+            current_user.username,
+            current_user.role
+        );
     } else {
         tracing::warn!("Admin check failed: no authenticated user in request");
     }
-    
+
     // Access denied
     let error = AuthError::AccessDenied("Admin role required".to_string());
     error.into_response()

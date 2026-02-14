@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 // Re-export entity errors from the centralized module
 pub use super::entity_errors::{UserError, UserResult};
@@ -23,7 +23,7 @@ impl std::fmt::Display for UserRole {
 #[derive(Debug, Clone)]
 pub struct User {
     id: String,
-    username: String, 
+    username: String,
     email: String,
     password_hash: String,
     role: UserRole,
@@ -39,11 +39,11 @@ pub struct User {
 
 impl User {
     /// Create a new user with a pre-hashed password.
-    /// 
+    ///
     /// The password hashing should be done externally using PasswordHasherPort
     /// to maintain clean architecture and keep cryptographic dependencies
     /// out of the domain layer.
-    /// 
+    ///
     /// # Arguments
     /// * `username` - User's username (3-32 characters)
     /// * `email` - User's email address
@@ -52,26 +52,30 @@ impl User {
     /// * `storage_quota_bytes` - Storage quota in bytes
     pub fn new(
         username: String,
-        email: String, 
+        email: String,
         password_hash: String,
         role: UserRole,
         storage_quota_bytes: i64,
     ) -> UserResult<Self> {
         // Validations
         if username.is_empty() || username.len() < 3 || username.len() > 32 {
-            return Err(UserError::InvalidUsername("Username must be between 3 and 32 characters".to_string()));
+            return Err(UserError::InvalidUsername(
+                "Username must be between 3 and 32 characters".to_string(),
+            ));
         }
-        
+
         if !email.contains('@') || email.len() < 5 {
             return Err(UserError::ValidationError("Invalid email".to_string()));
         }
-        
+
         if password_hash.is_empty() {
-            return Err(UserError::InvalidPassword("Password hash cannot be empty".to_string()));
+            return Err(UserError::InvalidPassword(
+                "Password hash cannot be empty".to_string(),
+            ));
         }
-        
+
         let now = Utc::now();
-        
+
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             username,
@@ -88,7 +92,7 @@ impl User {
             oidc_subject: None,
         })
     }
-    
+
     /// Create a new OIDC-authenticated user (no password required).
     pub fn new_oidc(
         username: String,
@@ -104,9 +108,7 @@ impl User {
             ));
         }
         if !email.contains('@') || email.len() < 5 {
-            return Err(UserError::ValidationError(
-                "Invalid email".to_string(),
-            ));
+            return Err(UserError::ValidationError("Invalid email".to_string()));
         }
         let now = Utc::now();
         Ok(Self {
@@ -125,7 +127,7 @@ impl User {
             oidc_subject: Some(oidc_subject),
         })
     }
-    
+
     // Create from existing values (for reconstruction from DB)
     pub fn from_data(
         id: String,
@@ -189,48 +191,48 @@ impl User {
             oidc_subject,
         }
     }
-    
+
     // Getters
     pub fn id(&self) -> &str {
         &self.id
     }
-    
+
     pub fn username(&self) -> &str {
         &self.username
     }
-    
+
     pub fn email(&self) -> &str {
         &self.email
     }
-    
+
     pub fn role(&self) -> UserRole {
         self.role
     }
-    
+
     pub fn storage_quota_bytes(&self) -> i64 {
         self.storage_quota_bytes
     }
-    
+
     pub fn storage_used_bytes(&self) -> i64 {
         self.storage_used_bytes
     }
-    
+
     pub fn created_at(&self) -> DateTime<Utc> {
         self.created_at
     }
-    
+
     pub fn updated_at(&self) -> DateTime<Utc> {
         self.updated_at
     }
-    
+
     pub fn last_login_at(&self) -> Option<DateTime<Utc>> {
         self.last_login_at
     }
-    
+
     pub fn is_active(&self) -> bool {
         self.active
     }
-    
+
     pub fn password_hash(&self) -> &str {
         &self.password_hash
     }
@@ -247,35 +249,35 @@ impl User {
     pub fn is_oidc_user(&self) -> bool {
         self.oidc_provider.is_some()
     }
-    
+
     /// Update the password hash.
-    /// 
+    ///
     /// The new password should be hashed externally using PasswordHasherPort
     /// before calling this method.
     pub fn update_password_hash(&mut self, new_hash: String) {
         self.password_hash = new_hash;
         self.updated_at = Utc::now();
     }
-    
+
     // Update storage usage
     pub fn update_storage_used(&mut self, storage_used_bytes: i64) {
         self.storage_used_bytes = storage_used_bytes;
         self.updated_at = Utc::now();
     }
-    
+
     // Register login
     pub fn register_login(&mut self) {
         let now = Utc::now();
         self.last_login_at = Some(now);
         self.updated_at = now;
     }
-    
+
     // Deactivate user
     pub fn deactivate(&mut self) {
         self.active = false;
         self.updated_at = Utc::now();
     }
-    
+
     // Activate user
     pub fn activate(&mut self) {
         self.active = true;

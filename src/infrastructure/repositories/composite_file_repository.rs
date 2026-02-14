@@ -86,7 +86,9 @@ impl FileWritePort for CompositeFileRepository {
         content_type: String,
         content: Vec<u8>,
     ) -> Result<File, DomainError> {
-        self.write.save_file(name, folder_id, content_type, content).await
+        self.write
+            .save_file(name, folder_id, content_type, content)
+            .await
     }
 
     async fn save_file_from_stream(
@@ -96,7 +98,9 @@ impl FileWritePort for CompositeFileRepository {
         content_type: String,
         stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
     ) -> Result<File, DomainError> {
-        self.write.save_file_from_stream(name, folder_id, content_type, stream).await
+        self.write
+            .save_file_from_stream(name, folder_id, content_type, stream)
+            .await
     }
 
     async fn move_file(
@@ -107,11 +111,7 @@ impl FileWritePort for CompositeFileRepository {
         self.write.move_file(file_id, target_folder_id).await
     }
 
-    async fn rename_file(
-        &self,
-        file_id: &str,
-        new_name: &str,
-    ) -> Result<File, DomainError> {
+    async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<File, DomainError> {
         self.write.rename_file(file_id, new_name).await
     }
 
@@ -119,7 +119,11 @@ impl FileWritePort for CompositeFileRepository {
         self.write.delete_file(id).await
     }
 
-    async fn update_file_content(&self, file_id: &str, content: Vec<u8>) -> Result<(), DomainError> {
+    async fn update_file_content(
+        &self,
+        file_id: &str,
+        content: Vec<u8>,
+    ) -> Result<(), DomainError> {
         self.write.update_file_content(file_id, content).await
     }
 
@@ -130,14 +134,20 @@ impl FileWritePort for CompositeFileRepository {
         content_type: String,
         size: u64,
     ) -> Result<(File, PathBuf), DomainError> {
-        self.write.register_file_deferred(name, folder_id, content_type, size).await
+        self.write
+            .register_file_deferred(name, folder_id, content_type, size)
+            .await
     }
 
     async fn move_to_trash(&self, file_id: &str) -> Result<(), DomainError> {
         self.write.move_to_trash(file_id).await
     }
 
-    async fn restore_from_trash(&self, file_id: &str, original_path: &str) -> Result<(), DomainError> {
+    async fn restore_from_trash(
+        &self,
+        file_id: &str,
+        original_path: &str,
+    ) -> Result<(), DomainError> {
         self.write.restore_from_trash(file_id, original_path).await
     }
 

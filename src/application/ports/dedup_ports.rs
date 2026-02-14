@@ -4,11 +4,11 @@
 //! keeping the application and interface layers independent of the specific
 //! content-addressable storage implementation.
 
-use std::path::{Path, PathBuf};
+use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::Serialize;
-use crate::common::errors::DomainError;
+use std::path::{Path, PathBuf};
 
 /// Metadata of a stored blob in the dedup system.
 #[derive(Debug, Clone, Serialize)]

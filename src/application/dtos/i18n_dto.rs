@@ -1,12 +1,12 @@
-use serde::{Serialize, Deserialize};
 use crate::domain::services::i18n_service::Locale;
+use serde::{Deserialize, Serialize};
 
 /// DTO for locale information
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocaleDto {
     /// Locale code (e.g., "en", "es")
     pub code: String,
-    
+
     /// Locale name in its own language (e.g., "English", "Español")
     pub name: String,
 }
@@ -20,7 +20,7 @@ impl From<Locale> for LocaleDto {
             Locale::German => ("de", "Deutsch"),
             Locale::Portuguese => ("pt", "Português"),
         };
-        
+
         Self {
             code: code.to_string(),
             name: name.to_string(),
@@ -33,7 +33,7 @@ impl From<Locale> for LocaleDto {
 pub struct TranslationRequestDto {
     /// The translation key
     pub key: String,
-    
+
     /// The locale code (optional, defaults to "en")
     pub locale: Option<String>,
 }
@@ -43,10 +43,10 @@ pub struct TranslationRequestDto {
 pub struct TranslationResponseDto {
     /// The translation key
     pub key: String,
-    
+
     /// The locale code used for translation
     pub locale: String,
-    
+
     /// The translated text
     pub text: String,
 }
@@ -56,10 +56,10 @@ pub struct TranslationResponseDto {
 pub struct TranslationErrorDto {
     /// The translation key that was not found
     pub key: String,
-    
+
     /// The locale code used for translation
     pub locale: String,
-    
+
     /// The error message
     pub error: String,
 }

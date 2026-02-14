@@ -1,17 +1,19 @@
 //! PathService - Infrastructure service for storage path management
-//! 
+//!
 //! This service was moved from domain/services because it implements application traits
 //! (StoragePort, StorageMediator) and has file system dependencies (tokio::fs).
-//! 
+//!
 //! StoragePath (Value Object) remains in domain/services/path_service.rs
 
-use std::path::{Path, PathBuf};
 use async_trait::async_trait;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
-use crate::common::errors::{DomainError, ErrorKind};
 use crate::application::ports::outbound::StoragePort;
-use crate::application::services::storage_mediator::{StorageMediator, StorageMediatorResult, StorageMediatorError};
+use crate::application::services::storage_mediator::{
+    StorageMediator, StorageMediatorError, StorageMediatorResult,
+};
+use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
 
@@ -25,7 +27,7 @@ impl PathService {
     pub fn new(root_path: PathBuf) -> Self {
         Self { root_path }
     }
-    
+
     /// Converts a domain path to an absolute physical path
     pub fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf {
         let mut path = self.root_path.clone();
@@ -34,45 +36,54 @@ impl PathService {
         }
         path
     }
-    
+
     /// Converts a physical path to a domain path
     pub fn to_storage_path(&self, physical_path: &Path) -> Option<StoragePath> {
-        physical_path.strip_prefix(&self.root_path).ok().map(|rel_path| {
-            let segments: Vec<String> = rel_path
-                .components()
-                .filter_map(|c| match c {
-                    std::path::Component::Normal(os_str) => Some(os_str.to_string_lossy().to_string()),
-                    _ => None,
-                })
-                .collect();
-            StoragePath::new(segments)
-        })
+        physical_path
+            .strip_prefix(&self.root_path)
+            .ok()
+            .map(|rel_path| {
+                let segments: Vec<String> = rel_path
+                    .components()
+                    .filter_map(|c| match c {
+                        std::path::Component::Normal(os_str) => {
+                            Some(os_str.to_string_lossy().to_string())
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                StoragePath::new(segments)
+            })
     }
-    
+
     /// Creates a file path within a folder
     pub fn create_file_path(&self, folder_path: &StoragePath, file_name: &str) -> StoragePath {
         folder_path.join(file_name)
     }
-    
+
     /// Checks if a path is a direct child of another
-    pub fn is_direct_child(&self, parent_path: &StoragePath, potential_child: &StoragePath) -> bool {
+    pub fn is_direct_child(
+        &self,
+        parent_path: &StoragePath,
+        potential_child: &StoragePath,
+    ) -> bool {
         if let Some(child_parent) = potential_child.parent() {
             &child_parent == parent_path
         } else {
             parent_path.is_empty()
         }
     }
-    
+
     /// Checks if a path is at the root
     pub fn is_in_root(&self, path: &StoragePath) -> bool {
         path.parent().is_none_or(|p| p.is_empty())
     }
-    
+
     /// Gets the root path used by this service
     pub fn get_root_path(&self) -> &Path {
         &self.root_path
     }
-    
+
     /// Validates a path to ensure it doesn't contain dangerous components
     pub fn validate_path(&self, path: &StoragePath) -> Result<(), DomainError> {
         // Check for empty segments
@@ -80,10 +91,10 @@ impl PathService {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "Path",
-                format!("Path contains empty segments: {}", path.to_string())
+                format!("Path contains empty segments: {}", path.to_string()),
             ));
         }
-        
+
         // Check for dangerous characters
         let dangerous_chars = ['\\', ':', '*', '?', '"', '<', '>', '|'];
         for segment in path.segments() {
@@ -91,20 +102,20 @@ impl PathService {
                 return Err(DomainError::new(
                     ErrorKind::InvalidInput,
                     "Path",
-                    format!("Path contains dangerous characters: {}", segment)
+                    format!("Path contains dangerous characters: {}", segment),
                 ));
             }
-            
+
             // Check that it doesn't start with . (hidden in Unix)
             if segment.starts_with('.') && segment != ".well-known" {
                 return Err(DomainError::new(
                     ErrorKind::InvalidInput,
                     "Path",
-                    format!("Path segments cannot start with dot: {}", segment)
+                    format!("Path segments cannot start with dot: {}", segment),
                 ));
             }
         }
-        
+
         Ok(())
     }
 }
@@ -118,45 +129,50 @@ impl StoragePort for PathService {
         }
         path
     }
-    
+
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError> {
         // First validate the path
         self.validate_path(storage_path)?;
-        
+
         // Resolve to physical path
         let physical_path = self.resolve_path(storage_path);
-        
+
         // Create directories if they don't exist
         if !physical_path.exists() {
-            fs::create_dir_all(&physical_path).await
-                .map_err(|e| DomainError::new(
+            fs::create_dir_all(&physical_path).await.map_err(|e| {
+                DomainError::new(
                     ErrorKind::AccessDenied,
                     "Storage",
-                    format!("Failed to create directory: {}", physical_path.display())
-                ).with_source(e))?;
-                
+                    format!("Failed to create directory: {}", physical_path.display()),
+                )
+                .with_source(e)
+            })?;
+
             tracing::debug!("Created directory: {}", physical_path.display());
         } else if !physical_path.is_dir() {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "Storage",
-                format!("Path exists but is not a directory: {}", physical_path.display())
+                format!(
+                    "Path exists but is not a directory: {}",
+                    physical_path.display()
+                ),
             ));
         }
-        
+
         Ok(())
     }
-    
+
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
         let physical_path = self.resolve_path(storage_path);
-        
+
         let exists = physical_path.exists() && physical_path.is_file();
         Ok(exists)
     }
-    
+
     async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
         let physical_path = self.resolve_path(storage_path);
-        
+
         let exists = physical_path.exists() && physical_path.is_dir();
         Ok(exists)
     }
@@ -167,77 +183,100 @@ impl StorageMediator for PathService {
     async fn get_folder_path(&self, folder_id: &str) -> StorageMediatorResult<PathBuf> {
         // This is a simplified implementation since PathService doesn't have direct
         // access to folder repository. It's typically used through a proxy.
-        Err(StorageMediatorError::NotFound(format!("Folder with ID {} not found", folder_id)))
+        Err(StorageMediatorError::NotFound(format!(
+            "Folder with ID {} not found",
+            folder_id
+        )))
     }
-    
+
     async fn get_folder_storage_path(&self, folder_id: &str) -> StorageMediatorResult<StoragePath> {
         // Simplified implementation - should be overridden by actual implementations
-        Err(StorageMediatorError::NotFound(format!("Folder with ID {} not found", folder_id)))
+        Err(StorageMediatorError::NotFound(format!(
+            "Folder with ID {} not found",
+            folder_id
+        )))
     }
-    
+
     async fn get_folder(&self, folder_id: &str) -> StorageMediatorResult<Folder> {
         // Simplified implementation - should be overridden by actual implementations
-        Err(StorageMediatorError::NotFound(format!("Folder with ID {} not found", folder_id)))
+        Err(StorageMediatorError::NotFound(format!(
+            "Folder with ID {} not found",
+            folder_id
+        )))
     }
-    
+
     async fn file_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(&StoragePath::from_string(&path.to_string_lossy()));
         Ok(abs_path.exists() && abs_path.is_file())
     }
-    
-    async fn file_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool> {
+
+    async fn file_exists_at_storage_path(
+        &self,
+        storage_path: &StoragePath,
+    ) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(storage_path);
         Ok(abs_path.exists() && abs_path.is_file())
     }
-    
+
     async fn folder_exists_at_path(&self, path: &Path) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(&StoragePath::from_string(&path.to_string_lossy()));
         Ok(abs_path.exists() && abs_path.is_dir())
     }
-    
-    async fn folder_exists_at_storage_path(&self, storage_path: &StoragePath) -> StorageMediatorResult<bool> {
+
+    async fn folder_exists_at_storage_path(
+        &self,
+        storage_path: &StoragePath,
+    ) -> StorageMediatorResult<bool> {
         let abs_path = self.resolve_path(storage_path);
         Ok(abs_path.exists() && abs_path.is_dir())
     }
-    
+
     fn resolve_path(&self, relative_path: &Path) -> PathBuf {
         // Convert path to storage path then resolve
         let path_str = relative_path.to_string_lossy().to_string();
         let storage_path = StoragePath::from_string(&path_str);
         PathService::resolve_path(self, &storage_path)
     }
-    
+
     fn resolve_storage_path(&self, storage_path: &StoragePath) -> PathBuf {
         PathService::resolve_path(self, storage_path)
     }
-    
+
     async fn ensure_directory(&self, path: &Path) -> StorageMediatorResult<()> {
-        let abs_path = PathService::resolve_path(self, &StoragePath::from_string(&path.to_string_lossy()));
-        
+        let abs_path =
+            PathService::resolve_path(self, &StoragePath::from_string(&path.to_string_lossy()));
+
         if !abs_path.exists() {
-            fs::create_dir_all(&abs_path).await
-                .map_err(|e| StorageMediatorError::AccessError(format!("Failed to create directory: {}", e)))?;
+            fs::create_dir_all(&abs_path).await.map_err(|e| {
+                StorageMediatorError::AccessError(format!("Failed to create directory: {}", e))
+            })?;
         } else if !abs_path.is_dir() {
-            return Err(StorageMediatorError::InvalidPath(
-                format!("Path exists but is not a directory: {}", abs_path.display())
-            ));
+            return Err(StorageMediatorError::InvalidPath(format!(
+                "Path exists but is not a directory: {}",
+                abs_path.display()
+            )));
         }
-        
+
         Ok(())
     }
-    
-    async fn ensure_storage_directory(&self, storage_path: &StoragePath) -> StorageMediatorResult<()> {
+
+    async fn ensure_storage_directory(
+        &self,
+        storage_path: &StoragePath,
+    ) -> StorageMediatorResult<()> {
         let abs_path = PathService::resolve_path(self, storage_path);
-        
+
         if !abs_path.exists() {
-            fs::create_dir_all(&abs_path).await
-                .map_err(|e| StorageMediatorError::AccessError(format!("Failed to create directory: {}", e)))?;
+            fs::create_dir_all(&abs_path).await.map_err(|e| {
+                StorageMediatorError::AccessError(format!("Failed to create directory: {}", e))
+            })?;
         } else if !abs_path.is_dir() {
-            return Err(StorageMediatorError::InvalidPath(
-                format!("Path exists but is not a directory: {}", abs_path.display())
-            ));
+            return Err(StorageMediatorError::InvalidPath(format!(
+                "Path exists but is not a directory: {}",
+                abs_path.display()
+            )));
         }
-        
+
         Ok(())
     }
 }
@@ -245,57 +284,57 @@ impl StorageMediator for PathService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_resolve_path() {
         let service = PathService::new(PathBuf::from("/storage"));
-        
+
         let storage_path = StoragePath::from_string("test/file.txt");
         let absolute = service.resolve_path(&storage_path);
-        
+
         assert_eq!(absolute, PathBuf::from("/storage/test/file.txt"));
     }
-    
+
     #[test]
     fn test_to_storage_path() {
         let service = PathService::new(PathBuf::from("/storage"));
-        
+
         let physical_path = PathBuf::from("/storage/folder/file.txt");
         let storage_path = service.to_storage_path(&physical_path).unwrap();
-        
+
         assert_eq!(storage_path.to_string(), "/folder/file.txt");
     }
-    
+
     #[test]
     fn test_is_in_root() {
         let service = PathService::new(PathBuf::from("/storage"));
-        
+
         let root_path = StoragePath::from_string("file.txt");
         let nested_path = StoragePath::from_string("folder/file.txt");
-        
+
         assert!(service.is_in_root(&root_path));
         assert!(!service.is_in_root(&nested_path));
     }
-    
+
     #[test]
     fn test_is_direct_child() {
         let service = PathService::new(PathBuf::from("/storage"));
-        
+
         let parent = StoragePath::from_string("folder");
         let child = StoragePath::from_string("folder/file.txt");
         let not_child = StoragePath::from_string("folder2/file.txt");
-        
+
         assert!(service.is_direct_child(&parent, &child));
         assert!(!service.is_direct_child(&parent, &not_child));
     }
-    
+
     #[test]
     fn test_create_file_path() {
         let service = PathService::new(PathBuf::from("/storage"));
-        
+
         let folder_path = StoragePath::from_string("folder");
         let file_path = service.create_file_path(&folder_path, "file.txt");
-        
+
         assert_eq!(file_path.to_string(), "/folder/file.txt");
     }
 }

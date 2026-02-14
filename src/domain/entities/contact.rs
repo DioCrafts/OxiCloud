@@ -46,25 +46,64 @@ impl AddressBook {
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     ) -> Self {
-        Self { id, name, owner_id, description, color, is_public, created_at, updated_at }
+        Self {
+            id,
+            name,
+            owner_id,
+            description,
+            color,
+            is_public,
+            created_at,
+            updated_at,
+        }
     }
 
     // --- Getters ---
-    pub fn id(&self) -> &Uuid { &self.id }
-    pub fn name(&self) -> &str { &self.name }
-    pub fn owner_id(&self) -> &str { &self.owner_id }
-    pub fn description(&self) -> Option<&str> { self.description.as_deref() }
-    pub fn color(&self) -> Option<&str> { self.color.as_deref() }
-    pub fn is_public(&self) -> bool { self.is_public }
-    pub fn created_at(&self) -> &DateTime<Utc> { &self.created_at }
-    pub fn updated_at(&self) -> &DateTime<Utc> { &self.updated_at }
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn owner_id(&self) -> &str {
+        &self.owner_id
+    }
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+    pub fn color(&self) -> Option<&str> {
+        self.color.as_deref()
+    }
+    pub fn is_public(&self) -> bool {
+        self.is_public
+    }
+    pub fn created_at(&self) -> &DateTime<Utc> {
+        &self.created_at
+    }
+    pub fn updated_at(&self) -> &DateTime<Utc> {
+        &self.updated_at
+    }
 
     // --- Setters for mutable operations ---
-    pub fn set_name(&mut self, name: String) { self.name = name; self.updated_at = Utc::now(); }
-    pub fn set_description(&mut self, description: Option<String>) { self.description = description; self.updated_at = Utc::now(); }
-    pub fn set_color(&mut self, color: Option<String>) { self.color = color; self.updated_at = Utc::now(); }
-    pub fn set_is_public(&mut self, is_public: bool) { self.is_public = is_public; self.updated_at = Utc::now(); }
-    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) { self.updated_at = updated_at; }
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+        self.updated_at = Utc::now();
+    }
+    pub fn set_description(&mut self, description: Option<String>) {
+        self.description = description;
+        self.updated_at = Utc::now();
+    }
+    pub fn set_color(&mut self, color: Option<String>) {
+        self.color = color;
+        self.updated_at = Utc::now();
+    }
+    pub fn set_is_public(&mut self, is_public: bool) {
+        self.is_public = is_public;
+        self.updated_at = Utc::now();
+    }
+    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) {
+        self.updated_at = updated_at;
+    }
 }
 
 impl Default for AddressBook {
@@ -198,72 +237,191 @@ impl Contact {
         updated_at: DateTime<Utc>,
     ) -> Self {
         Self {
-            id, address_book_id, uid, full_name, first_name, last_name, nickname,
-            email, phone, address, organization, title, notes, photo_url,
-            birthday, anniversary, vcard, etag, created_at, updated_at,
+            id,
+            address_book_id,
+            uid,
+            full_name,
+            first_name,
+            last_name,
+            nickname,
+            email,
+            phone,
+            address,
+            organization,
+            title,
+            notes,
+            photo_url,
+            birthday,
+            anniversary,
+            vcard,
+            etag,
+            created_at,
+            updated_at,
         }
     }
 
     // --- Getters ---
-    pub fn id(&self) -> &Uuid { &self.id }
-    pub fn address_book_id(&self) -> &Uuid { &self.address_book_id }
-    pub fn uid(&self) -> &str { &self.uid }
-    pub fn full_name(&self) -> Option<&str> { self.full_name.as_deref() }
-    pub fn first_name(&self) -> Option<&str> { self.first_name.as_deref() }
-    pub fn last_name(&self) -> Option<&str> { self.last_name.as_deref() }
-    pub fn nickname(&self) -> Option<&str> { self.nickname.as_deref() }
-    pub fn email(&self) -> &[Email] { &self.email }
-    pub fn phone(&self) -> &[Phone] { &self.phone }
-    pub fn address(&self) -> &[Address] { &self.address }
-    pub fn organization(&self) -> Option<&str> { self.organization.as_deref() }
-    pub fn title(&self) -> Option<&str> { self.title.as_deref() }
-    pub fn notes(&self) -> Option<&str> { self.notes.as_deref() }
-    pub fn photo_url(&self) -> Option<&str> { self.photo_url.as_deref() }
-    pub fn birthday(&self) -> Option<&NaiveDate> { self.birthday.as_ref() }
-    pub fn anniversary(&self) -> Option<&NaiveDate> { self.anniversary.as_ref() }
-    pub fn vcard(&self) -> &str { &self.vcard }
-    pub fn etag(&self) -> &str { &self.etag }
-    pub fn created_at(&self) -> &DateTime<Utc> { &self.created_at }
-    pub fn updated_at(&self) -> &DateTime<Utc> { &self.updated_at }
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
+    pub fn address_book_id(&self) -> &Uuid {
+        &self.address_book_id
+    }
+    pub fn uid(&self) -> &str {
+        &self.uid
+    }
+    pub fn full_name(&self) -> Option<&str> {
+        self.full_name.as_deref()
+    }
+    pub fn first_name(&self) -> Option<&str> {
+        self.first_name.as_deref()
+    }
+    pub fn last_name(&self) -> Option<&str> {
+        self.last_name.as_deref()
+    }
+    pub fn nickname(&self) -> Option<&str> {
+        self.nickname.as_deref()
+    }
+    pub fn email(&self) -> &[Email] {
+        &self.email
+    }
+    pub fn phone(&self) -> &[Phone] {
+        &self.phone
+    }
+    pub fn address(&self) -> &[Address] {
+        &self.address
+    }
+    pub fn organization(&self) -> Option<&str> {
+        self.organization.as_deref()
+    }
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+    pub fn notes(&self) -> Option<&str> {
+        self.notes.as_deref()
+    }
+    pub fn photo_url(&self) -> Option<&str> {
+        self.photo_url.as_deref()
+    }
+    pub fn birthday(&self) -> Option<&NaiveDate> {
+        self.birthday.as_ref()
+    }
+    pub fn anniversary(&self) -> Option<&NaiveDate> {
+        self.anniversary.as_ref()
+    }
+    pub fn vcard(&self) -> &str {
+        &self.vcard
+    }
+    pub fn etag(&self) -> &str {
+        &self.etag
+    }
+    pub fn created_at(&self) -> &DateTime<Utc> {
+        &self.created_at
+    }
+    pub fn updated_at(&self) -> &DateTime<Utc> {
+        &self.updated_at
+    }
 
     // --- Owned getters for persistence layer bind() calls ---
-    pub fn full_name_owned(&self) -> Option<String> { self.full_name.clone() }
-    pub fn first_name_owned(&self) -> Option<String> { self.first_name.clone() }
-    pub fn last_name_owned(&self) -> Option<String> { self.last_name.clone() }
-    pub fn nickname_owned(&self) -> Option<String> { self.nickname.clone() }
-    pub fn organization_owned(&self) -> Option<String> { self.organization.clone() }
-    pub fn title_owned(&self) -> Option<String> { self.title.clone() }
-    pub fn notes_owned(&self) -> Option<String> { self.notes.clone() }
-    pub fn photo_url_owned(&self) -> Option<String> { self.photo_url.clone() }
+    pub fn full_name_owned(&self) -> Option<String> {
+        self.full_name.clone()
+    }
+    pub fn first_name_owned(&self) -> Option<String> {
+        self.first_name.clone()
+    }
+    pub fn last_name_owned(&self) -> Option<String> {
+        self.last_name.clone()
+    }
+    pub fn nickname_owned(&self) -> Option<String> {
+        self.nickname.clone()
+    }
+    pub fn organization_owned(&self) -> Option<String> {
+        self.organization.clone()
+    }
+    pub fn title_owned(&self) -> Option<String> {
+        self.title.clone()
+    }
+    pub fn notes_owned(&self) -> Option<String> {
+        self.notes.clone()
+    }
+    pub fn photo_url_owned(&self) -> Option<String> {
+        self.photo_url.clone()
+    }
 
     // --- Setters for mutable operations (contact_service.rs needs these) ---
-    pub fn set_full_name(&mut self, v: Option<String>) { self.full_name = v; }
-    pub fn set_first_name(&mut self, v: Option<String>) { self.first_name = v; }
-    pub fn set_last_name(&mut self, v: Option<String>) { self.last_name = v; }
-    pub fn set_nickname(&mut self, v: Option<String>) { self.nickname = v; }
-    pub fn set_organization(&mut self, v: Option<String>) { self.organization = v; }
-    pub fn set_title(&mut self, v: Option<String>) { self.title = v; }
-    pub fn set_notes(&mut self, v: Option<String>) { self.notes = v; }
-    pub fn set_photo_url(&mut self, v: Option<String>) { self.photo_url = v; }
-    pub fn set_birthday(&mut self, v: Option<NaiveDate>) { self.birthday = v; }
-    pub fn set_anniversary(&mut self, v: Option<NaiveDate>) { self.anniversary = v; }
-    pub fn set_vcard(&mut self, vcard: String) { self.vcard = vcard; }
-    pub fn set_etag(&mut self, etag: String) { self.etag = etag; }
-    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) { self.updated_at = updated_at; }
-    pub fn set_address_book_id(&mut self, id: Uuid) { self.address_book_id = id; }
-    pub fn set_uid(&mut self, uid: String) { self.uid = uid; }
+    pub fn set_full_name(&mut self, v: Option<String>) {
+        self.full_name = v;
+    }
+    pub fn set_first_name(&mut self, v: Option<String>) {
+        self.first_name = v;
+    }
+    pub fn set_last_name(&mut self, v: Option<String>) {
+        self.last_name = v;
+    }
+    pub fn set_nickname(&mut self, v: Option<String>) {
+        self.nickname = v;
+    }
+    pub fn set_organization(&mut self, v: Option<String>) {
+        self.organization = v;
+    }
+    pub fn set_title(&mut self, v: Option<String>) {
+        self.title = v;
+    }
+    pub fn set_notes(&mut self, v: Option<String>) {
+        self.notes = v;
+    }
+    pub fn set_photo_url(&mut self, v: Option<String>) {
+        self.photo_url = v;
+    }
+    pub fn set_birthday(&mut self, v: Option<NaiveDate>) {
+        self.birthday = v;
+    }
+    pub fn set_anniversary(&mut self, v: Option<NaiveDate>) {
+        self.anniversary = v;
+    }
+    pub fn set_vcard(&mut self, vcard: String) {
+        self.vcard = vcard;
+    }
+    pub fn set_etag(&mut self, etag: String) {
+        self.etag = etag;
+    }
+    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) {
+        self.updated_at = updated_at;
+    }
+    pub fn set_address_book_id(&mut self, id: Uuid) {
+        self.address_book_id = id;
+    }
+    pub fn set_uid(&mut self, uid: String) {
+        self.uid = uid;
+    }
 
     // --- Collection mutators ---
-    pub fn push_email(&mut self, e: Email) { self.email.push(e); }
-    pub fn push_phone(&mut self, p: Phone) { self.phone.push(p); }
-    pub fn set_email(&mut self, email: Vec<Email>) { self.email = email; }
-    pub fn set_phone(&mut self, phone: Vec<Phone>) { self.phone = phone; }
-    pub fn set_address(&mut self, address: Vec<Address>) { self.address = address; }
-    pub fn email_is_empty(&self) -> bool { self.email.is_empty() }
-    pub fn phone_is_empty(&self) -> bool { self.phone.is_empty() }
+    pub fn push_email(&mut self, e: Email) {
+        self.email.push(e);
+    }
+    pub fn push_phone(&mut self, p: Phone) {
+        self.phone.push(p);
+    }
+    pub fn set_email(&mut self, email: Vec<Email>) {
+        self.email = email;
+    }
+    pub fn set_phone(&mut self, phone: Vec<Phone>) {
+        self.phone = phone;
+    }
+    pub fn set_address(&mut self, address: Vec<Address>) {
+        self.address = address;
+    }
+    pub fn email_is_empty(&self) -> bool {
+        self.email.is_empty()
+    }
+    pub fn phone_is_empty(&self) -> bool {
+        self.phone.is_empty()
+    }
 
     // --- Consuming methods for ownership transfer ---
-    pub fn into_email(self) -> Vec<Email> { self.email }
+    pub fn into_email(self) -> Vec<Email> {
+        self.email
+    }
     pub fn into_parts(self) -> ContactParts {
         ContactParts {
             id: self.id,
@@ -355,7 +513,13 @@ impl ContactGroup {
     /// Creates a new ContactGroup with generated id and timestamps
     pub fn new(address_book_id: Uuid, name: String) -> Self {
         let now = Utc::now();
-        Self { id: Uuid::new_v4(), address_book_id, name, created_at: now, updated_at: now }
+        Self {
+            id: Uuid::new_v4(),
+            address_book_id,
+            name,
+            created_at: now,
+            updated_at: now,
+        }
     }
 
     /// Reconstructs from persistence
@@ -366,19 +530,40 @@ impl ContactGroup {
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     ) -> Self {
-        Self { id, address_book_id, name, created_at, updated_at }
+        Self {
+            id,
+            address_book_id,
+            name,
+            created_at,
+            updated_at,
+        }
     }
 
     // --- Getters ---
-    pub fn id(&self) -> &Uuid { &self.id }
-    pub fn address_book_id(&self) -> &Uuid { &self.address_book_id }
-    pub fn name(&self) -> &str { &self.name }
-    pub fn created_at(&self) -> &DateTime<Utc> { &self.created_at }
-    pub fn updated_at(&self) -> &DateTime<Utc> { &self.updated_at }
+    pub fn id(&self) -> &Uuid {
+        &self.id
+    }
+    pub fn address_book_id(&self) -> &Uuid {
+        &self.address_book_id
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn created_at(&self) -> &DateTime<Utc> {
+        &self.created_at
+    }
+    pub fn updated_at(&self) -> &DateTime<Utc> {
+        &self.updated_at
+    }
 
     // --- Setters ---
-    pub fn set_name(&mut self, name: String) { self.name = name; self.updated_at = Utc::now(); }
-    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) { self.updated_at = updated_at; }
+    pub fn set_name(&mut self, name: String) {
+        self.name = name;
+        self.updated_at = Utc::now();
+    }
+    pub fn set_updated_at(&mut self, updated_at: DateTime<Utc>) {
+        self.updated_at = updated_at;
+    }
 }
 
 impl Default for ContactGroup {

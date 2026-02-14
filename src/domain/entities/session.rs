@@ -1,5 +1,5 @@
+use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
-use chrono::{DateTime, Utc, Duration};
 
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -64,20 +64,20 @@ impl Session {
             revoked,
         }
     }
-    
+
     // Getters
     pub fn id(&self) -> &str {
         &self.id
     }
-    
+
     pub fn user_id(&self) -> &str {
         &self.user_id
     }
-    
+
     pub fn refresh_token(&self) -> &str {
         &self.refresh_token
     }
-    
+
     pub fn expires_at(&self) -> DateTime<Utc> {
         self.expires_at
     }
@@ -89,19 +89,19 @@ impl Session {
     pub fn user_agent(&self) -> Option<&str> {
         self.user_agent.as_deref()
     }
-    
+
     pub fn created_at(&self) -> DateTime<Utc> {
         self.created_at
     }
-    
+
     pub fn is_expired(&self) -> bool {
         Utc::now() > self.expires_at
     }
-    
+
     pub fn is_revoked(&self) -> bool {
         self.revoked
     }
-    
+
     pub fn revoke(&mut self) {
         self.revoked = true;
     }

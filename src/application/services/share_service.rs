@@ -47,7 +47,9 @@ impl From<ShareServiceError> for DomainError {
             ShareServiceError::ItemNotFound(s) => DomainError::not_found("Item", s),
             ShareServiceError::AccessDenied(s) => DomainError::access_denied("Share", s),
             ShareServiceError::InvalidPassword(s) => DomainError::access_denied("Share", s),
-            ShareServiceError::Expired => DomainError::access_denied("Share", "Share has expired".to_string()),
+            ShareServiceError::Expired => {
+                DomainError::access_denied("Share", "Share has expired".to_string())
+            }
             ShareServiceError::Repository(s) => DomainError::internal_error("Share", s),
             ShareServiceError::InvalidItemType(s) => DomainError::validation_error(s),
             ShareServiceError::Validation(s) => DomainError::validation_error(s),
@@ -91,13 +93,23 @@ impl ShareService {
                 self.file_repository
                     .get_file(item_id) // Using the correct method from the FileStoragePort trait
                     .await
-                    .map_err(|_| ShareServiceError::ItemNotFound(format!("File with ID {} not found", item_id)))?;
+                    .map_err(|_| {
+                        ShareServiceError::ItemNotFound(format!(
+                            "File with ID {} not found",
+                            item_id
+                        ))
+                    })?;
             }
             ShareItemType::Folder => {
                 self.folder_repository
                     .get_folder(item_id) // Using the correct method from the FolderStoragePort trait
                     .await
-                    .map_err(|_| ShareServiceError::ItemNotFound(format!("Folder with ID {} not found", item_id)))?;
+                    .map_err(|_| {
+                        ShareServiceError::ItemNotFound(format!(
+                            "Folder with ID {} not found",
+                            item_id
+                        ))
+                    })?;
             }
         }
         Ok(())
@@ -105,13 +117,13 @@ impl ShareService {
 
     /// Password hash using Argon2id (resistant to timing attacks and GPU attacks)
     fn hash_password(&self, password: &str) -> String {
-        use argon2::{Argon2, PasswordHasher};
         use argon2::password_hash::SaltString;
+        use argon2::{Argon2, PasswordHasher};
         use rand_core::OsRng;
-        
+
         let salt = SaltString::generate(&mut OsRng);
         let argon2 = Argon2::default();
-        
+
         argon2
             .hash_password(password.as_bytes(), &salt)
             .expect("Failed to hash share password")
@@ -167,7 +179,9 @@ impl ShareUseCase for ShareService {
             .share_repository
             .find_share_by_id(id)
             .await
-            .map_err(|e| ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e)))?;
+            .map_err(|e| {
+                ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e))
+            })?;
 
         // Check if it has expired
         if share.is_expired() {
@@ -184,7 +198,9 @@ impl ShareUseCase for ShareService {
             .share_repository
             .find_share_by_token(token)
             .await
-            .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
+            .map_err(|e| {
+                ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e))
+            })?;
 
         // Check if it has expired
         if share.is_expired() {
@@ -229,7 +245,9 @@ impl ShareUseCase for ShareService {
             .share_repository
             .find_share_by_id(id)
             .await
-            .map_err(|e| ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e)))?;
+            .map_err(|e| {
+                ShareServiceError::NotFound(format!("Share with ID {} not found: {}", id, e))
+            })?;
 
         // Update permissions if provided
         if let Some(permissions_dto) = dto.permissions {
@@ -264,7 +282,10 @@ impl ShareUseCase for ShareService {
             .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
 
         // Convert the entity to DTO for the response
-        Ok(ShareDto::from_entity(&updated_share, &self.config.base_url()))
+        Ok(ShareDto::from_entity(
+            &updated_share,
+            &self.config.base_url(),
+        ))
     }
 
     async fn delete_shared_link(&self, id: &str) -> Result<(), DomainError> {
@@ -300,12 +321,7 @@ impl ShareUseCase for ShareService {
             .collect();
 
         // Create the paginated result
-        let paginated = PaginatedResponseDto::new(
-            share_dtos,
-            page,
-            per_page,
-            total
-        );
+        let paginated = PaginatedResponseDto::new(share_dtos, page, per_page, total);
 
         Ok(paginated)
     }
@@ -320,7 +336,9 @@ impl ShareUseCase for ShareService {
             .share_repository
             .find_share_by_token(token)
             .await
-            .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
+            .map_err(|e| {
+                ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e))
+            })?;
 
         // Check if it has expired
         if share.is_expired() {
@@ -329,9 +347,7 @@ impl ShareUseCase for ShareService {
 
         // Verify the password using the infrastructure port
         match share.password_hash() {
-            Some(hash) => {
-                self.password_hasher.verify_password(password, hash)
-            }
+            Some(hash) => self.password_hasher.verify_password(password, hash),
             None => Ok(true), // No password required
         }
     }
@@ -342,7 +358,9 @@ impl ShareUseCase for ShareService {
             .share_repository
             .find_share_by_token(token)
             .await
-            .map_err(|e| ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e)))?;
+            .map_err(|e| {
+                ShareServiceError::NotFound(format!("Share with token {} not found: {}", token, e))
+            })?;
 
         // Check if it has expired
         if share.is_expired() {
@@ -365,9 +383,9 @@ impl ShareUseCase for ShareService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::application::ports::share_ports::ShareStoragePort;
-    use crate::application::ports::auth_ports::PasswordHasherPort;
     use crate::application::dtos::share_dto::SharePermissionsDto;
+    use crate::application::ports::auth_ports::PasswordHasherPort;
+    use crate::application::ports::share_ports::ShareStoragePort;
     use crate::common::config::AppConfig;
     use crate::domain::repositories::folder_repository::FolderRepository;
     use async_trait::async_trait;
@@ -391,12 +409,17 @@ mod tests {
 
     #[async_trait]
     impl FileReadPort for MockFileRepository {
-        async fn get_file(&self, id: &str) -> Result<crate::domain::entities::file::File, DomainError> {
+        async fn get_file(
+            &self,
+            id: &str,
+        ) -> Result<crate::domain::entities::file::File, DomainError> {
             if id == "test_file_id" {
                 let file = crate::domain::entities::file::File::new(
                     id.to_string(),
                     "test.txt".to_string(),
-                    crate::domain::services::path_service::StoragePath::from_string("/path/to/test.txt"),
+                    crate::domain::services::path_service::StoragePath::from_string(
+                        "/path/to/test.txt",
+                    ),
                     123,
                     "text/plain".to_string(),
                     None,
@@ -407,11 +430,14 @@ mod tests {
                 Err(DomainError::not_found("File", id))
             }
         }
-        
-        async fn list_files(&self, _folder_id: Option<&str>) -> Result<Vec<crate::domain::entities::file::File>, DomainError> {
+
+        async fn list_files(
+            &self,
+            _folder_id: Option<&str>,
+        ) -> Result<Vec<crate::domain::entities::file::File>, DomainError> {
             unimplemented!()
         }
-        
+
         async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
             unimplemented!()
         }
@@ -419,7 +445,10 @@ mod tests {
         async fn get_file_stream(
             &self,
             _id: &str,
-        ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, DomainError> {
+        ) -> Result<
+            Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>,
+            DomainError,
+        > {
             unimplemented!()
         }
 
@@ -428,7 +457,10 @@ mod tests {
             _id: &str,
             _start: u64,
             _end: Option<u64>,
-        ) -> Result<Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>, DomainError> {
+        ) -> Result<
+            Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>,
+            DomainError,
+        > {
             unimplemented!()
         }
 
@@ -436,7 +468,10 @@ mod tests {
             unimplemented!()
         }
 
-        async fn get_file_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
+        async fn get_file_path(
+            &self,
+            _id: &str,
+        ) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
             unimplemented!()
         }
 
@@ -447,16 +482,25 @@ mod tests {
 
     #[async_trait]
     impl FolderRepository for MockFolderRepository {
-        async fn create_folder(&self, _name: String, _parent_id: Option<String>) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+        async fn create_folder(
+            &self,
+            _name: String,
+            _parent_id: Option<String>,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()
         }
 
-        async fn get_folder(&self, id: &str) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+        async fn get_folder(
+            &self,
+            id: &str,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             if id == "test_folder_id" {
                 let folder = crate::domain::entities::folder::Folder::new(
                     id.to_string(),
                     "test".to_string(),
-                    crate::domain::services::path_service::StoragePath::from_string("/path/to/test"),
+                    crate::domain::services::path_service::StoragePath::from_string(
+                        "/path/to/test",
+                    ),
                     None,
                 )
                 .unwrap();
@@ -466,35 +510,62 @@ mod tests {
             }
         }
 
-        async fn get_folder_by_path(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<crate::domain::entities::folder::Folder, DomainError> {
-            unimplemented!()
-        }
-        
-        async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
-            unimplemented!()
-        }
-
-        async fn list_folders_paginated(&self, _parent_id: Option<&str>, _offset: usize, _limit: usize, _include_total: bool) -> Result<(Vec<crate::domain::entities::folder::Folder>, Option<usize>), DomainError> {
+        async fn get_folder_by_path(
+            &self,
+            _storage_path: &crate::domain::services::path_service::StoragePath,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()
         }
 
-        async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+        async fn list_folders(
+            &self,
+            _parent_id: Option<&str>,
+        ) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
             unimplemented!()
         }
 
-        async fn move_folder(&self, _id: &str, _new_parent_id: Option<&str>) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+        async fn list_folders_paginated(
+            &self,
+            _parent_id: Option<&str>,
+            _offset: usize,
+            _limit: usize,
+            _include_total: bool,
+        ) -> Result<(Vec<crate::domain::entities::folder::Folder>, Option<usize>), DomainError>
+        {
             unimplemented!()
         }
-        
+
+        async fn rename_folder(
+            &self,
+            _id: &str,
+            _new_name: String,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+            unimplemented!()
+        }
+
+        async fn move_folder(
+            &self,
+            _id: &str,
+            _new_parent_id: Option<&str>,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+            unimplemented!()
+        }
+
         async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
             unimplemented!()
         }
 
-        async fn folder_exists(&self, _storage_path: &crate::domain::services::path_service::StoragePath) -> Result<bool, DomainError> {
+        async fn folder_exists(
+            &self,
+            _storage_path: &crate::domain::services::path_service::StoragePath,
+        ) -> Result<bool, DomainError> {
             unimplemented!()
         }
 
-        async fn get_folder_path(&self, _id: &str) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
+        async fn get_folder_path(
+            &self,
+            _id: &str,
+        ) -> Result<crate::domain::services::path_service::StoragePath, DomainError> {
             unimplemented!()
         }
 
@@ -502,7 +573,11 @@ mod tests {
             unimplemented!()
         }
 
-        async fn restore_from_trash(&self, _folder_id: &str, _original_path: &str) -> Result<(), DomainError> {
+        async fn restore_from_trash(
+            &self,
+            _folder_id: &str,
+            _original_path: &str,
+        ) -> Result<(), DomainError> {
             unimplemented!()
         }
 
@@ -530,91 +605,103 @@ mod tests {
         async fn save_share(&self, share: &Share) -> Result<Share, DomainError> {
             let mut shares = self.shares.lock().unwrap();
             let mut tokens = self.tokens.lock().unwrap();
-            
+
             shares.insert(share.id().to_string(), share.clone());
             tokens.insert(share.token().to_string(), share.id().to_string());
-            
+
             Ok(share.clone())
         }
-        
+
         async fn find_share_by_id(&self, id: &str) -> Result<Share, DomainError> {
             let shares = self.shares.lock().unwrap();
-            
-            shares.get(id)
+
+            shares
+                .get(id)
                 .cloned()
                 .ok_or_else(|| DomainError::not_found("Share", id))
         }
-        
+
         async fn find_share_by_token(&self, token: &str) -> Result<Share, DomainError> {
             let tokens = self.tokens.lock().unwrap();
             let shares = self.shares.lock().unwrap();
-            
-            let id = tokens.get(token)
+
+            let id = tokens
+                .get(token)
                 .ok_or_else(|| DomainError::not_found("Share", token))?;
-            
-            shares.get(id)
+
+            shares
+                .get(id)
                 .cloned()
                 .ok_or_else(|| DomainError::not_found("Share", id.as_str()))
         }
-        
-        async fn find_shares_by_item(&self, item_id: &str, item_type: &ShareItemType) -> Result<Vec<Share>, DomainError> {
+
+        async fn find_shares_by_item(
+            &self,
+            item_id: &str,
+            item_type: &ShareItemType,
+        ) -> Result<Vec<Share>, DomainError> {
             let shares = self.shares.lock().unwrap();
-            
+
             let type_str = item_type.to_string();
-            let result: Vec<Share> = shares.values()
+            let result: Vec<Share> = shares
+                .values()
                 .filter(|s| s.item_id() == item_id && s.item_type().to_string() == type_str)
                 .cloned()
                 .collect();
-            
+
             Ok(result)
         }
-        
+
         async fn update_share(&self, share: &Share) -> Result<Share, DomainError> {
             let mut shares = self.shares.lock().unwrap();
-            
+
             let id_str = share.id().to_string();
             if !shares.contains_key(&id_str) {
                 return Err(DomainError::not_found("Share", &id_str));
             }
-            
+
             shares.insert(id_str, share.clone());
-            
+
             Ok(share.clone())
         }
-        
+
         async fn delete_share(&self, id: &str) -> Result<(), DomainError> {
             let mut shares = self.shares.lock().unwrap();
             let mut tokens = self.tokens.lock().unwrap();
-            
+
             // Find the share to get the token
-            let share = shares.get(id)
+            let share = shares
+                .get(id)
                 .ok_or_else(|| DomainError::not_found("Share", id))?;
-            
+
             // Remove token mapping
             tokens.remove(share.token());
-            
+
             // Remove the share
             shares.remove(id);
-            
+
             Ok(())
         }
-        
-        async fn find_shares_by_user(&self, user_id: &str, offset: usize, limit: usize) -> Result<(Vec<Share>, usize), DomainError> {
+
+        async fn find_shares_by_user(
+            &self,
+            user_id: &str,
+            offset: usize,
+            limit: usize,
+        ) -> Result<(Vec<Share>, usize), DomainError> {
             let shares = self.shares.lock().unwrap();
-            
-            let user_shares: Vec<Share> = shares.values()
+
+            let user_shares: Vec<Share> = shares
+                .values()
                 .filter(|s| s.created_by() == user_id)
                 .cloned()
                 .collect();
-            
+
             let total = user_shares.len();
-            
+
             // Apply pagination
-            let paginated = user_shares.into_iter()
-                .skip(offset)
-                .take(limit)
-                .collect();
-            
+            let paginated = user_shares.into_iter().skip(offset).take(limit).collect();
+
             Ok((paginated, total))
         }
     }
@@ -622,14 +709,15 @@ mod tests {
     #[tokio::test]
     async fn test_create_shared_link() {
         let config = Arc::new(AppConfig::default());
-        
+
         let share_repo = Arc::new(MockShareRepository::new());
         let file_repo = Arc::new(MockFileRepository);
         let folder_repo = Arc::new(MockFolderRepository);
         let password_hasher = Arc::new(MockPasswordHasher);
-        
-        let service = ShareService::new(config, share_repo, file_repo, folder_repo, password_hasher);
-        
+
+        let service =
+            ShareService::new(config, share_repo, file_repo, folder_repo, password_hasher);
+
         // Test creating a file share
         let dto = CreateShareDto {
             item_id: "test_file_id".to_string(),
@@ -642,10 +730,10 @@ mod tests {
                 reshare: false,
             }),
         };
-        
+
         let result = service.create_shared_link("user123", dto).await;
         assert!(result.is_ok());
-        
+
         let share_dto = result.unwrap();
         assert_eq!(share_dto.item_id, "test_file_id");
         assert_eq!(share_dto.item_type, "file");

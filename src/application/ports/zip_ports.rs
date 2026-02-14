@@ -4,8 +4,8 @@
 //! keeping the interface layer independent of specific ZIP
 //! implementation details.
 
-use async_trait::async_trait;
 use crate::common::errors::DomainError;
+use async_trait::async_trait;
 
 /// Port for ZIP archive operations.
 ///

@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use async_trait::async_trait;
-use tracing::info;
-use crate::common::errors::{Result, DomainError, ErrorKind};
-use crate::application::ports::recent_ports::{RecentItemsUseCase, RecentItemsRepositoryPort};
 use crate::application::dtos::recent_dto::RecentItemDto;
+use crate::application::ports::recent_ports::{RecentItemsRepositoryPort, RecentItemsUseCase};
+use crate::common::errors::{DomainError, ErrorKind, Result};
+use async_trait::async_trait;
+use std::sync::Arc;
+use tracing::info;
 
 /// Implementation of the use case for managing recent items.
 ///
@@ -27,17 +27,35 @@ impl RecentService {
 #[async_trait]
 impl RecentItemsUseCase for RecentService {
     /// Get recent items for a user
-    async fn get_recent_items(&self, user_id: &str, limit: Option<i32>) -> Result<Vec<RecentItemDto>> {
+    async fn get_recent_items(
+        &self,
+        user_id: &str,
+        limit: Option<i32>,
+    ) -> Result<Vec<RecentItemDto>> {
         info!("Getting recent items for user: {}", user_id);
-        let limit_value = limit.unwrap_or(self.max_recent_items).min(self.max_recent_items);
+        let limit_value = limit
+            .unwrap_or(self.max_recent_items)
+            .min(self.max_recent_items);
         let items = self.repo.get_recent_items(user_id, limit_value).await?;
-        info!("Retrieved {} recent items for user {}", items.len(), user_id);
+        info!(
+            "Retrieved {} recent items for user {}",
+            items.len(),
+            user_id
+        );
         Ok(items)
     }
 
     /// Record access to an item
-    async fn record_item_access(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()> {
-        info!("Recording access to {} '{}' for user {}", item_type, item_id, user_id);
+    async fn record_item_access(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        item_type: &str,
+    ) -> Result<()> {
+        info!(
+            "Recording access to {} '{}' for user {}",
+            item_type, item_id, user_id
+        );
 
         if item_type != "file" && item_type != "folder" {
             return Err(DomainError::new(
@@ -50,18 +68,35 @@ impl RecentItemsUseCase for RecentService {
         self.repo.upsert_access(user_id, item_id, item_type).await?;
         self.repo.prune(user_id, self.max_recent_items).await?;
 
-        info!("Successfully recorded access to {} '{}' for user {}", item_type, item_id, user_id);
+        info!(
+            "Successfully recorded access to {} '{}' for user {}",
+            item_type, item_id, user_id
+        );
         Ok(())
     }
 
     /// Remove an item from recent
-    async fn remove_from_recent(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool> {
-        info!("Removing {} '{}' from recent for user {}", item_type, item_id, user_id);
+    async fn remove_from_recent(
+        &self,
+        user_id: &str,
+        item_id: &str,
+        item_type: &str,
+    ) -> Result<bool> {
+        info!(
+            "Removing {} '{}' from recent for user {}",
+            item_type, item_id, user_id
+        );
         let removed = self.repo.remove_item(user_id, item_id, item_type).await?;
         info!(
             "{} {} '{}' from recent items for user {}",
-            if removed { "Successfully removed" } else { "Not found" },
-            item_type, item_id, user_id
+            if removed {
+                "Successfully removed"
+            } else {
+                "Not found"
+            },
+            item_type,
+            item_id,
+            user_id
         );
         Ok(removed)
     }

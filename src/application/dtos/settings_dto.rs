@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // OIDC Settings DTOs (Admin Panel)

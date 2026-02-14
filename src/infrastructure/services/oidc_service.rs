@@ -4,11 +4,11 @@
 //! ID token validation (RS256 via JWKS), and UserInfo fetching.
 //! Compatible with Authentik, Keycloak, and any standard OIDC provider.
 
-use std::sync::RwLock;
 use async_trait::async_trait;
 use serde::Deserialize;
+use std::sync::RwLock;
 
-use crate::application::ports::auth_ports::{OidcServicePort, OidcTokenSet, OidcIdClaims};
+use crate::application::ports::auth_ports::{OidcIdClaims, OidcServicePort, OidcTokenSet};
 use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
 
@@ -41,8 +41,8 @@ struct JwkKey {
     key_use: Option<String>,
     kid: Option<String>,
     alg: Option<String>,
-    n: Option<String>,      // RSA modulus (base64url)
-    e: Option<String>,      // RSA exponent (base64url)
+    n: Option<String>, // RSA modulus (base64url)
+    e: Option<String>, // RSA exponent (base64url)
 }
 
 // ============================================================================
@@ -128,9 +128,10 @@ impl OidcService {
     async fn get_discovery(&self) -> Result<OidcDiscovery, DomainError> {
         // Check cache first
         {
-            let cache = self.discovery.read().map_err(|_| DomainError::new(
-                ErrorKind::InternalError, "OIDC", "Lock poisoned",
-            ))?;
+            let cache = self
+                .discovery
+                .read()
+                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
             if let Some(ref disc) = *cache {
                 return Ok(disc.clone());
             }
@@ -139,34 +140,44 @@ impl OidcService {
         // Fetch discovery document
         let issuer = self.config.issuer_url.trim_end_matches('/');
         let discovery_url = format!("{}/.well-known/openid-configuration", issuer);
-        
+
         tracing::info!("Fetching OIDC discovery from: {}", discovery_url);
 
-        let resp = self.http_client.get(&discovery_url)
+        let resp = self
+            .http_client
+            .get(&discovery_url)
             .send()
             .await
-            .map_err(|e| DomainError::new(
-                ErrorKind::InternalError, "OIDC",
-                format!("Failed to fetch OIDC discovery: {}", e),
-            ))?;
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "OIDC",
+                    format!("Failed to fetch OIDC discovery: {}", e),
+                )
+            })?;
 
         if !resp.status().is_success() {
             return Err(DomainError::new(
-                ErrorKind::InternalError, "OIDC",
+                ErrorKind::InternalError,
+                "OIDC",
                 format!("OIDC discovery returned status {}", resp.status()),
             ));
         }
 
-        let discovery: OidcDiscovery = resp.json().await.map_err(|e| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            format!("Failed to parse OIDC discovery: {}", e),
-        ))?;
+        let discovery: OidcDiscovery = resp.json().await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                format!("Failed to parse OIDC discovery: {}", e),
+            )
+        })?;
 
         // Cache it
         {
-            let mut cache = self.discovery.write().map_err(|_| DomainError::new(
-                ErrorKind::InternalError, "OIDC", "Lock poisoned",
-            ))?;
+            let mut cache = self
+                .discovery
+                .write()
+                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
             *cache = Some(discovery.clone());
         }
 
@@ -177,9 +188,10 @@ impl OidcService {
     async fn get_jwks(&self) -> Result<JwksDocument, DomainError> {
         // Check cache first
         {
-            let cache = self.jwks.read().map_err(|_| DomainError::new(
-                ErrorKind::InternalError, "OIDC", "Lock poisoned",
-            ))?;
+            let cache = self
+                .jwks
+                .read()
+                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
             if let Some(ref jwks) = *cache {
                 return Ok(jwks.clone());
             }
@@ -189,24 +201,33 @@ impl OidcService {
 
         tracing::debug!("Fetching JWKS from: {}", discovery.jwks_uri);
 
-        let resp = self.http_client.get(&discovery.jwks_uri)
+        let resp = self
+            .http_client
+            .get(&discovery.jwks_uri)
             .send()
             .await
-            .map_err(|e| DomainError::new(
-                ErrorKind::InternalError, "OIDC",
-                format!("Failed to fetch JWKS: {}", e),
-            ))?;
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "OIDC",
+                    format!("Failed to fetch JWKS: {}", e),
+                )
+            })?;
 
-        let jwks: JwksDocument = resp.json().await.map_err(|e| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            format!("Failed to parse JWKS: {}", e),
-        ))?;
+        let jwks: JwksDocument = resp.json().await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                format!("Failed to parse JWKS: {}", e),
+            )
+        })?;
 
         // Cache it
         {
-            let mut cache = self.jwks.write().map_err(|_| DomainError::new(
-                ErrorKind::InternalError, "OIDC", "Lock poisoned",
-            ))?;
+            let mut cache = self
+                .jwks
+                .write()
+                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
             *cache = Some(jwks.clone());
         }
 
@@ -232,13 +253,21 @@ impl OidcService {
         let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
         let header_bytes = engine.decode(parts[0]).ok()?;
         let header: serde_json::Value = serde_json::from_slice(&header_bytes).ok()?;
-        header.get("kid").and_then(|v| v.as_str()).map(|s| s.to_string())
+        header
+            .get("kid")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
     }
 }
 
 #[async_trait]
 impl OidcServicePort for OidcService {
-    async fn get_authorize_url(&self, state: &str, nonce: &str, pkce_challenge: &str) -> Result<String, DomainError> {
+    async fn get_authorize_url(
+        &self,
+        state: &str,
+        nonce: &str,
+        pkce_challenge: &str,
+    ) -> Result<String, DomainError> {
         // Fetch or use cached discovery to get the correct authorization_endpoint
         let discovery = self.get_discovery().await?;
         let auth_endpoint = discovery.authorization_endpoint;
@@ -258,12 +287,21 @@ impl OidcServicePort for OidcService {
         Ok(url)
     }
 
-    async fn exchange_code(&self, code: &str, pkce_verifier: &str) -> Result<OidcTokenSet, DomainError> {
+    async fn exchange_code(
+        &self,
+        code: &str,
+        pkce_verifier: &str,
+    ) -> Result<OidcTokenSet, DomainError> {
         let discovery = self.get_discovery().await?;
 
-        tracing::debug!("Exchanging authorization code at: {}", discovery.token_endpoint);
+        tracing::debug!(
+            "Exchanging authorization code at: {}",
+            discovery.token_endpoint
+        );
 
-        let resp = self.http_client.post(&discovery.token_endpoint)
+        let resp = self
+            .http_client
+            .post(&discovery.token_endpoint)
             .form(&[
                 ("grant_type", "authorization_code"),
                 ("code", code),
@@ -274,30 +312,44 @@ impl OidcServicePort for OidcService {
             ])
             .send()
             .await
-            .map_err(|e| DomainError::new(
-                ErrorKind::InternalError, "OIDC",
-                format!("Token exchange failed: {}", e),
-            ))?;
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "OIDC",
+                    format!("Token exchange failed: {}", e),
+                )
+            })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            tracing::error!("OIDC token exchange error: status={}, body={}", status, body);
+            tracing::error!(
+                "OIDC token exchange error: status={}, body={}",
+                status,
+                body
+            );
             return Err(DomainError::new(
-                ErrorKind::AccessDenied, "OIDC",
+                ErrorKind::AccessDenied,
+                "OIDC",
                 format!("Token exchange failed with status {}", status),
             ));
         }
 
-        let token_resp: TokenResponse = resp.json().await.map_err(|e| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            format!("Failed to parse token response: {}", e),
-        ))?;
+        let token_resp: TokenResponse = resp.json().await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                format!("Failed to parse token response: {}", e),
+            )
+        })?;
 
-        let id_token = token_resp.id_token.ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            "No id_token in token response",
-        ))?;
+        let id_token = token_resp.id_token.ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                "No id_token in token response",
+            )
+        })?;
 
         Ok(OidcTokenSet {
             access_token: token_resp.access_token,
@@ -306,7 +358,11 @@ impl OidcServicePort for OidcService {
         })
     }
 
-    async fn validate_id_token(&self, id_token: &str, expected_nonce: Option<&str>) -> Result<OidcIdClaims, DomainError> {
+    async fn validate_id_token(
+        &self,
+        id_token: &str,
+        expected_nonce: Option<&str>,
+    ) -> Result<OidcIdClaims, DomainError> {
         let jwks = self.get_jwks().await?;
         let discovery = self.get_discovery().await?;
 
@@ -314,24 +370,37 @@ impl OidcServicePort for OidcService {
         let kid = Self::extract_jwt_kid(id_token);
 
         // Find the matching RSA key
-        let jwk = Self::find_rsa_key(&jwks, kid.as_deref()).ok_or_else(|| DomainError::new(
-            ErrorKind::AccessDenied, "OIDC",
-            "No suitable RSA key found in JWKS for ID token validation",
-        ))?;
+        let jwk = Self::find_rsa_key(&jwks, kid.as_deref()).ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::AccessDenied,
+                "OIDC",
+                "No suitable RSA key found in JWKS for ID token validation",
+            )
+        })?;
 
-        let n = jwk.n.as_ref().ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC", "JWKS key missing 'n' component",
-        ))?;
-        let e = jwk.e.as_ref().ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC", "JWKS key missing 'e' component",
-        ))?;
+        let n = jwk.n.as_ref().ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                "JWKS key missing 'n' component",
+            )
+        })?;
+        let e = jwk.e.as_ref().ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                "JWKS key missing 'e' component",
+            )
+        })?;
 
         // Build decoding key from RSA components
-        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_components(n, e)
-            .map_err(|err| DomainError::new(
-                ErrorKind::InternalError, "OIDC",
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_components(n, e).map_err(|err| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
                 format!("Failed to build RSA decoding key: {}", err),
-            ))?;
+            )
+        })?;
 
         // Determine algorithm from JWKS (default RS256)
         let alg = match jwk.alg.as_deref() {
@@ -345,17 +414,17 @@ impl OidcServicePort for OidcService {
         validation.set_issuer(&[&discovery.issuer]);
         validation.set_audience(&[&self.config.client_id]);
 
-        let token_data = jsonwebtoken::decode::<IdTokenClaims>(
-            id_token,
-            &decoding_key,
-            &validation,
-        ).map_err(|e| {
-            tracing::warn!("OIDC ID token validation failed: {}", e);
-            DomainError::new(
-                ErrorKind::AccessDenied, "OIDC",
-                format!("ID token validation failed: {}", e),
-            )
-        })?;
+        let token_data =
+            jsonwebtoken::decode::<IdTokenClaims>(id_token, &decoding_key, &validation).map_err(
+                |e| {
+                    tracing::warn!("OIDC ID token validation failed: {}", e);
+                    DomainError::new(
+                        ErrorKind::AccessDenied,
+                        "OIDC",
+                        format!("ID token validation failed: {}", e),
+                    )
+                },
+            )?;
 
         let claims = token_data.claims;
 
@@ -366,7 +435,8 @@ impl OidcServicePort for OidcService {
                 Some(actual) => {
                     tracing::warn!("OIDC nonce mismatch: expected={}, got={}", expected, actual);
                     return Err(DomainError::new(
-                        ErrorKind::AccessDenied, "OIDC",
+                        ErrorKind::AccessDenied,
+                        "OIDC",
                         "ID token nonce mismatch — possible replay attack",
                     ));
                 }
@@ -389,31 +459,43 @@ impl OidcServicePort for OidcService {
     async fn fetch_user_info(&self, access_token: &str) -> Result<OidcIdClaims, DomainError> {
         let discovery = self.get_discovery().await?;
 
-        let userinfo_url = discovery.userinfo_endpoint.ok_or_else(|| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            "No userinfo_endpoint in OIDC discovery",
-        ))?;
+        let userinfo_url = discovery.userinfo_endpoint.ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                "No userinfo_endpoint in OIDC discovery",
+            )
+        })?;
 
-        let resp = self.http_client.get(&userinfo_url)
+        let resp = self
+            .http_client
+            .get(&userinfo_url)
             .header("Authorization", format!("Bearer {}", access_token))
             .send()
             .await
-            .map_err(|e| DomainError::new(
-                ErrorKind::InternalError, "OIDC",
-                format!("UserInfo request failed: {}", e),
-            ))?;
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "OIDC",
+                    format!("UserInfo request failed: {}", e),
+                )
+            })?;
 
         if !resp.status().is_success() {
             return Err(DomainError::new(
-                ErrorKind::AccessDenied, "OIDC",
+                ErrorKind::AccessDenied,
+                "OIDC",
                 format!("UserInfo returned status {}", resp.status()),
             ));
         }
 
-        let info: UserInfoResponse = resp.json().await.map_err(|e| DomainError::new(
-            ErrorKind::InternalError, "OIDC",
-            format!("Failed to parse UserInfo: {}", e),
-        ))?;
+        let info: UserInfoResponse = resp.json().await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                format!("Failed to parse UserInfo: {}", e),
+            )
+        })?;
 
         Ok(OidcIdClaims {
             sub: info.sub,

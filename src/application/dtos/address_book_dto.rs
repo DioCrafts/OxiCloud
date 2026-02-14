@@ -1,6 +1,6 @@
+use crate::domain::entities::contact::AddressBook;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use crate::domain::entities::contact::AddressBook;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressBookDto {

@@ -1,13 +1,13 @@
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
-use crate::application::ports::file_ports::FileManagementUseCase;
-use crate::application::ports::storage_ports::{FileWritePort, FileReadPort};
 use crate::application::ports::dedup_ports::DedupPort;
+use crate::application::ports::file_ports::FileManagementUseCase;
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::errors::DomainError;
-use tracing::{debug, info, warn, error};
+use tracing::{debug, error, info, warn};
 
 /// Service for file management operations (move, delete).
 ///
@@ -76,9 +76,14 @@ impl FileManagementService {
 
     /// Decrement dedup reference count; log result.
     async fn decrement_dedup_ref(&self, hash: &str) {
-        let Some(dedup) = &self.dedup_service else { return };
+        let Some(dedup) = &self.dedup_service else {
+            return;
+        };
         match dedup.remove_reference(hash).await {
-            Ok(true) => info!("🗑️ DEDUP: Blob {} deleted (no more references)", &hash[..12]),
+            Ok(true) => info!(
+                "🗑️ DEDUP: Blob {} deleted (no more references)",
+                &hash[..12]
+            ),
             Ok(false) => debug!("🔗 DEDUP: Reference removed from blob {}", &hash[..12]),
             Err(e) => warn!("⚠️ DEDUP: Failed to decrement reference: {}", e),
         }
@@ -92,12 +97,19 @@ impl FileManagementUseCase for FileManagementService {
         file_id: &str,
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
-        info!("Moving file with ID: {} to folder: {:?}", file_id, folder_id);
+        info!(
+            "Moving file with ID: {} to folder: {:?}",
+            file_id, folder_id
+        );
 
-        let moved_file = self.file_repository.move_file(file_id, folder_id).await.map_err(|e| {
-            error!("Error moving file (ID: {}): {}", file_id, e);
-            e
-        })?;
+        let moved_file = self
+            .file_repository
+            .move_file(file_id, folder_id)
+            .await
+            .map_err(|e| {
+                error!("Error moving file (ID: {}): {}", file_id, e);
+                e
+            })?;
 
         info!(
             "File moved successfully: {} (ID: {}) to folder: {:?}",
@@ -109,17 +121,17 @@ impl FileManagementUseCase for FileManagementService {
         Ok(FileDto::from(moved_file))
     }
 
-    async fn rename_file(
-        &self,
-        file_id: &str,
-        new_name: &str,
-    ) -> Result<FileDto, DomainError> {
+    async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError> {
         info!("Renaming file with ID: {} to \"{}\"", file_id, new_name);
 
-        let renamed_file = self.file_repository.rename_file(file_id, new_name).await.map_err(|e| {
-            error!("Error renaming file (ID: {}): {}", file_id, e);
-            e
-        })?;
+        let renamed_file = self
+            .file_repository
+            .rename_file(file_id, new_name)
+            .await
+            .map_err(|e| {
+                error!("Error renaming file (ID: {}): {}", file_id, e);
+                e
+            })?;
 
         info!(
             "File renamed successfully: {} (ID: {})",
@@ -135,11 +147,7 @@ impl FileManagementUseCase for FileManagementService {
     }
 
     /// Smart delete: trash-first with dedup reference cleanup.
-    async fn delete_with_cleanup(
-        &self,
-        id: &str,
-        user_id: &str,
-    ) -> Result<bool, DomainError> {
+    async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError> {
         // Step 1: Compute content hash for dedup tracking
         let content_hash = self.compute_content_hash(id).await;
 

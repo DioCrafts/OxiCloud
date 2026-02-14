@@ -1,11 +1,7 @@
-use axum::{
-    routing::get,
-    Router,
-    response::Html,
-};
-use tower_http::services::ServeDir;
-use crate::common::di::AppState;
 use crate::common::config::AppConfig;
+use crate::common::di::AppState;
+use axum::{Router, response::Html, routing::get};
+use tower_http::services::ServeDir;
 
 /// Creates web routes for serving static files
 pub fn create_web_routes() -> Router<AppState> {
@@ -20,9 +16,7 @@ pub fn create_web_routes() -> Router<AppState> {
         .route("/admin", get(serve_admin_page))
         .route("/shared", get(serve_shared_page))
         // Serve static files
-        .fallback_service(
-            ServeDir::new(static_path)
-        )
+        .fallback_service(ServeDir::new(static_path))
 }
 
 /// Serve the login page

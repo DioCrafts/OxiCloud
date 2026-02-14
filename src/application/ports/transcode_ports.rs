@@ -4,9 +4,9 @@
 //! (e.g., JPEG/PNG → WebP), keeping the application and interface layers
 //! independent of specific image processing implementations.
 
+use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
-use crate::common::errors::DomainError;
 
 /// Supported output formats for image transcoding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

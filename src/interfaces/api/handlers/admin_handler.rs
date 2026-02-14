@@ -1,18 +1,17 @@
 use axum::{
     Router,
-    routing::{get, put, post, delete},
-    extract::{State, Json, Path, Query},
-    http::{StatusCode, HeaderMap, header},
+    extract::{Json, Path, Query, State},
+    http::{HeaderMap, StatusCode, header},
     response::IntoResponse,
+    routing::{delete, get, post, put},
 };
 
-use crate::common::di::AppState;
 use crate::application::dtos::settings_dto::{
-    SaveOidcSettingsDto, TestOidcConnectionDto,
-    UpdateUserRoleDto, UpdateUserActiveDto, UpdateUserQuotaDto,
-    ListUsersQueryDto, DashboardStatsDto,
-    AdminCreateUserDto, AdminResetPasswordDto,
+    AdminCreateUserDto, AdminResetPasswordDto, DashboardStatsDto, ListUsersQueryDto,
+    SaveOidcSettingsDto, TestOidcConnectionDto, UpdateUserActiveDto, UpdateUserQuotaDto,
+    UpdateUserRoleDto,
 };
+use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 
 /// Admin API routes — all require admin role.
@@ -41,7 +40,9 @@ pub fn admin_routes() -> Router<AppState> {
 
 /// Validate JWT and require admin role. Returns (user_id, role).
 async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, String), AppError> {
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     let token = headers
@@ -50,7 +51,9 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, S
         .and_then(|v| v.strip_prefix("Bearer "))
         .ok_or_else(|| AppError::unauthorized("Authorization token required"))?;
 
-    let claims = auth.token_service.validate_token(token)
+    let claims = auth
+        .token_service
+        .validate_token(token)
         .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
 
     if claims.role != "admin" {
@@ -71,10 +74,14 @@ async fn get_oidc_settings(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let svc = state.admin_settings_service.as_ref()
+    let svc = state
+        .admin_settings_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    let settings = svc.get_oidc_settings().await
+    let settings = svc
+        .get_oidc_settings()
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to load settings: {}", e)))?;
 
     Ok(Json(settings))
@@ -88,15 +95,21 @@ async fn save_oidc_settings(
 ) -> Result<impl IntoResponse, AppError> {
     let (user_id, _) = admin_guard(&state, &headers).await?;
 
-    let svc = state.admin_settings_service.as_ref()
+    let svc = state
+        .admin_settings_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    svc.save_oidc_settings(dto, &user_id).await
+    svc.save_oidc_settings(dto, &user_id)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to save settings: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": "OIDC settings saved and applied successfully"
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "OIDC settings saved and applied successfully"
+        })),
+    ))
 }
 
 /// POST /api/admin/settings/oidc/test — test OIDC discovery
@@ -107,10 +120,14 @@ async fn test_oidc_connection(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let svc = state.admin_settings_service.as_ref()
+    let svc = state
+        .admin_settings_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    let result = svc.test_oidc_connection(dto).await
+    let result = svc
+        .test_oidc_connection(dto)
+        .await
         .map_err(|e| AppError::internal_error(format!("Connection test failed: {}", e)))?;
 
     Ok(Json(result))
@@ -123,10 +140,16 @@ async fn get_general_settings(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    let user_count = auth.auth_application_service.count_users_efficient().await.unwrap_or(0);
+    let user_count = auth
+        .auth_application_service
+        .count_users_efficient()
+        .await
+        .unwrap_or(0);
     let oidc_configured = auth.auth_application_service.oidc_enabled();
 
     Ok(Json(serde_json::json!({
@@ -148,13 +171,17 @@ async fn get_dashboard_stats(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     let auth_app = &auth.auth_application_service;
 
     // Get storage stats from repository (single efficient query)
-    let db_pool = state.db_pool.as_ref()
+    let db_pool = state
+        .db_pool
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Database not available"))?;
 
     // Use direct SQL for aggregated stats — more efficient than loading all users
@@ -221,16 +248,25 @@ async fn list_users(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     let limit = query.limit.unwrap_or(100).min(500);
     let offset = query.offset.unwrap_or(0);
 
-    let users = auth.auth_application_service.list_users(limit, offset).await
+    let users = auth
+        .auth_application_service
+        .list_users(limit, offset)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to list users: {}", e)))?;
 
-    let total = auth.auth_application_service.count_users_efficient().await.unwrap_or(0);
+    let total = auth
+        .auth_application_service
+        .count_users_efficient()
+        .await
+        .unwrap_or(0);
 
     Ok(Json(serde_json::json!({
         "users": users,
@@ -248,10 +284,15 @@ async fn get_user(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    let user = auth.auth_application_service.get_user_admin(&id).await
+    let user = auth
+        .auth_application_service
+        .get_user_admin(&id)
+        .await
         .map_err(|e| AppError::not_found(format!("User not found: {}", e)))?;
 
     Ok(Json(user))
@@ -274,15 +315,22 @@ async fn delete_user(
         ));
     }
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    auth.auth_application_service.delete_user_admin(&id).await
+    auth.auth_application_service
+        .delete_user_admin(&id)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to delete user: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": "User deleted successfully"
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "User deleted successfully"
+        })),
+    ))
 }
 
 /// PUT /api/admin/users/:id/role — change user role
@@ -303,15 +351,22 @@ async fn update_user_role(
         ));
     }
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    auth.auth_application_service.change_user_role(&id, &dto.role).await
+    auth.auth_application_service
+        .change_user_role(&id, &dto.role)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to change role: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": format!("User role updated to '{}'", dto.role)
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": format!("User role updated to '{}'", dto.role)
+        })),
+    ))
 }
 
 /// PUT /api/admin/users/:id/active — activate/deactivate user
@@ -332,16 +387,27 @@ async fn update_user_active(
         ));
     }
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    auth.auth_application_service.set_user_active(&id, dto.active).await
+    auth.auth_application_service
+        .set_user_active(&id, dto.active)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to update user status: {}", e)))?;
 
-    let status = if dto.active { "activated" } else { "deactivated" };
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": format!("User {}", status)
-    }))))
+    let status = if dto.active {
+        "activated"
+    } else {
+        "deactivated"
+    };
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": format!("User {}", status)
+        })),
+    ))
 }
 
 /// PUT /api/admin/users/:id/quota — update user storage quota
@@ -353,16 +419,23 @@ async fn update_user_quota(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    auth.auth_application_service.update_user_quota(&id, dto.quota_bytes).await
+    auth.auth_application_service
+        .update_user_quota(&id, dto.quota_bytes)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to update quota: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": "User quota updated",
-        "quota_bytes": dto.quota_bytes,
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "User quota updated",
+            "quota_bytes": dto.quota_bytes,
+        })),
+    ))
 }
 
 // ============================================================================
@@ -377,15 +450,22 @@ async fn create_user(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    let user = auth.auth_application_service.admin_create_user(dto).await
-        .map_err(|e| AppError::new(
-            StatusCode::BAD_REQUEST,
-            format!("Failed to create user: {}", e),
-            "CreateUserFailed",
-        ))?;
+    let user = auth
+        .auth_application_service
+        .admin_create_user(dto)
+        .await
+        .map_err(|e| {
+            AppError::new(
+                StatusCode::BAD_REQUEST,
+                format!("Failed to create user: {}", e),
+                "CreateUserFailed",
+            )
+        })?;
 
     Ok((StatusCode::CREATED, Json(user)))
 }
@@ -399,19 +479,28 @@ async fn reset_user_password(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let auth = state.auth_service.as_ref()
+    let auth = state
+        .auth_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
-    auth.auth_application_service.admin_reset_password(&id, &dto.new_password).await
-        .map_err(|e| AppError::new(
-            StatusCode::BAD_REQUEST,
-            format!("Failed to reset password: {}", e),
-            "ResetPasswordFailed",
-        ))?;
+    auth.auth_application_service
+        .admin_reset_password(&id, &dto.new_password)
+        .await
+        .map_err(|e| {
+            AppError::new(
+                StatusCode::BAD_REQUEST,
+                format!("Failed to reset password: {}", e),
+                "ResetPasswordFailed",
+            )
+        })?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": "Password reset successfully"
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "Password reset successfully"
+        })),
+    ))
 }
 
 // ============================================================================
@@ -425,7 +514,9 @@ async fn get_registration_setting(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
-    let svc = state.admin_settings_service.as_ref()
+    let svc = state
+        .admin_settings_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
     let val = svc.get_registration_enabled().await;
@@ -443,22 +534,31 @@ async fn set_registration_setting(
 ) -> Result<impl IntoResponse, AppError> {
     let (admin_id, _) = admin_guard(&state, &headers).await?;
 
-    let enabled = body.get("registration_enabled")
+    let enabled = body
+        .get("registration_enabled")
         .and_then(|v| v.as_bool())
-        .ok_or_else(|| AppError::new(
-            StatusCode::BAD_REQUEST,
-            "Missing boolean field 'registration_enabled'",
-            "InvalidInput",
-        ))?;
+        .ok_or_else(|| {
+            AppError::new(
+                StatusCode::BAD_REQUEST,
+                "Missing boolean field 'registration_enabled'",
+                "InvalidInput",
+            )
+        })?;
 
-    let svc = state.admin_settings_service.as_ref()
+    let svc = state
+        .admin_settings_service
+        .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    svc.set_registration_enabled(enabled, &admin_id).await
+    svc.set_registration_enabled(enabled, &admin_id)
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to save setting: {}", e)))?;
 
-    Ok((StatusCode::OK, Json(serde_json::json!({
-        "message": format!("Public registration {}", if enabled { "enabled" } else { "disabled" }),
-        "registration_enabled": enabled,
-    }))))
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": format!("Public registration {}", if enabled { "enabled" } else { "disabled" }),
+            "registration_enabled": enabled,
+        })),
+    ))
 }

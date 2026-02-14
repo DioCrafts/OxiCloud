@@ -1,11 +1,15 @@
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-    use chrono::{Utc, TimeZone, NaiveDate};
-    use crate::application::adapters::carddav_adapter::{CardDavAdapter, CardDavReportType, contact_to_vcard};
-    use crate::application::adapters::webdav_adapter::{PropFindRequest, PropFindType, QualifiedName};
+    use crate::application::adapters::carddav_adapter::{
+        CardDavAdapter, CardDavReportType, contact_to_vcard,
+    };
+    use crate::application::adapters::webdav_adapter::{
+        PropFindRequest, PropFindType, QualifiedName,
+    };
     use crate::application::dtos::address_book_dto::AddressBookDto;
-    use crate::application::dtos::contact_dto::{ContactDto, EmailDto, PhoneDto, AddressDto};
+    use crate::application::dtos::contact_dto::{AddressDto, ContactDto, EmailDto, PhoneDto};
+    use chrono::{NaiveDate, TimeZone, Utc};
+    use std::io::Cursor;
 
     fn sample_address_book() -> AddressBookDto {
         AddressBookDto {
@@ -41,24 +45,20 @@ mod tests {
                     is_primary: false,
                 },
             ],
-            phone: vec![
-                PhoneDto {
-                    number: "+1-555-0100".to_string(),
-                    r#type: "cell".to_string(),
-                    is_primary: true,
-                },
-            ],
-            address: vec![
-                AddressDto {
-                    street: Some("123 Main St".to_string()),
-                    city: Some("Springfield".to_string()),
-                    state: Some("IL".to_string()),
-                    postal_code: Some("62701".to_string()),
-                    country: Some("US".to_string()),
-                    r#type: "home".to_string(),
-                    is_primary: true,
-                },
-            ],
+            phone: vec![PhoneDto {
+                number: "+1-555-0100".to_string(),
+                r#type: "cell".to_string(),
+                is_primary: true,
+            }],
+            address: vec![AddressDto {
+                street: Some("123 Main St".to_string()),
+                city: Some("Springfield".to_string()),
+                state: Some("IL".to_string()),
+                postal_code: Some("62701".to_string()),
+                country: Some("US".to_string()),
+                r#type: "home".to_string(),
+                is_primary: true,
+            }],
             organization: Some("Acme Corp".to_string()),
             title: Some("Software Engineer".to_string()),
             notes: Some("Met at conference".to_string()),
@@ -104,20 +104,40 @@ mod tests {
         let contact = sample_contact();
         let vcard = contact_to_vcard(&contact);
 
-        assert!(vcard.starts_with("BEGIN:VCARD"), "vCard should start with BEGIN:VCARD");
+        assert!(
+            vcard.starts_with("BEGIN:VCARD"),
+            "vCard should start with BEGIN:VCARD"
+        );
         assert!(vcard.contains("VERSION:3.0"), "Should be vCard 3.0");
         assert!(vcard.contains("FN:John Doe"), "Should contain full name");
-        assert!(vcard.contains("N:Doe;John"), "Should contain structured name");
+        assert!(
+            vcard.contains("N:Doe;John"),
+            "Should contain structured name"
+        );
         assert!(vcard.contains("NICKNAME:Johnny"), "Should contain nickname");
         assert!(vcard.contains("john@example.com"), "Should contain email");
         assert!(vcard.contains("+1-555-0100"), "Should contain phone number");
-        assert!(vcard.contains("ORG:Acme Corp"), "Should contain organization");
-        assert!(vcard.contains("TITLE:Software Engineer"), "Should contain title");
-        assert!(vcard.contains("NOTE:Met at conference"), "Should contain notes");
+        assert!(
+            vcard.contains("ORG:Acme Corp"),
+            "Should contain organization"
+        );
+        assert!(
+            vcard.contains("TITLE:Software Engineer"),
+            "Should contain title"
+        );
+        assert!(
+            vcard.contains("NOTE:Met at conference"),
+            "Should contain notes"
+        );
         assert!(vcard.contains("BDAY:1990-05-15"), "Should contain birthday");
-        assert!(vcard.contains("UID:uid-contact-001@oxicloud"), "Should contain UID");
-        assert!(vcard.ends_with("END:VCARD\r\n") || vcard.trim_end().ends_with("END:VCARD"),
-            "vCard should end with END:VCARD");
+        assert!(
+            vcard.contains("UID:uid-contact-001@oxicloud"),
+            "Should contain UID"
+        );
+        assert!(
+            vcard.ends_with("END:VCARD\r\n") || vcard.trim_end().ends_with("END:VCARD"),
+            "vCard should end with END:VCARD"
+        );
     }
 
     #[test]
@@ -128,7 +148,10 @@ mod tests {
         assert!(vcard.contains("BEGIN:VCARD"), "Should start correctly");
         assert!(vcard.contains("VERSION:3.0"), "Should be vCard 3.0");
         assert!(vcard.contains("FN:Jane Smith"), "Should have full name");
-        assert!(vcard.contains("UID:uid-contact-002@oxicloud"), "Should have UID");
+        assert!(
+            vcard.contains("UID:uid-contact-002@oxicloud"),
+            "Should have UID"
+        );
         assert!(vcard.contains("END:VCARD"), "Should end correctly");
         // Should NOT contain optional fields
         assert!(!vcard.contains("NICKNAME:"), "Should not have nickname");
@@ -154,7 +177,11 @@ mod tests {
         </D:mkcol>"#;
 
         let result = CardDavAdapter::parse_mkaddressbook(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse mkaddressbook: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse mkaddressbook: {:?}",
+            result.err()
+        );
         let (name, desc, color) = result.unwrap();
         assert_eq!(name, "Work Contacts");
         assert_eq!(desc, Some("Colleagues and clients".to_string()));
@@ -195,7 +222,11 @@ mod tests {
         </CR:addressbook-query>"#;
 
         let result = CardDavAdapter::parse_report(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse addressbook-query: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse addressbook-query: {:?}",
+            result.err()
+        );
 
         match result.unwrap() {
             CardDavReportType::AddressbookQuery { props } => {
@@ -219,7 +250,11 @@ mod tests {
         </CR:addressbook-multiget>"#;
 
         let result = CardDavAdapter::parse_report(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse multiget: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse multiget: {:?}",
+            result.err()
+        );
 
         match result.unwrap() {
             CardDavReportType::AddressbookMultiget { hrefs, props } => {
@@ -251,12 +286,25 @@ mod tests {
             "/carddav",
         );
 
-        assert!(result.is_ok(), "Failed to generate propfind response: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to generate propfind response: {:?}",
+            result.err()
+        );
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("multistatus"), "Should contain multistatus");
-        assert!(xml_str.contains("My Contacts"), "Should contain address book name");
-        assert!(xml_str.contains("ab-001"), "Should contain address book ID in href");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Should contain multistatus"
+        );
+        assert!(
+            xml_str.contains("My Contacts"),
+            "Should contain address book name"
+        );
+        assert!(
+            xml_str.contains("ab-001"),
+            "Should contain address book ID in href"
+        );
     }
 
     #[test]
@@ -277,11 +325,21 @@ mod tests {
             "0",
         );
 
-        assert!(result.is_ok(), "Failed to generate depth-0 propfind: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to generate depth-0 propfind: {:?}",
+            result.err()
+        );
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("multistatus"), "Should contain multistatus");
-        assert!(xml_str.contains("My Contacts"), "Should contain address book name");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Should contain multistatus"
+        );
+        assert!(
+            xml_str.contains("My Contacts"),
+            "Should contain address book name"
+        );
     }
 
     #[test]
@@ -302,14 +360,30 @@ mod tests {
             "1",
         );
 
-        assert!(result.is_ok(), "Failed to generate depth-1 propfind: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to generate depth-1 propfind: {:?}",
+            result.err()
+        );
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("multistatus"), "Should contain multistatus");
-        assert!(xml_str.contains("My Contacts"), "Should contain address book name");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Should contain multistatus"
+        );
+        assert!(
+            xml_str.contains("My Contacts"),
+            "Should contain address book name"
+        );
         // Depth 1 should include contact resources
-        assert!(xml_str.contains("contact-001"), "Should include contact-001");
-        assert!(xml_str.contains("contact-002"), "Should include contact-002");
+        assert!(
+            xml_str.contains("contact-001"),
+            "Should include contact-001"
+        );
+        assert!(
+            xml_str.contains("contact-002"),
+            "Should include contact-002"
+        );
     }
 
     // ========================
@@ -319,9 +393,10 @@ mod tests {
     #[test]
     fn test_generate_contacts_response() {
         let contacts = vec![sample_contact()];
-        let vcards = vec![
-            ("contact-001".to_string(), contact_to_vcard(&sample_contact())),
-        ];
+        let vcards = vec![(
+            "contact-001".to_string(),
+            contact_to_vcard(&sample_contact()),
+        )];
         let report = CardDavReportType::AddressbookQuery {
             props: vec![
                 QualifiedName {
@@ -344,10 +419,17 @@ mod tests {
             "/carddav/ab-001",
         );
 
-        assert!(result.is_ok(), "Failed to generate contacts response: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to generate contacts response: {:?}",
+            result.err()
+        );
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("multistatus"), "Should contain multistatus");
+        assert!(
+            xml_str.contains("multistatus"),
+            "Should contain multistatus"
+        );
         assert!(xml_str.contains("contact-001"), "Should reference contact");
         assert!(xml_str.contains("etag-abc123"), "Should contain etag");
     }
@@ -356,9 +438,7 @@ mod tests {
     fn test_generate_empty_contacts_response() {
         let contacts: Vec<ContactDto> = vec![];
         let vcards: Vec<(String, String)> = vec![];
-        let report = CardDavReportType::AddressbookQuery {
-            props: vec![],
-        };
+        let report = CardDavReportType::AddressbookQuery { props: vec![] };
 
         let mut output = Vec::new();
         let result = CardDavAdapter::generate_contacts_response(
@@ -369,7 +449,10 @@ mod tests {
             "/carddav/ab-001",
         );
 
-        assert!(result.is_ok(), "Empty contacts should produce valid response");
+        assert!(
+            result.is_ok(),
+            "Empty contacts should produce valid response"
+        );
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
         assert!(xml_str.contains("multistatus"), "Should have multistatus");
     }
@@ -383,7 +466,7 @@ mod tests {
         let mut ab2 = sample_address_book();
         ab2.id = "ab-002".to_string();
         ab2.name = "Work Contacts".to_string();
-        
+
         let addressbooks = vec![sample_address_book(), ab2];
         let request = PropFindRequest {
             prop_find_type: PropFindType::AllProp,
@@ -399,8 +482,14 @@ mod tests {
 
         assert!(result.is_ok());
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
-        assert!(xml_str.contains("My Contacts"), "Should contain first address book");
-        assert!(xml_str.contains("Work Contacts"), "Should contain second address book");
+        assert!(
+            xml_str.contains("My Contacts"),
+            "Should contain first address book"
+        );
+        assert!(
+            xml_str.contains("Work Contacts"),
+            "Should contain second address book"
+        );
         assert!(xml_str.contains("ab-001"), "Should have first ID");
         assert!(xml_str.contains("ab-002"), "Should have second ID");
     }
@@ -416,7 +505,10 @@ mod tests {
 
         // Should contain both emails
         assert!(vcard.contains("john@example.com"), "Should have work email");
-        assert!(vcard.contains("john.doe@personal.com"), "Should have personal email");
+        assert!(
+            vcard.contains("john.doe@personal.com"),
+            "Should have personal email"
+        );
     }
 
     #[test]

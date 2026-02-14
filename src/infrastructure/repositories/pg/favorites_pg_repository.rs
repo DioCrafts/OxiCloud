@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
+use std::sync::Arc;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::application::dtos::favorites_dto::FavoriteItemDto;
 use crate::application::ports::favorites_ports::FavoritesRepositoryPort;
-use crate::common::errors::{Result, DomainError, ErrorKind};
+use crate::common::errors::{DomainError, ErrorKind, Result};
 
 /// PostgreSQL implementation of the favorites persistence port.
 pub struct FavoritesPgRepository {
@@ -42,7 +42,11 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         .await
         .map_err(|e| {
             error!("Database error fetching favorites: {}", e);
-            DomainError::new(ErrorKind::InternalError, "Favorites", format!("Failed to fetch favorites: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to fetch favorites: {}", e),
+            )
         })?;
 
         let favorites = rows
@@ -76,7 +80,11 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         .await
         .map_err(|e| {
             error!("Database error adding favorite: {}", e);
-            DomainError::new(ErrorKind::InternalError, "Favorites", format!("Failed to add to favorites: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to add to favorites: {}", e),
+            )
         })?;
 
         Ok(())
@@ -98,7 +106,11 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         .await
         .map_err(|e| {
             error!("Database error removing favorite: {}", e);
-            DomainError::new(ErrorKind::InternalError, "Favorites", format!("Failed to remove from favorites: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to remove from favorites: {}", e),
+            )
         })?;
 
         Ok(result.rows_affected() > 0)
@@ -122,7 +134,11 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         .await
         .map_err(|e| {
             error!("Database error checking favorite status: {}", e);
-            DomainError::new(ErrorKind::InternalError, "Favorites", format!("Failed to check favorite status: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to check favorite status: {}", e),
+            )
         })?;
 
         Ok(row.try_get("is_favorite").unwrap_or(false))

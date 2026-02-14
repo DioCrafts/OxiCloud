@@ -1,15 +1,17 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Row, types::Uuid};
-use std::sync::Arc;
 use chrono::Utc;
 use serde_json::Value as JsonValue;
+use sqlx::{PgPool, Row, types::Uuid};
+use std::sync::Arc;
 
-use crate::domain::entities::contact::{Contact, ContactGroup};
-use crate::domain::repositories::contact_repository::{ContactGroupRepository, ContactRepositoryResult};
-use crate::common::errors::{DomainError, ErrorKind};
 use super::contact_persistence_dto::{
-    emails_from_persistence, phones_from_persistence, addresses_from_persistence,
-    EmailPersistenceDto, PhonePersistenceDto, AddressPersistenceDto,
+    AddressPersistenceDto, EmailPersistenceDto, PhonePersistenceDto, addresses_from_persistence,
+    emails_from_persistence, phones_from_persistence,
+};
+use crate::common::errors::{DomainError, ErrorKind};
+use crate::domain::entities::contact::{Contact, ContactGroup};
+use crate::domain::repositories::contact_repository::{
+    ContactGroupRepository, ContactRepositoryResult,
 };
 
 pub struct ContactGroupPgRepository {
@@ -36,21 +38,25 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to create group: {}", e)))?;
-        
+
         Ok(group)
     }
 
     async fn update_group(&self, group: ContactGroup) -> ContactRepositoryResult<ContactGroup> {
-        sqlx::query(
-            "UPDATE carddav.contact_groups SET name = $1, updated_at = $2 WHERE id = $3"
-        )
-        .bind(group.name())
-        .bind(Utc::now())
-        .bind(group.id())
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to update group: {}", e)))?;
-        
+        sqlx::query("UPDATE carddav.contact_groups SET name = $1, updated_at = $2 WHERE id = $3")
+            .bind(group.name())
+            .bind(Utc::now())
+            .bind(group.id())
+            .execute(self.pool.as_ref())
+            .await
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "ContactGroup",
+                    format!("Failed to update group: {}", e),
+                )
+            })?;
+
         Ok(group)
     }
 
@@ -60,14 +66,26 @@ impl ContactGroupRepository for ContactGroupPgRepository {
             .bind(id)
             .execute(self.pool.as_ref())
             .await
-            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to delete group memberships: {}", e)))?;
-        
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "ContactGroup",
+                    format!("Failed to delete group memberships: {}", e),
+                )
+            })?;
+
         sqlx::query("DELETE FROM carddav.contact_groups WHERE id = $1")
             .bind(id)
             .execute(self.pool.as_ref())
             .await
-            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to delete group: {}", e)))?;
-        
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "ContactGroup",
+                    format!("Failed to delete group: {}", e),
+                )
+            })?;
+
         Ok(())
     }
 
@@ -79,7 +97,7 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to get group: {}", e)))?;
-        
+
         match row {
             Some(row) => {
                 let group = ContactGroup::from_raw(
@@ -90,12 +108,15 @@ impl ContactGroupRepository for ContactGroupPgRepository {
                     row.get("updated_at"),
                 );
                 Ok(Some(group))
-            },
+            }
             None => Ok(None),
         }
     }
 
-    async fn get_groups_by_address_book(&self, address_book_id: &Uuid) -> ContactRepositoryResult<Vec<ContactGroup>> {
+    async fn get_groups_by_address_book(
+        &self,
+        address_book_id: &Uuid,
+    ) -> ContactRepositoryResult<Vec<ContactGroup>> {
         let rows = sqlx::query(
             "SELECT id, address_book_id, name, created_at, updated_at FROM carddav.contact_groups WHERE address_book_id = $1 ORDER BY name"
         )
@@ -103,19 +124,26 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         .fetch_all(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to list groups: {}", e)))?;
-        
-        Ok(rows.into_iter().map(|row| {
-            ContactGroup::from_raw(
-                row.get::<Uuid, _>("id"),
-                row.get::<Uuid, _>("address_book_id"),
-                row.get::<String, _>("name"),
-                row.get("created_at"),
-                row.get("updated_at"),
-            )
-        }).collect())
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                ContactGroup::from_raw(
+                    row.get::<Uuid, _>("id"),
+                    row.get::<Uuid, _>("address_book_id"),
+                    row.get::<String, _>("name"),
+                    row.get("created_at"),
+                    row.get("updated_at"),
+                )
+            })
+            .collect())
     }
 
-    async fn add_contact_to_group(&self, group_id: &Uuid, contact_id: &Uuid) -> ContactRepositoryResult<()> {
+    async fn add_contact_to_group(
+        &self,
+        group_id: &Uuid,
+        contact_id: &Uuid,
+    ) -> ContactRepositoryResult<()> {
         sqlx::query(
             "INSERT INTO carddav.group_memberships (group_id, contact_id) VALUES ($1, $2) ON CONFLICT DO NOTHING"
         )
@@ -124,24 +152,37 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         .execute(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to add contact to group: {}", e)))?;
-        
+
         Ok(())
     }
 
-    async fn remove_contact_from_group(&self, group_id: &Uuid, contact_id: &Uuid) -> ContactRepositoryResult<()> {
+    async fn remove_contact_from_group(
+        &self,
+        group_id: &Uuid,
+        contact_id: &Uuid,
+    ) -> ContactRepositoryResult<()> {
         sqlx::query(
-            "DELETE FROM carddav.group_memberships WHERE group_id = $1 AND contact_id = $2"
+            "DELETE FROM carddav.group_memberships WHERE group_id = $1 AND contact_id = $2",
         )
         .bind(group_id)
         .bind(contact_id)
         .execute(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to remove contact from group: {}", e)))?;
-        
+        .map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "ContactGroup",
+                format!("Failed to remove contact from group: {}", e),
+            )
+        })?;
+
         Ok(())
     }
 
-    async fn get_contacts_in_group(&self, group_id: &Uuid) -> ContactRepositoryResult<Vec<Contact>> {
+    async fn get_contacts_in_group(
+        &self,
+        group_id: &Uuid,
+    ) -> ContactRepositoryResult<Vec<Contact>> {
         let rows = sqlx::query(
             r#"
             SELECT 
@@ -152,12 +193,18 @@ impl ContactGroupRepository for ContactGroupPgRepository {
             INNER JOIN carddav.group_memberships gm ON c.id = gm.contact_id
             WHERE gm.group_id = $1
             ORDER BY c.full_name, c.first_name, c.last_name
-            "#
+            "#,
         )
         .bind(group_id)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to get contacts in group: {}", e)))?;
+        .map_err(|e| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "ContactGroup",
+                format!("Failed to get contacts in group: {}", e),
+            )
+        })?;
 
         let mut contacts = Vec::new();
         for row in &rows {
@@ -201,7 +248,10 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         Ok(contacts)
     }
 
-    async fn get_groups_for_contact(&self, contact_id: &Uuid) -> ContactRepositoryResult<Vec<ContactGroup>> {
+    async fn get_groups_for_contact(
+        &self,
+        contact_id: &Uuid,
+    ) -> ContactRepositoryResult<Vec<ContactGroup>> {
         let rows = sqlx::query(
             "SELECT g.id, g.address_book_id, g.name, g.created_at, g.updated_at FROM carddav.contact_groups g INNER JOIN carddav.group_memberships gm ON g.id = gm.group_id WHERE gm.contact_id = $1 ORDER BY g.name"
         )
@@ -209,15 +259,18 @@ impl ContactGroupRepository for ContactGroupPgRepository {
         .fetch_all(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::new(ErrorKind::InternalError, "ContactGroup", format!("Failed to get groups for contact: {}", e)))?;
-        
-        Ok(rows.into_iter().map(|row| {
-            ContactGroup::from_raw(
-                row.get::<Uuid, _>("id"),
-                row.get::<Uuid, _>("address_book_id"),
-                row.get::<String, _>("name"),
-                row.get("created_at"),
-                row.get("updated_at"),
-            )
-        }).collect())
+
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                ContactGroup::from_raw(
+                    row.get::<Uuid, _>("id"),
+                    row.get::<Uuid, _>("address_book_id"),
+                    row.get::<String, _>("name"),
+                    row.get("created_at"),
+                    row.get("updated_at"),
+                )
+            })
+            .collect())
     }
 }

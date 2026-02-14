@@ -1,12 +1,12 @@
-use std::sync::Arc;
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
+use std::sync::Arc;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::application::dtos::recent_dto::RecentItemDto;
 use crate::application::ports::recent_ports::RecentItemsRepositoryPort;
-use crate::common::errors::{Result, DomainError, ErrorKind};
+use crate::common::errors::{DomainError, ErrorKind, Result};
 
 /// PostgreSQL implementation of the recent items persistence port.
 pub struct RecentItemsPgRepository {
@@ -44,7 +44,11 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         .await
         .map_err(|e| {
             error!("Database error fetching recent items: {}", e);
-            DomainError::new(ErrorKind::InternalError, "RecentItems", format!("Failed to fetch recent items: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "RecentItems",
+                format!("Failed to fetch recent items: {}", e),
+            )
         })?;
 
         let items = rows
@@ -79,7 +83,11 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         .await
         .map_err(|e| {
             error!("Database error upserting recent item access: {}", e);
-            DomainError::new(ErrorKind::InternalError, "RecentItems", format!("Failed to record item access: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "RecentItems",
+                format!("Failed to record item access: {}", e),
+            )
         })?;
 
         Ok(())
@@ -101,7 +109,11 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         .await
         .map_err(|e| {
             error!("Database error removing recent item: {}", e);
-            DomainError::new(ErrorKind::InternalError, "RecentItems", format!("Failed to remove recent item: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "RecentItems",
+                format!("Failed to remove recent item: {}", e),
+            )
         })?;
 
         Ok(result.rows_affected() > 0)
@@ -121,7 +133,11 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         .await
         .map_err(|e| {
             error!("Database error clearing recent items: {}", e);
-            DomainError::new(ErrorKind::InternalError, "RecentItems", format!("Failed to clear recent items: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "RecentItems",
+                format!("Failed to clear recent items: {}", e),
+            )
         })?;
 
         Ok(())
@@ -147,7 +163,11 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         .await
         .map_err(|e| {
             error!("Database error pruning old recent items: {}", e);
-            DomainError::new(ErrorKind::InternalError, "RecentItems", format!("Failed to prune recent items: {}", e))
+            DomainError::new(
+                ErrorKind::InternalError,
+                "RecentItems",
+                format!("Failed to prune recent items: {}", e),
+            )
         })?;
 
         Ok(())

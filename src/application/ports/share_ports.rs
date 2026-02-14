@@ -3,12 +3,11 @@ use async_trait::async_trait;
 use crate::{
     application::dtos::{
         pagination::PaginatedResponseDto,
-        share_dto::{CreateShareDto, ShareDto, UpdateShareDto}
+        share_dto::{CreateShareDto, ShareDto, UpdateShareDto},
     },
     common::errors::DomainError,
     domain::entities::share::ShareItemType,
 };
-
 
 #[async_trait]
 pub trait ShareUseCase: Send + Sync + 'static {
@@ -56,30 +55,45 @@ pub trait ShareUseCase: Send + Sync + 'static {
         token: &str,
         password: &str,
     ) -> Result<bool, DomainError>;
-    
+
     /// Register an access to a shared link
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError>;
 }
 
 #[async_trait]
 pub trait ShareStoragePort: Send + Sync + 'static {
-    async fn save_share(&self, share: &crate::domain::entities::share::Share) 
-        -> Result<crate::domain::entities::share::Share, DomainError>;
-    
-    async fn find_share_by_id(&self, id: &str) 
-        -> Result<crate::domain::entities::share::Share, DomainError>;
-    
-    async fn find_share_by_token(&self, token: &str) 
-        -> Result<crate::domain::entities::share::Share, DomainError>;
-    
-    async fn find_shares_by_item(&self, item_id: &str, item_type: &ShareItemType) 
-        -> Result<Vec<crate::domain::entities::share::Share>, DomainError>;
-    
-    async fn update_share(&self, share: &crate::domain::entities::share::Share) 
-        -> Result<crate::domain::entities::share::Share, DomainError>;
-    
+    async fn save_share(
+        &self,
+        share: &crate::domain::entities::share::Share,
+    ) -> Result<crate::domain::entities::share::Share, DomainError>;
+
+    async fn find_share_by_id(
+        &self,
+        id: &str,
+    ) -> Result<crate::domain::entities::share::Share, DomainError>;
+
+    async fn find_share_by_token(
+        &self,
+        token: &str,
+    ) -> Result<crate::domain::entities::share::Share, DomainError>;
+
+    async fn find_shares_by_item(
+        &self,
+        item_id: &str,
+        item_type: &ShareItemType,
+    ) -> Result<Vec<crate::domain::entities::share::Share>, DomainError>;
+
+    async fn update_share(
+        &self,
+        share: &crate::domain::entities::share::Share,
+    ) -> Result<crate::domain::entities::share::Share, DomainError>;
+
     async fn delete_share(&self, id: &str) -> Result<(), DomainError>;
-    
-    async fn find_shares_by_user(&self, user_id: &str, offset: usize, limit: usize) 
-        -> Result<(Vec<crate::domain::entities::share::Share>, usize), DomainError>;
+
+    async fn find_shares_by_user(
+        &self,
+        user_id: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<crate::domain::entities::share::Share>, usize), DomainError>;
 }

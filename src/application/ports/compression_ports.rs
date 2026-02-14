@@ -4,8 +4,8 @@
 //! keeping the application and interface layers independent of specific
 //! compression implementations (gzip, zstd, etc.).
 
-use async_trait::async_trait;
 use crate::common::errors::DomainError;
+use async_trait::async_trait;
 
 /// Compression level settings for file compression operations.
 ///
@@ -30,7 +30,11 @@ pub enum CompressionLevel {
 #[async_trait]
 pub trait CompressionPort: Send + Sync + 'static {
     /// Compress data in memory.
-    async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> Result<Vec<u8>, DomainError>;
+    async fn compress_data(
+        &self,
+        data: &[u8],
+        level: CompressionLevel,
+    ) -> Result<Vec<u8>, DomainError>;
 
     /// Decompress data in memory.
     async fn decompress_data(&self, compressed_data: &[u8]) -> Result<Vec<u8>, DomainError>;

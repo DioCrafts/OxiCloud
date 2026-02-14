@@ -3,8 +3,8 @@
 //! This module contains domain-specific error types.
 //! DomainError is the base error used throughout the domain layer.
 
-use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::error::Error as StdError;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use thiserror::Error;
 
 /// Common Result type for the domain with DomainError as the standard error
@@ -68,11 +68,7 @@ pub struct DomainError {
 
 impl DomainError {
     /// Creates a new domain error
-    pub fn new<S: Into<String>>(
-        kind: ErrorKind,
-        entity_type: &'static str,
-        message: S,
-    ) -> Self {
+    pub fn new<S: Into<String>>(kind: ErrorKind, entity_type: &'static str, message: S) -> Self {
         Self {
             kind,
             entity_type,
@@ -108,11 +104,7 @@ impl DomainError {
 
     /// Creates an error for unsupported operations
     pub fn operation_not_supported<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
-        Self::new(
-            ErrorKind::UnsupportedOperation,
-            entity_type,
-            message,
-        )
+        Self::new(ErrorKind::UnsupportedOperation, entity_type, message)
     }
 
     /// Creates a timeout error
@@ -125,7 +117,7 @@ impl DomainError {
             source: None,
         }
     }
-    
+
     /// Creates an internal error
     pub fn internal_error<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
@@ -136,7 +128,7 @@ impl DomainError {
             source: None,
         }
     }
-    
+
     /// Creates an access denied error
     pub fn access_denied<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
@@ -147,7 +139,7 @@ impl DomainError {
             source: None,
         }
     }
-    
+
     /// Alias for access_denied to maintain compatibility
     pub fn unauthorized<S: Into<String>>(message: S) -> Self {
         Self {
@@ -158,18 +150,18 @@ impl DomainError {
             source: None,
         }
     }
-    
+
     /// Creates a database error
     pub fn database_error<S: Into<String>>(message: S) -> Self {
         Self {
-            kind: ErrorKind::DatabaseError, 
+            kind: ErrorKind::DatabaseError,
             entity_type: "Database",
             entity_id: None,
             message: message.into(),
             source: None,
         }
     }
-    
+
     /// Creates a validation error
     pub fn validation_error<S: Into<String>>(message: S) -> Self {
         Self {
@@ -180,7 +172,7 @@ impl DomainError {
             source: None,
         }
     }
-    
+
     /// Creates a not implemented error
     pub fn not_implemented<S: Into<String>>(entity_type: &'static str, message: S) -> Self {
         Self {
@@ -212,7 +204,11 @@ pub trait ErrorContext<T, E> {
         C: Into<String>,
         F: FnOnce() -> C;
 
-    fn with_error_kind(self, kind: ErrorKind, entity_type: &'static str) -> std::result::Result<T, DomainError>;
+    fn with_error_kind(
+        self,
+        kind: ErrorKind,
+        entity_type: &'static str,
+    ) -> std::result::Result<T, DomainError>;
 }
 
 impl<T, E: StdError + Send + Sync + 'static> ErrorContext<T, E> for std::result::Result<T, E> {
@@ -221,26 +217,26 @@ impl<T, E: StdError + Send + Sync + 'static> ErrorContext<T, E> for std::result:
         C: Into<String>,
         F: FnOnce() -> C,
     {
-        self.map_err(|e| {
-            DomainError {
-                kind: ErrorKind::InternalError,
-                entity_type: "Unknown",
-                entity_id: None,
-                message: context().into(),
-                source: Some(Box::new(e)),
-            }
+        self.map_err(|e| DomainError {
+            kind: ErrorKind::InternalError,
+            entity_type: "Unknown",
+            entity_id: None,
+            message: context().into(),
+            source: Some(Box::new(e)),
         })
     }
 
-    fn with_error_kind(self, kind: ErrorKind, entity_type: &'static str) -> std::result::Result<T, DomainError> {
-        self.map_err(|e| {
-            DomainError {
-                kind,
-                entity_type,
-                entity_id: None,
-                message: format!("{}", e),
-                source: Some(Box::new(e)),
-            }
+    fn with_error_kind(
+        self,
+        kind: ErrorKind,
+        entity_type: &'static str,
+    ) -> std::result::Result<T, DomainError> {
+        self.map_err(|e| DomainError {
+            kind,
+            entity_type,
+            entity_id: None,
+            message: format!("{}", e),
+            source: Some(Box::new(e)),
         })
     }
 }

@@ -1,7 +1,7 @@
 //! StoragePath - Domain Value Object for representing storage paths
-//! 
+//!
 //! This module contains only the StoragePath Value Object which is part of the pure domain.
-//! PathService (which implements StoragePort and StorageMediator) was moved to 
+//! PathService (which implements StoragePort and StorageMediator) was moved to
 //! infrastructure/services/path_service.rs because it has file system dependencies.
 
 use std::path::PathBuf;
@@ -17,12 +17,14 @@ impl StoragePath {
     pub fn new(segments: Vec<String>) -> Self {
         Self { segments }
     }
-    
+
     /// Creates an empty path (root)
     pub fn root() -> Self {
-        Self { segments: Vec::new() }
+        Self {
+            segments: Vec::new(),
+        }
     }
-    
+
     /// Creates a path from a string with segments separated by /
     pub fn from_string(path: &str) -> Self {
         let segments = path
@@ -32,7 +34,7 @@ impl StoragePath {
             .collect();
         Self { segments }
     }
-    
+
     /// Creates a path from a PathBuf
     pub fn from(path_buf: PathBuf) -> Self {
         let segments = path_buf
@@ -44,34 +46,38 @@ impl StoragePath {
             .collect();
         Self { segments }
     }
-    
+
     /// Appends a segment to the path
     pub fn join(&self, segment: &str) -> Self {
         let mut new_segments = self.segments.clone();
         new_segments.push(segment.to_string());
-        Self { segments: new_segments }
+        Self {
+            segments: new_segments,
+        }
     }
-    
+
     /// Gets the file name (last segment)
     pub fn file_name(&self) -> Option<String> {
         self.segments.last().cloned()
     }
-    
+
     /// Gets the parent directory path
     pub fn parent(&self) -> Option<Self> {
         if self.segments.is_empty() {
             None
         } else {
             let parent_segments = self.segments[..self.segments.len() - 1].to_vec();
-            Some(Self { segments: parent_segments })
+            Some(Self {
+                segments: parent_segments,
+            })
         }
     }
-    
+
     /// Checks if the path is empty (is the root)
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
-    
+
     /// Converts the path to a string with format "/segment1/segment2/..."
     pub fn to_string(&self) -> String {
         if self.segments.is_empty() {
@@ -80,7 +86,7 @@ impl StoragePath {
             format!("/{}", self.segments.join("/"))
         }
     }
-    
+
     /// Returns the path representation as a string
     pub fn as_str(&self) -> &str {
         // Note: The implementation should really store the string,
@@ -88,7 +94,7 @@ impl StoragePath {
         // This is only used for the get_folder_path_str implementation
         "/"
     }
-    
+
     /// Gets the path segments
     pub fn segments(&self) -> &[String] {
         &self.segments
@@ -98,35 +104,35 @@ impl StoragePath {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_storage_path_from_string() {
         let path = StoragePath::from_string("folder/subfolder/file.txt");
         assert_eq!(path.segments(), &["folder", "subfolder", "file.txt"]);
         assert_eq!(path.to_string(), "/folder/subfolder/file.txt");
     }
-    
+
     #[test]
     fn test_storage_path_join() {
         let path = StoragePath::from_string("folder");
         let joined = path.join("file.txt");
         assert_eq!(joined.to_string(), "/folder/file.txt");
     }
-    
+
     #[test]
     fn test_storage_path_parent() {
         let path = StoragePath::from_string("folder/file.txt");
         let parent = path.parent().unwrap();
         assert_eq!(parent.to_string(), "/folder");
     }
-    
+
     #[test]
     fn test_storage_path_root() {
         let root = StoragePath::root();
         assert!(root.is_empty());
         assert_eq!(root.to_string(), "/");
     }
-    
+
     #[test]
     fn test_storage_path_file_name() {
         let path = StoragePath::from_string("folder/file.txt");

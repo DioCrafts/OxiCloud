@@ -4,24 +4,24 @@
 //! using the domain repositories. It bridges the gap between the application layer
 //! and the infrastructure layer for CardDAV functionality.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::application::dtos::address_book_dto::{
-    AddressBookDto, CreateAddressBookDto, UpdateAddressBookDto,
-    ShareAddressBookDto, UnshareAddressBookDto
+    AddressBookDto, CreateAddressBookDto, ShareAddressBookDto, UnshareAddressBookDto,
+    UpdateAddressBookDto,
 };
 use crate::application::dtos::contact_dto::{
-    ContactDto, CreateContactDto, UpdateContactDto, CreateContactVCardDto,
-    ContactGroupDto, CreateContactGroupDto, UpdateContactGroupDto, GroupMembershipDto,
-    EmailDto, PhoneDto, AddressDto
+    AddressDto, ContactDto, ContactGroupDto, CreateContactDto, CreateContactGroupDto,
+    CreateContactVCardDto, EmailDto, GroupMembershipDto, PhoneDto, UpdateContactDto,
+    UpdateContactGroupDto,
 };
 use crate::application::ports::carddav_ports::{AddressBookUseCase, ContactUseCase};
 use crate::common::errors::{DomainError, ErrorKind};
-use crate::domain::entities::contact::{AddressBook, Contact, ContactGroup, Email, Phone, Address};
+use crate::domain::entities::contact::{Address, AddressBook, Contact, ContactGroup, Email, Phone};
 use crate::domain::repositories::address_book_repository::AddressBookRepository;
-use crate::domain::repositories::contact_repository::{ContactRepository, ContactGroupRepository};
+use crate::domain::repositories::contact_repository::{ContactGroupRepository, ContactRepository};
 
 /// Adapter that implements AddressBookUseCase and ContactUseCase using domain repositories
 pub struct ContactStorageAdapter {
@@ -46,16 +46,28 @@ impl ContactStorageAdapter {
 
     /// Helper to parse UUID from string
     fn parse_uuid(id: &str, entity_name: &'static str) -> Result<Uuid, DomainError> {
-        Uuid::parse_str(id)
-            .map_err(|_| DomainError::new(ErrorKind::InvalidInput, entity_name, format!("Invalid {} ID format", entity_name)))
+        Uuid::parse_str(id).map_err(|_| {
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                entity_name,
+                format!("Invalid {} ID format", entity_name),
+            )
+        })
     }
 
     /// Helper to check if user has access to an address book
-    async fn check_address_book_access(&self, address_book_id: &Uuid, user_id: &str) -> Result<AddressBook, DomainError> {
-        let address_book = self.address_book_repository
+    async fn check_address_book_access(
+        &self,
+        address_book_id: &Uuid,
+        user_id: &str,
+    ) -> Result<AddressBook, DomainError> {
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(address_book_id)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
 
         // Check if user is owner
         if address_book.owner_id() == user_id {
@@ -68,20 +80,34 @@ impl ContactStorageAdapter {
         }
 
         // Check if address book is shared with user
-        let shares = self.address_book_repository.get_address_book_shares(address_book_id).await?;
+        let shares = self
+            .address_book_repository
+            .get_address_book_shares(address_book_id)
+            .await?;
         if shares.iter().any(|(shared_user, _)| shared_user == user_id) {
             return Ok(address_book);
         }
 
-        Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Access denied to address book"))
+        Err(DomainError::new(
+            ErrorKind::AccessDenied,
+            "AddressBook",
+            "Access denied to address book",
+        ))
     }
 
     /// Helper to check write access
-    async fn check_write_access(&self, address_book_id: &Uuid, user_id: &str) -> Result<AddressBook, DomainError> {
-        let address_book = self.address_book_repository
+    async fn check_write_access(
+        &self,
+        address_book_id: &Uuid,
+        user_id: &str,
+    ) -> Result<AddressBook, DomainError> {
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(address_book_id)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
 
         // Owner always has write access
         if address_book.owner_id() == user_id {
@@ -89,12 +115,22 @@ impl ContactStorageAdapter {
         }
 
         // Check shares for write permission
-        let shares = self.address_book_repository.get_address_book_shares(address_book_id).await?;
-        if shares.iter().any(|(shared_user, can_write)| shared_user == user_id && *can_write) {
+        let shares = self
+            .address_book_repository
+            .get_address_book_shares(address_book_id)
+            .await?;
+        if shares
+            .iter()
+            .any(|(shared_user, can_write)| shared_user == user_id && *can_write)
+        {
             return Ok(address_book);
         }
 
-        Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Write access denied"))
+        Err(DomainError::new(
+            ErrorKind::AccessDenied,
+            "AddressBook",
+            "Write access denied",
+        ))
     }
 
     /// Convert EmailDto to domain Email
@@ -131,51 +167,62 @@ impl ContactStorageAdapter {
     /// Generate vCard from contact data
     fn generate_vcard(contact: &Contact) -> String {
         let mut vcard = String::from("BEGIN:VCARD\nVERSION:3.0\n");
-        
+
         if let Some(full_name) = contact.full_name() {
             vcard.push_str(&format!("FN:{}\n", full_name));
         }
-        
+
         if contact.first_name().is_some() || contact.last_name().is_some() {
             let last = contact.last_name().unwrap_or("");
             let first = contact.first_name().unwrap_or("");
             vcard.push_str(&format!("N:{};{};;;\n", last, first));
         }
-        
+
         if let Some(nickname) = contact.nickname() {
             vcard.push_str(&format!("NICKNAME:{}\n", nickname));
         }
-        
+
         for email in contact.email() {
-            vcard.push_str(&format!("EMAIL;TYPE={}:{}\n", email.r#type.to_uppercase(), email.email));
+            vcard.push_str(&format!(
+                "EMAIL;TYPE={}:{}\n",
+                email.r#type.to_uppercase(),
+                email.email
+            ));
         }
-        
+
         for phone in contact.phone() {
-            vcard.push_str(&format!("TEL;TYPE={}:{}\n", phone.r#type.to_uppercase(), phone.number));
+            vcard.push_str(&format!(
+                "TEL;TYPE={}:{}\n",
+                phone.r#type.to_uppercase(),
+                phone.number
+            ));
         }
-        
+
         if let Some(org) = contact.organization() {
             vcard.push_str(&format!("ORG:{}\n", org));
         }
-        
+
         if let Some(title) = contact.title() {
             vcard.push_str(&format!("TITLE:{}\n", title));
         }
-        
+
         if let Some(notes) = contact.notes() {
             vcard.push_str(&format!("NOTE:{}\n", notes));
         }
-        
+
         vcard.push_str(&format!("UID:{}\n", contact.uid()));
         vcard.push_str("END:VCARD\n");
-        
+
         vcard
     }
 }
 
 #[async_trait]
 impl AddressBookUseCase for ContactStorageAdapter {
-    async fn create_address_book(&self, dto: CreateAddressBookDto) -> Result<AddressBookDto, DomainError> {
+    async fn create_address_book(
+        &self,
+        dto: CreateAddressBookDto,
+    ) -> Result<AddressBookDto, DomainError> {
         let address_book = AddressBook::new(
             dto.name,
             dto.owner_id,
@@ -184,16 +231,23 @@ impl AddressBookUseCase for ContactStorageAdapter {
             dto.is_public.unwrap_or(false),
         );
 
-        let created = self.address_book_repository.create_address_book(address_book).await?;
+        let created = self
+            .address_book_repository
+            .create_address_book(address_book)
+            .await?;
         Ok(AddressBookDto::from(created))
     }
 
-    async fn update_address_book(&self, address_book_id: &str, update: UpdateAddressBookDto) -> Result<AddressBookDto, DomainError> {
+    async fn update_address_book(
+        &self,
+        address_book_id: &str,
+        update: UpdateAddressBookDto,
+    ) -> Result<AddressBookDto, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Check write access
         let mut address_book = self.check_write_access(&uuid, &update.user_id).await?;
-        
+
         if let Some(name) = update.name {
             address_book.set_name(name);
         }
@@ -208,93 +262,164 @@ impl AddressBookUseCase for ContactStorageAdapter {
         }
         address_book.set_updated_at(chrono::Utc::now());
 
-        let updated = self.address_book_repository.update_address_book(address_book).await?;
+        let updated = self
+            .address_book_repository
+            .update_address_book(address_book)
+            .await?;
         Ok(AddressBookDto::from(updated))
     }
 
-    async fn delete_address_book(&self, address_book_id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_address_book(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Only owner can delete
-        let address_book = self.address_book_repository
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
+
         if address_book.owner_id() != user_id {
-            return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can delete address book"));
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "AddressBook",
+                "Only owner can delete address book",
+            ));
         }
 
-        self.address_book_repository.delete_address_book(&uuid).await
+        self.address_book_repository
+            .delete_address_book(&uuid)
+            .await
     }
 
-    async fn get_address_book(&self, address_book_id: &str, user_id: &str) -> Result<AddressBookDto, DomainError> {
+    async fn get_address_book(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<AddressBookDto, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
         let address_book = self.check_address_book_access(&uuid, user_id).await?;
         Ok(AddressBookDto::from(address_book))
     }
 
-    async fn list_user_address_books(&self, user_id: &str) -> Result<Vec<AddressBookDto>, DomainError> {
-        let owned = self.address_book_repository.get_address_books_by_owner(user_id).await?;
-        let shared = self.address_book_repository.get_shared_address_books(user_id).await?;
-        
+    async fn list_user_address_books(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<AddressBookDto>, DomainError> {
+        let owned = self
+            .address_book_repository
+            .get_address_books_by_owner(user_id)
+            .await?;
+        let shared = self
+            .address_book_repository
+            .get_shared_address_books(user_id)
+            .await?;
+
         let mut all_books: Vec<AddressBook> = owned;
         all_books.extend(shared);
-        
+
         Ok(all_books.into_iter().map(AddressBookDto::from).collect())
     }
 
     async fn list_public_address_books(&self) -> Result<Vec<AddressBookDto>, DomainError> {
-        let public = self.address_book_repository.get_public_address_books().await?;
+        let public = self
+            .address_book_repository
+            .get_public_address_books()
+            .await?;
         Ok(public.into_iter().map(AddressBookDto::from).collect())
     }
 
-    async fn share_address_book(&self, dto: ShareAddressBookDto, user_id: &str) -> Result<(), DomainError> {
+    async fn share_address_book(
+        &self,
+        dto: ShareAddressBookDto,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
         let uuid = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;
-        
+
         // Only owner can share
-        let address_book = self.address_book_repository
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
+
         if address_book.owner_id() != user_id {
-            return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can share"));
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "AddressBook",
+                "Only owner can share",
+            ));
         }
 
-        self.address_book_repository.share_address_book(&uuid, &dto.user_id, dto.can_write).await
+        self.address_book_repository
+            .share_address_book(&uuid, &dto.user_id, dto.can_write)
+            .await
     }
 
-    async fn unshare_address_book(&self, dto: UnshareAddressBookDto, user_id: &str) -> Result<(), DomainError> {
+    async fn unshare_address_book(
+        &self,
+        dto: UnshareAddressBookDto,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
         let uuid = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;
-        
+
         // Only owner can unshare
-        let address_book = self.address_book_repository
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
+
         if address_book.owner_id() != user_id {
-            return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can unshare"));
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "AddressBook",
+                "Only owner can unshare",
+            ));
         }
 
-        self.address_book_repository.unshare_address_book(&uuid, &dto.user_id).await
+        self.address_book_repository
+            .unshare_address_book(&uuid, &dto.user_id)
+            .await
     }
 
-    async fn get_address_book_shares(&self, address_book_id: &str, user_id: &str) -> Result<Vec<(String, bool)>, DomainError> {
+    async fn get_address_book_shares(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(String, bool)>, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Only owner can view shares
-        let address_book = self.address_book_repository
+        let address_book = self
+            .address_book_repository
             .get_address_book_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "AddressBook", "Address book not found")
+            })?;
+
         if address_book.owner_id() != user_id {
-            return Err(DomainError::new(ErrorKind::AccessDenied, "AddressBook", "Only owner can view shares"));
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "AddressBook",
+                "Only owner can view shares",
+            ));
         }
 
-        self.address_book_repository.get_address_book_shares(&uuid).await
+        self.address_book_repository
+            .get_address_book_shares(&uuid)
+            .await
     }
 }
 
@@ -302,9 +427,10 @@ impl AddressBookUseCase for ContactStorageAdapter {
 impl ContactUseCase for ContactStorageAdapter {
     async fn create_contact(&self, dto: CreateContactDto) -> Result<ContactDto, DomainError> {
         let address_book_id = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;
-        
+
         // Check write access
-        self.check_write_access(&address_book_id, &dto.user_id).await?;
+        self.check_write_access(&address_book_id, &dto.user_id)
+            .await?;
 
         let now = chrono::Utc::now();
         let mut contact = Contact::from_raw(
@@ -338,11 +464,15 @@ impl ContactUseCase for ContactStorageAdapter {
         Ok(ContactDto::from(created))
     }
 
-    async fn create_contact_from_vcard(&self, dto: CreateContactVCardDto) -> Result<ContactDto, DomainError> {
+    async fn create_contact_from_vcard(
+        &self,
+        dto: CreateContactVCardDto,
+    ) -> Result<ContactDto, DomainError> {
         let address_book_id = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;
-        
+
         // Check write access
-        self.check_write_access(&address_book_id, &dto.user_id).await?;
+        self.check_write_access(&address_book_id, &dto.user_id)
+            .await?;
 
         // Parse vCard fields
         let now = chrono::Utc::now();
@@ -381,29 +511,41 @@ impl ContactUseCase for ContactStorageAdapter {
                 notes = Some(trimmed[5..].trim().to_string());
             } else if trimmed.starts_with("EMAIL") {
                 if let Some(value) = trimmed.split(':').nth(1)
-                    && !value.is_empty() {
-                        let email_type = if trimmed.contains("TYPE=HOME") { "home" }
-                            else if trimmed.contains("TYPE=WORK") { "work" }
-                            else { "other" };
-                        emails.push(Email {
-                            email: value.trim().to_string(),
-                            r#type: email_type.to_string(),
-                            is_primary: emails.is_empty(),
-                        });
-                    }
+                    && !value.is_empty()
+                {
+                    let email_type = if trimmed.contains("TYPE=HOME") {
+                        "home"
+                    } else if trimmed.contains("TYPE=WORK") {
+                        "work"
+                    } else {
+                        "other"
+                    };
+                    emails.push(Email {
+                        email: value.trim().to_string(),
+                        r#type: email_type.to_string(),
+                        is_primary: emails.is_empty(),
+                    });
+                }
             } else if trimmed.starts_with("TEL")
                 && let Some(value) = trimmed.split(':').nth(1)
-                    && !value.is_empty() {
-                        let phone_type = if trimmed.contains("TYPE=CELL") || trimmed.contains("TYPE=MOBILE") { "mobile" }
-                            else if trimmed.contains("TYPE=HOME") { "home" }
-                            else if trimmed.contains("TYPE=WORK") { "work" }
-                            else { "other" };
-                        phones.push(Phone {
-                            number: value.trim().to_string(),
-                            r#type: phone_type.to_string(),
-                            is_primary: phones.is_empty(),
-                        });
-                    }
+                && !value.is_empty()
+            {
+                let phone_type = if trimmed.contains("TYPE=CELL") || trimmed.contains("TYPE=MOBILE")
+                {
+                    "mobile"
+                } else if trimmed.contains("TYPE=HOME") {
+                    "home"
+                } else if trimmed.contains("TYPE=WORK") {
+                    "work"
+                } else {
+                    "other"
+                };
+                phones.push(Phone {
+                    number: value.trim().to_string(),
+                    r#type: phone_type.to_string(),
+                    is_primary: phones.is_empty(),
+                });
+            }
         }
 
         let contact_uid = uid.unwrap_or_else(|| format!("{}@oxicloud", Uuid::new_v4()));
@@ -422,9 +564,9 @@ impl ContactUseCase for ContactStorageAdapter {
             organization,
             title,
             notes,
-            None,  // photo_url
-            None,  // birthday
-            None,  // anniversary
+            None, // photo_url
+            None, // birthday
+            None, // anniversary
             dto.vcard,
             Uuid::new_v4().to_string(),
             now,
@@ -435,16 +577,22 @@ impl ContactUseCase for ContactStorageAdapter {
         Ok(ContactDto::from(created))
     }
 
-    async fn update_contact(&self, contact_id: &str, update: UpdateContactDto) -> Result<ContactDto, DomainError> {
+    async fn update_contact(
+        &self,
+        contact_id: &str,
+        update: UpdateContactDto,
+    ) -> Result<ContactDto, DomainError> {
         let uuid = Self::parse_uuid(contact_id, "Contact")?;
-        
-        let mut contact = self.contact_repository
+
+        let mut contact = self
+            .contact_repository
             .get_contact_by_id(&uuid)
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
-        
+
         // Check write access to the address book
-        self.check_write_access(contact.address_book_id(), &update.user_id).await?;
+        self.check_write_access(contact.address_book_id(), &update.user_id)
+            .await?;
 
         if let Some(full_name) = update.full_name {
             contact.set_full_name(Some(full_name));
@@ -497,77 +645,109 @@ impl ContactUseCase for ContactStorageAdapter {
 
     async fn delete_contact(&self, contact_id: &str, user_id: &str) -> Result<(), DomainError> {
         let uuid = Self::parse_uuid(contact_id, "Contact")?;
-        
-        let contact = self.contact_repository
+
+        let contact = self
+            .contact_repository
             .get_contact_by_id(&uuid)
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
-        
+
         // Check write access
-        self.check_write_access(contact.address_book_id(), user_id).await?;
+        self.check_write_access(contact.address_book_id(), user_id)
+            .await?;
 
         self.contact_repository.delete_contact(&uuid).await
     }
 
-    async fn get_contact(&self, contact_id: &str, user_id: &str) -> Result<ContactDto, DomainError> {
+    async fn get_contact(
+        &self,
+        contact_id: &str,
+        user_id: &str,
+    ) -> Result<ContactDto, DomainError> {
         let uuid = Self::parse_uuid(contact_id, "Contact")?;
-        
-        let contact = self.contact_repository
+
+        let contact = self
+            .contact_repository
             .get_contact_by_id(&uuid)
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
-        
+
         // Check read access
-        self.check_address_book_access(contact.address_book_id(), user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id)
+            .await?;
 
         Ok(ContactDto::from(contact))
     }
 
-    async fn list_contacts(&self, address_book_id: &str, user_id: &str) -> Result<Vec<ContactDto>, DomainError> {
+    async fn list_contacts(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<ContactDto>, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Check read access
         self.check_address_book_access(&uuid, user_id).await?;
 
-        let contacts = self.contact_repository.get_contacts_by_address_book(&uuid).await?;
+        let contacts = self
+            .contact_repository
+            .get_contacts_by_address_book(&uuid)
+            .await?;
         Ok(contacts.into_iter().map(ContactDto::from).collect())
     }
 
-    async fn search_contacts(&self, address_book_id: &str, query: &str, user_id: &str) -> Result<Vec<ContactDto>, DomainError> {
+    async fn search_contacts(
+        &self,
+        address_book_id: &str,
+        query: &str,
+        user_id: &str,
+    ) -> Result<Vec<ContactDto>, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Check read access
         self.check_address_book_access(&uuid, user_id).await?;
 
-        let contacts = self.contact_repository.search_contacts(&uuid, query).await?;
+        let contacts = self
+            .contact_repository
+            .search_contacts(&uuid, query)
+            .await?;
         Ok(contacts.into_iter().map(ContactDto::from).collect())
     }
 
-    async fn create_group(&self, dto: CreateContactGroupDto) -> Result<ContactGroupDto, DomainError> {
+    async fn create_group(
+        &self,
+        dto: CreateContactGroupDto,
+    ) -> Result<ContactGroupDto, DomainError> {
         let address_book_id = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;
-        
-        // Check write access
-        self.check_write_access(&address_book_id, &dto.user_id).await?;
 
-        let group = ContactGroup::new(
-            address_book_id,
-            dto.name,
-        );
+        // Check write access
+        self.check_write_access(&address_book_id, &dto.user_id)
+            .await?;
+
+        let group = ContactGroup::new(address_book_id, dto.name);
 
         let created = self.group_repository.create_group(group).await?;
         Ok(ContactGroupDto::from(created))
     }
 
-    async fn update_group(&self, group_id: &str, update: UpdateContactGroupDto) -> Result<ContactGroupDto, DomainError> {
+    async fn update_group(
+        &self,
+        group_id: &str,
+        update: UpdateContactGroupDto,
+    ) -> Result<ContactGroupDto, DomainError> {
         let uuid = Self::parse_uuid(group_id, "ContactGroup")?;
-        
-        let mut group = self.group_repository
+
+        let mut group = self
+            .group_repository
             .get_group_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
+
         // Check write access
-        self.check_write_access(group.address_book_id(), &update.user_id).await?;
+        self.check_write_access(group.address_book_id(), &update.user_id)
+            .await?;
 
         group.set_name(update.name);
         group.set_updated_at(chrono::Utc::now());
@@ -578,124 +758,190 @@ impl ContactUseCase for ContactStorageAdapter {
 
     async fn delete_group(&self, group_id: &str, user_id: &str) -> Result<(), DomainError> {
         let uuid = Self::parse_uuid(group_id, "ContactGroup")?;
-        
-        let group = self.group_repository
+
+        let group = self
+            .group_repository
             .get_group_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
+
         // Check write access
-        self.check_write_access(group.address_book_id(), user_id).await?;
+        self.check_write_access(group.address_book_id(), user_id)
+            .await?;
 
         self.group_repository.delete_group(&uuid).await
     }
 
-    async fn get_group(&self, group_id: &str, user_id: &str) -> Result<ContactGroupDto, DomainError> {
+    async fn get_group(
+        &self,
+        group_id: &str,
+        user_id: &str,
+    ) -> Result<ContactGroupDto, DomainError> {
         let uuid = Self::parse_uuid(group_id, "ContactGroup")?;
-        
-        let group = self.group_repository
+
+        let group = self
+            .group_repository
             .get_group_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
+
         // Check read access
-        self.check_address_book_access(group.address_book_id(), user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id)
+            .await?;
 
         Ok(ContactGroupDto::from(group))
     }
 
-    async fn list_groups(&self, address_book_id: &str, user_id: &str) -> Result<Vec<ContactGroupDto>, DomainError> {
+    async fn list_groups(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<ContactGroupDto>, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Check read access
         self.check_address_book_access(&uuid, user_id).await?;
 
-        let groups = self.group_repository.get_groups_by_address_book(&uuid).await?;
+        let groups = self
+            .group_repository
+            .get_groups_by_address_book(&uuid)
+            .await?;
         Ok(groups.into_iter().map(ContactGroupDto::from).collect())
     }
 
-    async fn add_contact_to_group(&self, dto: GroupMembershipDto, user_id: &str) -> Result<(), DomainError> {
+    async fn add_contact_to_group(
+        &self,
+        dto: GroupMembershipDto,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
         let group_id = Self::parse_uuid(&dto.group_id, "ContactGroup")?;
         let contact_id = Self::parse_uuid(&dto.contact_id, "Contact")?;
-        
-        let group = self.group_repository
+
+        let group = self
+            .group_repository
             .get_group_by_id(&group_id)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
-        // Check write access
-        self.check_write_access(group.address_book_id(), user_id).await?;
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
 
-        self.group_repository.add_contact_to_group(&group_id, &contact_id).await
+        // Check write access
+        self.check_write_access(group.address_book_id(), user_id)
+            .await?;
+
+        self.group_repository
+            .add_contact_to_group(&group_id, &contact_id)
+            .await
     }
 
-    async fn remove_contact_from_group(&self, dto: GroupMembershipDto, user_id: &str) -> Result<(), DomainError> {
+    async fn remove_contact_from_group(
+        &self,
+        dto: GroupMembershipDto,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
         let group_id = Self::parse_uuid(&dto.group_id, "ContactGroup")?;
         let contact_id = Self::parse_uuid(&dto.contact_id, "Contact")?;
-        
-        let group = self.group_repository
+
+        let group = self
+            .group_repository
             .get_group_by_id(&group_id)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
-        // Check write access
-        self.check_write_access(group.address_book_id(), user_id).await?;
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
 
-        self.group_repository.remove_contact_from_group(&group_id, &contact_id).await
+        // Check write access
+        self.check_write_access(group.address_book_id(), user_id)
+            .await?;
+
+        self.group_repository
+            .remove_contact_from_group(&group_id, &contact_id)
+            .await
     }
 
-    async fn list_contacts_in_group(&self, group_id: &str, user_id: &str) -> Result<Vec<ContactDto>, DomainError> {
+    async fn list_contacts_in_group(
+        &self,
+        group_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<ContactDto>, DomainError> {
         let uuid = Self::parse_uuid(group_id, "ContactGroup")?;
-        
-        let group = self.group_repository
+
+        let group = self
+            .group_repository
             .get_group_by_id(&uuid)
             .await?
-            .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found"))?;
-        
+            .ok_or_else(|| {
+                DomainError::new(ErrorKind::NotFound, "ContactGroup", "Group not found")
+            })?;
+
         // Check read access
-        self.check_address_book_access(group.address_book_id(), user_id).await?;
+        self.check_address_book_access(group.address_book_id(), user_id)
+            .await?;
 
         let contacts = self.group_repository.get_contacts_in_group(&uuid).await?;
         Ok(contacts.into_iter().map(ContactDto::from).collect())
     }
 
-    async fn list_groups_for_contact(&self, contact_id: &str, user_id: &str) -> Result<Vec<ContactGroupDto>, DomainError> {
+    async fn list_groups_for_contact(
+        &self,
+        contact_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<ContactGroupDto>, DomainError> {
         let uuid = Self::parse_uuid(contact_id, "Contact")?;
-        
-        let contact = self.contact_repository
+
+        let contact = self
+            .contact_repository
             .get_contact_by_id(&uuid)
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
-        
+
         // Check read access
-        self.check_address_book_access(contact.address_book_id(), user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id)
+            .await?;
 
         let groups = self.group_repository.get_groups_for_contact(&uuid).await?;
         Ok(groups.into_iter().map(ContactGroupDto::from).collect())
     }
 
-    async fn get_contact_vcard(&self, contact_id: &str, user_id: &str) -> Result<String, DomainError> {
+    async fn get_contact_vcard(
+        &self,
+        contact_id: &str,
+        user_id: &str,
+    ) -> Result<String, DomainError> {
         let uuid = Self::parse_uuid(contact_id, "Contact")?;
-        
-        let contact = self.contact_repository
+
+        let contact = self
+            .contact_repository
             .get_contact_by_id(&uuid)
             .await?
             .ok_or_else(|| DomainError::new(ErrorKind::NotFound, "Contact", "Contact not found"))?;
-        
+
         // Check read access
-        self.check_address_book_access(contact.address_book_id(), user_id).await?;
+        self.check_address_book_access(contact.address_book_id(), user_id)
+            .await?;
 
         Ok(contact.vcard().to_string())
     }
 
-    async fn get_contacts_as_vcards(&self, address_book_id: &str, user_id: &str) -> Result<Vec<(String, String)>, DomainError> {
+    async fn get_contacts_as_vcards(
+        &self,
+        address_book_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(String, String)>, DomainError> {
         let uuid = Self::parse_uuid(address_book_id, "AddressBook")?;
-        
+
         // Check read access
         self.check_address_book_access(&uuid, user_id).await?;
 
-        let contacts = self.contact_repository.get_contacts_by_address_book(&uuid).await?;
-        
+        let contacts = self
+            .contact_repository
+            .get_contacts_by_address_book(&uuid)
+            .await?;
+
         Ok(contacts
             .into_iter()
             .map(|c| (c.id().to_string(), c.vcard().to_string()))

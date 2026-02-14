@@ -4,11 +4,11 @@
 //! keeping the application and interface layers independent of specific
 //! image processing implementations.
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
-use crate::common::errors::DomainError;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Thumbnail sizes supported by the system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -42,7 +42,11 @@ impl ThumbnailSize {
 
     /// Get all thumbnail sizes.
     pub fn all() -> &'static [ThumbnailSize] {
-        &[ThumbnailSize::Icon, ThumbnailSize::Preview, ThumbnailSize::Large]
+        &[
+            ThumbnailSize::Icon,
+            ThumbnailSize::Preview,
+            ThumbnailSize::Large,
+        ]
     }
 }
 
@@ -77,11 +81,7 @@ pub trait ThumbnailPort: Send + Sync + 'static {
     /// Generate all thumbnail sizes for a file in the background.
     ///
     /// Called after file upload to pre-generate thumbnails.
-    fn generate_all_sizes_background(
-        self: Arc<Self>,
-        file_id: String,
-        original_path: PathBuf,
-    );
+    fn generate_all_sizes_background(self: Arc<Self>, file_id: String, original_path: PathBuf);
 
     /// Delete all thumbnails for a file.
     async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError>;
