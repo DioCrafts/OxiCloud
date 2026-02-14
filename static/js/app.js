@@ -161,6 +161,13 @@ function setupUserMenu() {
         e.stopPropagation();
         const isOpen = wrapper.classList.contains('open');
         wrapper.classList.toggle('open');
+
+        // Close notification bell if open
+        const notifWrapper = document.getElementById('notif-wrapper');
+        const notifBtn = document.getElementById('notif-bell-btn');
+        if (notifWrapper) notifWrapper.classList.remove('open');
+        if (notifBtn) notifBtn.classList.remove('active');
+
         if (!isOpen) {
             updateUserMenuData();
             // Show/hide admin panel button based on user role

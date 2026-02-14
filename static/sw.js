@@ -1,10 +1,11 @@
 // OxiCloud Service Worker
-const CACHE_NAME = 'oxicloud-cache-v9';
+const CACHE_NAME = 'oxicloud-cache-v10';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/js/i18n.js',
   '/js/languageSelector.js',
+  '/js/notifications.js',
   '/locales/en.json',
   '/locales/es.json',
   '/locales/fa.json',

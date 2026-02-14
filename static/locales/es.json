@@ -338,6 +338,8 @@
     "file_deleted": "Archivo movido a papelera",
     "folder_deleted": "Carpeta movida a papelera",
     "item_deleted_permanently": "Elemento eliminado permanentemente",
-    "trash_emptied": "Papelera vaciada correctamente"
+    "trash_emptied": "Papelera vaciada correctamente",
+    "title": "Notificaciones",
+    "empty": "Sin notificaciones"
   }
 }

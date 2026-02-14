@@ -20,114 +20,49 @@ function getAuthHeaders() {
 const fileOps = {
 
     // ========================================================================
-    // Upload progress toast helpers
+    // Upload progress — notification bell integration
     // ========================================================================
+    _currentBatchId: null,
 
-    /** Show the upload progress toast and reset its contents */
+    /** Start a new upload batch in the notification bell */
     _initUploadToast(totalFiles) {
-        const toast = document.getElementById('upload-toast');
-        const body  = document.getElementById('upload-toast-body');
-        const title = document.getElementById('upload-toast-title');
-        const stats = document.getElementById('upload-toast-stats');
-        const fill  = document.getElementById('upload-toast-overall-fill');
-        const closeBtn = document.getElementById('upload-toast-close');
-
-        body.innerHTML = '';
-        fill.style.width = '0%';
-        const uploadingText = (window.i18n && window.i18n.t) ? window.i18n.t('upload.uploading') : 'Uploading...';
-        title.textContent = uploadingText;
-        stats.textContent = `0 / ${totalFiles}`;
-        toast.classList.add('visible');
-
-        // Allow user to minimise (hide) the toast; it will re-appear on next upload
-        closeBtn.onclick = () => toast.classList.remove('visible');
+        this._currentBatchId = window.notifications
+            ? window.notifications.addUploadBatch(totalFiles)
+            : null;
     },
 
-    /** Add a file row to the toast and return its element references */
-    _addToastFileRow(fileName) {
-        const body = document.getElementById('upload-toast-body');
-        const row = document.createElement('div');
-        row.className = 'upload-toast-file';
-        row.innerHTML = `
-            <span class="upload-toast-file-icon"><i class="fas fa-spinner fa-spin"></i></span>
-            <div class="upload-toast-file-info">
-                <div class="upload-toast-file-name" title="${fileName}">${fileName}</div>
-                <div class="upload-toast-file-bar"><div class="upload-toast-file-fill"></div></div>
-            </div>
-            <span class="upload-toast-file-pct">0%</span>
-        `;
-        body.appendChild(row);
-        // Auto-scroll to bottom
-        body.scrollTop = body.scrollHeight;
-        return {
-            row,
-            icon: row.querySelector('.upload-toast-file-icon'),
-            fill: row.querySelector('.upload-toast-file-fill'),
-            pct:  row.querySelector('.upload-toast-file-pct'),
-        };
-    },
-
-    /** Update the overall progress in the toast footer */
-    _updateOverallProgress(completedCount, totalFiles) {
-        const fill  = document.getElementById('upload-toast-overall-fill');
-        const stats = document.getElementById('upload-toast-stats');
-        const pct = totalFiles > 0 ? Math.round((completedCount / totalFiles) * 100) : 0;
-        fill.style.width = pct + '%';
-        stats.textContent = `${completedCount} / ${totalFiles}`;
-    },
-
-    /** Mark upload toast as fully complete and auto-hide after a delay */
+    /** Finalise the batch in the notification bell */
     _finishUploadToast(successCount, totalFiles) {
-        const title = document.getElementById('upload-toast-title');
-        const fill  = document.getElementById('upload-toast-overall-fill');
-        fill.style.width = '100%';
-
-        const completeText = (window.i18n && window.i18n.t)
-            ? window.i18n.t('upload.complete', { count: successCount, total: totalFiles })
-            : `${successCount} / ${totalFiles} uploaded`;
-        title.textContent = completeText;
-
-        setTimeout(() => {
-            const toast = document.getElementById('upload-toast');
-            toast.classList.remove('visible');
-        }, 4000);
+        if (window.notifications && this._currentBatchId) {
+            window.notifications.finishBatch(this._currentBatchId, successCount, totalFiles);
+        }
     },
 
     /**
      * Upload a single file via XMLHttpRequest with progress events.
-     * Returns a promise that resolves with { ok, data? }.
+     * Progress is reported to the notification bell via batchId + fileName.
+     * Returns a promise that resolves with { ok, data?, errorMsg?, isQuotaError? }.
      */
-    _uploadFileXHR(formData, fileRowElements) {
+    _uploadFileXHR(formData, batchId, fileName) {
         return new Promise((resolve) => {
             const xhr = new XMLHttpRequest();
+            const notif = window.notifications;
 
             xhr.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable && fileRowElements) {
+                if (e.lengthComputable && notif && batchId) {
                     const pct = Math.round((e.loaded / e.total) * 100);
-                    fileRowElements.fill.style.width = pct + '%';
-                    fileRowElements.pct.textContent = pct + '%';
+                    notif.updateFile(batchId, fileName, pct, 'uploading');
                 }
             });
 
             xhr.addEventListener('load', () => {
                 if (xhr.status >= 200 && xhr.status < 300) {
-                    if (fileRowElements) {
-                        fileRowElements.fill.style.width = '100%';
-                        fileRowElements.fill.classList.add('done');
-                        fileRowElements.pct.textContent = '100%';
-                        fileRowElements.icon.innerHTML = '<i class="fas fa-check-circle"></i>';
-                        fileRowElements.icon.classList.add('done');
-                    }
+                    if (notif && batchId) notif.updateFile(batchId, fileName, 100, 'done');
                     let data = null;
                     try { data = JSON.parse(xhr.responseText); } catch (_) {}
                     resolve({ ok: true, data });
                 } else {
-                    if (fileRowElements) {
-                        fileRowElements.fill.classList.add('error');
-                        fileRowElements.pct.textContent = 'ERR';
-                        fileRowElements.icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
-                        fileRowElements.icon.classList.add('error');
-                    }
+                    if (notif && batchId) notif.updateFile(batchId, fileName, 0, 'error');
                     // Parse error body for quota-exceeded or other messages
                     let errorMsg = null;
                     let isQuotaError = false;
@@ -141,12 +76,7 @@ const fileOps = {
             });
 
             xhr.addEventListener('error', () => {
-                if (fileRowElements) {
-                    fileRowElements.fill.classList.add('error');
-                    fileRowElements.pct.textContent = 'ERR';
-                    fileRowElements.icon.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
-                    fileRowElements.icon.classList.add('error');
-                }
+                if (notif && batchId) notif.updateFile(batchId, fileName, 0, 'error');
                 resolve({ ok: false });
             });
 
@@ -179,8 +109,9 @@ const fileOps = {
         if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
         if (progressBar) { progressBar.style.width = '0%'; }
 
-        // Show upload toast
+        // Show upload notification
         this._initUploadToast(totalFiles);
+        const batchId = this._currentBatchId;
 
         let uploadedCount = 0;
         let successCount = 0;
@@ -197,10 +128,7 @@ const fileOps = {
                 file: file.name, size: file.size
             });
 
-            // Add row to toast
-            const rowEls = this._addToastFileRow(file.name);
-
-            const result = await this._uploadFileXHR(formData, rowEls);
+            const result = await this._uploadFileXHR(formData, batchId, file.name);
 
             uploadedCount++;
 
@@ -208,8 +136,10 @@ const fileOps = {
             if (progressBar) {
                 progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
             }
-            // Toast overall bar
-            this._updateOverallProgress(uploadedCount, totalFiles);
+            // Notify bell of per-file completion
+            if (window.notifications && batchId) {
+                window.notifications.fileCompleted(batchId, result.ok);
+            }
 
             if (result.ok) {
                 successCount++;
@@ -218,11 +148,15 @@ const fileOps = {
                 console.error(`Upload error for ${file.name}`);
                 if (result.isQuotaError) {
                     const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
-                    window.ui.showNotification('Error', `${file.name}: ${msg}`);
-                    // Stop uploading remaining files — quota is full
+                    if (window.notifications) {
+                        window.notifications.addNotification({
+                            icon: 'fa-exclamation-triangle',
+                            iconClass: 'error',
+                            title: file.name,
+                            text: msg
+                        });
+                    }
                     break;
-                } else {
-                    window.ui.showNotification('Error', `Error uploading file: ${file.name}`);
                 }
             }
         }
@@ -317,9 +251,10 @@ const fileOps = {
             }
         }
         
-        // Upload files with progress toast
+        // Upload files with notification bell
         const totalFiles = files.length;
         this._initUploadToast(totalFiles);
+        const batchId = this._currentBatchId;
 
         let uploadedCount = 0;
         let successCount = 0;
@@ -335,15 +270,16 @@ const fileOps = {
             formData.append('file', file);
 
             const displayName = file.webkitRelativePath || file.name;
-            const rowEls = this._addToastFileRow(displayName);
 
-            const result = await this._uploadFileXHR(formData, rowEls);
+            const result = await this._uploadFileXHR(formData, batchId, displayName);
             
             uploadedCount++;
             if (progressBar) {
                 progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
             }
-            this._updateOverallProgress(uploadedCount, totalFiles);
+            if (window.notifications && batchId) {
+                window.notifications.fileCompleted(batchId, result.ok);
+            }
                 
             if (result.ok) {
                 successCount++;
@@ -352,7 +288,14 @@ const fileOps = {
                 console.error(`Error uploading ${file.webkitRelativePath}`);
                 if (result.isQuotaError) {
                     const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
-                    window.ui.showNotification('Error', `${file.name}: ${msg}`);
+                    if (window.notifications) {
+                        window.notifications.addNotification({
+                            icon: 'fa-exclamation-triangle',
+                            iconClass: 'error',
+                            title: file.name,
+                            text: msg
+                        });
+                    }
                     break;
                 }
             }

@@ -19,6 +19,7 @@
     <!-- Scripts -->
     <script src="/js/i18n.js"></script>
     <script src="/js/languageSelector.js"></script>
+    <script src="/js/notifications.js"></script>
     <script src="/js/modal.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/contextMenus.js"></script>
@@ -105,6 +106,29 @@
 
             <div class="user-controls">
                 <div id="language-selector"></div>
+
+                <!-- Notification Bell -->
+                <div class="notif-wrapper" id="notif-wrapper">
+                    <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications">
+                        <i class="fas fa-bell"></i>
+                        <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+                    </button>
+                    <div class="notif-panel" id="notif-panel">
+                        <div class="notif-panel-header">
+                            <span class="notif-panel-title" data-i18n="notifications.title">Notifications</span>
+                            <button class="notif-clear-btn" id="notif-clear-btn" title="Clear all">
+                                <i class="fas fa-check-double"></i>
+                            </button>
+                        </div>
+                        <div class="notif-panel-body" id="notif-panel-body">
+                            <div class="notif-empty" id="notif-empty">
+                                <i class="fas fa-bell-slash"></i>
+                                <span data-i18n="notifications.empty">No notifications</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="user-menu-wrapper" id="user-menu-wrapper">
                     <button class="user-avatar-btn" id="user-avatar-btn">
                         <div class="user-avatar" id="user-avatar">AD</div>
@@ -289,21 +313,7 @@
         </div>
     </div>
 
-    <!-- Upload Progress Toast -->
-    <div class="upload-toast" id="upload-toast">
-        <div class="upload-toast-header">
-            <span class="upload-toast-title" id="upload-toast-title">Uploading...</span>
-            <button class="upload-toast-close" id="upload-toast-close" title="Minimize">&minus;</button>
-        </div>
-        <div class="upload-toast-body" id="upload-toast-body">
-            <!-- File entries will be added dynamically -->
-        </div>
-        <div class="upload-toast-footer">
-            <div class="upload-toast-overall-bar">
-                <div class="upload-toast-overall-fill" id="upload-toast-overall-fill"></div>
-            </div>
-            <span class="upload-toast-stats" id="upload-toast-stats"></span>
-        </div>
-    </div>
+    <!-- Upload Progress Toast (hidden – driven by notification bell) -->
+    <div class="upload-toast" id="upload-toast" style="display:none"></div>
 </body>
 </html>

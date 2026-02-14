@@ -338,6 +338,8 @@
     "file_deleted": "File moved to trash",
     "folder_deleted": "Folder moved to trash",
     "item_deleted_permanently": "Item permanently deleted",
-    "trash_emptied": "Trash emptied successfully"
+    "trash_emptied": "Trash emptied successfully",
+    "title": "Notifications",
+    "empty": "No notifications"
   }
 }
