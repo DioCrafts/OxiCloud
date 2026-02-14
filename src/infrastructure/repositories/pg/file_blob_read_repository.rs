@@ -64,9 +64,7 @@ impl FileBlobReadRepository {
         created_at: i64,
         modified_at: i64,
     ) -> Result<File, DomainError> {
-        let storage_path = self
-            .build_file_path(folder_id.as_deref(), &name)
-            .await?;
+        let storage_path = self.build_file_path(folder_id.as_deref(), &name).await?;
         File::with_timestamps(
             id,
             name,
@@ -115,10 +113,7 @@ impl FileReadPort for FileBlobReadRepository {
             .await
     }
 
-    async fn list_files(
-        &self,
-        folder_id: Option<&str>,
-    ) -> Result<Vec<File>, DomainError> {
+    async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
         let rows: Vec<(String, String, Option<String>, i64, String, i64, i64)> =
             if let Some(fid) = folder_id {
                 sqlx::query_as(
@@ -264,8 +259,7 @@ impl FileReadPort for FileBlobReadRepository {
             }
         }
 
-        current_parent.ok_or_else(|| {
-            DomainError::not_found("Folder", format!("parent for path: {path}"))
-        })
+        current_parent
+            .ok_or_else(|| DomainError::not_found("Folder", format!("parent for path: {path}")))
     }
 }

@@ -168,7 +168,7 @@ impl AuthApplicationService {
     /// Returns whether OIDC is configured and enabled
     pub fn oidc_enabled(&self) -> bool {
         let state = self.oidc.read().unwrap();
-        state.service.is_some() && state.config.as_ref().is_some_and(|c| c.enabled)
+        state.service.is_some() && state.config.as_ref().map_or(false, |c| c.enabled)
     }
 
     /// Returns whether password login is disabled (OIDC-only mode)
@@ -177,7 +177,7 @@ impl AuthApplicationService {
         state
             .config
             .as_ref()
-            .is_some_and(|c| c.disable_password_login)
+            .map_or(false, |c| c.disable_password_login)
     }
 
     /// Returns a clone of the OIDC config if available
@@ -664,11 +664,23 @@ impl AuthApplicationService {
         // Admin quota, capped to available disk space
         let admin_quota = self.capped_quota(&admin_role);
 
+        // Hash the password (same as register / admin_create_user)
+        let password_hash = self
+            .password_hasher
+            .hash_password(&dto.password)
+            .map_err(|e| {
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "User",
+                    format!("Error hashing password: {}", e),
+                )
+            })?;
+
         // Create the new admin user
         let user = User::new(
             dto.username.clone(),
             dto.email.clone(),
-            dto.password.clone(),
+            password_hash,
             admin_role,
             admin_quota,
         )

@@ -129,7 +129,7 @@ impl BatchOperationService {
                 // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
 
-                let copy_result = mgmt.move_file(&file_id, target_folder.clone()).await;
+                let copy_result = mgmt.copy_file(&file_id, target_folder.clone()).await;
 
                 // Release the permit explicitly (also released on drop)
                 drop(permit);

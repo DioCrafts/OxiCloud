@@ -115,6 +115,16 @@ pub trait FileWritePort: Send + Sync + 'static {
         size: u64,
     ) -> Result<(File, PathBuf), DomainError>;
 
+    /// Copies a file to a (possibly different) folder.
+    ///
+    /// With blob-dedup, this only creates a new metadata row and increments
+    /// the blob reference count — zero disk I/O for the content.
+    async fn copy_file(
+        &self,
+        file_id: &str,
+        target_folder_id: Option<String>,
+    ) -> Result<File, DomainError>;
+
     // ── Trash operations ──
 
     /// Moves a file to the trash

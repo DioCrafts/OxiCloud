@@ -86,9 +86,7 @@ impl TrashRepository for TrashDbRepository {
         .bind(user_id.to_string())
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("list: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("TrashDb", format!("list: {e}")))?;
 
         Ok(rows
             .into_iter()
@@ -98,11 +96,7 @@ impl TrashRepository for TrashDbRepository {
             .collect())
     }
 
-    async fn get_trash_item(
-        &self,
-        id: &Uuid,
-        user_id: &Uuid,
-    ) -> Result<Option<TrashedItem>> {
+    async fn get_trash_item(&self, id: &Uuid, user_id: &Uuid) -> Result<Option<TrashedItem>> {
         let row = sqlx::query_as::<_, (Uuid, String, String, String, Option<DateTime<Utc>>)>(
             r#"
             SELECT id, name, item_type, user_id, trashed_at
@@ -114,9 +108,7 @@ impl TrashRepository for TrashDbRepository {
         .bind(user_id.to_string())
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("get: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("TrashDb", format!("get: {e}")))?;
 
         Ok(row.map(|(id, name, item_type, uid, trashed_at)| {
             self.row_to_trashed_item(id, name, item_type, uid, trashed_at)
@@ -139,26 +131,18 @@ impl TrashRepository for TrashDbRepository {
 
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()> {
         // Delete all trashed files for this user
-        sqlx::query(
-            "DELETE FROM storage.files WHERE user_id = $1 AND is_trashed = TRUE",
-        )
-        .bind(user_id.to_string())
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("clear files: {e}"))
-        })?;
+        sqlx::query("DELETE FROM storage.files WHERE user_id = $1 AND is_trashed = TRUE")
+            .bind(user_id.to_string())
+            .execute(self.pool.as_ref())
+            .await
+            .map_err(|e| DomainError::internal_error("TrashDb", format!("clear files: {e}")))?;
 
         // Delete all trashed folders for this user
-        sqlx::query(
-            "DELETE FROM storage.folders WHERE user_id = $1 AND is_trashed = TRUE",
-        )
-        .bind(user_id.to_string())
-        .execute(self.pool.as_ref())
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("clear folders: {e}"))
-        })?;
+        sqlx::query("DELETE FROM storage.folders WHERE user_id = $1 AND is_trashed = TRUE")
+            .bind(user_id.to_string())
+            .execute(self.pool.as_ref())
+            .await
+            .map_err(|e| DomainError::internal_error("TrashDb", format!("clear folders: {e}")))?;
 
         Ok(())
     }
@@ -177,9 +161,7 @@ impl TrashRepository for TrashDbRepository {
         .bind(cutoff)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("expired: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("TrashDb", format!("expired: {e}")))?;
 
         Ok(rows
             .into_iter()

@@ -34,7 +34,9 @@ impl FolderDbRepository {
 
     /// Get the pool, panicking if stub.
     fn pool(&self) -> &PgPool {
-        self.pool.as_deref().expect("FolderDbRepository: pool not available (stub instance)")
+        self.pool
+            .as_deref()
+            .expect("FolderDbRepository: pool not available (stub instance)")
     }
 
     // ── helpers ──────────────────────────────────────────────────
@@ -181,14 +183,10 @@ impl FolderRepository for FolderDbRepository {
         .map_err(|e| DomainError::internal_error("FolderDb", format!("get: {e}")))?
         .ok_or_else(|| DomainError::not_found("Folder", id))?;
 
-        self.row_to_folder(row.0, row.1, row.2, row.3, row.4)
-            .await
+        self.row_to_folder(row.0, row.1, row.2, row.3, row.4).await
     }
 
-    async fn get_folder_by_path(
-        &self,
-        storage_path: &StoragePath,
-    ) -> Result<Folder, DomainError> {
+    async fn get_folder_by_path(&self, storage_path: &StoragePath) -> Result<Folder, DomainError> {
         // Walk the path segments to find the folder.
         let path_str = storage_path.to_string();
         let segments: Vec<&str> = path_str.split('/').filter(|s| !s.is_empty()).collect();
@@ -235,10 +233,7 @@ impl FolderRepository for FolderDbRepository {
         self.get_folder(&current_id).await
     }
 
-    async fn list_folders(
-        &self,
-        parent_id: Option<&str>,
-    ) -> Result<Vec<Folder>, DomainError> {
+    async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
         let rows: Vec<(String, String, Option<String>, i64, i64)> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
@@ -347,11 +342,7 @@ impl FolderRepository for FolderDbRepository {
         Ok((folders, total))
     }
 
-    async fn rename_folder(
-        &self,
-        id: &str,
-        new_name: String,
-    ) -> Result<Folder, DomainError> {
+    async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError> {
         sqlx::query(
             r#"
             UPDATE storage.folders
@@ -429,43 +420,42 @@ impl FolderRepository for FolderDbRepository {
     // ── Trash operations ──
 
     async fn move_to_trash(&self, folder_id: &str) -> Result<(), DomainError> {
-        // Soft-delete: set is_trashed = true and remember original parent
-        let result = sqlx::query(
+        // Atomic CTE: trash folder + all descendant files in a single statement.
+        // PostgreSQL executes the entire CTE as one atomic operation — no
+        // intermediate state where the folder is trashed but files are not.
+        let result = sqlx::query_scalar::<_, i64>(
             r#"
-            UPDATE storage.folders
-               SET is_trashed = TRUE,
-                   trashed_at = NOW(),
-                   original_parent_id = parent_id,
-                   updated_at = NOW()
-             WHERE id = $1::uuid AND NOT is_trashed
+            WITH trash_folder AS (
+                UPDATE storage.folders
+                   SET is_trashed = TRUE,
+                       trashed_at = NOW(),
+                       original_parent_id = parent_id,
+                       updated_at = NOW()
+                 WHERE id = $1::uuid AND NOT is_trashed
+                RETURNING id
+            ),
+            descendants AS (
+                SELECT id FROM trash_folder
+                UNION ALL
+                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
+            ),
+            trash_files AS (
+                UPDATE storage.files
+                   SET is_trashed = TRUE, trashed_at = NOW(), original_folder_id = folder_id
+                 WHERE folder_id IN (SELECT id FROM descendants) AND NOT is_trashed
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM trash_folder
             "#,
         )
         .bind(folder_id)
-        .execute(self.pool())
+        .fetch_one(self.pool())
         .await
         .map_err(|e| DomainError::internal_error("FolderDb", format!("trash: {e}")))?;
 
-        if result.rows_affected() == 0 {
+        if result == 0 {
             return Err(DomainError::not_found("Folder", folder_id));
         }
-
-        // Also trash all files inside the folder (recursively)
-        sqlx::query(
-            r#"
-            WITH RECURSIVE descendants AS (
-                SELECT id FROM storage.folders WHERE id = $1::uuid
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            )
-            UPDATE storage.files
-               SET is_trashed = TRUE, trashed_at = NOW(), original_folder_id = folder_id
-             WHERE folder_id IN (SELECT id FROM descendants) AND NOT is_trashed
-            "#,
-        )
-        .bind(folder_id)
-        .execute(self.pool())
-        .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("trash files: {e}")))?;
 
         Ok(())
     }
@@ -475,47 +465,44 @@ impl FolderRepository for FolderDbRepository {
         folder_id: &str,
         _original_path: &str,
     ) -> Result<(), DomainError> {
-        // Restore: set is_trashed = false, restore parent_id from original_parent_id
-        let result = sqlx::query(
+        // Atomic CTE: restore folder + all descendant files in a single statement.
+        let result = sqlx::query_scalar::<_, i64>(
             r#"
-            UPDATE storage.folders
-               SET is_trashed = FALSE,
-                   trashed_at = NULL,
-                   parent_id = COALESCE(original_parent_id, parent_id),
-                   original_parent_id = NULL,
-                   updated_at = NOW()
-             WHERE id = $1::uuid AND is_trashed
+            WITH restore_folder AS (
+                UPDATE storage.folders
+                   SET is_trashed = FALSE,
+                       trashed_at = NULL,
+                       parent_id = COALESCE(original_parent_id, parent_id),
+                       original_parent_id = NULL,
+                       updated_at = NOW()
+                 WHERE id = $1::uuid AND is_trashed
+                RETURNING id
+            ),
+            descendants AS (
+                SELECT id FROM restore_folder
+                UNION ALL
+                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
+            ),
+            restore_files AS (
+                UPDATE storage.files
+                   SET is_trashed = FALSE,
+                       trashed_at = NULL,
+                       folder_id = COALESCE(original_folder_id, folder_id),
+                       original_folder_id = NULL
+                 WHERE folder_id IN (SELECT id FROM descendants) AND is_trashed
+                RETURNING 1
+            )
+            SELECT COUNT(*) FROM restore_folder
             "#,
         )
         .bind(folder_id)
-        .execute(self.pool())
+        .fetch_one(self.pool())
         .await
         .map_err(|e| DomainError::internal_error("FolderDb", format!("restore: {e}")))?;
 
-        if result.rows_affected() == 0 {
+        if result == 0 {
             return Err(DomainError::not_found("Folder", folder_id));
         }
-
-        // Also restore files that were trashed with this folder
-        sqlx::query(
-            r#"
-            WITH RECURSIVE descendants AS (
-                SELECT id FROM storage.folders WHERE id = $1::uuid
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            )
-            UPDATE storage.files
-               SET is_trashed = FALSE,
-                   trashed_at = NULL,
-                   folder_id = COALESCE(original_folder_id, folder_id),
-                   original_folder_id = NULL
-             WHERE folder_id IN (SELECT id FROM descendants) AND is_trashed
-            "#,
-        )
-        .bind(folder_id)
-        .execute(self.pool())
-        .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("restore files: {e}")))?;
 
         Ok(())
     }
@@ -562,9 +549,7 @@ impl FolderDbRepository {
         .map_err(|e| DomainError::internal_error("FolderDb", format!("home folder: {e}")))?;
 
         match row {
-            Some((id, ca, ma)) => {
-                self.row_to_folder(id, name.to_string(), None, ca, ma).await
-            }
+            Some((id, ca, ma)) => self.row_to_folder(id, name.to_string(), None, ca, ma).await,
             None => {
                 // Already exists — fetch it
                 let existing = sqlx::query_as::<_, (String, i64, i64)>(
@@ -580,9 +565,7 @@ impl FolderDbRepository {
                 .bind(user_id)
                 .fetch_one(self.pool())
                 .await
-                .map_err(|e| {
-                    DomainError::internal_error("FolderDb", format!("home fetch: {e}"))
-                })?;
+                .map_err(|e| DomainError::internal_error("FolderDb", format!("home fetch: {e}")))?;
                 self.row_to_folder(existing.0, name.to_string(), None, existing.1, existing.2)
                     .await
             }
@@ -591,13 +574,11 @@ impl FolderDbRepository {
 
     /// Returns user_id for a given folder. Used by file repositories.
     pub async fn get_folder_user_id(&self, folder_id: &str) -> Result<String, DomainError> {
-        sqlx::query_scalar::<_, String>(
-            "SELECT user_id FROM storage.folders WHERE id = $1::uuid",
-        )
-        .bind(folder_id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("user_id lookup: {e}")))?
-        .ok_or_else(|| DomainError::not_found("Folder", folder_id))
+        sqlx::query_scalar::<_, String>("SELECT user_id FROM storage.folders WHERE id = $1::uuid")
+            .bind(folder_id)
+            .fetch_optional(self.pool())
+            .await
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("user_id lookup: {e}")))?
+            .ok_or_else(|| DomainError::not_found("Folder", folder_id))
     }
 }

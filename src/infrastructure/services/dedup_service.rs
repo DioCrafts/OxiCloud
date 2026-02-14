@@ -209,9 +209,7 @@ impl DedupService {
         }
 
         // Atomic write: temp file → rename
-        let temp_path = self
-            .temp_root
-            .join(format!("{}.tmp", uuid::Uuid::new_v4()));
+        let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
         fs::write(&temp_path, content).await.map_err(|e| {
             DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
         })?;
@@ -258,10 +256,7 @@ impl DedupService {
         let file_size = fs::metadata(source_path)
             .await
             .map_err(|e| {
-                DomainError::internal_error(
-                    "Dedup",
-                    format!("Failed to get file metadata: {}", e),
-                )
+                DomainError::internal_error("Dedup", format!("Failed to get file metadata: {}", e))
             })?
             .len();
 

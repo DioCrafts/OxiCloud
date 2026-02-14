@@ -106,23 +106,33 @@ pub trait CalendarStoragePort: Send + Sync + 'static {
     ) -> Result<Vec<CalendarEventDto>, DomainError>;
 }
 
-/// Port for calendar use cases
+/// Port for calendar use cases.
+///
+/// All methods require an explicit `user_id` parameter for authorization.
+/// The CalDAV protocol handler extracts the user identity from JWT claims
+/// and passes it through.
 #[async_trait]
 pub trait CalendarUseCase: Send + Sync + 'static {
     // Calendar operations
     async fn create_calendar(
         &self,
         calendar: CreateCalendarDto,
+        user_id: &str,
     ) -> Result<CalendarDto, DomainError>;
     async fn update_calendar(
         &self,
         calendar_id: &str,
         update: UpdateCalendarDto,
+        user_id: &str,
     ) -> Result<CalendarDto, DomainError>;
-    async fn delete_calendar(&self, calendar_id: &str) -> Result<(), DomainError>;
-    async fn get_calendar(&self, calendar_id: &str) -> Result<CalendarDto, DomainError>;
-    async fn list_my_calendars(&self) -> Result<Vec<CalendarDto>, DomainError>;
-    async fn list_shared_calendars(&self) -> Result<Vec<CalendarDto>, DomainError>;
+    async fn delete_calendar(&self, calendar_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn get_calendar(
+        &self,
+        calendar_id: &str,
+        user_id: &str,
+    ) -> Result<CalendarDto, DomainError>;
+    async fn list_my_calendars(&self, user_id: &str) -> Result<Vec<CalendarDto>, DomainError>;
+    async fn list_shared_calendars(&self, user_id: &str) -> Result<Vec<CalendarDto>, DomainError>;
     async fn list_public_calendars(
         &self,
         limit: Option<i64>,
@@ -133,90 +143,57 @@ pub trait CalendarUseCase: Send + Sync + 'static {
     async fn share_calendar(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        target_user_id: &str,
         access_level: &str,
+        caller_user_id: &str,
     ) -> Result<(), DomainError>;
     async fn remove_calendar_sharing(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        target_user_id: &str,
+        caller_user_id: &str,
     ) -> Result<(), DomainError>;
     async fn get_calendar_shares(
         &self,
         calendar_id: &str,
+        user_id: &str,
     ) -> Result<Vec<(String, String)>, DomainError>;
 
     // Event operations
-    async fn create_event(&self, event: CreateEventDto) -> Result<CalendarEventDto, DomainError>;
+    async fn create_event(
+        &self,
+        event: CreateEventDto,
+        user_id: &str,
+    ) -> Result<CalendarEventDto, DomainError>;
     async fn create_event_from_ical(
         &self,
         event: CreateEventICalDto,
+        user_id: &str,
     ) -> Result<CalendarEventDto, DomainError>;
     async fn update_event(
         &self,
         event_id: &str,
         update: UpdateEventDto,
+        user_id: &str,
     ) -> Result<CalendarEventDto, DomainError>;
-    async fn delete_event(&self, event_id: &str) -> Result<(), DomainError>;
-    async fn get_event(&self, event_id: &str) -> Result<CalendarEventDto, DomainError>;
+    async fn delete_event(&self, event_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn get_event(
+        &self,
+        event_id: &str,
+        user_id: &str,
+    ) -> Result<CalendarEventDto, DomainError>;
     async fn list_events(
         &self,
         calendar_id: &str,
         limit: Option<i64>,
         offset: Option<i64>,
+        user_id: &str,
     ) -> Result<Vec<CalendarEventDto>, DomainError>;
     async fn get_events_in_range(
         &self,
         calendar_id: &str,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-    ) -> Result<Vec<CalendarEventDto>, DomainError>;
-
-    // ─── User-contextualized variants (for CalDAV protocol handler) ──
-    async fn create_calendar_for_user(
-        &self,
-        calendar: CreateCalendarDto,
-        user_id: &str,
-    ) -> Result<CalendarDto, DomainError>;
-    async fn update_calendar_for_user(
-        &self,
-        calendar_id: &str,
-        update: UpdateCalendarDto,
-        user_id: &str,
-    ) -> Result<CalendarDto, DomainError>;
-    async fn delete_calendar_for_user(
-        &self,
-        calendar_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
-    async fn get_calendar_for_user(
-        &self,
-        calendar_id: &str,
-        user_id: &str,
-    ) -> Result<CalendarDto, DomainError>;
-    async fn list_my_calendars_for_user(
-        &self,
-        user_id: &str,
-    ) -> Result<Vec<CalendarDto>, DomainError>;
-    async fn list_events_for_user(
-        &self,
-        calendar_id: &str,
-        limit: Option<i64>,
-        offset: Option<i64>,
         user_id: &str,
     ) -> Result<Vec<CalendarEventDto>, DomainError>;
-    async fn get_events_in_range_for_user(
-        &self,
-        calendar_id: &str,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
-        user_id: &str,
-    ) -> Result<Vec<CalendarEventDto>, DomainError>;
-    async fn create_event_from_ical_for_user(
-        &self,
-        event: CreateEventICalDto,
-        user_id: &str,
-    ) -> Result<CalendarEventDto, DomainError>;
-    async fn delete_event_for_user(&self, event_id: &str, user_id: &str)
-    -> Result<(), DomainError>;
 }

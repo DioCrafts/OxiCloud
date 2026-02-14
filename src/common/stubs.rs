@@ -168,6 +168,14 @@ impl FileWritePort for StubFileWritePort {
         Ok(File::default())
     }
 
+    async fn copy_file(
+        &self,
+        _file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
+
     async fn rename_file(&self, _file_id: &str, _new_name: &str) -> Result<File, DomainError> {
         Ok(File::default())
     }
@@ -476,6 +484,14 @@ pub struct StubFileManagementUseCase;
 #[async_trait]
 impl FileManagementUseCase for StubFileManagementUseCase {
     async fn move_file(
+        &self,
+        _file_id: &str,
+        _folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn copy_file(
         &self,
         _file_id: &str,
         _folder_id: Option<String>,

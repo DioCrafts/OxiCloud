@@ -138,6 +138,13 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
+    /// Copies a file to another folder (zero-copy with dedup).
+    async fn copy_file(
+        &self,
+        file_id: &str,
+        target_folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError>;
+
     /// Renames a file
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
 

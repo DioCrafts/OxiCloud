@@ -121,6 +121,35 @@ impl FileManagementUseCase for FileManagementService {
         Ok(FileDto::from(moved_file))
     }
 
+    async fn copy_file(
+        &self,
+        file_id: &str,
+        target_folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        info!(
+            "Copying file with ID: {} to folder: {:?}",
+            file_id, target_folder_id
+        );
+
+        let copied_file = self
+            .file_repository
+            .copy_file(file_id, target_folder_id)
+            .await
+            .map_err(|e| {
+                error!("Error copying file (ID: {}): {}", file_id, e);
+                e
+            })?;
+
+        info!(
+            "File copied successfully: {} (ID: {}) to folder: {:?}",
+            copied_file.name(),
+            copied_file.id(),
+            copied_file.folder_id()
+        );
+
+        Ok(FileDto::from(copied_file))
+    }
+
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError> {
         info!("Renaming file with ID: {} to \"{}\"", file_id, new_name);
 
