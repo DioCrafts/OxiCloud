@@ -405,7 +405,14 @@ function copyWebDAVUrl() {
   const statusEl = document.getElementById('webdav-copy-status');
   
   navigator.clipboard.writeText(getWebDAVUrl()).then(() => {
-    statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> WebDAV URL copied to clipboard</div>';
+    // Create success message safely
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success';
+    alertDiv.innerHTML = '<i class="fas fa-check-circle"></i> ';
+    const successText = document.createTextNode('WebDAV URL copied to clipboard');
+    alertDiv.appendChild(successText);
+    statusEl.innerHTML = '';
+    statusEl.appendChild(alertDiv);
     setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
   }).catch(err => {
     // Create error message safely to prevent XSS
