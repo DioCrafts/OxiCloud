@@ -220,7 +220,7 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn btn-primary" onclick="copyWebDAVUrl()"><i class="fas fa-copy"></i> Copy URL</button>
-        <a href="/webdav-setup.html" target="_blank" class="btn" style="background:#f1f5f9;color:#475569"><i class="fas fa-book"></i> Setup Guide</a>
+        <a href="/webdav-setup.html" target="_blank" rel="noopener noreferrer" class="btn" style="background:#f1f5f9;color:#475569" aria-label="Open WebDAV Setup Guide in new tab"><i class="fas fa-book"></i> Setup Guide <i class="fas fa-external-link-alt" style="font-size:10px"></i></a>
       </div>
       <div id="webdav-copy-status" style="margin-top:10px"></div>
     </div>
@@ -408,7 +408,14 @@ function copyWebDAVUrl() {
     statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> WebDAV URL copied to clipboard</div>';
     setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
   }).catch(err => {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Failed to copy: ' + err.message + '</div>';
+    // Create error message safely to prevent XSS
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-error';
+    alertDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Failed to copy: ';
+    const errorText = document.createTextNode(err.message);
+    alertDiv.appendChild(errorText);
+    statusEl.innerHTML = '';
+    statusEl.appendChild(alertDiv);
   });
 }
 
