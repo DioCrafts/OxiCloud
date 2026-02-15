@@ -32,7 +32,7 @@ struct OidcDiscovery {
 
 #[derive(Debug, Clone, Deserialize)]
 struct JwksDocument {
-    keys: Vec<serde_json::Value>,
+    keys: Vec<jsonwebtoken::jwk::Jwk>,
 }
 
 // ============================================================================
@@ -95,7 +95,7 @@ pub struct OidcService {
     http_client: reqwest::Client,
     /// Cached discovery document
     discovery: RwLock<Option<OidcDiscovery>>,
-    /// Cached JWKS (raw JSON values)
+    /// Cached JWKS (typed JWK keys)
     jwks: RwLock<Option<JwksDocument>>,
 }
 
@@ -225,16 +225,18 @@ impl OidcService {
     }
 
     /// Find a suitable key from JWKS by kid header (filters out encryption keys)
-    fn find_key<'a>(jwks: &'a JwksDocument, kid: Option<&str>) -> Option<&'a serde_json::Value> {
+    fn find_key<'a>(
+        jwks: &'a JwksDocument,
+        kid: Option<&str>,
+    ) -> Option<&'a jsonwebtoken::jwk::Jwk> {
         jwks.keys.iter().find(|k| {
             // Exclude encryption keys (only use signature keys)
-            let use_field = k.get("use").and_then(|v| v.as_str());
-            if use_field == Some("enc") {
+            if k.common.public_key_use == Some(jsonwebtoken::jwk::PublicKeyUse::Encryption) {
                 return false;
             }
             // Match kid if provided
             if let Some(target_kid) = kid {
-                return k.get("kid").and_then(|v| v.as_str()) == Some(target_kid);
+                return k.common.key_id.as_deref() == Some(target_kid);
             }
             // No kid specified, include this key
             true
@@ -367,8 +369,8 @@ impl OidcServicePort for OidcService {
         // Extract kid from JWT header
         let kid = Self::extract_jwt_kid(id_token);
 
-        // Find the matching key from JWKS
-        let jwk_value = Self::find_key(&jwks, kid.as_deref()).ok_or_else(|| {
+        // Find the matching key from JWKS (already typed as Jwk)
+        let jwk = Self::find_key(&jwks, kid.as_deref()).ok_or_else(|| {
             DomainError::new(
                 ErrorKind::AccessDenied,
                 "OIDC",
@@ -376,16 +378,7 @@ impl OidcServicePort for OidcService {
             )
         })?;
 
-        // Use jsonwebtoken's from_jwk to automatically handle key type and algorithm detection
-        let jwk: jsonwebtoken::jwk::Jwk = serde_json::from_value(jwk_value.clone()).map_err(|e| {
-            DomainError::new(
-                ErrorKind::InternalError,
-                "OIDC",
-                format!("Failed to parse JWK: {}", e),
-            )
-        })?;
-
-        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(&jwk).map_err(|e| {
+        let decoding_key = jsonwebtoken::DecodingKey::from_jwk(jwk).map_err(|e| {
             DomainError::new(
                 ErrorKind::InternalError,
                 "OIDC",
