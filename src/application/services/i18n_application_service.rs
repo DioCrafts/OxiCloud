@@ -43,7 +43,7 @@ impl I18nApplicationService {
 
     /// Get a translation for a key and locale
     pub async fn translate(&self, key: &str, locale: Option<Locale>) -> I18nResult<String> {
-        let locale = locale.unwrap_or(Locale::default());
+        let locale = locale.unwrap_or_default();
         self.i18n_service.translate(key, locale).await
     }
 

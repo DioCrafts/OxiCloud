@@ -84,11 +84,13 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
 
     /// Assemble all chunks into the final file.
     ///
-    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size)`.
+    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, sha256_hash)`.
+    /// The hash is computed during assembly (hash-on-write), eliminating a
+    /// second sequential read of the assembled file.
     async fn complete_upload(
         &self,
         upload_id: &str,
-    ) -> Result<(PathBuf, String, Option<String>, String, u64), DomainError>;
+    ) -> Result<(PathBuf, String, Option<String>, String, u64, String), DomainError>;
 
     /// Finalize upload: clean up the session and temporary files.
     async fn finalize_upload(&self, upload_id: &str) -> Result<(), DomainError>;

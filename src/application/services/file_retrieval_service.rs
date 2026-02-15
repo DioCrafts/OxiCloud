@@ -13,8 +13,6 @@ use tracing::{debug, info, warn};
 
 /// Threshold below which files are served from RAM cache (10 MB).
 const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
-/// Threshold above which mmap is used instead of streaming (100 MB).
-const MMAP_THRESHOLD: u64 = 100 * 1024 * 1024;
 
 /// Service for file retrieval operations
 ///
@@ -103,63 +101,16 @@ impl FileRetrievalService {
             _ => None,
         }
     }
-}
 
-#[async_trait]
-impl FileRetrievalUseCase for FileRetrievalService {
-    async fn get_file(&self, id: &str) -> Result<FileDto, DomainError> {
-        let file = self.file_read.get_file(id).await?;
-        Ok(FileDto::from(file))
-    }
-
-    async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError> {
-        // Normalize the path (remove leading/trailing slashes)
-        let path = path.trim_start_matches('/').trim_end_matches('/');
-
-        // List all files and find the one with matching path
-        let all_files = self.list_files(None).await?;
-
-        for file in all_files {
-            let file_path = file.path.trim_start_matches('/').trim_end_matches('/');
-            if file_path == path
-                || file_path.ends_with(&format!("/{}", path))
-                || path.ends_with(&format!("/{}", file_path))
-            {
-                return Ok(file);
-            }
-        }
-
-        Err(DomainError::not_found(
-            "File",
-            format!("not found at path: {}", path),
-        ))
-    }
-
-    async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError> {
-        let files = self.file_read.list_files(folder_id).await?;
-        Ok(files.into_iter().map(FileDto::from).collect())
-    }
-
-    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError> {
-        self.file_read.get_file_content(id).await
-    }
-
-    async fn get_file_stream(
+    /// Core multi-tier download logic shared by `get_file_optimized` and
+    /// `get_file_optimized_preloaded`.
+    async fn optimized_inner(
         &self,
         id: &str,
-    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
-        self.file_read.get_file_stream(id).await
-    }
-
-    /// Multi-tier optimized download.
-    async fn get_file_optimized(
-        &self,
-        id: &str,
+        dto: FileDto,
         accept_webp: bool,
         prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
-        let file = self.file_read.get_file(id).await?;
-        let dto = FileDto::from(file);
         let mime_type = dto.mime_type.clone();
         let file_size = dto.size;
         let file_name = dto.name.clone();
@@ -274,27 +225,9 @@ impl FileRetrievalUseCase for FileRetrievalService {
             ));
         }
 
-        // ── Tier 2: MMAP (10–100 MB) ────────────────────────
-        if file_size < MMAP_THRESHOLD {
-            info!(
-                "🗺️ TIER 2 MMAP: {} ({} MB)",
-                file_name,
-                file_size / (1024 * 1024)
-            );
-            match self.file_read.get_file_mmap(id).await {
-                Ok(mmap_content) => {
-                    return Ok((dto, OptimizedFileContent::Mmap(mmap_content)));
-                }
-                Err(e) => {
-                    warn!("MMAP failed, falling back to streaming: {}", e);
-                    // fall through to streaming
-                }
-            }
-        }
-
-        // ── Tier 3: Streaming (≥100 MB) ─────────────────────
+        // ── Tier 2 + 3: Streaming (≥10 MB) ──────────────────
         info!(
-            "📡 TIER 3 STREAMING: {} ({} MB)",
+            "📡 TIER 2 STREAMING: {} ({} MB)",
             file_name,
             file_size / (1024 * 1024)
         );
@@ -313,6 +246,67 @@ impl FileRetrievalUseCase for FileRetrievalService {
                 ))
             }
         }
+    }
+}
+
+#[async_trait]
+impl FileRetrievalUseCase for FileRetrievalService {
+    async fn get_file(&self, id: &str) -> Result<FileDto, DomainError> {
+        let file = self.file_read.get_file(id).await?;
+        Ok(FileDto::from(file))
+    }
+
+    async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError> {
+        // Direct SQL lookup — O(folder_depth) queries instead of O(total_files)
+        if let Some(file) = self.file_read.find_file_by_path(path).await? {
+            return Ok(FileDto::from(file));
+        }
+
+        Err(DomainError::not_found(
+            "File",
+            format!("not found at path: {}", path),
+        ))
+    }
+
+    async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError> {
+        let files = self.file_read.list_files(folder_id).await?;
+        Ok(files.into_iter().map(FileDto::from).collect())
+    }
+
+    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError> {
+        self.file_read.get_file_content(id).await
+    }
+
+    async fn get_file_stream(
+        &self,
+        id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        self.file_read.get_file_stream(id).await
+    }
+
+    /// Multi-tier optimized download.
+    async fn get_file_optimized(
+        &self,
+        id: &str,
+        accept_webp: bool,
+        prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        let file = self.file_read.get_file(id).await?;
+        let dto = FileDto::from(file);
+        self.optimized_inner(id, dto, accept_webp, prefer_original)
+            .await
+    }
+
+    /// Like `get_file_optimized` but skips the metadata re-fetch.
+    async fn get_file_optimized_preloaded(
+        &self,
+        id: &str,
+        file_dto: FileDto,
+        accept_webp: bool,
+        prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        self.optimized_inner(id, file_dto, accept_webp, prefer_original)
+            .await
     }
 
     /// Range-based streaming for HTTP Range Requests.

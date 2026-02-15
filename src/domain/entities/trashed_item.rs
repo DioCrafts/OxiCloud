@@ -41,8 +41,7 @@ impl TrashedItem {
         }
     }
 
-    /// Reconstruct a TrashedItem from persisted data (e.g. JSON index).
-    /// Skips ID generation — uses the provided values directly.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
         id: Uuid,
         original_id: Uuid,

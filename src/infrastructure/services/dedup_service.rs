@@ -24,12 +24,15 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::Stream;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncSeekExt, BufReader};
+use tokio_util::io::ReaderStream;
 
 use crate::application::ports::dedup_ports::{
     BlobMetadataDto, DedupPort, DedupResultDto, DedupStatsDto,
@@ -38,6 +41,9 @@ use crate::domain::errors::{DomainError, ErrorKind};
 
 /// Chunk size for streaming hash calculation (256KB)
 const HASH_CHUNK_SIZE: usize = 256 * 1024;
+
+/// Chunk size for streaming file reads (256 KB — 4x fewer iterations)
+const STREAM_CHUNK_SIZE: usize = 256 * 1024;
 
 /// Content-Addressable Storage Service (PostgreSQL-backed)
 pub struct DedupService {
@@ -209,7 +215,9 @@ impl DedupService {
         }
 
         // Atomic write: temp file → rename
-        let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
+        let temp_path = self
+            .temp_root
+            .join(format!("{}.tmp", uuid::Uuid::new_v4()));
         fs::write(&temp_path, content).await.map_err(|e| {
             DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
         })?;
@@ -248,22 +256,33 @@ impl DedupService {
     }
 
     /// Store content with deduplication (streaming from file).
+    /// Store content with deduplication (streaming from file).
+    ///
+    /// If `pre_computed_hash` is `Some`, the file will NOT be re-read for
+    /// SHA-256 — saving one full sequential read (the biggest I/O win).
     pub async fn store_from_file(
         &self,
         source_path: &Path,
         content_type: Option<String>,
+        pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
         let file_size = fs::metadata(source_path)
             .await
             .map_err(|e| {
-                DomainError::internal_error("Dedup", format!("Failed to get file metadata: {}", e))
+                DomainError::internal_error(
+                    "Dedup",
+                    format!("Failed to get file metadata: {}", e),
+                )
             })?
             .len();
 
-        // Calculate hash (streaming)
-        let hash = Self::hash_file(source_path)
-            .await
-            .map_err(DomainError::from)?;
+        // Use pre-computed hash if available, otherwise calculate (streaming)
+        let hash = match pre_computed_hash {
+            Some(h) => h,
+            None => Self::hash_file(source_path)
+                .await
+                .map_err(DomainError::from)?,
+        };
 
         // Begin transaction
         let mut tx = self.pool.begin().await.map_err(|e| {
@@ -519,6 +538,75 @@ impl DedupService {
         self.read_blob(hash).await.map(Bytes::from)
     }
 
+    /// Stream blob content in 64 KB chunks — constant memory (~64 KB per stream).
+    ///
+    /// Unlike `read_blob()`, this never loads the entire file into RAM.
+    /// A 1 GB file uses the same ~64 KB as a 1 KB file.
+    pub async fn read_blob_stream(
+        &self,
+        hash: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        let blob_path = self.blob_path(hash);
+        let file = File::open(&blob_path).await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::NotFound,
+                "Blob",
+                format!("Failed to open blob {}: {}", hash, e),
+            )
+        })?;
+        Ok(Box::pin(ReaderStream::with_capacity(file, STREAM_CHUNK_SIZE)))
+    }
+
+    /// Stream a byte range of a blob — only reads the requested portion.
+    ///
+    /// Uses seek + take so a 1 MB range request on a 1 GB file only reads 1 MB.
+    pub async fn read_blob_range_stream(
+        &self,
+        hash: &str,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        let blob_path = self.blob_path(hash);
+        let mut file = File::open(&blob_path).await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::NotFound,
+                "Blob",
+                format!("Failed to open blob {}: {}", hash, e),
+            )
+        })?;
+
+        // Seek to the start position
+        file.seek(std::io::SeekFrom::Start(start))
+            .await
+            .map_err(|e| {
+                DomainError::internal_error("Blob", format!("Failed to seek in blob: {}", e))
+            })?;
+
+        // If an end is specified, limit the read with take()
+        if let Some(end_pos) = end {
+            let limit = end_pos.saturating_sub(start);
+            let limited = file.take(limit);
+            Ok(Box::pin(ReaderStream::with_capacity(limited, STREAM_CHUNK_SIZE)))
+        } else {
+            Ok(Box::pin(ReaderStream::with_capacity(file, STREAM_CHUNK_SIZE)))
+        }
+    }
+
+    /// Get the size of a blob without reading its content.
+    pub async fn blob_size(&self, hash: &str) -> Result<u64, DomainError> {
+        let blob_path = self.blob_path(hash);
+        let meta = fs::metadata(&blob_path).await.map_err(|e| {
+            DomainError::new(
+                ErrorKind::NotFound,
+                "Blob",
+                format!("Failed to stat blob {}: {}", hash, e),
+            )
+        })?;
+        Ok(meta.len())
+    }
+
     // ── Statistics (computed from PG) ────────────────────────────
 
     /// Get deduplication statistics by querying PostgreSQL.
@@ -666,8 +754,9 @@ impl DedupPort for DedupService {
         &self,
         source_path: &Path,
         content_type: Option<String>,
+        pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
-        self.store_from_file(source_path, content_type).await
+        self.store_from_file(source_path, content_type, pre_computed_hash).await
     }
 
     async fn blob_exists(&self, hash: &str) -> bool {
@@ -684,6 +773,28 @@ impl DedupPort for DedupService {
 
     async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError> {
         self.read_blob_bytes(hash).await
+    }
+
+    async fn read_blob_stream(
+        &self,
+        hash: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        self.read_blob_stream(hash).await
+    }
+
+    async fn read_blob_range_stream(
+        &self,
+        hash: &str,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        self.read_blob_range_stream(hash, start, end).await
+    }
+
+    async fn blob_size(&self, hash: &str) -> Result<u64, DomainError> {
+        self.blob_size(hash).await
     }
 
     async fn add_reference(&self, hash: &str) -> Result<(), DomainError> {

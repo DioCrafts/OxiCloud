@@ -41,8 +41,7 @@ impl Session {
         }
     }
 
-    /// Reconstruct a Session from persisted data (e.g. database row).
-    /// Skips ID generation — uses the provided values directly.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
         id: String,
         user_id: String,

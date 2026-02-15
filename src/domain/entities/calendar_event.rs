@@ -79,6 +79,7 @@ impl CalendarEvent {
      * @param ical_data Complete iCalendar data (VEVENT component)
      * @return Result containing the new CalendarEvent or a domain error
      */
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         calendar_id: Uuid,
         summary: String,
@@ -165,6 +166,7 @@ impl CalendarEvent {
      * @param updated_at Time when the event was last modified
      * @return Result containing the new CalendarEvent or a domain error
      */
+    #[allow(clippy::too_many_arguments)]
     pub fn with_id(
         id: Uuid,
         calendar_id: Uuid,

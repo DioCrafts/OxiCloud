@@ -220,7 +220,7 @@ class FileRenderer {
         <div class="file-icon folder-icon">
           <i class="fas fa-folder"></i>
         </div>
-        <div class="file-name">${item.name}</div>
+        <div class="file-name">${window.escapeHtml(item.name)}</div>
       `;
       
       // Make draggable
@@ -274,7 +274,7 @@ class FileRenderer {
         <div class="file-icon">
           <i class="${iconClass}"></i>
         </div>
-        <div class="file-name">${item.name}</div>
+        <div class="file-name">${window.escapeHtml(item.name)}</div>
       `;
       
       // Make draggable
@@ -343,7 +343,7 @@ class FileRenderer {
           <div class="file-icon folder-icon">
             <i class="fas fa-folder"></i>
           </div>
-          <span>${item.name}</span>
+          <span>${window.escapeHtml(item.name)}</span>
         </div>
         <div>${this.i18n.t('files.file_types.folder')}</div>
         <div>--</div>
@@ -416,7 +416,7 @@ class FileRenderer {
           <div class="file-icon">
             <i class="${iconClass}"></i>
           </div>
-          <span>${item.name}</span>
+          <span>${window.escapeHtml(item.name)}</span>
         </div>
         <div>${typeLabel}</div>
         <div>${fileSize}</div>

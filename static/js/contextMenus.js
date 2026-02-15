@@ -424,7 +424,7 @@ const contextMenus = {
                         const folderItem = document.createElement('div');
                         folderItem.className = 'folder-select-item';
                         folderItem.dataset.folderId = folder.id;
-                        folderItem.innerHTML = `<i class="fas fa-folder"></i> ${folder.name}`;
+                        folderItem.innerHTML = `<i class="fas fa-folder"></i> ${escapeHtml(folder.name)}`;
 
                         folderItem.addEventListener('click', () => {
                             // Deselect all

@@ -513,8 +513,10 @@ let authInitialized = false;
     const timeSinceCleanup = Date.now() - lastCleanup;
     
     if (lastCleanup > 0 && timeSinceCleanup < 10000) { // Less than 10 seconds
-        console.warn('Multiple auth problems in short time, enabling direct bypass mode');
-        localStorage.setItem('bypass_auth_mode', 'true');
+        console.warn('Multiple auth problems in short time, clearing auth data');
+        localStorage.removeItem('oxicloud_token');
+        localStorage.removeItem('oxicloud_refresh_token');
+        localStorage.removeItem('oxicloud_token_expiry');
     }
 })();
 
@@ -577,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                     
                     // Redirect to main app
-                    window.location.href = '/?no_redirect=true';
+                    window.location.href = '/';
                     return;
                 }
             } catch (err) {
@@ -690,8 +692,12 @@ if (isLoginPage && loginForm) {
         console.log("Login response:", data);  // Log the response for debugging
         
         // Use the correct field names from our API response
-        const token = data.access_token || data.token || "mock_access_token"; 
-        const refreshToken = data.refresh_token || data.refreshToken || "mock_refresh_token";
+        const token = data.access_token || data.token;
+        const refreshToken = data.refresh_token || data.refreshToken;
+        
+        if (!token) {
+            throw new Error('Server did not return an access token');
+        }
         
         localStorage.setItem(TOKEN_KEY, token);
         localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
@@ -731,20 +737,13 @@ if (isLoginPage && loginForm) {
         // Reset redirect counter on successful login
         sessionStorage.removeItem('redirect_count');
         
-        // Fetch and store user data
-        // Use the user data directly from the response
-        const userData = data.user || { 
-            id: 'test-user-id', 
-            username: username, 
-            email: username + '@example.com', 
-            role: 'user',
-            active: true,
-            storage_quota_bytes: 10737418240, // 10GB default
-            storage_used_bytes: 0
-        };
-        
-        console.log("Storing user data:", userData);
-        localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+        // Fetch and store user data from the response
+        if (data.user) {
+            console.log("Storing user data from server");
+            localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
+        } else {
+            console.warn("Server did not return user data — will fetch from /me endpoint after redirect");
+        }
         
         // Redirect to main app
         redirectToMainApp();
@@ -859,25 +858,6 @@ async function login(username, password) {
     try {
         console.log(`Attempting to login with username: ${username}`);
         
-        // Special case for test user
-        if (username === 'test' && password === 'test') {
-            console.log('Using test user fallback');
-            // Return a mock response that matches our backend structure
-            return {
-                user: {
-                    id: "test-user-id",
-                    username: "test",
-                    email: "test@example.com",
-                    role: "user",
-                    active: true
-                },
-                access_token: "mock_access_token",
-                refresh_token: "mock_refresh_token",
-                token_type: "Bearer",
-                expires_in: 3600
-            };
-        }
-        
         // Add better error handling with timeout
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
@@ -927,19 +907,6 @@ async function login(username, password) {
 async function register(username, email, password, role = 'user') {
     try {
         console.log(`Attempting to register user: ${username}`);
-        
-        // Special case for test user
-        if (username === 'test') {
-            console.log('Using test user registration fallback');
-            // Return a mock user response
-            return {
-                id: "test-user-id",
-                username: username,
-                email: email,
-                role: role || "user",
-                active: true
-            };
-        }
         
         const response = await fetch(REGISTER_ENDPOINT, {
             method: 'POST',
@@ -1005,7 +972,6 @@ async function fetchUserData(token) {
  */
 async function refreshAuthToken(refreshToken) {
     try {
-        console.log("CRITICAL: Token refresh disabled to prevent infinite loop");
         // Check if we're in a refresh loop
         const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0');
         localStorage.setItem('refresh_attempts', (refreshAttempts + 1).toString());
@@ -1021,49 +987,15 @@ async function refreshAuthToken(refreshToken) {
             throw new Error('Too many refresh attempts, forcing login');
         }
         
-        // For test users, generate a fake response that will work
-        // This ensures the app works with test accounts
-        const isMockToken = refreshToken === "mock_refresh_token" || refreshToken.includes("mock");
-        
-        if (isMockToken) {
-            console.log("Using mock refresh token response");
-            // Create a simulated token with no expiration
-            const timestamp = Math.floor(Date.now() / 1000);
-            const expiry = timestamp + 86400 * 30; // 30 days
-            
-            // Create a basic token with a very long expiry
-            const mockUserData = {
-                id: "default-user-id",
-                username: "usuario",
-                email: "usuario@example.com",
-                role: "user",
-                active: true
-            };
-            
-            // Store directly in localStorage to bypass token parsing
-            localStorage.setItem(USER_DATA_KEY, JSON.stringify(mockUserData));
-            localStorage.setItem(TOKEN_KEY, "mock_token_preventing_loops");
-            localStorage.setItem(TOKEN_EXPIRY_KEY, new Date(expiry * 1000).toISOString());
-            
-            // Reset counters
-            sessionStorage.removeItem('redirect_count');
-            localStorage.setItem('refresh_attempts', '0');
-            
-            return {
-                user: mockUserData,
-                access_token: "mock_token_preventing_loops",
-                refresh_token: "mock_refresh_token_new",
-                token_type: "Bearer",
-                expires_in: 86400 * 30
-            };
+        if (!refreshToken) {
+            throw new Error('No refresh token available');
         }
         
-        // If it's not a mock token, let's try the normal refresh but with extra safeguards
-        console.log("Attempting to refresh real token with safety limits");
+        console.log("Attempting to refresh token");
         
-        // Extra timeout for safety
+        // Timeout for safety
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced to 3 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         const response = await fetch(REFRESH_ENDPOINT, {
             method: 'POST',
@@ -1138,73 +1070,36 @@ async function checkFirstRun() {
 
 /**
  * Redirect to main application
- * Complete rewrite with multiple failsafes to prevent redirect loops
  */
 function redirectToMainApp() {
-    console.log('Redirecting to main application with anti-loop measures');
+    console.log('Redirecting to main application');
     
     try {
-        // Check if we're in bypass mode
-        const bypassMode = localStorage.getItem('bypass_auth_mode') === 'true';
-        
-        // Calculate which URL parameter to use
-        let param = 'no_redirect=true';
-        
-        // Add strong bypass parameter if in bypass mode
-        if (bypassMode) {
-            param = 'bypass_auth=true';
-            console.log('CRITICAL: Using emergency bypass mode for redirection');
-        }
-        
         // Reset refresh attempts counter on redirection
         localStorage.setItem('refresh_attempts', '0');
         sessionStorage.removeItem('redirect_count');
         
-        // Set a token expiry if none exists (to prevent potential loops)
+        // Set a token expiry if none exists
         const tokenExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
         if (!tokenExpiry) {
-            console.log('Setting default token expiry before redirect');
             const expiryTime = new Date();
-            expiryTime.setDate(expiryTime.getDate() + 30); // 30 days
+            expiryTime.setDate(expiryTime.getDate() + 30);
             localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
         }
         
-        // Additional guard: ensure we have at least some form of token
+        // Verify we have a valid token before redirecting
         const hasToken = localStorage.getItem(TOKEN_KEY);
-        if (!hasToken && !bypassMode) {
-            console.warn('No token found before redirect, creating emergency token');
-            localStorage.setItem(TOKEN_KEY, 'emergency_redirect_token');
+        if (!hasToken) {
+            console.error('No token found, cannot redirect to app');
+            return;
         }
         
-        // Log that we're about to redirect
-        console.log(`Redirecting to app with param: ${param}`);
-        
-        // Use a timeout to prevent any potential race conditions
-        setTimeout(() => {
-            try {
-                // Navigate to the main app with the appropriate parameter
-                window.location.replace(`/?${param}`);
-            } catch (innerError) {
-                console.error('Critical error during redirection:', innerError);
-                // Ultimate fallback - clear everything and go to a special error page
-                localStorage.clear();
-                sessionStorage.clear();
-                window.location.href = '/login?critical=redirect_error';
-            }
-        }, 50);
+        // Navigate to the main app
+        window.location.replace('/');
     } catch (error) {
-        console.error('Fatal error in redirectToMainApp:', error);
-        // Emergency fallback
-        try {
-            window.location.href = '/login?error=redirect_fatal';
-        } catch (e) {
-            // Nothing more we can do
-            alert('Critical redirect error. Please reload the page and try again.');
-        }
+        console.error('Error during redirect:', error);
+        window.location.href = '/login?error=redirect_failed';
     }
-    
-    // No more redirect checks or token validation
-    return;
 }
 
 /**

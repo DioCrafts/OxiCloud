@@ -491,24 +491,24 @@ impl ContactUseCase for ContactStorageAdapter {
 
         for line in vcard_data.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("UID:") {
-                uid = Some(trimmed[4..].trim().to_string());
-            } else if trimmed.starts_with("FN:") {
-                full_name = Some(trimmed[3..].trim().to_string());
-            } else if trimmed.starts_with("N:") {
-                let parts: Vec<&str> = trimmed[2..].split(';').collect();
+            if let Some(stripped) = trimmed.strip_prefix("UID:") {
+                uid = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("FN:") {
+                full_name = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("N:") {
+                let parts: Vec<&str> = stripped.split(';').collect();
                 if parts.len() >= 2 {
                     last_name = Some(parts[0].trim().to_string()).filter(|s| !s.is_empty());
                     first_name = Some(parts[1].trim().to_string()).filter(|s| !s.is_empty());
                 }
-            } else if trimmed.starts_with("NICKNAME:") {
-                nickname = Some(trimmed[9..].trim().to_string());
-            } else if trimmed.starts_with("ORG:") {
-                organization = Some(trimmed[4..].trim().to_string());
-            } else if trimmed.starts_with("TITLE:") {
-                title = Some(trimmed[6..].trim().to_string());
-            } else if trimmed.starts_with("NOTE:") {
-                notes = Some(trimmed[5..].trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("NICKNAME:") {
+                nickname = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("ORG:") {
+                organization = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("TITLE:") {
+                title = Some(stripped.trim().to_string());
+            } else if let Some(stripped) = trimmed.strip_prefix("NOTE:") {
+                notes = Some(stripped.trim().to_string());
             } else if trimmed.starts_with("EMAIL") {
                 if let Some(value) = trimmed.split(':').nth(1)
                     && !value.is_empty()

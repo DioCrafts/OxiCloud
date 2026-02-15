@@ -87,7 +87,7 @@ impl PathService {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
                 "Path",
-                format!("Path contains empty segments: {}", path.to_string()),
+                format!("Path contains empty segments: {}", path),
             ));
         }
 

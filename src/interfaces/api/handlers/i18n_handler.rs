@@ -32,7 +32,7 @@ impl I18nHandler {
         Query(query): Query<TranslationRequestDto>,
     ) -> impl IntoResponse {
         let locale = match &query.locale {
-            Some(locale_str) => match Locale::from_str(locale_str) {
+            Some(locale_str) => match Locale::from_code(locale_str) {
                 Some(locale) => Some(locale),
                 None => {
                     let error = TranslationErrorDto {
@@ -86,7 +86,7 @@ impl I18nHandler {
         State(_service): State<AppState>,
         locale_code: String,
     ) -> impl IntoResponse {
-        let locale = match Locale::from_str(&locale_code) {
+        let locale = match Locale::from_code(&locale_code) {
             Some(locale) => locale,
             None => {
                 return (

@@ -114,13 +114,13 @@ impl ContactService {
 
         let lines: Vec<&str> = vcard_data.lines().collect();
 
-        for i in 0..lines.len() {
-            let line = lines[i].trim();
+        for line in &lines {
+            let line = line.trim();
 
-            if line.starts_with("FN:") {
-                contact.set_full_name(Some(line[3..].to_string()));
-            } else if line.starts_with("N:") {
-                let parts: Vec<&str> = line[2..].split(';').collect();
+            if let Some(stripped) = line.strip_prefix("FN:") {
+                contact.set_full_name(Some(stripped.to_string()));
+            } else if let Some(stripped) = line.strip_prefix("N:") {
+                let parts: Vec<&str> = stripped.split(';').collect();
                 if parts.len() >= 2 {
                     contact.set_last_name(Some(parts[0].to_string()));
                     contact.set_first_name(Some(parts[1].to_string()));
@@ -163,14 +163,14 @@ impl ContactService {
                         is_primary: contact.phone_is_empty(), // First one is primary
                     });
                 }
-            } else if line.starts_with("ORG:") {
-                contact.set_organization(Some(line[4..].to_string()));
-            } else if line.starts_with("TITLE:") {
-                contact.set_title(Some(line[6..].to_string()));
-            } else if line.starts_with("NOTE:") {
-                contact.set_notes(Some(line[5..].to_string()));
-            } else if line.starts_with("UID:") {
-                contact.set_uid(line[4..].to_string());
+            } else if let Some(stripped) = line.strip_prefix("ORG:") {
+                contact.set_organization(Some(stripped.to_string()));
+            } else if let Some(stripped) = line.strip_prefix("TITLE:") {
+                contact.set_title(Some(stripped.to_string()));
+            } else if let Some(stripped) = line.strip_prefix("NOTE:") {
+                contact.set_notes(Some(stripped.to_string()));
+            } else if let Some(stripped) = line.strip_prefix("UID:") {
+                contact.set_uid(stripped.to_string());
             }
         }
 

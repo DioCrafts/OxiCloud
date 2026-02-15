@@ -78,15 +78,19 @@ impl StoragePath {
         self.segments.is_empty()
     }
 
-    /// Converts the path to a string with format "/segment1/segment2/..."
-    pub fn to_string(&self) -> String {
+}
+
+impl std::fmt::Display for StoragePath {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.segments.is_empty() {
-            "/".to_string()
+            write!(f, "/")
         } else {
-            format!("/{}", self.segments.join("/"))
+            write!(f, "/{}", self.segments.join("/"))
         }
     }
+}
 
+impl StoragePath {
     /// Returns the path representation as a string
     pub fn as_str(&self) -> &str {
         // Note: The implementation should really store the string,

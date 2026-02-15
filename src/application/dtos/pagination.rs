@@ -73,11 +73,7 @@ impl PaginationRequestDto {
         }
 
         // Ensure the page size is between 10 and 500
-        if page_size < 10 {
-            page_size = 10;
-        } else if page_size > 500 {
-            page_size = 500;
-        }
+        page_size = page_size.clamp(10, 500);
 
         Self { page, page_size }
     }

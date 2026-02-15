@@ -677,7 +677,7 @@ const ui = {
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
-            <div class="file-name">${folder.name}</div>
+            <div class="file-name">${escapeHtml(folder.name)}</div>
             <div class="file-info">Folder</div>
         `;
 
@@ -818,7 +818,7 @@ const ui = {
                 <div class="file-icon folder-icon">
                     <i class="fas fa-folder"></i>
                 </div>
-                <span>${folder.name}</span>
+                <span>${escapeHtml(folder.name)}</span>
                 ${isFolderFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
@@ -952,7 +952,7 @@ const ui = {
             <div class="file-icon">
                 <i class="${iconClass}"></i>
             </div>
-            <div class="file-name">${file.name}</div>
+            <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
 
@@ -1056,7 +1056,7 @@ const ui = {
                 <div class="file-icon ${iconSpecialClass}">
                     <i class="${iconClass}"></i>
                 </div>
-                <span>${file.name}</span>
+                <span>${escapeHtml(file.name)}</span>
                 ${isFileFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${typeLabel}</div>

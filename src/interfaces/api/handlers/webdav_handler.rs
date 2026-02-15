@@ -404,17 +404,17 @@ async fn handle_get(
         .await
         .map_err(|_e| AppError::not_found(format!("File not found: {}", path)))?;
 
-    // Get file content
-    let content = file_retrieval_service
-        .get_file_content(&file.id)
+    // Stream file content — constant ~64 KB memory regardless of file size
+    let stream = file_retrieval_service
+        .get_file_stream(&file.id)
         .await
-        .map_err(|e| AppError::internal_error(format!("Failed to get file content: {}", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to stream file: {}", e)))?;
 
-    // Build response
+    // Build streaming response using Content-Length from metadata
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, file.mime_type)
-        .header(header::CONTENT_LENGTH, content.len())
+        .header(header::CONTENT_LENGTH, file.size)
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(
             header::LAST_MODIFIED,
@@ -422,7 +422,7 @@ async fn handle_get(
                 .unwrap_or_else(Utc::now)
                 .to_rfc2822(),
         )
-        .body(Body::from(content))
+        .body(Body::from_stream(Box::into_pin(stream)))
         .unwrap())
 }
 
@@ -458,21 +458,16 @@ async fn handle_head(
             .unwrap());
     }
 
-    // Try as file
+    // Try as file — use metadata only, never load content for HEAD
     let file = file_retrieval_service
         .get_file_by_path(&path)
         .await
         .map_err(|_e| AppError::not_found(format!("Resource not found: {}", path)))?;
 
-    let content = file_retrieval_service
-        .get_file_content(&file.id)
-        .await
-        .map_err(|e| AppError::internal_error(format!("Failed to get file content: {}", e)))?;
-
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, &file.mime_type)
-        .header(header::CONTENT_LENGTH, content.len())
+        .header(header::CONTENT_LENGTH, file.size)
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(
             header::LAST_MODIFIED,
@@ -960,32 +955,33 @@ async fn handle_copy(
             }
         }
     } else {
-        // Try to copy file
+        // Copy file — use zero-copy dedup (only increments blob ref_count, no content loaded)
         let file = file_retrieval_service
             .get_file_by_path(&source_path)
             .await
             .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
 
-        // Get file content
-        let content = file_retrieval_service
-            .get_file_content(&file.id)
-            .await
-            .map_err(|e| AppError::internal_error(format!("Failed to get file content: {}", e)))?;
-
-        // Get destination parent path and filename
-        let dest_filename = destination_path
-            .split('/')
-            .next_back()
-            .unwrap_or(&destination_path);
+        // Get destination parent folder ID
         let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
             &destination_path[..idx]
         } else {
             ""
         };
 
-        // Create new file in destination
-        file_upload_service
-            .create_file(dest_parent_path, dest_filename, &content, &file.mime_type)
+        let target_folder_id = if dest_parent_path.is_empty() {
+            None
+        } else {
+            match folder_service.get_folder_by_path(dest_parent_path).await {
+                Ok(parent) => Some(parent.id),
+                Err(_) => None,
+            }
+        };
+
+        // Zero-copy: only creates a new metadata row + increments blob reference count.
+        // No file content is ever loaded into memory.
+        let file_management_service = &state.applications.file_management_service;
+        file_management_service
+            .copy_file(&file.id, target_folder_id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to copy file: {}", e)))?;
     }

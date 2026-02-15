@@ -61,11 +61,14 @@ impl QualifiedName {
         }
     }
 
-    pub fn to_string(&self) -> String {
+}
+
+impl std::fmt::Display for QualifiedName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.namespace.is_empty() {
-            self.name.clone()
+            write!(f, "{}", self.name)
         } else {
-            format!("{{{}}}{}", self.namespace, self.name)
+            write!(f, "{{{}}}{}", self.namespace, self.name)
         }
     }
 }

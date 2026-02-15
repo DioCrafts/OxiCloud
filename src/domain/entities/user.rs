@@ -128,7 +128,7 @@ impl User {
         })
     }
 
-    // Create from existing values (for reconstruction from DB)
+    #[allow(clippy::too_many_arguments)]
     pub fn from_data(
         id: String,
         username: String,
@@ -159,7 +159,7 @@ impl User {
         }
     }
 
-    /// Reconstruct from DB with OIDC fields
+    #[allow(clippy::too_many_arguments)]
     pub fn from_data_full(
         id: String,
         username: String,

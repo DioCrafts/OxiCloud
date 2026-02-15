@@ -56,6 +56,9 @@ npm-debug.log
 *.log
 logs/
 
+# Storage data (user files, blobs — never commit)
+storage/
+
 # Temporary files
 *.tmp
 *.bak

@@ -7,6 +7,7 @@
 //! **None of these stubs should ever handle real user requests.**
 
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -22,7 +23,7 @@ use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
 use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
-    OptimizedFileContent, UploadStrategy,
+    OptimizedFileContent,
 };
 use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
@@ -150,12 +151,14 @@ impl FileWritePort for StubFileWritePort {
         Ok(File::default())
     }
 
-    async fn save_file_from_stream(
+    async fn save_file_from_temp(
         &self,
         _name: String,
         _folder_id: Option<String>,
         _content_type: String,
-        _stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        _temp_path: &Path,
+        _size: u64,
+        _pre_computed_hash: Option<String>,
     ) -> Result<File, DomainError> {
         Ok(File::default())
     }
@@ -380,6 +383,18 @@ pub struct StubFileUploadUseCase;
 
 #[async_trait]
 impl FileUploadUseCase for StubFileUploadUseCase {
+    async fn upload_file_streaming(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _temp_path: &Path,
+        _size: u64,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
     async fn upload_file(
         &self,
         _name: String,
@@ -390,15 +405,15 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         Ok(FileDto::default())
     }
 
-    async fn smart_upload(
+    async fn upload_file_from_path(
         &self,
         _name: String,
         _folder_id: Option<String>,
         _content_type: String,
-        _chunks: Vec<Bytes>,
-        _total_size: usize,
-    ) -> Result<(FileDto, UploadStrategy), DomainError> {
-        Ok((FileDto::default(), UploadStrategy::Buffered))
+        _file_path: &Path,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
     }
 
     async fn create_file(
@@ -576,6 +591,7 @@ impl DedupPort for StubDedupPort {
         &self,
         _source_path: &Path,
         _content_type: Option<String>,
+        _pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
         Err(DomainError::internal_error(
             "DedupService",
@@ -599,6 +615,37 @@ impl DedupPort for StubDedupPort {
     }
 
     async fn read_blob_bytes(&self, _hash: &str) -> Result<Bytes, DomainError> {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn read_blob_stream(
+        &self,
+        _hash: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn read_blob_range_stream(
+        &self,
+        _hash: &str,
+        _start: u64,
+        _end: Option<u64>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
+    {
+        Err(DomainError::internal_error(
+            "DedupService",
+            "DedupService not initialized",
+        ))
+    }
+
+    async fn blob_size(&self, _hash: &str) -> Result<u64, DomainError> {
         Err(DomainError::internal_error(
             "DedupService",
             "DedupService not initialized",

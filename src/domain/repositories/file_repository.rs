@@ -9,7 +9,6 @@
 //! the infrastructure layer.
 
 use std::path::PathBuf;
-use std::pin::Pin;
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -81,13 +80,15 @@ pub trait FileWriteRepository: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<File, DomainError>;
 
-    /// Streaming upload — writes chunks to disk without accumulating in RAM.
-    async fn save_file_from_stream(
+    /// Streaming upload — saves a file from a temp file already on disk.
+    async fn save_file_from_temp(
         &self,
         name: String,
         folder_id: Option<String>,
         content_type: String,
-        stream: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        temp_path: &std::path::Path,
+        size: u64,
+        pre_computed_hash: Option<String>,
     ) -> Result<File, DomainError>;
 
     /// Moves a file to another folder.

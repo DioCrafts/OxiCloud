@@ -501,7 +501,7 @@ const favorites = {
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
-            <div class="file-name">${folder.name}</div>
+            <div class="file-name">${escapeHtml(folder.name)}</div>
             <div class="file-info">Folder</div>
         `;
 
@@ -550,7 +550,7 @@ const favorites = {
                 <div class="file-icon folder-icon">
                     <i class="fas fa-folder"></i>
                 </div>
-                <span>${folder.name}</span>
+                <span>${escapeHtml(folder.name)}</span>
             </div>
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
@@ -639,7 +639,7 @@ const favorites = {
             <div class="file-icon ${iconSpecialClass}">
                 <i class="${iconClass}"></i>
             </div>
-            <div class="file-name">${file.name}</div>
+            <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
 
@@ -685,9 +685,9 @@ const favorites = {
                 <div class="file-icon ${iconSpecialClass}">
                     <i class="${iconClass}"></i>
                 </div>
-                <span>${file.name}</span>
+                <span>${escapeHtml(file.name)}</span>
             </div>
-            <div class="type-cell">${typeLabel}</div>
+            <div class="type-cell">${escapeHtml(typeLabel)}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;

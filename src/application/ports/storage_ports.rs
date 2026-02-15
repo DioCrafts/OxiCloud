@@ -56,6 +56,26 @@ pub trait FileReadPort: Send + Sync + 'static {
 
     /// Gets the parent folder ID from a path (WebDAV).
     async fn get_parent_folder_id(&self, path: &str) -> Result<String, DomainError>;
+
+    /// Find a file by its logical path (folder_name/.../file_name).
+    ///
+    /// The default implementation falls back to `list_files(None)` + linear
+    /// scan (O(N)). Repositories should override with a direct SQL query.
+    async fn find_file_by_path(&self, path: &str) -> Result<Option<File>, DomainError> {
+        let path = path.trim_start_matches('/').trim_end_matches('/');
+        let all_files = self.list_files(None).await?;
+        for file in all_files {
+            let file_path = file.path_string();
+            let file_path = file_path.trim_start_matches('/').trim_end_matches('/');
+            if file_path == path
+                || file_path.ends_with(&format!("/{}", path))
+                || path.ends_with(&format!("/{}", file_path))
+            {
+                return Ok(Some(file));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ─────────────────────────────────────────────────────
@@ -77,13 +97,18 @@ pub trait FileWritePort: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<File, DomainError>;
 
-    /// Streaming upload — writes chunks to disk without accumulating in RAM.
-    async fn save_file_from_stream(
+    /// Streaming upload — saves a file from a temp file already on disk.
+    ///
+    /// When `pre_computed_hash` is provided, the dedup service skips the
+    /// hash re-read — zero extra I/O beyond the initial spool.
+    async fn save_file_from_temp(
         &self,
         name: String,
         folder_id: Option<String>,
         content_type: String,
-        stream: std::pin::Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        temp_path: &std::path::Path,
+        size: u64,
+        pre_computed_hash: Option<String>,
     ) -> Result<File, DomainError>;
 
     /// Moves a file to another folder.

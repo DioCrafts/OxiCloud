@@ -7,8 +7,10 @@
 use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::Stream;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 
 /// Metadata of a stored blob in the dedup system.
 #[derive(Debug, Clone, Serialize)]
@@ -103,10 +105,15 @@ pub trait DedupPort: Send + Sync + 'static {
     ) -> Result<DedupResultDto, DomainError>;
 
     /// Store content with deduplication (streaming from file).
+    ///
+    /// If `pre_computed_hash` is provided (e.g. hash-on-write from the handler),
+    /// the file will NOT be re-read to calculate the hash — saving one full
+    /// sequential read of the file.
     async fn store_from_file(
         &self,
         source_path: &Path,
         content_type: Option<String>,
+        pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError>;
 
     /// Check if a blob with the given hash exists.
@@ -120,6 +127,29 @@ pub trait DedupPort: Send + Sync + 'static {
 
     /// Read blob content as `Bytes`.
     async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError>;
+
+    /// Stream blob content in chunks (64 KB default) — constant memory usage.
+    ///
+    /// Unlike `read_blob()`, this never loads the entire file into RAM.
+    async fn read_blob_stream(
+        &self,
+        hash: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>;
+
+    /// Stream a byte range of a blob — only reads the requested portion.
+    ///
+    /// Uses seek + take so a 1 MB range on a 1 GB file only reads 1 MB from disk.
+    async fn read_blob_range_stream(
+        &self,
+        hash: &str,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>;
+
+    /// Get the size of a blob without reading its content.
+    ///
+    /// Used by HEAD requests to return Content-Length without loading the file.
+    async fn blob_size(&self, hash: &str) -> Result<u64, DomainError>;
 
     /// Add a reference to a blob (increment ref_count).
     async fn add_reference(&self, hash: &str) -> Result<(), DomainError>;

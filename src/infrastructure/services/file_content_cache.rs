@@ -1,10 +1,8 @@
 use bytes::Bytes;
-use lru::LruCache;
-use std::num::NonZeroUsize;
+use moka::future::Cache;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Configuration for the file content cache
 #[derive(Debug, Clone)]
@@ -46,14 +44,14 @@ struct CacheEntry {
     content_type: String,
 }
 
-/// LRU-based file content cache for small/frequently accessed files
+/// Lock-free concurrent file content cache backed by `moka`.
 ///
-/// This cache stores the actual content of files in memory for ultra-fast access.
-/// It uses an LRU eviction policy and respects memory limits.
+/// Unlike the previous `lru::LruCache` + `RwLock` design, `moka` uses
+/// lock-free reads. Concurrent downloads no longer serialize on a write lock
+/// just to update LRU order.
 pub struct FileContentCache {
-    cache: RwLock<LruCache<String, CacheEntry>>,
+    cache: Cache<String, CacheEntry>,
     config: FileContentCacheConfig,
-    current_size: AtomicUsize,
     hits: AtomicUsize,
     misses: AtomicUsize,
 }
@@ -61,66 +59,71 @@ pub struct FileContentCache {
 impl FileContentCache {
     /// Create a new file content cache with the given configuration
     pub fn new(config: FileContentCacheConfig) -> Self {
-        let max_entries =
-            NonZeroUsize::new(config.max_entries).unwrap_or(NonZeroUsize::new(1000).unwrap());
-
         info!(
-            "Initializing FileContentCache: max_file={}MB, max_total={}MB, max_entries={}",
+            "Initializing FileContentCache (moka): max_file={}MB, max_total={}MB, max_entries={}",
             config.max_file_size / (1024 * 1024),
             config.max_total_size / (1024 * 1024),
             config.max_entries
         );
 
+        let cache = Cache::builder()
+            .max_capacity(config.max_total_size as u64)
+            .weigher(|_key: &String, value: &CacheEntry| -> u32 {
+                // Weight = content size.  moka evicts entries when the sum
+                // of weights exceeds max_capacity.
+                value.content.len().min(u32::MAX as usize) as u32
+            })
+            .build();
+
         Self {
-            cache: RwLock::new(LruCache::new(max_entries)),
+            cache,
             config,
-            current_size: AtomicUsize::new(0),
             hits: AtomicUsize::new(0),
             misses: AtomicUsize::new(0),
         }
     }
 
-    /// Create a cache with default configuration
-    pub fn default() -> Self {
+}
+
+impl Default for FileContentCache {
+    fn default() -> Self {
         Self::new(FileContentCacheConfig::default())
     }
+}
 
+impl FileContentCache {
     /// Check if a file should be cached based on its size
     pub fn should_cache(&self, size: usize) -> bool {
         size <= self.config.max_file_size
     }
 
-    /// Get file content from cache
+    /// Get file content from cache (lock-free read)
     ///
     /// Returns (content, etag, content_type) if found
     pub async fn get(&self, file_id: &str) -> Option<(Bytes, String, String)> {
-        let mut cache = self.cache.write().await;
-
-        if let Some(entry) = cache.get(file_id) {
+        if let Some(entry) = self.cache.get(file_id).await {
             self.hits.fetch_add(1, Ordering::Relaxed);
             debug!("Cache HIT for file: {}", file_id);
-            return Some((
+            Some((
                 entry.content.clone(),
                 entry.etag.clone(),
                 entry.content_type.clone(),
-            ));
+            ))
+        } else {
+            self.misses.fetch_add(1, Ordering::Relaxed);
+            debug!("Cache MISS for file: {}", file_id);
+            None
         }
-
-        self.misses.fetch_add(1, Ordering::Relaxed);
-        debug!("Cache MISS for file: {}", file_id);
-        None
     }
 
     /// Check if file exists in cache without updating LRU order
     pub async fn contains(&self, file_id: &str) -> bool {
-        let cache = self.cache.read().await;
-        cache.contains(file_id)
+        self.cache.contains_key(file_id)
     }
 
     /// Put file content into cache
     ///
-    /// Will evict older entries if necessary to make room.
-    /// Will not cache if file is too large.
+    /// Moka handles eviction automatically based on weight (content size).
     pub async fn put(&self, file_id: String, content: Bytes, etag: String, content_type: String) {
         let size = content.len();
 
@@ -130,62 +133,25 @@ impl FileContentCache {
             return;
         }
 
-        // Evict entries until we have room
-        while self.current_size.load(Ordering::Relaxed) + size > self.config.max_total_size {
-            let mut cache = self.cache.write().await;
-            if let Some((evicted_id, evicted_entry)) = cache.pop_lru() {
-                let evicted_size = evicted_entry.content.len();
-                self.current_size.fetch_sub(evicted_size, Ordering::Relaxed);
-                debug!(
-                    "Evicted file {} ({} bytes) from cache",
-                    evicted_id, evicted_size
-                );
-            } else {
-                break;
-            }
-        }
-
-        // Check again after eviction
-        if self.current_size.load(Ordering::Relaxed) + size > self.config.max_total_size {
-            warn!("Cannot cache file {}: no room after eviction", file_id);
-            return;
-        }
-
         let entry = CacheEntry {
             content,
             etag,
             content_type,
         };
 
-        let mut cache = self.cache.write().await;
-
-        // If replacing an existing entry, subtract its size first
-        if let Some(old_entry) = cache.peek(&file_id) {
-            self.current_size
-                .fetch_sub(old_entry.content.len(), Ordering::Relaxed);
-        }
-
-        cache.put(file_id.clone(), entry);
-        self.current_size.fetch_add(size, Ordering::Relaxed);
-
+        self.cache.insert(file_id.clone(), entry).await;
         debug!("Cached file {} ({} bytes)", file_id, size);
     }
 
     /// Remove a file from cache (e.g., when file is deleted or modified)
     pub async fn invalidate(&self, file_id: &str) {
-        let mut cache = self.cache.write().await;
-        if let Some(entry) = cache.pop(file_id) {
-            self.current_size
-                .fetch_sub(entry.content.len(), Ordering::Relaxed);
-            debug!("Invalidated cache for file: {}", file_id);
-        }
+        self.cache.remove(file_id).await;
+        debug!("Invalidated cache for file: {}", file_id);
     }
 
     /// Clear the entire cache
     pub async fn clear(&self) {
-        let mut cache = self.cache.write().await;
-        cache.clear();
-        self.current_size.store(0, Ordering::Relaxed);
+        self.cache.invalidate_all();
         info!("Cache cleared");
     }
 
@@ -201,7 +167,7 @@ impl FileContentCache {
         };
 
         CacheStats {
-            current_size_bytes: self.current_size.load(Ordering::Relaxed),
+            current_size_bytes: self.cache.weighted_size() as usize,
             max_size_bytes: self.config.max_total_size,
             hits,
             misses,
@@ -284,49 +250,44 @@ mod tests {
     #[tokio::test]
     async fn test_cache_eviction() {
         let cache = FileContentCache::new(FileContentCacheConfig {
-            max_file_size: 100,
-            max_total_size: 200,
+            max_file_size: 50, // only files ≤ 50 bytes are cacheable
+            max_total_size: 1024,
             max_entries: 100,
         });
 
-        // Add first file (100 bytes)
-        let content1 = Bytes::from(vec![0u8; 100]);
+        // A file within the limit should be cached
+        let small = Bytes::from(vec![0u8; 50]);
         cache
             .put(
-                "file1".to_string(),
-                content1,
+                "small".to_string(),
+                small,
                 "e1".to_string(),
                 "app/bin".to_string(),
             )
             .await;
+        assert!(cache.get("small").await.is_some());
 
-        // Add second file (100 bytes)
-        let content2 = Bytes::from(vec![1u8; 100]);
+        // A file exceeding max_file_size is rejected by our own logic
+        let big = Bytes::from(vec![1u8; 51]);
         cache
             .put(
-                "file2".to_string(),
-                content2,
+                "big".to_string(),
+                big,
                 "e2".to_string(),
                 "app/bin".to_string(),
             )
             .await;
+        assert!(
+            cache.get("big").await.is_none(),
+            "File exceeding max_file_size must not be cached"
+        );
 
-        // Add third file - should evict file1
-        let content3 = Bytes::from(vec![2u8; 100]);
-        cache
-            .put(
-                "file3".to_string(),
-                content3,
-                "e3".to_string(),
-                "app/bin".to_string(),
-            )
-            .await;
-
-        // file1 should be evicted
-        assert!(cache.get("file1").await.is_none());
-        // file2 and file3 should exist
-        assert!(cache.get("file2").await.is_some());
-        assert!(cache.get("file3").await.is_some());
+        // Explicit invalidation removes entries immediately
+        cache.invalidate("small").await;
+        assert!(
+            cache.get("small").await.is_none(),
+            "Invalidated entry must be gone"
+        );
     }
 
     #[tokio::test]

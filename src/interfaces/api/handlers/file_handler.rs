@@ -35,18 +35,22 @@ impl FileHandler {
     //  UPLOAD
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Uploads a file with TRUE STREAMING support and Write-Behind Cache
+    /// Streaming file upload — constant ~64 KB RAM regardless of file size.
     ///
-    /// The three-tier strategy (write-behind / buffered / streaming) and dedup
-    /// are fully handled by `FileUploadUseCase::smart_upload`.
-    /// This handler only extracts multipart fields and maps the result to HTTP.
+    /// **Hash-on-Write**: SHA-256 is computed while spooling the multipart
+    /// body to the temp file. This eliminates the second sequential read
+    /// that dedup_service would otherwise need, cutting total I/O in half.
     pub async fn upload_file(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         mut multipart: Multipart,
     ) -> impl IntoResponse {
+        use sha2::{Digest, Sha256};
+
+        let upload_service = &state.applications.file_upload_service;
         let mut folder_id: Option<String> = None;
 
-        tracing::debug!("📤 Processing file upload request");
+        tracing::debug!("📤 Processing streaming file upload (hash-on-write)");
 
         while let Some(field) = multipart.next_field().await.unwrap_or(None) {
             let name = field.name().unwrap_or("").to_string();
@@ -66,18 +70,82 @@ impl FileHandler {
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                // Collect chunks from multipart
-                let mut chunks: Vec<Bytes> = Vec::new();
-                let mut total_size: usize = 0;
-                let mut field = field;
-                while let Ok(Some(chunk)) = field.chunk().await {
-                    total_size += chunk.len();
-                    chunks.push(chunk);
+                // ── Early quota check (before spooling to disk) ──────
+                // Use the multipart field's Content-Length header if present.
+                // If the user is already over quota, reject immediately
+                // without wasting I/O on spooling the entire body.
+                if let Some(storage_svc) = state.storage_usage_service.as_ref() {
+                    let estimated_size = field
+                        .headers()
+                        .get(header::CONTENT_LENGTH)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    if let Err(err) = storage_svc
+                        .check_storage_quota(&auth_user.id, estimated_size)
+                        .await
+                    {
+                        tracing::warn!(
+                            "⛔ UPLOAD REJECTED (early quota): user={}, file={}, est_size={}",
+                            auth_user.username,
+                            filename,
+                            estimated_size
+                        );
+                        return Self::quota_error_response(err).into_response();
+                    }
                 }
 
-                // Empty file
-                if chunks.is_empty() {
-                    let upload_service = &state.applications.file_upload_service;
+                // ── Spool multipart field to temp file + hash-on-write ──
+                let temp_dir = state.core.path_service.get_root_path().join(".dedup_temp");
+                let _ = tokio::fs::create_dir_all(&temp_dir).await;
+                let temp_path = temp_dir.join(format!("upload-{}", uuid::Uuid::new_v4()));
+
+                let mut total_size: u64 = 0;
+                let mut hasher = Sha256::new();
+                let spool_result: Result<(), String> = async {
+                    let file = tokio::fs::File::create(&temp_path)
+                        .await
+                        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+                    // Pre-allocate if Content-Length is known (reduces fragmentation)
+                    let hint = field
+                        .headers()
+                        .get(axum::http::header::CONTENT_LENGTH)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.parse::<u64>().ok());
+                    if let Some(len) = hint {
+                        let _ = file.set_len(len).await;  // best-effort
+                    }
+
+                    // 512 KB buffer — 8× fewer write syscalls than 64 KB
+                    let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
+                    let mut field = field;
+                    while let Ok(Some(chunk)) = field.chunk().await {
+                        total_size += chunk.len() as u64;
+                        hasher.update(&chunk);
+                        tokio::io::AsyncWriteExt::write_all(&mut writer, &chunk)
+                            .await
+                            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+                    }
+                    tokio::io::AsyncWriteExt::flush(&mut writer)
+                        .await
+                        .map_err(|e| format!("Failed to flush temp file: {}", e))?;
+                    Ok(())
+                }
+                .await;
+
+                if let Err(e) = spool_result {
+                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    tracing::error!("❌ UPLOAD SPOOL FAILED: {} - {}", filename, e);
+                    return Self::domain_error_response(
+                        crate::common::errors::DomainError::internal_error("FileUpload", e),
+                    )
+                    .into_response();
+                }
+
+                // Empty file — use in-memory path
+                if total_size == 0 {
+                    let _ = tokio::fs::remove_file(&temp_path).await;
                     return match upload_service
                         .upload_file(filename, folder_id, content_type, vec![])
                         .await
@@ -87,127 +155,49 @@ impl FileHandler {
                     };
                 }
 
-                // Delegate to FileService (simple path, no write-behind/dedup)
-                let upload_service = &state.applications.file_upload_service;
-                let data = Self::combine_chunks(chunks, total_size);
-                match upload_service
-                    .upload_file(filename.clone(), folder_id, content_type, data)
-                    .await
+                // Finalize hash
+                let hash = hex::encode(hasher.finalize());
+
+                // ── Quota enforcement ────────────────────────────────
+                if let Some(storage_svc) = state.storage_usage_service.as_ref()
+                    && let Err(err) = storage_svc
+                        .check_storage_quota(&auth_user.id, total_size)
+                        .await
                 {
-                    Ok(file) => {
-                        tracing::info!("✅ UPLOAD COMPLETE: {} (ID: {})", filename, file.id);
-                        return Self::created_json_response(&file);
-                    }
-                    Err(err) => {
-                        tracing::error!("❌ UPLOAD FAILED: {} - {}", filename, err);
-                        return Self::domain_error_response(err);
-                    }
-                }
-            }
-        }
-
-        (
-            StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({
-                "error": "No file provided"
-            })),
-        )
-            .into_response()
-    }
-
-    /// Uploads a file with Write-Behind Cache + Dedup (smart strategy).
-    ///
-    /// Delegates entirely to `FileUploadUseCase::smart_upload` which picks the
-    /// optimal tier and handles deduplication internally.
-    pub async fn upload_file_with_cache(
-        State(state): State<GlobalState>,
-        auth_user: AuthUser,
-        mut multipart: Multipart,
-    ) -> impl IntoResponse {
-        let upload_service = &state.applications.file_upload_service;
-        let mut folder_id: Option<String> = None;
-
-        tracing::debug!("📤 Processing file upload request (with smart upload)");
-
-        while let Some(field) = multipart.next_field().await.unwrap_or(None) {
-            let name = field.name().unwrap_or("").to_string();
-
-            if name == "folder_id" {
-                let v = field.text().await.unwrap_or_default();
-                if !v.is_empty() {
-                    folder_id = Some(v);
-                }
-                continue;
-            }
-
-            if name == "file" {
-                let filename = field.file_name().unwrap_or("unnamed").to_string();
-                let content_type = field
-                    .content_type()
-                    .unwrap_or("application/octet-stream")
-                    .to_string();
-
-                // Collect chunks
-                let mut chunks: Vec<Bytes> = Vec::new();
-                let mut total_size: usize = 0;
-                let mut field = field;
-                while let Ok(Some(chunk)) = field.chunk().await {
-                    total_size += chunk.len();
-                    chunks.push(chunk);
-                }
-
-                // Empty file
-                if chunks.is_empty() {
-                    let upload_svc = &state.applications.file_upload_service;
-                    return match upload_svc
-                        .upload_file(filename, folder_id, content_type, vec![])
-                        .await
-                    {
-                        Ok(file) => Self::created_json_response(&file).into_response(),
-                        Err(err) => Self::domain_error_response(err).into_response(),
-                    };
-                }
-
-                // ── Quota enforcement ────────────────────────────────────
-                if let Some(storage_svc) = state.storage_usage_service.as_ref() {
-                    if let Err(err) = storage_svc
-                        .check_storage_quota(&auth_user.id, total_size as u64)
-                        .await
-                    {
+                        let _ = tokio::fs::remove_file(&temp_path).await;
                         tracing::warn!(
-                            "⛔ UPLOAD REJECTED (quota): user={}, file={}, size={} — {}",
+                            "⛔ UPLOAD REJECTED (quota): user={}, file={}, size={}",
                             auth_user.username,
                             filename,
-                            total_size,
-                            err
+                            total_size
                         );
                         return Self::quota_error_response(err).into_response();
                     }
-                }
 
-                // Delegate to smart_upload (handles write-behind, dedup, streaming)
+                // ── Streaming upload (temp file → blob store, hash pre-computed) ─
                 match upload_service
-                    .smart_upload(
+                    .upload_file_streaming(
                         filename.clone(),
                         folder_id,
                         content_type,
-                        chunks,
+                        &temp_path,
                         total_size,
+                        Some(hash),
                     )
                     .await
                 {
-                    Ok((file, strategy)) => {
+                    Ok(file) => {
                         tracing::info!(
-                            "✅ SMART UPLOAD: {} ({} bytes, strategy: {:?}, ID: {})",
+                            "✅ STREAMING UPLOAD: {} ({} bytes, ID: {})",
                             filename,
                             total_size,
-                            strategy,
                             file.id
                         );
                         return Self::created_json_response(&file).into_response();
                     }
                     Err(err) => {
-                        tracing::error!("❌ SMART UPLOAD FAILED: {} - {}", filename, err);
+                        let _ = tokio::fs::remove_file(&temp_path).await;
+                        tracing::error!("❌ UPLOAD FAILED: {} - {}", filename, err);
                         return Self::domain_error_response(err).into_response();
                     }
                 }
@@ -451,7 +441,7 @@ impl FileHandler {
             .is_some_and(|v| v == "true" || v == "1");
 
         match retrieval
-            .get_file_optimized(&id, accept_webp, prefer_original)
+            .get_file_optimized_preloaded(&id, file_dto.clone(), accept_webp, prefer_original)
             .await
         {
             Ok((_file, content)) => match content {
@@ -545,16 +535,16 @@ impl FileHandler {
 
     /// Uploads a file and generates thumbnails in the background for images.
     ///
-    /// Delegates to [`Self::upload_file_with_cache`] and, on success, spawns
+    /// Delegates to [`Self::upload_file`] (streaming) and, on success, spawns
     /// a background task to generate all thumbnail sizes.
     pub async fn upload_file_with_thumbnails(
         State(state): State<GlobalState>,
         auth_user: AuthUser,
         multipart: Multipart,
     ) -> impl IntoResponse {
-        // Use the smart upload handler
+        // Use the streaming upload handler
         let response =
-            Self::upload_file_with_cache(State(state.clone()), auth_user, multipart).await;
+            Self::upload_file(State(state.clone()), auth_user, multipart).await;
 
         // Try to extract file info for thumbnail generation
         if let Ok(body_bytes) =
@@ -802,19 +792,6 @@ impl FileHandler {
     // ═══════════════════════════════════════════════════════════════════════
     //  PRIVATE HELPERS
     // ═══════════════════════════════════════════════════════════════════════
-
-    /// Combine chunks into a single Vec<u8>.
-    fn combine_chunks(chunks: Vec<Bytes>, total_size: usize) -> Vec<u8> {
-        if chunks.len() == 1 {
-            chunks.into_iter().next().unwrap().to_vec()
-        } else {
-            let mut combined = Vec::with_capacity(total_size);
-            for chunk in chunks {
-                combined.extend_from_slice(&chunk);
-            }
-            combined
-        }
-    }
 
     /// Build a Content-Disposition header value.
     fn content_disposition(name: &str, mime: &str, params: &HashMap<String, String>) -> String {

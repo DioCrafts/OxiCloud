@@ -6,8 +6,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: oxicloud
-#    ports:
-#      - "5432:5432"
+    ports:
+      - "5432:5432"
     networks:
       - oxicloud
     volumes:

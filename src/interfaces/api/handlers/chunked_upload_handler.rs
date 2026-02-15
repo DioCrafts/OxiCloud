@@ -103,27 +103,26 @@ impl ChunkedUploadHandler {
         }
 
         // ── Quota enforcement ────────────────────────────────────
-        if let Some(storage_svc) = state.storage_usage_service.as_ref() {
-            if let Err(err) = storage_svc
+        if let Some(storage_svc) = state.storage_usage_service.as_ref()
+            && let Err(err) = storage_svc
                 .check_storage_quota(&auth_user.id, request.total_size)
                 .await
-            {
-                tracing::warn!(
-                    "⛔ CHUNKED UPLOAD REJECTED (quota): user={}, file={}, size={} — {}",
-                    auth_user.username,
-                    request.filename,
-                    request.total_size,
-                    err.message
-                );
-                return (
-                    StatusCode::INSUFFICIENT_STORAGE,
-                    Json(serde_json::json!({
-                        "error": err.message,
-                        "error_type": "QuotaExceeded"
-                    })),
-                )
-                    .into_response();
-            }
+        {
+            tracing::warn!(
+                "⛔ CHUNKED UPLOAD REJECTED (quota): user={}, file={}, size={} — {}",
+                auth_user.username,
+                request.filename,
+                request.total_size,
+                err.message
+            );
+            return (
+                StatusCode::INSUFFICIENT_STORAGE,
+                Json(serde_json::json!({
+                    "error": err.message,
+                    "error_type": "QuotaExceeded"
+                })),
+            )
+                .into_response();
         }
 
         // Validate chunk size if provided
@@ -279,8 +278,8 @@ impl ChunkedUploadHandler {
         let chunked_service = &state.core.chunked_upload_service;
         let upload_service = &state.applications.file_upload_service;
 
-        // Assemble chunks
-        let (assembled_path, filename, folder_id, content_type, total_size) =
+        // Assemble chunks (hash-on-write: SHA-256 computed during assembly)
+        let (assembled_path, filename, folder_id, content_type, total_size, hash) =
             match chunked_service.complete_upload(&upload_id).await {
                 Ok(result) => result,
                 Err(e) => {
@@ -300,24 +299,9 @@ impl ChunkedUploadHandler {
                 }
             };
 
-        // Read assembled file and create final file record
-        let file_data = match tokio::fs::read(&assembled_path).await {
-            Ok(data) => data,
-            Err(e) => {
-                tracing::error!("Failed to read assembled file: {}", e);
-                return (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to read assembled file: {}", e)
-                    })),
-                )
-                    .into_response();
-            }
-        };
-
-        // Upload via normal service (this handles path resolution, metadata, etc.)
+        // Upload from assembled file on disk — zero extra RAM copies, hash pre-computed
         match upload_service
-            .upload_file(filename.clone(), folder_id.clone(), content_type, file_data)
+            .upload_file_from_path(filename.clone(), folder_id.clone(), content_type, &assembled_path, Some(hash))
             .await
         {
             Ok(file) => {

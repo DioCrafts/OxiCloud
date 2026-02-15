@@ -3,6 +3,23 @@
  * This file contains the core functionality, initialization and state management
  */
 
+/**
+ * Escape HTML special characters to prevent XSS attacks.
+ * Use this whenever inserting user-provided text (file names, folder names, etc.) into HTML.
+ * @param {string} str - The string to escape
+ * @returns {string} The escaped string safe for HTML insertion
+ */
+function escapeHtml(str) {
+    if (typeof str !== 'string') return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
+
 // Global state
 const app = {
     currentView: 'grid',   // Current view mode: 'grid' or 'list'
@@ -972,8 +989,8 @@ function addTrashItemToView(item) {
         <div class="file-icon">
             <i class="${iconClass}"></i>
         </div>
-        <div class="file-name">${item.name}</div>
-        <div class="file-info">${typeLabel} - ${formattedDate}</div>
+        <div class="file-name">${escapeHtml(item.name)}</div>
+        <div class="file-info">${escapeHtml(typeLabel)} - ${escapeHtml(formattedDate)}</div>
         <div class="trash-actions">
             <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
                 <i class="fas fa-undo"></i>
@@ -1013,11 +1030,11 @@ function addTrashItemToView(item) {
             <div class="file-icon">
                 <i class="${iconClass}"></i>
             </div>
-            <span>${item.name}</span>
+            <span>${escapeHtml(item.name)}</span>
         </div>
-        <div class="type-cell">${typeLabel}</div>
-        <div class="path-cell">${item.original_path || '--'}</div>
-        <div class="date-cell">${formattedDate}</div>
+        <div class="type-cell">${escapeHtml(typeLabel)}</div>
+        <div class="path-cell">${escapeHtml(item.original_path || '--')}</div>
+        <div class="date-cell">${escapeHtml(formattedDate)}</div>
         <div class="actions-cell">
             <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
                 <i class="fas fa-undo"></i>
@@ -1465,7 +1482,7 @@ async function refreshUserData() {
     const token = localStorage.getItem(TOKEN_KEY);
     console.log('refreshUserData called, token:', token ? token.substring(0, 20) + '...' : 'null');
     
-    if (!token || token === 'mock_token_emergency_bypass' || token === 'emergency_token') {
+    if (!token) {
         console.log('No valid token, skipping user data refresh');
         return null;
     }
@@ -1579,91 +1596,11 @@ function showUserProfileModal() {
  * Check if user is authenticated and load user's home folder
  */
 async function checkAuthentication() {
-    // COMPLETE BREAK FOR AUTHENTICATION LOOPS: 
-    // Always allow app to load with minimal authentication
-    // This is an emergency fix to stop the redirect loops
-
-    // Check URL for no_redirect parameter that indicates we should bypass auth
-    const bypassAuth = window.location.search.includes('no_redirect=true') || 
-                        window.location.search.includes('bypass_auth=true');
-    
-    if (bypassAuth) {
-        console.log('CRITICAL: Bypassing all authentication checks due to URL parameter');
-        
-        // Always force a clean authentication state to break loops
-        const TOKEN_KEY = 'oxicloud_token';
-        const USER_DATA_KEY = 'oxicloud_user';
-        
-        // Set a mock token if needed
-        if (!localStorage.getItem(TOKEN_KEY)) {
-            console.log('Setting mock token to prevent redirects');
-            localStorage.setItem(TOKEN_KEY, 'mock_token_emergency_bypass');
-            // Set expiry far in the future
-            localStorage.setItem('oxicloud_token_expiry', 
-                new Date(Date.now() + 86400000 * 30).toISOString()); // 30 days
-        }
-        
-        // Create minimal user data to make the app work
-        const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-        if (!userData.username) {
-            console.log('No user data found, creating mock user');
-            const defaultUserData = {
-                id: 'default-user-id',
-                username: 'usuario',
-                email: 'usuario@example.com',
-                storage_quota_bytes: 10737418240, // 10GB default
-                storage_used_bytes: 0
-            };
-            localStorage.setItem(USER_DATA_KEY, JSON.stringify(defaultUserData));
-            
-            // Update avatar with default initials
-            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
-            
-            // Update storage display with default values
-            updateStorageUsageDisplay(defaultUserData);
-        } else {
-            // Update avatar with user initials
-            const userInitials = userData.username.substring(0, 2).toUpperCase();
-            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
-            
-            // Show cached storage first, then try to refresh from server
-            updateStorageUsageDisplay(userData);
-            
-            // Try to get updated storage from server (if we have a real token)
-            const token = localStorage.getItem(TOKEN_KEY);
-            if (token && token !== 'mock_token_emergency_bypass' && token !== 'emergency_token') {
-                console.log('Bypass mode: Attempting to refresh storage from server...');
-                refreshUserData().then(freshData => {
-                    if (freshData) {
-                        console.log('Bypass mode: Storage updated from server');
-                    }
-                }).catch(err => {
-                    console.warn('Bypass mode: Could not refresh user data:', err);
-                });
-            }
-        }
-        
-        // Reset all counters to prevent loops
-        sessionStorage.removeItem('redirect_count');
-        localStorage.setItem('refresh_attempts', '0');
-        
-        // Proceed directly to load files
-        app.currentPath = '';
-        ui.updateBreadcrumb('');
-        loadFiles();
-        return;
-    }
-    
     try {
-        // Simplified authentication check - just verify token exists
         const TOKEN_KEY = 'oxicloud_token';
         const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
         const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
         const USER_DATA_KEY = 'oxicloud_user';
-        
-        // Reset counters to prevent loops
-        sessionStorage.removeItem('redirect_count');
-        localStorage.setItem('refresh_attempts', '0');
         
         // --- OIDC exchange code handling ---
         // After OIDC login, the backend redirects here with ?oidc_code=...
@@ -1737,18 +1674,16 @@ async function checkAuthentication() {
             }
         }
         
-        // Simple token check - just verify it exists
+        // Verify token exists
         const token = localStorage.getItem(TOKEN_KEY);
         
         if (!token) {
             console.log('No token found, redirecting to login');
-            // Avoid potential loop by adding a parameter
-            const redirectUrl = '/login?source=app';
-            window.location.href = redirectUrl;
+            window.location.href = '/login?source=app';
             return;
         }
 
-        // Token exists, proceed with minimal validation
+        // Token exists, proceed with app initialization
         console.log('Token found, proceeding with app initialization');
         
         // Display user information if available
@@ -1769,7 +1704,6 @@ async function checkAuthentication() {
             updateStorageUsageDisplay(userData);
             
             // Then refresh user data from server in the background to get updated storage
-            // This triggers the backend to recalculate storage and returns fresh data
             refreshUserData().then(freshData => {
                 if (freshData) {
                     console.log('Storage usage updated from server');
@@ -1781,56 +1715,41 @@ async function checkAuthentication() {
             // Find and load the user's home folder
             findUserHomeFolder(userData.username);
         } else {
-            // If no user data but we have a token, create default user data
-            console.log('No user data but token exists, using default user');
-            const defaultUserData = {
-                id: 'default-user-id',
-                username: 'usuario',
-                email: 'usuario@example.com',
-                storage_quota_bytes: 10737418240, // 10GB default
-                storage_used_bytes: 0
-            };
-            localStorage.setItem(USER_DATA_KEY, JSON.stringify(defaultUserData));
-            
-            // Update avatar with default initials
-            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
-            
-            // Update storage display with default values
-            updateStorageUsageDisplay(defaultUserData);
-            
-            // Find and load default folder
-            app.currentPath = '';
-            ui.updateBreadcrumb('');
-            loadFiles();
+            // No user data but token exists — try to fetch from server
+            console.log('No user data, attempting to fetch from server');
+            try {
+                const freshData = await refreshUserData();
+                if (freshData && freshData.username) {
+                    const userInitials = freshData.username.substring(0, 2).toUpperCase();
+                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
+                    updateStorageUsageDisplay(freshData);
+                    findUserHomeFolder(freshData.username);
+                } else {
+                    // Server didn't return valid user data — token is likely invalid
+                    console.warn('Could not retrieve user data, redirecting to login');
+                    localStorage.removeItem(TOKEN_KEY);
+                    localStorage.removeItem(REFRESH_TOKEN_KEY);
+                    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+                    localStorage.removeItem(USER_DATA_KEY);
+                    window.location.href = '/login?source=invalid_session';
+                }
+            } catch (err) {
+                console.error('Failed to fetch user data:', err);
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(REFRESH_TOKEN_KEY);
+                localStorage.removeItem(TOKEN_EXPIRY_KEY);
+                localStorage.removeItem(USER_DATA_KEY);
+                window.location.href = '/login?source=session_error';
+            }
         }
     } catch (error) {
         console.error('Error during authentication check:', error);
-        
-        // CRITICAL: On any error, create emergency bypass to break any loops
-        console.log('Creating emergency authentication bypass due to error');
-        localStorage.setItem('oxicloud_token', 'emergency_token');
-        localStorage.setItem('oxicloud_token_expiry', 
-            new Date(Date.now() + 86400000 * 30).toISOString()); // 30 days
-        
-        const defaultUserData = {
-            id: 'emergency-user-id',
-            username: 'usuario',
-            email: 'usuario@example.com',
-            storage_quota_bytes: 10737418240, // 10GB default
-            storage_used_bytes: 0
-        };
-        localStorage.setItem('oxicloud_user', JSON.stringify(defaultUserData));
-        
-        // Update avatar
-        document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = 'US');
-        
-        // Update storage display with default values
-        updateStorageUsageDisplay(defaultUserData);
-        
-        // Load root files
-        app.currentPath = '';
-        ui.updateBreadcrumb('');
-        loadFiles();
+        // On error, redirect to login cleanly — never create fake tokens
+        localStorage.removeItem('oxicloud_token');
+        localStorage.removeItem('oxicloud_refresh_token');
+        localStorage.removeItem('oxicloud_token_expiry');
+        localStorage.removeItem('oxicloud_user');
+        window.location.href = '/login?source=auth_error';
     }
 }
 

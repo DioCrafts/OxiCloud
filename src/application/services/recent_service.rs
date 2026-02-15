@@ -19,7 +19,7 @@ impl RecentService {
     pub fn new(repo: Arc<dyn RecentItemsRepositoryPort>, max_recent_items: i32) -> Self {
         Self {
             repo,
-            max_recent_items: max_recent_items.max(1).min(100),
+            max_recent_items: max_recent_items.clamp(1, 100),
         }
     }
 }

@@ -273,7 +273,7 @@ async fn handle_propfind(
             let mut response_body = Vec::new();
             CardDavAdapter::generate_contacts_response(
                 &mut response_body,
-                &[contact.clone()],
+                std::slice::from_ref(contact),
                 &[(contact.uid.clone(), contact_to_vcard(contact))],
                 &report,
                 base_href,
@@ -489,8 +489,8 @@ async fn handle_put(
 fn extract_uid_from_vcard(vcard_data: &str) -> Option<String> {
     for line in vcard_data.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("UID:") {
-            return Some(trimmed[4..].trim().to_string());
+        if let Some(stripped) = trimmed.strip_prefix("UID:") {
+            return Some(stripped.trim().to_string());
         }
     }
     None

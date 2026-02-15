@@ -78,22 +78,20 @@ impl CalDavAdapter {
                         s if s == "filter" || s.ends_with(":filter") => in_filter = true,
                         s if s == "time-range" || s.ends_with(":time-range") => {
                             // Parse time-range attributes
-                            for attr in e.attributes() {
-                                if let Ok(attr) = attr {
-                                    let attr_name =
-                                        std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                                    let attr_value = attr.unescape_value().unwrap_or_default();
+                            for attr in e.attributes().flatten() {
+                                let attr_name =
+                                    std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                                let attr_value = attr.unescape_value().unwrap_or_default();
 
-                                    if attr_name == "start" {
-                                        // Parse ISO date format with Z for UTC
-                                        start_time = DateTime::parse_from_rfc3339(&attr_value)
-                                            .ok()
-                                            .map(|dt| dt.with_timezone(&Utc));
-                                    } else if attr_name == "end" {
-                                        end_time = DateTime::parse_from_rfc3339(&attr_value)
-                                            .ok()
-                                            .map(|dt| dt.with_timezone(&Utc));
-                                    }
+                                if attr_name == "start" {
+                                    // Parse ISO date format with Z for UTC
+                                    start_time = DateTime::parse_from_rfc3339(&attr_value)
+                                        .ok()
+                                        .map(|dt| dt.with_timezone(&Utc));
+                                } else if attr_name == "end" {
+                                    end_time = DateTime::parse_from_rfc3339(&attr_value)
+                                        .ok()
+                                        .map(|dt| dt.with_timezone(&Utc));
                                 }
                             }
                         }
@@ -151,22 +149,20 @@ impl CalDavAdapter {
                         props.push(QualifiedName::new(namespace, prop_name));
                     } else if name_str == "time-range" || name_str.ends_with(":time-range") {
                         // Parse time-range attributes
-                        for attr in e.attributes() {
-                            if let Ok(attr) = attr {
-                                let attr_name =
-                                    std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
-                                let attr_value = attr.unescape_value().unwrap_or_default();
+                        for attr in e.attributes().flatten() {
+                            let attr_name =
+                                std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            let attr_value = attr.unescape_value().unwrap_or_default();
 
-                                if attr_name == "start" {
-                                    // Parse ISO date format with Z for UTC
-                                    start_time = DateTime::parse_from_rfc3339(&attr_value)
-                                        .ok()
-                                        .map(|dt| dt.with_timezone(&Utc));
-                                } else if attr_name == "end" {
-                                    end_time = DateTime::parse_from_rfc3339(&attr_value)
-                                        .ok()
-                                        .map(|dt| dt.with_timezone(&Utc));
-                                }
+                            if attr_name == "start" {
+                                // Parse ISO date format with Z for UTC
+                                start_time = DateTime::parse_from_rfc3339(&attr_value)
+                                    .ok()
+                                    .map(|dt| dt.with_timezone(&Utc));
+                            } else if attr_name == "end" {
+                                end_time = DateTime::parse_from_rfc3339(&attr_value)
+                                    .ok()
+                                    .map(|dt| dt.with_timezone(&Utc));
                             }
                         }
                     }

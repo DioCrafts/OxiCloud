@@ -18,8 +18,9 @@ pub enum I18nError {
 pub type I18nResult<T> = Result<T, I18nError>;
 
 /// Supported locales
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Locale {
+    #[default]
     English,
     Spanish,
     French,
@@ -40,7 +41,7 @@ impl Locale {
     }
 
     /// Create from locale code string
-    pub fn from_str(code: &str) -> Option<Self> {
+    pub fn from_code(code: &str) -> Option<Self> {
         match code.to_lowercase().as_str() {
             "en" => Some(Locale::English),
             "es" => Some(Locale::Spanish),
@@ -49,11 +50,6 @@ impl Locale {
             "pt" => Some(Locale::Portuguese),
             _ => None,
         }
-    }
-
-    /// Get default locale
-    pub fn default() -> Self {
-        Locale::English
     }
 }
 

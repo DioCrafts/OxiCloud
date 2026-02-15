@@ -193,14 +193,14 @@ impl FileWritePort for MockFileRepository {
         unimplemented!()
     }
 
-    async fn save_file_from_stream(
+    async fn save_file_from_temp(
         &self,
         _name: String,
         _folder_id: Option<String>,
         _content_type: String,
-        _stream: std::pin::Pin<
-            Box<dyn Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send>,
-        >,
+        _temp_path: &std::path::Path,
+        _size: u64,
+        _pre_computed_hash: Option<String>,
     ) -> std::result::Result<File, DomainError> {
         unimplemented!()
     }
@@ -240,6 +240,14 @@ impl FileWritePort for MockFileRepository {
         _content_type: String,
         _size: u64,
     ) -> std::result::Result<(File, PathBuf), DomainError> {
+        unimplemented!()
+    }
+
+    async fn copy_file(
+        &self,
+        _file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> std::result::Result<File, DomainError> {
         unimplemented!()
     }
 
@@ -608,17 +616,19 @@ mod tests {
         );
 
         // Verify the file is restored in file repository
-        let files = file_repo.files.lock().unwrap();
-        let trashed_files = file_repo.trashed_files.lock().unwrap();
+        {
+            let files = file_repo.files.lock().unwrap();
+            let trashed_files = file_repo.trashed_files.lock().unwrap();
 
-        assert!(
-            files.get(file_id).is_some(),
-            "File should be back in main storage"
-        );
-        assert!(
-            trashed_files.get(file_id).is_none(),
-            "File should no longer be in trash storage"
-        );
+            assert!(
+                files.get(file_id).is_some(),
+                "File should be back in main storage"
+            );
+            assert!(
+                trashed_files.get(file_id).is_none(),
+                "File should no longer be in trash storage"
+            );
+        }
 
         // Verify the trash item is removed
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
@@ -670,17 +680,19 @@ mod tests {
         );
 
         // Verify the file is permanently deleted
-        let files = file_repo.files.lock().unwrap();
-        let trashed_files = file_repo.trashed_files.lock().unwrap();
+        {
+            let files = file_repo.files.lock().unwrap();
+            let trashed_files = file_repo.trashed_files.lock().unwrap();
 
-        assert!(
-            files.get(file_id).is_none(),
-            "File should not be in main storage"
-        );
-        assert!(
-            trashed_files.get(file_id).is_none(),
-            "File should not be in trash storage"
-        );
+            assert!(
+                files.get(file_id).is_none(),
+                "File should not be in main storage"
+            );
+            assert!(
+                trashed_files.get(file_id).is_none(),
+                "File should not be in trash storage"
+            );
+        }
 
         // Verify the trash item is removed
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();

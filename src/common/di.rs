@@ -884,6 +884,7 @@ impl AppState {
     /// Uses `Default` stubs for infrastructure services, then overlays the real
     /// application-level services that arrive as parameters from `main.rs`.
     /// This keeps `routes.rs` free of any `crate::infrastructure` references.
+    #[allow(clippy::too_many_arguments)]
     pub fn for_routing(
         folder_service: Arc<FolderService>,
         file_retrieval_service: Arc<

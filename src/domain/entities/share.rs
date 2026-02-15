@@ -84,8 +84,7 @@ impl Share {
         })
     }
 
-    /// Reconstruct a Share from persisted data (e.g. filesystem/database).
-    /// Skips validation and ID generation — uses the provided values directly.
+    #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
         id: String,
         item_id: String,

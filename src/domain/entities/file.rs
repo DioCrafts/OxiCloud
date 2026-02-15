@@ -127,7 +127,7 @@ impl File {
         })
     }
 
-    /// Creates a file with specific timestamps (for reconstruction)
+    #[allow(clippy::too_many_arguments)]
     pub fn with_timestamps(
         id: String,
         name: String,
@@ -196,8 +196,7 @@ impl File {
         self.modified_at
     }
 
-    /// Creates a new File instance from a DTO
-    /// This function is primarily for conversions in batch handlers
+    #[allow(clippy::too_many_arguments)]
     pub fn from_dto(
         id: String,
         name: String,

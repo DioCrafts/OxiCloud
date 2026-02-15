@@ -246,7 +246,7 @@ const recent = {
             <div class="file-icon ${iconSpecialClass}">
                 <i class="${iconClass}"></i>
             </div>
-            <div class="file-name">${file.name}</div>
+            <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Accessed ${formattedDate.split(' ')[0]}</div>
         `;
 
@@ -297,9 +297,9 @@ const recent = {
                 <div class="file-icon ${iconSpecialClass}">
                     <i class="${iconClass}"></i>
                 </div>
-                <span>${file.name}</span>
+                <span>${escapeHtml(file.name)}</span>
             </div>
-            <div class="type-cell">${typeLabel}</div>
+            <div class="type-cell">${escapeHtml(typeLabel)}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;

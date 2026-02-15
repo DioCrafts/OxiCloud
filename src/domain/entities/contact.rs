@@ -35,7 +35,7 @@ impl AddressBook {
         }
     }
 
-    /// Reconstructs from persistence (no validation)
+    #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
         id: Uuid,
         name: String,

@@ -5,11 +5,8 @@
 //! - `DedupPort` for content-addressable blob storage on the filesystem
 
 use async_trait::async_trait;
-use bytes::Bytes;
-use futures::Stream;
 use sqlx::PgPool;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::application::ports::dedup_ports::DedupPort;
@@ -55,7 +52,7 @@ impl FileBlobWriteRepository {
         }
     }
 
-    /// Convert a database row into a `File` domain entity.
+    #[allow(clippy::too_many_arguments)]
     async fn row_to_file(
         &self,
         id: String,
@@ -140,14 +137,13 @@ impl FileWritePort for FileBlobWriteRepository {
                         rollback_err
                     );
                 }
-                if let sqlx::Error::Database(ref db_err) = e {
-                    if db_err.code().as_deref() == Some("23505") {
+                if let sqlx::Error::Database(ref db_err) = e
+                    && db_err.code().as_deref() == Some("23505") {
                         return Err(DomainError::already_exists(
                             "File",
                             format!("{name} already exists in folder"),
                         ));
                     }
-                }
                 return Err(DomainError::internal_error(
                     "FileBlobWrite",
                     format!("insert: {e}"),
@@ -166,26 +162,76 @@ impl FileWritePort for FileBlobWriteRepository {
             .await
     }
 
-    async fn save_file_from_stream(
+    async fn save_file_from_temp(
         &self,
         name: String,
         folder_id: Option<String>,
         content_type: String,
-        stream: Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>,
+        temp_path: &std::path::Path,
+        size: u64,
+        pre_computed_hash: Option<String>,
     ) -> Result<File, DomainError> {
-        use futures::StreamExt;
+        let user_id = self.resolve_user_id(folder_id.as_deref()).await?;
 
-        // Collect stream into bytes (blobs are content-addressed, need full content for hash)
-        let mut content = Vec::new();
-        let mut stream = stream;
-        while let Some(chunk) = stream.next().await {
-            let chunk = chunk.map_err(|e| {
-                DomainError::internal_error("FileBlobWrite", format!("stream read: {e}"))
-            })?;
-            content.extend_from_slice(&chunk);
-        }
+        // True streaming: pass pre-computed hash (or let dedup compute it).
+        // When hash is pre-computed, zero extra disk reads.
+        let dedup_result = self
+            .dedup
+            .store_from_file(temp_path, Some(content_type.clone()), pre_computed_hash)
+            .await?;
+        let blob_hash = dedup_result.hash().to_string();
 
-        self.save_file(name, folder_id, content_type, content).await
+        // Insert file metadata — if this fails, compensate by removing the blob ref
+        let row = match sqlx::query_as::<_, (String, i64, i64)>(
+            r#"
+            INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
+            VALUES ($1, $2::uuid, $3, $4, $5, $6)
+            RETURNING id::text,
+                      EXTRACT(EPOCH FROM created_at)::bigint,
+                      EXTRACT(EPOCH FROM updated_at)::bigint
+            "#,
+        )
+        .bind(&name)
+        .bind(&folder_id)
+        .bind(&user_id)
+        .bind(&blob_hash)
+        .bind(size as i64)
+        .bind(&content_type)
+        .fetch_one(self.pool.as_ref())
+        .await
+        {
+            Ok(row) => row,
+            Err(e) => {
+                if let Err(rollback_err) = self.dedup.remove_reference(&blob_hash).await {
+                    tracing::error!(
+                        "Blob orphaned after failed INSERT — hash: {}, err: {}",
+                        &blob_hash[..12],
+                        rollback_err
+                    );
+                }
+                if let sqlx::Error::Database(ref db_err) = e
+                    && db_err.code().as_deref() == Some("23505") {
+                        return Err(DomainError::already_exists(
+                            "File",
+                            format!("{name} already exists in folder"),
+                        ));
+                    }
+                return Err(DomainError::internal_error(
+                    "FileBlobWrite",
+                    format!("insert: {e}"),
+                ));
+            }
+        };
+
+        tracing::info!(
+            "📡 STREAMING WRITE: {} ({} bytes, hash: {})",
+            name,
+            size,
+            &blob_hash[..12]
+        );
+
+        self.row_to_file(row.0, name, folder_id, size as i64, content_type, row.1, row.2)
+            .await
     }
 
     async fn move_file(
@@ -265,14 +311,13 @@ impl FileWritePort for FileBlobWriteRepository {
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.code().as_deref() == Some("23505") {
+            if let sqlx::Error::Database(ref db_err) = e
+                && db_err.code().as_deref() == Some("23505") {
                     return DomainError::already_exists(
                         "File",
                         "File with that name already exists in target folder".to_string(),
                     );
                 }
-            }
             DomainError::internal_error("FileBlobWrite", format!("copy: {e}"))
         })?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
@@ -314,14 +359,13 @@ impl FileWritePort for FileBlobWriteRepository {
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.code().as_deref() == Some("23505") {
+            if let sqlx::Error::Database(ref db_err) = e
+                && db_err.code().as_deref() == Some("23505") {
                     return DomainError::already_exists(
                         "File",
                         format!("{new_name} already exists"),
                     );
                 }
-            }
             DomainError::internal_error("FileBlobWrite", format!("rename: {e}"))
         })?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
@@ -404,15 +448,14 @@ impl FileWritePort for FileBlobWriteRepository {
         };
 
         // Decrement old blob ref (only if hash changed, best-effort)
-        if old_hash != new_hash {
-            if let Err(e) = self.dedup.remove_reference(&old_hash).await {
+        if old_hash != new_hash
+            && let Err(e) = self.dedup.remove_reference(&old_hash).await {
                 tracing::warn!(
                     "Failed to decrement old blob ref {}: {}",
                     &old_hash[..12],
                     e
                 );
             }
-        }
 
         Ok(())
     }

@@ -253,7 +253,7 @@ async fn handle_propfind(
             let mut response_body = Vec::new();
             CalDavAdapter::generate_calendar_events_response(
                 &mut response_body,
-                &[event.clone()],
+                std::slice::from_ref(event),
                 &report_type,
                 base_href,
             )
@@ -469,8 +469,8 @@ async fn handle_put(
 fn extract_uid_from_ical(ical_data: &str) -> Option<String> {
     for line in ical_data.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("UID:") {
-            return Some(trimmed[4..].trim().to_string());
+        if let Some(stripped) = trimmed.strip_prefix("UID:") {
+            return Some(stripped.trim().to_string());
         }
     }
     None

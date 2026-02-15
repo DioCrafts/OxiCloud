@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -11,21 +12,33 @@ use crate::common::errors::DomainError;
 // Upload port
 // ─────────────────────────────────────────────────────
 
-/// Strategy chosen by the upload service based on file size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UploadStrategy {
-    /// Instant (<256KB): write-behind cache, ~0ms latency
-    WriteBehind,
-    /// Buffered (256KB–1MB): full bytes in memory then write
-    Buffered,
-    /// Streaming (≥1MB): pipe chunks directly to disk
-    Streaming,
-}
-
-/// Primary port for file upload operations
+/// Primary port for file upload operations.
+///
+/// All upload paths converge on streaming-to-disk:
+/// - Normal uploads: handler spools multipart to temp file → `upload_file_streaming`
+/// - WebDAV PUT: small in-memory buffer → `upload_file`
+/// - Chunked uploads: chunks already on disk → `upload_file_from_path`
 #[async_trait]
 pub trait FileUploadUseCase: Send + Sync + 'static {
-    /// Uploads a new file from bytes
+    /// Upload from a temp file already on disk (true streaming, ~64 KB RAM).
+    ///
+    /// When `pre_computed_hash` is `Some`, the blob store skips the hash
+    /// re-read — the handler already computed it during the multipart spool.
+    async fn upload_file_streaming(
+        &self,
+        name: String,
+        folder_id: Option<String>,
+        content_type: String,
+        temp_path: &Path,
+        size: u64,
+        pre_computed_hash: Option<String>,
+    ) -> Result<FileDto, DomainError>;
+
+    /// Upload from in-memory bytes (for small payloads: WebDAV, empty files).
+    ///
+    /// Only used for WebDAV PUT and empty files where the content is already
+    /// buffered by the protocol handler. For normal uploads, prefer
+    /// `upload_file_streaming`.
     async fn upload_file(
         &self,
         name: String,
@@ -34,18 +47,17 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         content: Vec<u8>,
     ) -> Result<FileDto, DomainError>;
 
-    /// Smart upload: picks the best strategy (write-behind / buffered / streaming)
-    /// and handles dedup automatically.
+    /// Upload from a file already assembled on disk (chunked uploads).
     ///
-    /// Returns `(FileDto, UploadStrategy)` so the handler can log the chosen tier.
-    async fn smart_upload(
+    /// Same as `upload_file_streaming` but with a separate name for clarity.
+    async fn upload_file_from_path(
         &self,
         name: String,
         folder_id: Option<String>,
         content_type: String,
-        chunks: Vec<Bytes>,
-        total_size: usize,
-    ) -> Result<(FileDto, UploadStrategy), DomainError>;
+        file_path: &Path,
+        pre_computed_hash: Option<String>,
+    ) -> Result<FileDto, DomainError>;
 
     /// Creates a new file at the specified path (for WebDAV)
     async fn create_file(
@@ -114,6 +126,21 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         accept_webp: bool,
         prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError>;
+
+    /// Like `get_file_optimized` but accepts an already-fetched `FileDto`,
+    /// avoiding a redundant metadata query when the handler already has it.
+    async fn get_file_optimized_preloaded(
+        &self,
+        id: &str,
+        file_dto: FileDto,
+        accept_webp: bool,
+        prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        // Default: ignore pre-fetched meta, re-fetch everything.
+        let _ = file_dto;
+        self.get_file_optimized(id, accept_webp, prefer_original)
+            .await
+    }
 
     /// Range-based streaming for HTTP Range Requests (video seek, resumable DL).
     async fn get_file_range_stream(

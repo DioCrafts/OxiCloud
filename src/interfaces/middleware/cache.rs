@@ -48,6 +48,12 @@ pub struct HttpCache {
     default_max_age: u64,
 }
 
+impl Default for HttpCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HttpCache {
     /// Creates a new cache instance
     pub fn new() -> Self {

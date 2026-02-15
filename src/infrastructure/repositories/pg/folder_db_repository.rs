@@ -43,28 +43,6 @@ impl FolderDbRepository {
 
     /// Build the full virtual path for a folder by walking up the `parent_id` chain.
     async fn build_folder_path(&self, folder_id: &str) -> Result<StoragePath, DomainError> {
-        // CTE-based recursive query to build path segments
-        let _rows = sqlx::query_as::<_, (String,)>(
-            r#"
-            WITH RECURSIVE ancestors AS (
-                SELECT id, name, parent_id
-                  FROM storage.folders
-                 WHERE id = $1::uuid
-                UNION ALL
-                SELECT f.id, f.name, f.parent_id
-                  FROM storage.folders f
-                  JOIN ancestors a ON f.id = a.parent_id
-            )
-            SELECT name FROM ancestors ORDER BY name
-            "#,
-        )
-        .bind(folder_id)
-        .fetch_all(self.pool())
-        .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("path query: {e}")))?;
-
-        // Actually we need a proper ordering. Let me rewrite with depth tracking.
-        // Re-query with depth.
         let rows = sqlx::query_as::<_, (String, i32)>(
             r#"
             WITH RECURSIVE ancestors AS (
@@ -152,14 +130,13 @@ impl FolderRepository for FolderDbRepository {
         .fetch_one(self.pool())
         .await
         .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.code().as_deref() == Some("23505") {
+            if let sqlx::Error::Database(ref db_err) = e
+                && db_err.code().as_deref() == Some("23505") {
                     return DomainError::already_exists(
                         "Folder",
                         format!("{name} already exists in parent"),
                     );
                 }
-            }
             DomainError::internal_error("FolderDb", format!("insert: {e}"))
         })?;
 
@@ -355,14 +332,13 @@ impl FolderRepository for FolderDbRepository {
         .execute(self.pool())
         .await
         .map_err(|e| {
-            if let sqlx::Error::Database(ref db_err) = e {
-                if db_err.code().as_deref() == Some("23505") {
+            if let sqlx::Error::Database(ref db_err) = e
+                && db_err.code().as_deref() == Some("23505") {
                     return DomainError::already_exists(
                         "Folder",
                         format!("{new_name} already exists"),
                     );
                 }
-            }
             DomainError::internal_error("FolderDb", format!("rename: {e}"))
         })?;
 
