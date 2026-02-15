@@ -99,13 +99,13 @@ RUST_LOG=debug cargo run
 - Search across files and folders
 - Favorites and recent files
 - Responsive grid/list views
+- WebDAV support for desktop and mobile sync
 
 ## What's Next
 
 I'm working on these when I have time:
 
 - File sharing via links
-- WebDAV for desktop sync
 - Basic versioning
 - Mobile app improvements
 
