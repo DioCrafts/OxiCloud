@@ -192,7 +192,7 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
     <h3>Using Finder</h3>
     <ol>
       <li>Open <strong>Finder</strong></li>
-      <li>From the menu bar, click <strong>Go</strong> → <strong>Connect to Server</strong> (or press <kbd>⌘K</kbd>)</li>
+      <li>From the menu bar, click <strong>Go</strong> → <strong>Connect to Server</strong> (or press <kbd>Cmd+K</kbd>)</li>
       <li>Enter your WebDAV URL (shown above)</li>
       <li>Click <strong>Connect</strong></li>
       <li>Enter your OxiCloud username and password</li>
@@ -292,8 +292,12 @@ function scrollTo(selector) {
   document.querySelector(selector).scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function getWebDAVUrl() {
+  return window.location.protocol + '//' + window.location.host + '/webdav/';
+}
+
 // Display WebDAV URL
-const webdavUrl = window.location.protocol + '//' + window.location.host + '/webdav/';
+const webdavUrl = getWebDAVUrl();
 document.getElementById('webdav-url-display').textContent = webdavUrl;
 document.getElementById('webdav-url-display2').textContent = webdavUrl;
 </script>

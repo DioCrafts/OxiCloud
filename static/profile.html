@@ -257,6 +257,10 @@ function headers() {
   return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
 }
 
+function getWebDAVUrl() {
+  return window.location.protocol + '//' + window.location.host + '/webdav/';
+}
+
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
   const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -320,8 +324,7 @@ async function init() {
     document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : 'Unlimited');
 
     // WebDAV URL
-    const webdavUrl = window.location.protocol + '//' + window.location.host + '/webdav/';
-    document.getElementById('webdav-url').textContent = webdavUrl;
+    document.getElementById('webdav-url').textContent = getWebDAVUrl();
 
     // Hide change password for OIDC-only users
     if (user.auth_provider && user.auth_provider !== 'local') {
@@ -399,10 +402,9 @@ async function changePassword(e) {
 }
 
 function copyWebDAVUrl() {
-  const webdavUrl = window.location.protocol + '//' + window.location.host + '/webdav/';
   const statusEl = document.getElementById('webdav-copy-status');
   
-  navigator.clipboard.writeText(webdavUrl).then(() => {
+  navigator.clipboard.writeText(getWebDAVUrl()).then(() => {
     statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> WebDAV URL copied to clipboard</div>';
     setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
   }).catch(err => {
