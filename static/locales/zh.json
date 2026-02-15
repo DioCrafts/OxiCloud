@@ -276,5 +276,13 @@
     "accessed": "访问于",
     "empty_state": "没有最近文件",
     "empty_hint": "您打开的文件将显示在这里"
+  },
+  "batch": {
+    "one_selected": "已选择 1 个项目",
+    "n_selected": "已选择 {{count}} 个项目",
+    "confirm_delete": "确定要将 {{count}} 个项目移至回收站吗？",
+    "move_title": "移动 {{count}} 个项目",
+    "add_favorites": "添加到收藏夹",
+    "move_copy": "移动或复制"
   }
 }

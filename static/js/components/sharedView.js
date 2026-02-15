@@ -292,7 +292,13 @@ const sharedView = {
 
             const nameCell = document.createElement('td');
             nameCell.className = 'shared-item-name';
-            nameCell.innerHTML = `<span class="item-icon">${item.item_type === 'file' ? '📄' : '📁'}</span><span>${displayName}</span>`;
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'item-icon';
+            iconSpan.textContent = item.item_type === 'file' ? '📄' : '📁';
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = displayName;
+            nameCell.appendChild(iconSpan);
+            nameCell.appendChild(nameSpan);
 
             const typeCell = document.createElement('td');
             typeCell.textContent = item.item_type === 'file' ? this.translate('shared_typeFile', 'File') : this.translate('shared_typeFolder', 'Folder');

@@ -3919,7 +3919,27 @@ html[dir='rtl'] .fa-sign-out-alt {
     /* Checked via JS */
 }
 
-/* -- Batch action bar -- */
+/* ── Selection-mode header (replaces Name/Type/Size/Modified) ── */
+.list-header.selection-mode {
+    grid-template-columns: 36px 1fr;
+    background-color: #1e293b;
+    color: #fff;
+    border-bottom-color: #334155;
+}
+
+.list-header.selection-mode .list-header-checkbox input[type="checkbox"] {
+    accent-color: #ff5e3a;
+}
+
+.batch-selection-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
+}
+
+/* -- Batch action bar (grid view floating bar) -- */
 .batch-action-bar {
     display: flex;
     align-items: center;
@@ -4720,9 +4740,14 @@ html[dir='rtl'] .fa-sign-out-alt {
     color: #e2e8f0;
 }
 /* Batch bar dark mode */
-[data-theme="dark"] .batch-bar {
+[data-theme="dark"] .batch-action-bar {
     background-color: #1e293b;
     border-color: #334155;
+    color: #e2e8f0;
+}
+[data-theme="dark"] .list-header.selection-mode {
+    background-color: #0f172a;
+    border-bottom-color: #334155;
     color: #e2e8f0;
 }
 /* Search results dark mode */

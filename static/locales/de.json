@@ -339,5 +339,13 @@
     "folder_deleted": "Ordner in Papierkorb verschoben",
     "item_deleted_permanently": "Element endgültig gelöscht",
     "trash_emptied": "Papierkorb erfolgreich geleert"
+  },
+  "batch": {
+    "one_selected": "1 Element ausgewählt",
+    "n_selected": "{{count}} Elemente ausgewählt",
+    "confirm_delete": "Möchten Sie wirklich {{count}} Elemente in den Papierkorb verschieben?",
+    "move_title": "{{count}} Element(e) verschieben",
+    "add_favorites": "Zu Favoriten hinzufügen",
+    "move_copy": "Verschieben oder kopieren"
   }
 }

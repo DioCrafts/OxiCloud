@@ -339,5 +339,13 @@
     "folder_deleted": "Pasta movida para a lixeira",
     "item_deleted_permanently": "Item excluído permanentemente",
     "trash_emptied": "Lixeira esvaziada com sucesso"
+  },
+  "batch": {
+    "one_selected": "1 item selecionado",
+    "n_selected": "{{count}} itens selecionados",
+    "confirm_delete": "Tem certeza de que deseja mover {{count}} itens para a lixeira?",
+    "move_title": "Mover {{count}} item(ns)",
+    "add_favorites": "Adicionar aos favoritos",
+    "move_copy": "Mover ou copiar"
   }
 }

@@ -71,10 +71,30 @@ impl FolderService {
                 )
             }
 
+            async fn list_folders_for_owner_paginated(
+                &self,
+                _parent_id: Option<&str>,
+                _owner_id: &str,
+                _pagination: &crate::application::dtos::pagination::PaginationRequestDto,
+            ) -> Result<
+                crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>,
+                DomainError,
+            > {
+                Ok(
+                    crate::application::dtos::pagination::PaginatedResponseDto::new(
+                        vec![],
+                        0,
+                        10,
+                        0,
+                    ),
+                )
+            }
+
             async fn rename_folder(
                 &self,
                 _id: &str,
                 _dto: RenameFolderDto,
+                _caller_id: &str,
             ) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
             }
@@ -83,11 +103,12 @@ impl FolderService {
                 &self,
                 _id: &str,
                 _dto: MoveFolderDto,
+                _caller_id: &str,
             ) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
             }
 
-            async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
+            async fn delete_folder(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
                 Ok(())
             }
         }
@@ -211,17 +232,15 @@ impl FolderUseCase for FolderService {
         pagination: &crate::application::dtos::pagination::PaginationRequestDto,
     ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>
     {
-        // Validate and adjust pagination
         let pagination = pagination.validate_and_adjust();
 
-        // Get paginated folders and total count
         let (folders, total_items) = self
             .folder_storage
             .list_folders_paginated(
                 parent_id,
                 pagination.offset(),
                 pagination.limit(),
-                true, // Always include total for better UX
+                true,
             )
             .await
             .map_err(|e| {
@@ -234,10 +253,8 @@ impl FolderUseCase for FolderService {
                 )
             })?;
 
-        // The total is needed to calculate pagination
         let total = total_items.unwrap_or(folders.len());
 
-        // Convert to PaginatedResponseDto
         let response = crate::application::dtos::pagination::PaginatedResponseDto::new(
             folders.into_iter().map(FolderDto::from).collect(),
             pagination.page,
@@ -248,11 +265,54 @@ impl FolderUseCase for FolderService {
         Ok(response)
     }
 
-    /// Renames a folder
+    /// Lists folders with pagination, scoped to a specific owner.
+    async fn list_folders_for_owner_paginated(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+        pagination: &crate::application::dtos::pagination::PaginationRequestDto,
+    ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>
+    {
+        let pagination = pagination.validate_and_adjust();
+
+        let (folders, total_items) = self
+            .folder_storage
+            .list_folders_by_owner_paginated(
+                parent_id,
+                owner_id,
+                pagination.offset(),
+                pagination.limit(),
+                true,
+            )
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "FolderStorage",
+                    format!(
+                        "Failed to list folders for owner '{}' with pagination in parent {:?}: {}",
+                        owner_id, parent_id, e
+                    ),
+                )
+            })?;
+
+        let total = total_items.unwrap_or(folders.len());
+
+        let response = crate::application::dtos::pagination::PaginatedResponseDto::new(
+            folders.into_iter().map(FolderDto::from).collect(),
+            pagination.page,
+            pagination.page_size,
+            total,
+        );
+
+        Ok(response)
+    }
+
+    /// Renames a folder after verifying ownership.
     async fn rename_folder(
         &self,
         id: &str,
         dto: RenameFolderDto,
+        caller_id: &str,
     ) -> Result<FolderDto, DomainError> {
         // Input validation
         if dto.name.is_empty() {
@@ -263,13 +323,21 @@ impl FolderUseCase for FolderService {
             ));
         }
 
-        // Verify the folder exists
+        // Verify the folder exists and belongs to the caller
         let existing_folder = self.folder_storage.get_folder(id).await.map_err(|e| {
             DomainError::internal_error(
                 "FolderStorage",
                 format!("Failed to get folder with ID: {} for renaming: {}", id, e),
             )
         })?;
+
+        if existing_folder.owner_id() != Some(caller_id) {
+            tracing::warn!(
+                "rename_folder: user '{}' attempted to rename folder '{}' owned by '{:?}'",
+                caller_id, id, existing_folder.owner_id()
+            );
+            return Err(DomainError::not_found("Folder", id));
+        }
 
         // Create transaction for renaming
         let mut transaction = StorageTransaction::new("rename_folder");
@@ -323,15 +391,23 @@ impl FolderUseCase for FolderService {
         Ok(FolderDto::from(folder))
     }
 
-    /// Moves a folder to a new parent
-    async fn move_folder(&self, id: &str, dto: MoveFolderDto) -> Result<FolderDto, DomainError> {
-        // Verify the source folder exists
+    /// Moves a folder to a new parent after verifying ownership.
+    async fn move_folder(&self, id: &str, dto: MoveFolderDto, caller_id: &str) -> Result<FolderDto, DomainError> {
+        // Verify the source folder exists and belongs to the caller
         let source_folder = self.folder_storage.get_folder(id).await.map_err(|e| {
             DomainError::internal_error(
                 "FolderStorage",
                 format!("Failed to get folder with ID: {} for moving: {}", id, e),
             )
         })?;
+
+        if source_folder.owner_id() != Some(caller_id) {
+            tracing::warn!(
+                "move_folder: user '{}' attempted to move folder '{}' owned by '{:?}'",
+                caller_id, id, source_folder.owner_id()
+            );
+            return Err(DomainError::not_found("Folder", id));
+        }
 
         // If a parent_id is specified, verify it exists
         if let Some(parent_id) = &dto.parent_id {
@@ -408,17 +484,23 @@ impl FolderUseCase for FolderService {
         Ok(FolderDto::from(folder))
     }
 
-    /// Deletes a folder
-    async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {
-        // Verify the folder exists
-        let _folder = self.folder_storage.get_folder(id).await.map_err(|e| {
+    /// Deletes a folder after verifying ownership.
+    async fn delete_folder(&self, id: &str, caller_id: &str) -> Result<(), DomainError> {
+        // Verify the folder exists and belongs to the caller
+        let folder = self.folder_storage.get_folder(id).await.map_err(|e| {
             DomainError::internal_error(
                 "FolderStorage",
                 format!("Failed to get folder with ID: {} for deletion: {}", id, e),
             )
         })?;
 
-        // In a real implementation, we could verify permissions, dependencies, etc.
+        if folder.owner_id() != Some(caller_id) {
+            tracing::warn!(
+                "delete_folder: user '{}' attempted to delete folder '{}' owned by '{:?}'",
+                caller_id, id, folder.owner_id()
+            );
+            return Err(DomainError::not_found("Folder", id));
+        }
 
         // Delete the folder
         self.folder_storage.delete_folder(id).await.map_err(|e| {

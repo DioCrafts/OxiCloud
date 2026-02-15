@@ -268,6 +268,17 @@ impl FolderRepository for StubFolderStoragePort {
         Ok((Vec::new(), Some(0)))
     }
 
+    async fn list_folders_by_owner_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _owner_id: &str,
+        _offset: usize,
+        _limit: usize,
+        _include_total: bool,
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
+        Ok((Vec::new(), Some(0)))
+    }
+
     async fn rename_folder(&self, _id: &str, _new_name: String) -> Result<Folder, DomainError> {
         Ok(Folder::default())
     }
@@ -374,19 +385,29 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(PaginatedResponseDto::new(Vec::new(), 0, 10, 0))
     }
 
+    async fn list_folders_for_owner_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _owner_id: &str,
+        _pagination: &PaginationRequestDto,
+    ) -> Result<PaginatedResponseDto<FolderDto>, DomainError> {
+        Ok(PaginatedResponseDto::new(Vec::new(), 0, 10, 0))
+    }
+
     async fn rename_folder(
         &self,
         _id: &str,
         _dto: RenameFolderDto,
+        _caller_id: &str,
     ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
-    async fn move_folder(&self, _id: &str, _dto: MoveFolderDto) -> Result<FolderDto, DomainError> {
+    async fn move_folder(&self, _id: &str, _dto: MoveFolderDto, _caller_id: &str) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
-    async fn delete_folder(&self, _id: &str) -> Result<(), DomainError> {
+    async fn delete_folder(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
         Ok(())
     }
 }

@@ -1250,8 +1250,18 @@ function initRubberBandSelection() {
 
             if (intersects) {
                 card.classList.add('selected');
+                // Sync with multiSelect module
+                if (window.multiSelect) {
+                    const info = window.multiSelect._extractInfo(card);
+                    if (info) window.multiSelect.select(info.id, info.name, info.type, info.parentId);
+                }
             } else {
                 card.classList.remove('selected');
+                // Deselect from multiSelect module
+                if (window.multiSelect) {
+                    const info = window.multiSelect._extractInfo(card);
+                    if (info) window.multiSelect.deselect(info.id);
+                }
             }
         });
     });
@@ -1260,6 +1270,8 @@ function initRubberBandSelection() {
         if (!active) return;
         active = false;
         selRect.style.display = 'none';
+        // Update the batch bar after rubber band selection completes
+        if (window.multiSelect) window.multiSelect._syncUI();
     });
 }
 

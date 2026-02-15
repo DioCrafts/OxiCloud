@@ -341,5 +341,13 @@
     "trash_emptied": "Papelera vaciada correctamente",
     "title": "Notificaciones",
     "empty": "Sin notificaciones"
+  },
+  "batch": {
+    "one_selected": "1 elemento seleccionado",
+    "n_selected": "{{count}} elementos seleccionados",
+    "confirm_delete": "¿Estás seguro de que quieres mover {{count}} elementos a la papelera?",
+    "move_title": "Mover {{count}} elemento(s)",
+    "add_favorites": "Añadir a favoritos",
+    "move_copy": "Mover o copiar"
   }
 }

@@ -369,6 +369,82 @@ impl FolderRepository for FolderDbRepository {
         Ok((folders, total))
     }
 
+    async fn list_folders_by_owner_paginated(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+        offset: usize,
+        limit: usize,
+        include_total: bool,
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
+        let total = if include_total {
+            let count: i64 = if let Some(pid) = parent_id {
+                sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed",
+                )
+                .bind(pid)
+                .bind(owner_id)
+                .fetch_one(self.pool())
+                .await
+            } else {
+                sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed",
+                )
+                .bind(owner_id)
+                .fetch_one(self.pool())
+                .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("count_by_owner: {e}")))?;
+            Some(count as usize)
+        } else {
+            None
+        };
+
+        let rows: Vec<(String, String, Option<String>, String, i64, i64)> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
+                SELECT id::text, name, parent_id::text, user_id,
+                       EXTRACT(EPOCH FROM created_at)::bigint,
+                       EXTRACT(EPOCH FROM updated_at)::bigint
+                  FROM storage.folders
+                 WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
+                 ORDER BY name
+                 LIMIT $3 OFFSET $4
+                "#,
+            )
+            .bind(pid)
+            .bind(owner_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT id::text, name, parent_id::text, user_id,
+                       EXTRACT(EPOCH FROM created_at)::bigint,
+                       EXTRACT(EPOCH FROM updated_at)::bigint
+                  FROM storage.folders
+                 WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
+                 ORDER BY name
+                 LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(owner_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}")))?;
+
+        let mut folders = Vec::with_capacity(rows.len());
+        for (id, name, pid, uid, ca, ma) in rows {
+            folders.push(self.row_to_folder(id, name, pid, Some(uid), ca, ma).await?);
+        }
+        Ok((folders, total))
+    }
+
     async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError> {
         sqlx::query(
             r#"

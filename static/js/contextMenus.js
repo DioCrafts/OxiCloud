@@ -543,21 +543,44 @@ const contextMenus = {
                     `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 
                     'No expiration';
                 
-                shareEl.innerHTML = `
-                    <div class="share-url">${share.url}</div>
-                    <div class="share-info">
-                        ${share.has_password ? '<span class="share-protected"><i class="fas fa-lock"></i> Password protected</span>' : ''}
-                        <span class="share-expiration">${expiresText}</span>
-                    </div>
-                    <div class="share-actions">
-                        <button class="btn btn-small copy-link-btn" data-share-url="${share.url}">
-                            <i class="fas fa-copy"></i> Copy
-                        </button>
-                        <button class="btn btn-small btn-danger delete-link-btn" data-share-id="${share.id}">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </div>
-                `;
+                // Share URL
+                const urlDiv = document.createElement('div');
+                urlDiv.className = 'share-url';
+                urlDiv.textContent = share.url;
+                shareEl.appendChild(urlDiv);
+
+                // Share info
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'share-info';
+                if (share.has_password) {
+                    const protectedSpan = document.createElement('span');
+                    protectedSpan.className = 'share-protected';
+                    protectedSpan.innerHTML = '<i class="fas fa-lock"></i> Password protected';
+                    infoDiv.appendChild(protectedSpan);
+                }
+                const expirationSpan = document.createElement('span');
+                expirationSpan.className = 'share-expiration';
+                expirationSpan.textContent = expiresText;
+                infoDiv.appendChild(expirationSpan);
+                shareEl.appendChild(infoDiv);
+
+                // Share actions
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'share-actions';
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'btn btn-small copy-link-btn';
+                copyBtn.dataset.shareUrl = share.url;
+                copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                actionsDiv.appendChild(copyBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-small btn-danger delete-link-btn';
+                deleteBtn.dataset.shareId = share.id;
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                actionsDiv.appendChild(deleteBtn);
+
+                shareEl.appendChild(actionsDiv);
                 
                 existingSharesContainer.appendChild(shareEl);
             });

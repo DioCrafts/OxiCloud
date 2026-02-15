@@ -678,10 +678,11 @@ function setupEventListeners() {
         }
 
         // Deselect all cards when clicking empty area (not on a card, menu, or modal)
-        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-action-bar')) {
+        // Note: multiSelect._hookGlobalDeselect() handles clearing the internal
+        // selection state; this handler only covers the legacy CSS class removal.
+        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-action-bar') && !e.target.closest('.list-header.selection-mode')) {
             document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
             document.querySelectorAll('.file-item.selected').forEach(c => c.classList.remove('selected'));
-            if (window.multiSelect) window.multiSelect.clear();
         }
     });
 }

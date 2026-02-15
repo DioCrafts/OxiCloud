@@ -373,6 +373,17 @@ impl FolderRepository for MockFolderRepository {
         Ok((vec![], Some(0)))
     }
 
+    async fn list_folders_by_owner_paginated(
+        &self,
+        _parent_id: Option<&str>,
+        _owner_id: &str,
+        _offset: usize,
+        _limit: usize,
+        _include_total: bool,
+    ) -> std::result::Result<(Vec<Folder>, Option<usize>), DomainError> {
+        Ok((vec![], Some(0)))
+    }
+
     async fn rename_folder(
         &self,
         _id: &str,

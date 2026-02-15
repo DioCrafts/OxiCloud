@@ -408,6 +408,7 @@ impl BatchOperationService {
         &self,
         folder_ids: Vec<String>,
         _recursive: bool,
+        caller_id: &str,
     ) -> Result<BatchResult<String>, BatchOperationError> {
         info!("Starting batch deletion of {} folders", folder_ids.len());
         let start_time = std::time::Instant::now();
@@ -427,14 +428,13 @@ impl BatchOperationService {
             let folder_service = self.folder_service.clone();
             let semaphore = self.semaphore.clone();
             let id_clone = folder_id.clone();
+            let caller = caller_id.to_string();
 
             async move {
                 // Acquire semaphore permit
                 let permit = semaphore.acquire().await.unwrap();
 
-                // For both recursive and non-recursive, use the standard delete_folder method
-                // since FolderUseCase only has a single delete_folder method
-                let delete_result = folder_service.delete_folder(&folder_id).await;
+                let delete_result = folder_service.delete_folder(&folder_id, &caller).await;
 
                 // Release the permit explicitly
                 drop(permit);
@@ -616,6 +616,7 @@ impl BatchOperationService {
         &self,
         folder_ids: Vec<String>,
         target_folder_id: Option<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<FolderDto>, BatchOperationError> {
         info!("Starting batch move of {} folders", folder_ids.len());
         let start_time = std::time::Instant::now();
@@ -633,11 +634,12 @@ impl BatchOperationService {
             let folder_service = self.folder_service.clone();
             let target = target_folder_id.clone();
             let semaphore = self.semaphore.clone();
+            let caller = caller_id.to_string();
 
             async move {
                 let permit = semaphore.acquire().await.unwrap();
                 let dto = MoveFolderDto { parent_id: target };
-                let move_result = folder_service.move_folder(&folder_id, dto).await;
+                let move_result = folder_service.move_folder(&folder_id, dto, &caller).await;
                 drop(permit);
                 (folder_id, move_result)
             }

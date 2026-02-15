@@ -339,5 +339,13 @@
     "folder_deleted": "Dossier déplacé vers la corbeille",
     "item_deleted_permanently": "Élément supprimé définitivement",
     "trash_emptied": "Corbeille vidée avec succès"
+  },
+  "batch": {
+    "one_selected": "1 élément sélectionné",
+    "n_selected": "{{count}} éléments sélectionnés",
+    "confirm_delete": "Voulez-vous vraiment déplacer {{count}} éléments vers la corbeille ?",
+    "move_title": "Déplacer {{count}} élément(s)",
+    "add_favorites": "Ajouter aux favoris",
+    "move_copy": "Déplacer ou copier"
   }
 }

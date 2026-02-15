@@ -645,9 +645,10 @@ async fn handle_delete(
     let folder_result = folder_service.get_folder_by_path(&path).await;
 
     if let Ok(folder) = folder_result {
-        // Delete folder
+        // Delete folder — use the folder's own owner as caller_id
+        let caller_id = folder.owner_id.as_deref().unwrap_or("webdav");
         folder_service
-            .delete_folder(&folder.id)
+            .delete_folder(&folder.id, caller_id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
     } else {
@@ -761,7 +762,7 @@ async fn handle_move(
         };
 
         folder_service
-            .move_folder(&folder.id, move_dto)
+            .move_folder(&folder.id, move_dto, folder.owner_id.as_deref().unwrap_or("webdav"))
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
 
@@ -771,7 +772,7 @@ async fn handle_move(
             };
 
             folder_service
-                .rename_folder(&folder.id, rename_dto)
+                .rename_folder(&folder.id, rename_dto, folder.owner_id.as_deref().unwrap_or("webdav"))
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
         }

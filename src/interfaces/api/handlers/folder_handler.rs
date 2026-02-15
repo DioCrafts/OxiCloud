@@ -13,7 +13,7 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState as GlobalAppState;
 use crate::common::errors::ErrorKind;
-use crate::interfaces::middleware::auth::{AuthUser, OptionalAuthUser};
+use crate::interfaces::middleware::auth::AuthUser;
 
 type AppState = Arc<FolderService>;
 
@@ -136,15 +136,14 @@ impl FolderHandler {
     }
 
     /// Lists contents of a specific folder with pagination.
+    /// Scoped to the authenticated user — only returns folders owned by this user.
     pub async fn list_folder_contents_paginated(
         State(service): State<AppState>,
-        _auth_user: AuthUser,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         pagination: Query<PaginationRequestDto>,
     ) -> axum::response::Response {
-        // For sub-folder pagination, use the standard paginated path
-        // (owner filtering is implicit — sub-folders inherit ownership)
-        match service.list_folders_paginated(Some(&id), &pagination).await {
+        match service.list_folders_for_owner_paginated(Some(&id), &auth_user.id, &pagination).await {
             Ok(paginated_result) => (StatusCode::OK, Json(paginated_result)).into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -184,13 +183,14 @@ impl FolderHandler {
         }
     }
 
-    /// Renames a folder
+    /// Renames a folder (ownership enforced by service layer)
     pub async fn rename_folder(
         State(service): State<AppState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Json(dto): Json<RenameFolderDto>,
     ) -> impl IntoResponse {
-        match service.rename_folder(&id, dto).await {
+        match service.rename_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -211,13 +211,14 @@ impl FolderHandler {
         }
     }
 
-    /// Moves a folder to a new parent
+    /// Moves a folder to a new parent (ownership enforced by service layer)
     pub async fn move_folder(
         State(service): State<AppState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Json(dto): Json<MoveFolderDto>,
     ) -> impl IntoResponse {
-        match service.move_folder(&id, dto).await {
+        match service.move_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -231,13 +232,13 @@ impl FolderHandler {
         }
     }
 
-    /// Deletes a folder (with trash support)
+    /// Deletes a folder (ownership enforced by service layer)
     pub async fn delete_folder(
         State(service): State<AppState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
-        // For folder deletion without trash functionality
-        match service.delete_folder(&id).await {
+        match service.delete_folder(&id, &auth_user.id).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -250,16 +251,13 @@ impl FolderHandler {
         }
     }
 
-    /// Deletes a folder with trash functionality
+    /// Deletes a folder with trash functionality (ownership enforced by service layer)
     pub async fn delete_folder_with_trash(
         State(state): State<GlobalAppState>,
-        OptionalAuthUser(auth_user): OptionalAuthUser,
+        auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
-        let user_id = auth_user
-            .as_ref()
-            .map(|u| u.id.as_str())
-            .unwrap_or("anonymous");
+        let user_id = &auth_user.id;
         // Check if trash service is available
         if let Some(trash_service) = &state.trash_service {
             tracing::info!("Moving folder to trash: {}", id);
@@ -282,7 +280,7 @@ impl FolderHandler {
 
         // Fallback to permanent delete if trash is unavailable or failed
         let folder_service = &state.applications.folder_service;
-        match folder_service.delete_folder(&id).await {
+        match folder_service.delete_folder(&id, user_id).await {
             Ok(_) => {
                 tracing::info!("Folder permanently deleted: {}", id);
                 StatusCode::NO_CONTENT.into_response()
@@ -306,19 +304,32 @@ impl FolderHandler {
         }
     }
 
-    /// Downloads a folder as a ZIP file
+    /// Downloads a folder as a ZIP file (ownership enforced)
     pub async fn download_folder_zip(
         State(state): State<GlobalAppState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Query(_params): Query<HashMap<String, String>>,
     ) -> impl IntoResponse {
         tracing::info!("Downloading folder as ZIP: {}", id);
 
-        // Get folder information first to check it exists and get name
+        // Get folder information and verify ownership
         let folder_service = &state.applications.folder_service;
 
         match folder_service.get_folder(&id).await {
             Ok(folder) => {
+                // Access check: folder must belong to the requesting user
+                if folder.owner_id.as_deref() != Some(&auth_user.id) {
+                    tracing::warn!(
+                        "download_folder_zip: user '{}' attempted to download folder '{}' owned by '{:?}'",
+                        auth_user.id, id, folder.owner_id
+                    );
+                    return (
+                        StatusCode::NOT_FOUND,
+                        Json(serde_json::json!({ "error": "Folder not found" })),
+                    )
+                        .into_response();
+                }
                 tracing::info!("Preparing ZIP for folder: {} ({})", folder.name, id);
 
                 // Use ZIP service from DI container

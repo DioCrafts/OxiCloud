@@ -313,7 +313,7 @@
  "fa": "Persiano",
  "fr": "Francese",
  "de": "Tedesco",
- "pt": "Portoghese"
+ "pt": "Portoghese",
  "it": "Italiano"
  }
  },
@@ -340,5 +340,13 @@
  "folder_deleted": "Cartella spostata nel cestino",
  "item_deleted_permanently": "Elemento eliminato definitivamente",
  "trash_emptied": "Cestino svuotato con successo"
+ },
+ "batch": {
+  "one_selected": "1 elemento selezionato",
+  "n_selected": "{{count}} elementi selezionati",
+  "confirm_delete": "Sei sicuro di voler spostare {{count}} elementi nel cestino?",
+  "move_title": "Sposta {{count}} elemento/i",
+  "add_favorites": "Aggiungi ai preferiti",
+  "move_copy": "Sposta o copia"
  }
 }

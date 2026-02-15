@@ -38,15 +38,23 @@ pub trait FolderUseCase: Send + Sync + 'static {
         pagination: &crate::application::dtos::pagination::PaginationRequestDto,
     ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>;
 
-    /// Renames a folder
-    async fn rename_folder(&self, id: &str, dto: RenameFolderDto)
+    /// Lists folders with pagination, scoped to a specific owner.
+    async fn list_folders_for_owner_paginated(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+        pagination: &crate::application::dtos::pagination::PaginationRequestDto,
+    ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>;
+
+    /// Renames a folder (ownership verified against caller_id)
+    async fn rename_folder(&self, id: &str, dto: RenameFolderDto, caller_id: &str)
     -> Result<FolderDto, DomainError>;
 
-    /// Moves a folder to another parent
-    async fn move_folder(&self, id: &str, dto: MoveFolderDto) -> Result<FolderDto, DomainError>;
+    /// Moves a folder to another parent (ownership verified against caller_id)
+    async fn move_folder(&self, id: &str, dto: MoveFolderDto, caller_id: &str) -> Result<FolderDto, DomainError>;
 
-    /// Deletes a folder
-    async fn delete_folder(&self, id: &str) -> Result<(), DomainError>;
+    /// Deletes a folder (ownership verified against caller_id)
+    async fn delete_folder(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
 }
 
 /**

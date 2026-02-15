@@ -54,6 +54,18 @@ pub trait FolderRepository: Send + Sync + 'static {
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError>;
 
+    /// Lists folders with pagination, scoped to a specific owner.
+    /// Combines the owner filtering of `list_folders_by_owner` with
+    /// the pagination of `list_folders_paginated`.
+    async fn list_folders_by_owner_paginated(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+        offset: usize,
+        limit: usize,
+        include_total: bool,
+    ) -> Result<(Vec<Folder>, Option<usize>), DomainError>;
+
     /// Renames a folder
     async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError>;
 

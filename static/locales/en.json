@@ -341,5 +341,13 @@
     "trash_emptied": "Trash emptied successfully",
     "title": "Notifications",
     "empty": "No notifications"
+  },
+  "batch": {
+    "one_selected": "1 item selected",
+    "n_selected": "{{count}} items selected",
+    "confirm_delete": "Are you sure you want to move {{count}} items to trash?",
+    "move_title": "Move {{count}} item(s)",
+    "add_favorites": "Add to favorites",
+    "move_copy": "Move or copy"
   }
 }

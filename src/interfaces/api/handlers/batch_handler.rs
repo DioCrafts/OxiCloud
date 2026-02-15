@@ -258,6 +258,7 @@ pub async fn delete_files_batch(
 /// Handler for deleting multiple folders in batch
 pub async fn delete_folders_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFolderOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are folders to process
@@ -274,7 +275,7 @@ pub async fn delete_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .delete_folders(request.folder_ids, request.recursive)
+        .delete_folders(request.folder_ids, request.recursive, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -555,6 +556,7 @@ pub async fn trash_batch(
 /// Handler for moving multiple folders in batch
 pub async fn move_folders_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFolderOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     if request.folder_ids.is_empty() {
@@ -569,7 +571,7 @@ pub async fn move_folders_batch(
 
     let result = state
         .batch_service
-        .move_folders(request.folder_ids, request.target_folder_id)
+        .move_folders(request.folder_ids, request.target_folder_id, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
