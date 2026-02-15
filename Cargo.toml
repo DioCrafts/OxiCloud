@@ -39,7 +39,6 @@ quick-xml = "0.39.0"
 dotenvy = "0.15.7"
 lru = "0.16.3"
 moka = { version = "0.12", features = ["future"] }
-memmap2 = "0.9"
 http-range-header = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
 md5 = "0.8.0"
