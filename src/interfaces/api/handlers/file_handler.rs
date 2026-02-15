@@ -114,7 +114,7 @@ impl FileHandler {
                         .and_then(|v| v.to_str().ok())
                         .and_then(|s| s.parse::<u64>().ok());
                     if let Some(len) = hint {
-                        let _ = file.set_len(len).await;  // best-effort
+                        let _ = file.set_len(len).await; // best-effort
                     }
 
                     // 512 KB buffer — 8× fewer write syscalls than 64 KB
@@ -164,15 +164,15 @@ impl FileHandler {
                         .check_storage_quota(&auth_user.id, total_size)
                         .await
                 {
-                        let _ = tokio::fs::remove_file(&temp_path).await;
-                        tracing::warn!(
-                            "⛔ UPLOAD REJECTED (quota): user={}, file={}, size={}",
-                            auth_user.username,
-                            filename,
-                            total_size
-                        );
-                        return Self::quota_error_response(err).into_response();
-                    }
+                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    tracing::warn!(
+                        "⛔ UPLOAD REJECTED (quota): user={}, file={}, size={}",
+                        auth_user.username,
+                        filename,
+                        total_size
+                    );
+                    return Self::quota_error_response(err).into_response();
+                }
 
                 // ── Streaming upload (temp file → blob store, hash pre-computed) ─
                 match upload_service
@@ -543,8 +543,7 @@ impl FileHandler {
         multipart: Multipart,
     ) -> impl IntoResponse {
         // Use the streaming upload handler
-        let response =
-            Self::upload_file(State(state.clone()), auth_user, multipart).await;
+        let response = Self::upload_file(State(state.clone()), auth_user, multipart).await;
 
         // Try to extract file info for thumbnail generation
         if let Ok(body_bytes) =

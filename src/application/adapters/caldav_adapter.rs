@@ -150,8 +150,7 @@ impl CalDavAdapter {
                     } else if name_str == "time-range" || name_str.ends_with(":time-range") {
                         // Parse time-range attributes
                         for attr in e.attributes().flatten() {
-                            let attr_name =
-                                std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+                            let attr_name = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
                             let attr_value = attr.unescape_value().unwrap_or_default();
 
                             if attr_name == "start" {

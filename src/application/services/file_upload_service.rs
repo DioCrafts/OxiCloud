@@ -118,7 +118,14 @@ impl FileUploadUseCase for FileUploadService {
     ) -> Result<FileDto, DomainError> {
         let file = self
             .file_write
-            .save_file_from_temp(name.clone(), folder_id, content_type, temp_path, size, pre_computed_hash)
+            .save_file_from_temp(
+                name.clone(),
+                folder_id,
+                content_type,
+                temp_path,
+                size,
+                pre_computed_hash,
+            )
             .await?;
         let dto = FileDto::from(file);
         info!(
@@ -165,8 +172,15 @@ impl FileUploadUseCase for FileUploadService {
             })?
             .len();
 
-        self.upload_file_streaming(name, folder_id, content_type, file_path, size, pre_computed_hash)
-            .await
+        self.upload_file_streaming(
+            name,
+            folder_id,
+            content_type,
+            file_path,
+            size,
+            pre_computed_hash,
+        )
+        .await
     }
 
     /// Creates a file at a specific path (for WebDAV PUT on new resource).
@@ -205,12 +219,13 @@ impl FileUploadUseCase for FileUploadService {
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError> {
         // Direct SQL lookup — O(folder_depth) instead of O(total_files)
         if let Some(file_read) = &self.file_read
-            && let Some(file) = file_read.find_file_by_path(path).await? {
-                self.file_write
-                    .update_file_content(file.id(), content.to_vec())
-                    .await?;
-                return Ok(());
-            }
+            && let Some(file) = file_read.find_file_by_path(path).await?
+        {
+            self.file_write
+                .update_file_content(file.id(), content.to_vec())
+                .await?;
+            return Ok(());
+        }
 
         let path_normalized = path.trim_start_matches('/').trim_end_matches('/');
         let (parent_path, filename) = if let Some(idx) = path_normalized.rfind('/') {

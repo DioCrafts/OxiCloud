@@ -301,7 +301,13 @@ impl ChunkedUploadHandler {
 
         // Upload from assembled file on disk — zero extra RAM copies, hash pre-computed
         match upload_service
-            .upload_file_from_path(filename.clone(), folder_id.clone(), content_type, &assembled_path, Some(hash))
+            .upload_file_from_path(
+                filename.clone(),
+                folder_id.clone(),
+                content_type,
+                &assembled_path,
+                Some(hash),
+            )
             .await
         {
             Ok(file) => {

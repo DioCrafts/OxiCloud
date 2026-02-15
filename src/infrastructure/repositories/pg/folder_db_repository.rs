@@ -131,12 +131,13 @@ impl FolderRepository for FolderDbRepository {
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e
-                && db_err.code().as_deref() == Some("23505") {
-                    return DomainError::already_exists(
-                        "Folder",
-                        format!("{name} already exists in parent"),
-                    );
-                }
+                && db_err.code().as_deref() == Some("23505")
+            {
+                return DomainError::already_exists(
+                    "Folder",
+                    format!("{name} already exists in parent"),
+                );
+            }
             DomainError::internal_error("FolderDb", format!("insert: {e}"))
         })?;
 
@@ -333,12 +334,10 @@ impl FolderRepository for FolderDbRepository {
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e
-                && db_err.code().as_deref() == Some("23505") {
-                    return DomainError::already_exists(
-                        "Folder",
-                        format!("{new_name} already exists"),
-                    );
-                }
+                && db_err.code().as_deref() == Some("23505")
+            {
+                return DomainError::already_exists("Folder", format!("{new_name} already exists"));
+            }
             DomainError::internal_error("FolderDb", format!("rename: {e}"))
         })?;
 

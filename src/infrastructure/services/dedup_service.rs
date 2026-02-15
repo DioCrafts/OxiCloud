@@ -215,9 +215,7 @@ impl DedupService {
         }
 
         // Atomic write: temp file → rename
-        let temp_path = self
-            .temp_root
-            .join(format!("{}.tmp", uuid::Uuid::new_v4()));
+        let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
         fs::write(&temp_path, content).await.map_err(|e| {
             DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
         })?;
@@ -269,10 +267,7 @@ impl DedupService {
         let file_size = fs::metadata(source_path)
             .await
             .map_err(|e| {
-                DomainError::internal_error(
-                    "Dedup",
-                    format!("Failed to get file metadata: {}", e),
-                )
+                DomainError::internal_error("Dedup", format!("Failed to get file metadata: {}", e))
             })?
             .len();
 
@@ -555,7 +550,10 @@ impl DedupService {
                 format!("Failed to open blob {}: {}", hash, e),
             )
         })?;
-        Ok(Box::pin(ReaderStream::with_capacity(file, STREAM_CHUNK_SIZE)))
+        Ok(Box::pin(ReaderStream::with_capacity(
+            file,
+            STREAM_CHUNK_SIZE,
+        )))
     }
 
     /// Stream a byte range of a blob — only reads the requested portion.
@@ -588,9 +586,15 @@ impl DedupService {
         if let Some(end_pos) = end {
             let limit = end_pos.saturating_sub(start);
             let limited = file.take(limit);
-            Ok(Box::pin(ReaderStream::with_capacity(limited, STREAM_CHUNK_SIZE)))
+            Ok(Box::pin(ReaderStream::with_capacity(
+                limited,
+                STREAM_CHUNK_SIZE,
+            )))
         } else {
-            Ok(Box::pin(ReaderStream::with_capacity(file, STREAM_CHUNK_SIZE)))
+            Ok(Box::pin(ReaderStream::with_capacity(
+                file,
+                STREAM_CHUNK_SIZE,
+            )))
         }
     }
 
@@ -680,15 +684,15 @@ impl DedupService {
             }
 
             // Check size
-            if let Ok(file_meta) = fs::metadata(&blob_path).await {
-                if file_meta.len() != *expected_size as u64 {
-                    corrupted.push(format!(
-                        "{}: size mismatch (expected: {}, actual: {})",
-                        hash,
-                        expected_size,
-                        file_meta.len()
-                    ));
-                }
+            if let Ok(file_meta) = fs::metadata(&blob_path).await
+                && file_meta.len() != *expected_size as u64
+            {
+                corrupted.push(format!(
+                    "{}: size mismatch (expected: {}, actual: {})",
+                    hash,
+                    expected_size,
+                    file_meta.len()
+                ));
             }
         }
 
@@ -756,7 +760,8 @@ impl DedupPort for DedupService {
         content_type: Option<String>,
         pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
-        self.store_from_file(source_path, content_type, pre_computed_hash).await
+        self.store_from_file(source_path, content_type, pre_computed_hash)
+            .await
     }
 
     async fn blob_exists(&self, hash: &str) -> bool {

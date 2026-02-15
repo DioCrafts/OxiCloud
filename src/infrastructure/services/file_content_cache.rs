@@ -82,7 +82,6 @@ impl FileContentCache {
             misses: AtomicUsize::new(0),
         }
     }
-
 }
 
 impl Default for FileContentCache {

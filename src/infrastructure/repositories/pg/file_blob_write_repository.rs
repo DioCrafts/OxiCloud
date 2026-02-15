@@ -138,12 +138,13 @@ impl FileWritePort for FileBlobWriteRepository {
                     );
                 }
                 if let sqlx::Error::Database(ref db_err) = e
-                    && db_err.code().as_deref() == Some("23505") {
-                        return Err(DomainError::already_exists(
-                            "File",
-                            format!("{name} already exists in folder"),
-                        ));
-                    }
+                    && db_err.code().as_deref() == Some("23505")
+                {
+                    return Err(DomainError::already_exists(
+                        "File",
+                        format!("{name} already exists in folder"),
+                    ));
+                }
                 return Err(DomainError::internal_error(
                     "FileBlobWrite",
                     format!("insert: {e}"),
@@ -210,12 +211,13 @@ impl FileWritePort for FileBlobWriteRepository {
                     );
                 }
                 if let sqlx::Error::Database(ref db_err) = e
-                    && db_err.code().as_deref() == Some("23505") {
-                        return Err(DomainError::already_exists(
-                            "File",
-                            format!("{name} already exists in folder"),
-                        ));
-                    }
+                    && db_err.code().as_deref() == Some("23505")
+                {
+                    return Err(DomainError::already_exists(
+                        "File",
+                        format!("{name} already exists in folder"),
+                    ));
+                }
                 return Err(DomainError::internal_error(
                     "FileBlobWrite",
                     format!("insert: {e}"),
@@ -230,8 +232,16 @@ impl FileWritePort for FileBlobWriteRepository {
             &blob_hash[..12]
         );
 
-        self.row_to_file(row.0, name, folder_id, size as i64, content_type, row.1, row.2)
-            .await
+        self.row_to_file(
+            row.0,
+            name,
+            folder_id,
+            size as i64,
+            content_type,
+            row.1,
+            row.2,
+        )
+        .await
     }
 
     async fn move_file(
@@ -312,12 +322,13 @@ impl FileWritePort for FileBlobWriteRepository {
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e
-                && db_err.code().as_deref() == Some("23505") {
-                    return DomainError::already_exists(
-                        "File",
-                        "File with that name already exists in target folder".to_string(),
-                    );
-                }
+                && db_err.code().as_deref() == Some("23505")
+            {
+                return DomainError::already_exists(
+                    "File",
+                    "File with that name already exists in target folder".to_string(),
+                );
+            }
             DomainError::internal_error("FileBlobWrite", format!("copy: {e}"))
         })?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
@@ -360,12 +371,10 @@ impl FileWritePort for FileBlobWriteRepository {
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e
-                && db_err.code().as_deref() == Some("23505") {
-                    return DomainError::already_exists(
-                        "File",
-                        format!("{new_name} already exists"),
-                    );
-                }
+                && db_err.code().as_deref() == Some("23505")
+            {
+                return DomainError::already_exists("File", format!("{new_name} already exists"));
+            }
             DomainError::internal_error("FileBlobWrite", format!("rename: {e}"))
         })?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
@@ -449,13 +458,14 @@ impl FileWritePort for FileBlobWriteRepository {
 
         // Decrement old blob ref (only if hash changed, best-effort)
         if old_hash != new_hash
-            && let Err(e) = self.dedup.remove_reference(&old_hash).await {
-                tracing::warn!(
-                    "Failed to decrement old blob ref {}: {}",
-                    &old_hash[..12],
-                    e
-                );
-            }
+            && let Err(e) = self.dedup.remove_reference(&old_hash).await
+        {
+            tracing::warn!(
+                "Failed to decrement old blob ref {}: {}",
+                &old_hash[..12],
+                e
+            );
+        }
 
         Ok(())
     }

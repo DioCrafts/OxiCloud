@@ -77,7 +77,6 @@ impl StoragePath {
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
-
 }
 
 impl std::fmt::Display for StoragePath {

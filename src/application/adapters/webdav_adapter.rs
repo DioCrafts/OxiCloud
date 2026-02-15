@@ -60,7 +60,6 @@ impl QualifiedName {
             name: name.into(),
         }
     }
-
 }
 
 impl std::fmt::Display for QualifiedName {

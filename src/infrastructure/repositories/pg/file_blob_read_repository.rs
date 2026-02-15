@@ -106,7 +106,19 @@ impl FileBlobReadRepository {
 #[async_trait]
 impl FileReadPort for FileBlobReadRepository {
     async fn get_file(&self, id: &str) -> Result<File, DomainError> {
-        let row = sqlx::query_as::<_, (String, String, Option<String>, i64, String, i64, i64, String)>(
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                i64,
+                String,
+                i64,
+                i64,
+                String,
+            ),
+        >(
             r#"
             SELECT id::text, name, folder_id::text, size, mime_type,
                    EXTRACT(EPOCH FROM created_at)::bigint,
@@ -374,7 +386,9 @@ impl FileReadPort for FileBlobReadRepository {
         .map_err(|e| DomainError::internal_error("FileBlobRead", format!("find file: {e}")))?;
 
         match row {
-            Some(r) => Ok(Some(self.row_to_file(r.0, r.1, r.2, r.3, r.4, r.5, r.6).await?)),
+            Some(r) => Ok(Some(
+                self.row_to_file(r.0, r.1, r.2, r.3, r.4, r.5, r.6).await?,
+            )),
             None => Ok(None),
         }
     }
