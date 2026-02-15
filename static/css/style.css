@@ -1791,6 +1791,10 @@ select:focus {
     text-align: center;
     margin-bottom: 5px;
     color: #2d3748;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .file-info {
@@ -1857,6 +1861,14 @@ select:focus {
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.file-item .name-cell span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .file-item .file-icon {
@@ -1868,6 +1880,7 @@ select:focus {
     border-radius: 8px;
     font-size: 20px;
     margin-bottom: 0;
+    flex-shrink: 0;
 }
 
 .file-item .file-icon.folder-icon {
