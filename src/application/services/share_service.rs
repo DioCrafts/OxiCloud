@@ -154,6 +154,7 @@ impl ShareUseCase for ShareService {
         // Create the Share entity
         let share = Share::new(
             dto.item_id.clone(),
+            dto.item_name.clone(),
             item_type,
             user_id.to_string(),
             permissions,
@@ -520,6 +521,14 @@ mod tests {
         async fn list_folders(
             &self,
             _parent_id: Option<&str>,
+        ) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
+            unimplemented!()
+        }
+
+        async fn list_folders_by_owner(
+            &self,
+            _parent_id: Option<&str>,
+            _owner_id: &str,
         ) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
             unimplemented!()
         }

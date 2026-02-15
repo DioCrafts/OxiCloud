@@ -19,7 +19,7 @@ use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
 };
 use crate::application::dtos::pagination::{PaginatedResponseDto, PaginationRequestDto};
-use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
+use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto};
 use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
@@ -250,6 +250,14 @@ impl FolderRepository for StubFolderStoragePort {
         Ok(Vec::new())
     }
 
+    async fn list_folders_by_owner(
+        &self,
+        _parent_id: Option<&str>,
+        _owner_id: &str,
+    ) -> Result<Vec<Folder>, DomainError> {
+        Ok(Vec::new())
+    }
+
     async fn list_folders_paginated(
         &self,
         _parent_id: Option<&str>,
@@ -347,6 +355,14 @@ impl FolderUseCase for StubFolderUseCase {
     }
 
     async fn list_folders(&self, _parent_id: Option<&str>) -> Result<Vec<FolderDto>, DomainError> {
+        Ok(Vec::new())
+    }
+
+    async fn list_folders_for_owner(
+        &self,
+        _parent_id: Option<&str>,
+        _owner_id: &str,
+    ) -> Result<Vec<FolderDto>, DomainError> {
         Ok(Vec::new())
     }
 
@@ -557,6 +573,18 @@ pub struct StubSearchUseCase;
 impl SearchUseCase for StubSearchUseCase {
     async fn search(&self, _criteria: SearchCriteriaDto) -> Result<SearchResultsDto, DomainError> {
         Ok(SearchResultsDto::empty())
+    }
+
+    async fn suggest(
+        &self,
+        _query: &str,
+        _folder_id: Option<&str>,
+        _limit: usize,
+    ) -> Result<SearchSuggestionsDto, DomainError> {
+        Ok(SearchSuggestionsDto {
+            suggestions: Vec::new(),
+            query_time_ms: 0,
+        })
     }
 
     async fn clear_search_cache(&self) -> Result<(), DomainError> {

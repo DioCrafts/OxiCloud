@@ -1,6 +1,6 @@
 /**
  * OxiCloud - Shared View Component
- * Encapsulates shared files view functionality
+ * In-app shared files view. All operations go through the backend API.
  */
 
 const sharedView = {
@@ -8,640 +8,530 @@ const sharedView = {
     items: [],
     filteredItems: [],
     currentItem: null,
-    
-    // Initialize the shared view
+
+    /** Auth header helper */
+    _headers(json = false) {
+        const h = {};
+        const token = localStorage.getItem('oxicloud_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        if (json) h['Content-Type'] = 'application/json';
+        return h;
+    },
+
     init() {
-        console.log('Initializing shared view component');
+        console.log('Initializing shared view component (API-backed)');
         this.loadItems();
     },
-    
-    // Show the shared view UI
+
     show() {
-        console.log('Showing shared view component');
         this.displayUI();
         this.attachEventListeners();
-        this.filterAndSortItems();
+        this.loadItems().then(() => this.filterAndSortItems());
     },
-    
-    // Hide the shared view UI
+
     hide() {
-        const sharedContainer = document.getElementById('shared-container');
-        if (sharedContainer) {
-            sharedContainer.style.display = 'none';
-        }
+        const c = document.getElementById('shared-container');
+        if (c) c.style.display = 'none';
     },
-    
-    // Load shared items from local storage
-    loadItems() {
+
+    // Load shared items from backend API
+    async loadItems() {
         try {
-            this.items = JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-            this.filteredItems = [...this.items];
-        } catch (error) {
-            console.error('Error loading shared items:', error);
+            const res = await fetch('/api/shares?page=1&per_page=1000', {
+                headers: this._headers()
+            });
+            if (res.ok) {
+                const data = await res.json();
+                this.items = data.items || [];
+            } else {
+                this.items = [];
+            }
+        } catch (err) {
+            console.error('Error loading shared items:', err);
             this.items = [];
-            this.filteredItems = [];
         }
+        this.filteredItems = [...this.items];
     },
-    
+
     // Create and display the shared view UI
     displayUI() {
         const contentArea = document.querySelector('.content-area');
-        
-        // Create container if it doesn't exist
-        let sharedContainer = document.getElementById('shared-container');
-        if (!sharedContainer) {
-            sharedContainer = document.createElement('div');
-            sharedContainer.id = 'shared-container';
-            contentArea.appendChild(sharedContainer);
+
+        let container = document.getElementById('shared-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'shared-container';
+            container.className = 'shared-view-container';
+            if (contentArea) contentArea.appendChild(container);
         }
-        
-        // Show container
-        sharedContainer.style.display = 'block';
-        
-        // Update container
-        sharedContainer.innerHTML = `
-            <div class="shared-filters">
-                <div class="filter-group">
-                    <label for="filter-type" data-i18n="shared.filterType">Type:</label>
-                    <select id="filter-type">
-                        <option value="all" data-i18n="shared.filterAll">All</option>
-                        <option value="file" data-i18n="shared.filterFiles">Files</option>
-                        <option value="folder" data-i18n="shared.filterFolders">Folders</option>
+
+        container.style.display = 'block';
+        container.innerHTML = `
+            <div class="shared-header">
+                <h2 data-i18n="nav.shared">Shared Files</h2>
+                <div class="shared-filters">
+                    <select id="filter-type" class="shared-filter-select">
+                        <option value="all" data-i18n="shared_allTypes">All types</option>
+                        <option value="file" data-i18n="shared_files">Files</option>
+                        <option value="folder" data-i18n="shared_folders">Folders</option>
                     </select>
-                </div>
-                <div class="filter-group">
-                    <label for="sort-by" data-i18n="shared.sortBy">Sort by:</label>
-                    <select id="sort-by">
-                        <option value="name" data-i18n="shared.sortByName">Name</option>
-                        <option value="date" data-i18n="shared.sortByDate">Date shared</option>
-                        <option value="expiration" data-i18n="shared.sortByExpiration">Expiration</option>
+                    <select id="sort-by" class="shared-filter-select">
+                        <option value="date" data-i18n="shared_sortDate">Sort by date</option>
+                        <option value="name" data-i18n="shared_sortName">Sort by name</option>
+                        <option value="expiration" data-i18n="shared_sortExpiration">Sort by expiration</option>
                     </select>
-                </div>
-                <div class="search-box">
-                    <input type="text" id="shared-search-filter" placeholder="Search shared items...">
-                    <button id="shared-search-filter-btn" class="btn btn-primary" data-i18n="shared.search">Search</button>
+                    <div class="shared-search-box">
+                        <input type="text" id="shared-search-filter" data-i18n-placeholder="shared_searchPlaceholder" placeholder="Search...">
+                        <button id="shared-search-filter-btn" class="search-btn">🔍</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="shared-list-container">
-                <table class="shared-list">
+            <div id="empty-shared-state" class="empty-state" style="display:none;">
+                <div class="empty-state-icon">📤</div>
+                <h3 data-i18n="shared_emptyTitle">No shared items</h3>
+                <p data-i18n="shared_emptyDesc">Items you share will appear here</p>
+                <button id="empty-go-to-files" class="button primary" data-i18n="shared_goToFiles">Go to Files</button>
+            </div>
+
+            <div class="shared-list-container" style="display:none;">
+                <table class="shared-table">
                     <thead>
                         <tr>
-                            <th data-i18n="shared.colName">Name</th>
-                            <th data-i18n="shared.colType">Type</th>
-                            <th data-i18n="shared.colDateShared">Date Shared</th>
-                            <th data-i18n="shared.colExpiration">Expiration</th>
-                            <th data-i18n="shared.colPermissions">Permissions</th>
-                            <th data-i18n="shared.colPassword">Password</th>
-                            <th data-i18n="shared.colActions">Actions</th>
+                            <th data-i18n="shared_columnName">Name</th>
+                            <th data-i18n="shared_columnType">Type</th>
+                            <th data-i18n="shared_columnDate">Date</th>
+                            <th data-i18n="shared_columnExpiration">Expiration</th>
+                            <th data-i18n="shared_columnPermissions">Permissions</th>
+                            <th data-i18n="shared_columnPassword">Password</th>
+                            <th data-i18n="shared_columnActions">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="shared-items-list">
-                        <!-- Shared items will be loaded here dynamically -->
-                    </tbody>
+                    <tbody id="shared-items-list"></tbody>
                 </table>
             </div>
 
-            <div id="empty-shared-state" class="empty-state">
-                <div class="empty-state-icon">📂</div>
-                <h3 data-i18n="shared.emptyStateTitle">No shared resources yet</h3>
-                <p data-i18n="shared.emptyStateDesc">When you share files or folders, they will appear here</p>
-                <button id="empty-go-to-files" class="button primary" data-i18n="shared.goToFiles">Go to Files</button>
-            </div>
-
-            <!-- Share Link Dialog (for editing existing shares) -->
-            <div id="share-dialog" class="dialog">
-                <div class="dialog-content">
-                    <div class="dialog-header">
-                        <h3 data-i18n="share.dialogTitle">Share Link</h3>
+            <!-- Share Edit Dialog -->
+            <div id="share-dialog" class="shared-dialog">
+                <div class="shared-dialog-content">
+                    <div class="shared-dialog-header">
+                        <span id="share-dialog-icon">📄</span>
+                        <span id="share-dialog-name">Item</span>
                         <button class="close-dialog-btn">&times;</button>
                     </div>
-                    <div class="dialog-body">
-                        <div class="share-item-info">
-                            <span id="share-dialog-icon" class="item-icon">📄</span>
-                            <span id="share-dialog-name" class="item-name">filename.ext</span>
+                    <div class="share-link-section">
+                        <label data-i18n="share.linkLabel">Share Link:</label>
+                        <div class="share-link-input">
+                            <input type="text" id="share-link-url" readonly>
+                            <button id="copy-link-btn" class="button" data-i18n="share.copyLink">Copy</button>
                         </div>
-
-                        <div class="share-link-section">
-                            <label for="share-link-url" data-i18n="share.linkLabel">Share Link:</label>
-                            <div class="share-link-container">
-                                <input type="text" id="share-link-url" readonly>
-                                <button id="copy-link-btn" data-i18n="share.copyLink">Copy</button>
-                            </div>
+                    </div>
+                    <div class="share-permissions-section">
+                        <h4 data-i18n="share.permissions">Permissions</h4>
+                        <label><input type="checkbox" id="permission-read" checked> <span data-i18n="share.permissionRead">Read</span></label>
+                        <label><input type="checkbox" id="permission-write"> <span data-i18n="share.permissionWrite">Write</span></label>
+                        <label><input type="checkbox" id="permission-reshare"> <span data-i18n="share.permissionReshare">Reshare</span></label>
+                    </div>
+                    <div class="share-password-section">
+                        <label><input type="checkbox" id="enable-password"> <span data-i18n="share.enablePassword">Password protection</span></label>
+                        <div class="password-input-group">
+                            <input type="text" id="share-password" disabled placeholder="Enter password">
+                            <button id="generate-password" class="button small" data-i18n="share.generatePassword">Generate</button>
                         </div>
-
-                        <div class="share-settings">
-                            <div class="share-setting">
-                                <label data-i18n="share.permissions">Permissions:</label>
-                                <div class="permissions-options">
-                                    <label>
-                                        <input type="checkbox" id="permission-read" checked>
-                                        <span data-i18n="share.permissionRead">Read</span>
-                                    </label>
-                                    <label>
-                                        <input type="checkbox" id="permission-write">
-                                        <span data-i18n="share.permissionWrite">Write</span>
-                                    </label>
-                                    <label>
-                                        <input type="checkbox" id="permission-reshare">
-                                        <span data-i18n="share.permissionReshare">Reshare</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="share-setting">
-                                <label for="share-password" data-i18n="share.password">Password Protection:</label>
-                                <div class="password-setting">
-                                    <input type="checkbox" id="enable-password">
-                                    <input type="password" id="share-password" placeholder="Enter password" disabled>
-                                    <button id="generate-password" data-i18n="share.generatePassword">Generate</button>
-                                </div>
-                            </div>
-
-                            <div class="share-setting">
-                                <label for="share-expiration" data-i18n="share.expiration">Expiration Date:</label>
-                                <div class="expiration-setting">
-                                    <input type="checkbox" id="enable-expiration">
-                                    <input type="date" id="share-expiration" disabled>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="share-actions">
-                            <button id="update-share-btn" class="button primary" data-i18n="share.update">Update Share</button>
-                            <button id="remove-share-btn" class="button danger" data-i18n="share.remove">Remove Share</button>
-                        </div>
+                    </div>
+                    <div class="share-expiration-section">
+                        <label><input type="checkbox" id="enable-expiration"> <span data-i18n="share.enableExpiration">Set expiration</span></label>
+                        <input type="date" id="share-expiration" disabled>
+                    </div>
+                    <div class="share-actions">
+                        <button id="update-share-btn" class="button primary" data-i18n="share.update">Update</button>
+                        <button id="remove-share-btn" class="button danger" data-i18n="share.remove">Remove Share</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Email Notification Dialog -->
-            <div id="share-notification-dialog" class="dialog">
-                <div class="dialog-content">
-                    <div class="dialog-header">
-                        <h3 data-i18n="share.notifyTitle">Send Notification</h3>
+            <!-- Notification Dialog -->
+            <div id="share-notification-dialog" class="shared-dialog">
+                <div class="shared-dialog-content">
+                    <div class="shared-dialog-header">
+                        <span id="notify-dialog-icon">📧</span>
+                        <span id="notify-dialog-name">Item</span>
                         <button class="close-dialog-btn">&times;</button>
                     </div>
-                    <div class="dialog-body">
-                        <div class="share-item-info">
-                            <span id="notify-dialog-icon" class="item-icon">📄</span>
-                            <span id="notify-dialog-name" class="item-name">filename.ext</span>
+                    <div class="notification-form">
+                        <div class="form-group">
+                            <label data-i18n="share.notifyEmail">Email:</label>
+                            <input type="email" id="notification-email" placeholder="recipient@example.com">
                         </div>
-
-                        <div class="notification-form">
-                            <div class="form-group">
-                                <label for="notification-email" data-i18n="share.notifyEmailLabel">Email Address:</label>
-                                <input type="email" id="notification-email" placeholder="Enter recipient email">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="notification-message" data-i18n="share.notifyMessageLabel">Message (optional):</label>
-                                <textarea id="notification-message" placeholder="Add a personal message" rows="3"></textarea>
-                            </div>
+                        <div class="form-group">
+                            <label data-i18n="share.notifyMessage">Message (optional):</label>
+                            <textarea id="notification-message" rows="3"></textarea>
                         </div>
-
-                        <div class="notification-actions">
-                            <button id="send-notification-btn" class="button primary" data-i18n="share.notifySend">Send Notification</button>
-                        </div>
+                    </div>
+                    <div class="notification-actions">
+                        <button id="send-notification-btn" class="button primary" data-i18n="share.notifySend">Send Notification</button>
                     </div>
                 </div>
             </div>
         `;
-        
+
         // Hide other UI elements
         const filesGrid = document.getElementById('files-grid');
         const filesListView = document.getElementById('files-list-view');
         if (filesGrid) filesGrid.style.display = 'none';
         if (filesListView) filesListView.style.display = 'none';
-        
-        // Translate UI if i18n is loaded
+
         if (window.i18n && window.i18n.translatePage) {
             window.i18n.translatePage();
         }
     },
-    
-    // Attach event listeners to the shared view UI
+
+    // Attach event listeners
     attachEventListeners() {
         const filterType = document.getElementById('filter-type');
         const sortBy = document.getElementById('sort-by');
         const searchFilter = document.getElementById('shared-search-filter');
         const searchBtn = document.getElementById('shared-search-filter-btn');
         const emptyGoToFiles = document.getElementById('empty-go-to-files');
-        
+
         if (filterType) filterType.addEventListener('change', () => this.filterAndSortItems());
         if (sortBy) sortBy.addEventListener('change', () => this.filterAndSortItems());
-        if (searchFilter) searchFilter.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') this.filterAndSortItems();
-        });
+        if (searchFilter) searchFilter.addEventListener('keyup', e => { if (e.key === 'Enter') this.filterAndSortItems(); });
         if (searchBtn) searchBtn.addEventListener('click', () => this.filterAndSortItems());
-        
-        // Back to files button (empty state)
         if (emptyGoToFiles) emptyGoToFiles.addEventListener('click', () => window.switchToFilesView());
-        
-        // Share dialog buttons
+
+        // Share dialog
         const shareDialog = document.getElementById('share-dialog');
         if (shareDialog) {
             const closeBtn = shareDialog.querySelector('.close-dialog-btn');
-            const copyLinkBtn = document.getElementById('copy-link-btn');
-            const enablePassword = document.getElementById('enable-password');
-            const sharePassword = document.getElementById('share-password');
-            const generatePasswordBtn = document.getElementById('generate-password');
-            const enableExpiration = document.getElementById('enable-expiration');
-            const shareExpiration = document.getElementById('share-expiration');
-            const updateShareBtn = document.getElementById('update-share-btn');
-            const removeShareBtn = document.getElementById('remove-share-btn');
-            
             if (closeBtn) closeBtn.addEventListener('click', () => this.closeShareDialog());
+            const copyLinkBtn = document.getElementById('copy-link-btn');
             if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => this.copyShareLink());
-            if (enablePassword) enablePassword.addEventListener('change', () => {
-                if (sharePassword) {
-                    sharePassword.disabled = !enablePassword.checked;
-                    if (enablePassword.checked) sharePassword.focus();
-                }
+            const enablePw = document.getElementById('enable-password');
+            const pwField = document.getElementById('share-password');
+            if (enablePw) enablePw.addEventListener('change', () => {
+                if (pwField) { pwField.disabled = !enablePw.checked; if (enablePw.checked) pwField.focus(); }
             });
-            if (generatePasswordBtn) generatePasswordBtn.addEventListener('click', () => this.generatePassword());
-            if (enableExpiration) enableExpiration.addEventListener('change', () => {
-                if (shareExpiration) {
-                    shareExpiration.disabled = !enableExpiration.checked;
-                    if (enableExpiration.checked) shareExpiration.focus();
-                }
+            const genPwBtn = document.getElementById('generate-password');
+            if (genPwBtn) genPwBtn.addEventListener('click', () => this.generatePassword());
+            const enableExp = document.getElementById('enable-expiration');
+            const expField = document.getElementById('share-expiration');
+            if (enableExp) enableExp.addEventListener('change', () => {
+                if (expField) { expField.disabled = !enableExp.checked; if (enableExp.checked) expField.focus(); }
             });
-            if (updateShareBtn) updateShareBtn.addEventListener('click', () => this.updateSharedItem());
-            if (removeShareBtn) removeShareBtn.addEventListener('click', () => this.removeSharedItem());
+            const updateBtn = document.getElementById('update-share-btn');
+            if (updateBtn) updateBtn.addEventListener('click', () => this.updateSharedItem());
+            const removeBtn = document.getElementById('remove-share-btn');
+            if (removeBtn) removeBtn.addEventListener('click', () => this.removeSharedItem());
         }
-        
-        // Notification dialog buttons
-        const notificationDialog = document.getElementById('share-notification-dialog');
-        if (notificationDialog) {
-            const closeBtn = notificationDialog.querySelector('.close-dialog-btn');
-            const sendBtn = document.getElementById('send-notification-btn');
-            
+
+        // Notification dialog
+        const notifDialog = document.getElementById('share-notification-dialog');
+        if (notifDialog) {
+            const closeBtn = notifDialog.querySelector('.close-dialog-btn');
             if (closeBtn) closeBtn.addEventListener('click', () => this.closeNotificationDialog());
+            const sendBtn = document.getElementById('send-notification-btn');
             if (sendBtn) sendBtn.addEventListener('click', () => this.sendNotification());
         }
     },
-    
-    // Filter and sort the items based on the current settings
+
+    // Filter and sort items
     filterAndSortItems() {
         const filterType = document.getElementById('filter-type');
         const sortBy = document.getElementById('sort-by');
         const searchFilter = document.getElementById('shared-search-filter');
-        
-        if (!filterType || !sortBy || !searchFilter) return;
-        
-        const type = filterType.value;
-        const sort = sortBy.value;
-        const searchTerm = searchFilter.value.toLowerCase();
-        
-        // Filter items
+
+        const type = filterType ? filterType.value : 'all';
+        const sort = sortBy ? sortBy.value : 'date';
+        const searchTerm = searchFilter ? searchFilter.value.toLowerCase() : '';
+
         this.filteredItems = this.items.filter(item => {
-            // Filter by type
-            if (type !== 'all' && item.type !== type) return false;
-            
-            // Filter by search term
-            const nameMatch = item.name.toLowerCase().includes(searchTerm);
-            return nameMatch;
+            if (type !== 'all' && item.item_type !== type) return false;
+            const name = (item.item_name || item.item_id || '').toLowerCase();
+            return name.includes(searchTerm);
         });
-        
-        // Sort items
+
         this.filteredItems.sort((a, b) => {
             if (sort === 'name') {
-                return a.name.localeCompare(b.name);
+                return (a.item_name || a.item_id || '').localeCompare(b.item_name || b.item_id || '');
             } else if (sort === 'date') {
-                return new Date(b.created_at || b.dateShared) - new Date(a.created_at || a.dateShared);
+                return (b.created_at || 0) - (a.created_at || 0);
             } else if (sort === 'expiration') {
-                // Handle null expiration dates (items without expiration come last)
                 if (!a.expires_at && !b.expires_at) return 0;
                 if (!a.expires_at) return 1;
                 if (!b.expires_at) return -1;
-                return new Date(a.expires_at) - new Date(b.expires_at);
+                return a.expires_at - b.expires_at;
             }
             return 0;
         });
-        
-        // Display filtered and sorted items
+
         this.displaySharedItems();
     },
-    
-    // Display the shared items in the UI
+
+    // Display items in the table
     displaySharedItems() {
         const sharedItemsList = document.getElementById('shared-items-list');
-        const emptySharedState = document.getElementById('empty-shared-state');
-        const sharedListContainer = document.querySelector('.shared-list-container');
-        
-        if (!sharedItemsList || !emptySharedState || !sharedListContainer) return;
-        
-        // Clear the list
+        const emptyState = document.getElementById('empty-shared-state');
+        const listContainer = document.querySelector('.shared-list-container');
+
+        if (!sharedItemsList || !emptyState || !listContainer) return;
         sharedItemsList.innerHTML = '';
-        
-        // Show empty state if no items
+
         if (this.filteredItems.length === 0) {
-            emptySharedState.style.display = 'flex';
-            sharedListContainer.style.display = 'none';
+            emptyState.style.display = 'flex';
+            listContainer.style.display = 'none';
             return;
         }
-        
-        // Hide empty state and show table
-        emptySharedState.style.display = 'none';
-        sharedListContainer.style.display = 'block';
-        
-        // Add items to the list
+
+        emptyState.style.display = 'none';
+        listContainer.style.display = 'block';
+
         this.filteredItems.forEach(item => {
             const row = document.createElement('tr');
-            
-            // Icon and name
+            const displayName = item.item_name || item.item_id || 'Unknown';
+
             const nameCell = document.createElement('td');
             nameCell.className = 'shared-item-name';
-            const icon = document.createElement('span');
-            icon.className = 'item-icon';
-            icon.textContent = item.type === 'file' ? '📄' : '📁';
-            const name = document.createElement('span');
-            name.textContent = item.name;
-            nameCell.appendChild(icon);
-            nameCell.appendChild(name);
-            
-            // Type
+            nameCell.innerHTML = `<span class="item-icon">${item.item_type === 'file' ? '📄' : '📁'}</span><span>${displayName}</span>`;
+
             const typeCell = document.createElement('td');
-            typeCell.textContent = item.type === 'file' ? this.translate('shared_typeFile', 'File') : this.translate('shared_typeFolder', 'Folder');
-            
-            // Date shared
+            typeCell.textContent = item.item_type === 'file' ? this.translate('shared_typeFile', 'File') : this.translate('shared_typeFolder', 'Folder');
+
             const dateCell = document.createElement('td');
-            dateCell.textContent = this.formatDate(item.created_at || item.dateShared);
-            
-            // Expiration
-            const expirationCell = document.createElement('td');
-            expirationCell.textContent = item.expires_at ? this.formatDate(item.expires_at) : this.translate('shared_noExpiration', 'No expiration');
-            
-            // Permissions
-            const permissionsCell = document.createElement('td');
-            const permissions = [];
-            if (item.permissions?.read) permissions.push(this.translate('share_permissionRead', 'Read'));
-            if (item.permissions?.write) permissions.push(this.translate('share_permissionWrite', 'Write'));
-            if (item.permissions?.reshare) permissions.push(this.translate('share_permissionReshare', 'Reshare'));
-            permissionsCell.textContent = permissions.join(', ') || 'Read';
-            
-            // Password
-            const passwordCell = document.createElement('td');
-            passwordCell.textContent = (item.password || item.password_protected) ? this.translate('shared_hasPassword', 'Yes') : this.translate('shared_noPassword', 'No');
-            
-            // Actions
+            dateCell.textContent = this.formatDate(item.created_at);
+
+            const expCell = document.createElement('td');
+            expCell.textContent = item.expires_at ? this.formatDate(item.expires_at) : this.translate('shared_noExpiration', 'No expiration');
+
+            const permCell = document.createElement('td');
+            const perms = [];
+            if (item.permissions?.read) perms.push(this.translate('share_permissionRead', 'Read'));
+            if (item.permissions?.write) perms.push(this.translate('share_permissionWrite', 'Write'));
+            if (item.permissions?.reshare) perms.push(this.translate('share_permissionReshare', 'Reshare'));
+            permCell.textContent = perms.join(', ') || 'Read';
+
+            const pwCell = document.createElement('td');
+            pwCell.textContent = item.has_password ? this.translate('shared_hasPassword', 'Yes') : this.translate('shared_noPassword', 'No');
+
             const actionsCell = document.createElement('td');
             actionsCell.className = 'shared-item-actions';
-            
-            // Edit button
+
             const editBtn = document.createElement('button');
             editBtn.className = 'action-btn edit-btn';
             editBtn.innerHTML = '<span class="action-icon">✏️</span>';
             editBtn.title = this.translate('shared_editShare', 'Edit Share');
             editBtn.addEventListener('click', () => this.openShareDialog(item));
-            
-            // Notify button
+
             const notifyBtn = document.createElement('button');
             notifyBtn.className = 'action-btn notify-btn';
             notifyBtn.innerHTML = '<span class="action-icon">📧</span>';
             notifyBtn.title = this.translate('shared_notifyShare', 'Notify Someone');
             notifyBtn.addEventListener('click', () => this.openNotificationDialog(item));
-            
-            // Copy link button
+
             const copyBtn = document.createElement('button');
             copyBtn.className = 'action-btn copy-btn';
             copyBtn.innerHTML = '<span class="action-icon">📋</span>';
             copyBtn.title = this.translate('shared_copyLink', 'Copy Link');
             copyBtn.addEventListener('click', () => {
                 navigator.clipboard.writeText(item.url)
-                    .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied to clipboard!')))
-                    .catch(err => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
+                    .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
+                    .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
             });
-            
-            // Remove button
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'action-btn remove-btn';
-            removeBtn.innerHTML = '<span class="action-icon">🗑️</span>';
-            removeBtn.title = this.translate('shared_removeShare', 'Remove Share');
-            removeBtn.addEventListener('click', () => {
-                this.currentItem = item;
-                this.removeSharedItem();
-            });
-            
-            actionsCell.appendChild(editBtn);
-            actionsCell.appendChild(notifyBtn);
-            actionsCell.appendChild(copyBtn);
-            actionsCell.appendChild(removeBtn);
-            
-            // Add cells to row
-            row.appendChild(nameCell);
-            row.appendChild(typeCell);
-            row.appendChild(dateCell);
-            row.appendChild(expirationCell);
-            row.appendChild(permissionsCell);
-            row.appendChild(passwordCell);
-            row.appendChild(actionsCell);
-            
-            // Add row to table
+
+            const rmBtn = document.createElement('button');
+            rmBtn.className = 'action-btn remove-btn';
+            rmBtn.innerHTML = '<span class="action-icon">🗑️</span>';
+            rmBtn.title = this.translate('shared_removeShare', 'Remove Share');
+            rmBtn.addEventListener('click', () => { this.currentItem = item; this.removeSharedItem(); });
+
+            actionsCell.append(editBtn, notifyBtn, copyBtn, rmBtn);
+            row.append(nameCell, typeCell, dateCell, expCell, permCell, pwCell, actionsCell);
             sharedItemsList.appendChild(row);
         });
     },
-    
-    // Open the share dialog for a shared item
+
+    // Open share dialog
     openShareDialog(item) {
         this.currentItem = item;
         const shareDialog = document.getElementById('share-dialog');
-        const shareDialogIcon = document.getElementById('share-dialog-icon');
-        const shareDialogName = document.getElementById('share-dialog-name');
-        const shareLinkUrl = document.getElementById('share-link-url');
-        const enablePassword = document.getElementById('enable-password');
-        const sharePassword = document.getElementById('share-password');
-        const enableExpiration = document.getElementById('enable-expiration');
-        const shareExpiration = document.getElementById('share-expiration');
-        const permissionRead = document.getElementById('permission-read');
-        const permissionWrite = document.getElementById('permission-write');
-        const permissionReshare = document.getElementById('permission-reshare');
-        
-        if (!shareDialog || !shareDialogIcon || !shareDialogName || !shareLinkUrl) return;
-        
-        // Set dialog content
-        shareDialogIcon.textContent = item.type === 'file' ? '📄' : '📁';
-        shareDialogName.textContent = item.name;
-        shareLinkUrl.value = item.url;
-        
-        // Set permissions
-        if (permissionRead) permissionRead.checked = item.permissions?.read !== false;
-        if (permissionWrite) permissionWrite.checked = !!item.permissions?.write;
-        if (permissionReshare) permissionReshare.checked = !!item.permissions?.reshare;
-        
-        // Set password
-        if (enablePassword) {
-            enablePassword.checked = !!(item.password || item.password_protected);
-            if (sharePassword) {
-                sharePassword.disabled = !enablePassword.checked;
-                sharePassword.value = item.password || '';
+        const dn = item.item_name || item.item_id || 'Unknown';
+
+        const iconEl = document.getElementById('share-dialog-icon');
+        const nameEl = document.getElementById('share-dialog-name');
+        const urlEl = document.getElementById('share-link-url');
+        const enablePw = document.getElementById('enable-password');
+        const pwField = document.getElementById('share-password');
+        const enableExp = document.getElementById('enable-expiration');
+        const expField = document.getElementById('share-expiration');
+        const permRead = document.getElementById('permission-read');
+        const permWrite = document.getElementById('permission-write');
+        const permReshare = document.getElementById('permission-reshare');
+
+        if (!shareDialog) return;
+        if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
+        if (nameEl) nameEl.textContent = dn;
+        if (urlEl) urlEl.value = item.url || '';
+
+        if (permRead) permRead.checked = item.permissions?.read !== false;
+        if (permWrite) permWrite.checked = !!item.permissions?.write;
+        if (permReshare) permReshare.checked = !!item.permissions?.reshare;
+
+        if (enablePw) {
+            enablePw.checked = item.has_password;
+            if (pwField) { pwField.disabled = !enablePw.checked; pwField.value = ''; }
+        }
+        if (enableExp) {
+            enableExp.checked = !!item.expires_at;
+            if (expField) {
+                expField.disabled = !enableExp.checked;
+                expField.value = item.expires_at ? new Date(item.expires_at * 1000).toISOString().split('T')[0] : '';
             }
         }
-        
-        // Set expiration
-        if (enableExpiration) {
-            enableExpiration.checked = !!item.expires_at;
-            if (shareExpiration) {
-                shareExpiration.disabled = !enableExpiration.checked;
-                shareExpiration.value = item.expires_at ? new Date(item.expires_at).toISOString().split('T')[0] : '';
-            }
-        }
-        
-        // Show dialog
+
         shareDialog.classList.add('active');
     },
-    
-    // Close the share dialog
+
     closeShareDialog() {
-        const shareDialog = document.getElementById('share-dialog');
-        if (shareDialog) shareDialog.classList.remove('active');
+        const d = document.getElementById('share-dialog');
+        if (d) d.classList.remove('active');
         this.currentItem = null;
     },
-    
-    // Open the notification dialog for a shared item
+
     openNotificationDialog(item) {
         this.currentItem = item;
-        const notificationDialog = document.getElementById('share-notification-dialog');
-        const notifyDialogIcon = document.getElementById('notify-dialog-icon');
-        const notifyDialogName = document.getElementById('notify-dialog-name');
-        const notificationEmail = document.getElementById('notification-email');
-        const notificationMessage = document.getElementById('notification-message');
-        
-        if (!notificationDialog || !notifyDialogIcon || !notifyDialogName || !notificationEmail || !notificationMessage) return;
-        
-        // Set dialog content
-        notifyDialogIcon.textContent = item.type === 'file' ? '📄' : '📁';
-        notifyDialogName.textContent = item.name;
-        notificationEmail.value = '';
-        notificationMessage.value = '';
-        
-        // Show dialog
-        notificationDialog.classList.add('active');
+        const dn = item.item_name || item.item_id || 'Unknown';
+        const d = document.getElementById('share-notification-dialog');
+        const iconEl = document.getElementById('notify-dialog-icon');
+        const nameEl = document.getElementById('notify-dialog-name');
+        const emailEl = document.getElementById('notification-email');
+        const msgEl = document.getElementById('notification-message');
+
+        if (!d) return;
+        if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
+        if (nameEl) nameEl.textContent = dn;
+        if (emailEl) emailEl.value = '';
+        if (msgEl) msgEl.value = '';
+        d.classList.add('active');
     },
-    
-    // Close the notification dialog
+
     closeNotificationDialog() {
-        const notificationDialog = document.getElementById('share-notification-dialog');
-        if (notificationDialog) notificationDialog.classList.remove('active');
+        const d = document.getElementById('share-notification-dialog');
+        if (d) d.classList.remove('active');
         this.currentItem = null;
     },
-    
-    // Copy a share link to the clipboard
+
     copyShareLink() {
-        const shareLinkUrl = document.getElementById('share-link-url');
-        if (!shareLinkUrl) return;
-        
-        navigator.clipboard.writeText(shareLinkUrl.value)
-            .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied to clipboard!')))
-            .catch(err => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
+        const el = document.getElementById('share-link-url');
+        if (!el) return;
+        navigator.clipboard.writeText(el.value)
+            .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
+            .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
     },
-    
-    // Generate a random password for a share
+
+    // Generate secure password with crypto API
     generatePassword() {
-        const sharePassword = document.getElementById('share-password');
-        const enablePassword = document.getElementById('enable-password');
-        if (!sharePassword || !enablePassword) return;
-        
+        const pwField = document.getElementById('share-password');
+        const enablePw = document.getElementById('enable-password');
+        if (!pwField || !enablePw) return;
+
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+        const array = new Uint32Array(16);
+        crypto.getRandomValues(array);
         let password = '';
-        for (let i = 0; i < 12; i++) {
-            password += chars.charAt(Math.floor(Math.random() * chars.length));
+        for (let i = 0; i < 16; i++) {
+            password += chars[array[i] % chars.length];
         }
-        sharePassword.value = password;
-        enablePassword.checked = true;
-        sharePassword.disabled = false;
+        pwField.value = password;
+        enablePw.checked = true;
+        pwField.disabled = false;
     },
-    
-    // Update a shared item with new settings
-    updateSharedItem() {
+
+    // Update share via API
+    async updateSharedItem() {
         if (!this.currentItem) return;
-        const permissionRead = document.getElementById('permission-read');
-        const permissionWrite = document.getElementById('permission-write');
-        const permissionReshare = document.getElementById('permission-reshare');
-        const enablePassword = document.getElementById('enable-password');
-        const sharePassword = document.getElementById('share-password');
-        const enableExpiration = document.getElementById('enable-expiration');
-        const shareExpiration = document.getElementById('share-expiration');
-        
-        if (!permissionRead || !permissionWrite || !permissionReshare || !enablePassword || !sharePassword || !enableExpiration || !shareExpiration) return;
-        
-        // Get updated settings
-        const permissions = {
-            read: permissionRead.checked,
-            write: permissionWrite.checked,
-            reshare: permissionReshare.checked
+
+        const permRead = document.getElementById('permission-read');
+        const permWrite = document.getElementById('permission-write');
+        const permReshare = document.getElementById('permission-reshare');
+        const enablePw = document.getElementById('enable-password');
+        const pwField = document.getElementById('share-password');
+        const enableExp = document.getElementById('enable-expiration');
+        const expField = document.getElementById('share-expiration');
+
+        const body = {
+            permissions: {
+                read: permRead ? permRead.checked : true,
+                write: permWrite ? permWrite.checked : false,
+                reshare: permReshare ? permReshare.checked : false
+            },
+            password: (enablePw && enablePw.checked && pwField && pwField.value) ? pwField.value : null,
+            expires_at: (enableExp && enableExp.checked && expField && expField.value)
+                ? Math.floor(new Date(expField.value).getTime() / 1000)
+                : null
         };
-        
-        const password = enablePassword.checked ? sharePassword.value : null;
-        const expires_at = enableExpiration.checked ? new Date(shareExpiration.value).toISOString() : null;
-        
-        // Update the shared link via the global function
-        if (window.updateSharedLink) {
-            window.updateSharedLink(this.currentItem.id, {
-                permissions,
-                password,
-                expires_at
+
+        try {
+            const res = await fetch(`/api/shares/${this.currentItem.id}`, {
+                method: 'PUT',
+                headers: this._headers(true),
+                body: JSON.stringify(body)
             });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || `Server error ${res.status}`);
+            }
+            this.showNotification(this.translate('shared_itemUpdated', 'Share settings updated'));
+        } catch (err) {
+            console.error('Error updating share:', err);
+            this.showNotification(err.message || 'Error updating share', 'error');
         }
-        
-        // Reload items and close dialog
-        this.loadItems();
-        this.filterAndSortItems();
+
         this.closeShareDialog();
-        
-        // Show notification
-        this.showNotification(this.translate('shared_itemUpdated', 'Share settings updated successfully'));
+        await this.loadItems();
+        this.filterAndSortItems();
     },
-    
-    // Remove a shared item
-    removeSharedItem() {
+
+    // Remove share via API
+    async removeSharedItem() {
         if (!this.currentItem) return;
-        
-        // Remove the shared link via the global function
-        if (window.removeSharedLink) {
-            window.removeSharedLink(this.currentItem.id);
+
+        try {
+            const res = await fetch(`/api/shares/${this.currentItem.id}`, {
+                method: 'DELETE',
+                headers: this._headers()
+            });
+            if (!res.ok && res.status !== 204) throw new Error(`Server error ${res.status}`);
+            this.showNotification(this.translate('shared_itemRemoved', 'Share removed'));
+        } catch (err) {
+            console.error('Error removing share:', err);
+            this.showNotification('Error removing share', 'error');
         }
-        
-        // Reload items and close dialog if open
-        this.loadItems();
-        this.filterAndSortItems();
+
         this.closeShareDialog();
-        
-        // Show notification
-        this.showNotification(this.translate('shared_itemRemoved', 'Share removed successfully'));
+        await this.loadItems();
+        this.filterAndSortItems();
     },
-    
-    // Send a notification for a shared item
+
+    // Send notification (stub)
     sendNotification() {
         if (!this.currentItem) return;
-        const notificationEmail = document.getElementById('notification-email');
-        const notificationMessage = document.getElementById('notification-message');
-        
-        if (!notificationEmail || !notificationMessage) return;
-        
-        const email = notificationEmail.value.trim();
-        const message = notificationMessage.value.trim();
-        
-        // Validate email
+        const emailEl = document.getElementById('notification-email');
+        const msgEl = document.getElementById('notification-message');
+        const email = emailEl ? emailEl.value.trim() : '';
+        const message = msgEl ? msgEl.value.trim() : '';
+
         if (!email || !this.validateEmail(email)) {
             this.showNotification(this.translate('shared_invalidEmail', 'Please enter a valid email address'), 'error');
             return;
         }
-        
-        // Send notification via the global function
-        if (window.sendShareNotification) {
-            window.sendShareNotification(this.currentItem.id, email, message)
-                .then(() => {
-                    this.closeNotificationDialog();
-                    this.showNotification(this.translate('shared_notificationSent', 'Notification sent successfully'));
-                })
-                .catch(error => {
-                    this.showNotification(this.translate('shared_notificationFailed', 'Failed to send notification'), 'error');
-                });
+
+        if (window.fileSharing && window.fileSharing.sendShareNotification) {
+            window.fileSharing.sendShareNotification(this.currentItem.url, email, message)
+                .then(() => { this.closeNotificationDialog(); this.showNotification(this.translate('shared_notificationSent', 'Notification sent')); })
+                .catch(() => this.showNotification(this.translate('shared_notificationFailed', 'Failed to send notification'), 'error'));
         }
     },
-    
-    // Show a notification
+
     showNotification(message, type = 'success') {
         if (window.ui && window.ui.showNotification) {
             window.ui.showNotification(message, type);
@@ -649,28 +539,21 @@ const sharedView = {
             alert(message);
         }
     },
-    
-    // Validate an email address
+
     validateEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(email);
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     },
-    
-    // Format a date string
-    formatDate(dateString) {
-        if (!dateString) return 'N/A';
-        const options = { year: 'numeric', month: 'short', day: 'numeric' };
-        return new Date(dateString).toLocaleDateString(undefined, options);
+
+    formatDate(value) {
+        if (!value) return 'N/A';
+        const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
+        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     },
-    
-    // Translate a string using i18n if available
+
     translate(key, defaultText) {
-        if (window.i18n && window.i18n.t) {
-            return window.i18n.t(key, defaultText);
-        }
+        if (window.i18n && window.i18n.t) return window.i18n.t(key, defaultText);
         return defaultText;
     }
 };
 
-// Export the shared view component
 window.sharedView = sharedView;

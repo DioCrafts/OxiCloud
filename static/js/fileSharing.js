@@ -1,219 +1,146 @@
 /**
  * OxiCloud - File Sharing Module
- * This file handles file sharing functionality (shared links, permissions, etc.)
+ * All operations go through the backend API at /api/shares.
+ * No localStorage is used for share data.
  */
 
-// File Sharing Module
 const fileSharing = {
+    /** Auth header helper */
+    _headers(json = true) {
+        const h = {};
+        const token = localStorage.getItem('oxicloud_token');
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        if (json) h['Content-Type'] = 'application/json';
+        return h;
+    },
+
     /**
-     * Generate a shared link for a file or folder
+     * Create a shared link via backend API
      * @param {string} itemId - ID of the file or folder
-     * @param {string} itemType - Type ('file' or 'folder')
-     * @param {Object} options - Sharing options (password, expiration, etc.)
-     * @returns {Object} - Shared link information
+     * @param {string} itemType - 'file' or 'folder'
+     * @param {Object} options - { name, password, expirationDate, permissions }
+     * @returns {Promise<Object>} ShareDto from backend
      */
-    generateSharedLink(itemId, itemType, options = {}) {
-        try {
-            // In a real implementation, this would be a call to the backend
-            // But for now, we'll simulate it with a mock response
-            
-            // Default options
-            const defaultOptions = {
-                password: null,
-                expirationDate: null,
-                permissions: {
-                    read: true,
-                    write: false,
-                    reshare: false
-                }
-            };
-            
-            // Merge options
-            const finalOptions = { ...defaultOptions, ...options };
-            
-            // Generate a mock link (would normally come from server)
-            const linkId = Math.random().toString(36).substring(2, 15);
-            const shareToken = Math.random().toString(36).substring(2, 20);
-            const baseUrl = window.location.origin;
-            const sharedUrl = `${baseUrl}/s/${shareToken}`;
-            
-            // Create expiration date if set
-            let expiresAt = null;
-            if (finalOptions.expirationDate) {
-                expiresAt = new Date(finalOptions.expirationDate);
-            }
-            
-            // Create a mock response that matches what we'd expect from the server
-            const response = {
-                id: linkId,
-                type: itemType,
-                itemId: itemId,
-                url: sharedUrl,
-                token: shareToken,
-                password_protected: !!finalOptions.password,
-                expires_at: expiresAt ? expiresAt.toISOString() : null,
-                permissions: finalOptions.permissions,
-                created_at: new Date().toISOString(),
-                created_by: {
-                    id: "current-user-id", // Would be the actual user ID
-                    username: "current-user" // Would be the actual username
-                },
-                access_count: 0,
-                // Add some UI friendly properties for shared.js compatibility
-                name: options.name || "Shared Item",
-                dateShared: new Date().toISOString(),
-                expiration: expiresAt ? expiresAt.toISOString() : null,
-                password: finalOptions.password
-            };
-            
-            // In a real implementation, we would store this link in localStorage for now
-            // until backend implementation is ready
-            this.saveSharedLink(response);
-            
-            // Return the "response" as if it came from the server
-            return response;
-        } catch (error) {
-            console.error('Error generating shared link:', error);
-            throw error;
+    async createSharedLink(itemId, itemType, options = {}) {
+        const body = {
+            item_id: itemId,
+            item_name: options.name || null,
+            item_type: itemType,
+            password: options.password || null,
+            expires_at: options.expirationDate
+                ? Math.floor(new Date(options.expirationDate).getTime() / 1000)
+                : null,
+            permissions: options.permissions || { read: true, write: false, reshare: false }
+        };
+
+        const res = await fetch('/api/shares', {
+            method: 'POST',
+            headers: this._headers(),
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${res.status}`);
         }
+
+        return await res.json();
     },
-    
-    /**
-     * Save a shared link to localStorage (temporary storage until backend is ready)
-     * @param {Object} linkData - Shared link data
-     */
-    saveSharedLink(linkData) {
-        try {
-            // Get existing shared links
-            const existingLinks = JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-            
-            // Add new link
-            existingLinks.push(linkData);
-            
-            // Save back to localStorage
-            localStorage.setItem('oxicloud_shared_links', JSON.stringify(existingLinks));
-        } catch (error) {
-            console.error('Error saving shared link to local storage:', error);
-        }
-    },
-    
-    /**
-     * Remove a shared link
-     * @param {string} linkId - ID of the shared link to remove
-     * @returns {Promise<boolean>} - Success status
-     */
-    removeSharedLink(linkId) {
-        try {
-            // Get existing shared links
-            const existingLinks = JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-            
-            // Filter out the link to remove
-            const updatedLinks = existingLinks.filter(link => link.id !== linkId);
-            
-            // Save back to localStorage
-            localStorage.setItem('oxicloud_shared_links', JSON.stringify(updatedLinks));
-            
-            // Removed network delay simulation
-            
-            return true;
-        } catch (error) {
-            console.error('Error removing shared link:', error);
-            return false;
-        }
-    },
-    
-    /**
-     * Update a shared link's properties
-     * @param {string} linkId - ID of the shared link to update
-     * @param {Object} updateData - Properties to update
-     * @returns {Promise<Object>} - Updated shared link
-     */
-    updateSharedLink(linkId, updateData) {
-        try {
-            // Get existing shared links
-            const existingLinks = JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-            
-            // Find the link to update
-            const linkIndex = existingLinks.findIndex(link => link.id === linkId);
-            if (linkIndex === -1) {
-                throw new Error('Shared link not found');
-            }
-            
-            // Update link data
-            existingLinks[linkIndex] = {
-                ...existingLinks[linkIndex],
-                ...updateData,
-                updated_at: new Date().toISOString()
-            };
-            
-            // Save back to localStorage
-            localStorage.setItem('oxicloud_shared_links', JSON.stringify(existingLinks));
-            
-            // Removed network delay simulation
-            
-            return existingLinks[linkIndex];
-        } catch (error) {
-            console.error('Error updating shared link:', error);
-            throw error;
-        }
-    },
-    
+
     /**
      * Get all shared links for the current user
-     * @returns {Promise<Array>} - Array of shared links
+     * @returns {Promise<Array>} Array of ShareDto
      */
-    getSharedLinks() {
+    async getSharedLinks() {
         try {
-            // Get shared links from localStorage
-            const links = JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-            
-            // Removed network delay simulation
-            
-            return links;
+            const res = await fetch('/api/shares?page=1&per_page=1000', {
+                headers: this._headers(false)
+            });
+            if (!res.ok) return [];
+            const data = await res.json();
+            return data.items || [];
         } catch (error) {
-            console.error('Error getting shared links:', error);
+            console.error('Error fetching shared links:', error);
             return [];
         }
     },
-    
+
     /**
      * Get shared links for a specific item
-     * @param {string} itemId - ID of the file or folder
-     * @param {string} itemType - Type ('file' or 'folder')
-     * @returns {Promise<Array>} - Array of shared links for the item
+     * @param {string} itemId
+     * @param {string} itemType - 'file' or 'folder'
+     * @returns {Promise<Array>} Filtered shares
      */
-    getSharedLinksForItem(itemId, itemType) {
+    async getSharedLinksForItem(itemId, itemType) {
         try {
-            // Get all shared links
-            const allLinks = this.getSharedLinks();
-            
-            // Filter by item ID and type
-            return allLinks.filter(link => link.itemId === itemId && link.type === itemType);
+            const all = await this.getSharedLinks();
+            return all.filter(s => s.item_id === itemId && s.item_type === itemType);
         } catch (error) {
             console.error('Error getting shared links for item:', error);
             return [];
         }
     },
-    
+
     /**
      * Check if an item has any shared links
-     * @param {string} itemId - ID of the file or folder
-     * @param {string} itemType - Type ('file' or 'folder')
-     * @returns {Promise<boolean>} - True if the item has shared links
+     * @returns {Promise<boolean>}
      */
-    hasSharedLinks(itemId, itemType) {
-        const links = this.getSharedLinksForItem(itemId, itemType);
+    async hasSharedLinks(itemId, itemType) {
+        const links = await this.getSharedLinksForItem(itemId, itemType);
         return links.length > 0;
     },
-    
+
+    /**
+     * Update a shared link
+     * @param {string} shareId
+     * @param {Object} updateData - { permissions, password, expires_at }
+     * @returns {Promise<Object>} Updated ShareDto
+     */
+    async updateSharedLink(shareId, updateData) {
+        const body = {};
+        if (updateData.permissions) body.permissions = updateData.permissions;
+        if (updateData.password !== undefined) body.password = updateData.password;
+        if (updateData.expires_at !== undefined) body.expires_at = updateData.expires_at;
+
+        const res = await fetch(`/api/shares/${shareId}`, {
+            method: 'PUT',
+            headers: this._headers(),
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `Server error ${res.status}`);
+        }
+
+        return await res.json();
+    },
+
+    /**
+     * Delete a shared link
+     * @param {string} shareId
+     * @returns {Promise<boolean>}
+     */
+    async removeSharedLink(shareId) {
+        try {
+            const res = await fetch(`/api/shares/${shareId}`, {
+                method: 'DELETE',
+                headers: this._headers(false)
+            });
+            return res.ok || res.status === 204;
+        } catch (error) {
+            console.error('Error removing shared link:', error);
+            return false;
+        }
+    },
+
     /**
      * Copy a shared link to clipboard
-     * @param {string} url - URL to copy
-     * @returns {boolean} - Success status
+     * @param {string} url
      */
-    copyLinkToClipboard(url) {
+    async copyLinkToClipboard(url) {
         try {
-            navigator.clipboard.writeText(url);
+            await navigator.clipboard.writeText(url);
             window.ui.showNotification('Link copied', 'Link copied to clipboard');
             return true;
         } catch (error) {
@@ -222,55 +149,42 @@ const fileSharing = {
             return false;
         }
     },
-    
+
     /**
-     * Format expiration date for display
-     * @param {string} dateString - ISO date string
-     * @returns {string} - Formatted date string
+     * Format expiration date for display (Unix timestamp in seconds or ISO string)
+     * @param {number|string} value
+     * @returns {string}
      */
-    formatExpirationDate(dateString) {
-        if (!dateString) return 'No expiration';
-        
-        const date = new Date(dateString);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    formatExpirationDate(value) {
+        if (!value) return 'No expiration';
+        const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     },
 
     /**
-     * Send a notification about a shared resource
-     * @param {string} shareUrl - The URL of the shared resource
-     * @param {string} recipientEmail - Email of the recipient
-     * @param {string} message - Optional message to include
-     * @returns {boolean} - Success status
+     * Send a notification about a shared resource (stub — no backend endpoint yet)
+     * @param {string} shareUrl
+     * @param {string} recipientEmail
+     * @param {string} message
+     * @returns {Promise<boolean>}
      */
-    sendShareNotification(shareUrl, recipientEmail, message = '') {
-        try {
-            // In a real implementation, this would call the backend
-            // For now, we'll just simulate a successful notification
-            console.log(`Share notification for ${shareUrl} sent to ${recipientEmail}`);
-            console.log(`Message: ${message || 'No message included'}`);
-            
-            // Simulate network delay
-            //await new Promise(resolve => setTimeout(resolve, 800));
-            
+    async sendShareNotification(shareUrl, recipientEmail, message = '') {
+        // TODO: implement backend endpoint for email notifications
+        console.log(`Share notification for ${shareUrl} sent to ${recipientEmail}`);
+        if (window.ui) {
             window.ui.showNotification('Notification sent', `Notification sent to ${recipientEmail}`);
-            return true;
-        } catch (error) {
-            console.error('Error sending share notification:', error);
-            window.ui.showNotification('Error', 'Could not send notification');
-            return false;
         }
+        return true;
     },
-    
+
     /**
-     * Initialize file sharing event listeners and UI elements
+     * Initialize file sharing event listeners
      */
     init() {
-        // This will be called by the app.js initialization
-        console.log('File sharing module initialized');
-        
-        // Add "Shared" view event listeners
+        console.log('File sharing module initialized (API-backed)');
         document.querySelectorAll('.nav-item').forEach(item => {
-            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.shared') {
+            const span = item.querySelector('span');
+            if (span && span.getAttribute('data-i18n') === 'nav.shared') {
                 item.addEventListener('click', () => {
                     if (window.switchToSharedView) {
                         window.switchToSharedView();
@@ -281,101 +195,11 @@ const fileSharing = {
     }
 };
 
-/**
- * Get all shared links 
- * @returns {Array} Array of shared links
- */
-function getSharedLinks() {
-    try {
-        return JSON.parse(localStorage.getItem('oxicloud_shared_links') || '[]');
-    } catch (error) {
-        console.error('Error getting shared links:', error);
-        return [];
-    }
-}
-
-/**
- * Update a shared link
- * @param {string} linkId - ID of the link to update
- * @param {Object} updateData - Data to update
- * @returns {boolean} Success status
- */
-function updateSharedLink(linkId, updateData) {
-    try {
-        const links = getSharedLinks();
-        const index = links.findIndex(link => link.id === linkId);
-        if (index === -1) return false;
-        
-        links[index] = {...links[index], ...updateData};
-        localStorage.setItem('oxicloud_shared_links', JSON.stringify(links));
-        return true;
-    } catch (error) {
-        console.error('Error updating shared link:', error);
-        return false;
-    }
-}
-
-/**
- * Remove a shared link
- * @param {string} linkId - ID of the link to remove
- * @returns {boolean} Success status
- */
-function removeSharedLink(linkId) {
-    try {
-        const links = getSharedLinks();
-        const filteredLinks = links.filter(link => link.id !== linkId);
-        localStorage.setItem('oxicloud_shared_links', JSON.stringify(filteredLinks));
-        return true;
-    } catch (error) {
-        console.error('Error removing shared link:', error);
-        return false;
-    }
-}
-
-/**
- * Send a notification about a shared link
- * @param {string} linkId - ID of the link
- * @param {string} email - Recipient email
- * @param {string} message - Optional message
- * @returns {Promise<boolean>} Success status
- */
-function sendShareNotification(linkId, email, message = '') {
-    return new Promise((resolve) => {
-        console.log(`Notification for link ${linkId} sent to ${email}`);
-        console.log(`Message: ${message || 'No message'}`);
-        setTimeout(() => resolve(true), 500);
-    });
-}
-
-/**
- * Translate text using i18n if available
- * @param {string} key - Translation key
- * @param {string} defaultText - Default text if translation not found
- * @returns {string} Translated text
- */
-function translate(key, defaultText) {
-    if (window.i18n && window.i18n.t) {
-        return window.i18n.t(key, defaultText);
-    }
-    return defaultText;
-}
-
-/**
- * Initialize i18n module
- */
-function initializeI18n() {
-    if (window.i18n && window.i18n.init) {
-        window.i18n.init();
-    }
-}
-
-// Expose functions globally
-window.getSharedLinks = getSharedLinks;
-window.updateSharedLink = updateSharedLink;
-window.removeSharedLink = removeSharedLink;
-window.sendShareNotification = sendShareNotification;
-window.translate = translate;
-window.initializeI18n = initializeI18n;
-
-// Expose file sharing module globally
+// Expose module globally
 window.fileSharing = fileSharing;
+
+// Global convenience functions that delegate to the module
+window.getSharedLinks = () => fileSharing.getSharedLinks();
+window.updateSharedLink = (id, data) => fileSharing.updateSharedLink(id, data);
+window.removeSharedLink = (id) => fileSharing.removeSharedLink(id);
+window.sendShareNotification = (url, email, msg) => fileSharing.sendShareNotification(url, email, msg);

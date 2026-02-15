@@ -1,7 +1,7 @@
 use axum::{
     extract::{Json, State},
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -12,6 +12,7 @@ use crate::application::services::batch_operations::{
     BatchOperationService, BatchResult, BatchStats,
 };
 use crate::interfaces::api::handlers::ApiResult;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Shared state for the batch handler
 #[derive(Clone)]
@@ -427,4 +428,194 @@ pub async fn get_folders_batch(
     };
 
     Ok((status_code, Json(response)).into_response())
+}
+
+/// DTO for batch trash operation requests
+#[derive(Debug, Deserialize)]
+pub struct BatchTrashRequest {
+    /// IDs of the files to move to trash
+    #[serde(default)]
+    pub file_ids: Vec<String>,
+    /// IDs of the folders to move to trash
+    #[serde(default)]
+    pub folder_ids: Vec<String>,
+}
+
+/// DTO for batch download requests
+#[derive(Debug, Deserialize)]
+pub struct BatchDownloadRequest {
+    /// IDs of the files to include in the ZIP
+    #[serde(default)]
+    pub file_ids: Vec<String>,
+    /// IDs of the folders to include in the ZIP
+    #[serde(default)]
+    pub folder_ids: Vec<String>,
+}
+
+/// Handler for moving multiple files and folders to trash in batch
+pub async fn trash_batch(
+    State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
+    Json(request): Json<BatchTrashRequest>,
+) -> ApiResult<impl IntoResponse> {
+    if request.file_ids.is_empty() && request.folder_ids.is_empty() {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "No file or folder IDs provided"
+            })),
+        )
+            .into_response());
+    }
+
+    let mut all_successful: Vec<String> = Vec::new();
+    let mut all_failed: Vec<FailedOperation> = Vec::new();
+    let total = request.file_ids.len() + request.folder_ids.len();
+    let start_time = std::time::Instant::now();
+
+    // Trash files
+    if !request.file_ids.is_empty() {
+        match state
+            .batch_service
+            .trash_files(request.file_ids, &auth_user.id)
+            .await
+        {
+            Ok(result) => {
+                all_successful.extend(result.successful);
+                all_failed.extend(
+                    result
+                        .failed
+                        .into_iter()
+                        .map(|(id, error)| FailedOperation { id, error }),
+                );
+            }
+            Err(e) => {
+                return Ok((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response());
+            }
+        }
+    }
+
+    // Trash folders
+    if !request.folder_ids.is_empty() {
+        match state
+            .batch_service
+            .trash_folders(request.folder_ids, &auth_user.id)
+            .await
+        {
+            Ok(result) => {
+                all_successful.extend(result.successful);
+                all_failed.extend(
+                    result
+                        .failed
+                        .into_iter()
+                        .map(|(id, error)| FailedOperation { id, error }),
+                );
+            }
+            Err(e) => {
+                return Ok((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+                    .into_response());
+            }
+        }
+    }
+
+    let successful_count = all_successful.len();
+    let failed_count = all_failed.len();
+
+    let response = BatchOperationResponse {
+        successful: all_successful,
+        failed: all_failed,
+        stats: BatchOperationStats {
+            total,
+            successful: successful_count,
+            failed: failed_count,
+            execution_time_ms: start_time.elapsed().as_millis(),
+        },
+    };
+
+    let status_code = if failed_count > 0 {
+        if successful_count > 0 {
+            StatusCode::PARTIAL_CONTENT
+        } else {
+            StatusCode::BAD_REQUEST
+        }
+    } else {
+        StatusCode::OK
+    };
+
+    Ok((status_code, Json(response)).into_response())
+}
+
+/// Handler for moving multiple folders in batch
+pub async fn move_folders_batch(
+    State(state): State<BatchHandlerState>,
+    Json(request): Json<BatchFolderOperationRequest>,
+) -> ApiResult<impl IntoResponse> {
+    if request.folder_ids.is_empty() {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "No folder IDs provided"
+            })),
+        )
+            .into_response());
+    }
+
+    let result = state
+        .batch_service
+        .move_folders(request.folder_ids, request.target_folder_id)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let response: BatchOperationResponse<FolderDto> = result.into();
+
+    let status_code = if response.stats.failed > 0 {
+        if response.stats.successful > 0 {
+            StatusCode::PARTIAL_CONTENT
+        } else {
+            StatusCode::BAD_REQUEST
+        }
+    } else {
+        StatusCode::OK
+    };
+
+    Ok((status_code, Json(response)).into_response())
+}
+
+/// Handler for downloading multiple files and folders as a single ZIP
+pub async fn download_batch(
+    State(state): State<BatchHandlerState>,
+    Json(request): Json<BatchDownloadRequest>,
+) -> Result<Response, (StatusCode, String)> {
+    if request.file_ids.is_empty() && request.folder_ids.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "No file or folder IDs provided".to_string(),
+        ));
+    }
+
+    let zip_bytes = state
+        .batch_service
+        .download_zip(request.file_ids, request.folder_ids)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let filename = format!("oxicloud-download-{}.zip", chrono::Utc::now().timestamp());
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "application/zip")
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename),
+        )
+        .header("Content-Length", zip_bytes.len().to_string())
+        .body(axum::body::Body::from(zip_bytes))
+        .unwrap())
 }

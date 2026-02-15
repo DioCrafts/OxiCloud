@@ -21,6 +21,10 @@ pub struct Folder {
     /// Parent folder ID (None if it's a root folder)
     parent_id: Option<String>,
 
+    /// Owner user ID — scopes folder visibility per user.
+    /// `None` only for legacy/stub folders; real folders always have an owner.
+    owner_id: Option<String>,
+
     /// Creation timestamp
     created_at: u64,
 
@@ -38,6 +42,7 @@ impl Default for Folder {
             storage_path: StoragePath::from_string("/"),
             path_string: "/".to_string(),
             parent_id: None,
+            owner_id: None,
             created_at: 0,
             modified_at: 0,
         }
@@ -51,6 +56,17 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
+    ) -> FolderResult<Self> {
+        Self::new_with_owner(id, name, storage_path, parent_id, None)
+    }
+
+    /// Creates a new folder with validation and an explicit owner.
+    pub fn new_with_owner(
+        id: String,
+        name: String,
+        storage_path: StoragePath,
+        parent_id: Option<String>,
+        owner_id: Option<String>,
     ) -> FolderResult<Self> {
         // Validate folder name
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -71,6 +87,7 @@ impl Folder {
             storage_path,
             path_string,
             parent_id,
+            owner_id,
             created_at: now,
             modified_at: now,
         })
@@ -82,6 +99,19 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
+        created_at: u64,
+        modified_at: u64,
+    ) -> FolderResult<Self> {
+        Self::with_timestamps_and_owner(id, name, storage_path, parent_id, None, created_at, modified_at)
+    }
+
+    /// Creates a folder with specific timestamps and owner (for DB reconstruction)
+    pub fn with_timestamps_and_owner(
+        id: String,
+        name: String,
+        storage_path: StoragePath,
+        parent_id: Option<String>,
+        owner_id: Option<String>,
         created_at: u64,
         modified_at: u64,
     ) -> FolderResult<Self> {
@@ -99,6 +129,7 @@ impl Folder {
             storage_path,
             path_string,
             parent_id,
+            owner_id,
             created_at,
             modified_at,
         })
@@ -133,6 +164,10 @@ impl Folder {
         self.modified_at
     }
 
+    pub fn owner_id(&self) -> Option<&str> {
+        self.owner_id.as_deref()
+    }
+
     /// Creates a new Folder instance from a DTO
     /// This function is primarily for conversions in batch handlers
     pub fn from_dto(
@@ -153,6 +188,7 @@ impl Folder {
             storage_path,
             path_string: path,
             parent_id,
+            owner_id: None,
             created_at,
             modified_at,
         }
@@ -188,6 +224,7 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id: self.parent_id.clone(),
+            owner_id: self.owner_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })
@@ -219,6 +256,7 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id,
+            owner_id: self.owner_id.clone(),
             created_at: self.created_at,
             modified_at: now,
         })

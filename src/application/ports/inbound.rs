@@ -3,7 +3,9 @@ use async_trait::async_trait;
 use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
 };
-use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
+use crate::application::dtos::search_dto::{
+    SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto,
+};
 use crate::common::errors::DomainError;
 
 /// Primary port for folder operations
@@ -20,6 +22,14 @@ pub trait FolderUseCase: Send + Sync + 'static {
 
     /// Lists folders within a parent folder
     async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<FolderDto>, DomainError>;
+
+    /// Lists folders scoped to a specific owner (for user-facing endpoints).
+    /// At root level, only returns folders belonging to this user.
+    async fn list_folders_for_owner(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<FolderDto>, DomainError>;
 
     /// Lists folders with pagination
     async fn list_folders_paginated(
@@ -40,25 +50,24 @@ pub trait FolderUseCase: Send + Sync + 'static {
 }
 
 /**
- * Primary port for file and folder search
+ * Primary port for file and folder search.
  *
- * Defines the operations related to advanced search of
- * files and folders based on various criteria.
+ * All search processing (filtering, scoring, sorting, categorization)
+ * is handled server-side in Rust for maximum efficiency.
  */
 #[async_trait]
 pub trait SearchUseCase: Send + Sync + 'static {
-    /**
-     * Performs a search based on the specified criteria
-     *
-     * @param criteria Search criteria including text, dates, sizes, etc.
-     * @return Search results containing matching files and folders
-     */
+    /// Performs a full search based on the specified criteria.
     async fn search(&self, criteria: SearchCriteriaDto) -> Result<SearchResultsDto, DomainError>;
 
-    /**
-     * Clears the search results cache
-     *
-     * @return Result indicating success or error
-     */
+    /// Returns quick suggestions for autocomplete (lightweight, fast).
+    async fn suggest(
+        &self,
+        query: &str,
+        folder_id: Option<&str>,
+        limit: usize,
+    ) -> Result<SearchSuggestionsDto, DomainError>;
+
+    /// Clears the search results cache.
     async fn clear_search_cache(&self) -> Result<(), DomainError>;
 }

@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — Admin Panel</title>
+<!-- Apply saved theme immediately to prevent flash of light mode -->
+<script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif}
@@ -194,6 +196,74 @@ details[open] summary{margin-bottom:14px;color:#ff5e3a}
 /* ── Pagination ── */
 .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:14px;font-size:13px;color:#94a3b8;padding:0 4px}
 .pagination button{padding:6px 14px}
+
+/* ── Dark Mode ── */
+[data-theme="dark"] body{background:#0f172a;color:#e2e8f0}
+[data-theme="dark"] ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+[data-theme="dark"] *{scrollbar-color:rgba(255,255,255,.15) transparent}
+[data-theme="dark"] .admin-tabs{background:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+[data-theme="dark"] .admin-tab{color:#94a3b8}
+[data-theme="dark"] .admin-tab:hover{color:#f1f5f9;background:#162032}
+[data-theme="dark"] .admin-card{background:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,.2),0 0 0 1px rgba(255,255,255,.03)}
+[data-theme="dark"] .admin-card h2{color:#f1f5f9}
+[data-theme="dark"] .stat-card{background:#162032;border-color:#334155}
+[data-theme="dark"] .stat-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.15)}
+[data-theme="dark"] .stat-value{color:#f1f5f9}
+[data-theme="dark"] .stat-label{color:#64748b}
+[data-theme="dark"] .stat-card.warn{border-color:#92400e;background:#422006}
+[data-theme="dark"] .stat-card.danger{border-color:#991b1b;background:#3b1111}
+[data-theme="dark"] .progress-bar{background:#334155}
+[data-theme="dark"] .table-wrap{border-color:#334155}
+[data-theme="dark"] th{background:#162032;color:#64748b;border-bottom-color:#334155}
+[data-theme="dark"] td{border-bottom-color:#334155;color:#e2e8f0}
+[data-theme="dark"] tr:hover{background:#162032}
+[data-theme="dark"] .user-name{color:#f1f5f9}
+[data-theme="dark"] .user-email{color:#64748b}
+[data-theme="dark"] .badge-admin{background:#1e3a5f;color:#60a5fa}
+[data-theme="dark"] .badge-user{background:#334155;color:#94a3b8}
+[data-theme="dark"] .badge-active{background:#052e16;color:#86efac}
+[data-theme="dark"] .badge-inactive{background:#3b1111;color:#fca5a5}
+[data-theme="dark"] .badge-oidc{background:#2e1065;color:#c4b5fd}
+[data-theme="dark"] .btn-secondary{background:#1e293b;color:#e2e8f0;border-color:#334155}
+[data-theme="dark"] .btn-secondary:hover{background:#334155;border-color:#475569}
+[data-theme="dark"] .btn-danger{background:#3b1111;color:#fca5a5;border-color:#991b1b}
+[data-theme="dark"] .btn-danger:hover{background:#4a1515}
+[data-theme="dark"] .btn-success{background:#052e16;color:#86efac;border-color:#065f46}
+[data-theme="dark"] .btn-success:hover{background:#064e27}
+[data-theme="dark"] .form-group label{color:#94a3b8}
+[data-theme="dark"] .form-group input[type="text"],
+[data-theme="dark"] .form-group input[type="password"],
+[data-theme="dark"] .form-group input[type="url"],
+[data-theme="dark"] .form-group input[type="number"],
+[data-theme="dark"] .form-group select{background:#0f172a;border-color:#334155;color:#e2e8f0}
+[data-theme="dark"] .form-group input:focus,
+[data-theme="dark"] .form-group select:focus{border-color:#ff5e3a;background:#0f172a;box-shadow:0 0 0 3px rgba(255,94,58,.15)}
+[data-theme="dark"] .form-group small{color:#64748b}
+[data-theme="dark"] .toggle-row label{color:#94a3b8}
+[data-theme="dark"] .slider{background:#475569}
+[data-theme="dark"] .readonly-field{background:#0f172a;border-color:#334155;color:#e2e8f0}
+[data-theme="dark"] .readonly-field button{background:#1e293b;border-color:#334155;color:#94a3b8}
+[data-theme="dark"] .readonly-field button:hover{background:#334155;color:#f1f5f9}
+[data-theme="dark"] .warning{background:#422006;border-color:#92400e;color:#fbbf24}
+[data-theme="dark"] .alert-success{background:#052e16;color:#86efac;border-color:#065f46}
+[data-theme="dark"] .alert-error{background:#3b1111;color:#fca5a5;border-color:#991b1b}
+[data-theme="dark"] .alert-info{background:#0c2d48;color:#93c5fd;border-color:#1d4ed8}
+[data-theme="dark"] .discovery-result.ok{background:#052e16;border-color:#065f46;color:#86efac}
+[data-theme="dark"] .discovery-result.fail{background:#3b1111;border-color:#991b1b;color:#fca5a5}
+[data-theme="dark"] details{border-top-color:#334155}
+[data-theme="dark"] details summary{color:#94a3b8}
+[data-theme="dark"] details summary:hover{color:#ff5e3a}
+[data-theme="dark"] details[open] summary{color:#ff5e3a}
+[data-theme="dark"] .modal{background:#1e293b;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+[data-theme="dark"] .modal h3{color:#f1f5f9}
+[data-theme="dark"] .modal-overlay{background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+[data-theme="dark"] .quota-text{color:#64748b}
+[data-theme="dark"] .pagination{color:#64748b}
+[data-theme="dark"] #access-denied h2{color:#fca5a5}
+[data-theme="dark"] #access-denied p{color:#94a3b8}
+[data-theme="dark"] #access-denied .access-icon{background:#3b1111}
+[data-theme="dark"] #loading{color:#64748b}
+[data-theme="dark"] .toggle-row{border-top-color:#334155}
 </style>
 </head>
 <body>

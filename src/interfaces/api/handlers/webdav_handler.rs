@@ -212,6 +212,7 @@ async fn handle_propfind(
             name: "".to_string(),
             path: "".to_string(),
             parent_id: None,
+            owner_id: None,
             created_at: Utc::now().timestamp() as u64,
             modified_at: Utc::now().timestamp() as u64,
             is_root: true,

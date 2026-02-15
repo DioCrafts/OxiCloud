@@ -15,6 +15,8 @@ use crate::{
 struct ShareRecord {
     id: String,
     item_id: String,
+    #[serde(default)]
+    item_name: Option<String>,
     item_type: String,
     token: String,
     password_hash: Option<String>,
@@ -84,6 +86,7 @@ impl ShareFsRepository {
         Share::from_raw(
             record.id.clone(),
             record.item_id.clone(),
+            record.item_name.clone(),
             item_type,
             record.token.clone(),
             record.password_hash.clone(),
@@ -100,6 +103,7 @@ impl ShareFsRepository {
         ShareRecord {
             id: share.id().to_string(),
             item_id: share.item_id().to_string(),
+            item_name: share.item_name().map(|s| s.to_string()),
             item_type: share.item_type().to_string(),
             token: share.token().to_string(),
             password_hash: share.password_hash().map(|s| s.to_string()),

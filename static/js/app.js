@@ -396,9 +396,16 @@ function setupEventListeners() {
     // Set up drag and drop
     ui.setupDragAndDrop();
     
-    // Search input
+    // Debounce timer for live search
+    let searchDebounceTimer = null;
+    const SEARCH_DEBOUNCE_MS = 300;
+    const SEARCH_MIN_CHARS = 3;
+    
+    // Search input — Enter key
     elements.searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
+            // Cancel any pending debounce
+            if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
             const query = elements.searchInput.value.trim();
             if (query) {
                 performSearch(query);
@@ -412,8 +419,29 @@ function setupEventListeners() {
         }
     });
     
+    // Search input — Live search (debounced, after 3+ chars)
+    elements.searchInput.addEventListener('input', () => {
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+        const query = elements.searchInput.value.trim();
+        
+        if (query.length >= SEARCH_MIN_CHARS) {
+            searchDebounceTimer = setTimeout(() => {
+                performSearch(query);
+            }, SEARCH_DEBOUNCE_MS);
+        } else if (query.length === 0 && app.isSearchMode) {
+            // User cleared the search input — return to normal view
+            searchDebounceTimer = setTimeout(() => {
+                app.isSearchMode = false;
+                app.currentPath = '';
+                ui.updateBreadcrumb('');
+                loadFiles();
+            }, SEARCH_DEBOUNCE_MS);
+        }
+    });
+    
     // Search button
     document.getElementById('search-button').addEventListener('click', () => {
+        if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
         const query = elements.searchInput.value.trim();
         if (query) {
             performSearch(query);
@@ -686,14 +714,7 @@ async function loadFiles(options = {}) {
         
         // Always ensure a userHomeFolderId is set
         if (!app.userHomeFolderId) {
-            // If we don't have a home folder ID yet, try to get the user's username
-            const USER_DATA_KEY = 'oxicloud_user';
-            const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-            if (userData.username) {
-                // Find user's home folder
-                console.log("Looking for user folder for", userData.username);
-                await findUserHomeFolder(userData.username);
-            }
+            await resolveHomeFolder();
         }
         
         // Add timestamp to avoid cache
@@ -791,28 +812,9 @@ async function loadFiles(options = {}) {
         // Add folders (check if it's an array)
         const folderList = Array.isArray(folders) ? folders : [];
         
-        // Get user info for filtering
-        const USER_DATA_KEY = 'oxicloud_user';
-        const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-        const username = userData.username || '';
-        
-        // Filter folders before adding them to the view
-        const visibleFolders = folderList.filter(folder => {
-            // Skip system folders (starting with dot) when at root
-            if (!app.currentPath && folder.name.startsWith('.')) {
-                return false;
-            }
-            
-            // Skip other users' folders when at root
-            if (!app.currentPath && folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
-                return false;
-            }
-            
-            return true;
-        });
-        
-        // Add filtered folders to the view
-        visibleFolders.forEach(folder => {
+        // Backend already scopes folders to the authenticated user,
+        // so no client-side filtering is needed.
+        folderList.forEach(folder => {
             ui.addFolderToView(folder);
         });
         
@@ -1064,55 +1066,51 @@ function addTrashItemToView(item) {
 }
 
 /**
- * Perform search with the given query
+ * Perform search with the given query.
+ * All processing (filtering, scoring, sorting, categorization) is done
+ * server-side in Rust. This function only sends the request and renders.
+ *
  * @param {string} query - Search query
+ * @param {string} [sortBy] - Sort order (relevance|name|name_desc|date|date_desc|size|size_desc)
  */
-async function performSearch(query) {
-    console.log(`Performing search for: "${query}"`);
+async function performSearch(query, sortBy) {
+    console.log(`Performing search for: "${query}" (sort: ${sortBy || 'relevance'})`);
     
     try {
-        // Update UI to indicate search mode
         app.isSearchMode = true;
-        
-        // Set breadcrumb for search
         ui.updateBreadcrumb(`Search: "${query}"`);
         
-        // Prepare search options
+        // Show loading spinner
+        const filesGrid = document.getElementById('files-grid');
+        if (filesGrid) {
+            filesGrid.innerHTML = `
+                <div class="search-results-header">
+                    <h3><i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Searching for "${query}"...</h3>
+                </div>
+            `;
+        }
+        
+        // All options — backend handles all processing
         const options = {
-            recursive: true, // Search in all subfolders
-            limit: 100      // Limit results for performance
+            recursive: true,
+            limit: 100,
+            sort_by: sortBy || 'relevance'
         };
         
-        // Always restrict search to the user's current folder context
-        // This ensures users can't search outside their personal folder
+        // Restrict search to user's folder context
         if (!app.isTrashView) {
-            // If we're in a subfolder, search from there, otherwise use the user's home folder
             options.folder_id = app.currentPath;
             
-            // Always include folder_id even if it's the root of user's home folder
-            // so user cannot search outside their allowed scope
             if (!options.folder_id || options.folder_id === '') {
-                // Fall back to user's home folder - we should never be here
-                // because findUserHomeFolder should have set app.currentPath
-                console.warn("Search without folder_id - this shouldn't happen with proper user context");
-                
-                // Try to get folder from localStorage if available
-                const USER_DATA_KEY = 'oxicloud_user';
-                const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-                if (userData.username) {
-                    console.log("Retrieving home folder for user before search");
-                    await findUserHomeFolder(userData.username);
-                    options.folder_id = app.currentPath;
-                }
+                await resolveHomeFolder();
+                options.folder_id = app.currentPath;
             }
         }
         
-        console.log(`Searching with options:`, options);
-        
-        // Perform the search
+        // Send search request — backend does all processing
         const searchResults = await window.search.searchFiles(query, options);
         
-        // Display search results
+        // Render enriched results from the server
         window.search.displaySearchResults(searchResults);
         
     } catch (error) {
@@ -1120,6 +1118,14 @@ async function performSearch(query) {
         window.ui.showNotification('Error', 'Error performing search');
     }
 }
+
+// Listen for re-sort events from the search sort dropdown
+document.addEventListener('search-resort', (e) => {
+    const searchInput = document.querySelector('.search-container input');
+    if (searchInput && searchInput.value.trim()) {
+        performSearch(searchInput.value.trim(), e.detail.sort_by);
+    }
+});
 
 // Expose needed functions to global scope
 window.app = app;
@@ -1713,7 +1719,7 @@ async function checkAuthentication() {
             });
             
             // Find and load the user's home folder
-            findUserHomeFolder(userData.username);
+            resolveHomeFolder().then(() => loadFiles());
         } else {
             // No user data but token exists — try to fetch from server
             console.log('No user data, attempting to fetch from server');
@@ -1723,7 +1729,7 @@ async function checkAuthentication() {
                     const userInitials = freshData.username.substring(0, 2).toUpperCase();
                     document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
                     updateStorageUsageDisplay(freshData);
-                    findUserHomeFolder(freshData.username);
+                    resolveHomeFolder().then(() => loadFiles());
                 } else {
                     // Server didn't return valid user data — token is likely invalid
                     console.warn('Could not retrieve user data, redirecting to login');
@@ -1757,131 +1763,39 @@ async function checkAuthentication() {
  * Find the user's home folder and load it
  * @param {string} username - The current user's username
  */
-async function findUserHomeFolder(username) {
+/**
+ * Resolve the user's home folder from the backend.
+ * Since the backend now scopes GET /api/folders to the authenticated user,
+ * we simply pick the first root-level folder returned.
+ */
+async function resolveHomeFolder() {
+    if (app.userHomeFolderId) return; // Already resolved
     try {
-        console.log("Finding home folder for user:", username);
-        
-        // CRITICAL FIX: Always create a default folder if needed
-        // This prevents loops when the folder can't be found
-        const defaultFolder = {
-            id: 'default-folder',
-            name: `My Folder - ${username}`,
-            parent_id: null,
-            created_at: Date.now() / 1000,
-            updated_at: Date.now() / 1000
-        };
-        
-        // First, load all folders at the root
-        console.log("Fetching folders from API");
-        
-        // Set max retries and timeout to prevent potential infinite loops
-        let retries = 0;
-        const maxRetries = 1; // Reduced from 2 to 1
-        
-        while (retries < maxRetries) {
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout to 3 seconds
-                
-                const folderToken = localStorage.getItem('oxicloud_token');
-                const folderHeaders = folderToken ? { 'Authorization': `Bearer ${folderToken}` } : {};
-                const response = await fetch('/api/folders', {
-                    headers: folderHeaders,
-                    signal: controller.signal
-                });
-                
-                clearTimeout(timeoutId);
-                
-                if (response.status === 401 || response.status === 403) {
-                    console.warn(`Authentication error (${response.status}) when fetching folders`);
-                    // Use default folder to break the loop
-                    console.log('Using default folder to prevent redirection loop');
-                    app.userHomeFolderId = defaultFolder.id;
-                    app.userHomeFolderName = defaultFolder.name;
-                    app.currentPath = defaultFolder.id;
-                    ui.updateBreadcrumb(defaultFolder.name);
-                    loadFiles();
-                    return;
-                }
-                
-                if (!response.ok) {
-                    throw new Error(`Error loading folders: ${response.status}`);
-                }
-                
-                const folders = await response.json();
-                const folderList = Array.isArray(folders) ? folders : [];
-                
-                console.log(`Found ${folderList.length} folders at root`);
-                
-                // Look for a folder with a name pattern that matches the user's home folder
-                const homeFolderPattern = `My Folder - ${username}`;
-                
-                // Filter first to remove system folders and other users' folders
-                const visibleFolders = folderList.filter(folder => {
-                    // Skip system folders (starting with dot)
-                    if (folder.name.startsWith('.')) {
-                        return false;
-                    }
-                    
-                    // Skip other users' home folders
-                    if (folder.name.startsWith('My Folder - ') && !folder.name.includes(username)) {
-                        return false;
-                    }
-                    
-                    return true;
-                });
-                
-                // Find the user's home folder from filtered list
-                let homeFolder = visibleFolders.find(folder => folder.name === homeFolderPattern);
-                
-                if (homeFolder) {
-                    console.log(`Found user's home folder: ${homeFolder.name} (${homeFolder.id})`);
-                    
-                    // Store the home folder ID and name in the app state
-                    // This is used for breadcrumb navigation and restricting user access
-                    app.userHomeFolderId = homeFolder.id;
-                    app.userHomeFolderName = homeFolder.name;
-                    
-                    // Set this as the current path and load its contents
-                    app.currentPath = homeFolder.id;
-                    ui.updateBreadcrumb(homeFolder.name);
-                    loadFiles();
-                    return; // Success! Exit function
-                } else {
-                    console.warn("Could not find user's home folder");
-                    
-                    // SECURITY: Never fall back to another user's folder.
-                    // If user's own folder doesn't exist, show root (empty state).
-                    console.log('User home folder not found, showing root');
-                    app.currentPath = '';
-                    ui.updateBreadcrumb('');
-                    loadFiles();
-                    return;
-                }
-                
-                // If we get here, we've successfully processed the response
-                break;
-                
-            } catch (fetchError) {
-                retries++;
-                console.error(`Fetch attempt ${retries} failed:`, fetchError);
-                
-                if (retries >= maxRetries) {
-                    throw fetchError; // Re-throw after max retries
-                }
-                
-                // Wait before retrying
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+        const token = localStorage.getItem('oxicloud_token');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const response = await fetch('/api/folders', { headers });
+        if (!response.ok) {
+            console.warn(`Could not fetch home folder: ${response.status}`);
+            return;
+        }
+        const folders = await response.json();
+        const folderList = Array.isArray(folders) ? folders : [];
+        if (folderList.length > 0) {
+            const home = folderList[0];
+            app.userHomeFolderId = home.id;
+            app.userHomeFolderName = home.name;
+            app.currentPath = home.id;
+            ui.updateBreadcrumb(home.name);
+            console.log(`Home folder resolved: ${home.name} (${home.id})`);
+        } else {
+            console.warn('No root folders found for user');
+            app.currentPath = '';
+            ui.updateBreadcrumb('');
         }
     } catch (error) {
-        console.error('Error finding user home folder:', error);
-        
-        // Fall back to loading root in case of error
-        // This is a critical fallback to prevent infinite loops
+        console.error('Error resolving home folder:', error);
         app.currentPath = '';
         ui.updateBreadcrumb('');
-        loadFiles();
     }
 }
 

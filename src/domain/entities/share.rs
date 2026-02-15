@@ -8,6 +8,7 @@ pub use super::entity_errors::ShareError;
 pub struct Share {
     id: String,
     item_id: String,
+    item_name: Option<String>,
     item_type: ShareItemType,
     token: String,
     password_hash: Option<String>,
@@ -34,6 +35,7 @@ pub enum ShareItemType {
 impl Share {
     pub fn new(
         item_id: String,
+        item_name: Option<String>,
         item_type: ShareItemType,
         created_by: String,
         permissions: Option<SharePermissions>,
@@ -69,6 +71,7 @@ impl Share {
         Ok(Self {
             id: Uuid::new_v4().to_string(),
             item_id,
+            item_name,
             item_type,
             token: Uuid::new_v4().to_string(),
             password_hash,
@@ -88,6 +91,7 @@ impl Share {
     pub fn from_raw(
         id: String,
         item_id: String,
+        item_name: Option<String>,
         item_type: ShareItemType,
         token: String,
         password_hash: Option<String>,
@@ -100,6 +104,7 @@ impl Share {
         Self {
             id,
             item_id,
+            item_name,
             item_type,
             token,
             password_hash,
@@ -119,6 +124,10 @@ impl Share {
 
     pub fn item_id(&self) -> &str {
         &self.item_id
+    }
+
+    pub fn item_name(&self) -> Option<&str> {
+        self.item_name.as_deref()
     }
 
     pub fn item_type(&self) -> &ShareItemType {
@@ -257,6 +266,7 @@ mod tests {
     fn test_create_share() {
         let share = Share::new(
             "test_file_id".to_string(),
+            None,
             ShareItemType::File,
             "user123".to_string(),
             None,
@@ -287,6 +297,7 @@ mod tests {
         let future = now + 3600; // 1 hour in the future
         let share = Share::new(
             "test_file_id".to_string(),
+            None,
             ShareItemType::File,
             "user123".to_string(),
             None,
@@ -301,6 +312,7 @@ mod tests {
         let past = now - 3600; // 1 hour in the past
         let share_result = Share::new(
             "test_file_id".to_string(),
+            None,
             ShareItemType::File,
             "user123".to_string(),
             None,
@@ -335,6 +347,7 @@ mod tests {
     fn test_has_password_with_hash() {
         let share = Share::new(
             "test_file_id".to_string(),
+            None,
             ShareItemType::File,
             "user123".to_string(),
             None,
@@ -351,6 +364,7 @@ mod tests {
     fn test_has_password_without_hash() {
         let share = Share::new(
             "test_file_id".to_string(),
+            None,
             ShareItemType::File,
             "user123".to_string(),
             None,

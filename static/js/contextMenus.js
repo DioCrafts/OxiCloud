@@ -206,22 +206,39 @@ const contextMenus = {
             if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
                 const targetId = window.app.selectedTargetFolderId;
                 const items = window.app.batchMoveItems || [];
+
+                const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
+                const folderIds = items.filter(i => i.type === 'folder' && i.id !== targetId).map(i => i.id);
+
                 let success = 0, errors = 0;
 
-                for (const item of items) {
-                    try {
-                        if (item.type === 'folder') {
-                            if (item.id === targetId) continue;
-                            const ok = await window.fileOps.moveFolder(item.id, targetId);
-                            if (ok) success++; else errors++;
-                        } else {
-                            const ok = await window.fileOps.moveFile(item.id, targetId);
-                            if (ok) success++; else errors++;
-                        }
-                    } catch (err) {
-                        console.error('Error moving item:', item, err);
-                        errors++;
+                try {
+                    // Batch move files in a single request
+                    if (fileIds.length > 0) {
+                        const res = await fetch('/api/batch/files/move', {
+                            method: 'POST',
+                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetId })
+                        });
+                        const data = await res.json();
+                        success += data.stats?.successful || 0;
+                        errors += data.stats?.failed || 0;
                     }
+
+                    // Batch move folders in a single request
+                    if (folderIds.length > 0) {
+                        const res = await fetch('/api/batch/folders/move', {
+                            method: 'POST',
+                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ folder_ids: folderIds, target_folder_id: targetId })
+                        });
+                        const data = await res.json();
+                        success += data.stats?.successful || 0;
+                        errors += data.stats?.failed || 0;
+                    }
+                } catch (err) {
+                    console.error('Batch move error:', err);
+                    errors++;
                 }
 
                 this.closeMoveDialog();
@@ -465,7 +482,7 @@ const contextMenus = {
      * @param {Object} item - File or folder object
      * @param {string} itemType - 'file' or 'folder'
      */
-    showShareDialog(item, itemType) {
+    async showShareDialog(item, itemType) {
         try {
         const shareDialog = document.getElementById('share-dialog');
         if (!shareDialog) {
@@ -507,8 +524,8 @@ const contextMenus = {
         window.app.shareDialogItem = item;
         window.app.shareDialogItemType = itemType;
         
-        // Check if item already has shares
-        const existingShares = window.fileSharing.getSharedLinksForItem(item.id, itemType);
+        // Check if item already has shares (async API call)
+        const existingShares = await window.fileSharing.getSharedLinksForItem(item.id, itemType);
         const existingSharesContainer = document.getElementById('existing-shares-container');
         
         // Clear existing shares container
@@ -529,7 +546,7 @@ const contextMenus = {
                 shareEl.innerHTML = `
                     <div class="share-url">${share.url}</div>
                     <div class="share-info">
-                        ${share.password_protected ? '<span class="share-protected"><i class="fas fa-lock"></i> Password protected</span>' : ''}
+                        ${share.has_password ? '<span class="share-protected"><i class="fas fa-lock"></i> Password protected</span>' : ''}
                         <span class="share-expiration">${expiresText}</span>
                     </div>
                     <div class="share-actions">
@@ -563,9 +580,9 @@ const contextMenus = {
                         title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
                         message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
                         confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
-                    }).then(confirmed => {
+                    }).then(async (confirmed) => {
                         if (confirmed) {
-                            window.fileSharing.removeSharedLink(shareId);
+                            await window.fileSharing.removeSharedLink(shareId);
                             btn.closest('.existing-share-item').remove();
                             if (existingSharesContainer.children.length === 0) {
                                 document.getElementById('existing-shares-section').style.display = 'none';
@@ -613,6 +630,7 @@ const contextMenus = {
         // Build DTO for backend API
         const createDto = {
             item_id: item.id,
+            item_name: item.name || null,
             item_type: itemType,
             password: password || null,
             expires_at: expirationDate ? Math.floor(new Date(expirationDate).getTime() / 1000) : null,
@@ -640,22 +658,6 @@ const contextMenus = {
             }
 
             const shareInfo = await response.json();
-            
-            // Also save to localStorage for offline / shared-view compatibility
-            window.fileSharing.saveSharedLink({
-                id: shareInfo.id,
-                type: shareInfo.item_type,
-                itemId: shareInfo.item_id,
-                url: shareInfo.url,
-                token: shareInfo.token,
-                password_protected: shareInfo.has_password,
-                expires_at: shareInfo.expires_at ? new Date(shareInfo.expires_at * 1000).toISOString() : null,
-                permissions: shareInfo.permissions,
-                created_at: new Date(shareInfo.created_at * 1000).toISOString(),
-                access_count: shareInfo.access_count || 0,
-                name: item.name,
-                dateShared: new Date().toISOString()
-            });
 
             // Update UI with new share
             const shareUrl = document.getElementById('generated-share-url');

@@ -36,6 +36,15 @@ pub trait FolderRepository: Send + Sync + 'static {
     /// Lists folders within a parent folder
     async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError>;
 
+    /// Lists root-level folders owned by a specific user.
+    /// For non-root queries (parent_id is Some), ownership is implicit
+    /// because the parent already belongs to the user.
+    async fn list_folders_by_owner(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<Folder>, DomainError>;
+
     /// Lists folders with pagination
     async fn list_folders_paginated(
         &self,

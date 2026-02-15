@@ -1,22 +1,27 @@
 /**
- * OxiCloud - Search Module
- * This file handles search functionality for files and folders
+ * OxiCloud - Search Module (thin client)
+ *
+ * All search processing (filtering, scoring, sorting, categorization,
+ * icon mapping, size formatting) is performed on the Rust backend.
+ * This module is a pure rendering client — it sends requests and
+ * displays the enriched results returned by the server.
  */
 
 const search = {
     /**
-     * Perform a basic search using query string
+     * Perform a search using query parameters.
+     * The backend handles all processing and returns enriched results with
+     * relevance_score, icon_class, category, size_formatted, etc.
+     *
      * @param {string} query - Search query
      * @param {Object} options - Additional search options
-     * @returns {Promise<Object>} - Search results
+     * @returns {Promise<Object>} - Enriched search results from backend
      */
     async searchFiles(query, options = {}) {
         try {
-            // Prepare search parameters
             const params = new URLSearchParams();
             params.append('query', query);
-            
-            // Add optional parameters
+
             if (options.folder_id) params.append('folder_id', options.folder_id);
             if (options.recursive !== undefined) params.append('recursive', options.recursive);
             if (options.file_types) params.append('type', options.file_types);
@@ -28,16 +33,13 @@ const search = {
             if (options.modified_before) params.append('modified_before', options.modified_before);
             if (options.limit) params.append('limit', options.limit);
             if (options.offset) params.append('offset', options.offset);
+            if (options.sort_by) params.append('sort_by', options.sort_by);
 
-            // Create search URL
             const url = `/api/search?${params.toString()}`;
-            console.log(`Performing search with URL: ${url}`);
-            
-            // Perform the search request
-            const response = await fetch(url, {
-                headers: getAuthHeaders()
-            });
-            
+            console.log(`[search] GET ${url}`);
+
+            const response = await fetch(url, { headers: getAuthHeaders() });
+
             if (response.ok) {
                 return await response.json();
             } else {
@@ -48,67 +50,62 @@ const search = {
                 } catch (e) {
                     errorText = response.statusText;
                 }
-                
                 console.error(`Search error: ${errorText}`);
                 throw new Error(`Search failed: ${errorText}`);
             }
         } catch (error) {
             console.error('Error performing search:', error);
             window.ui.showNotification('Error', 'Error performing search');
-            return { files: [], folders: [], total_count: 0 };
+            return { files: [], folders: [], total_count: 0, query_time_ms: 0, sort_by: 'relevance' };
         }
     },
 
     /**
-     * Perform advanced search with multiple criteria
-     * @param {Object} criteria - Search criteria
-     * @returns {Promise<Object>} - Search results
+     * Get autocomplete suggestions from the backend.
+     * Returns lightweight name suggestions without full search overhead.
+     *
+     * @param {string} query - Prefix to search for
+     * @param {Object} options - { folder_id, limit }
+     * @returns {Promise<Object>} - { suggestions: [...], query_time_ms }
      */
-    async advancedSearch(criteria) {
+    async getSuggestions(query, options = {}) {
         try {
-            console.log('Performing advanced search with criteria:', criteria);
-            
-            // Use POST endpoint for advanced search
-            const response = await fetch('/api/search', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...getAuthHeaders()
-                },
-                body: JSON.stringify(criteria)
-            });
-            
+            const params = new URLSearchParams();
+            params.append('query', query);
+            if (options.folder_id) params.append('folder_id', options.folder_id);
+            if (options.limit) params.append('limit', options.limit);
+
+            const url = `/api/search/suggest?${params.toString()}`;
+            const response = await fetch(url, { headers: getAuthHeaders() });
+
             if (response.ok) {
                 return await response.json();
             } else {
-                let errorText = '';
-                try {
-                    const errorJson = await response.json();
-                    errorText = errorJson.error || response.statusText;
-                } catch (e) {
-                    errorText = response.statusText;
-                }
-                
-                console.error(`Advanced search error: ${errorText}`);
-                throw new Error(`Advanced search failed: ${errorText}`);
+                return { suggestions: [], query_time_ms: 0 };
             }
         } catch (error) {
-            console.error('Error performing advanced search:', error);
-            window.ui.showNotification('Error', 'Error performing advanced search');
-            return { files: [], folders: [], total_count: 0 };
+            console.error('Error getting suggestions:', error);
+            return { suggestions: [], query_time_ms: 0 };
         }
     },
 
     /**
-     * Display search results in the UI
-     * @param {Object} results - Search results object with files and folders arrays
+     * Display search results in the UI.
+     *
+     * Uses server-computed enriched data:
+     * - icon_class: Font Awesome class for file type icon
+     * - size_formatted: Human-readable file size (e.g. "2.5 MB")
+     * - category: Content category (image, video, document, code, archive, audio, other)
+     * - relevance_score: 0-100 match quality
+     * - query_time_ms: Server-side query execution time
+     * - sort_by: Active sort order
+     *
+     * @param {Object} results - Enriched search results from backend
      */
     displaySearchResults(results) {
-        // Get the files grid and list view elements
         const filesGrid = document.getElementById('files-grid');
         const filesListView = document.getElementById('files-list-view');
-        
-        // Clear existing content
+
         filesGrid.innerHTML = '';
         filesListView.innerHTML = `
             <div class="list-header">
@@ -119,61 +116,88 @@ const search = {
                 <div data-i18n="files.modified">Modified</div>
             </div>
         `;
-        
-        // Add search results header
+
+        // Search results header with query time and sort controls
+        const totalCount = results.total_count || (results.files.length + results.folders.length);
+        const queryTimeText = results.query_time_ms !== undefined
+            ? ` <span class="search-time">(${results.query_time_ms}ms)</span>`
+            : '';
+
         const searchHeader = document.createElement('div');
         searchHeader.className = 'search-results-header';
         searchHeader.innerHTML = `
-            <h3>Search results (${results.total_count || (results.files.length + results.folders.length)})</h3>
-            <button class="btn btn-secondary" id="clear-search-btn">
-                <i class="fas fa-times"></i> Clear search
-            </button>
+            <h3>Search results (${totalCount})${queryTimeText}</h3>
+            <div class="search-controls">
+                <select id="search-sort-select" class="search-sort-select" title="Sort by">
+                    <option value="relevance"${results.sort_by === 'relevance' ? ' selected' : ''}>Relevance</option>
+                    <option value="name"${results.sort_by === 'name' ? ' selected' : ''}>Name A-Z</option>
+                    <option value="name_desc"${results.sort_by === 'name_desc' ? ' selected' : ''}>Name Z-A</option>
+                    <option value="date_desc"${results.sort_by === 'date_desc' ? ' selected' : ''}>Newest first</option>
+                    <option value="date"${results.sort_by === 'date' ? ' selected' : ''}>Oldest first</option>
+                    <option value="size_desc"${results.sort_by === 'size_desc' ? ' selected' : ''}>Largest first</option>
+                    <option value="size"${results.sort_by === 'size' ? ' selected' : ''}>Smallest first</option>
+                </select>
+                <button class="btn btn-secondary" id="clear-search-btn">
+                    <i class="fas fa-times"></i> Clear search
+                </button>
+            </div>
         `;
         filesGrid.appendChild(searchHeader);
-        
-        // Add event listener to clear search button
+
+        // Sort dropdown — re-searches with new sort order (server-side)
+        const sortSelect = document.getElementById('search-sort-select');
+        if (sortSelect) {
+            sortSelect.addEventListener('change', () => {
+                const searchInput = document.querySelector('.search-container input');
+                if (searchInput && searchInput.value.trim()) {
+                    const event = new CustomEvent('search-resort', {
+                        detail: { sort_by: sortSelect.value }
+                    });
+                    document.dispatchEvent(event);
+                }
+            });
+        }
+
+        // Clear search
         const clearSearchBtn = document.getElementById('clear-search-btn');
         if (clearSearchBtn) {
             clearSearchBtn.addEventListener('click', () => {
-                // Clear search input
                 document.querySelector('.search-container input').value = '';
-                
-                // Load regular files view
                 window.app.currentPath = '';
+                window.app.isSearchMode = false;
                 window.ui.updateBreadcrumb('');
                 window.loadFiles();
             });
         }
-        
-        // If no results, show empty state
+
+        // Empty state
         if (results.files.length === 0 && results.folders.length === 0) {
             const emptyState = document.createElement('div');
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
-                <i class="fas fa-search" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
-                <p>No results found for this search</p>
+                <i class="fas fa-search" style="font-size: 48px; color: var(--empty-icon, #ccc); margin-bottom: 16px;"></i>
+                <p style="color: var(--text-secondary, #64748b);">No results found for this search</p>
             `;
             filesGrid.appendChild(emptyState);
             return;
         }
-        
-        // Process folders
+
+        // Render folders (server-provided enriched data)
         results.folders.forEach(folder => {
             window.ui.addFolderToView(folder);
         });
-        
-        // Process files
+
+        // Render files (server-provided enriched data)
         results.files.forEach(file => {
             window.ui.addFileToView(file);
         });
-        
-        // Update file icons
+
         window.ui.updateFileIcons();
     },
-    
+
     /**
      * Clear the search cache on the server
-     * @returns {Promise<boolean>} - Success status
+     * @returns {Promise<boolean>}
      */
     async clearSearchCache() {
         try {
@@ -181,7 +205,7 @@ const search = {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
-            
+
             if (response.ok) {
                 window.ui.showNotification('Cache cleared', 'Search cache cleared successfully');
                 return true;

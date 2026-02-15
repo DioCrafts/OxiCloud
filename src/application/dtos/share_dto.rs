@@ -6,6 +6,7 @@ use crate::domain::entities::share::{Share, SharePermissions};
 pub struct ShareDto {
     pub id: String,
     pub item_id: String,
+    pub item_name: Option<String>,
     pub item_type: String,
     pub token: String,
     pub url: String,
@@ -27,6 +28,7 @@ pub struct SharePermissionsDto {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateShareDto {
     pub item_id: String,
+    pub item_name: Option<String>,
     pub item_type: String,
     pub password: Option<String>,
     pub expires_at: Option<u64>,
@@ -48,6 +50,7 @@ impl ShareDto {
         Self {
             id: share.id().to_string(),
             item_id: share.item_id().to_string(),
+            item_name: share.item_name().map(|s| s.to_string()),
             item_type: share.item_type().to_string(),
             token: share.token().to_string(),
             url,

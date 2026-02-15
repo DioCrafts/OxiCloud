@@ -308,46 +308,36 @@ const multiSelect = {
         });
         if (!confirmed) return;
 
-        let success = 0;
-        let errors = 0;
+        const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
+        const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
 
-        for (const item of items) {
-            try {
-                const endpoint = item.type === 'folder'
-                    ? `/api/trash/folders/${item.id}`
-                    : `/api/trash/files/${item.id}`;
+        try {
+            const response = await fetch('/api/batch/trash', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_ids: fileIds, folder_ids: folderIds })
+            });
 
-                const response = await fetch(endpoint, {
-                    method: 'DELETE',
-                    headers: getAuthHeaders()
-                });
+            const data = await response.json();
+            const success = data.stats?.successful || 0;
+            const errors = data.stats?.failed || 0;
 
-                if (response.ok) {
-                    success++;
-                } else {
-                    // Fallback to direct delete
-                    const fallback = item.type === 'folder'
-                        ? `/api/folders/${item.id}`
-                        : `/api/files/${item.id}`;
-                    const r2 = await fetch(fallback, { method: 'DELETE', headers: getAuthHeaders() });
-                    if (r2.ok) success++;
-                    else errors++;
-                }
-            } catch (e) {
-                console.error('Error deleting item:', item, e);
-                errors++;
+            this.clear();
+            window.loadFiles();
+
+            if (errors > 0) {
+                const failedNames = (data.failed || []).map(f => f.id).join(', ');
+                window.ui.showNotification('Batch delete',
+                    `${success} moved to trash, ${errors} failed`);
+            } else {
+                window.ui.showNotification('Moved to trash',
+                    `${success} item${success !== 1 ? 's' : ''} moved to trash`);
             }
-        }
-
-        this.clear();
-        window.loadFiles();
-
-        if (errors > 0) {
-            window.ui.showNotification('Batch delete',
-                `${success} moved to trash, ${errors} failed`);
-        } else {
-            window.ui.showNotification('Moved to trash',
-                `${success} item${success !== 1 ? 's' : ''} moved to trash`);
+        } catch (e) {
+            console.error('Batch trash error:', e);
+            window.ui.showNotification('Error', 'Could not move items to trash');
+            this.clear();
+            window.loadFiles();
         }
     },
 
@@ -379,17 +369,39 @@ const multiSelect = {
         dialog.style.display = 'flex';
     },
 
-    /** Batch download — downloads each item individually */
+    /** Batch download — downloads all selected items as a single ZIP */
     async batchDownload() {
         const items = this.items;
         if (items.length === 0) return;
 
-        for (const item of items) {
-            if (item.type === 'folder') {
-                await window.fileOps.downloadFolder(item.id, item.name);
-            } else {
-                await window.fileOps.downloadFile(item.id, item.name);
+        window.ui.showNotification('Preparing download', 'Creating ZIP archive...');
+
+        try {
+            const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
+            const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
+
+            const response = await fetch('/api/batch/download', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_ids: fileIds, folder_ids: folderIds })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
             }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `oxicloud-download-${Date.now()}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Batch download error:', e);
+            window.ui.showNotification('Error', 'Could not download selected items');
         }
     },
 

@@ -45,6 +45,14 @@ impl FolderService {
                 Ok(vec![])
             }
 
+            async fn list_folders_for_owner(
+                &self,
+                _parent_id: Option<&str>,
+                _owner_id: &str,
+            ) -> Result<Vec<FolderDto>, DomainError> {
+                Ok(vec![])
+            }
+
             async fn list_folders_paginated(
                 &self,
                 _parent_id: Option<&str>,
@@ -170,6 +178,29 @@ impl FolderUseCase for FolderService {
             })?;
 
         // Convert to DTOs
+        Ok(folders.into_iter().map(FolderDto::from).collect())
+    }
+
+    /// Lists folders scoped to a specific owner.
+    async fn list_folders_for_owner(
+        &self,
+        parent_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<FolderDto>, DomainError> {
+        let folders = self
+            .folder_storage
+            .list_folders_by_owner(parent_id, owner_id)
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "FolderStorage",
+                    format!(
+                        "Failed to list folders for owner '{}' in parent {:?}: {}",
+                        owner_id, parent_id, e
+                    ),
+                )
+            })?;
+
         Ok(folders.into_iter().map(FolderDto::from).collect())
     }
 

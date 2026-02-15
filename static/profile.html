@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — My Profile</title>
+<!-- Apply saved theme immediately to prevent flash of light mode -->
+<script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif}
@@ -118,6 +120,37 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
 #auth-error p{color:#64748b;margin-bottom:20px;font-size:14px}
 #auth-error a{display:inline-flex;align-items:center;gap:6px;padding:10px 24px;background:linear-gradient(135deg,#ff5e3a,#ff2d55);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:14px;box-shadow:0 3px 12px rgba(255,94,58,.3);transition:all .2s}
 #auth-error a:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(255,94,58,.4)}
+
+/* ── Dark Mode ── */
+[data-theme="dark"] body{background:#0f172a;color:#e2e8f0}
+[data-theme="dark"] ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+[data-theme="dark"] *{scrollbar-color:rgba(255,255,255,.15) transparent}
+[data-theme="dark"] .profile-card{background:#1e293b;box-shadow:0 1px 4px rgba(0,0,0,.2),0 0 0 1px rgba(255,255,255,.03)}
+[data-theme="dark"] .profile-card h2{color:#f1f5f9}
+[data-theme="dark"] .avatar-info h1{color:#f1f5f9}
+[data-theme="dark"] .avatar-info .email{color:#94a3b8}
+[data-theme="dark"] .role-badge-admin{background:#1e3a5f;color:#60a5fa}
+[data-theme="dark"] .role-badge-user{background:#334155;color:#94a3b8}
+[data-theme="dark"] .info-item{background:#162032;border-color:#334155}
+[data-theme="dark"] .info-item .info-label{color:#64748b}
+[data-theme="dark"] .info-item .info-label i{color:#475569}
+[data-theme="dark"] .info-item .info-value{color:#f1f5f9}
+[data-theme="dark"] .storage-stat{background:#162032;border-color:#334155}
+[data-theme="dark"] .storage-stat .stat-value{color:#f1f5f9}
+[data-theme="dark"] .storage-stat .stat-label{color:#64748b}
+[data-theme="dark"] .storage-bar{background:#334155}
+[data-theme="dark"] .storage-text{color:#64748b}
+[data-theme="dark"] .form-group label{color:#94a3b8}
+[data-theme="dark"] .form-group input{background:#0f172a;border-color:#334155;color:#e2e8f0}
+[data-theme="dark"] .form-group input:focus{border-color:#ff5e3a;background:#0f172a;box-shadow:0 0 0 3px rgba(255,94,58,.15)}
+[data-theme="dark"] .form-group small{color:#64748b}
+[data-theme="dark"] .alert-success{background:#052e16;color:#86efac;border-color:#065f46}
+[data-theme="dark"] .alert-error{background:#3b1111;color:#fca5a5;border-color:#991b1b}
+[data-theme="dark"] #auth-error{background:transparent}
+[data-theme="dark"] #auth-error .err-icon{background:#3b1111}
+[data-theme="dark"] #auth-error h2{color:#fca5a5}
+[data-theme="dark"] #auth-error p{color:#94a3b8}
+[data-theme="dark"] #loading{color:#64748b}
 </style>
 </head>
 <body>

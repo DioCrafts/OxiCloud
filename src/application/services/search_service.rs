@@ -7,19 +7,30 @@ use tokio::time;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
-use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto};
+use crate::application::dtos::search_dto::{
+    SearchCriteriaDto, SearchFileResultDto, SearchFolderResultDto, SearchResultsDto,
+    SearchSuggestionItem, SearchSuggestionsDto,
+};
 use crate::application::ports::inbound::SearchUseCase;
 use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::Result;
 
 /**
- * Search service implementation for files and folders.
+ * High-performance search service implementation for files and folders.
  *
- * This service implements the advanced search functionality that allows
- * users to find files and folders based on various criteria
- * such as name, type, date and size. It also includes a cache to improve
- * the performance of repeated searches.
+ * All search processing (filtering, scoring, sorting, categorization,
+ * formatting) is performed server-side in Rust for maximum efficiency.
+ * The frontend acts as a thin rendering client only.
+ *
+ * Features:
+ * - Parallel recursive folder traversal using tokio tasks
+ * - Relevance scoring (exact match > starts-with > contains)
+ * - Content categorization and icon mapping
+ * - Multiple sort options (relevance, name, date, size)
+ * - Server-side formatted file sizes
+ * - Quick suggestions endpoint for autocomplete
+ * - TTL-based result caching
  */
 pub struct SearchService {
     /// Repository for file operations
@@ -57,14 +68,149 @@ struct CachedSearchResult {
     timestamp: Instant,
 }
 
+// ─── Utility functions (pure, no self — computed on the server) ─────────
+
+/// Compute relevance score (0–100) for a name against a query.
+/// Exact match = 100, starts-with = 80, contains = 50, no match = 0.
+fn compute_relevance(name: &str, query: &str) -> u32 {
+    let name_lower = name.to_lowercase();
+    let query_lower = query.to_lowercase();
+
+    if name_lower == query_lower {
+        100
+    } else if name_lower.starts_with(&query_lower) {
+        80
+    } else if name_lower.contains(&query_lower) {
+        // Bonus for shorter names (more specific match)
+        let ratio = query_lower.len() as f64 / name_lower.len() as f64;
+        50 + (ratio * 20.0) as u32
+    } else {
+        0
+    }
+}
+
+/// Format bytes into a human-readable string (e.g. "2.5 MB").
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    if bytes == 0 {
+        return "0 B".to_string();
+    }
+    let exp = (bytes as f64).log(1024.0).floor() as usize;
+    let exp = exp.min(UNITS.len() - 1);
+    let value = bytes as f64 / 1024_f64.powi(exp as i32);
+    if exp == 0 {
+        format!("{} B", bytes)
+    } else {
+        format!("{:.1} {}", value, UNITS[exp])
+    }
+}
+
+/// Determine content category from MIME type.
+fn categorize_mime(mime: &str) -> &'static str {
+    let m = mime.to_lowercase();
+    if m.starts_with("image/") {
+        "image"
+    } else if m.starts_with("video/") {
+        "video"
+    } else if m.starts_with("audio/") {
+        "audio"
+    } else if m.starts_with("text/")
+        || m.contains("pdf")
+        || m.contains("document")
+        || m.contains("spreadsheet")
+        || m.contains("presentation")
+        || m.contains("msword")
+        || m.contains("officedocument")
+    {
+        "document"
+    } else if m.contains("zip")
+        || m.contains("tar")
+        || m.contains("gzip")
+        || m.contains("bzip")
+        || m.contains("7z")
+        || m.contains("rar")
+        || m.contains("compress")
+    {
+        "archive"
+    } else if m.contains("json")
+        || m.contains("xml")
+        || m.contains("javascript")
+        || m.contains("typescript")
+        || m.contains("x-python")
+        || m.contains("x-rust")
+        || m.contains("x-c")
+        || m.contains("x-java")
+        || m.contains("x-shellscript")
+        || m.contains("x-httpd-php")
+        || m.contains("yaml")
+        || m.contains("toml")
+    {
+        "code"
+    } else {
+        "other"
+    }
+}
+
+/// Get Font Awesome icon class for a file based on extension and MIME type.
+fn get_icon_class(name: &str, mime: &str) -> String {
+    // Try extension first
+    if let Some(ext) = name.rsplit('.').next() {
+        let ext_lower = ext.to_lowercase();
+        let icon = match ext_lower.as_str() {
+            // Documents
+            "pdf" => "fas fa-file-pdf",
+            "doc" | "docx" => "fas fa-file-word",
+            "xls" | "xlsx" => "fas fa-file-excel",
+            "ppt" | "pptx" => "fas fa-file-powerpoint",
+            "txt" | "rtf" | "md" => "fas fa-file-alt",
+            "csv" => "fas fa-file-csv",
+            // Images
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" => {
+                "fas fa-file-image"
+            }
+            // Video
+            "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" => {
+                "fas fa-file-video"
+            }
+            // Audio
+            "mp3" | "wav" | "ogg" | "flac" | "aac" | "wma" | "m4a" => "fas fa-file-audio",
+            // Archives
+            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => "fas fa-file-archive",
+            // Code
+            "js" | "ts" | "jsx" | "tsx" | "py" | "rs" | "go" | "java" | "c" | "cpp" | "cs"
+            | "rb" | "php" | "swift" | "kt" | "scala" | "r" | "lua" | "pl" | "sh" | "bash"
+            | "zsh" | "fish" | "ps1" | "bat" | "cmd" => "fas fa-file-code",
+            "html" | "htm" | "css" | "scss" | "sass" | "less" => "fas fa-file-code",
+            "json" | "xml" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf" => {
+                "fas fa-file-code"
+            }
+            "sql" => "fas fa-database",
+            _ => "",
+        };
+        if !icon.is_empty() {
+            return icon.to_string();
+        }
+    }
+
+    // Fallback to MIME type
+    let category = categorize_mime(mime);
+    match category {
+        "image" => "fas fa-file-image",
+        "video" => "fas fa-file-video",
+        "audio" => "fas fa-file-audio",
+        "document" => "fas fa-file-alt",
+        "archive" => "fas fa-file-archive",
+        "code" => "fas fa-file-code",
+        _ => "fas fa-file",
+    }
+    .to_string()
+}
+
+// ─── SearchService implementation ───────────────────────────────────────
+
 impl SearchService {
     /**
      * Creates a new instance of the search service.
-     *
-     * @param file_repository Repository for file operations
-     * @param folder_repository Repository for folder operations
-     * @param cache_ttl Cache time-to-live in seconds (0 to disable)
-     * @param max_cache_size Maximum cache size
      */
     pub fn new(
         file_repository: Arc<dyn FileReadPort>,
@@ -88,12 +234,7 @@ impl SearchService {
         search_service
     }
 
-    /**
-     * Starts an asynchronous task to clean up expired cache entries.
-     *
-     * @param cache_ref Reference to the shared cache
-     * @param ttl_seconds TTL in seconds
-     */
+    /// Starts an asynchronous task to clean up expired cache entries.
     fn start_cache_cleanup_task(
         cache_ref: Arc<Mutex<HashMap<SearchCacheKey, CachedSearchResult>>>,
         ttl_seconds: u64,
@@ -105,18 +246,13 @@ impl SearchService {
             loop {
                 time::sleep(cleanup_interval).await;
 
-                // Acquire lock and clean up expired entries
                 if let Ok(mut cache) = cache_ref.lock() {
                     let now = Instant::now();
-
-                    // Identify expired entries
                     let expired_keys: Vec<SearchCacheKey> = cache
                         .iter()
                         .filter(|(_, result)| now.duration_since(result.timestamp) > ttl)
                         .map(|(key, _)| key.clone())
                         .collect();
-
-                    // Remove expired entries
                     for key in expired_keys {
                         cache.remove(&key);
                     }
@@ -125,31 +261,17 @@ impl SearchService {
         });
     }
 
-    /**
-     * Creates a cache key from the search criteria.
-     *
-     * @param criteria Search criteria
-     * @param user_id User ID (to isolate cache between users)
-     * @return Cache key
-     */
+    /// Creates a cache key from the search criteria.
     fn create_cache_key(&self, criteria: &SearchCriteriaDto, user_id: &str) -> SearchCacheKey {
-        // Serialize criteria to generate a hash
         let criteria_str = serde_json::to_string(criteria).unwrap_or_default();
-
         SearchCacheKey {
             criteria_hash: criteria_str,
             user_id: user_id.to_string(),
         }
     }
 
-    /**
-     * Attempts to retrieve results from the cache.
-     *
-     * @param key Cache key
-     * @return Optionally, the results if they exist and have not expired
-     */
+    /// Attempts to retrieve results from the cache.
     fn get_from_cache(&self, key: &SearchCacheKey) -> Option<SearchResultsDto> {
-        // If TTL is 0, the cache is disabled
         if self.cache_ttl == 0 {
             return None;
         }
@@ -159,8 +281,6 @@ impl SearchService {
         {
             let now = Instant::now();
             let ttl = Duration::from_secs(self.cache_ttl);
-
-            // Check if the entry has expired
             if now.duration_since(cached_result.timestamp) < ttl {
                 return Some(cached_result.results.clone());
             }
@@ -169,20 +289,13 @@ impl SearchService {
         None
     }
 
-    /**
-     * Stores results in the cache.
-     *
-     * @param key Cache key
-     * @param results Results to store
-     */
+    /// Stores results in the cache.
     fn store_in_cache(&self, key: SearchCacheKey, results: SearchResultsDto) {
-        // If TTL is 0, the cache is disabled
         if self.cache_ttl == 0 {
             return;
         }
 
         if let Ok(mut cache) = self.search_cache.lock() {
-            // If the cache is full, remove the oldest entry
             if cache.len() >= self.max_cache_size
                 && let Some((oldest_key, _)) =
                     cache.iter().min_by_key(|(_, result)| result.timestamp)
@@ -191,7 +304,6 @@ impl SearchService {
                 cache.remove(&key_to_remove);
             }
 
-            // Store the new result
             cache.insert(
                 key,
                 CachedSearchResult {
@@ -202,268 +314,407 @@ impl SearchService {
         }
     }
 
-    /**
-     * Filters files according to the search criteria.
-     *
-     * @param files List of files to filter
-     * @param criteria Search criteria
-     * @return Files that match the criteria
-     */
-    fn filter_files(&self, files: Vec<FileDto>, criteria: &SearchCriteriaDto) -> Vec<FileDto> {
-        files
-            .into_iter()
-            .filter(|file| {
-                // Filter by name
-                if let Some(name_query) = &criteria.name_contains
-                    && !file
-                        .name
-                        .to_lowercase()
-                        .contains(&name_query.to_lowercase())
-                {
-                    return false;
-                }
+    /// Enrich a FileDto → SearchFileResultDto with server-computed metadata.
+    fn enrich_file(file: &FileDto, query: &str) -> SearchFileResultDto {
+        let relevance = if query.is_empty() {
+            50
+        } else {
+            compute_relevance(&file.name, query)
+        };
 
-                // Filter by file type (extension)
-                if let Some(file_types) = &criteria.file_types {
-                    if let Some(extension) = file.name.split('.').next_back() {
-                        if !file_types
-                            .iter()
-                            .any(|ext| ext.eq_ignore_ascii_case(extension))
-                        {
-                            return false;
-                        }
-                    } else {
-                        // Has no extension
-                        return false;
-                    }
-                }
+        SearchFileResultDto {
+            id: file.id.clone(),
+            name: file.name.clone(),
+            path: file.path.clone(),
+            size: file.size,
+            mime_type: file.mime_type.clone(),
+            folder_id: file.folder_id.clone(),
+            created_at: file.created_at,
+            modified_at: file.modified_at,
+            relevance_score: relevance,
+            size_formatted: format_bytes(file.size),
+            icon_class: get_icon_class(&file.name, &file.mime_type),
+            category: categorize_mime(&file.mime_type).to_string(),
+        }
+    }
 
-                // Filter by creation date
-                if let Some(created_after) = criteria.created_after
-                    && file.created_at < created_after
-                {
-                    return false;
-                }
+    /// Enrich a FolderDto → SearchFolderResultDto with server-computed metadata.
+    fn enrich_folder(folder: &FolderDto, query: &str) -> SearchFolderResultDto {
+        let relevance = if query.is_empty() {
+            50
+        } else {
+            compute_relevance(&folder.name, query)
+        };
 
-                if let Some(created_before) = criteria.created_before
-                    && file.created_at > created_before
-                {
-                    return false;
-                }
-
-                // Filter by modification date
-                if let Some(modified_after) = criteria.modified_after
-                    && file.modified_at < modified_after
-                {
-                    return false;
-                }
-
-                if let Some(modified_before) = criteria.modified_before
-                    && file.modified_at > modified_before
-                {
-                    return false;
-                }
-
-                // Filter by size
-                if let Some(min_size) = criteria.min_size
-                    && file.size < min_size
-                {
-                    return false;
-                }
-
-                if let Some(max_size) = criteria.max_size
-                    && file.size > max_size
-                {
-                    return false;
-                }
-
-                true
-            })
-            .collect()
+        SearchFolderResultDto {
+            id: folder.id.clone(),
+            name: folder.name.clone(),
+            path: folder.path.clone(),
+            parent_id: folder.parent_id.clone(),
+            created_at: folder.created_at,
+            modified_at: folder.modified_at,
+            is_root: folder.is_root,
+            relevance_score: relevance,
+        }
     }
 
     /**
-     * Filters folders according to the search criteria.
+     * Parallel recursive search through folders using tokio tasks.
      *
-     * @param folders List of folders to filter
-     * @param criteria Search criteria
-     * @return Folders that match the criteria
+     * Instead of searching subfolders sequentially, we spawn a task
+     * per subfolder and join them all concurrently.
      */
-    fn filter_folders(
-        &self,
-        folders: Vec<FolderDto>,
-        criteria: &SearchCriteriaDto,
-    ) -> Vec<FolderDto> {
-        folders
-            .into_iter()
-            .filter(|folder| {
-                // Filter by name
-                if let Some(name_query) = &criteria.name_contains
-                    && !folder
-                        .name
-                        .to_lowercase()
-                        .contains(&name_query.to_lowercase())
-                {
-                    return false;
-                }
-
-                // Filter by creation date
-                if let Some(created_after) = criteria.created_after
-                    && folder.created_at < created_after
-                {
-                    return false;
-                }
-
-                if let Some(created_before) = criteria.created_before
-                    && folder.created_at > created_before
-                {
-                    return false;
-                }
-
-                // Filter by modification date
-                if let Some(modified_after) = criteria.modified_after
-                    && folder.modified_at < modified_after
-                {
-                    return false;
-                }
-
-                if let Some(modified_before) = criteria.modified_before
-                    && folder.modified_at > modified_before
-                {
-                    return false;
-                }
-
-                true
-            })
-            .collect()
-    }
-
-    /**
-     * Implementation of recursive search through folders.
-     *
-     * @param current_folder_id ID of the current folder
-     * @param criteria Search criteria
-     * @param found_files Files found so far
-     * @param found_folders Folders found so far
-     */
-    async fn search_recursive(
-        &self,
-        current_folder_id: Option<&str>,
-        criteria: &SearchCriteriaDto,
-        found_files: &mut Vec<FileDto>,
-        found_folders: &mut Vec<FolderDto>,
-    ) -> Result<()> {
+    fn search_parallel(
+        file_repo: Arc<dyn FileReadPort>,
+        folder_repo: Arc<dyn FolderStoragePort>,
+        current_folder_id: Option<String>,
+        criteria: Arc<SearchCriteriaDto>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(Vec<FileDto>, Vec<FolderDto>)>> + Send>> {
         Box::pin(async move {
-            // List files in the current folder
-            let files = self.file_repository.list_files(current_folder_id).await?;
+        // List files in the current folder
+        let files = file_repo
+            .list_files(current_folder_id.as_deref())
+            .await?;
 
-            // Filter files according to criteria and add them to the results
-            let filtered_files =
-                self.filter_files(files.into_iter().map(FileDto::from).collect(), criteria);
-            found_files.extend(filtered_files);
+        let filtered_files: Vec<FileDto> = files
+            .into_iter()
+            .map(FileDto::from)
+            .filter(|file| passes_file_filter(file, &criteria))
+            .collect();
 
-            // If the search is recursive, process subfolders
-            if criteria.recursive {
-                // List subfolders
-                let folders = self
-                    .folder_repository
-                    .list_folders(current_folder_id)
-                    .await?;
+        let mut all_files = filtered_files;
+        let mut all_folders: Vec<FolderDto> = Vec::new();
 
-                // Filter folders according to criteria and add them to the results
-                let filtered_folders: Vec<FolderDto> = self
-                    .filter_folders(folders.into_iter().map(FolderDto::from).collect(), criteria);
+        // If recursive, process subfolders in parallel
+        if criteria.recursive {
+            let folders = folder_repo
+                .list_folders(current_folder_id.as_deref())
+                .await?;
 
-                // Add filtered folders to the results
-                found_folders.extend(filtered_folders.iter().cloned());
+            let folder_dtos: Vec<FolderDto> = folders
+                .into_iter()
+                .map(FolderDto::from)
+                .filter(|f| passes_folder_filter(f, &criteria))
+                .collect();
 
-                // Search recursively in each subfolder
-                for folder in filtered_folders {
-                    self.search_recursive(Some(&folder.id), criteria, found_files, found_folders)
-                        .await?;
-                }
+            all_folders.extend(folder_dtos.iter().cloned());
+
+            // Spawn parallel tasks for each subfolder
+            let mut handles = Vec::with_capacity(folder_dtos.len());
+            for subfolder in &folder_dtos {
+                let fr = file_repo.clone();
+                let fdr = folder_repo.clone();
+                let crit = criteria.clone();
+                let folder_id = subfolder.id.clone();
+
+                handles.push(tokio::spawn(async move {
+                    Self::search_parallel(fr, fdr, Some(folder_id), crit).await
+                }));
             }
 
-            Ok(())
+            // Collect results from all parallel tasks
+            for handle in handles {
+                match handle.await {
+                    Ok(Ok((sub_files, sub_folders))) => {
+                        all_files.extend(sub_files);
+                        all_folders.extend(sub_folders);
+                    }
+                    Ok(Err(e)) => {
+                        tracing::warn!("Parallel search subtask error: {}", e);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Parallel search task join error: {}", e);
+                    }
+                }
+            }
+        }
+
+        Ok((all_files, all_folders))
+        }) // end Box::pin
+    }
+
+    /// Quick suggestions search — returns up to `limit` name suggestions
+    /// matching the query prefix. Uses cache-friendly shallow search.
+    pub async fn suggest(
+        &self,
+        query: &str,
+        folder_id: Option<&str>,
+        limit: usize,
+    ) -> Result<SearchSuggestionsDto> {
+        let start = Instant::now();
+        let query_lower = query.to_lowercase();
+
+        let mut suggestions: Vec<SearchSuggestionItem> = Vec::new();
+
+        // List files in the folder
+        let files = self.file_repository.list_files(folder_id).await?;
+        for file in files {
+            let file_dto = FileDto::from(file);
+            if file_dto.name.to_lowercase().contains(&query_lower) {
+                let score = compute_relevance(&file_dto.name, query);
+                suggestions.push(SearchSuggestionItem {
+                    name: file_dto.name.clone(),
+                    item_type: "file".to_string(),
+                    id: file_dto.id.clone(),
+                    path: file_dto.path.clone(),
+                    icon_class: get_icon_class(&file_dto.name, &file_dto.mime_type),
+                    relevance_score: score,
+                });
+            }
+            if suggestions.len() >= limit * 2 {
+                break; // Collect enough candidates
+            }
+        }
+
+        // List folders
+        let folders = self.folder_repository.list_folders(folder_id).await?;
+        for folder in folders {
+            let folder_dto = FolderDto::from(folder);
+            if folder_dto.name.to_lowercase().contains(&query_lower) {
+                let score = compute_relevance(&folder_dto.name, query);
+                suggestions.push(SearchSuggestionItem {
+                    name: folder_dto.name.clone(),
+                    item_type: "folder".to_string(),
+                    id: folder_dto.id.clone(),
+                    path: folder_dto.path.clone(),
+                    icon_class: "fas fa-folder".to_string(),
+                    relevance_score: score,
+                });
+            }
+        }
+
+        // Sort by relevance and truncate
+        suggestions.sort_by(|a, b| b.relevance_score.cmp(&a.relevance_score));
+        suggestions.truncate(limit);
+
+        let elapsed = start.elapsed().as_millis() as u64;
+        Ok(SearchSuggestionsDto {
+            suggestions,
+            query_time_ms: elapsed,
         })
-        .await
     }
 }
+
+// ─── Standalone filter functions for use in parallel tasks ──────────────
+
+/// Check if a file passes all filter criteria (standalone, no &self needed).
+fn passes_file_filter(file: &FileDto, criteria: &SearchCriteriaDto) -> bool {
+    if let Some(name_query) = &criteria.name_contains
+        && !file
+            .name
+            .to_lowercase()
+            .contains(&name_query.to_lowercase())
+    {
+        return false;
+    }
+    if let Some(file_types) = &criteria.file_types {
+        if let Some(extension) = file.name.split('.').next_back() {
+            if !file_types
+                .iter()
+                .any(|ext| ext.eq_ignore_ascii_case(extension))
+            {
+                return false;
+            }
+        } else {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.created_after {
+        if file.created_at < v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.created_before {
+        if file.created_at > v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.modified_after {
+        if file.modified_at < v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.modified_before {
+        if file.modified_at > v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.min_size {
+        if file.size < v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.max_size {
+        if file.size > v {
+            return false;
+        }
+    }
+    true
+}
+
+/// Check if a folder passes all filter criteria (standalone).
+fn passes_folder_filter(folder: &FolderDto, criteria: &SearchCriteriaDto) -> bool {
+    if let Some(name_query) = &criteria.name_contains
+        && !folder
+            .name
+            .to_lowercase()
+            .contains(&name_query.to_lowercase())
+    {
+        return false;
+    }
+    if let Some(v) = criteria.created_after {
+        if folder.created_at < v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.created_before {
+        if folder.created_at > v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.modified_after {
+        if folder.modified_at < v {
+            return false;
+        }
+    }
+    if let Some(v) = criteria.modified_before {
+        if folder.modified_at > v {
+            return false;
+        }
+    }
+    true
+}
+
+// ─── SearchUseCase trait implementation ──────────────────────────────────
 
 #[async_trait]
 impl SearchUseCase for SearchService {
     /**
      * Performs a search based on the specified criteria.
      *
-     * @param criteria Search criteria
-     * @return Search results
+     * All processing happens server-side:
+     * - Parallel recursive traversal
+     * - Filtering by name, type, dates, size
+     * - Relevance scoring
+     * - Sorting (relevance, name, date, size)
+     * - Content categorization & icon mapping
+     * - Human-readable size formatting
+     * - Pagination
      */
     async fn search(&self, criteria: SearchCriteriaDto) -> Result<SearchResultsDto> {
+        let start = Instant::now();
+
         // TODO: Get user ID from the authentication context
         let user_id = "default-user";
         let cache_key = self.create_cache_key(&criteria, user_id);
 
-        // Try to get results from the cache
+        // Try cache
         if let Some(cached_results) = self.get_from_cache(&cache_key) {
             return Ok(cached_results);
         }
 
-        // Initialize collections for results
-        let mut found_files: Vec<FileDto> = Vec::new();
-        let mut found_folders: Vec<FolderDto> = Vec::new();
-
-        // Perform search in the specified folder or at the root
-        self.search_recursive(
-            criteria.folder_id.as_deref(),
-            &criteria,
-            &mut found_files,
-            &mut found_folders,
+        // ── Parallel recursive search ──
+        let criteria_arc = Arc::new(criteria.clone());
+        let (found_files, found_folders) = Self::search_parallel(
+            self.file_repository.clone(),
+            self.folder_repository.clone(),
+            criteria.folder_id.clone(),
+            criteria_arc,
         )
         .await?;
 
-        // Apply pagination
-        let total_count = found_files.len() + found_folders.len();
+        let query = criteria.name_contains.as_deref().unwrap_or("");
 
-        // Sort by relevance or date according to criteria
-        // By default, sort by modification date (most recent first)
-        found_files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
-        found_folders.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+        // ── Enrich results with server-computed metadata ──
+        let mut enriched_files: Vec<SearchFileResultDto> = found_files
+            .iter()
+            .map(|f| Self::enrich_file(f, query))
+            .collect();
 
-        // Apply limit and offset for pagination
+        let mut enriched_folders: Vec<SearchFolderResultDto> = found_folders
+            .iter()
+            .map(|f| Self::enrich_folder(f, query))
+            .collect();
+
+        // ── Sort based on criteria.sort_by ──
+        match criteria.sort_by.as_str() {
+            "name" => {
+                enriched_files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                enriched_folders
+                    .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            }
+            "name_desc" => {
+                enriched_files.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                enriched_folders
+                    .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+            }
+            "date" => {
+                enriched_files.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
+                enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
+            }
+            "date_desc" => {
+                enriched_files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+                enriched_folders.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+            }
+            "size" => {
+                enriched_files.sort_by(|a, b| a.size.cmp(&b.size));
+            }
+            "size_desc" => {
+                enriched_files.sort_by(|a, b| b.size.cmp(&a.size));
+            }
+            _ => {
+                // "relevance" (default) — highest relevance first, tie-break by date desc
+                enriched_files.sort_by(|a, b| {
+                    b.relevance_score
+                        .cmp(&a.relevance_score)
+                        .then_with(|| b.modified_at.cmp(&a.modified_at))
+                });
+                enriched_folders.sort_by(|a, b| {
+                    b.relevance_score
+                        .cmp(&a.relevance_score)
+                        .then_with(|| b.modified_at.cmp(&a.modified_at))
+                });
+            }
+        }
+
+        // ── Pagination ──
+        let total_count = enriched_files.len() + enriched_folders.len();
         let start_idx = criteria.offset.min(total_count);
         let end_idx = (criteria.offset + criteria.limit).min(total_count);
 
         let paginated_items: Vec<(bool, usize)> = (start_idx..end_idx)
             .map(|i| {
-                if i < found_folders.len() {
-                    (true, i) // It's a folder
+                if i < enriched_folders.len() {
+                    (true, i) // folder
                 } else {
-                    (false, i - found_folders.len()) // It's a file
+                    (false, i - enriched_folders.len()) // file
                 }
             })
             .collect();
 
-        // Extract paginated items
         let mut paginated_folders = Vec::new();
         let mut paginated_files = Vec::new();
 
         for (is_folder, idx) in paginated_items {
             if is_folder {
-                if idx < found_folders.len() {
-                    paginated_folders.push(found_folders[idx].clone());
+                if idx < enriched_folders.len() {
+                    paginated_folders.push(enriched_folders[idx].clone());
                 }
-            } else if idx < found_files.len() {
-                paginated_files.push(found_files[idx].clone());
+            } else if idx < enriched_files.len() {
+                paginated_files.push(enriched_files[idx].clone());
             }
         }
 
-        // Create results object
+        let elapsed_ms = start.elapsed().as_millis() as u64;
+
         let search_results = SearchResultsDto::new(
             paginated_files,
             paginated_folders,
             criteria.limit,
             criteria.offset,
             Some(total_count),
+            elapsed_ms,
+            criteria.sort_by.clone(),
         );
 
         // Store in cache
@@ -472,11 +723,17 @@ impl SearchUseCase for SearchService {
         Ok(search_results)
     }
 
-    /**
-     * Clears the search results cache.
-     *
-     * @return Result indicating success
-     */
+    /// Returns quick suggestions for autocomplete.
+    async fn suggest(
+        &self,
+        query: &str,
+        folder_id: Option<&str>,
+        limit: usize,
+    ) -> Result<SearchSuggestionsDto> {
+        self.suggest(query, folder_id, limit).await
+    }
+
+    /// Clears the search results cache.
     async fn clear_search_cache(&self) -> Result<()> {
         if let Ok(mut cache) = self.search_cache.lock() {
             cache.clear();
@@ -485,7 +742,8 @@ impl SearchUseCase for SearchService {
     }
 }
 
-// Implement the test use case (stub)
+// ── Stub for testing ────────────────────────────────────────────────────
+
 impl SearchService {
     /// Creates a stub version of the service for testing
     pub fn new_stub() -> impl SearchUseCase {
@@ -495,6 +753,18 @@ impl SearchService {
         impl SearchUseCase for SearchServiceStub {
             async fn search(&self, _criteria: SearchCriteriaDto) -> Result<SearchResultsDto> {
                 Ok(SearchResultsDto::empty())
+            }
+
+            async fn suggest(
+                &self,
+                _query: &str,
+                _folder_id: Option<&str>,
+                _limit: usize,
+            ) -> Result<SearchSuggestionsDto> {
+                Ok(SearchSuggestionsDto {
+                    suggestions: Vec::new(),
+                    query_time_ms: 0,
+                })
             }
 
             async fn clear_search_cache(&self) -> Result<()> {

@@ -93,11 +93,17 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     let recent_service = app_state.recent_service.clone();
 
     // Initialize the batch operations service
-    let batch_service = Arc::new(BatchOperationService::default(
+    let mut batch_service_builder = BatchOperationService::default(
         file_retrieval_service.clone(),
         file_management_service.clone(),
         folder_service.clone(),
-    ));
+    );
+    if let Some(ref ts) = trash_service {
+        batch_service_builder = batch_service_builder.with_trash_service(ts.clone());
+    }
+    let zip_service_ref = app_state.core.zip_service.clone();
+    batch_service_builder = batch_service_builder.with_zip_service(zip_service_ref);
+    let batch_service = Arc::new(batch_service_builder);
 
     // Create state for the batch operations handler
     let batch_handler_state = BatchHandlerState {
@@ -176,6 +182,11 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         .route("/folders/delete", post(batch_handler::delete_folders_batch))
         .route("/folders/create", post(batch_handler::create_folders_batch))
         .route("/folders/get", post(batch_handler::get_folders_batch))
+        .route("/folders/move", post(batch_handler::move_folders_batch))
+        // Trash operations (soft delete)
+        .route("/trash", post(batch_handler::trash_batch))
+        // Download as ZIP
+        .route("/download", post(batch_handler::download_batch))
         .with_state(batch_handler_state);
 
     // Create search routes if the service is available
@@ -185,6 +196,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         Router::new()
             // Simple search with query parameters
             .route("/", get(SearchHandler::search_files_get))
+            // Lightweight autocomplete suggestions
+            .route("/suggest", get(SearchHandler::suggest_files))
             // Advanced search with full criteria object
             .route("/advanced", post(SearchHandler::search_files_post))
             // Clear search cache
