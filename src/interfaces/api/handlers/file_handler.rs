@@ -64,7 +64,19 @@ impl FileHandler {
             }
 
             if name == "file" {
-                let filename = field.file_name().unwrap_or("unnamed").to_string();
+                let raw_filename = field.file_name().unwrap_or("unnamed").to_string();
+                // Browsers send the full relative path (e.g. "Screenshots/file.png")
+                // as the filename for folder uploads via webkitRelativePath.
+                // Strip path components to get the basename only.
+                // This also prevents path-traversal attacks.
+                let filename = raw_filename
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&raw_filename)
+                    .rsplit('\\')
+                    .next()
+                    .unwrap_or(&raw_filename)
+                    .to_string();
                 let content_type = field
                     .content_type()
                     .unwrap_or("application/octet-stream")

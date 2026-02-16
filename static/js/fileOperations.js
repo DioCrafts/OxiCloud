@@ -279,7 +279,9 @@ const fileOps = {
             
             const formData = new FormData();
             formData.append('folder_id', targetFolderId);
-            formData.append('file', file);
+            // Use file.name as the explicit filename to prevent the browser
+            // from sending the full webkitRelativePath as the filename
+            formData.append('file', file, file.name);
 
             const displayName = file.webkitRelativePath || file.name;
 

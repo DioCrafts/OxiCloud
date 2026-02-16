@@ -291,7 +291,15 @@ const ui = {
             e._oxiHandled = true;  // Mark as handled for document-level fallback
             dropzone.classList.remove('active');
             if (e.dataTransfer.files.length > 0) {
-                fileOps.uploadFiles(e.dataTransfer.files);
+                // Detect folder drops: files from folder drops have webkitRelativePath set
+                const hasRelativePaths = Array.from(e.dataTransfer.files).some(
+                    f => f.webkitRelativePath && f.webkitRelativePath.includes('/')
+                );
+                if (hasRelativePaths) {
+                    fileOps.uploadFolderFiles(e.dataTransfer.files);
+                } else {
+                    fileOps.uploadFiles(e.dataTransfer.files);
+                }
             }
             setTimeout(() => {
                 dropzone.style.display = 'none';
@@ -327,7 +335,15 @@ const ui = {
             if (e._oxiHandled) return;
 
             if (e.dataTransfer.files.length > 0) {
-                fileOps.uploadFiles(e.dataTransfer.files);
+                // Detect folder drops: files from folder drops have webkitRelativePath set
+                const hasRelativePaths = Array.from(e.dataTransfer.files).some(
+                    f => f.webkitRelativePath && f.webkitRelativePath.includes('/')
+                );
+                if (hasRelativePaths) {
+                    fileOps.uploadFolderFiles(e.dataTransfer.files);
+                } else {
+                    fileOps.uploadFiles(e.dataTransfer.files);
+                }
             }
 
             setTimeout(() => {
