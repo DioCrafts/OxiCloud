@@ -158,9 +158,7 @@ const recent = {
                 : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document'));
 
         const fileSize = isFolder ? '--' : (item.size_formatted || (window.formatFileSize ? window.formatFileSize(item.item_size || 0) : '0 B'));
-        const accessedDate = new Date(item.accessed_at);
-        const formattedDate = accessedDate.toLocaleDateString() + ' ' +
-            accessedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const formattedDate = window.formatDateTime(item.accessed_at);
 
         // Click handler
         const onClick = () => {

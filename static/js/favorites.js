@@ -26,6 +26,20 @@ const favorites = {
         return `${type}:${id}`;
     },
 
+    /**
+     * Replace the entire in-memory cache from an array of FavoriteItemDto
+     * objects (as returned by the batch endpoint). Avoids an extra
+     * GET /api/favorites round-trip.
+     */
+    _replaceCacheFromResponse(items) {
+        this._cache.clear();
+        for (const item of items) {
+            this._cache.set(this._cacheKey(item.item_id, item.item_type), item);
+        }
+        this._ready = true;
+        console.log(`Favorites cache replaced from response: ${this._cache.size} items`);
+    },
+
     // ───────────────────── lifecycle ─────────────────────
 
     /**
@@ -218,11 +232,7 @@ const favorites = {
         const folderId = item.item_id;
         const parentId = item.parent_id || '';
 
-        const modifiedAt = item.modified_at
-            ? new Date(item.modified_at)
-            : new Date(item.created_at);
-        const formattedDate = modifiedAt.toLocaleDateString() + ' ' +
-            modifiedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const formattedDate = window.formatDateTime(item.modified_at || item.created_at);
 
         // --- grid element ---
         const gridEl = document.createElement('div');
@@ -306,11 +316,7 @@ const favorites = {
             : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
 
         const fileSize = item.size_formatted || (window.formatFileSize ? window.formatFileSize(item.item_size || 0) : '0 B');
-        const modifiedAt = item.modified_at
-            ? new Date(item.modified_at)
-            : new Date(item.created_at);
-        const formattedDate = modifiedAt.toLocaleDateString() + ' ' +
-            modifiedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const formattedDate = window.formatDateTime(item.modified_at || item.created_at);
 
         // --- grid element ---
         const gridEl = document.createElement('div');

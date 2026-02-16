@@ -162,4 +162,91 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
 
         Ok(row.try_get("is_favorite").unwrap_or(false))
     }
+
+    async fn add_favorites_batch(
+        &self,
+        user_id: &str,
+        items: &[(String, String)],
+    ) -> Result<u64> {
+        if items.is_empty() {
+            return Ok(0);
+        }
+
+        let user_uuid = Uuid::parse_str(user_id)?;
+
+        // Validate all item_types upfront
+        for (_, item_type) in items {
+            if item_type != "file" && item_type != "folder" {
+                return Err(DomainError::new(
+                    ErrorKind::InvalidInput,
+                    "Favorites",
+                    format!("Item type must be 'file' or 'folder', got '{}'", item_type),
+                ));
+            }
+        }
+
+        // Build a multi-row INSERT with ON CONFLICT DO NOTHING
+        // Using a single transaction for atomicity
+        let mut tx = self.db_pool.begin().await.map_err(|e| {
+            error!("Database error starting transaction: {}", e);
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to start transaction: {}", e),
+            )
+        })?;
+
+        let mut total_inserted: u64 = 0;
+
+        // Insert in chunks to stay within Postgres' parameter limit (max ~32k params)
+        for chunk in items.chunks(5000) {
+            let mut query = String::from(
+                "INSERT INTO auth.user_favorites (user_id, item_id, item_type) VALUES ",
+            );
+            let mut param_idx = 1u32;
+            let mut first = true;
+
+            for _ in chunk {
+                if !first {
+                    query.push_str(", ");
+                }
+                query.push_str(&format!(
+                    "(${}::TEXT, ${}, ${})",
+                    param_idx,
+                    param_idx + 1,
+                    param_idx + 2
+                ));
+                param_idx += 3;
+                first = false;
+            }
+            query.push_str(" ON CONFLICT (user_id, item_id, item_type) DO NOTHING");
+
+            let mut q = sqlx::query(&query);
+            for (item_id, item_type) in chunk {
+                q = q.bind(&user_uuid).bind(item_id).bind(item_type);
+            }
+
+            let result = q.execute(&mut *tx).await.map_err(|e| {
+                error!("Database error in batch insert favorites: {}", e);
+                DomainError::new(
+                    ErrorKind::InternalError,
+                    "Favorites",
+                    format!("Failed to batch insert favorites: {}", e),
+                )
+            })?;
+
+            total_inserted += result.rows_affected();
+        }
+
+        tx.commit().await.map_err(|e| {
+            error!("Database error committing batch favorites: {}", e);
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to commit batch favorites: {}", e),
+            )
+        })?;
+
+        Ok(total_inserted)
+    }
 }

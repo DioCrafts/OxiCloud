@@ -157,8 +157,7 @@ const fileSharing = {
      */
     formatExpirationDate(value) {
         if (!value) return 'No expiration';
-        const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
-        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return window.formatDateTime(value);
     },
 
     /**

@@ -551,9 +551,7 @@ const sharedView = {
     },
 
     formatDate(value) {
-        if (!value) return 'N/A';
-        const date = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
-        return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        return window.formatDateShort ? window.formatDateShort(value) : String(value);
     },
 
     translate(key, defaultText) {

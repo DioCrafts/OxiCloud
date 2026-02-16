@@ -319,10 +319,7 @@ class FileRenderer {
       elem.dataset.folderName = item.name;
       elem.dataset.parentId = item.parent_id || "";
       
-      // Format date
-      const modifiedDate = new Date(item.modified_at * 1000);
-      const formattedDate = modifiedDate.toLocaleDateString() + ' ' + 
-                         modifiedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const formattedDate = window.formatDateTime(item.modified_at);
       
       elem.innerHTML = `
         <div class="name-cell">
@@ -375,10 +372,7 @@ class FileRenderer {
       // Format file size and date
       const fileSize = item.size_formatted || this.formatFileSize(item.size);
       
-      // Format date
-      const modifiedDate = new Date(item.modified_at * 1000);
-      const formattedDate = modifiedDate.toLocaleDateString() + ' ' + 
-                           modifiedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const formattedDate = window.formatDateTime(item.modified_at);
       
       elem.innerHTML = `
         <div class="name-cell">
@@ -431,16 +425,10 @@ class FileRenderer {
   }
   
   /**
-   * Format file size in human-readable format
+   * Format file size — delegates to the single global definition in app.js
    */
   formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return window.formatFileSize ? window.formatFileSize(bytes) : `${bytes} Bytes`;
   }
   
   /**

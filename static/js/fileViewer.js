@@ -294,17 +294,11 @@ class FileViewer {
   }
   
   /**
-   * Check if a MIME type is text-viewable
+   * Check if a MIME type is text-viewable — delegates to the single global
+   * definition exposed by app.js (window.isTextViewable).
    */
   isTextViewable(mimeType) {
-    if (!mimeType) return false;
-    if (mimeType.startsWith('text/')) return true;
-    const textTypes = [
-      'application/json', 'application/xml', 'application/javascript',
-      'application/x-sh', 'application/x-yaml', 'application/toml',
-      'application/x-toml', 'application/sql',
-    ];
-    return textTypes.includes(mimeType);
+    return window.isTextViewable ? window.isTextViewable(mimeType) : false;
   }
   
   /**

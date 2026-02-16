@@ -307,7 +307,7 @@ function updateUserMenuData() {
     
     // Storage info
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes || 10737418240;
+    const quotaBytes = userData.storage_quota_bytes || (10 * 1024 * 1024 * 1024); // 10 GB default
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     
     if (storageFill) storageFill.style.width = percentage + '%';
@@ -945,41 +945,23 @@ function addTrashItemToView(item) {
     const isFile = item.item_type === 'file';
     
     // Format date - backend sends trashed_at as ISO 8601 string
-    const deletedDate = new Date(item.trashed_at);
-    const formattedDate = deletedDate.toLocaleDateString() + ' ' +
-                         deletedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    const formattedDate = window.formatDateTime(item.trashed_at);
                          
-    // Determine type label and icon from extension (trash DTO has no mime_type)
-    let typeLabel;
+    // Use icon_class from the trash DTO if available, otherwise fall back to
+    // the comprehensive icon map exposed by ui.js.
     let iconClass;
+    let typeLabel;
     if (!isFile) {
-        iconClass = 'fas fa-folder';
+        iconClass = item.icon_class || 'fas fa-folder';
         typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
     } else {
-        const ext = (item.name.split('.').pop() || '').toLowerCase();
-        const imageExts = ['jpg','jpeg','png','gif','bmp','svg','webp','ico','tiff'];
-        const videoExts = ['mp4','avi','mkv','mov','wmv','flv','webm'];
-        const audioExts = ['mp3','wav','ogg','flac','aac','wma','m4a'];
-        const textExts  = ['txt','md','csv','log','ini','cfg','conf'];
-        if (ext === 'pdf') {
-            iconClass = 'fas fa-file-pdf';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.pdf') : 'PDF';
-        } else if (imageExts.includes(ext)) {
-            iconClass = 'fas fa-file-image';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
-        } else if (videoExts.includes(ext)) {
-            iconClass = 'fas fa-file-video';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.video') : 'Video';
-        } else if (audioExts.includes(ext)) {
-            iconClass = 'fas fa-file-audio';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.audio') : 'Audio';
-        } else if (textExts.includes(ext)) {
-            iconClass = 'fas fa-file-alt';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
-        } else {
-            iconClass = 'fas fa-file';
-            typeLabel = window.i18n ? window.i18n.t('files.file_types.document') : 'Document';
-        }
+        iconClass = item.icon_class || (window.ui && window.ui.getIconClass
+            ? window.ui.getIconClass(item.name)
+            : 'fas fa-file');
+        const cat = item.category || '';
+        typeLabel = cat
+            ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
+            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
     }
     
     // Grid view element
@@ -1134,6 +1116,55 @@ window.loadFiles = loadFiles;
 window.loadTrashItems = loadTrashItems;
 window.formatFileSize = formatFileSize;
 window.performSearch = performSearch;
+
+/**
+ * Centralised date+time formatter — use this everywhere instead of inline
+ * toLocaleDateString/toLocaleTimeString calls.
+ * @param {Date|number|string} value  Date object, unix-seconds number, or ISO string
+ * @returns {string} e.g. "16/02/2026 14:35"
+ */
+window.formatDateTime = function formatDateTime(value) {
+    if (!value) return '';
+    let d;
+    if (value instanceof Date) {
+        d = value;
+    } else if (typeof value === 'number') {
+        // Heuristic: values < 1e12 are unix seconds, otherwise ms
+        d = new Date(value < 1e12 ? value * 1000 : value);
+    } else {
+        d = new Date(value);
+    }
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString() + ' ' +
+           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/**
+ * Short date formatter (no time) for shares / expiration dates.
+ * @param {Date|number|string} value
+ * @returns {string} e.g. "Feb 16, 2026"
+ */
+window.formatDateShort = function formatDateShort(value) {
+    if (!value) return 'N/A';
+    const d = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
+    if (isNaN(d.getTime())) return String(value);
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+};
+
+/**
+ * Centralised "is this MIME type text-viewable?" check.
+ * Used by fileViewer, inlineViewer, and ui.isViewableFile.
+ */
+window.isTextViewable = function isTextViewable(mimeType) {
+    if (!mimeType) return false;
+    if (mimeType.startsWith('text/')) return true;
+    const textTypes = [
+        'application/json', 'application/xml', 'application/javascript',
+        'application/x-sh', 'application/x-yaml', 'application/toml',
+        'application/x-toml', 'application/sql',
+    ];
+    return textTypes.includes(mimeType);
+};
 
 // Set up global selectFolder function for navigation
 window.selectFolder = (id, name) => {
@@ -1424,10 +1455,10 @@ function switchToRecentFilesView() {
     elements.actionsBar.style.display = 'flex';
     
     // Add event listener for clear button
-    document.getElementById('clear-recent-btn').addEventListener('click', async () => {
+    document.getElementById('clear-recent-btn').addEventListener('click', () => {
         if (window.recent) {
-            await window.recent.clearRecentFiles();
-            await window.recent.displayRecentFiles();
+            window.recent.clearRecentFiles();
+            window.recent.displayRecentFiles();
             window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
         }
     });
@@ -1542,7 +1573,7 @@ function showUserProfileModal() {
     const role = userData.role || 'user';
     const initials = username.substring(0, 2).toUpperCase();
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes || 0;
+    const quotaBytes = userData.storage_quota_bytes || (10 * 1024 * 1024 * 1024); // 10 GB default
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
     
@@ -1829,14 +1860,15 @@ function logout() {
  */
 function updateStorageUsageDisplay(userData) {
     // Default values
+    const DEFAULT_QUOTA = 10 * 1024 * 1024 * 1024; // 10 GB
     let usedBytes = 0;
-    let quotaBytes = 10737418240; // Default 10GB
+    let quotaBytes = DEFAULT_QUOTA;
     let usagePercentage = 0;
 
     // Get values from user data if available
     if (userData) {
         usedBytes = userData.storage_used_bytes || 0;
-        quotaBytes = userData.storage_quota_bytes || 10737418240;
+        quotaBytes = userData.storage_quota_bytes || DEFAULT_QUOTA;
         
         // Calculate percentage (avoid division by zero)
         if (quotaBytes > 0) {

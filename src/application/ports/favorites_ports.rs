@@ -1,4 +1,4 @@
-use crate::application::dtos::favorites_dto::FavoriteItemDto;
+use crate::application::dtos::favorites_dto::{BatchFavoritesResult, FavoriteItemDto};
 use crate::common::errors::Result;
 use async_trait::async_trait;
 
@@ -21,6 +21,14 @@ pub trait FavoritesUseCase: Send + Sync {
 
     /// Check if an item is in user's favorites
     async fn is_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
+
+    /// Add multiple items to favorites in a single transaction.
+    /// Returns enriched favourites list so the client can replace its cache.
+    async fn batch_add_to_favorites(
+        &self,
+        user_id: &str,
+        items: &[(String, String)],
+    ) -> Result<BatchFavoritesResult>;
 }
 
 // ─────────────────────────────────────────────────────
@@ -45,4 +53,12 @@ pub trait FavoritesRepositoryPort: Send + Sync + 'static {
 
     /// Checks if an item is in favorites.
     async fn is_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool>;
+
+    /// Insert multiple items in a single transaction.
+    /// Returns the number of rows actually inserted (ignoring duplicates).
+    async fn add_favorites_batch(
+        &self,
+        user_id: &str,
+        items: &[(String, String)],
+    ) -> Result<u64>;
 }

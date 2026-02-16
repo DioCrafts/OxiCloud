@@ -231,6 +231,7 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
 
         Router::new()
             .route("/", get(favorites_handler::get_favorites))
+            .route("/batch", post(favorites_handler::batch_add_favorites))
             .route(
                 "/{item_type}/{item_id}",
                 post(favorites_handler::add_favorite),

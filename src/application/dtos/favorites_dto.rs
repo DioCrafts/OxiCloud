@@ -78,3 +78,23 @@ impl FavoriteItemDto {
         self
     }
 }
+
+/// Result DTO for batch add-to-favorites.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchFavoritesResult {
+    /// Statistics about the batch operation
+    pub stats: BatchFavoritesStats,
+    /// Full list of the user's favourites (enriched), so the client can
+    /// replace its local cache in a single round-trip.
+    pub favorites: Vec<FavoriteItemDto>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchFavoritesStats {
+    /// How many items were requested
+    pub requested: usize,
+    /// How many were actually inserted (new)
+    pub inserted: u64,
+    /// How many were already favourites (skipped)
+    pub already_existed: u64,
+}

@@ -442,32 +442,60 @@ const multiSelect = {
         }
     },
 
-    /** Batch add to favorites */
+    /** Batch add to favorites — single API call */
     async batchFavorites() {
         const items = this.items;
         if (items.length === 0 || !window.favorites) return;
 
-        let added = 0;
-        for (const item of items) {
-            const alreadyFav = window.favorites.isFavorite(item.id, item.type);
-            if (!alreadyFav) {
-                await window.favorites.addToFavorites(item.id, item.name, item.type, item.parentId);
-                added++;
-            }
-        }
-
-        this.clear();
-        if (typeof window.loadFiles === 'function') window.loadFiles();
-        if (added > 0) {
-            window.ui.showNotification(
-                this._t('favorites.add') || 'Added to favorites',
-                `${added} item${added !== 1 ? 's' : ''} added to favorites`
-            );
-        } else {
+        // Filter out items already in favourites
+        const toAdd = items.filter(i => !window.favorites.isFavorite(i.id, i.type));
+        if (toAdd.length === 0) {
+            this.clear();
             window.ui.showNotification(
                 this._t('favorites.add') || 'Favorites',
                 'All selected items are already favorites'
             );
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/favorites/batch', {
+                method: 'POST',
+                headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    items: toAdd.map(i => ({ item_id: i.id, item_type: i.type }))
+                })
+            });
+
+            if (!response.ok) throw new Error(`Server returned ${response.status}`);
+
+            const data = await response.json();
+            const inserted = data.stats?.inserted || 0;
+
+            // Replace cache directly from response (no extra GET)
+            if (data.favorites && window.favorites._replaceCacheFromResponse) {
+                window.favorites._replaceCacheFromResponse(data.favorites);
+            } else {
+                await window.favorites._fetchFromServer();
+            }
+
+            this.clear();
+            if (typeof window.loadFiles === 'function') window.loadFiles();
+
+            if (inserted > 0) {
+                window.ui.showNotification(
+                    this._t('favorites.add') || 'Added to favorites',
+                    `${inserted} item${inserted !== 1 ? 's' : ''} added to favorites`
+                );
+            } else {
+                window.ui.showNotification(
+                    this._t('favorites.add') || 'Favorites',
+                    'All selected items are already favorites'
+                );
+            }
+        } catch (e) {
+            console.error('Batch favorites error:', e);
+            window.ui.showNotification('Error', 'Could not add items to favorites');
         }
     },
 

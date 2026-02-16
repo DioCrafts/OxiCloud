@@ -1,4 +1,4 @@
-use crate::application::dtos::favorites_dto::FavoriteItemDto;
+use crate::application::dtos::favorites_dto::{BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto};
 use crate::application::ports::favorites_ports::{FavoritesRepositoryPort, FavoritesUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
 use async_trait::async_trait;
@@ -93,5 +93,52 @@ impl FavoritesUseCase for FavoritesService {
             item_type, item_id, user_id
         );
         self.repo.is_favorite(user_id, item_id, item_type).await
+    }
+
+    async fn batch_add_to_favorites(
+        &self,
+        user_id: &str,
+        items: &[(String, String)],
+    ) -> Result<BatchFavoritesResult> {
+        info!(
+            "Batch adding {} items to favorites for user {}",
+            items.len(),
+            user_id
+        );
+
+        // Validate all item types
+        for (item_id, item_type) in items {
+            if item_type != "file" && item_type != "folder" {
+                return Err(DomainError::new(
+                    ErrorKind::InvalidInput,
+                    "Favorites",
+                    format!(
+                        "Item type must be 'file' or 'folder' for item '{}'",
+                        item_id
+                    ),
+                ));
+            }
+        }
+
+        let requested = items.len();
+        let inserted = self.repo.add_favorites_batch(user_id, items).await?;
+        let already_existed = requested as u64 - inserted;
+
+        info!(
+            "Batch favorites for user {}: {} requested, {} inserted, {} already existed",
+            user_id, requested, inserted, already_existed
+        );
+
+        // Return the full enriched list so the client can replace its cache
+        let favorites = self.repo.get_favorites(user_id).await?;
+
+        Ok(BatchFavoritesResult {
+            stats: BatchFavoritesStats {
+                requested,
+                inserted,
+                already_existed,
+            },
+            favorites,
+        })
     }
 }

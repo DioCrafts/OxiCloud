@@ -443,13 +443,40 @@ const ui = {
         if (!file || !file.mime_type) return false;
         if (file.mime_type.startsWith('image/')) return true;
         if (file.mime_type === 'application/pdf') return true;
-        if (file.mime_type.startsWith('text/')) return true;
-        const textTypes = [
-            'application/json', 'application/xml', 'application/javascript',
-            'application/x-sh', 'application/x-yaml', 'application/toml',
-            'application/x-toml', 'application/sql',
-        ];
-        return textTypes.includes(file.mime_type);
+        // Delegate text-viewability to the single global definition
+        return window.isTextViewable ? window.isTextViewable(file.mime_type) : false;
+    },
+
+    /**
+     * Get FontAwesome icon class for a filename based on its extension.
+     * Used as fallback when the backend DTO doesn't include icon_class
+     * (e.g. trash items). Kept intentionally small — the comprehensive
+     * visual icon map lives in updateFileIcons().
+     */
+    getIconClass(fileName) {
+        if (!fileName) return 'fas fa-file';
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        const map = {
+            pdf:'fas fa-file-pdf', doc:'fas fa-file-word', docx:'fas fa-file-word',
+            txt:'fas fa-file-alt', rtf:'fas fa-file-alt', odt:'fas fa-file-alt',
+            xls:'fas fa-file-excel', xlsx:'fas fa-file-excel', csv:'fas fa-file-excel', ods:'fas fa-file-excel',
+            ppt:'fas fa-file-powerpoint', pptx:'fas fa-file-powerpoint', odp:'fas fa-file-powerpoint',
+            jpg:'fas fa-file-image', jpeg:'fas fa-file-image', png:'fas fa-file-image',
+            gif:'fas fa-file-image', svg:'fas fa-file-image', webp:'fas fa-file-image',
+            bmp:'fas fa-file-image', ico:'fas fa-file-image',
+            mp4:'fas fa-file-video', avi:'fas fa-file-video', mov:'fas fa-file-video',
+            mkv:'fas fa-file-video', webm:'fas fa-file-video', flv:'fas fa-file-video',
+            mp3:'fas fa-file-audio', wav:'fas fa-file-audio', ogg:'fas fa-file-audio',
+            flac:'fas fa-file-audio', aac:'fas fa-file-audio', m4a:'fas fa-file-audio',
+            zip:'fas fa-file-archive', rar:'fas fa-file-archive', '7z':'fas fa-file-archive',
+            tar:'fas fa-file-archive', gz:'fas fa-file-archive',
+            js:'fas fa-file-code', ts:'fas fa-file-code', py:'fas fa-file-code',
+            rs:'fas fa-file-code', java:'fas fa-file-code', html:'fas fa-file-code',
+            css:'fas fa-file-code', json:'fas fa-file-code', xml:'fas fa-file-code',
+            sh:'fas fa-terminal', bash:'fas fa-terminal', bat:'fas fa-terminal',
+            md:'fas fa-file-alt',
+        };
+        return map[ext] || 'fas fa-file';
     },
 
     /**
@@ -788,10 +815,7 @@ const ui = {
         folderListElement.dataset.folderName = folder.name;
         folderListElement.dataset.parentId = folder.parent_id || "";
 
-        // Format date
-        const modifiedDate = new Date(folder.modified_at * 1000);
-        const formattedDate = modifiedDate.toLocaleDateString() + ' ' +
-                             modifiedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const formattedDate = window.formatDateTime(folder.modified_at);
 
         // Make draggable if not in root
         if (window.app.currentPath !== "") {
@@ -903,18 +927,17 @@ const ui = {
         
         console.log(`Adding file to the view: ${file.name} (${file.id})`);
         
-        // Use pre-computed display fields from the API response
+        // Use pre-computed display fields from the DTO when available
         const iconClass = file.icon_class || 'fas fa-file';
         const iconSpecialClass = file.icon_special_class || '';
-        const typeLabel = file.category
-            ? (window.i18n ? window.i18n.t(`files.file_types.${file.category.toLowerCase()}`) || file.category : file.category)
+        const cat = file.category || '';
+        const typeLabel = cat
+            ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
             : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
 
-        // Format size and date
+        // Format size and date — prefer DTO fields, fall back to computation
         const fileSize = file.size_formatted || window.formatFileSize(file.size);
-        const modifiedDate = new Date(file.modified_at * 1000);
-        const formattedDate = modifiedDate.toLocaleDateString() + ' ' +
-                             modifiedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        const formattedDate = window.formatDateTime(file.modified_at);
 
         // Grid view element
         const fileGridElement = document.createElement('div');
