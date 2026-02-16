@@ -57,6 +57,12 @@ pub trait FileReadPort: Send + Sync + 'static {
     /// Gets the parent folder ID from a path (WebDAV).
     async fn get_parent_folder_id(&self, path: &str) -> Result<String, DomainError>;
 
+    /// Gets the content-addressable blob hash for a file (O(1) DB lookup).
+    ///
+    /// Returns the SHA-256 hash stored in `storage.files.blob_hash`.
+    /// Used for dedup reference tracking without loading file content.
+    async fn get_blob_hash(&self, file_id: &str) -> Result<String, DomainError>;
+
     /// Find a file by its logical path (folder_name/.../file_name).
     ///
     /// The default implementation falls back to `list_files(None)` + linear

@@ -3,6 +3,9 @@
 //! Implements `FileWritePort` using:
 //! - `storage.files` table for metadata
 //! - `DedupPort` for content-addressable blob storage on the filesystem
+//!
+//! File paths are resolved by querying the materialized `storage.folders.path`
+//! column (O(1) per lookup), so no recursive CTEs are needed.
 
 use async_trait::async_trait;
 use sqlx::PgPool;
@@ -13,7 +16,6 @@ use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::storage_ports::FileWritePort;
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
-use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::services::path_service::StoragePath;
 
 use super::folder_db_repository::FolderDbRepository;
@@ -38,32 +40,49 @@ impl FileBlobWriteRepository {
         }
     }
 
-    /// Build a virtual StoragePath for a file from its DB metadata.
-    async fn build_file_path(
+    /// Build a `StoragePath` from the materialized folder path + file name.
+    fn make_file_path(folder_path: Option<&str>, file_name: &str) -> StoragePath {
+        match folder_path {
+            Some(fp) if !fp.is_empty() => StoragePath::from_string(&format!("{fp}/{file_name}")),
+            _ => StoragePath::from_string(file_name),
+        }
+    }
+
+    /// Look up the materialized folder path. O(1) — no recursive CTE.
+    async fn lookup_folder_path(
         &self,
         folder_id: Option<&str>,
-        file_name: &str,
-    ) -> Result<StoragePath, DomainError> {
-        if let Some(fid) = folder_id {
-            let folder_path = self.folder_repo.get_folder_path(fid).await?;
-            Ok(folder_path.join(file_name))
-        } else {
-            Ok(StoragePath::from_string(file_name))
+    ) -> Result<Option<String>, DomainError> {
+        match folder_id {
+            Some(fid) => {
+                let path: String = sqlx::query_scalar(
+                    "SELECT path FROM storage.folders WHERE id = $1::uuid",
+                )
+                .bind(fid)
+                .fetch_optional(self.pool.as_ref())
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error("FileBlobWrite", format!("folder path: {e}"))
+                })?
+                .ok_or_else(|| DomainError::not_found("Folder", fid))?;
+                Ok(Some(path))
+            }
+            None => Ok(None),
         }
     }
 
     #[allow(clippy::too_many_arguments)]
-    async fn row_to_file(
-        &self,
+    fn row_to_file(
         id: String,
         name: String,
         folder_id: Option<String>,
+        folder_path: Option<String>,
         size: i64,
         mime_type: String,
         created_at: i64,
         modified_at: i64,
     ) -> Result<File, DomainError> {
-        let storage_path = self.build_file_path(folder_id.as_deref(), &name).await?;
+        let storage_path = Self::make_file_path(folder_path.as_deref(), &name);
         File::with_timestamps(
             id,
             name,
@@ -159,8 +178,8 @@ impl FileWritePort for FileBlobWriteRepository {
             &blob_hash[..12]
         );
 
-        self.row_to_file(row.0, name, folder_id, size, content_type, row.1, row.2)
-            .await
+        let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
+        Self::row_to_file(row.0, name, folder_id, folder_path, size, content_type, row.1, row.2)
     }
 
     async fn save_file_from_temp(
@@ -232,16 +251,17 @@ impl FileWritePort for FileBlobWriteRepository {
             &blob_hash[..12]
         );
 
-        self.row_to_file(
+        let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
+        Self::row_to_file(
             row.0,
             name,
             folder_id,
+            folder_path,
             size as i64,
             content_type,
             row.1,
             row.2,
         )
-        .await
     }
 
     async fn move_file(
@@ -267,8 +287,8 @@ impl FileWritePort for FileBlobWriteRepository {
         .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("move: {e}")))?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
 
-        self.row_to_file(row.0, row.1, row.2, row.3, row.4, row.5, row.6)
-            .await
+        let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
+        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
     }
 
     async fn copy_file(
@@ -350,8 +370,8 @@ impl FileWritePort for FileBlobWriteRepository {
             &blob_hash[..12]
         );
 
-        self.row_to_file(row.0, row.1, row.2, row.3, row.4, row.5, row.6)
-            .await
+        let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
+        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
     }
 
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<File, DomainError> {
@@ -379,8 +399,8 @@ impl FileWritePort for FileBlobWriteRepository {
         })?
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
 
-        self.row_to_file(row.0, row.1, row.2, row.3, row.4, row.5, row.6)
-            .await
+        let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
+        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
     }
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
@@ -502,17 +522,17 @@ impl FileWritePort for FileBlobWriteRepository {
         .await
         .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("deferred: {e}")))?;
 
-        let file = self
-            .row_to_file(
-                row.0.clone(),
-                name,
-                folder_id,
-                size as i64,
-                content_type,
-                row.1,
-                row.2,
-            )
-            .await?;
+        let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
+        let file = Self::row_to_file(
+            row.0.clone(),
+            name,
+            folder_id,
+            folder_path,
+            size as i64,
+            content_type,
+            row.1,
+            row.2,
+        )?;
 
         // The target_path is not meaningful for blob storage (content goes to .blobs/)
         // but the WriteBehindCache API requires it. We return a synthetic path.

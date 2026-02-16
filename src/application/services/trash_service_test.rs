@@ -179,6 +179,10 @@ impl FileReadPort for MockFileRepository {
     async fn get_parent_folder_id(&self, _path: &str) -> std::result::Result<String, DomainError> {
         unimplemented!()
     }
+
+    async fn get_blob_hash(&self, _file_id: &str) -> std::result::Result<String, DomainError> {
+        Ok(String::new())
+    }
 }
 
 #[async_trait]

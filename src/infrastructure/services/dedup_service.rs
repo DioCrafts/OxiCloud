@@ -810,10 +810,6 @@ impl DedupPort for DedupService {
         self.remove_reference(hash).await
     }
 
-    fn hash_bytes(&self, content: &[u8]) -> String {
-        DedupService::hash_bytes(content)
-    }
-
     async fn hash_file(&self, path: &Path) -> Result<String, DomainError> {
         DedupService::hash_file(path)
             .await

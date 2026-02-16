@@ -673,34 +673,257 @@ const ui = {
         });
     },
 
+
+    /* ================================================================
+     *  Data store + event delegation (replaces per-item listeners)
+     * ================================================================ */
+
+    /** @type {Map<string, Object>} item data keyed by id */
+    _items: new Map(),
+
+    /** @type {boolean} */
+    _delegationReady: false,
+
     /**
-     * Add folder to the view
-     * @param {Object} folder - Folder object
+     * Attach a fixed set of delegated event listeners to the two
+     * container elements (files-grid, files-list-view).
+     * Called once – idempotent.
      */
-    addFolderToView(folder) {
-        // Check if the folder already exists in the view to avoid duplicates
-        if (document.querySelector(`.file-card[data-folder-id="${folder.id}"]`) || 
-            document.querySelector(`.file-item[data-folder-id="${folder.id}"]`)) {
-            console.log(`Folder ${folder.name} (${folder.id}) already exists in the view, not duplicating`);
-            return;
+    initDelegation() {
+        if (this._delegationReady) return;
+        const grid = document.getElementById('files-grid');
+        const list = document.getElementById('files-list-view');
+        if (!grid || !list) return;
+        this._delegationReady = true;
+
+        const self = this;
+
+        // ── helpers ────────────────────────────────────────────────
+        const itemInfo = (card) => {
+            if (!card) return null;
+            const fileId = card.dataset.fileId;
+            if (fileId) return { type: 'file', id: fileId, data: self._items.get(fileId) };
+            const folderId = card.dataset.folderId;
+            if (folderId) return { type: 'folder', id: folderId, data: self._items.get(folderId) };
+            return null;
+        };
+
+        const openFile = (file) => {
+            if (!file) return;
+            if (window.recent) {
+                document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file } }));
+            }
+            if (self.isViewableFile(file)) {
+                if (window.inlineViewer) window.inlineViewer.openFile(file);
+                else if (window.fileViewer) window.fileViewer.open(file);
+                else window.fileOps.downloadFile(file.id, file.name);
+            } else {
+                window.fileOps.downloadFile(file.id, file.name);
+            }
+        };
+
+        const navigateFolder = (card) => {
+            window.app.currentPath = card.dataset.folderId;
+            self.updateBreadcrumb(card.dataset.folderName);
+            window.loadFiles();
+        };
+
+        const setContextTarget = (card, info) => {
+            if (info.type === 'folder') {
+                window.app.contextMenuTargetFolder = {
+                    id: info.id,
+                    name: card.dataset.folderName,
+                    parent_id: card.dataset.parentId || ""
+                };
+            } else {
+                window.app.contextMenuTargetFile = {
+                    id: info.id,
+                    name: card.dataset.fileName,
+                    folder_id: card.dataset.folderId || ""
+                };
+            }
+        };
+
+        // ── GRID: click (select) ──────────────────────────────────
+        grid.addEventListener('click', (e) => {
+            const card = e.target.closest('.file-card');
+            if (!card) return;
+
+            if (e.target.closest('.file-card-more')) {
+                e.stopPropagation();
+                e.preventDefault();
+                const info = itemInfo(card);
+                if (!info) return;
+                setContextTarget(card, info);
+                const menuId = info.type === 'folder'
+                    ? 'folder-context-menu' : 'file-context-menu';
+                showContextMenuAtElement(
+                    e.target.closest('.file-card-more'), menuId);
+                return;
+            }
+
+            if (e.target.closest('.file-card-checkbox')) {
+                toggleCardSelection(card, e);
+                return;
+            }
+
+            toggleCardSelection(card, e);
+        });
+
+        // ── GRID: dblclick (navigate / open) ──────────────────────
+        grid.addEventListener('dblclick', (e) => {
+            const card = e.target.closest('.file-card');
+            if (!card) return;
+            if (e.target.closest('.file-card-more') ||
+                e.target.closest('.file-card-checkbox')) return;
+
+            const info = itemInfo(card);
+            if (!info) return;
+
+            if (info.type === 'folder') {
+                navigateFolder(card);
+            } else {
+                openFile(info.data);
+            }
+        });
+
+        // ── LIST: click (navigate / open) ─────────────────────────
+        list.addEventListener('click', (e) => {
+            if (e.target.closest('.list-header')) return;
+            const card = e.target.closest('.file-item');
+            if (!card) return;
+
+            if (e.target.closest('.list-item-checkbox') ||
+                e.target.closest('.item-checkbox')) {
+                toggleCardSelection(card, e);
+                return;
+            }
+
+            const info = itemInfo(card);
+            if (!info) return;
+
+            if (info.type === 'folder') {
+                navigateFolder(card);
+            } else {
+                openFile(info.data);
+            }
+        });
+
+        // ── shared events on both containers ──────────────────────
+        for (const container of [grid, list]) {
+            const sel = container === grid ? '.file-card' : '.file-item';
+
+            // contextmenu
+            container.addEventListener('contextmenu', (e) => {
+                const card = e.target.closest(sel);
+                if (!card) return;
+                e.preventDefault();
+                const info = itemInfo(card);
+                if (!info) return;
+                setContextTarget(card, info);
+                const menuId = info.type === 'folder'
+                    ? 'folder-context-menu' : 'file-context-menu';
+                const menu = document.getElementById(menuId);
+                menu.style.left = `${e.pageX}px`;
+                menu.style.top  = `${e.pageY}px`;
+                menu.style.display = 'block';
+            });
+
+            // dragstart
+            container.addEventListener('dragstart', (e) => {
+                const card = e.target.closest(sel);
+                if (!card) { e.preventDefault(); return; }
+
+                // Grid items must be selected to start dragging
+                if (container === grid &&
+                    !card.classList.contains('selected')) {
+                    e.preventDefault();
+                    return;
+                }
+
+                const info = itemInfo(card);
+                if (!info) { e.preventDefault(); return; }
+
+                e.dataTransfer.setData('text/plain', info.id);
+                if (info.type === 'folder') {
+                    e.dataTransfer.setData(
+                        'application/oxicloud-folder', 'true');
+                }
+                card.classList.add('dragging');
+            });
+
+            // dragend
+            container.addEventListener('dragend', (e) => {
+                const card = e.target.closest(sel);
+                if (card) card.classList.remove('dragging');
+                document.querySelectorAll('.drop-target')
+                    .forEach(el => el.classList.remove('drop-target'));
+            });
+
+            // dragover – only folders are valid drop targets
+            container.addEventListener('dragover', (e) => {
+                const card = e.target.closest(sel);
+                if (!card || card.dataset.fileId) return;
+                if (!card.dataset.folderId) return;
+                e.preventDefault();
+                card.classList.add('drop-target');
+            });
+
+            // dragleave
+            container.addEventListener('dragleave', (e) => {
+                const card = e.target.closest(sel);
+                if (!card || card.dataset.fileId) return;
+                card.classList.remove('drop-target');
+            });
+
+            // drop – only folders accept drops
+            container.addEventListener('drop', async (e) => {
+                const card = e.target.closest(sel);
+                if (!card || card.dataset.fileId) return;
+                const targetFolderId = card.dataset.folderId;
+                if (!targetFolderId) return;
+
+                e.preventDefault();
+                card.classList.remove('drop-target');
+
+                const id = e.dataTransfer.getData('text/plain');
+                const isFolder =
+                    e.dataTransfer.getData('application/oxicloud-folder') === 'true';
+
+                if (id) {
+                    if (isFolder) {
+                        if (id === targetFolderId) {
+                            alert("You cannot move a folder to itself");
+                            return;
+                        }
+                        await fileOps.moveFolder(id, targetFolderId);
+                    } else {
+                        await fileOps.moveFile(id, targetFolderId);
+                    }
+                }
+            });
         }
-        
-        console.log(`Adding folder to the view: ${folder.name} (${folder.id})`);
-        
-        // Grid view element
-        const folderGridElement = document.createElement('div');
-        folderGridElement.className = 'file-card';
-        folderGridElement.dataset.folderId = folder.id;
-        folderGridElement.dataset.folderName = folder.name;
-        folderGridElement.dataset.parentId = folder.parent_id || "";
+    },
 
-        // Check if folder is a favorite
-        const isFolderFav = window.favorites && window.favorites.isFavorite(folder.id, 'folder');
+    /* ================================================================
+     *  Pure element-creation helpers (no addEventListener)
+     * ================================================================ */
 
-        folderGridElement.innerHTML = `
+    /** Create a grid card for a folder */
+    _createFolderCard(folder) {
+        const el = document.createElement('div');
+        el.className = 'file-card';
+        el.dataset.folderId  = folder.id;
+        el.dataset.folderName = folder.name;
+        el.dataset.parentId  = folder.parent_id || "";
+
+        const isFav = window.favorites &&
+            window.favorites.isFavorite(folder.id, 'folder');
+
+        el.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
-            ${isFolderFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
+            ${isFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
@@ -708,245 +931,59 @@ const ui = {
             <div class="file-info">Folder</div>
         `;
 
-        // Drag and drop setup for folders
         if (window.app.currentPath !== "") {
-            folderGridElement.setAttribute('draggable', 'true');
-
-            folderGridElement.addEventListener('dragstart', (e) => {
-                if (!folderGridElement.classList.contains('selected')) {
-                    e.preventDefault();
-                    return;
-                }
-                e.dataTransfer.setData('text/plain', folder.id);
-                e.dataTransfer.setData('application/oxicloud-folder', 'true');
-                folderGridElement.classList.add('dragging');
-            });
-
-            folderGridElement.addEventListener('dragend', () => {
-                folderGridElement.classList.remove('dragging');
-                document.querySelectorAll('.drop-target').forEach(el => {
-                    el.classList.remove('drop-target');
-                });
-            });
+            el.setAttribute('draggable', 'true');
         }
+        return el;
+    },
 
-        // Single click to select, double click to navigate
-        folderGridElement.addEventListener('click', (e) => {
-            if (e.target.closest('.file-card-more') || e.target.closest('.file-card-checkbox')) return;
-            toggleCardSelection(folderGridElement, e);
-        });
+    /** Create a list row for a folder */
+    _createFolderItem(folder) {
+        const el = document.createElement('div');
+        el.className = 'file-item';
+        el.dataset.folderId  = folder.id;
+        el.dataset.folderName = folder.name;
+        el.dataset.parentId  = folder.parent_id || "";
 
-        folderGridElement.addEventListener('dblclick', () => {
-            window.app.currentPath = folder.id;
-            this.updateBreadcrumb(folder.name);
-            window.loadFiles();
-        });
-
-        // Checkbox click
-        folderGridElement.querySelector('.file-card-checkbox').addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleCardSelection(folderGridElement, e);
-        });
-
-        // More actions button
-        folderGridElement.querySelector('.file-card-more').addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            window.app.contextMenuTargetFolder = {
-                id: folder.id,
-                name: folder.name,
-                parent_id: folder.parent_id || ""
-            };
-            showContextMenuAtElement(e.currentTarget, 'folder-context-menu');
-        });
-
-        // Context menu
-        folderGridElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            window.app.contextMenuTargetFolder = {
-                id: folder.id,
-                name: folder.name,
-                parent_id: folder.parent_id || ""
-            };
-
-            let folderContextMenu = document.getElementById('folder-context-menu');
-            folderContextMenu.style.left = `${e.pageX}px`;
-            folderContextMenu.style.top = `${e.pageY}px`;
-            folderContextMenu.style.display = 'block';
-        });
-
-        // Drop target setup
-        folderGridElement.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            folderGridElement.classList.add('drop-target');
-        });
-
-        folderGridElement.addEventListener('dragleave', () => {
-            folderGridElement.classList.remove('drop-target');
-        });
-
-        folderGridElement.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            folderGridElement.classList.remove('drop-target');
-
-            const id = e.dataTransfer.getData('text/plain');
-            const isFolder = e.dataTransfer.getData('application/oxicloud-folder') === 'true';
-
-            if (id) {
-                if (isFolder) {
-                    if (id === folder.id) {
-                        alert("You cannot move a folder to itself");
-                        return;
-                    }
-                    await fileOps.moveFolder(id, folder.id);
-                } else {
-                    await fileOps.moveFile(id, folder.id);
-                }
-            }
-        });
-
-        document.getElementById('files-grid').appendChild(folderGridElement);
-
-        // List view element - Improved
-        const folderListElement = document.createElement('div');
-        folderListElement.className = 'file-item';
-        folderListElement.dataset.folderId = folder.id;
-        folderListElement.dataset.folderName = folder.name;
-        folderListElement.dataset.parentId = folder.parent_id || "";
-
+        const isFav = window.favorites &&
+            window.favorites.isFavorite(folder.id, 'folder');
         const formattedDate = window.formatDateTime(folder.modified_at);
 
-        // Make draggable if not in root
         if (window.app.currentPath !== "") {
-            folderListElement.setAttribute('draggable', 'true');
-
-            folderListElement.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', folder.id);
-                e.dataTransfer.setData('application/oxicloud-folder', 'true');
-                folderListElement.classList.add('dragging');
-            });
-
-            folderListElement.addEventListener('dragend', () => {
-                folderListElement.classList.remove('dragging');
-                document.querySelectorAll('.drop-target').forEach(el => {
-                    el.classList.remove('drop-target');
-                });
-            });
+            el.setAttribute('draggable', 'true');
         }
 
-        // Improved: Structure and classes for list view
-        folderListElement.innerHTML = `
+        el.innerHTML = `
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon folder-icon">
                     <i class="fas fa-folder"></i>
                 </div>
                 <span>${escapeHtml(folder.name)}</span>
-                ${isFolderFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
         `;
-
-        // Checkbox click in list view
-        folderListElement.querySelector('.item-checkbox').addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleCardSelection(folderListElement, e);
-        });
-
-        // Click to navigate
-        folderListElement.addEventListener('click', (e) => {
-            if (e.target.closest('.list-item-checkbox')) return;
-            window.app.currentPath = folder.id;
-            this.updateBreadcrumb(folder.name);
-            window.loadFiles();
-        });
-
-        // Context menu
-        folderListElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            window.app.contextMenuTargetFolder = {
-                id: folder.id,
-                name: folder.name,
-                parent_id: folder.parent_id || ""
-            };
-
-            let folderContextMenu = document.getElementById('folder-context-menu');
-            folderContextMenu.style.left = `${e.pageX}px`;
-            folderContextMenu.style.top = `${e.pageY}px`;
-            folderContextMenu.style.display = 'block';
-        });
-
-        // Drop target setup for list view
-        folderListElement.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            folderListElement.classList.add('drop-target');
-        });
-
-        folderListElement.addEventListener('dragleave', () => {
-            folderListElement.classList.remove('drop-target');
-        });
-
-        folderListElement.addEventListener('drop', async (e) => {
-            e.preventDefault();
-            folderListElement.classList.remove('drop-target');
-
-            const id = e.dataTransfer.getData('text/plain');
-            const isFolder = e.dataTransfer.getData('application/oxicloud-folder') === 'true';
-
-            if (id) {
-                if (isFolder) {
-                    if (id === folder.id) {
-                        alert("You cannot move a folder to itself");
-                        return;
-                    }
-                    await fileOps.moveFolder(id, folder.id);
-                } else {
-                    await fileOps.moveFile(id, folder.id);
-                }
-            }
-        });
-
-        document.getElementById('files-list-view').appendChild(folderListElement);
+        return el;
     },
 
-    /**
-     * Add file to the view
-     * @param {Object} file - File object
-     */
-    addFileToView(file) {
-        // Check if the file already exists in the view to avoid duplicates
-        if (document.querySelector(`.file-card[data-file-id="${file.id}"]`) ||
-            document.querySelector(`.file-item[data-file-id="${file.id}"]`)) {
-            console.log(`File ${file.name} (${file.id}) already exists in the view, not duplicating`);
-            return;
-        }
-        
-        console.log(`Adding file to the view: ${file.name} (${file.id})`);
-        
-        // Use pre-computed display fields from the DTO when available
+    /** Create a grid card for a file */
+    _createFileCard(file) {
         const iconClass = file.icon_class || 'fas fa-file';
-        const iconSpecialClass = file.icon_special_class || '';
-        const cat = file.category || '';
-        const typeLabel = cat
-            ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
-            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
-
-        // Format size and date — prefer DTO fields, fall back to computation
-        const fileSize = file.size_formatted || window.formatFileSize(file.size);
+        const isFileFav = window.favorites &&
+            window.favorites.isFavorite(file.id, 'file');
         const formattedDate = window.formatDateTime(file.modified_at);
 
-        // Grid view element
-        const fileGridElement = document.createElement('div');
-        fileGridElement.className = 'file-card';
+        const el = document.createElement('div');
+        el.className = 'file-card';
+        el.dataset.fileId   = file.id;
+        el.dataset.fileName = file.name;
+        el.dataset.folderId = file.folder_id || "";
+        el.setAttribute('draggable', 'true');
 
-        // Check if file is a favorite
-        const isFileFav = window.favorites && window.favorites.isFavorite(file.id, 'file');
-
-        fileGridElement.innerHTML = `
+        el.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
             ${isFileFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
@@ -956,102 +993,34 @@ const ui = {
             <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
+        return el;
+    },
 
-        fileGridElement.dataset.fileId = file.id;
-        fileGridElement.dataset.fileName = file.name;
-        fileGridElement.dataset.folderId = file.folder_id || "";
+    /** Create a list row for a file */
+    _createFileItem(file) {
+        const iconClass = file.icon_class || 'fas fa-file';
+        const iconSpecialClass = file.icon_special_class || '';
+        const cat = file.category || '';
+        const typeLabel = cat
+            ? (window.i18n
+                ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat
+                : cat)
+            : (window.i18n
+                ? window.i18n.t('files.file_types.document')
+                : 'Document');
+        const fileSize = file.size_formatted || window.formatFileSize(file.size);
+        const formattedDate = window.formatDateTime(file.modified_at);
+        const isFileFav = window.favorites &&
+            window.favorites.isFavorite(file.id, 'file');
 
-        // Make draggable
-        fileGridElement.setAttribute('draggable', 'true');
+        const el = document.createElement('div');
+        el.className = 'file-item';
+        el.dataset.fileId   = file.id;
+        el.dataset.fileName = file.name;
+        el.dataset.folderId = file.folder_id || "";
+        el.setAttribute('draggable', 'true');
 
-        fileGridElement.addEventListener('dragstart', (e) => {
-            if (!fileGridElement.classList.contains('selected')) {
-                e.preventDefault();
-                return;
-            }
-            e.dataTransfer.setData('text/plain', file.id);
-            fileGridElement.classList.add('dragging');
-        });
-
-        fileGridElement.addEventListener('dragend', () => {
-            fileGridElement.classList.remove('dragging');
-            document.querySelectorAll('.drop-target').forEach(el => {
-                el.classList.remove('drop-target');
-            });
-        });
-
-        // Single click = select, double click = open/download
-        fileGridElement.addEventListener('click', (e) => {
-            if (e.target.closest('.file-card-more') || e.target.closest('.file-card-checkbox')) return;
-            toggleCardSelection(fileGridElement, e);
-        });
-
-        fileGridElement.addEventListener('dblclick', () => {
-            // Track this file access for recent files
-            if (window.recent) {
-                document.dispatchEvent(new CustomEvent('file-accessed', {
-                    detail: { file }
-                }));
-            }
-            
-            // Check if it's a viewable file type
-            if (this.isViewableFile(file)) {
-                if (window.inlineViewer) {
-                    window.inlineViewer.openFile(file);
-                } else if (window.fileViewer) {
-                    window.fileViewer.open(file);
-                } else {
-                    window.fileOps.downloadFile(file.id, file.name);
-                }
-            } else {
-                window.fileOps.downloadFile(file.id, file.name);
-            }
-        });
-
-        // Checkbox click
-        fileGridElement.querySelector('.file-card-checkbox').addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleCardSelection(fileGridElement, e);
-        });
-
-        // More actions button
-        fileGridElement.querySelector('.file-card-more').addEventListener('click', (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            window.app.contextMenuTargetFile = {
-                id: file.id,
-                name: file.name,
-                folder_id: file.folder_id || ""
-            };
-            showContextMenuAtElement(e.currentTarget, 'file-context-menu');
-        });
-
-        // Context menu
-        fileGridElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            window.app.contextMenuTargetFile = {
-                id: file.id,
-                name: file.name,
-                folder_id: file.folder_id || ""
-            };
-
-            let fileContextMenu = document.getElementById('file-context-menu');
-            fileContextMenu.style.left = `${e.pageX}px`;
-            fileContextMenu.style.top = `${e.pageY}px`;
-            fileContextMenu.style.display = 'block';
-        });
-
-        document.getElementById('files-grid').appendChild(fileGridElement);
-
-        // List view element - Improved with specific classes and enhanced layout
-        const fileListElement = document.createElement('div');
-        fileListElement.className = 'file-item';
-        fileListElement.dataset.fileId = file.id;
-        fileListElement.dataset.fileName = file.name;
-        fileListElement.dataset.folderId = file.folder_id || "";
-
-        fileListElement.innerHTML = `
+        el.innerHTML = `
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
@@ -1064,73 +1033,95 @@ const ui = {
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;
+        return el;
+    },
 
-        // Checkbox click in list view
-        fileListElement.querySelector('.item-checkbox').addEventListener('click', (e) => {
-            e.stopPropagation();
-            toggleCardSelection(fileListElement, e);
-        });
+    /* ================================================================
+     *  Batch rendering with DocumentFragment
+     * ================================================================ */
 
-        // Make draggable (list view)
-        fileListElement.setAttribute('draggable', 'true');
+    /**
+     * Render an array of folders into both grid and list views
+     * using DocumentFragment for minimal reflows.
+     */
+    renderFolders(folders) {
+        if (!this._delegationReady) this.initDelegation();
+        const gridFrag = document.createDocumentFragment();
+        const listFrag = document.createDocumentFragment();
 
-        fileListElement.addEventListener('dragstart', (e) => {
-            e.dataTransfer.setData('text/plain', file.id);
-            fileListElement.classList.add('dragging');
-        });
+        for (const folder of folders) {
+            this._items.set(folder.id, folder);
+            gridFrag.appendChild(this._createFolderCard(folder));
+            listFrag.appendChild(this._createFolderItem(folder));
+        }
 
-        fileListElement.addEventListener('dragend', () => {
-            fileListElement.classList.remove('dragging');
-            document.querySelectorAll('.drop-target').forEach(el => {
-                el.classList.remove('drop-target');
-            });
-        });
+        document.getElementById('files-grid').appendChild(gridFrag);
+        document.getElementById('files-list-view').appendChild(listFrag);
+    },
 
-        // View or download on click
-        fileListElement.addEventListener('click', (e) => {
-            if (e.target.closest('.list-item-checkbox')) return;
-            // Track this file access for recent files
-            if (window.recent) {
-                document.dispatchEvent(new CustomEvent('file-accessed', {
-                    detail: { file }
-                }));
-            }
-            
-            // Check if it's a viewable file type
-            if (this.isViewableFile(file)) {
-                // Open in the inline viewer
-                if (window.inlineViewer) {
-                    window.inlineViewer.openFile(file);
-                } else if (window.fileViewer) {
-                    // Fallback to standard file viewer
-                    window.fileViewer.open(file);
-                } else {
-                    // No viewer available, download directly
-                    window.fileOps.downloadFile(file.id, file.name);
-                }
-            } else {
-                // For other file types, download directly
-                window.fileOps.downloadFile(file.id, file.name);
-            }
-        });
+    /**
+     * Render an array of files into both grid and list views
+     * using DocumentFragment for minimal reflows.
+     */
+    renderFiles(files) {
+        if (!this._delegationReady) this.initDelegation();
+        const gridFrag = document.createDocumentFragment();
+        const listFrag = document.createDocumentFragment();
 
-        // Context menu (list view)
-        fileListElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
+        for (const file of files) {
+            this._items.set(file.id, file);
+            gridFrag.appendChild(this._createFileCard(file));
+            listFrag.appendChild(this._createFileItem(file));
+        }
 
-            window.app.contextMenuTargetFile = {
-                id: file.id,
-                name: file.name,
-                folder_id: file.folder_id || ""
-            };
+        document.getElementById('files-grid').appendChild(gridFrag);
+        document.getElementById('files-list-view').appendChild(listFrag);
+    },
 
-            let fileContextMenu = document.getElementById('file-context-menu');
-            fileContextMenu.style.left = `${e.pageX}px`;
-            fileContextMenu.style.top = `${e.pageY}px`;
-            fileContextMenu.style.display = 'block';
-        });
+    /* ================================================================
+     *  Single-item add (backward-compatible API for post-upload, etc.)
+     * ================================================================ */
 
-        document.getElementById('files-list-view').appendChild(fileListElement);
+    /**
+     * Add a single folder to both views.
+     * @param {Object} folder - Folder object
+     */
+    addFolderToView(folder) {
+        if (!this._delegationReady) this.initDelegation();
+
+        // Duplicate guard
+        if (document.querySelector(`.file-card[data-folder-id="${folder.id}"]`) ||
+            document.querySelector(`.file-item[data-folder-id="${folder.id}"]`)) {
+            console.log(`Folder ${folder.name} (${folder.id}) already exists in the view, not duplicating`);
+            return;
+        }
+
+        this._items.set(folder.id, folder);
+        document.getElementById('files-grid')
+            .appendChild(this._createFolderCard(folder));
+        document.getElementById('files-list-view')
+            .appendChild(this._createFolderItem(folder));
+    },
+
+    /**
+     * Add a single file to both views.
+     * @param {Object} file - File object
+     */
+    addFileToView(file) {
+        if (!this._delegationReady) this.initDelegation();
+
+        // Duplicate guard
+        if (document.querySelector(`.file-card[data-file-id="${file.id}"]`) ||
+            document.querySelector(`.file-item[data-file-id="${file.id}"]`)) {
+            console.log(`File ${file.name} (${file.id}) already exists in the view, not duplicating`);
+            return;
+        }
+
+        this._items.set(file.id, file);
+        document.getElementById('files-grid')
+            .appendChild(this._createFileCard(file));
+        document.getElementById('files-list-view')
+            .appendChild(this._createFileItem(file));
     }
 };
 

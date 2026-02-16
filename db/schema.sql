@@ -305,7 +305,7 @@ COMMENT ON TABLE carddav.contact_groups IS 'Contact groups within address books'
 COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between contacts and groups';
 
 -- ============================================================
--- 4. STORAGE SCHEMA — 100% Blob Storage Model
+-- 4. STORAGE SCHEMA — 100% Blob Storage Model + ltree hierarchy
 -- ============================================================
 -- All file/folder metadata lives here. Actual file content is stored
 -- as content-addressed blobs on the filesystem (.blobs/{prefix}/{hash}.blob).
@@ -313,8 +313,15 @@ COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between
 -- files or in-memory HashMaps are used.
 -- No physical directories are created for user folders — they are
 -- virtual records in this schema.
+--
+-- Folder hierarchy uses PostgreSQL ltree for O(1) path lookups,
+-- sub-tree queries, and ancestor/descendant operations — replacing
+-- expensive recursive CTEs.
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS storage;
+
+-- Enable ltree extension for hierarchical path operations
+CREATE EXTENSION IF NOT EXISTS ltree;
 
 -- Content-addressable blob index (dedup)
 -- One row per unique content hash; multiple storage.files rows may
@@ -334,11 +341,17 @@ CREATE INDEX IF NOT EXISTS idx_blobs_orphaned
 COMMENT ON TABLE storage.blobs IS 'Content-addressable blob dedup index — one row per unique SHA-256 hash';
 
 -- Virtual folders (replaces physical directories on disk)
+-- `path` is a materialized readable path (e.g. "Home - user1/Documents/Work")
+--   maintained automatically by triggers on INSERT/UPDATE of name or parent_id.
+-- `lpath` is an ltree label path using sanitized UUIDs for GiST-indexed
+--   hierarchical queries (ancestor, descendant, sub-tree).
 CREATE TABLE IF NOT EXISTS storage.folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     parent_id UUID REFERENCES storage.folders(id) ON DELETE CASCADE,
     user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    path TEXT NOT NULL DEFAULT '',
+    lpath ltree NOT NULL DEFAULT '',
     is_trashed BOOLEAN NOT NULL DEFAULT FALSE,
     trashed_at TIMESTAMP WITH TIME ZONE,
     original_parent_id UUID,
@@ -355,6 +368,57 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_folders_unique_name_root
 CREATE INDEX IF NOT EXISTS idx_folders_user_id ON storage.folders(user_id);
 CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON storage.folders(parent_id);
 CREATE INDEX IF NOT EXISTS idx_folders_trashed ON storage.folders(user_id, is_trashed);
+-- ltree GiST index for sub-tree, ancestor, and descendant queries
+CREATE INDEX IF NOT EXISTS idx_folders_lpath ON storage.folders USING gist (lpath);
+-- B-tree index on path for exact path lookups
+CREATE INDEX IF NOT EXISTS idx_folders_path ON storage.folders (path text_pattern_ops);
+
+-- ── ltree trigger: compute path & lpath on INSERT or UPDATE of name/parent_id ──
+CREATE OR REPLACE FUNCTION storage.compute_folder_path()
+RETURNS trigger AS $$
+DECLARE
+    parent_path TEXT;
+    parent_lpath ltree;
+    my_label TEXT;
+BEGIN
+    -- Convert UUID to a valid ltree label (replace '-' with '_')
+    my_label := replace(NEW.id::text, '-', '_');
+
+    IF NEW.parent_id IS NULL THEN
+        NEW.path  := NEW.name;
+        NEW.lpath := my_label::ltree;
+    ELSE
+        SELECT path, lpath INTO parent_path, parent_lpath
+          FROM storage.folders WHERE id = NEW.parent_id;
+
+        NEW.path  := parent_path || '/' || NEW.name;
+        NEW.lpath := parent_lpath || my_label::ltree;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_folders_path
+    BEFORE INSERT OR UPDATE OF name, parent_id ON storage.folders
+    FOR EACH ROW EXECUTE FUNCTION storage.compute_folder_path();
+
+-- ── Cascade trigger: when a folder's path/lpath changes, update all descendants ──
+CREATE OR REPLACE FUNCTION storage.cascade_folder_path()
+RETURNS trigger AS $$
+BEGIN
+    IF OLD.path IS DISTINCT FROM NEW.path OR OLD.lpath IS DISTINCT FROM NEW.lpath THEN
+        -- Update all descendant folders (recursive via trigger re-fire)
+        UPDATE storage.folders
+           SET parent_id = parent_id  -- no-op value change, but fires the BEFORE UPDATE trigger
+         WHERE parent_id = NEW.id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_folders_cascade_path
+    AFTER UPDATE OF path, lpath ON storage.folders
+    FOR EACH ROW EXECUTE FUNCTION storage.cascade_folder_path();
 
 -- Files as references to content-addressable blobs
 CREATE TABLE IF NOT EXISTS storage.files (
@@ -394,6 +458,6 @@ CREATE OR REPLACE VIEW storage.trash_items AS
            original_parent_id, created_at
     FROM storage.folders WHERE is_trashed = TRUE;
 
-COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy — no physical directories on disk';
+COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy with ltree — no physical directories on disk';
 COMMENT ON TABLE storage.files IS 'File metadata pointing to content-addressable blobs';
 COMMENT ON VIEW storage.trash_items IS 'Unified view of all trashed files and folders';

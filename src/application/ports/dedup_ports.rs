@@ -159,9 +159,6 @@ pub trait DedupPort: Send + Sync + 'static {
     /// Returns `true` if the blob was deleted (ref_count reached 0).
     async fn remove_reference(&self, hash: &str) -> Result<bool, DomainError>;
 
-    /// Calculate SHA-256 hash of in-memory content.
-    fn hash_bytes(&self, content: &[u8]) -> String;
-
     /// Calculate SHA-256 hash of a file (streaming).
     async fn hash_file(&self, path: &Path) -> Result<String, DomainError>;
 

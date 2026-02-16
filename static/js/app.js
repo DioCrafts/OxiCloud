@@ -788,6 +788,7 @@ async function loadFiles(options = {}) {
         
         // Clear existing files in both views
         if (window.multiSelect) window.multiSelect.clear();
+        ui._items.clear();
         elements.filesGrid.innerHTML = '';
         elements.filesListView.innerHTML = `
             <div class="list-header">
@@ -815,9 +816,7 @@ async function loadFiles(options = {}) {
         
         // Backend already scopes folders to the authenticated user,
         // so no client-side filtering is needed.
-        folderList.forEach(folder => {
-            ui.addFolderToView(folder);
-        });
+        ui.renderFolders(folderList);
         
         // Also load files in this folder
         const cacheTimestamp = new Date().getTime();
@@ -846,10 +845,7 @@ async function loadFiles(options = {}) {
                 const fileList = Array.isArray(files) ? files : [];
                 console.log(`Processing ${fileList.length} files`);
                 
-                fileList.forEach(file => {
-                    console.log(`Adding file to view: ${file.name} (${file.id})`);
-                    ui.addFileToView(file);
-                });
+                ui.renderFiles(fileList);
             } else {
                 const errorText = await filesResponse.text();
                 console.error(`Error loading files: ${filesResponse.status} - ${errorText}`);

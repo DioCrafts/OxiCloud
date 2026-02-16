@@ -131,6 +131,10 @@ impl FileReadPort for StubFileReadPort {
     async fn get_parent_folder_id(&self, _path: &str) -> Result<String, DomainError> {
         Ok("root".to_string())
     }
+
+    async fn get_blob_hash(&self, _file_id: &str) -> Result<String, DomainError> {
+        Ok(String::new())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -707,10 +711,6 @@ impl DedupPort for StubDedupPort {
 
     async fn remove_reference(&self, _hash: &str) -> Result<bool, DomainError> {
         Ok(false)
-    }
-
-    fn hash_bytes(&self, _content: &[u8]) -> String {
-        String::new()
     }
 
     async fn hash_file(&self, _path: &Path) -> Result<String, DomainError> {

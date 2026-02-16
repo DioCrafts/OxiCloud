@@ -479,6 +479,10 @@ mod tests {
         async fn get_parent_folder_id(&self, _path: &str) -> Result<String, DomainError> {
             unimplemented!()
         }
+
+        async fn get_blob_hash(&self, _file_id: &str) -> Result<String, DomainError> {
+            Ok(String::new())
+        }
     }
 
     #[async_trait]

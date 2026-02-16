@@ -12,7 +12,7 @@ use tracing::{debug, error, info, warn};
 /// Service for file management operations (move, delete).
 ///
 /// The `delete_with_cleanup` method internalises:
-/// 1. Content-hash computation for dedup tracking
+/// 1. Blob-hash lookup for dedup tracking (O(1) DB read)
 /// 2. Trash-first soft-delete
 /// 3. Fallback to permanent delete
 /// 4. Dedup reference-count decrement
@@ -57,18 +57,22 @@ impl FileManagementService {
 
     // ── private helpers ──────────────────────────────────────────
 
-    /// Compute the content hash for dedup tracking. Returns `None` on failure.
-    async fn compute_content_hash(&self, id: &str) -> Option<String> {
-        let dedup = self.dedup_service.as_ref()?;
+    /// Look up the blob hash from the database. Returns `None` when
+    /// dedup is inactive or the file is not found.
+    ///
+    /// This is O(1) — a single `SELECT blob_hash` by primary key.
+    /// It replaces the old `compute_content_hash` which loaded the
+    /// entire file into RAM just to re-derive the same hash.
+    async fn lookup_blob_hash(&self, id: &str) -> Option<String> {
+        self.dedup_service.as_ref()?; // dedup must be active
         let file_read = self.file_read.as_ref()?;
-        match file_read.get_file_content(id).await {
-            Ok(content) => {
-                let hash = dedup.hash_bytes(&content);
-                debug!("🔗 DEDUP: File {} has content hash: {}", id, &hash[..12]);
+        match file_read.get_blob_hash(id).await {
+            Ok(hash) => {
+                info!("🔗 DEDUP: File {} has blob hash: {}", id, &hash[..12]);
                 Some(hash)
             }
             Err(e) => {
-                debug!("Could not read file content for dedup: {}", e);
+                warn!("Could not get blob hash for dedup: {}", e);
                 None
             }
         }
@@ -177,8 +181,8 @@ impl FileManagementUseCase for FileManagementService {
 
     /// Smart delete: trash-first with dedup reference cleanup.
     async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError> {
-        // Step 1: Compute content hash for dedup tracking
-        let content_hash = self.compute_content_hash(id).await;
+        // Step 1: Look up blob hash for dedup tracking (O(1) DB read)
+        let content_hash = self.lookup_blob_hash(id).await;
 
         // Step 2: Try trash (soft delete)
         if let Some(trash) = &self.trash_service {
