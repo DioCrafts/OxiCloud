@@ -1,6 +1,7 @@
 pub mod address_book_dto;
 pub mod calendar_dto;
 pub mod contact_dto;
+pub mod display_helpers;
 pub mod favorites_dto;
 pub mod file_dto;
 pub mod folder_dto;

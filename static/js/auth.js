@@ -1106,20 +1106,6 @@ function redirectToMainApp() {
  * Logout - clear tokens and redirect to login
  */
 function logout() {
-    // Clear user-specific recent files and favorites before removing user data
-    try {
-        const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-        if (userData.username) {
-            localStorage.removeItem(`oxicloud_recent_files_${userData.username}`);
-            localStorage.removeItem(`oxicloud_favorites_${userData.username}`);
-        }
-    } catch (e) {
-        // Ignore parse errors during cleanup
-    }
-    // Also remove any legacy global keys
-    localStorage.removeItem('oxicloud_recent_files');
-    localStorage.removeItem('oxicloud_favorites');
-    
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(TOKEN_EXPIRY_KEY);

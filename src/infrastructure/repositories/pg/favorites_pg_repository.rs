@@ -27,14 +27,23 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         let rows = sqlx::query(
             r#"
             SELECT
-                id::TEXT   AS "id",
-                user_id::TEXT AS "user_id",
-                item_id    AS "item_id",
-                item_type  AS "item_type",
-                created_at AS "created_at"
-            FROM auth.user_favorites
-            WHERE user_id = $1::TEXT
-            ORDER BY created_at DESC
+                uf.id::TEXT                                     AS "id",
+                uf.user_id::TEXT                                AS "user_id",
+                uf.item_id                                      AS "item_id",
+                uf.item_type                                    AS "item_type",
+                uf.created_at                                   AS "created_at",
+                COALESCE(f.name, fld.name)                      AS "item_name",
+                f.size                                          AS "item_size",
+                f.mime_type                                     AS "item_mime_type",
+                COALESCE(f.folder_id::TEXT, fld.parent_id::TEXT) AS "parent_id",
+                COALESCE(f.updated_at, fld.updated_at)          AS "modified_at"
+            FROM auth.user_favorites uf
+            LEFT JOIN storage.files   f   ON uf.item_type = 'file'
+                                         AND uf.item_id = f.id::TEXT
+            LEFT JOIN storage.folders fld ON uf.item_type = 'folder'
+                                         AND uf.item_id = fld.id::TEXT
+            WHERE uf.user_id = $1::TEXT
+            ORDER BY uf.created_at DESC
             "#,
         )
         .bind(user_uuid)
@@ -57,7 +66,17 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
                 item_id: row.get("item_id"),
                 item_type: row.get("item_type"),
                 created_at: row.get("created_at"),
-            })
+                item_name: row.try_get("item_name").ok(),
+                item_size: row.try_get("item_size").ok(),
+                item_mime_type: row.try_get("item_mime_type").ok(),
+                parent_id: row.try_get("parent_id").ok(),
+                modified_at: row.try_get("modified_at").ok(),
+                // Temporary defaults; with_display_fields() computes the real values
+                icon_class: String::new(),
+                icon_special_class: String::new(),
+                category: String::new(),
+                size_formatted: String::new(),
+            }.with_display_fields())
             .collect();
 
         Ok(favorites)

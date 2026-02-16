@@ -27,14 +27,22 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         let rows = sqlx::query(
             r#"
             SELECT
-                id::TEXT      AS "id",
-                user_id::TEXT AS "user_id",
-                item_id       AS "item_id",
-                item_type     AS "item_type",
-                accessed_at   AS "accessed_at"
-            FROM auth.user_recent_files
-            WHERE user_id = $1::TEXT
-            ORDER BY accessed_at DESC
+                ur.id::TEXT                                     AS "id",
+                ur.user_id::TEXT                                AS "user_id",
+                ur.item_id                                      AS "item_id",
+                ur.item_type                                    AS "item_type",
+                ur.accessed_at                                  AS "accessed_at",
+                COALESCE(f.name, fld.name)                      AS "item_name",
+                f.size                                          AS "item_size",
+                f.mime_type                                     AS "item_mime_type",
+                COALESCE(f.folder_id::TEXT, fld.parent_id::TEXT) AS "parent_id"
+            FROM auth.user_recent_files ur
+            LEFT JOIN storage.files   f   ON ur.item_type = 'file'
+                                         AND ur.item_id = f.id::TEXT
+            LEFT JOIN storage.folders fld ON ur.item_type = 'folder'
+                                         AND ur.item_id = fld.id::TEXT
+            WHERE ur.user_id = $1::TEXT
+            ORDER BY ur.accessed_at DESC
             LIMIT $2
             "#,
         )
@@ -59,7 +67,16 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
                 item_id: row.get("item_id"),
                 item_type: row.get("item_type"),
                 accessed_at: row.get("accessed_at"),
-            })
+                item_name: row.try_get("item_name").ok(),
+                item_size: row.try_get("item_size").ok(),
+                item_mime_type: row.try_get("item_mime_type").ok(),
+                parent_id: row.try_get("parent_id").ok(),
+                // Temporary defaults; with_display_fields() computes the real values
+                icon_class: String::new(),
+                icon_special_class: String::new(),
+                category: String::new(),
+                size_formatted: String::new(),
+            }.with_display_fields())
             .collect();
 
         Ok(items)

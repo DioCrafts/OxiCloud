@@ -217,8 +217,8 @@ class FileRenderer {
       elem.dataset.parentId = item.parent_id || "";
       
       elem.innerHTML = `
-        <div class="file-icon folder-icon">
-          <i class="fas fa-folder"></i>
+        <div class="file-icon ${item.icon_special_class || 'folder-icon'}">
+          <i class="${item.icon_class || 'fas fa-folder'}"></i>
         </div>
         <div class="file-name">${window.escapeHtml(item.name)}</div>
       `;
@@ -253,22 +253,8 @@ class FileRenderer {
       elem.dataset.fileName = item.name;
       elem.dataset.folderId = item.folder_id || "";
       
-      // Determine icon based on MIME type
-      let iconClass = 'fas fa-file';
-      
-      if (item.mime_type) {
-        if (item.mime_type.startsWith('image/')) {
-          iconClass = 'fas fa-file-image';
-        } else if (item.mime_type.startsWith('text/')) {
-          iconClass = 'fas fa-file-alt';
-        } else if (item.mime_type.startsWith('video/')) {
-          iconClass = 'fas fa-file-video';
-        } else if (item.mime_type.startsWith('audio/')) {
-          iconClass = 'fas fa-file-audio';
-        } else if (item.mime_type === 'application/pdf') {
-          iconClass = 'fas fa-file-pdf';
-        }
-      }
+      // Use pre-computed icon class from the API response
+      const iconClass = item.icon_class || 'fas fa-file';
       
       elem.innerHTML = `
         <div class="file-icon">
@@ -340,12 +326,12 @@ class FileRenderer {
       
       elem.innerHTML = `
         <div class="name-cell">
-          <div class="file-icon folder-icon">
-            <i class="fas fa-folder"></i>
+          <div class="file-icon ${item.icon_special_class || 'folder-icon'}">
+            <i class="${item.icon_class || 'fas fa-folder'}"></i>
           </div>
           <span>${window.escapeHtml(item.name)}</span>
         </div>
-        <div>${this.i18n.t('files.file_types.folder')}</div>
+        <div>${item.category ? (this.i18n.t(`files.file_types.${item.category.toLowerCase()}`) || item.category) : this.i18n.t('files.file_types.folder')}</div>
         <div>--</div>
         <div>${formattedDate}</div>
       `;
@@ -380,31 +366,14 @@ class FileRenderer {
       elem.dataset.fileName = item.name;
       elem.dataset.folderId = item.folder_id || "";
       
-      // Determine file type label based on MIME type
-      let typeLabel = this.i18n.t('files.file_types.document');
-      let iconClass = 'fas fa-file';
+      // Use pre-computed display fields from the API response
+      const iconClass = item.icon_class || 'fas fa-file';
+      const typeLabel = item.category
+          ? (this.i18n.t(`files.file_types.${item.category.toLowerCase()}`) || item.category)
+          : this.i18n.t('files.file_types.document');
       
-      if (item.mime_type) {
-        if (item.mime_type.startsWith('image/')) {
-          iconClass = 'fas fa-file-image';
-          typeLabel = this.i18n.t('files.file_types.image');
-        } else if (item.mime_type.startsWith('text/')) {
-          iconClass = 'fas fa-file-alt';
-          typeLabel = this.i18n.t('files.file_types.text');
-        } else if (item.mime_type.startsWith('video/')) {
-          iconClass = 'fas fa-file-video';
-          typeLabel = this.i18n.t('files.file_types.video');
-        } else if (item.mime_type.startsWith('audio/')) {
-          iconClass = 'fas fa-file-audio';
-          typeLabel = this.i18n.t('files.file_types.audio');
-        } else if (item.mime_type === 'application/pdf') {
-          iconClass = 'fas fa-file-pdf';
-          typeLabel = this.i18n.t('files.file_types.pdf');
-        }
-      }
-      
-      // Format file size
-      const fileSize = this.formatFileSize(item.size);
+      // Format file size and date
+      const fileSize = item.size_formatted || this.formatFileSize(item.size);
       
       // Format date
       const modifiedDate = new Date(item.modified_at * 1000);

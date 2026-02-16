@@ -52,6 +52,17 @@ pub struct FolderDto {
 
     /// Whether this is a root folder
     pub is_root: bool,
+
+    // ── Pre-computed display fields ──
+
+    /// FontAwesome icon CSS class (always "fas fa-folder")
+    pub icon_class: String,
+
+    /// Extra CSS class for icon styling (always "folder-icon")
+    pub icon_special_class: String,
+
+    /// Human-readable category (always "Folder")
+    pub category: String,
 }
 
 impl From<Folder> for FolderDto {
@@ -67,6 +78,9 @@ impl From<Folder> for FolderDto {
             created_at: folder.created_at(),
             modified_at: folder.modified_at(),
             is_root,
+            icon_class: "fas fa-folder".to_string(),
+            icon_special_class: "folder-icon".to_string(),
+            category: "Folder".to_string(),
         }
     }
 }
@@ -74,8 +88,8 @@ impl From<Folder> for FolderDto {
 // To convert from FolderDto to Folder for batch handlers
 impl From<FolderDto> for Folder {
     fn from(dto: FolderDto) -> Self {
-        // Use constructor to create an entity from DTO
-        // Note: this should be simplified if Folder has a proper constructor
+        // Display fields (icon_class, icon_special_class, category)
+        // are not part of the domain entity and are ignored.
         Folder::from_dto(
             dto.id,
             dto.name,
@@ -99,6 +113,9 @@ impl FolderDto {
             created_at: 0,
             modified_at: 0,
             is_root: true,
+            icon_class: "fas fa-folder".to_string(),
+            icon_special_class: "folder-icon".to_string(),
+            category: "Folder".to_string(),
         }
     }
 }

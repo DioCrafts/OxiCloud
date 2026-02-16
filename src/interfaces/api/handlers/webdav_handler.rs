@@ -216,6 +216,9 @@ async fn handle_propfind(
             created_at: Utc::now().timestamp() as u64,
             modified_at: Utc::now().timestamp() as u64,
             is_root: true,
+            icon_class: "fas fa-folder".to_string(),
+            icon_special_class: "folder-icon".to_string(),
+            category: "Folder".to_string(),
         };
 
         // Generate response

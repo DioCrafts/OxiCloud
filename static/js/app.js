@@ -1424,10 +1424,10 @@ function switchToRecentFilesView() {
     elements.actionsBar.style.display = 'flex';
     
     // Add event listener for clear button
-    document.getElementById('clear-recent-btn').addEventListener('click', () => {
+    document.getElementById('clear-recent-btn').addEventListener('click', async () => {
         if (window.recent) {
-            window.recent.clearRecentFiles();
-            window.recent.displayRecentFiles();
+            await window.recent.clearRecentFiles();
+            await window.recent.displayRecentFiles();
             window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
         }
     });

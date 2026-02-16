@@ -742,6 +742,7 @@ mod tests {
         // Test creating a file share
         let dto = CreateShareDto {
             item_id: "test_file_id".to_string(),
+            item_name: Some("test_file.txt".to_string()),
             item_type: "file".to_string(),
             password: Some("secret".to_string()),
             expires_at: None,

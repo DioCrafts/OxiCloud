@@ -903,37 +903,15 @@ const ui = {
         
         console.log(`Adding file to the view: ${file.name} (${file.id})`);
         
-        // Determine icon and type
-        let iconClass = 'fas fa-file';
-        let iconSpecialClass = '';
-        let typeLabel = 'Document';
-
-        if (file.mime_type) {
-            if (file.mime_type.startsWith('image/')) {
-                iconClass = 'fas fa-file-image';
-                iconSpecialClass = 'image-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
-            } else if (file.mime_type.startsWith('text/')) {
-                iconClass = 'fas fa-file-alt';
-                iconSpecialClass = 'text-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
-            } else if (file.mime_type.startsWith('video/')) {
-                iconClass = 'fas fa-file-video';
-                iconSpecialClass = 'video-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.video') : 'Video';
-            } else if (file.mime_type.startsWith('audio/')) {
-                iconClass = 'fas fa-file-audio';
-                iconSpecialClass = 'audio-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.audio') : 'Audio';
-            } else if (file.mime_type === 'application/pdf') {
-                iconClass = 'fas fa-file-pdf';
-                iconSpecialClass = 'pdf-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.pdf') : 'PDF';
-            }
-        }
+        // Use pre-computed display fields from the API response
+        const iconClass = file.icon_class || 'fas fa-file';
+        const iconSpecialClass = file.icon_special_class || '';
+        const typeLabel = file.category
+            ? (window.i18n ? window.i18n.t(`files.file_types.${file.category.toLowerCase()}`) || file.category : file.category)
+            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
 
         // Format size and date
-        const fileSize = window.formatFileSize(file.size);
+        const fileSize = file.size_formatted || window.formatFileSize(file.size);
         const modifiedDate = new Date(file.modified_at * 1000);
         const formattedDate = modifiedDate.toLocaleDateString() + ' ' +
                              modifiedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});

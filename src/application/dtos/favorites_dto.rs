@@ -1,7 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// DTO for favorites item
+use super::display_helpers::{format_file_size, mime_to_category, mime_to_icon_class, mime_to_icon_special_class};
+
+/// DTO for favorites item, enriched with item metadata via SQL JOIN
+/// so the frontend does not need N+1 requests to resolve names/sizes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FavoriteItemDto {
     /// Unique identifier for the favorite entry
@@ -18,4 +21,60 @@ pub struct FavoriteItemDto {
 
     /// When the item was added to favorites
     pub created_at: DateTime<Utc>,
+
+    // ── Enriched metadata (resolved via JOIN) ──
+
+    /// Display name of the file or folder
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_name: Option<String>,
+
+    /// Size in bytes (files only; folders → None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_size: Option<i64>,
+
+    /// MIME type (files only)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_mime_type: Option<String>,
+
+    /// Parent folder ID (folder_id for files, parent_id for folders)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+
+    /// Last modification timestamp of the item
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub modified_at: Option<DateTime<Utc>>,
+
+    // ── Pre-computed display fields ──
+
+    /// FontAwesome icon CSS class (e.g. "fas fa-file-image", "fas fa-folder")
+    pub icon_class: String,
+
+    /// Extra CSS class for icon styling (e.g. "image-icon", "folder-icon")
+    pub icon_special_class: String,
+
+    /// Human-readable category (e.g. "Image", "Folder")
+    pub category: String,
+
+    /// Formatted file size (e.g. "3.27 MB"); "--" for folders
+    pub size_formatted: String,
+}
+
+impl FavoriteItemDto {
+    /// Populate display fields from the enriched metadata.
+    /// Call this after constructing from the SQL row.
+    pub fn with_display_fields(mut self) -> Self {
+        if self.item_type == "folder" {
+            self.icon_class = "fas fa-folder".to_string();
+            self.icon_special_class = "folder-icon".to_string();
+            self.category = "Folder".to_string();
+            self.size_formatted = "--".to_string();
+        } else {
+            let mime = self.item_mime_type.as_deref().unwrap_or("application/octet-stream");
+            self.icon_class = mime_to_icon_class(mime).to_string();
+            self.icon_special_class = mime_to_icon_special_class(mime).to_string();
+            self.category = mime_to_category(mime).to_string();
+            self.size_formatted = format_file_size(self.item_size.unwrap_or(0) as u64);
+        }
+        self
+    }
 }

@@ -1,154 +1,97 @@
 /**
- * OxiCloud - Recent Files Module
- * This file handles tracking and displaying recently accessed files
+ * OxiCloud - Recent Files Module (server-authoritative)
+ *
+ * Source of truth: GET /api/recent (enriched with name/size/mime via SQL JOIN).
+ * File-access events are forwarded to the backend with POST /api/recent/{type}/{id}.
+ * No localStorage usage — the server persists and prunes recent items.
  */
 
-// Recent Files Module
 const recent = {
-    // Base key for storing recent files in localStorage (username is appended)
-    STORAGE_KEY_PREFIX: 'oxicloud_recent_files',
-    
-    // Legacy key (pre-fix, shared across all users)
-    LEGACY_STORAGE_KEY: 'oxicloud_recent_files',
-    
-    // Maximum number of recent files to store
+    /** Maximum items to request from the server */
     MAX_RECENT_FILES: 20,
-    
-    /**
-     * Get the user-specific storage key for recent files.
-     * Falls back to legacy global key if username is unavailable.
-     * @returns {string} localStorage key scoped to the current user
-     */
-    getStorageKey() {
-        try {
-            const userData = JSON.parse(localStorage.getItem('oxicloud_user') || '{}');
-            if (userData.username) {
-                return `${this.STORAGE_KEY_PREFIX}_${userData.username}`;
-            }
-        } catch (e) {
-            console.warn('Could not determine current user for recent files key');
-        }
-        // Should not happen in normal flow — user must be logged in
-        return this.LEGACY_STORAGE_KEY;
+
+    // ───────────────────── helpers ─────────────────────
+
+    _authHeaders() {
+        const token = localStorage.getItem('oxicloud_token');
+        const h = {};
+        if (token) h['Authorization'] = `Bearer ${token}`;
+        return h;
     },
-    
+
+    // ───────────────────── lifecycle ─────────────────────
+
     /**
-     * Initialize recent files module
+     * Initialise the module.  Called once from app.js on startup.
      */
     init() {
-        console.log('Initializing recent files module');
-        this.migrateFromLegacyKey();
-        this.ensureRecentFilesStorage();
+        console.log('Initializing recent files module (server-authoritative)');
         this.setupEventListeners();
     },
-    
+
     /**
-     * Migrate data from the old global key to the user-specific key.
-     * This runs once: if the legacy key has data and the user-specific key
-     * does not yet exist, the data is moved.
-     */
-    migrateFromLegacyKey() {
-        const userKey = this.getStorageKey();
-        // Only migrate if the key is actually user-specific
-        if (userKey === this.LEGACY_STORAGE_KEY) return;
-        
-        const legacyData = localStorage.getItem(this.LEGACY_STORAGE_KEY);
-        if (legacyData && !localStorage.getItem(userKey)) {
-            console.log('Migrating recent files from legacy global key to user-specific key');
-            localStorage.setItem(userKey, legacyData);
-        }
-        // Always remove the legacy key so other users don't see stale data
-        localStorage.removeItem(this.LEGACY_STORAGE_KEY);
-    },
-    
-    /**
-     * Make sure the recent files storage is initialized
-     */
-    ensureRecentFilesStorage() {
-        const key = this.getStorageKey();
-        if (!localStorage.getItem(key)) {
-            localStorage.setItem(key, JSON.stringify([]));
-        }
-    },
-    
-    /**
-     * Set up event listeners to track file access
+     * Listen for file-accessed events dispatched by ui.js and forward
+     * them to the backend.
      */
     setupEventListeners() {
-        // Listen for custom event when a file is accessed
         document.addEventListener('file-accessed', (event) => {
             if (event.detail && event.detail.file) {
-                this.addRecentFile(event.detail.file);
+                const file = event.detail.file;
+                const itemType = file.item_type || 'file';
+                this._recordAccess(file.id, itemType);
             }
         });
     },
-    
+
     /**
-     * Add a file to recent files
-     * @param {Object} file - File object containing id, name, folder_id, etc.
+     * Record an access event on the server.
      */
-    addRecentFile(file) {
-        // Don't add if no file or no ID
-        if (!file || !file.id) {
-            return;
-        }
-        
-        // Get current recent files
-        const recentFiles = this.getRecentFiles();
-        
-        // Remove if file already exists in recent files
-        const existingIndex = recentFiles.findIndex(item => item.id === file.id);
-        if (existingIndex !== -1) {
-            recentFiles.splice(existingIndex, 1);
-        }
-        
-        // Add file with timestamp to the beginning of the array
-        const fileWithTimestamp = {
-            ...file,
-            accessedAt: Date.now()
-        };
-        
-        recentFiles.unshift(fileWithTimestamp);
-        
-        // Keep only the most recent files (limit to MAX_RECENT_FILES)
-        const trimmedFiles = recentFiles.slice(0, this.MAX_RECENT_FILES);
-        
-        // Save back to localStorage (user-scoped key)
-        localStorage.setItem(this.getStorageKey(), JSON.stringify(trimmedFiles));
-    },
-    
-    /**
-     * Get recent files from localStorage
-     * @returns {Array} Array of recent file objects with timestamps
-     */
-    getRecentFiles() {
+    async _recordAccess(itemId, itemType) {
         try {
-            const recentFilesJson = localStorage.getItem(this.getStorageKey());
-            return recentFilesJson ? JSON.parse(recentFilesJson) : [];
-        } catch (error) {
-            console.error('Error loading recent files:', error);
-            return [];
+            await fetch(`/api/recent/${itemType}/${itemId}`, {
+                method: 'POST',
+                headers: this._authHeaders()
+            });
+        } catch (err) {
+            console.warn('Failed to record recent access:', err);
         }
     },
-    
+
+    // ───────────────────── public API ─────────────────────
+
     /**
-     * Clear all recent files
+     * Clear all recent items (delegates to the server).
      */
-    clearRecentFiles() {
-        localStorage.setItem(this.getStorageKey(), JSON.stringify([]));
+    async clearRecentFiles() {
+        try {
+            await fetch('/api/recent/clear', {
+                method: 'DELETE',
+                headers: this._authHeaders()
+            });
+        } catch (err) {
+            console.error('Error clearing recent files:', err);
+        }
     },
-    
+
     /**
-     * Display recent files in the UI
+     * Fetch and display recent files.  Data comes directly from the
+     * enriched backend response — zero extra per-item fetches.
      */
     async displayRecentFiles() {
         try {
-            const recentFiles = this.getRecentFiles();
-            
-            // Clear existing content
+            const response = await fetch(`/api/recent?limit=${this.MAX_RECENT_FILES}`, {
+                headers: this._authHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
+            const recentItems = await response.json();
+
             const filesGrid = document.getElementById('files-grid');
             const filesListView = document.getElementById('files-list-view');
-            
+
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
                 <div class="list-header recent-header">
@@ -159,12 +102,10 @@ const recent = {
                     <div data-i18n="recent.accessed">Accessed</div>
                 </div>
             `;
-            
-            // Update breadcrumb - just show Home
+
             window.ui.updateBreadcrumb('');
-            
-            // Show empty state if no recent files
-            if (recentFiles.length === 0) {
+
+            if (recentItems.length === 0) {
                 const emptyState = document.createElement('div');
                 emptyState.className = 'empty-state';
                 emptyState.innerHTML = `
@@ -175,168 +116,134 @@ const recent = {
                 filesGrid.appendChild(emptyState);
                 return;
             }
-            
-            // Process each recent file
-            for (const recentFile of recentFiles) {
-                this.createRecentFileElement(recentFile, filesGrid, filesListView);
+
+            for (const item of recentItems) {
+                this._renderRecentItem(item, filesGrid, filesListView);
             }
-            
-            // Update file icons
+
             window.ui.updateFileIcons();
-            
         } catch (error) {
             console.error('Error displaying recent files:', error);
-            window.ui.showNotification('Error', 'Error loading recent files');
+            if (window.ui && window.ui.showNotification) {
+                window.ui.showNotification('Error', 'Error loading recent files');
+            }
         }
     },
-    
-    /**
-     * Create a file element for a recent file
-     * @param {Object} file - Recent file object
-     * @param {HTMLElement} filesGrid - Grid view container
-     * @param {HTMLElement} filesListView - List view container
-     */
-    createRecentFileElement(file, filesGrid, filesListView) {
-        // Determine icon and type
-        let iconClass = 'fas fa-file';
-        let iconSpecialClass = '';
-        let typeLabel = window.i18n ? window.i18n.t('files.file_types.document') : 'Document';
 
-        if (file.mime_type) {
-            if (file.mime_type.startsWith('image/')) {
-                iconClass = 'fas fa-file-image';
-                iconSpecialClass = 'image-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.image') : 'Image';
-            } else if (file.mime_type.startsWith('text/')) {
-                iconClass = 'fas fa-file-alt';
-                iconSpecialClass = 'text-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.text') : 'Text';
-            } else if (file.mime_type.startsWith('video/')) {
-                iconClass = 'fas fa-file-video';
-                iconSpecialClass = 'video-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.video') : 'Video';
-            } else if (file.mime_type.startsWith('audio/')) {
-                iconClass = 'fas fa-file-audio';
-                iconSpecialClass = 'audio-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.audio') : 'Audio';
-            } else if (file.mime_type === 'application/pdf') {
-                iconClass = 'fas fa-file-pdf';
-                iconSpecialClass = 'pdf-icon';
-                typeLabel = window.i18n ? window.i18n.t('files.file_types.pdf') : 'PDF';
-            }
-        }
+    // ───────────────────── renderer ─────────────────────
 
-        // Format size and date
-        const fileSize = window.formatFileSize ? window.formatFileSize(file.size || 0) : '0 B';
-        const accessedDate = new Date(file.accessedAt);
+    _renderRecentItem(item, filesGrid, filesListView) {
+        const name = item.item_name || item.item_id || 'Unknown';
+        const itemId = item.item_id;
+        const folderId = item.parent_id || '';
+        const mimeType = item.item_mime_type || 'application/octet-stream';
+        const isFolder = item.item_type === 'folder';
+
+        // Build a minimal file object for click handlers
+        const fileObj = {
+            id: itemId,
+            name,
+            folder_id: folderId,
+            mime_type: mimeType,
+            size: item.item_size || 0
+        };
+
+        // Use pre-computed display fields from the enriched API response
+        const iconClass = item.icon_class || (isFolder ? 'fas fa-folder' : 'fas fa-file');
+        const iconSpecialClass = item.icon_special_class || (isFolder ? 'folder-icon' : '');
+        const typeLabel = item.category
+            ? (window.i18n ? window.i18n.t(`files.file_types.${item.category.toLowerCase()}`) || item.category : item.category)
+            : (isFolder
+                ? (window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder')
+                : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document'));
+
+        const fileSize = isFolder ? '--' : (item.size_formatted || (window.formatFileSize ? window.formatFileSize(item.item_size || 0) : '0 B'));
+        const accessedDate = new Date(item.accessed_at);
         const formattedDate = accessedDate.toLocaleDateString() + ' ' +
-                            accessedDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            accessedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // Grid view element
-        const fileGridElement = document.createElement('div');
-        fileGridElement.className = 'file-card recent-item';
-        fileGridElement.dataset.fileId = file.id;
-        fileGridElement.dataset.fileName = file.name;
-        fileGridElement.dataset.folderId = file.folder_id || "";
+        // Click handler
+        const onClick = () => {
+            if (isFolder) {
+                window.app.currentPath = itemId;
+                window.ui.updateBreadcrumb(name);
+                window.loadFiles();
+            } else {
+                // Re-record access
+                document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file: fileObj } }));
+                if (window.ui && window.ui.isViewableFile(fileObj) && window.inlineViewer) {
+                    window.inlineViewer.openFile(fileObj);
+                } else if (window.fileOps) {
+                    window.fileOps.downloadFile(itemId, name);
+                }
+            }
+        };
 
-        fileGridElement.innerHTML = `
-            <div class="recent-indicator">
-                <i class="fas fa-clock"></i>
-            </div>
-            <div class="file-icon ${iconSpecialClass}">
-                <i class="${iconClass}"></i>
-            </div>
-            <div class="file-name">${escapeHtml(file.name)}</div>
+        // Context menu handler
+        const onContextMenu = (e) => {
+            e.preventDefault();
+            if (isFolder) {
+                window.app.contextMenuTargetFolder = { id: itemId, name, parent_id: folderId };
+                const cm = document.getElementById('folder-context-menu');
+                cm.style.left = `${e.pageX}px`;
+                cm.style.top = `${e.pageY}px`;
+                cm.style.display = 'block';
+            } else {
+                window.app.contextMenuTargetFile = { id: itemId, name, folder_id: folderId };
+                const cm = document.getElementById('file-context-menu');
+                cm.style.left = `${e.pageX}px`;
+                cm.style.top = `${e.pageY}px`;
+                cm.style.display = 'block';
+            }
+        };
+
+        // --- grid element ---
+        const gridEl = document.createElement('div');
+        gridEl.className = `file-card recent-item`;
+        if (isFolder) {
+            gridEl.dataset.folderId = itemId;
+            gridEl.dataset.folderName = name;
+        } else {
+            gridEl.dataset.fileId = itemId;
+            gridEl.dataset.fileName = name;
+            gridEl.dataset.folderId = folderId;
+        }
+        gridEl.innerHTML = `
+            <div class="recent-indicator"><i class="fas fa-clock"></i></div>
+            <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
+            <div class="file-name">${escapeHtml(name)}</div>
             <div class="file-info">Accessed ${formattedDate.split(' ')[0]}</div>
         `;
+        gridEl.addEventListener('click', onClick);
+        gridEl.addEventListener('contextmenu', onContextMenu);
+        filesGrid.appendChild(gridEl);
 
-        // View or download on click
-        fileGridElement.addEventListener('click', () => {
-            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
-                window.inlineViewer.openFile(file);
-            } else if (window.fileOps) {
-                window.fileOps.downloadFile(file.id, file.name);
-            }
-            
-            // Dispatch custom event to update recent files
-            document.dispatchEvent(new CustomEvent('file-accessed', {
-                detail: { file }
-            }));
-        });
-
-        // Context menu
-        fileGridElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            window.app.contextMenuTargetFile = {
-                id: file.id,
-                name: file.name,
-                folder_id: file.folder_id || ""
-            };
-
-            let fileContextMenu = document.getElementById('file-context-menu');
-            fileContextMenu.style.left = `${e.pageX}px`;
-            fileContextMenu.style.top = `${e.pageY}px`;
-            fileContextMenu.style.display = 'block';
-        });
-
-        filesGrid.appendChild(fileGridElement);
-
-        // List view element
-        const fileListElement = document.createElement('div');
-        fileListElement.className = 'file-item recent-item';
-        fileListElement.dataset.fileId = file.id;
-        fileListElement.dataset.fileName = file.name;
-        fileListElement.dataset.folderId = file.folder_id || "";
-
-        fileListElement.innerHTML = `
-            <div class="recent-indicator">
-                <i class="fas fa-clock"></i>
-            </div>
+        // --- list element ---
+        const listEl = document.createElement('div');
+        listEl.className = `file-item recent-item`;
+        if (isFolder) {
+            listEl.dataset.folderId = itemId;
+            listEl.dataset.folderName = name;
+        } else {
+            listEl.dataset.fileId = itemId;
+            listEl.dataset.fileName = name;
+            listEl.dataset.folderId = folderId;
+        }
+        listEl.innerHTML = `
+            <div class="recent-indicator"><i class="fas fa-clock"></i></div>
             <div class="name-cell">
-                <div class="file-icon ${iconSpecialClass}">
-                    <i class="${iconClass}"></i>
-                </div>
-                <span>${escapeHtml(file.name)}</span>
+                <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
+                <span>${escapeHtml(name)}</span>
             </div>
             <div class="type-cell">${escapeHtml(typeLabel)}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;
-
-        // View or download on click
-        fileListElement.addEventListener('click', () => {
-            if (window.ui && window.ui.isViewableFile(file) && window.inlineViewer) {
-                window.inlineViewer.openFile(file);
-            } else if (window.fileOps) {
-                window.fileOps.downloadFile(file.id, file.name);
-            }
-            
-            // Dispatch custom event to update recent files
-            document.dispatchEvent(new CustomEvent('file-accessed', {
-                detail: { file }
-            }));
-        });
-
-        // Context menu
-        fileListElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-
-            window.app.contextMenuTargetFile = {
-                id: file.id,
-                name: file.name,
-                folder_id: file.folder_id || ""
-            };
-
-            let fileContextMenu = document.getElementById('file-context-menu');
-            fileContextMenu.style.left = `${e.pageX}px`;
-            fileContextMenu.style.top = `${e.pageY}px`;
-            fileContextMenu.style.display = 'block';
-        });
-
-        filesListView.appendChild(fileListElement);
+        listEl.addEventListener('click', onClick);
+        listEl.addEventListener('contextmenu', onContextMenu);
+        filesListView.appendChild(listEl);
     }
 };
 
-// Expose recent module globally
+// Expose globally
 window.recent = recent;
