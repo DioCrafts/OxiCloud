@@ -287,10 +287,15 @@ const ui = {
 
         dropzone.addEventListener('drop', (e) => {
             e.preventDefault();
+            e.stopPropagation(); // Prevent bubbling to document's drop handler (avoids double upload)
+            e._oxiHandled = true;  // Mark as handled for document-level fallback
             dropzone.classList.remove('active');
             if (e.dataTransfer.files.length > 0) {
                 fileOps.uploadFiles(e.dataTransfer.files);
             }
+            setTimeout(() => {
+                dropzone.style.display = 'none';
+            }, 500);
         });
 
         // Document-wide drag and drop
@@ -317,6 +322,9 @@ const ui = {
         document.addEventListener('drop', (e) => {
             e.preventDefault();
             dropzone.classList.remove('active');
+
+            // Skip if already handled by the dropzone handler (defensive against bubble leaks)
+            if (e._oxiHandled) return;
 
             if (e.dataTransfer.files.length > 0) {
                 fileOps.uploadFiles(e.dataTransfer.files);

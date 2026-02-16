@@ -55,6 +55,9 @@ pub trait FolderUseCase: Send + Sync + 'static {
 
     /// Deletes a folder (ownership verified against caller_id)
     async fn delete_folder(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
+
+    /// Creates a root-level home folder for a user during registration.
+    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<FolderDto, DomainError>;
 }
 
 /**

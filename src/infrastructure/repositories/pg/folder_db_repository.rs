@@ -603,17 +603,11 @@ impl FolderRepository for FolderDbRepository {
         }
         Ok(())
     }
-}
 
-// ── Extra helpers for blob-storage bootstrap ──
-
-impl FolderDbRepository {
-    /// Creates a root-level home folder for a user.
-    /// This is called during user registration.
-    pub async fn create_home_folder(
+    async fn create_home_folder(
         &self,
         user_id: &str,
-        name: &str,
+        name: String,
     ) -> Result<Folder, DomainError> {
         let row = sqlx::query_as::<_, (String, String, i64, i64)>(
             r#"
@@ -626,14 +620,14 @@ impl FolderDbRepository {
                       EXTRACT(EPOCH FROM updated_at)::bigint
             "#,
         )
-        .bind(name)
+        .bind(&name)
         .bind(user_id)
         .fetch_optional(self.pool())
         .await
         .map_err(|e| DomainError::internal_error("FolderDb", format!("home folder: {e}")))?;
 
         match row {
-            Some((id, path, ca, ma)) => Self::row_to_folder(id, name.to_string(), path, None, Some(user_id.to_string()), ca, ma),
+            Some((id, path, ca, ma)) => Self::row_to_folder(id, name.clone(), path, None, Some(user_id.to_string()), ca, ma),
             None => {
                 // Already exists — fetch it
                 let existing = sqlx::query_as::<_, (String, String, i64, i64)>(
@@ -646,16 +640,20 @@ impl FolderDbRepository {
                      WHERE name = $1 AND user_id = $2 AND parent_id IS NULL
                     "#,
                 )
-                .bind(name)
+                .bind(&name)
                 .bind(user_id)
                 .fetch_one(self.pool())
                 .await
                 .map_err(|e| DomainError::internal_error("FolderDb", format!("home fetch: {e}")))?;
-                Self::row_to_folder(existing.0, name.to_string(), existing.1, None, Some(user_id.to_string()), existing.2, existing.3)
+                Self::row_to_folder(existing.0, name, existing.1, None, Some(user_id.to_string()), existing.2, existing.3)
             }
         }
     }
+}
 
+// ── Extra helpers for blob-storage bootstrap ──
+
+impl FolderDbRepository {
     /// Returns user_id for a given folder. Used by file repositories.
     pub async fn get_folder_user_id(&self, folder_id: &str) -> Result<String, DomainError> {
         sqlx::query_scalar::<_, String>("SELECT user_id FROM storage.folders WHERE id = $1::uuid")

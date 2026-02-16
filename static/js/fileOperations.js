@@ -23,6 +23,7 @@ const fileOps = {
     // Upload progress — notification bell integration
     // ========================================================================
     _currentBatchId: null,
+    _isUploading: false,  // Guard against concurrent upload calls
 
     /** Start a new upload batch in the notification bell */
     _initUploadToast(totalFiles) {
@@ -103,86 +104,97 @@ const fileOps = {
         const totalFiles = files.length;
         if (totalFiles === 0) return;
 
-        // Legacy progress bar (inside dropzone) — keep working for drag-drop
-        const progressBar = document.querySelector('.progress-fill');
-        const uploadProgressDiv = document.querySelector('.upload-progress');
-        if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
-        if (progressBar) { progressBar.style.width = '0%'; }
-
-        // Show upload notification
-        this._initUploadToast(totalFiles);
-        const batchId = this._currentBatchId;
-
-        let uploadedCount = 0;
-        let successCount = 0;
-
-        for (let i = 0; i < totalFiles; i++) {
-            const file = files[i];
-            const formData = new FormData();
-
-            const targetFolderId = window.app.currentPath || window.app.userHomeFolderId;
-            if (targetFolderId) formData.append('folder_id', targetFolderId);
-            formData.append('file', file);
-
-            console.log(`Uploading file to folder: ${targetFolderId || 'root'}`, {
-                file: file.name, size: file.size
-            });
-
-            const result = await this._uploadFileXHR(formData, batchId, file.name);
-
-            uploadedCount++;
-
-            // Legacy dropzone bar
-            if (progressBar) {
-                progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
-            }
-            // Notify bell of per-file completion
-            if (window.notifications && batchId) {
-                window.notifications.fileCompleted(batchId, result.ok);
-            }
-
-            if (result.ok) {
-                successCount++;
-                console.log(`Successfully uploaded ${file.name}`, result.data);
-            } else {
-                console.error(`Upload error for ${file.name}`);
-                if (result.isQuotaError) {
-                    const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
-                    if (window.notifications) {
-                        window.notifications.addNotification({
-                            icon: 'fa-exclamation-triangle',
-                            iconClass: 'error',
-                            title: file.name,
-                            text: msg
-                        });
-                    }
-                    break;
-                }
-            }
+        // Guard: prevent concurrent upload calls (e.g. double drop events)
+        if (this._isUploading) {
+            console.warn('Upload already in progress, ignoring duplicate call');
+            return;
         }
-
-        // All done
-        this._finishUploadToast(successCount, totalFiles);
-
-        // Wait for backend to persist, then reload
-        await new Promise(resolve => setTimeout(resolve, 800));
-
-        // Refresh storage usage display
-        if (typeof window.refreshUserData === 'function') {
-            try { await window.refreshUserData(); } catch (_) {}
-        }
+        this._isUploading = true;
 
         try {
-            await window.loadFiles({ forceRefresh: true });
-        } catch (reloadError) {
-            console.error('Error reloading files:', reloadError);
-        }
+            // Legacy progress bar (inside dropzone) — keep working for drag-drop
+            const progressBar = document.querySelector('.progress-fill');
+            const uploadProgressDiv = document.querySelector('.upload-progress');
+            if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
+            if (progressBar) { progressBar.style.width = '0%'; }
 
-        setTimeout(() => {
-            const dropzone = document.getElementById('dropzone');
-            if (dropzone) dropzone.style.display = 'none';
-            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
-        }, 500);
+            // Show upload notification
+            this._initUploadToast(totalFiles);
+            const batchId = this._currentBatchId;
+
+            let uploadedCount = 0;
+            let successCount = 0;
+
+            for (let i = 0; i < totalFiles; i++) {
+                const file = files[i];
+                const formData = new FormData();
+
+                const targetFolderId = window.app.currentPath || window.app.userHomeFolderId;
+                if (targetFolderId) formData.append('folder_id', targetFolderId);
+                formData.append('file', file);
+
+                console.log(`Uploading file to folder: ${targetFolderId || 'root'}`, {
+                    file: file.name, size: file.size
+                });
+
+                const result = await this._uploadFileXHR(formData, batchId, file.name);
+
+                uploadedCount++;
+
+                // Legacy dropzone bar
+                if (progressBar) {
+                    progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
+                }
+                // Notify bell of per-file completion
+                if (window.notifications && batchId) {
+                    window.notifications.fileCompleted(batchId, result.ok);
+                }
+
+                if (result.ok) {
+                    successCount++;
+                    console.log(`Successfully uploaded ${file.name}`, result.data);
+                } else {
+                    console.error(`Upload error for ${file.name}`);
+                    if (result.isQuotaError) {
+                        const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
+                        if (window.notifications) {
+                            window.notifications.addNotification({
+                                icon: 'fa-exclamation-triangle',
+                                iconClass: 'error',
+                                title: file.name,
+                                text: msg
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // All done
+            this._finishUploadToast(successCount, totalFiles);
+
+            // Wait for backend to persist, then reload
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            // Refresh storage usage display
+            if (typeof window.refreshUserData === 'function') {
+                try { await window.refreshUserData(); } catch (_) {}
+            }
+
+            try {
+                await window.loadFiles({ forceRefresh: true });
+            } catch (reloadError) {
+                console.error('Error reloading files:', reloadError);
+            }
+
+            setTimeout(() => {
+                const dropzone = document.getElementById('dropzone');
+                if (dropzone) dropzone.style.display = 'none';
+                if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+            }, 500);
+        } finally {
+            this._isUploading = false;
+        }
     },
 
     /**

@@ -68,20 +68,19 @@ const sharedView = {
         container.style.display = 'block';
         container.innerHTML = `
             <div class="shared-header">
-                <h2 data-i18n="nav.shared">Shared Files</h2>
                 <div class="shared-filters">
                     <select id="filter-type" class="shared-filter-select">
-                        <option value="all" data-i18n="shared_allTypes">All types</option>
-                        <option value="file" data-i18n="shared_files">Files</option>
-                        <option value="folder" data-i18n="shared_folders">Folders</option>
+                        <option value="all" data-i18n="shared_filterAll">All</option>
+                        <option value="file" data-i18n="shared_filterFiles">Files</option>
+                        <option value="folder" data-i18n="shared_filterFolders">Folders</option>
                     </select>
                     <select id="sort-by" class="shared-filter-select">
-                        <option value="date" data-i18n="shared_sortDate">Sort by date</option>
-                        <option value="name" data-i18n="shared_sortName">Sort by name</option>
-                        <option value="expiration" data-i18n="shared_sortExpiration">Sort by expiration</option>
+                        <option value="date" data-i18n="shared_sortByDate">Sort by date</option>
+                        <option value="name" data-i18n="shared_sortByName">Sort by name</option>
+                        <option value="expiration" data-i18n="shared_sortByExpiration">Sort by expiration</option>
                     </select>
                     <div class="shared-search-box">
-                        <input type="text" id="shared-search-filter" data-i18n-placeholder="shared_searchPlaceholder" placeholder="Search...">
+                        <input type="text" id="shared-search-filter" data-i18n-placeholder="shared_search" placeholder="Search...">
                         <button id="shared-search-filter-btn" class="search-btn">🔍</button>
                     </div>
                 </div>
@@ -89,8 +88,8 @@ const sharedView = {
 
             <div id="empty-shared-state" class="empty-state" style="display:none;">
                 <div class="empty-state-icon">📤</div>
-                <h3 data-i18n="shared_emptyTitle">No shared items</h3>
-                <p data-i18n="shared_emptyDesc">Items you share will appear here</p>
+                <h3 data-i18n="shared_emptyStateTitle">No shared items</h3>
+                <p data-i18n="shared_emptyStateDesc">Items you share will appear here</p>
                 <button id="empty-go-to-files" class="button primary" data-i18n="shared_goToFiles">Go to Files</button>
             </div>
 
@@ -98,78 +97,78 @@ const sharedView = {
                 <table class="shared-table">
                     <thead>
                         <tr>
-                            <th data-i18n="shared_columnName">Name</th>
-                            <th data-i18n="shared_columnType">Type</th>
-                            <th data-i18n="shared_columnDate">Date</th>
-                            <th data-i18n="shared_columnExpiration">Expiration</th>
-                            <th data-i18n="shared_columnPermissions">Permissions</th>
-                            <th data-i18n="shared_columnPassword">Password</th>
-                            <th data-i18n="shared_columnActions">Actions</th>
+                            <th data-i18n="shared_colName">Name</th>
+                            <th data-i18n="shared_colType">Type</th>
+                            <th data-i18n="shared_colDateShared">Date</th>
+                            <th data-i18n="shared_colExpiration">Expiration</th>
+                            <th data-i18n="shared_colPermissions">Permissions</th>
+                            <th data-i18n="shared_colPassword">Password</th>
+                            <th data-i18n="shared_colActions">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="shared-items-list"></tbody>
                 </table>
             </div>
 
-            <!-- Share Edit Dialog -->
-            <div id="share-dialog" class="shared-dialog">
+            <!-- Share Edit Dialog (sharedView-specific) -->
+            <div id="shared-view-edit-dialog" class="shared-dialog">
                 <div class="shared-dialog-content">
                     <div class="shared-dialog-header">
-                        <span id="share-dialog-icon">📄</span>
-                        <span id="share-dialog-name">Item</span>
+                        <span id="sv-dialog-icon">📄</span>
+                        <span id="sv-dialog-name">Item</span>
                         <button class="close-dialog-btn">&times;</button>
                     </div>
                     <div class="share-link-section">
                         <label data-i18n="share.linkLabel">Share Link:</label>
                         <div class="share-link-input">
-                            <input type="text" id="share-link-url" readonly>
-                            <button id="copy-link-btn" class="button" data-i18n="share.copyLink">Copy</button>
+                            <input type="text" id="sv-share-link-url" readonly>
+                            <button id="sv-copy-link-btn" class="button" data-i18n="share.copyLink">Copy</button>
                         </div>
                     </div>
                     <div class="share-permissions-section">
                         <h4 data-i18n="share.permissions">Permissions</h4>
-                        <label><input type="checkbox" id="permission-read" checked> <span data-i18n="share.permissionRead">Read</span></label>
-                        <label><input type="checkbox" id="permission-write"> <span data-i18n="share.permissionWrite">Write</span></label>
-                        <label><input type="checkbox" id="permission-reshare"> <span data-i18n="share.permissionReshare">Reshare</span></label>
+                        <label><input type="checkbox" id="sv-permission-read" checked> <span data-i18n="share.permissionRead">Read</span></label>
+                        <label><input type="checkbox" id="sv-permission-write"> <span data-i18n="share.permissionWrite">Write</span></label>
+                        <label><input type="checkbox" id="sv-permission-reshare"> <span data-i18n="share.permissionReshare">Reshare</span></label>
                     </div>
                     <div class="share-password-section">
-                        <label><input type="checkbox" id="enable-password"> <span data-i18n="share.enablePassword">Password protection</span></label>
+                        <label><input type="checkbox" id="sv-enable-password"> <span data-i18n="share.enablePassword">Password protection</span></label>
                         <div class="password-input-group">
-                            <input type="text" id="share-password" disabled placeholder="Enter password">
-                            <button id="generate-password" class="button small" data-i18n="share.generatePassword">Generate</button>
+                            <input type="text" id="sv-share-password" disabled placeholder="Enter password">
+                            <button id="sv-generate-password" class="button small" data-i18n="share.generatePassword">Generate</button>
                         </div>
                     </div>
                     <div class="share-expiration-section">
-                        <label><input type="checkbox" id="enable-expiration"> <span data-i18n="share.enableExpiration">Set expiration</span></label>
-                        <input type="date" id="share-expiration" disabled>
+                        <label><input type="checkbox" id="sv-enable-expiration"> <span data-i18n="share.enableExpiration">Set expiration</span></label>
+                        <input type="date" id="sv-share-expiration" disabled>
                     </div>
                     <div class="share-actions">
-                        <button id="update-share-btn" class="button primary" data-i18n="share.update">Update</button>
-                        <button id="remove-share-btn" class="button danger" data-i18n="share.remove">Remove Share</button>
+                        <button id="sv-update-share-btn" class="button primary" data-i18n="share.update">Update</button>
+                        <button id="sv-remove-share-btn" class="button danger" data-i18n="share.remove">Remove Share</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Notification Dialog -->
-            <div id="share-notification-dialog" class="shared-dialog">
+            <!-- Notification Dialog (sharedView-specific) -->
+            <div id="sv-notification-dialog" class="shared-dialog">
                 <div class="shared-dialog-content">
                     <div class="shared-dialog-header">
-                        <span id="notify-dialog-icon">📧</span>
-                        <span id="notify-dialog-name">Item</span>
+                        <span id="sv-notify-dialog-icon">📧</span>
+                        <span id="sv-notify-dialog-name">Item</span>
                         <button class="close-dialog-btn">&times;</button>
                     </div>
                     <div class="notification-form">
                         <div class="form-group">
                             <label data-i18n="share.notifyEmail">Email:</label>
-                            <input type="email" id="notification-email" placeholder="recipient@example.com">
+                            <input type="email" id="sv-notification-email" placeholder="recipient@example.com">
                         </div>
                         <div class="form-group">
                             <label data-i18n="share.notifyMessage">Message (optional):</label>
-                            <textarea id="notification-message" rows="3"></textarea>
+                            <textarea id="sv-notification-message" rows="3"></textarea>
                         </div>
                     </div>
                     <div class="notification-actions">
-                        <button id="send-notification-btn" class="button primary" data-i18n="share.notifySend">Send Notification</button>
+                        <button id="sv-send-notification-btn" class="button primary" data-i18n="share.notifySend">Send Notification</button>
                     </div>
                 </div>
             </div>
@@ -200,37 +199,37 @@ const sharedView = {
         if (searchBtn) searchBtn.addEventListener('click', () => this.filterAndSortItems());
         if (emptyGoToFiles) emptyGoToFiles.addEventListener('click', () => window.switchToFilesView());
 
-        // Share dialog
-        const shareDialog = document.getElementById('share-dialog');
+        // Share dialog (sharedView-specific IDs)
+        const shareDialog = document.getElementById('shared-view-edit-dialog');
         if (shareDialog) {
             const closeBtn = shareDialog.querySelector('.close-dialog-btn');
             if (closeBtn) closeBtn.addEventListener('click', () => this.closeShareDialog());
-            const copyLinkBtn = document.getElementById('copy-link-btn');
+            const copyLinkBtn = document.getElementById('sv-copy-link-btn');
             if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => this.copyShareLink());
-            const enablePw = document.getElementById('enable-password');
-            const pwField = document.getElementById('share-password');
+            const enablePw = document.getElementById('sv-enable-password');
+            const pwField = document.getElementById('sv-share-password');
             if (enablePw) enablePw.addEventListener('change', () => {
                 if (pwField) { pwField.disabled = !enablePw.checked; if (enablePw.checked) pwField.focus(); }
             });
-            const genPwBtn = document.getElementById('generate-password');
+            const genPwBtn = document.getElementById('sv-generate-password');
             if (genPwBtn) genPwBtn.addEventListener('click', () => this.generatePassword());
-            const enableExp = document.getElementById('enable-expiration');
-            const expField = document.getElementById('share-expiration');
+            const enableExp = document.getElementById('sv-enable-expiration');
+            const expField = document.getElementById('sv-share-expiration');
             if (enableExp) enableExp.addEventListener('change', () => {
                 if (expField) { expField.disabled = !enableExp.checked; if (enableExp.checked) expField.focus(); }
             });
-            const updateBtn = document.getElementById('update-share-btn');
+            const updateBtn = document.getElementById('sv-update-share-btn');
             if (updateBtn) updateBtn.addEventListener('click', () => this.updateSharedItem());
-            const removeBtn = document.getElementById('remove-share-btn');
+            const removeBtn = document.getElementById('sv-remove-share-btn');
             if (removeBtn) removeBtn.addEventListener('click', () => this.removeSharedItem());
         }
 
-        // Notification dialog
-        const notifDialog = document.getElementById('share-notification-dialog');
+        // Notification dialog (sharedView-specific IDs)
+        const notifDialog = document.getElementById('sv-notification-dialog');
         if (notifDialog) {
             const closeBtn = notifDialog.querySelector('.close-dialog-btn');
             if (closeBtn) closeBtn.addEventListener('click', () => this.closeNotificationDialog());
-            const sendBtn = document.getElementById('send-notification-btn');
+            const sendBtn = document.getElementById('sv-send-notification-btn');
             if (sendBtn) sendBtn.addEventListener('click', () => this.sendNotification());
         }
     },
@@ -359,19 +358,19 @@ const sharedView = {
     // Open share dialog
     openShareDialog(item) {
         this.currentItem = item;
-        const shareDialog = document.getElementById('share-dialog');
+        const shareDialog = document.getElementById('shared-view-edit-dialog');
         const dn = item.item_name || item.item_id || 'Unknown';
 
-        const iconEl = document.getElementById('share-dialog-icon');
-        const nameEl = document.getElementById('share-dialog-name');
-        const urlEl = document.getElementById('share-link-url');
-        const enablePw = document.getElementById('enable-password');
-        const pwField = document.getElementById('share-password');
-        const enableExp = document.getElementById('enable-expiration');
-        const expField = document.getElementById('share-expiration');
-        const permRead = document.getElementById('permission-read');
-        const permWrite = document.getElementById('permission-write');
-        const permReshare = document.getElementById('permission-reshare');
+        const iconEl = document.getElementById('sv-dialog-icon');
+        const nameEl = document.getElementById('sv-dialog-name');
+        const urlEl = document.getElementById('sv-share-link-url');
+        const enablePw = document.getElementById('sv-enable-password');
+        const pwField = document.getElementById('sv-share-password');
+        const enableExp = document.getElementById('sv-enable-expiration');
+        const expField = document.getElementById('sv-share-expiration');
+        const permRead = document.getElementById('sv-permission-read');
+        const permWrite = document.getElementById('sv-permission-write');
+        const permReshare = document.getElementById('sv-permission-reshare');
 
         if (!shareDialog) return;
         if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
@@ -398,7 +397,7 @@ const sharedView = {
     },
 
     closeShareDialog() {
-        const d = document.getElementById('share-dialog');
+        const d = document.getElementById('shared-view-edit-dialog');
         if (d) d.classList.remove('active');
         this.currentItem = null;
     },
@@ -406,11 +405,11 @@ const sharedView = {
     openNotificationDialog(item) {
         this.currentItem = item;
         const dn = item.item_name || item.item_id || 'Unknown';
-        const d = document.getElementById('share-notification-dialog');
-        const iconEl = document.getElementById('notify-dialog-icon');
-        const nameEl = document.getElementById('notify-dialog-name');
-        const emailEl = document.getElementById('notification-email');
-        const msgEl = document.getElementById('notification-message');
+        const d = document.getElementById('sv-notification-dialog');
+        const iconEl = document.getElementById('sv-notify-dialog-icon');
+        const nameEl = document.getElementById('sv-notify-dialog-name');
+        const emailEl = document.getElementById('sv-notification-email');
+        const msgEl = document.getElementById('sv-notification-message');
 
         if (!d) return;
         if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
@@ -421,13 +420,13 @@ const sharedView = {
     },
 
     closeNotificationDialog() {
-        const d = document.getElementById('share-notification-dialog');
+        const d = document.getElementById('sv-notification-dialog');
         if (d) d.classList.remove('active');
         this.currentItem = null;
     },
 
     copyShareLink() {
-        const el = document.getElementById('share-link-url');
+        const el = document.getElementById('sv-share-link-url');
         if (!el) return;
         navigator.clipboard.writeText(el.value)
             .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
@@ -436,8 +435,8 @@ const sharedView = {
 
     // Generate secure password with crypto API
     generatePassword() {
-        const pwField = document.getElementById('share-password');
-        const enablePw = document.getElementById('enable-password');
+        const pwField = document.getElementById('sv-share-password');
+        const enablePw = document.getElementById('sv-enable-password');
         if (!pwField || !enablePw) return;
 
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -456,13 +455,13 @@ const sharedView = {
     async updateSharedItem() {
         if (!this.currentItem) return;
 
-        const permRead = document.getElementById('permission-read');
-        const permWrite = document.getElementById('permission-write');
-        const permReshare = document.getElementById('permission-reshare');
-        const enablePw = document.getElementById('enable-password');
-        const pwField = document.getElementById('share-password');
-        const enableExp = document.getElementById('enable-expiration');
-        const expField = document.getElementById('share-expiration');
+        const permRead = document.getElementById('sv-permission-read');
+        const permWrite = document.getElementById('sv-permission-write');
+        const permReshare = document.getElementById('sv-permission-reshare');
+        const enablePw = document.getElementById('sv-enable-password');
+        const pwField = document.getElementById('sv-share-password');
+        const enableExp = document.getElementById('sv-enable-expiration');
+        const expField = document.getElementById('sv-share-expiration');
 
         const body = {
             permissions: {
@@ -521,8 +520,8 @@ const sharedView = {
     // Send notification (stub)
     sendNotification() {
         if (!this.currentItem) return;
-        const emailEl = document.getElementById('notification-email');
-        const msgEl = document.getElementById('notification-message');
+        const emailEl = document.getElementById('sv-notification-email');
+        const msgEl = document.getElementById('sv-notification-message');
         const email = emailEl ? emailEl.value.trim() : '';
         const message = msgEl ? msgEl.value.trim() : '';
 

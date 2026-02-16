@@ -99,4 +99,12 @@ pub trait FolderRepository: Send + Sync + 'static {
 
     /// Permanently deletes a folder (used by the trash)
     async fn delete_folder_permanently(&self, folder_id: &str) -> Result<(), DomainError>;
+
+    /// Creates a root-level home folder for a user.
+    /// This is used during user registration to create the user's personal folder.
+    async fn create_home_folder(
+        &self,
+        user_id: &str,
+        name: String,
+    ) -> Result<Folder, DomainError>;
 }

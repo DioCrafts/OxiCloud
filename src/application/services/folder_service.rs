@@ -111,6 +111,10 @@ impl FolderService {
             async fn delete_folder(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
                 Ok(())
             }
+
+            async fn create_home_folder(&self, _user_id: &str, _name: String) -> Result<FolderDto, DomainError> {
+                Ok(FolderDto::empty())
+            }
         }
 
         FolderServiceStub
@@ -151,6 +155,22 @@ impl FolderUseCase for FolderService {
             })?;
 
         // Convert to DTO
+        Ok(FolderDto::from(folder))
+    }
+
+    /// Creates a root-level home folder for a user during registration.
+    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<FolderDto, DomainError> {
+        let folder = self
+            .folder_storage
+            .create_home_folder(user_id, name)
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "FolderStorage",
+                    format!("Failed to create home folder: {}", e),
+                )
+            })?;
+
         Ok(FolderDto::from(folder))
     }
 

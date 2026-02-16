@@ -609,6 +609,14 @@ mod tests {
         async fn delete_folder_permanently(&self, _folder_id: &str) -> Result<(), DomainError> {
             unimplemented!()
         }
+
+        async fn create_home_folder(
+            &self,
+            _user_id: &str,
+            _name: String,
+        ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
+            unimplemented!()
+        }
     }
 
     struct MockShareRepository {

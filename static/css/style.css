@@ -2498,6 +2498,225 @@ select:focus {
     padding: 0;
 }
 
+/* Shared View Dialog (edit/notification dialogs inside sharedView component) */
+.shared-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.45);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 3000;
+    backdrop-filter: blur(2px);
+    animation: modalFadeIn 0.2s ease;
+}
+
+.shared-dialog.active {
+    display: flex;
+}
+
+.shared-dialog-content {
+    background-color: white;
+    border-radius: 16px;
+    width: 480px;
+    max-width: 90%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+    overflow: hidden;
+    animation: modalSlideIn 0.25s ease;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 0;
+}
+
+.shared-dialog-header {
+    font-size: 17px;
+    font-weight: 600;
+    color: #1a202c;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.shared-dialog-header .close-dialog-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: #718096;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+}
+
+.shared-dialog-header .close-dialog-btn:hover {
+    background: #f0f0f0;
+    color: #1a202c;
+}
+
+.shared-dialog .share-link-section,
+.shared-dialog .share-permissions-section,
+.shared-dialog .share-password-section,
+.shared-dialog .share-expiration-section,
+.shared-dialog .notification-form {
+    padding: 16px 24px;
+}
+
+.shared-dialog .share-link-section label,
+.shared-dialog .share-permissions-section h4,
+.shared-dialog .notification-form label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #2d3748;
+    font-size: 14px;
+}
+
+.shared-dialog .share-link-input {
+    display: flex;
+    gap: 8px;
+}
+
+.shared-dialog .share-link-input input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f8fafc;
+    color: #1a202c;
+}
+
+.shared-dialog .share-permissions-section label,
+.shared-dialog .share-password-section label,
+.shared-dialog .share-expiration-section label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.shared-dialog .password-input-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.shared-dialog .password-input-group input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f8fafc;
+}
+
+.shared-dialog .share-expiration-section input[type="date"] {
+    padding: 8px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    background: #f8fafc;
+    margin-top: 8px;
+}
+
+.shared-dialog .share-actions,
+.shared-dialog .notification-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.shared-dialog .notification-form input,
+.shared-dialog .notification-form textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 14px;
+    background: #f8fafc;
+    color: #1a202c;
+    outline: none;
+    transition: all 0.15s ease;
+    box-sizing: border-box;
+}
+
+.shared-dialog .notification-form input:focus,
+.shared-dialog .notification-form textarea:focus {
+    border-color: #ff5e3a;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(255,94,58,0.1);
+}
+
+.shared-dialog .notification-form .form-group {
+    padding: 0;
+    margin-bottom: 15px;
+}
+
+/* Dark mode for shared-dialog */
+[data-theme="dark"] .shared-dialog-content {
+    background-color: #1e293b;
+}
+
+[data-theme="dark"] .shared-dialog-header {
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .shared-dialog-header .close-dialog-btn {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .shared-dialog-header .close-dialog-btn:hover {
+    background: #334155;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .shared-dialog .share-link-input input,
+[data-theme="dark"] .shared-dialog .password-input-group input,
+[data-theme="dark"] .shared-dialog .share-expiration-section input,
+[data-theme="dark"] .shared-dialog .notification-form input,
+[data-theme="dark"] .shared-dialog .notification-form textarea {
+    background: #0f172a;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .shared-dialog .share-link-input input:focus,
+[data-theme="dark"] .shared-dialog .notification-form input:focus,
+[data-theme="dark"] .shared-dialog .notification-form textarea:focus {
+    border-color: #ff5e3a;
+    background: #1e293b;
+}
+
+[data-theme="dark"] .shared-dialog .share-link-section label,
+[data-theme="dark"] .shared-dialog .share-permissions-section h4,
+[data-theme="dark"] .shared-dialog .notification-form label {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .shared-dialog .share-permissions-section label,
+[data-theme="dark"] .shared-dialog .share-password-section label,
+[data-theme="dark"] .shared-dialog .share-expiration-section label {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .shared-dialog .share-actions,
+[data-theme="dark"] .shared-dialog .notification-actions {
+    background: #162032;
+    border-top-color: #334155;
+}
+
 /* Folder select items in move dialog */
 .folder-select-item {
     display: flex;
@@ -4535,6 +4754,8 @@ html[dir='rtl'] .fa-sign-out-alt {
 
 /* Empty state */
 [data-theme="dark"] .empty-state {
+    background-color: #1e293b;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     color: #64748b;
 }
 [data-theme="dark"] .empty-state i {
@@ -4633,7 +4854,8 @@ html[dir='rtl'] .fa-sign-out-alt {
 
 /* ── Shared View Dark Mode ── */
 [data-theme="dark"] .shared-filters {
-    background-color: transparent;
+    background-color: #1e293b;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 [data-theme="dark"] .filter-group label {
     color: #94a3b8;
@@ -4776,4 +4998,31 @@ html[dir='rtl'] .fa-sign-out-alt {
 }
 [data-theme="dark"] .search-sort-select:focus {
     border-color: #ff5e3a;
+}
+
+/* Trash & action buttons dark mode */
+[data-theme="dark"] .trash-actions button,
+[data-theme="dark"] .actions-cell button {
+    background: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+[data-theme="dark"] .trash-actions button:hover,
+[data-theme="dark"] .actions-cell button:hover {
+    background: #334155;
+}
+[data-theme="dark"] .action-btn {
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+[data-theme="dark"] .action-btn:hover {
+    background-color: #334155;
+    border-color: #475569;
+}
+
+/* Header dark mode (shared page) */
+[data-theme="dark"] header {
+    background-color: #1e293b;
+    border-bottom-color: #334155;
 }

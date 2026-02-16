@@ -1,4 +1,3 @@
-use crate::application::dtos::folder_dto::CreateFolderDto;
 use crate::application::dtos::user_dto::{
     AuthResponseDto, ChangePasswordDto, LoginDto, RefreshTokenDto, RegisterDto, UserDto,
 };
@@ -318,43 +317,7 @@ impl AuthApplicationService {
         let created_user = self.user_storage.create_user(user).await?;
 
         // Create personal folder for the user
-        if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("My Folder - {}", dto.username);
-
-            match folder_service
-                .create_folder(CreateFolderDto {
-                    name: folder_name,
-                    parent_id: None,
-                })
-                .await
-            {
-                Ok(folder) => {
-                    tracing::info!(
-                        "Personal folder created for user {}: {} (ID: {})",
-                        created_user.id(),
-                        folder.name,
-                        folder.id
-                    );
-
-                    // Here we could save the folder-to-user association,
-                    // for example, in a folder-user relationship table
-                }
-                Err(e) => {
-                    // We don't fail registration due to a folder creation error,
-                    // but we log it for investigation
-                    tracing::error!(
-                        "Could not create personal folder for user {}: {}",
-                        created_user.id(),
-                        e
-                    );
-                }
-            }
-        } else {
-            tracing::warn!(
-                "Folder service not configured, cannot create personal folder for user: {}",
-                created_user.id()
-            );
-        }
+        self.create_personal_folder(&dto.username, created_user.id()).await;
 
         tracing::info!("User registered: {}", created_user.id());
         Ok(UserDto::from(created_user))
@@ -695,34 +658,8 @@ impl AuthApplicationService {
         // 4. Save the new admin user
         let created_user = self.user_storage.create_user(user).await?;
 
-        // 5. Create personal folder for the new admin if folder service is available
-        if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("My Folder - {}", dto.username);
-
-            match folder_service
-                .create_folder(CreateFolderDto {
-                    name: folder_name,
-                    parent_id: None,
-                })
-                .await
-            {
-                Ok(folder) => {
-                    tracing::info!(
-                        "Personal folder created for admin {}: {} (ID: {})",
-                        created_user.id(),
-                        folder.name,
-                        folder.id
-                    );
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "Could not create personal folder for admin {}: {}",
-                        created_user.id(),
-                        e
-                    );
-                }
-            }
-        }
+        // 5. Create personal folder for the new admin
+        self.create_personal_folder(&dto.username, created_user.id()).await;
 
         tracing::info!("Custom admin created: {}", created_user.id());
         Ok(UserDto::from(created_user))
@@ -828,32 +765,7 @@ impl AuthApplicationService {
         }
 
         // Create personal folder
-        if let Some(folder_service) = &self.folder_service {
-            let folder_name = format!("My Folder - {}", dto.username);
-            match folder_service
-                .create_folder(CreateFolderDto {
-                    name: folder_name,
-                    parent_id: None,
-                })
-                .await
-            {
-                Ok(folder) => {
-                    tracing::info!(
-                        "Personal folder created for admin-created user {}: {} (ID: {})",
-                        created.id(),
-                        folder.name,
-                        folder.id
-                    );
-                }
-                Err(e) => {
-                    tracing::error!(
-                        "Could not create personal folder for user {}: {}",
-                        created.id(),
-                        e
-                    );
-                }
-            }
-        }
+        self.create_personal_folder(&dto.username, created.id()).await;
 
         tracing::info!("Admin created user: {} ({})", dto.username, created.id());
         Ok(UserDto::from(created))
@@ -1290,10 +1202,7 @@ impl AuthApplicationService {
         if let Some(folder_service) = &self.folder_service {
             let folder_name = format!("My Folder - {}", username);
             match folder_service
-                .create_folder(CreateFolderDto {
-                    name: folder_name.clone(),
-                    parent_id: None,
-                })
+                .create_home_folder(user_id, folder_name.clone())
                 .await
             {
                 Ok(folder) => {

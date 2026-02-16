@@ -543,6 +543,7 @@ function setupEventListeners() {
                 
                 // Update UI
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';
+                elements.pageTitle.setAttribute('data-i18n', 'nav.trash');
                 elements.actionsBar.innerHTML = `
                     <div class="action-buttons">
                         <button class="btn btn-danger" id="empty-trash-btn">
@@ -1189,16 +1190,27 @@ function switchToSharedView() {
         sharedNavItem.classList.add('active');
     }
     
-    // Update UI
+    // Update UI — also set data-i18n so translatePage() doesn't overwrite
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Shared';
+    elements.pageTitle.setAttribute('data-i18n', 'nav.shared');
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
+    
+    // Hide breadcrumb itself
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
     
     // Hide standard actions bar
     if (elements.actionsBar) {
         elements.actionsBar.style.display = 'none';
     }
+    
+    // Hide file containers
+    const filesGrid = document.getElementById('files-grid');
+    const filesListView = document.getElementById('files-list-view');
+    if (filesGrid) filesGrid.style.display = 'none';
+    if (filesListView) filesListView.style.display = 'none';
     
     // Init and show shared view
     if (window.sharedView) {
@@ -1218,8 +1230,13 @@ function switchToFilesView() {
     app.isRecentView = false;
     app.currentSection = 'files';
     
-    // Update UI
+    // Update UI — restore data-i18n to files
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
+    elements.pageTitle.setAttribute('data-i18n', 'nav.files');
+    
+    // Restore breadcrumb visibility
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = '';
     
     // Remove active class from all nav items
     elements.navItems.forEach(navItem => navItem.classList.remove('active'));
@@ -1334,6 +1351,7 @@ function switchToFavoritesView() {
     
     // Update UI
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.favorites') : 'Favorites';
+    elements.pageTitle.setAttribute('data-i18n', 'nav.favorites');
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
@@ -1423,6 +1441,7 @@ function switchToRecentFilesView() {
     
     // Update UI
     elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.recent') : 'Recent';
+    elements.pageTitle.setAttribute('data-i18n', 'nav.recent');
     
     // Clear breadcrumb and show root
     ui.updateBreadcrumb('');
