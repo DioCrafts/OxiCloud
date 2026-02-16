@@ -474,8 +474,7 @@ const ui = {
     /**
      * Get FontAwesome icon class for a filename based on its extension.
      * Used as fallback when the backend DTO doesn't include icon_class
-     * (e.g. trash items). Kept intentionally small — the comprehensive
-     * visual icon map lives in updateFileIcons().
+     * (e.g. trash items).
      */
     getIconClass(fileName) {
         if (!fileName) return 'fas fa-file';
@@ -552,150 +551,6 @@ const ui = {
         }
     },
 
-    /**
-     * Update file icons based on file type
-     */
-    updateFileIcons() {
-        const fileCards = document.querySelectorAll('.file-card');
-
-        fileCards.forEach(card => {
-            const fileName = card.querySelector('.file-name')?.textContent || '';
-            const iconElement = card.querySelector('.file-icon');
-            if (!iconElement) return;
-
-            if (iconElement.classList.contains('folder-icon')) {
-                iconElement.innerHTML = '';
-                return;
-            }
-
-            const extension = fileName.includes('.') ? fileName.split('.').pop().toLowerCase() : '';
-            
-            // Map extensions to icon types
-            const iconMap = {
-                // Documents
-                pdf:   { cls: 'pdf-icon', fa: 'fas fa-file-pdf' },
-                doc:   { cls: 'doc-icon', fa: 'fas fa-file-word' },
-                docx:  { cls: 'doc-icon', fa: 'fas fa-file-word' },
-                txt:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
-                rtf:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
-                odt:   { cls: 'doc-icon', fa: 'fas fa-file-alt' },
-                // Spreadsheets
-                xlsx:  { cls: 'spreadsheet-icon' },
-                xls:   { cls: 'spreadsheet-icon' },
-                csv:   { cls: 'spreadsheet-icon' },
-                ods:   { cls: 'spreadsheet-icon' },
-                // Presentations
-                pptx:  { cls: 'presentation-icon' },
-                ppt:   { cls: 'presentation-icon' },
-                odp:   { cls: 'presentation-icon' },
-                // Images
-                jpg:   { cls: 'image-icon' },
-                jpeg:  { cls: 'image-icon' },
-                png:   { cls: 'image-icon' },
-                gif:   { cls: 'image-icon' },
-                svg:   { cls: 'image-icon' },
-                webp:  { cls: 'image-icon' },
-                bmp:   { cls: 'image-icon' },
-                ico:   { cls: 'image-icon' },
-                // Videos
-                mp4:   { cls: 'video-icon' },
-                avi:   { cls: 'video-icon' },
-                mov:   { cls: 'video-icon' },
-                mkv:   { cls: 'video-icon' },
-                webm:  { cls: 'video-icon' },
-                flv:   { cls: 'video-icon' },
-                // Audio
-                mp3:   { cls: 'audio-icon' },
-                wav:   { cls: 'audio-icon' },
-                ogg:   { cls: 'audio-icon' },
-                flac:  { cls: 'audio-icon' },
-                aac:   { cls: 'audio-icon' },
-                m4a:   { cls: 'audio-icon' },
-                // Archives
-                zip:   { cls: 'archive-icon' },
-                rar:   { cls: 'archive-icon' },
-                '7z':  { cls: 'archive-icon' },
-                tar:   { cls: 'archive-icon' },
-                gz:    { cls: 'archive-icon' },
-                bz2:   { cls: 'archive-icon' },
-                // Installers
-                dmg:   { cls: 'installer-icon' },
-                exe:   { cls: 'installer-icon' },
-                msi:   { cls: 'installer-icon' },
-                deb:   { cls: 'installer-icon' },
-                rpm:   { cls: 'installer-icon' },
-                pkg:   { cls: 'installer-icon' },
-                app:   { cls: 'installer-icon' },
-                // Scripts
-                sh:    { cls: 'script-icon', fa: 'fas fa-terminal' },
-                bash:  { cls: 'script-icon', fa: 'fas fa-terminal' },
-                zsh:   { cls: 'script-icon', fa: 'fas fa-terminal' },
-                bat:   { cls: 'script-icon', fa: 'fas fa-terminal' },
-                ps1:   { cls: 'script-icon', fa: 'fas fa-terminal' },
-                // Code — each with sub-type
-                json:  { cls: 'code-icon', sub: 'json-icon' },
-                js:    { cls: 'code-icon', sub: 'js-icon' },
-                jsx:   { cls: 'code-icon', sub: 'js-icon' },
-                ts:    { cls: 'code-icon', sub: 'ts-icon' },
-                tsx:   { cls: 'code-icon', sub: 'ts-icon' },
-                html:  { cls: 'code-icon', sub: 'html-icon' },
-                htm:   { cls: 'code-icon', sub: 'html-icon' },
-                css:   { cls: 'code-icon', sub: 'css-icon' },
-                scss:  { cls: 'code-icon', sub: 'css-icon' },
-                py:    { cls: 'code-icon', sub: 'py-icon' },
-                rs:    { cls: 'code-icon', sub: 'rust-icon' },
-                go:    { cls: 'code-icon', sub: 'go-icon' },
-                java:  { cls: 'code-icon', sub: 'java-icon' },
-                c:     { cls: 'code-icon', sub: 'c-icon' },
-                cpp:   { cls: 'code-icon', sub: 'c-icon' },
-                cs:    { cls: 'code-icon', sub: 'cs-icon' },
-                php:   { cls: 'code-icon', sub: 'php-icon' },
-                rb:    { cls: 'code-icon', sub: 'ruby-icon' },
-                swift: { cls: 'code-icon', sub: 'swift-icon' },
-                kt:    { cls: 'code-icon', sub: 'kotlin-icon' },
-                sql:   { cls: 'code-icon', sub: 'sql-icon' },
-                yaml:  { cls: 'code-icon', sub: 'yaml-icon' },
-                yml:   { cls: 'code-icon', sub: 'yaml-icon' },
-                toml:  { cls: 'code-icon', sub: 'toml-icon' },
-                xml:   { cls: 'code-icon', sub: 'html-icon' },
-                md:    { cls: 'code-icon', sub: 'md-icon' },
-                // Config
-                ini:   { cls: 'config-icon', fa: 'fas fa-cog' },
-                cfg:   { cls: 'config-icon', fa: 'fas fa-cog' },
-                conf:  { cls: 'config-icon', fa: 'fas fa-cog' },
-                env:   { cls: 'config-icon', fa: 'fas fa-cog' },
-            };
-
-            const mapping = iconMap[extension];
-            if (mapping) {
-                iconElement.className = `file-icon ${mapping.cls}`;
-                if (mapping.cls === 'code-icon') {
-                    // Code icons use pseudo-element lines
-                    iconElement.innerHTML = `
-                        <div class="code-line-1"></div>
-                        <div class="code-line-2"></div>
-                        <div class="code-line-3"></div>
-                    `;
-                    if (mapping.sub) iconElement.classList.add(mapping.sub);
-                } else {
-                    // Types with pure CSS visuals — clear the <i>
-                    const pureCssTypes = ['image-icon','video-icon','spreadsheet-icon','presentation-icon','audio-icon','archive-icon','installer-icon'];
-                    if (pureCssTypes.includes(mapping.cls)) {
-                        iconElement.innerHTML = '';
-                    } else if (mapping.fa) {
-                        // Types that keep the FA icon — update <i> class
-                        let iEl = iconElement.querySelector('i');
-                        if (!iEl) {
-                            iEl = document.createElement('i');
-                            iconElement.innerHTML = '';
-                            iconElement.appendChild(iEl);
-                        }
-                        iEl.className = mapping.fa;
-                    }
-                }
-            }
-        });
-    },
 
 
     /* ================================================================
@@ -739,7 +594,6 @@ const ui = {
             }
             if (self.isViewableFile(file)) {
                 if (window.inlineViewer) window.inlineViewer.openFile(file);
-                else if (window.fileViewer) window.fileViewer.open(file);
                 else window.fileOps.downloadFile(file.id, file.name);
             } else {
                 window.fileOps.downloadFile(file.id, file.name);
@@ -788,6 +642,16 @@ const ui = {
 
             if (e.target.closest('.file-card-checkbox')) {
                 toggleCardSelection(card, e);
+                return;
+            }
+
+            // In favorites/recent view, single-click navigates/opens (like list)
+            if (window.app.isFavoritesView || window.app.isRecentView) {
+                const info = itemInfo(card);
+                if (info) {
+                    if (info.type === 'folder') navigateFolder(card);
+                    else openFile(info.data);
+                }
                 return;
             }
 
@@ -996,6 +860,7 @@ const ui = {
     /** Create a grid card for a file */
     _createFileCard(file) {
         const iconClass = file.icon_class || 'fas fa-file';
+        const iconSpecialClass = file.icon_special_class || '';
         const isFileFav = window.favorites &&
             window.favorites.isFavorite(file.id, 'file');
         const formattedDate = window.formatDateTime(file.modified_at);
@@ -1011,7 +876,7 @@ const ui = {
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
             ${isFileFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
-            <div class="file-icon">
+            <div class="file-icon ${iconSpecialClass}">
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>

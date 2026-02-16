@@ -10,31 +10,26 @@
     <!-- Styles -->
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/inlineViewer.css">
-    <link rel="stylesheet" href="/css/fileViewer.css">
     <link rel="stylesheet" href="/css/favorites.css">
     <link rel="stylesheet" href="/css/recent.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
 
-    <!-- Scripts -->
-    <script src="/js/i18n.js"></script>
-    <script src="/js/languageSelector.js"></script>
-    <script src="/js/notifications.js"></script>
-    <script src="/js/modal.js"></script>
-    <script src="/js/ui.js"></script>
-    <script src="/js/contextMenus.js"></script>
-    <script src="/js/fileOperations.js"></script>
-    <script src="/js/multiSelect.js"></script>
-    <script src="/js/search.js"></script>
-    <script src="/js/favorites.js"></script>
-    <script src="/js/recent.js"></script>
-    <script src="/js/fileRenderer.js"></script>
-    <script src="/js/fileSharing.js"></script>
-    <script src="/js/components/sharedView.js"></script>
-    <!-- Viewers are loaded last to ensure document.body is available -->
-    <script defer src="/js/fileViewer.js"></script>
+    <!-- Scripts (defer: download in parallel, execute in order, after HTML parsed) -->
+    <script defer src="/js/i18n.js"></script>
+    <script defer src="/js/languageSelector.js"></script>
+    <script defer src="/js/notifications.js"></script>
+    <script defer src="/js/modal.js"></script>
+    <script defer src="/js/ui.js"></script>
+    <script defer src="/js/contextMenus.js"></script>
+    <script defer src="/js/fileOperations.js"></script>
+    <script defer src="/js/multiSelect.js"></script>
+    <script defer src="/js/search.js"></script>
+    <script defer src="/js/favorites.js"></script>
+    <script defer src="/js/recent.js"></script>
+    <script defer src="/js/fileSharing.js"></script>
+    <script defer src="/js/components/sharedView.js"></script>
     <script defer src="/js/inlineViewer.js"></script>
-    <script src="/js/app.js"></script>
+    <script defer src="/js/icons.js"></script>
+    <script defer src="/js/app.js"></script>
 
     <!-- Service Worker Registration -->
     <script>

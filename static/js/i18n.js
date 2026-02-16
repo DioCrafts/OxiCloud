@@ -207,17 +207,27 @@ async function initI18n() {
  * Translate all elements with data-i18n attribute
  */
 function translatePage() {
-    document.querySelectorAll('[data-i18n]').forEach(element => {
+    translateElement(document);
+}
+
+/**
+ * Translate only elements within a given root (scoped).
+ * Use this instead of translatePage() when you know which container changed.
+ * @param {Element|Document} root - The root element to search within
+ */
+function translateElement(root) {
+    const el = root || document;
+    el.querySelectorAll('[data-i18n]').forEach(element => {
         const key = element.getAttribute('data-i18n');
         element.textContent = t(key);
     });
     
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+    el.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
         const key = element.getAttribute('data-i18n-placeholder');
         element.placeholder = t(key);
     });
     
-    document.querySelectorAll('[data-i18n-title]').forEach(element => {
+    el.querySelectorAll('[data-i18n-title]').forEach(element => {
         const key = element.getAttribute('data-i18n-title');
         element.title = t(key);
     });
@@ -267,5 +277,6 @@ window.i18n = {
     getCurrentLocale,
     getSupportedLocales,
     translatePage,
+    translateElement,
     isLoaded: () => translationsLoaded
 };

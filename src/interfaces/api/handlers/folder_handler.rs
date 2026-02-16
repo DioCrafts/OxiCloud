@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::application::dtos::folder_dto::{CreateFolderDto, MoveFolderDto, RenameFolderDto};
+use crate::application::dtos::folder_listing_dto::FolderListingDto;
 use crate::application::dtos::pagination::PaginationRequestDto;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::application::services::folder_service::FolderService;
@@ -170,6 +171,43 @@ impl FolderHandler {
         match service.list_folders_for_owner(parent_id, &auth_user.id).await {
             Ok(folders) => (StatusCode::OK, Json(folders)).into_response(),
             Err(err) => {
+                let status = match err.kind {
+                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
+                    _ => StatusCode::INTERNAL_SERVER_ERROR,
+                };
+                (
+                    status,
+                    Json(serde_json::json!({ "error": err.to_string() })),
+                )
+                    .into_response()
+            }
+        }
+    }
+
+    /// Returns both sub-folders and files for a given folder in a single
+    /// response, eliminating the double-fetch the frontend used to make.
+    ///
+    /// Both queries run concurrently via `tokio::join!`.
+    pub async fn list_folder_listing(
+        State(state): State<GlobalAppState>,
+        auth_user: AuthUser,
+        Path(id): Path<String>,
+    ) -> axum::response::Response {
+        let folder_service = &state.applications.folder_service;
+        let file_service = &state.applications.file_retrieval_service;
+
+        // Run both queries concurrently — no sequential wait.
+        let (folders_result, files_result) = tokio::join!(
+            folder_service.list_folders_for_owner(Some(&id), &auth_user.id),
+            file_service.list_files(Some(&id))
+        );
+
+        match (folders_result, files_result) {
+            (Ok(folders), Ok(files)) => {
+                let listing = FolderListingDto { folders, files };
+                (StatusCode::OK, Json(listing)).into_response()
+            }
+            (Err(err), _) | (_, Err(err)) => {
                 let status = match err.kind {
                     ErrorKind::NotFound => StatusCode::NOT_FOUND,
                     _ => StatusCode::INTERNAL_SERVER_ERROR,

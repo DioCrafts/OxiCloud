@@ -15,6 +15,7 @@ use crate::{
         ports::share_ports::ShareUseCase,
     },
     common::errors::ErrorKind,
+    domain::entities::share::ShareItemType,
     interfaces::middleware::auth::OptionalAuthUser,
 };
 
@@ -22,6 +23,8 @@ use crate::{
 pub struct GetSharesQuery {
     pub page: Option<usize>,
     pub per_page: Option<usize>,
+    pub item_id: Option<String>,
+    pub item_type: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,21 +72,49 @@ pub async fn get_shared_link(
     }
 }
 
-/// Get all shared links created by the current user
+/// Get all shared links created by the current user.
+/// Supports optional filtering by item_id + item_type query params.
 pub async fn get_user_shares(
     State(share_use_case): State<Arc<dyn ShareUseCase>>,
     auth_user: OptionalAuthUser,
     Query(query): Query<GetSharesQuery>,
 ) -> impl IntoResponse {
-    let user_id = auth_user
+    let _user_id = auth_user
         .0
         .map(|u| u.id)
         .unwrap_or_else(|| "anonymous".to_string());
+
+    // If both item_id and item_type are provided, return shares for that specific item
+    if let (Some(item_id), Some(item_type_str)) = (&query.item_id, &query.item_type) {
+        let item_type = match ShareItemType::try_from(item_type_str.as_str()) {
+            Ok(t) => t,
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Invalid item_type: {}", item_type_str) })),
+                )
+                    .into_response();
+            }
+        };
+        return match share_use_case
+            .get_shared_links_for_item(item_id, &item_type)
+            .await
+        {
+            Ok(shares) => (StatusCode::OK, Json(shares)).into_response(),
+            Err(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": err.to_string() })),
+            )
+                .into_response(),
+        };
+    }
+
+    // Default: paginated list of all user shares
     let page = query.page.unwrap_or(1);
     let per_page = query.per_page.unwrap_or(20);
 
     match share_use_case
-        .get_user_shared_links(&user_id, page, per_page)
+        .get_user_shared_links(&_user_id, page, per_page)
         .await
     {
         Ok(shares) => (StatusCode::OK, Json(shares)).into_response(),

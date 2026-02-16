@@ -5,6 +5,7 @@ pub mod display_helpers;
 pub mod favorites_dto;
 pub mod file_dto;
 pub mod folder_dto;
+pub mod folder_listing_dto;
 pub mod i18n_dto;
 pub mod pagination;
 pub mod recent_dto;

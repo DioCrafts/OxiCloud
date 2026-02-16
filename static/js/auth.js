@@ -286,10 +286,7 @@ function initLanguageSelector() {
             await configureOidcLoginUI();
         }
         
-        // Translate the page with new locale
-        if (window.i18n && window.i18n.translatePage) {
-            window.i18n.translatePage();
-        }
+        // setLocale() already calls translatePage() internally
     });
 }
 

@@ -173,9 +173,6 @@ const fileOps = {
             // All done
             this._finishUploadToast(successCount, totalFiles);
 
-            // Wait for backend to persist, then reload
-            await new Promise(resolve => setTimeout(resolve, 800));
-
             // Refresh storage usage display
             if (typeof window.refreshUserData === 'function') {
                 try { await window.refreshUserData(); } catch (_) {}
@@ -187,11 +184,9 @@ const fileOps = {
                 console.error('Error reloading files:', reloadError);
             }
 
-            setTimeout(() => {
-                const dropzone = document.getElementById('dropzone');
-                if (dropzone) dropzone.style.display = 'none';
-                if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
-            }, 500);
+            const dropzone = document.getElementById('dropzone');
+            if (dropzone) dropzone.style.display = 'none';
+            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
         } finally {
             this._isUploading = false;
         }
@@ -317,25 +312,21 @@ const fileOps = {
         
         // Finish
         this._finishUploadToast(successCount, totalFiles);
-        
-        await new Promise(resolve => setTimeout(resolve, 800));
 
         // Refresh storage usage display
         if (typeof window.refreshUserData === 'function') {
             try { await window.refreshUserData(); } catch (_) {}
         }
-        
+
         try {
             await window.loadFiles({ forceRefresh: true });
         } catch (reloadError) {
             console.error('Error reloading files:', reloadError);
         }
-        
-        setTimeout(() => {
-            const dropzone = document.getElementById('dropzone');
-            if (dropzone) dropzone.style.display = 'none';
-            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
-        }, 500);
+
+        const dropzone = document.getElementById('dropzone');
+        if (dropzone) dropzone.style.display = 'none';
+        if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
     },
 
     /**
@@ -365,14 +356,9 @@ const fileOps = {
                 const folder = await response.json();
                 console.log('Folder created successfully:', folder);
                 
-                // Add the folder to the view immediately for instant feedback
+                // Optimistic UI: add folder card directly from server response
+                // — no reload needed since the backend already confirmed creation.
                 window.ui.addFolderToView(folder);
-                
-                // Wait to allow the backend to save the changes
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Reload files to refresh the view
-                await window.loadFiles({forceRefresh: true});
                 
                 window.ui.showNotification('Folder created', `"${name}" created successfully`);
             } else {

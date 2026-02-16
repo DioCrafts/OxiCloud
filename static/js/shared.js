@@ -13,13 +13,7 @@ function checkAuthentication() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // ── i18n ──
-    if (window.i18n && window.i18n.init) {
-        await window.i18n.init();
-        setTimeout(() => {
-            if (window.i18n.translatePage) window.i18n.translatePage();
-        }, 500);
-    }
+    // ── i18n ── (translatePage is called automatically by i18n.js on init)
 
     function t(key, fallback) {
         return (window.i18n && window.i18n.t) ? window.i18n.t(key, fallback) : fallback;

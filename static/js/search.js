@@ -191,8 +191,6 @@ const search = {
         results.files.forEach(file => {
             window.ui.addFileToView(file);
         });
-
-        window.ui.updateFileIcons();
     },
 
     /**

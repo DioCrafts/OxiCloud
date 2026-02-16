@@ -284,8 +284,8 @@ const multiSelect = {
                 // Re-wire the select-all checkbox
                 const cb = document.getElementById('select-all-checkbox');
                 if (cb) cb.addEventListener('change', () => this.toggleAll());
-                // Translate restored header
-                if (window.i18n && window.i18n.translatePage) window.i18n.translatePage();
+                // Translate restored header (scoped to list header)
+                if (window.i18n && window.i18n.translateElement) window.i18n.translateElement(listHeader);
             }
 
             // Hide grid bar

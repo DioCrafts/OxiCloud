@@ -94,8 +94,8 @@ const recent = {
 
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
-                <div class="list-header recent-header">
-                    <div></div>
+                <div class="list-header">
+                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                     <div data-i18n="files.name">Name</div>
                     <div data-i18n="files.type">Type</div>
                     <div data-i18n="files.size">Size</div>
@@ -117,129 +117,40 @@ const recent = {
                 return;
             }
 
+            const folders = [];
+            const files = [];
             for (const item of recentItems) {
-                this._renderRecentItem(item, filesGrid, filesListView);
+                const isFolder = item.item_type === 'folder';
+                if (isFolder) {
+                    folders.push({
+                        id: item.item_id,
+                        name: item.item_name || item.item_id,
+                        parent_id: item.parent_id || '',
+                        modified_at: item.accessed_at
+                    });
+                } else {
+                    files.push({
+                        id: item.item_id,
+                        name: item.item_name || item.item_id,
+                        folder_id: item.parent_id || '',
+                        mime_type: item.item_mime_type,
+                        icon_class: item.icon_class,
+                        icon_special_class: item.icon_special_class,
+                        category: item.category,
+                        size: item.item_size || 0,
+                        size_formatted: item.size_formatted,
+                        modified_at: item.accessed_at
+                    });
+                }
             }
-
-            window.ui.updateFileIcons();
+            if (folders.length) window.ui.renderFolders(folders);
+            if (files.length) window.ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying recent files:', error);
             if (window.ui && window.ui.showNotification) {
                 window.ui.showNotification('Error', 'Error loading recent files');
             }
         }
-    },
-
-    // ───────────────────── renderer ─────────────────────
-
-    _renderRecentItem(item, filesGrid, filesListView) {
-        const name = item.item_name || item.item_id || 'Unknown';
-        const itemId = item.item_id;
-        const folderId = item.parent_id || '';
-        const mimeType = item.item_mime_type || 'application/octet-stream';
-        const isFolder = item.item_type === 'folder';
-
-        // Build a minimal file object for click handlers
-        const fileObj = {
-            id: itemId,
-            name,
-            folder_id: folderId,
-            mime_type: mimeType,
-            size: item.item_size || 0
-        };
-
-        // Use pre-computed display fields from the enriched API response
-        const iconClass = item.icon_class || (isFolder ? 'fas fa-folder' : 'fas fa-file');
-        const iconSpecialClass = item.icon_special_class || (isFolder ? 'folder-icon' : '');
-        const typeLabel = item.category
-            ? (window.i18n ? window.i18n.t(`files.file_types.${item.category.toLowerCase()}`) || item.category : item.category)
-            : (isFolder
-                ? (window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder')
-                : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document'));
-
-        const fileSize = isFolder ? '--' : (item.size_formatted || (window.formatFileSize ? window.formatFileSize(item.item_size || 0) : '0 B'));
-        const formattedDate = window.formatDateTime(item.accessed_at);
-
-        // Click handler
-        const onClick = () => {
-            if (isFolder) {
-                window.app.currentPath = itemId;
-                window.ui.updateBreadcrumb(name);
-                window.loadFiles();
-            } else {
-                // Re-record access
-                document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file: fileObj } }));
-                if (window.ui && window.ui.isViewableFile(fileObj) && window.inlineViewer) {
-                    window.inlineViewer.openFile(fileObj);
-                } else if (window.fileOps) {
-                    window.fileOps.downloadFile(itemId, name);
-                }
-            }
-        };
-
-        // Context menu handler
-        const onContextMenu = (e) => {
-            e.preventDefault();
-            if (isFolder) {
-                window.app.contextMenuTargetFolder = { id: itemId, name, parent_id: folderId };
-                const cm = document.getElementById('folder-context-menu');
-                cm.style.left = `${e.pageX}px`;
-                cm.style.top = `${e.pageY}px`;
-                cm.style.display = 'block';
-            } else {
-                window.app.contextMenuTargetFile = { id: itemId, name, folder_id: folderId };
-                const cm = document.getElementById('file-context-menu');
-                cm.style.left = `${e.pageX}px`;
-                cm.style.top = `${e.pageY}px`;
-                cm.style.display = 'block';
-            }
-        };
-
-        // --- grid element ---
-        const gridEl = document.createElement('div');
-        gridEl.className = `file-card recent-item`;
-        if (isFolder) {
-            gridEl.dataset.folderId = itemId;
-            gridEl.dataset.folderName = name;
-        } else {
-            gridEl.dataset.fileId = itemId;
-            gridEl.dataset.fileName = name;
-            gridEl.dataset.folderId = folderId;
-        }
-        gridEl.innerHTML = `
-            <div class="recent-indicator"><i class="fas fa-clock"></i></div>
-            <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
-            <div class="file-name">${escapeHtml(name)}</div>
-            <div class="file-info">Accessed ${formattedDate.split(' ')[0]}</div>
-        `;
-        gridEl.addEventListener('click', onClick);
-        gridEl.addEventListener('contextmenu', onContextMenu);
-        filesGrid.appendChild(gridEl);
-
-        // --- list element ---
-        const listEl = document.createElement('div');
-        listEl.className = `file-item recent-item`;
-        if (isFolder) {
-            listEl.dataset.folderId = itemId;
-            listEl.dataset.folderName = name;
-        } else {
-            listEl.dataset.fileId = itemId;
-            listEl.dataset.fileName = name;
-            listEl.dataset.folderId = folderId;
-        }
-        listEl.innerHTML = `
-            <div class="recent-indicator"><i class="fas fa-clock"></i></div>
-            <div class="name-cell">
-                <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
-                <span>${escapeHtml(name)}</span>
-            </div>
-            <div class="type-cell">${escapeHtml(typeLabel)}</div>
-            <div class="size-cell">${fileSize}</div>
-            <div class="date-cell">${formattedDate}</div>
-        `;
-        listEl.addEventListener('click', onClick);
-        listEl.addEventListener('contextmenu', onContextMenu);
-        filesListView.appendChild(listEl);
     }
 };
 

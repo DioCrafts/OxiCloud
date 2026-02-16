@@ -1,8 +1,9 @@
 // OxiCloud Service Worker
-const CACHE_NAME = 'oxicloud-cache-v13';
+const CACHE_NAME = 'oxicloud-cache-v14';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/js/icons.js',
   '/js/i18n.js',
   '/js/languageSelector.js',
   '/js/notifications.js',
@@ -10,9 +11,7 @@ const ASSETS_TO_CACHE = [
   '/locales/es.json',
   '/locales/fa.json',
   '/locales/de.json',
-  '/favicon.ico',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css',
-  'https://cdn.jsdelivr.net/npm/alpinejs@3.12.3/dist/cdn.min.js'
+  '/favicon.ico'
 ];
 
 // Install event - cache assets

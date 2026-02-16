@@ -180,8 +180,8 @@ const sharedView = {
         if (filesGrid) filesGrid.style.display = 'none';
         if (filesListView) filesListView.style.display = 'none';
 
-        if (window.i18n && window.i18n.translatePage) {
-            window.i18n.translatePage();
+        if (window.i18n && window.i18n.translateElement) {
+            window.i18n.translateElement(container);
         }
     },
 

@@ -144,6 +144,13 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
         .route("/{id}/download", get(FolderHandler::download_folder_zip))
         .with_state(app_state.clone());
 
+    // Combined listing endpoint: returns both sub-folders AND files in one
+    // response.  Needs full AppState because it calls both FolderService
+    // and FileRetrievalService concurrently.
+    let folder_listing_router = Router::new()
+        .route("/{id}/listing", get(FolderHandler::list_folder_listing))
+        .with_state(app_state.clone());
+
     // Create folder operations that use trash (requires full AppState)
     let folders_ops_router =
         Router::new().route("/{id}", delete(FolderHandler::delete_folder_with_trash));
@@ -151,7 +158,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     // Merge the routers
     let folders_router = folders_basic_router
         .merge(folders_ops_router)
-        .merge(folder_zip_router);
+        .merge(folder_zip_router)
+        .merge(folder_listing_router);
 
     // Create file routes for basic operations and trash-enabled delete
     let basic_file_router = Router::new()

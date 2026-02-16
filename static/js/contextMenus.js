@@ -92,8 +92,6 @@ const contextMenus = {
                             // Open with inline viewer
                             if (window.inlineViewer) {
                                 window.inlineViewer.openFile(fileDetails);
-                            } else if (window.fileViewer) {
-                                window.fileViewer.open(fileDetails);
                             } else {
                                 // If no viewer is available, download directly
                                 window.fileOps.downloadFile(file.id, file.name);
@@ -468,9 +466,9 @@ const contextMenus = {
                     window.app.selectedTargetFolderId = "";
                 });
 
-                // Translate new elements
-                if (window.i18n && window.i18n.translatePage) {
-                    window.i18n.translatePage();
+                // Translate new elements (scoped to container)
+                if (window.i18n && window.i18n.translateElement) {
+                    window.i18n.translateElement(folderSelectContainer);
                 }
             }
         } catch (error) {

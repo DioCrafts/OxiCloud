@@ -185,8 +185,8 @@ const favorites = {
 
             filesGrid.innerHTML = '';
             filesListView.innerHTML = `
-                <div class="list-header favorites-header">
-                    <div></div>
+                <div class="list-header">
+                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                     <div data-i18n="files.name">Name</div>
                     <div data-i18n="files.type">Type</div>
                     <div data-i18n="files.size">Size</div>
@@ -208,177 +208,39 @@ const favorites = {
                 return;
             }
 
+            const folders = [];
+            const files = [];
             for (const item of this._cache.values()) {
                 if (item.item_type === 'folder') {
-                    this._renderFolder(item, filesGrid, filesListView);
+                    folders.push({
+                        id: item.item_id,
+                        name: item.item_name || item.item_id,
+                        parent_id: item.parent_id || '',
+                        modified_at: item.modified_at || item.created_at
+                    });
                 } else {
-                    this._renderFile(item, filesGrid, filesListView);
+                    files.push({
+                        id: item.item_id,
+                        name: item.item_name || item.item_id,
+                        folder_id: item.parent_id || '',
+                        mime_type: item.item_mime_type,
+                        icon_class: item.icon_class,
+                        icon_special_class: item.icon_special_class,
+                        category: item.category,
+                        size: item.item_size || 0,
+                        size_formatted: item.size_formatted,
+                        modified_at: item.modified_at || item.created_at
+                    });
                 }
             }
-
-            window.ui.updateFileIcons();
+            if (folders.length) window.ui.renderFolders(folders);
+            if (files.length) window.ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying favorites:', error);
             if (window.ui && window.ui.showNotification) {
                 window.ui.showNotification('Error', 'Error loading favorite items');
             }
         }
-    },
-
-    // ───────────────────── renderers ─────────────────────
-
-    _renderFolder(item, filesGrid, filesListView) {
-        const name = item.item_name || item.item_id || 'Unknown';
-        const folderId = item.item_id;
-        const parentId = item.parent_id || '';
-
-        const formattedDate = window.formatDateTime(item.modified_at || item.created_at);
-
-        // --- grid element ---
-        const gridEl = document.createElement('div');
-        gridEl.className = 'file-card favorite-item';
-        gridEl.dataset.folderId = folderId;
-        gridEl.dataset.folderName = name;
-        gridEl.dataset.parentId = parentId;
-        gridEl.innerHTML = `
-            <div class="favorite-indicator active"><i class="fas fa-star"></i></div>
-            <div class="file-icon folder-icon"><i class="fas fa-folder"></i></div>
-            <div class="file-name">${escapeHtml(name)}</div>
-            <div class="file-info">Folder</div>
-        `;
-        gridEl.addEventListener('click', () => {
-            window.app.currentPath = folderId;
-            window.ui.updateBreadcrumb(name);
-            window.loadFiles();
-        });
-        gridEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            window.app.contextMenuTargetFolder = { id: folderId, name, parent_id: parentId };
-            const cm = document.getElementById('folder-context-menu');
-            cm.style.left = `${e.pageX}px`;
-            cm.style.top = `${e.pageY}px`;
-            cm.style.display = 'block';
-        });
-        filesGrid.appendChild(gridEl);
-
-        // --- list element ---
-        const listEl = document.createElement('div');
-        listEl.className = 'file-item favorite-item';
-        listEl.dataset.folderId = folderId;
-        listEl.dataset.folderName = name;
-        listEl.dataset.parentId = parentId;
-        listEl.innerHTML = `
-            <div class="favorite-indicator active"><i class="fas fa-star"></i></div>
-            <div class="name-cell">
-                <div class="file-icon folder-icon"><i class="fas fa-folder"></i></div>
-                <span>${escapeHtml(name)}</span>
-            </div>
-            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
-            <div class="size-cell">--</div>
-            <div class="date-cell">${formattedDate}</div>
-        `;
-        listEl.addEventListener('click', () => {
-            window.app.currentPath = folderId;
-            window.ui.updateBreadcrumb(name);
-            window.loadFiles();
-        });
-        listEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            window.app.contextMenuTargetFolder = { id: folderId, name, parent_id: parentId };
-            const cm = document.getElementById('folder-context-menu');
-            cm.style.left = `${e.pageX}px`;
-            cm.style.top = `${e.pageY}px`;
-            cm.style.display = 'block';
-        });
-        filesListView.appendChild(listEl);
-    },
-
-    _renderFile(item, filesGrid, filesListView) {
-        const name = item.item_name || item.item_id || 'Unknown';
-        const fileId = item.item_id;
-        const folderId = item.parent_id || '';
-        const mimeType = item.item_mime_type || 'application/octet-stream';
-
-        // Build a minimal file object for click handlers
-        const fileObj = {
-            id: fileId,
-            name,
-            folder_id: folderId,
-            mime_type: mimeType,
-            size: item.item_size || 0
-        };
-
-        // Use pre-computed display fields from the enriched API response
-        const iconClass = item.icon_class || 'fas fa-file';
-        const iconSpecialClass = item.icon_special_class || '';
-        const typeLabel = item.category
-            ? (window.i18n ? window.i18n.t(`files.file_types.${item.category.toLowerCase()}`) || item.category : item.category)
-            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
-
-        const fileSize = item.size_formatted || (window.formatFileSize ? window.formatFileSize(item.item_size || 0) : '0 B');
-        const formattedDate = window.formatDateTime(item.modified_at || item.created_at);
-
-        // --- grid element ---
-        const gridEl = document.createElement('div');
-        gridEl.className = 'file-card favorite-item';
-        gridEl.dataset.fileId = fileId;
-        gridEl.dataset.fileName = name;
-        gridEl.dataset.folderId = folderId;
-        gridEl.innerHTML = `
-            <div class="favorite-indicator active"><i class="fas fa-star"></i></div>
-            <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
-            <div class="file-name">${escapeHtml(name)}</div>
-            <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
-        `;
-        gridEl.addEventListener('click', () => {
-            if (window.ui && window.ui.isViewableFile(fileObj) && window.inlineViewer) {
-                window.inlineViewer.openFile(fileObj);
-            } else if (window.fileOps) {
-                window.fileOps.downloadFile(fileId, name);
-            }
-        });
-        gridEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            window.app.contextMenuTargetFile = { id: fileId, name, folder_id: folderId };
-            const cm = document.getElementById('file-context-menu');
-            cm.style.left = `${e.pageX}px`;
-            cm.style.top = `${e.pageY}px`;
-            cm.style.display = 'block';
-        });
-        filesGrid.appendChild(gridEl);
-
-        // --- list element ---
-        const listEl = document.createElement('div');
-        listEl.className = 'file-item favorite-item';
-        listEl.dataset.fileId = fileId;
-        listEl.dataset.fileName = name;
-        listEl.dataset.folderId = folderId;
-        listEl.innerHTML = `
-            <div class="favorite-indicator active"><i class="fas fa-star"></i></div>
-            <div class="name-cell">
-                <div class="file-icon ${iconSpecialClass}"><i class="${iconClass}"></i></div>
-                <span>${escapeHtml(name)}</span>
-            </div>
-            <div class="type-cell">${escapeHtml(typeLabel)}</div>
-            <div class="size-cell">${fileSize}</div>
-            <div class="date-cell">${formattedDate}</div>
-        `;
-        listEl.addEventListener('click', () => {
-            if (window.ui && window.ui.isViewableFile(fileObj) && window.inlineViewer) {
-                window.inlineViewer.openFile(fileObj);
-            } else if (window.fileOps) {
-                window.fileOps.downloadFile(fileId, name);
-            }
-        });
-        listEl.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            window.app.contextMenuTargetFile = { id: fileId, name, folder_id: folderId };
-            const cm = document.getElementById('file-context-menu');
-            cm.style.left = `${e.pageX}px`;
-            cm.style.top = `${e.pageY}px`;
-            cm.style.display = 'block';
-        });
-        filesListView.appendChild(listEl);
     }
 };
 

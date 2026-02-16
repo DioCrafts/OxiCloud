@@ -66,15 +66,20 @@ const fileSharing = {
     },
 
     /**
-     * Get shared links for a specific item
+     * Get shared links for a specific item (server-side filtered)
      * @param {string} itemId
      * @param {string} itemType - 'file' or 'folder'
-     * @returns {Promise<Array>} Filtered shares
+     * @returns {Promise<Array>} Shares for this item
      */
     async getSharedLinksForItem(itemId, itemType) {
         try {
-            const all = await this.getSharedLinks();
-            return all.filter(s => s.item_id === itemId && s.item_type === itemType);
+            const params = new URLSearchParams({ item_id: itemId, item_type: itemType });
+            const res = await fetch(`/api/shares?${params}`, {
+                headers: this._headers(false)
+            });
+            if (!res.ok) return [];
+            const data = await res.json();
+            return Array.isArray(data) ? data : (data.items || []);
         } catch (error) {
             console.error('Error getting shared links for item:', error);
             return [];

@@ -68,25 +68,10 @@ function initApp() {
     // Setup event listeners
     setupEventListeners();
     
-    // Initialize file renderer if available
-    if (window.fileRenderer) {
-        console.log('Using optimized file renderer');
-    } else {
-        console.log('Using standard file rendering');
-    }
-    
-    // Check if inline viewer is initialized
-    if (window.inlineViewer) {
-        console.log('Inline viewer is available');
-    } else {
-        console.warn('Inline viewer not initialized yet, will initialize it now');
+    // Ensure inline viewer is initialized
+    if (!window.inlineViewer && typeof InlineViewer !== 'undefined') {
         try {
-            // Create inline viewer if not already created and if the class exists
-            if (typeof InlineViewer !== 'undefined') {
-                window.inlineViewer = new InlineViewer();
-            } else {
-                console.warn('InlineViewer class is not defined, skipping initialization');
-            }
+            window.inlineViewer = new InlineViewer();
         } catch (e) {
             console.error('Error initializing inline viewer:', e);
         }
@@ -719,7 +704,7 @@ async function loadFiles(options = {}) {
             await resolveHomeFolder();
         }
         
-        // Add timestamp to avoid cache
+        // Build the listing URL — single endpoint returns folders + files together
         const timestamp = new Date().getTime();
         let url;
         
@@ -727,7 +712,7 @@ async function loadFiles(options = {}) {
         if (!app.currentPath || app.currentPath === '') {
             // If at root, force user to their home folder
             if (app.userHomeFolderId) {
-                url = `/api/folders/${app.userHomeFolderId}/contents?t=${timestamp}`;
+                url = `/api/folders/${app.userHomeFolderId}/listing?t=${timestamp}`;
                 app.currentPath = app.userHomeFolderId;
                 ui.updateBreadcrumb(app.userHomeFolderName || 'Home');
                 console.log(`Loading user folder: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
@@ -738,7 +723,7 @@ async function loadFiles(options = {}) {
             }
         } else {
             // Normal case - viewing subfolder contents
-            url = `/api/folders/${app.currentPath}/contents?t=${timestamp}`;
+            url = `/api/folders/${app.currentPath}/listing?t=${timestamp}`;
             console.log(`Loading subfolder content: ${app.currentPath}`);
         }
         
@@ -762,13 +747,12 @@ async function loadFiles(options = {}) {
             console.log('Forcing complete refresh ignoring cache');
         }
         
-        console.log(`Loading files from ${url}`);
+        console.log(`Loading listing from ${url}`);
         const response = await fetch(url, requestOptions);
         
         // Critical error handling
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");
-            // Just show empty state instead of causing redirect loops
             elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
             elements.filesListView.innerHTML = `
                 <div class="list-header">
@@ -785,19 +769,22 @@ async function loadFiles(options = {}) {
         if (!response.ok) {
             throw new Error(`Server responded with status: ${response.status}`);
         }
-        const folders = await response.json();
         
-        // Clear existing files in both views
+        // Single response contains both folders and files
+        const listing = await response.json();
+        
+        // Clear existing content in both views
         if (window.multiSelect) window.multiSelect.clear();
         ui._items.clear();
         elements.filesGrid.innerHTML = '';
+        const _t = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
         elements.filesListView.innerHTML = `
             <div class="list-header">
                 <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                <div data-i18n="files.name">Name</div>
-                <div data-i18n="files.type">Type</div>
-                <div data-i18n="files.size">Size</div>
-                <div data-i18n="files.modified">Modified</div>
+                <div data-i18n="files.name">${_t('files.name')}</div>
+                <div data-i18n="files.type">${_t('files.type')}</div>
+                <div data-i18n="files.size">${_t('files.size')}</div>
+                <div data-i18n="files.modified">${_t('files.modified')}</div>
             </div>
         `;
 
@@ -807,57 +794,14 @@ async function loadFiles(options = {}) {
             selectAllCb.addEventListener('change', () => window.multiSelect.toggleAll());
         }
         
-        // Translate the header if i18n is available
-        if (window.i18n && window.i18n.translatePage) {
-            window.i18n.translatePage();
-        }
+        // Render folders and files from the combined listing
+        const folderList = Array.isArray(listing.folders) ? listing.folders : [];
+        const fileList = Array.isArray(listing.files) ? listing.files : [];
         
-        // Add folders (check if it's an array)
-        const folderList = Array.isArray(folders) ? folders : [];
-        
-        // Backend already scopes folders to the authenticated user,
-        // so no client-side filtering is needed.
         ui.renderFolders(folderList);
+        ui.renderFiles(fileList);
         
-        // Also load files in this folder
-        const cacheTimestamp = new Date().getTime();
-        let filesUrl = `/api/files?t=${cacheTimestamp}`; // Add timestamp to avoid cache issues
-        if (app.currentPath) {
-            filesUrl += `&folder_id=${app.currentPath}`;
-        }
-        console.log(`Loading files from: ${filesUrl}`);
-        
-        try {
-            console.log(`Fetching files from: ${filesUrl}`);
-            const filesResponse = await fetch(filesUrl, requestOptions); // Use same auth token
-            console.log(`Files response status: ${filesResponse.status}`);
-            
-            // Handle auth errors for files too
-            if (filesResponse.status === 401 || filesResponse.status === 403) {
-                console.warn("Auth error when loading files");
-                return; // Already showing folders, just stop here
-            }
-            
-            if (filesResponse.ok) {
-                const files = await filesResponse.json();
-                console.log(`Files received:`, files);
-                
-                // Add files (check if it's an array)
-                const fileList = Array.isArray(files) ? files : [];
-                console.log(`Processing ${fileList.length} files`);
-                
-                ui.renderFiles(fileList);
-            } else {
-                const errorText = await filesResponse.text();
-                console.error(`Error loading files: ${filesResponse.status} - ${errorText}`);
-            }
-        } catch (error) {
-            console.error('Error loading files:', error);
-            // File API may not be implemented yet, so we silently ignore this error
-        }
-        
-        // Update file icons based on file type
-        ui.updateFileIcons();
+        console.log(`Loaded ${folderList.length} folders and ${fileList.length} files`);
     } catch (error) {
         console.error('Error loading folders:', error);
         ui.showNotification('Error', 'Could not load files and folders');
@@ -890,20 +834,16 @@ async function loadTrashItems() {
         // Clear existing content
         if (window.multiSelect) window.multiSelect.clear();
         elements.filesGrid.innerHTML = '';
+        const _tt = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
         elements.filesListView.innerHTML = `
             <div class="list-header trash-header">
-                <div data-i18n="files.name">Name</div>
-                <div data-i18n="files.type">Type</div>
-                <div data-i18n="trash.original_location">Original location</div>
-                <div data-i18n="trash.deleted_date">Deletion date</div>
-                <div data-i18n="trash.actions">Actions</div>
+                <div data-i18n="files.name">${_tt('files.name')}</div>
+                <div data-i18n="files.type">${_tt('files.type')}</div>
+                <div data-i18n="trash.original_location">${_tt('trash.original_location')}</div>
+                <div data-i18n="trash.deleted_date">${_tt('trash.deleted_date')}</div>
+                <div data-i18n="trash.actions">${_tt('trash.actions')}</div>
             </div>
         `;
-        
-        // Translate the header if i18n is available
-        if (window.i18n && window.i18n.translatePage) {
-            window.i18n.translatePage();
-        }
         
         // Update breadcrumb - just show Home
         ui.updateBreadcrumb('');
@@ -1150,7 +1090,7 @@ window.formatDateShort = function formatDateShort(value) {
 
 /**
  * Centralised "is this MIME type text-viewable?" check.
- * Used by fileViewer, inlineViewer, and ui.isViewableFile.
+ * Used by inlineViewer and ui.isViewableFile.
  */
 window.isTextViewable = function isTextViewable(mimeType) {
     if (!mimeType) return false;
