@@ -38,6 +38,7 @@ services:
       - "DATABASE_URL=postgres://postgres:postgres@postgres/oxicloud"
     volumes:
       - storage_data:/app/storage
+      - ./static:/app/static
 
 networks:
   oxicloud:
