@@ -13,7 +13,7 @@ tokio-stream = { version = "0.1.18", features = ["fs"] }
 bytes = "1.11.1"
 tempfile = "3.25.0"
 tower = "0.5.3"
-tower-http = { version = "0.6.8", features = ["fs", "compression-gzip", "trace", "cors", "add-extension", "request-id", "set-header"] }
+tower-http = { version = "0.6.8", features = ["fs", "compression-gzip", "compression-br", "trace", "cors", "add-extension", "request-id", "set-header"] }
 flate2 = "1.1.9"
 zip = "=6.0.0"
 tracing = "0.1.44"
@@ -75,4 +75,3 @@ debug = true
 lto = "fat"
 codegen-units = 1
 opt-level = 3
-

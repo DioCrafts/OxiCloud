@@ -358,7 +358,8 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     let admin_router = admin_handler::admin_routes().with_state(app_state.clone());
     router = router.nest("/admin", admin_router);
 
+    // Compression for API responses (JSON) — excludes file downloads
     router
-        .layer(CompressionLayer::new())
+        .layer(CompressionLayer::new().br(true).gzip(true))
         .layer(TraceLayer::new_for_http())
 }
