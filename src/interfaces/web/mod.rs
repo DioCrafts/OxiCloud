@@ -13,7 +13,7 @@ pub fn create_web_routes() -> Router<AppState> {
     let static_path = config.static_path.clone();
 
     // Static assets (JS, CSS, JSON, SVG, ICO) served via ServeDir
-    // with gzip compression and aggressive caching (7 days).
+    // with brotli + gzip compression and aggressive caching (7 days).
     // HTML pages are served via explicit routes (include_str!) and
     // do NOT pass through these layers.
     let static_service = ServeDir::new(static_path);
@@ -26,7 +26,7 @@ pub fn create_web_routes() -> Router<AppState> {
         .route("/shared", get(serve_shared_page))
         // Serve static files with compression + cache headers
         .fallback_service(static_service)
-        .layer(CompressionLayer::new())
+        .layer(CompressionLayer::new().br(true).gzip(true))
         .layer(SetResponseHeaderLayer::if_not_present(
             CACHE_CONTROL,
             HeaderValue::from_static("public, max-age=604800, stale-while-revalidate=86400"),
