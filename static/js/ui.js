@@ -442,7 +442,10 @@ const ui = {
         const gridViewBtn = document.getElementById('grid-view-btn');
         const listViewBtn = document.getElementById('list-view-btn');
 
+        this._disableListVirtualization();
+
         this._hydrateViewIfNeeded('grid');
+        this._scheduleGridRebuild();
 
         filesGrid.style.display = 'grid';
         filesListView.style.display = 'none';
@@ -462,6 +465,9 @@ const ui = {
         const listViewBtn = document.getElementById('list-view-btn');
 
         this._hydrateViewIfNeeded('list');
+        this._scheduleListRebuild();
+
+        this._disableGridVirtualization();
 
         filesGrid.style.display = 'none';
         filesListView.style.display = 'flex';
@@ -722,12 +728,462 @@ const ui = {
     /** @type {boolean} */
     _delegationReady: false,
 
+    /** @type {number} max items per animation frame */
+    _renderBatchSize: 120,
+
+    /** @type {Map<string, number>} active render token per channel */
+    _activeRenderTokens: new Map(),
+
+    /** @type {number} enable virtualization above this item count */
+    _virtualListThreshold: 350,
+
+    /** @type {number} estimated list row height (px) */
+    _virtualListItemHeight: 61,
+
+    /** @type {number} extra rows above/below viewport */
+    _virtualListOverscan: 10,
+
+    /** @type {Object|null} */
+    _virtualListState: null,
+
+    _listRebuildTimer: null,
+
+    _onVirtualListScroll: null,
+
+    _onVirtualListResize: null,
+
+    /** @type {number} enable grid virtualization above this item count */
+    _virtualGridThreshold: 450,
+
+    /** @type {number} min card width used by CSS grid */
+    _virtualGridMinCardWidth: 200,
+
+    /** @type {number} extra rows above/below viewport */
+    _virtualGridOverscanRows: 2,
+
+    /** @type {Object|null} */
+    _virtualGridState: null,
+
+    _gridRebuildTimer: null,
+
+    _onVirtualGridScroll: null,
+
+    _onVirtualGridResize: null,
+
     _getActiveView() {
         if (window.app && window.app.currentView === 'list') return 'list';
         if (window.app && window.app.currentView === 'grid') return 'grid';
 
         const stored = localStorage.getItem('oxicloud-view');
         return stored === 'list' ? 'list' : 'grid';
+    },
+
+    _getListScrollHost() {
+        return document.querySelector('.content-area');
+    },
+
+    _getCombinedListItems() {
+        const items = [];
+        for (const folder of this._lastFolders) {
+            items.push({ kind: 'folder', data: folder });
+        }
+        for (const file of this._lastFiles) {
+            items.push({ kind: 'file', data: file });
+        }
+        return items;
+    },
+
+    _clearListContentKeepingHeader(listEl) {
+        if (!listEl) return null;
+        const header = listEl.querySelector('.list-header');
+        listEl.innerHTML = '';
+        if (header) listEl.appendChild(header);
+        return header;
+    },
+
+    _scheduleListRebuild() {
+        if (this._getActiveView() !== 'list') return;
+        if (this._listRebuildTimer) {
+            clearTimeout(this._listRebuildTimer);
+        }
+        this._listRebuildTimer = setTimeout(() => {
+            this._listRebuildTimer = null;
+            this._renderListFromCache();
+        }, 0);
+    },
+
+    _disableListVirtualization() {
+        const state = this._virtualListState;
+        if (!state) return;
+
+        if (state.host && this._onVirtualListScroll) {
+            state.host.removeEventListener('scroll', this._onVirtualListScroll);
+        }
+        if (this._onVirtualListResize) {
+            window.removeEventListener('resize', this._onVirtualListResize);
+        }
+
+        this._virtualListState = null;
+        this._onVirtualListScroll = null;
+        this._onVirtualListResize = null;
+    },
+
+    _renderListFromCache() {
+        const listEl = document.getElementById('files-list-view');
+        if (!listEl) return;
+
+        const combined = this._getCombinedListItems();
+        if (combined.length === 0) {
+            this._disableListVirtualization();
+            this._clearListContentKeepingHeader(listEl);
+            return;
+        }
+
+        if (combined.length <= this._virtualListThreshold) {
+            this._disableListVirtualization();
+            this._clearListContentKeepingHeader(listEl);
+
+            const frag = document.createDocumentFragment();
+            for (const item of combined) {
+                frag.appendChild(item.kind === 'folder'
+                    ? this._createFolderItem(item.data)
+                    : this._createFileItem(item.data));
+            }
+            listEl.appendChild(frag);
+            return;
+        }
+
+        this._enableListVirtualization(listEl, combined);
+    },
+
+    _enableListVirtualization(listEl, combinedItems) {
+        const host = this._getListScrollHost();
+        if (!host) {
+            this._disableListVirtualization();
+            this._clearListContentKeepingHeader(listEl);
+            const frag = document.createDocumentFragment();
+            for (const item of combinedItems) {
+                frag.appendChild(item.kind === 'folder'
+                    ? this._createFolderItem(item.data)
+                    : this._createFileItem(item.data));
+            }
+            listEl.appendChild(frag);
+            return;
+        }
+
+        this._disableListVirtualization();
+
+        const header = this._clearListContentKeepingHeader(listEl);
+        const headerHeight = header ? header.getBoundingClientRect().height : 0;
+        const topSpacer = document.createElement('div');
+        topSpacer.className = 'virtual-list-spacer virtual-list-spacer-top';
+        const bottomSpacer = document.createElement('div');
+        bottomSpacer.className = 'virtual-list-spacer virtual-list-spacer-bottom';
+
+        listEl.appendChild(topSpacer);
+        listEl.appendChild(bottomSpacer);
+
+        this._virtualListState = {
+            listEl,
+            host,
+            items: combinedItems,
+            headerHeight,
+            topSpacer,
+            bottomSpacer,
+            start: -1,
+            end: -1,
+            rafId: 0,
+        };
+
+        const scheduleRender = () => {
+            const state = this._virtualListState;
+            if (!state) return;
+            if (state.rafId) return;
+            state.rafId = requestAnimationFrame(() => {
+                if (!this._virtualListState) return;
+                this._virtualListState.rafId = 0;
+                this._renderVirtualListWindow();
+            });
+        };
+
+        this._onVirtualListScroll = scheduleRender;
+        this._onVirtualListResize = scheduleRender;
+        host.addEventListener('scroll', this._onVirtualListScroll, { passive: true });
+        window.addEventListener('resize', this._onVirtualListResize);
+
+        this._renderVirtualListWindow(true);
+    },
+
+    _renderVirtualListWindow(force = false) {
+        const state = this._virtualListState;
+        if (!state) return;
+
+        const hostRect = state.host.getBoundingClientRect();
+        const listRect = state.listEl.getBoundingClientRect();
+        const listTopInHost = (listRect.top - hostRect.top) + state.host.scrollTop;
+
+        const visibleStartPx = Math.max(0, state.host.scrollTop - (listTopInHost + state.headerHeight));
+        const visibleEndPx = Math.max(0, state.host.scrollTop + state.host.clientHeight - (listTopInHost + state.headerHeight));
+
+        const itemHeight = this._virtualListItemHeight;
+        const total = state.items.length;
+
+        let start = Math.floor(visibleStartPx / itemHeight) - this._virtualListOverscan;
+        let end = Math.ceil(visibleEndPx / itemHeight) + this._virtualListOverscan;
+
+        start = Math.max(0, start);
+        end = Math.min(total, end);
+
+        if (!force && start === state.start && end === state.end) {
+            return;
+        }
+
+        state.start = start;
+        state.end = end;
+
+        state.listEl.querySelectorAll('.file-item').forEach(el => el.remove());
+
+        const frag = document.createDocumentFragment();
+        for (let i = start; i < end; i++) {
+            const item = state.items[i];
+            frag.appendChild(item.kind === 'folder'
+                ? this._createFolderItem(item.data)
+                : this._createFileItem(item.data));
+        }
+
+        state.topSpacer.style.height = `${start * itemHeight}px`;
+        state.bottomSpacer.style.height = `${Math.max(0, (total - end) * itemHeight)}px`;
+
+        state.bottomSpacer.before(frag);
+    },
+
+    _scheduleGridRebuild() {
+        if (this._getActiveView() !== 'grid') return;
+        if (this._gridRebuildTimer) {
+            clearTimeout(this._gridRebuildTimer);
+        }
+        this._gridRebuildTimer = setTimeout(() => {
+            this._gridRebuildTimer = null;
+            this._renderGridFromCache();
+        }, 0);
+    },
+
+    _disableGridVirtualization() {
+        const state = this._virtualGridState;
+        if (!state) return;
+
+        if (state.host && this._onVirtualGridScroll) {
+            state.host.removeEventListener('scroll', this._onVirtualGridScroll);
+        }
+        if (this._onVirtualGridResize) {
+            window.removeEventListener('resize', this._onVirtualGridResize);
+        }
+
+        this._virtualGridState = null;
+        this._onVirtualGridScroll = null;
+        this._onVirtualGridResize = null;
+    },
+
+    _getCombinedGridItems() {
+        const items = [];
+        for (const folder of this._lastFolders) {
+            items.push({ kind: 'folder', data: folder });
+        }
+        for (const file of this._lastFiles) {
+            items.push({ kind: 'file', data: file });
+        }
+        return items;
+    },
+
+    _createGridCard(item) {
+        return item.kind === 'folder'
+            ? this._createFolderCard(item.data)
+            : this._createFileCard(item.data);
+    },
+
+    _computeGridColumns(gridEl) {
+        const style = window.getComputedStyle(gridEl);
+        const gap = parseFloat(style.columnGap || style.gap || '20') || 20;
+        const width = gridEl.clientWidth || 1;
+        const cols = Math.max(1, Math.floor((width + gap) / (this._virtualGridMinCardWidth + gap)));
+        return { cols, gap };
+    },
+
+    _measureGridRowHeight(gridEl, sampleItem) {
+        if (!sampleItem) return 180;
+
+        const sample = this._createGridCard(sampleItem);
+        sample.style.visibility = 'hidden';
+        sample.style.pointerEvents = 'none';
+        gridEl.appendChild(sample);
+        const h = Math.ceil(sample.getBoundingClientRect().height) || 180;
+        sample.remove();
+        return h;
+    },
+
+    _renderGridFromCache() {
+        const gridEl = document.getElementById('files-grid');
+        if (!gridEl) return;
+
+        const combined = this._getCombinedGridItems();
+        if (combined.length === 0) {
+            this._disableGridVirtualization();
+            gridEl.innerHTML = '';
+            return;
+        }
+
+        if (combined.length <= this._virtualGridThreshold) {
+            this._disableGridVirtualization();
+            gridEl.innerHTML = '';
+
+            const folders = combined.filter(x => x.kind === 'folder').map(x => x.data);
+            const files = combined.filter(x => x.kind === 'file').map(x => x.data);
+            this._renderFoldersToView(folders, 'grid');
+            this._renderFilesToView(files, 'grid');
+            return;
+        }
+
+        this._enableGridVirtualization(gridEl, combined);
+    },
+
+    _enableGridVirtualization(gridEl, combinedItems) {
+        const host = this._getListScrollHost();
+        if (!host) {
+            this._disableGridVirtualization();
+            gridEl.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            for (const item of combinedItems) {
+                frag.appendChild(this._createGridCard(item));
+            }
+            gridEl.appendChild(frag);
+            return;
+        }
+
+        this._disableGridVirtualization();
+        gridEl.innerHTML = '';
+
+        const topSpacer = document.createElement('div');
+        topSpacer.className = 'virtual-grid-spacer virtual-grid-spacer-top';
+        const bottomSpacer = document.createElement('div');
+        bottomSpacer.className = 'virtual-grid-spacer virtual-grid-spacer-bottom';
+        gridEl.appendChild(topSpacer);
+        gridEl.appendChild(bottomSpacer);
+
+        const metrics = this._computeGridColumns(gridEl);
+        const rowHeight = this._measureGridRowHeight(gridEl, combinedItems[0]);
+
+        this._virtualGridState = {
+            gridEl,
+            host,
+            items: combinedItems,
+            cols: metrics.cols,
+            gap: metrics.gap,
+            rowHeight,
+            topSpacer,
+            bottomSpacer,
+            startRow: -1,
+            endRow: -1,
+            rafId: 0,
+        };
+
+        const scheduleRender = () => {
+            const state = this._virtualGridState;
+            if (!state) return;
+            if (state.rafId) return;
+            state.rafId = requestAnimationFrame(() => {
+                if (!this._virtualGridState) return;
+                this._virtualGridState.rafId = 0;
+                this._renderVirtualGridWindow();
+            });
+        };
+
+        this._onVirtualGridScroll = scheduleRender;
+        this._onVirtualGridResize = scheduleRender;
+        host.addEventListener('scroll', this._onVirtualGridScroll, { passive: true });
+        window.addEventListener('resize', this._onVirtualGridResize);
+
+        this._renderVirtualGridWindow(true);
+    },
+
+    _renderVirtualGridWindow(force = false) {
+        const state = this._virtualGridState;
+        if (!state) return;
+
+        const metrics = this._computeGridColumns(state.gridEl);
+        if (metrics.cols !== state.cols || Math.abs(metrics.gap - state.gap) > 0.5) {
+            state.cols = metrics.cols;
+            state.gap = metrics.gap;
+            state.startRow = -1;
+            state.endRow = -1;
+        }
+
+        const hostRect = state.host.getBoundingClientRect();
+        const gridRect = state.gridEl.getBoundingClientRect();
+        const gridTopInHost = (gridRect.top - hostRect.top) + state.host.scrollTop;
+
+        const rowStride = state.rowHeight + state.gap;
+        const visibleStartPx = Math.max(0, state.host.scrollTop - gridTopInHost);
+        const visibleEndPx = Math.max(0, state.host.scrollTop + state.host.clientHeight - gridTopInHost);
+
+        const totalItems = state.items.length;
+        const totalRows = Math.ceil(totalItems / state.cols);
+
+        let startRow = Math.floor(visibleStartPx / rowStride) - this._virtualGridOverscanRows;
+        let endRow = Math.ceil(visibleEndPx / rowStride) + this._virtualGridOverscanRows;
+
+        startRow = Math.max(0, startRow);
+        endRow = Math.min(totalRows, endRow);
+
+        if (!force && startRow === state.startRow && endRow === state.endRow) {
+            return;
+        }
+
+        state.startRow = startRow;
+        state.endRow = endRow;
+
+        state.gridEl.querySelectorAll('.file-card').forEach(el => el.remove());
+
+        const startIndex = startRow * state.cols;
+        const endIndex = Math.min(totalItems, endRow * state.cols);
+
+        const frag = document.createDocumentFragment();
+        for (let i = startIndex; i < endIndex; i++) {
+            frag.appendChild(this._createGridCard(state.items[i]));
+        }
+
+        state.topSpacer.style.height = `${startRow * rowStride}px`;
+        state.bottomSpacer.style.height = `${Math.max(0, (totalRows - endRow) * rowStride)}px`;
+
+        state.bottomSpacer.before(frag);
+    },
+
+    _renderInBatches(items, target, createElement, channelKey) {
+        if (!Array.isArray(items) || items.length === 0 || !target) return;
+
+        const token = Date.now() + Math.random();
+        this._activeRenderTokens.set(channelKey, token);
+
+        const batchSize = this._renderBatchSize;
+        let index = 0;
+
+        const flushBatch = () => {
+            if (this._activeRenderTokens.get(channelKey) !== token) return;
+            if (!target.isConnected) return;
+
+            const frag = document.createDocumentFragment();
+            const end = Math.min(index + batchSize, items.length);
+            for (let i = index; i < end; i++) {
+                frag.appendChild(createElement(items[i]));
+            }
+            target.appendChild(frag);
+            index = end;
+
+            if (index < items.length) {
+                requestAnimationFrame(flushBatch);
+            }
+        };
+
+        requestAnimationFrame(flushBatch);
     },
 
     _renderFoldersToView(folders, view) {
@@ -737,13 +1193,21 @@ const ui = {
             : document.getElementById('files-grid');
         if (!target) return;
 
-        const frag = document.createDocumentFragment();
-        for (const folder of folders) {
-            frag.appendChild(view === 'list'
-                ? this._createFolderItem(folder)
-                : this._createFolderCard(folder));
+        if (folders.length <= this._renderBatchSize) {
+            const frag = document.createDocumentFragment();
+            for (const folder of folders) {
+                frag.appendChild(view === 'list'
+                    ? this._createFolderItem(folder)
+                    : this._createFolderCard(folder));
+            }
+            target.appendChild(frag);
+            return;
         }
-        target.appendChild(frag);
+
+        const createElement = view === 'list'
+            ? (folder) => this._createFolderItem(folder)
+            : (folder) => this._createFolderCard(folder);
+        this._renderInBatches(folders, target, createElement, `folders:${view}`);
     },
 
     _renderFilesToView(files, view) {
@@ -753,13 +1217,21 @@ const ui = {
             : document.getElementById('files-grid');
         if (!target) return;
 
-        const frag = document.createDocumentFragment();
-        for (const file of files) {
-            frag.appendChild(view === 'list'
-                ? this._createFileItem(file)
-                : this._createFileCard(file));
+        if (files.length <= this._renderBatchSize) {
+            const frag = document.createDocumentFragment();
+            for (const file of files) {
+                frag.appendChild(view === 'list'
+                    ? this._createFileItem(file)
+                    : this._createFileCard(file));
+            }
+            target.appendChild(frag);
+            return;
         }
-        target.appendChild(frag);
+
+        const createElement = view === 'list'
+            ? (file) => this._createFileItem(file)
+            : (file) => this._createFileCard(file);
+        this._renderInBatches(files, target, createElement, `files:${view}`);
     },
 
     _upsertById(arr, item) {
@@ -783,8 +1255,7 @@ const ui = {
             if (!grid) return;
             if (grid.children.length > 0) return;
 
-            this._renderFoldersToView(this._lastFolders, 'grid');
-            this._renderFilesToView(this._lastFiles, 'grid');
+            this._scheduleGridRebuild();
             return;
         }
 
@@ -794,8 +1265,7 @@ const ui = {
             // list view keeps a static header row as first child
             if (list.querySelector('.file-item')) return;
 
-            this._renderFoldersToView(this._lastFolders, 'list');
-            this._renderFilesToView(this._lastFiles, 'list');
+            this._scheduleListRebuild();
         }
     },
 
@@ -1270,7 +1740,18 @@ const ui = {
             this._items.set(folder.id, folder);
         }
 
-        this._renderFoldersToView(safeFolders, this._getActiveView());
+        const activeView = this._getActiveView();
+        if (activeView === 'list') {
+            this._scheduleListRebuild();
+            return;
+        }
+
+        if (activeView === 'grid') {
+            this._scheduleGridRebuild();
+            return;
+        }
+
+        this._renderFoldersToView(safeFolders, activeView);
     },
 
     /**
@@ -1286,7 +1767,18 @@ const ui = {
             this._items.set(file.id, file);
         }
 
-        this._renderFilesToView(safeFiles, this._getActiveView());
+        const activeView = this._getActiveView();
+        if (activeView === 'list') {
+            this._scheduleListRebuild();
+            return;
+        }
+
+        if (activeView === 'grid') {
+            this._scheduleGridRebuild();
+            return;
+        }
+
+        this._renderFilesToView(safeFiles, activeView);
     },
 
     /* ================================================================
@@ -1309,7 +1801,17 @@ const ui = {
 
         this._items.set(folder.id, folder);
         this._upsertById(this._lastFolders, folder);
-        this._renderFoldersToView([folder], this._getActiveView());
+        const activeView = this._getActiveView();
+        if (activeView === 'list') {
+            this._scheduleListRebuild();
+            return;
+        }
+
+        if (activeView === 'grid') {
+            this._scheduleGridRebuild();
+            return;
+        }
+        this._renderFoldersToView([folder], activeView);
     },
 
     /**
@@ -1328,7 +1830,17 @@ const ui = {
 
         this._items.set(file.id, file);
         this._upsertById(this._lastFiles, file);
-        this._renderFilesToView([file], this._getActiveView());
+        const activeView = this._getActiveView();
+        if (activeView === 'list') {
+            this._scheduleListRebuild();
+            return;
+        }
+
+        if (activeView === 'grid') {
+            this._scheduleGridRebuild();
+            return;
+        }
+        this._renderFilesToView([file], activeView);
     }
 };
 

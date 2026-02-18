@@ -49,6 +49,19 @@ const contextMenus = {
         
         document.getElementById('favorite-folder-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFolder) {
+                if (window.loadFavoritesModule) {
+                    try {
+                        await window.loadFavoritesModule();
+                    } catch (err) {
+                        console.error('Could not load favorites module:', err);
+                        if (window.ui && window.ui.showNotification) {
+                            window.ui.showNotification('Error', 'Could not load favorites');
+                        }
+                        window.ui.closeContextMenu();
+                        return;
+                    }
+                }
+
                 const folder = window.app.contextMenuTargetFolder;
 
                 // Check if folder is already in favorites to toggle
@@ -150,6 +163,19 @@ const contextMenus = {
         
         document.getElementById('favorite-file-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFile) {
+                if (window.loadFavoritesModule) {
+                    try {
+                        await window.loadFavoritesModule();
+                    } catch (err) {
+                        console.error('Could not load favorites module:', err);
+                        if (window.ui && window.ui.showNotification) {
+                            window.ui.showNotification('Error', 'Could not load favorites');
+                        }
+                        window.ui.closeFileContextMenu();
+                        return;
+                    }
+                }
+
                 const file = window.app.contextMenuTargetFile;
 
                 // Check if file is already in favorites to toggle

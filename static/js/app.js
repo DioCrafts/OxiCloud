@@ -122,6 +122,124 @@ const ACTIONS_BAR_TEMPLATES = {
     `
 };
 
+const LAZY_MODULES = {
+    search: {
+        url: '/js/search.js',
+        isReady: () => !!window.search,
+    },
+    favorites: {
+        url: '/js/favorites.js',
+        isReady: () => !!window.favorites,
+    },
+    recent: {
+        url: '/js/recent.js',
+        isReady: () => !!window.recent,
+    },
+    sharedView: {
+        url: '/js/components/sharedView.js',
+        isReady: () => !!window.sharedView,
+    },
+};
+
+const lazyLoadPromises = new Map();
+
+function loadScriptOnce(url) {
+    if (lazyLoadPromises.has(url)) {
+        return lazyLoadPromises.get(url);
+    }
+
+    const existing = document.querySelector(`script[src="${url}"]`);
+    if (existing) {
+        const alreadyLoaded = existing.dataset.loaded === 'true';
+        if (alreadyLoaded) {
+            return Promise.resolve();
+        }
+        const pending = new Promise((resolve, reject) => {
+            existing.addEventListener('load', () => {
+                existing.dataset.loaded = 'true';
+                resolve();
+            }, { once: true });
+            existing.addEventListener('error', () => {
+                reject(new Error(`Failed to load script: ${url}`));
+            }, { once: true });
+        });
+        lazyLoadPromises.set(url, pending);
+        return pending;
+    }
+
+    const promise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.defer = true;
+        script.dataset.lazy = 'true';
+        script.addEventListener('load', () => {
+            script.dataset.loaded = 'true';
+            resolve();
+        }, { once: true });
+        script.addEventListener('error', () => {
+            reject(new Error(`Failed to load script: ${url}`));
+        }, { once: true });
+        document.head.appendChild(script);
+    });
+
+    lazyLoadPromises.set(url, promise);
+    return promise;
+}
+
+async function ensureModule(moduleName) {
+    const moduleConfig = LAZY_MODULES[moduleName];
+    if (!moduleConfig) return;
+
+    if (moduleConfig.isReady()) return;
+
+    await loadScriptOnce(moduleConfig.url);
+
+    if (!moduleConfig.isReady()) {
+        throw new Error(`Module loaded but not ready: ${moduleName}`);
+    }
+}
+
+window.loadSearchModule = async function loadSearchModule() {
+    await ensureModule('search');
+};
+
+window.loadSharedViewModule = async function loadSharedViewModule() {
+    await ensureModule('sharedView');
+};
+
+window.loadFavoritesModule = async function loadFavoritesModule() {
+    await ensureModule('favorites');
+    if (window.favorites && window.favorites.init && !window.favorites.__initialized) {
+        await window.favorites.init();
+        window.favorites.__initialized = true;
+    }
+};
+
+window.loadRecentModule = async function loadRecentModule() {
+    await ensureModule('recent');
+    if (window.recent && window.recent.init && !window.recent.__initialized) {
+        window.recent.init();
+        window.recent.__initialized = true;
+    }
+};
+
+function warmupLazyModulesInIdle() {
+    const runWarmup = () => {
+        Promise.resolve()
+            .then(() => window.loadRecentModule())
+            .then(() => window.loadFavoritesModule())
+            .catch((err) => {
+                console.warn('Lazy warmup skipped:', err);
+            });
+    };
+
+    if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(runWarmup, { timeout: 2500 });
+    } else {
+        setTimeout(runWarmup, 1200);
+    }
+}
+
 function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
@@ -233,6 +351,9 @@ function initApp() {
     
     // Setup event listeners
     setupEventListeners();
+
+    // Warm up non-critical modules after first paint (does not block startup)
+    warmupLazyModulesInIdle();
     
     // Ensure inline viewer is initialized
     if (!window.inlineViewer && typeof InlineViewer !== 'undefined') {
@@ -243,21 +364,7 @@ function initApp() {
         }
     }
     
-    // Initialize favorites module if available
-    if (window.favorites && window.favorites.init) {
-        console.log('Initializing favorites module');
-        window.favorites.init();
-    } else {
-        console.warn('Favorites module not available or not initializable');
-    }
-    
-    // Initialize recent files module if available
-    if (window.recent && window.recent.init) {
-        console.log('Initializing recent files module');
-        window.recent.init();
-    } else {
-        console.warn('Recent files module not available or not initializable');
-    }
+    // Favorites and recent modules are lazy-loaded when those views are opened.
     
     // Initialize multi-select / batch actions
     if (window.multiSelect && window.multiSelect.init) {
@@ -1107,6 +1214,8 @@ async function performSearch(query, sortBy) {
                 options.folder_id = app.currentPath;
             }
         }
+
+        await window.loadSearchModule();
         
         // Send search request — backend does all processing
         const searchResults = await window.search.searchFiles(query, options);
@@ -1195,55 +1304,64 @@ window.selectFolder = (id, name) => {
  * Switch to the shared view
  */
 function switchToSharedView() {
-    // Hide trash view if active
-    app.isTrashView = false;
-    
-    // Set shared view as active
-    app.isSharedView = true;
-    app.currentSection = 'shared';
-    
-    // Remove active class from all nav items
-    elements.navItems.forEach(navItem => navItem.classList.remove('active'));
-    
-    // Find shared nav item and make it active
-    const sharedNavItem = document.querySelector('.nav-item:nth-child(2)');
-    if (sharedNavItem) {
-        sharedNavItem.classList.add('active');
-    }
-    
-    // Update UI — also set data-i18n so translatePage() doesn't overwrite
-    elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Shared';
-    elements.pageTitle.setAttribute('data-i18n', 'nav.shared');
-    
-    // Clear breadcrumb and show root
-    ui.updateBreadcrumb('');
-    
-    // Hide breadcrumb itself
-    const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
-    
-    // Hide standard actions bar
-    if (elements.actionsBar) {
-        elements.actionsBar.style.display = 'none';
-    }
-    
-    // Hide file containers
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = 'none';
-    if (filesListView) filesListView.style.display = 'none';
-    
-    // Init and show shared view
-    if (window.sharedView) {
-        window.sharedView.init();
-        window.sharedView.show();
-    }
+    window.loadSharedViewModule().then(() => {
+        // Hide trash view if active
+        app.isTrashView = false;
+        
+        // Set shared view as active
+        app.isSharedView = true;
+        app.currentSection = 'shared';
+        
+        // Remove active class from all nav items
+        elements.navItems.forEach(navItem => navItem.classList.remove('active'));
+        
+        // Find shared nav item and make it active
+        const sharedNavItem = document.querySelector('.nav-item:nth-child(2)');
+        if (sharedNavItem) {
+            sharedNavItem.classList.add('active');
+        }
+        
+        // Update UI — also set data-i18n so translatePage() doesn't overwrite
+        elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Shared';
+        elements.pageTitle.setAttribute('data-i18n', 'nav.shared');
+        
+        // Clear breadcrumb and show root
+        ui.updateBreadcrumb('');
+        
+        // Hide breadcrumb itself
+        const breadcrumb = document.querySelector('.breadcrumb');
+        if (breadcrumb) breadcrumb.style.display = 'none';
+        
+        // Hide standard actions bar
+        if (elements.actionsBar) {
+            elements.actionsBar.style.display = 'none';
+        }
+        
+        // Hide file containers
+        const filesGrid = document.getElementById('files-grid');
+        const filesListView = document.getElementById('files-list-view');
+        if (filesGrid) filesGrid.style.display = 'none';
+        if (filesListView) filesListView.style.display = 'none';
+        
+        // Init and show shared view
+        if (window.sharedView) {
+            window.sharedView.init();
+            window.sharedView.show();
+        }
+    }).catch((error) => {
+        console.error('Error loading shared view module:', error);
+        if (window.ui && window.ui.showNotification) {
+            window.ui.showNotification('Error', 'Could not load shared view');
+        }
+    });
 }
 
 /**
  * Switch back to the files view
  */
 function switchToFilesView() {
+    // Hide trash view if active
+    app.isTrashView = false;
     // Reset view flags
     app.isTrashView = false;
     app.isSharedView = false;
@@ -1301,7 +1419,17 @@ function switchToFilesView() {
 /**
  * Switch to the favorites view
  */
-function switchToFavoritesView() {
+async function switchToFavoritesView() {
+    try {
+        await window.loadFavoritesModule();
+    } catch (error) {
+        console.error('Error loading favorites module:', error);
+        if (window.ui && window.ui.showNotification) {
+            window.ui.showNotification('Error', 'Could not load favorites');
+        }
+        return;
+    }
+
     // Hide other views
     app.isTrashView = false;
     app.isSharedView = false;
@@ -1369,7 +1497,17 @@ function switchToFavoritesView() {
 /**
  * Switch to the recent files view
  */
-function switchToRecentFilesView() {
+async function switchToRecentFilesView() {
+    try {
+        await window.loadRecentModule();
+    } catch (error) {
+        console.error('Error loading recent module:', error);
+        if (window.ui && window.ui.showNotification) {
+            window.ui.showNotification('Error', 'Could not load recent files');
+        }
+        return;
+    }
+
     // Hide other views
     app.isTrashView = false;
     app.isSharedView = false;
@@ -1493,74 +1631,6 @@ async function refreshUserData() {
 
 // Expose refreshUserData globally
 window.refreshUserData = refreshUserData;
-
-/**
- * Show User Profile modal with account details
- */
-function showUserProfileModal() {
-    const USER_DATA_KEY = 'oxicloud_user';
-    const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-    const username = userData.username || 'User';
-    const email = userData.email || '';
-    const role = userData.role || 'user';
-    const initials = username.substring(0, 2).toUpperCase();
-    const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes || (10 * 1024 * 1024 * 1024); // 10 GB default
-    const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
-    const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
-    
-    const t = (key, fallback) => (window.i18n && window.i18n.t) ? window.i18n.t(key) || fallback : fallback;
-    
-    // Remove existing modal if any
-    const existing = document.getElementById('profile-modal-overlay');
-    if (existing) existing.remove();
-    
-    const overlay = document.createElement('div');
-    overlay.id = 'profile-modal-overlay';
-    overlay.className = 'about-modal-overlay';
-    overlay.innerHTML = `
-        <div class="about-modal" style="max-width:380px">
-            <div style="text-align:center;padding:20px 20px 0">
-                <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:12px">${initials}</div>
-                <h3 style="margin:0;font-size:18px;color:#1a1a2e">${username}</h3>
-                <p style="margin:4px 0 0;font-size:13px;color:#64748b">${email}</p>
-                <span style="display:inline-block;margin-top:8px;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;${
-                    role === 'admin' 
-                        ? 'background:#dbeafe;color:#1d4ed8' 
-                        : 'background:#f1f5f9;color:#64748b'
-                }">${role === 'admin' ? '🛡️ Admin' : '👤 ' + t('user_menu.role_user', 'User')}</span>
-            </div>
-            <div style="padding:16px 20px">
-                <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-                    <i class="fas fa-database" style="margin-right:4px"></i>${t('storage.title', 'Storage')}
-                </div>
-                <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px">
-                    <div style="height:100%;width:${percentage}%;background:${barColor};border-radius:6px;transition:width .3s"></div>
-                </div>
-                <div style="font-size:12px;color:#64748b;text-align:right">${percentage}% · ${formatFileSize(usedBytes)} / ${quotaBytes > 0 ? formatFileSize(quotaBytes) : '∞'}</div>
-            </div>
-            <div style="padding:0 20px 16px;display:flex;justify-content:center">
-                <button id="profile-modal-close" style="padding:8px 24px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s">${t('actions.close', 'Close')}</button>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    // Show with animation
-    requestAnimationFrame(() => overlay.classList.add('show'));
-    
-    // Close handlers
-    overlay.querySelector('#profile-modal-close').addEventListener('click', () => {
-        overlay.classList.remove('show');
-        setTimeout(() => overlay.remove(), 200);
-    });
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
-            overlay.classList.remove('show');
-            setTimeout(() => overlay.remove(), 200);
-        }
-    });
-}
 
 /**
  * Check if user is authenticated and load user's home folder

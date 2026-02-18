@@ -1870,6 +1870,17 @@ button.favorite-star {
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
+.virtual-list-spacer {
+    width: 100%;
+    pointer-events: none;
+}
+
+.virtual-grid-spacer {
+    grid-column: 1 / -1;
+    width: 100%;
+    pointer-events: none;
+}
+
 .list-header {
     display: grid;
     grid-template-columns: 36px minmax(200px, 2fr) 100px 110px 160px;
@@ -4218,11 +4229,6 @@ html[dir='rtl'] .fa-sign-out-alt {
     cursor: pointer;
     accent-color: #ff5e3a;
     border-radius: 4px;
-}
-
-/* Sync checkbox state visually with .selected */
-.file-item.selected .item-checkbox {
-    /* Checked via JS */
 }
 
 /* ── Selection-mode header (replaces Name/Type/Size/Modified) ── */

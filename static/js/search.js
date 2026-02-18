@@ -182,15 +182,9 @@ const search = {
             return;
         }
 
-        // Render folders (server-provided enriched data)
-        results.folders.forEach(folder => {
-            window.ui.addFolderToView(folder);
-        });
-
-        // Render files (server-provided enriched data)
-        results.files.forEach(file => {
-            window.ui.addFileToView(file);
-        });
+        // Render in batch (faster than item-by-item appends on large result sets)
+        window.ui.renderFolders(results.folders || []);
+        window.ui.renderFiles(results.files || []);
     },
 
     /**
