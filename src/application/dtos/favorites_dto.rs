@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::display_helpers::{format_file_size, mime_to_category, mime_to_icon_class, mime_to_icon_special_class};
+use super::display_helpers::{format_file_size, icon_class_for, icon_special_class_for, category_for};
 
 /// DTO for favorites item, enriched with item metadata via SQL JOIN
 /// so the frontend does not need N+1 requests to resolve names/sizes.
@@ -69,10 +69,11 @@ impl FavoriteItemDto {
             self.category = "Folder".to_string();
             self.size_formatted = "--".to_string();
         } else {
+            let name = self.item_name.as_deref().unwrap_or("");
             let mime = self.item_mime_type.as_deref().unwrap_or("application/octet-stream");
-            self.icon_class = mime_to_icon_class(mime).to_string();
-            self.icon_special_class = mime_to_icon_special_class(mime).to_string();
-            self.category = mime_to_category(mime).to_string();
+            self.icon_class = icon_class_for(name, mime).to_string();
+            self.icon_special_class = icon_special_class_for(name, mime).to_string();
+            self.category = category_for(name, mime).to_string();
             self.size_formatted = format_file_size(self.item_size.unwrap_or(0) as u64);
         }
         self

@@ -7,6 +7,7 @@ use tokio::time;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
+use crate::application::dtos::display_helpers::{icon_class_for, icon_special_class_for, category_for};
 use crate::application::dtos::search_dto::{
     SearchCriteriaDto, SearchFileResultDto, SearchFolderResultDto, SearchResultsDto,
     SearchSuggestionItem, SearchSuggestionsDto,
@@ -105,105 +106,21 @@ fn format_bytes(bytes: u64) -> String {
     }
 }
 
-/// Determine content category from MIME type.
-fn categorize_mime(mime: &str) -> &'static str {
-    let m = mime.to_lowercase();
-    if m.starts_with("image/") {
-        "image"
-    } else if m.starts_with("video/") {
-        "video"
-    } else if m.starts_with("audio/") {
-        "audio"
-    } else if m.starts_with("text/")
-        || m.contains("pdf")
-        || m.contains("document")
-        || m.contains("spreadsheet")
-        || m.contains("presentation")
-        || m.contains("msword")
-        || m.contains("officedocument")
-    {
-        "document"
-    } else if m.contains("zip")
-        || m.contains("tar")
-        || m.contains("gzip")
-        || m.contains("bzip")
-        || m.contains("7z")
-        || m.contains("rar")
-        || m.contains("compress")
-    {
-        "archive"
-    } else if m.contains("json")
-        || m.contains("xml")
-        || m.contains("javascript")
-        || m.contains("typescript")
-        || m.contains("x-python")
-        || m.contains("x-rust")
-        || m.contains("x-c")
-        || m.contains("x-java")
-        || m.contains("x-shellscript")
-        || m.contains("x-httpd-php")
-        || m.contains("yaml")
-        || m.contains("toml")
-    {
-        "code"
-    } else {
-        "other"
-    }
+/// Get Font Awesome icon class for a file based on extension and MIME type.
+/// Delegates to the centralised `display_helpers` so every API surface is
+/// consistent.
+fn get_icon_class(name: &str, mime: &str) -> String {
+    icon_class_for(name, mime).to_string()
 }
 
-/// Get Font Awesome icon class for a file based on extension and MIME type.
-fn get_icon_class(name: &str, mime: &str) -> String {
-    // Try extension first
-    if let Some(ext) = name.rsplit('.').next() {
-        let ext_lower = ext.to_lowercase();
-        let icon = match ext_lower.as_str() {
-            // Documents
-            "pdf" => "fas fa-file-pdf",
-            "doc" | "docx" => "fas fa-file-word",
-            "xls" | "xlsx" => "fas fa-file-excel",
-            "ppt" | "pptx" => "fas fa-file-powerpoint",
-            "txt" | "rtf" | "md" => "fas fa-file-alt",
-            "csv" => "fas fa-file-csv",
-            // Images
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" => {
-                "fas fa-file-image"
-            }
-            // Video
-            "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" => {
-                "fas fa-file-video"
-            }
-            // Audio
-            "mp3" | "wav" | "ogg" | "flac" | "aac" | "wma" | "m4a" => "fas fa-file-audio",
-            // Archives
-            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => "fas fa-file-archive",
-            // Code
-            "js" | "ts" | "jsx" | "tsx" | "py" | "rs" | "go" | "java" | "c" | "cpp" | "cs"
-            | "rb" | "php" | "swift" | "kt" | "scala" | "r" | "lua" | "pl" | "sh" | "bash"
-            | "zsh" | "fish" | "ps1" | "bat" | "cmd" => "fas fa-file-code",
-            "html" | "htm" | "css" | "scss" | "sass" | "less" => "fas fa-file-code",
-            "json" | "xml" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf" => {
-                "fas fa-file-code"
-            }
-            "sql" => "fas fa-database",
-            _ => "",
-        };
-        if !icon.is_empty() {
-            return icon.to_string();
-        }
-    }
+/// Get CSS special class for icon styling.
+fn get_icon_special_class(name: &str, mime: &str) -> String {
+    icon_special_class_for(name, mime).to_string()
+}
 
-    // Fallback to MIME type
-    let category = categorize_mime(mime);
-    match category {
-        "image" => "fas fa-file-image",
-        "video" => "fas fa-file-video",
-        "audio" => "fas fa-file-audio",
-        "document" => "fas fa-file-alt",
-        "archive" => "fas fa-file-archive",
-        "code" => "fas fa-file-code",
-        _ => "fas fa-file",
-    }
-    .to_string()
+/// Get category label from centralised helpers.
+fn get_category(name: &str, mime: &str) -> String {
+    category_for(name, mime).to_string()
 }
 
 // ─── SearchService implementation ───────────────────────────────────────
@@ -334,7 +251,8 @@ impl SearchService {
             relevance_score: relevance,
             size_formatted: format_bytes(file.size),
             icon_class: get_icon_class(&file.name, &file.mime_type),
-            category: categorize_mime(&file.mime_type).to_string(),
+            icon_special_class: get_icon_special_class(&file.name, &file.mime_type),
+            category: get_category(&file.name, &file.mime_type),
         }
     }
 
@@ -458,6 +376,7 @@ impl SearchService {
                     id: file_dto.id.clone(),
                     path: file_dto.path.clone(),
                     icon_class: get_icon_class(&file_dto.name, &file_dto.mime_type),
+                    icon_special_class: get_icon_special_class(&file_dto.name, &file_dto.mime_type),
                     relevance_score: score,
                 });
             }
@@ -478,6 +397,7 @@ impl SearchService {
                     id: folder_dto.id.clone(),
                     path: folder_dto.path.clone(),
                     icon_class: "fas fa-folder".to_string(),
+                    icon_special_class: "folder-icon".to_string(),
                     relevance_score: score,
                 });
             }

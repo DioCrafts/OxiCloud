@@ -1,7 +1,7 @@
 use crate::domain::entities::file::File;
 use serde::{Deserialize, Serialize};
 
-use super::display_helpers::{format_file_size, mime_to_category, mime_to_icon_class, mime_to_icon_special_class};
+use super::display_helpers::{format_file_size, icon_class_for, icon_special_class_for, category_for};
 
 /// DTO for file responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,21 +47,22 @@ pub struct FileDto {
 
 impl From<File> for FileDto {
     fn from(file: File) -> Self {
+        let name = file.name();
         let mime = file.mime_type();
         let size = file.size();
 
         Self {
             id: file.id().to_string(),
-            name: file.name().to_string(),
+            name: name.to_string(),
             path: file.path_string().to_string(),
             size,
             mime_type: mime.to_string(),
             folder_id: file.folder_id().map(String::from),
             created_at: file.created_at(),
             modified_at: file.modified_at(),
-            icon_class: mime_to_icon_class(mime).to_string(),
-            icon_special_class: mime_to_icon_special_class(mime).to_string(),
-            category: mime_to_category(mime).to_string(),
+            icon_class: icon_class_for(name, mime).to_string(),
+            icon_special_class: icon_special_class_for(name, mime).to_string(),
+            category: category_for(name, mime).to_string(),
             size_formatted: format_file_size(size),
         }
     }

@@ -79,10 +79,6 @@ const sharedView = {
                         <option value="name" data-i18n="shared_sortByName">Sort by name</option>
                         <option value="expiration" data-i18n="shared_sortByExpiration">Sort by expiration</option>
                     </select>
-                    <div class="shared-search-box">
-                        <input type="text" id="shared-search-filter" data-i18n-placeholder="shared_search" placeholder="Search...">
-                        <button id="shared-search-filter-btn" class="search-btn">🔍</button>
-                    </div>
                 </div>
             </div>
 
@@ -189,14 +185,10 @@ const sharedView = {
     attachEventListeners() {
         const filterType = document.getElementById('filter-type');
         const sortBy = document.getElementById('sort-by');
-        const searchFilter = document.getElementById('shared-search-filter');
-        const searchBtn = document.getElementById('shared-search-filter-btn');
         const emptyGoToFiles = document.getElementById('empty-go-to-files');
 
         if (filterType) filterType.addEventListener('change', () => this.filterAndSortItems());
         if (sortBy) sortBy.addEventListener('change', () => this.filterAndSortItems());
-        if (searchFilter) searchFilter.addEventListener('keyup', e => { if (e.key === 'Enter') this.filterAndSortItems(); });
-        if (searchBtn) searchBtn.addEventListener('click', () => this.filterAndSortItems());
         if (emptyGoToFiles) emptyGoToFiles.addEventListener('click', () => window.switchToFilesView());
 
         // Share dialog (sharedView-specific IDs)
@@ -238,11 +230,13 @@ const sharedView = {
     filterAndSortItems() {
         const filterType = document.getElementById('filter-type');
         const sortBy = document.getElementById('sort-by');
-        const searchFilter = document.getElementById('shared-search-filter');
 
         const type = filterType ? filterType.value : 'all';
         const sort = sortBy ? sortBy.value : 'date';
-        const searchTerm = searchFilter ? searchFilter.value.toLowerCase() : '';
+
+        // Use the top-bar search if available, otherwise no filter
+        const topSearch = document.getElementById('shared-search');
+        const searchTerm = topSearch ? topSearch.value.toLowerCase() : '';
 
         this.filteredItems = this.items.filter(item => {
             if (type !== 'all' && item.item_type !== type) return false;

@@ -100,24 +100,14 @@
 
 /* ── Star badge on file/folder cards (normal view) ── */
 
-/* Grid view: star below the checkbox */
+/* Grid view: keep interactive star button behavior from style.css */
 .file-card .favorite-star {
-    position: absolute;
-    top: 10px;
-    right: 38px;
-    font-size: 14px;
-    color: #ffc107;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
-    z-index: 5;
-    pointer-events: none;
-
-    [dir='rtl'] & {
-        right: unset;
-        left: 38px;
-    }
+    pointer-events: auto;
+    z-index: 12;
 }
 
-.file-card .favorite-star.active i {
+.file-card .favorite-star.active i,
+.file-card .favorite-star.active svg {
     animation: favorite-pulse 0.3s ease;
 }
 

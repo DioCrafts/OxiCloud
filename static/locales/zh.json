@@ -142,7 +142,12 @@
       "audio": "音频",
       "pdf": "PDF",
       "text": "文本",
-      "folder": "文件夹"
+      "folder": "文件夹",
+      "spreadsheet": "电子表格",
+      "presentation": "演示文稿",
+      "archive": "压缩文件",
+      "installer": "安装程序",
+      "code": "代码"
     }
   },
   "dialogs": {
@@ -268,7 +273,11 @@
     "empty_state": "还没有收藏",
     "empty_hint": "为文件或文件夹添加星标以将其添加到收藏夹",
     "add": "添加到收藏夹",
-    "remove": "从收藏夹移除"
+    "remove": "从收藏夹移除",
+    "added_title": "已添加到收藏",
+    "added_msg": "已添加到收藏",
+    "removed_title": "已从收藏移除",
+    "removed_msg": "已从收藏移除"
   },
   "recent": {
     "title": "最近",

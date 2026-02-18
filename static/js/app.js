@@ -46,6 +46,172 @@ const elements = {
     // Will be populated on initialization
 };
 
+// Upload dropdown listener state (prevents accumulated listeners)
+let uploadDropdownDocumentClickHandler = null;
+let uploadDropdownBindingsController = null;
+let actionsBarDelegationBound = false;
+
+const ACTIONS_BAR_TEMPLATES = {
+    files: `
+        <div class="action-buttons">
+            <div class="upload-dropdown" id="upload-dropdown">
+                <button class="btn btn-primary" id="upload-btn">
+                    <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
+                    <span data-i18n="actions.upload">Upload</span>
+                    <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                </button>
+                <div class="upload-dropdown-menu" id="upload-dropdown-menu">
+                    <button class="upload-dropdown-item" id="upload-files-btn">
+                        <i class="fas fa-file"></i>
+                        <span data-i18n="actions.upload_files">Upload files</span>
+                    </button>
+                    <button class="upload-dropdown-item" id="upload-folder-btn">
+                        <i class="fas fa-folder-open"></i>
+                        <span data-i18n="actions.upload_folder">Upload folder</span>
+                    </button>
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="new-folder-btn">
+                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i>
+                <span data-i18n="actions.new_folder">New folder</span>
+            </button>
+        </div>
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
+                <i class="fas fa-th"></i>
+            </button>
+            <button class="toggle-btn" id="list-view-btn" title="List view">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    `,
+    trash: `
+        <div class="action-buttons">
+            <button class="btn btn-danger" id="empty-trash-btn">
+                <i class="fas fa-trash-alt"></i>
+                <span data-i18n="trash.empty_trash">Empty trash</span>
+            </button>
+        </div>
+    `,
+    favorites: `
+        <div class="action-buttons"></div>
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
+                <i class="fas fa-th"></i>
+            </button>
+            <button class="toggle-btn" id="list-view-btn" title="List view">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    `,
+    recent: `
+        <div class="action-buttons">
+            <button class="btn btn-secondary" id="clear-recent-btn">
+                <i class="fas fa-broom" style="margin-right: 5px;"></i>
+                <span data-i18n="actions.clear_recent">Clear recent</span>
+            </button>
+        </div>
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
+                <i class="fas fa-th"></i>
+            </button>
+            <button class="toggle-btn" id="list-view-btn" title="List view">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
+    `
+};
+
+function setActionsBarMode(mode, force = false) {
+    if (!elements.actionsBar) return;
+
+    if (mode === 'hidden') {
+        elements.actionsBar.style.display = 'none';
+        elements.actionsBar.dataset.mode = 'hidden';
+        return;
+    }
+
+    if (!force && elements.actionsBar.dataset.mode === mode) {
+        return;
+    }
+
+    const html = ACTIONS_BAR_TEMPLATES[mode];
+    if (!html) return;
+
+    elements.actionsBar.innerHTML = html;
+    elements.actionsBar.style.display = 'flex';
+    elements.actionsBar.dataset.mode = mode;
+
+    // Refresh cached action elements after rebuild
+    elements.uploadBtn = document.getElementById('upload-btn');
+    elements.newFolderBtn = document.getElementById('new-folder-btn');
+    elements.gridViewBtn = document.getElementById('grid-view-btn');
+    elements.listViewBtn = document.getElementById('list-view-btn');
+
+    if (window.i18n && window.i18n.translateElement) {
+        window.i18n.translateElement(elements.actionsBar);
+    }
+
+    if (mode === 'files') {
+        setupUploadDropdown();
+    }
+}
+
+function setupActionsBarDelegation() {
+    if (actionsBarDelegationBound || !elements.actionsBar) return;
+    actionsBarDelegationBound = true;
+
+    elements.actionsBar.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+
+        switch (btn.id) {
+            case 'upload-files-btn': {
+                e.stopPropagation();
+                const menu = document.getElementById('upload-dropdown-menu');
+                if (menu) menu.classList.remove('show');
+                if (elements.fileInput) elements.fileInput.click();
+                break;
+            }
+            case 'upload-folder-btn': {
+                e.stopPropagation();
+                const menu = document.getElementById('upload-dropdown-menu');
+                if (menu) menu.classList.remove('show');
+                const folderInput = document.getElementById('folder-input');
+                if (folderInput) folderInput.click();
+                break;
+            }
+            case 'new-folder-btn': {
+                const folderName = await window.Modal.promptNewFolder();
+                if (folderName) {
+                    fileOps.createFolder(folderName);
+                }
+                break;
+            }
+            case 'grid-view-btn':
+                ui.switchToGridView();
+                break;
+            case 'list-view-btn':
+                ui.switchToListView();
+                break;
+            case 'empty-trash-btn':
+                if (await fileOps.emptyTrash()) {
+                    loadTrashItems();
+                }
+                break;
+            case 'clear-recent-btn':
+                if (window.recent) {
+                    window.recent.clearRecentFiles();
+                    window.recent.displayRecentFiles();
+                    window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
+                }
+                break;
+            default:
+                break;
+        }
+    });
+}
+
 /**
  * Initialize the application
  */
@@ -328,13 +494,17 @@ async function fetchAppVersion() {
  * Handles opening/closing the dropdown and triggering file/folder inputs
  */
 function setupUploadDropdown() {
-    const dropdown = document.getElementById('upload-dropdown');
     const uploadBtn = document.getElementById('upload-btn');
     const menu = document.getElementById('upload-dropdown-menu');
-    const uploadFilesBtn = document.getElementById('upload-files-btn');
-    const uploadFolderBtn = document.getElementById('upload-folder-btn');
     
     if (!uploadBtn || !menu) return;
+
+    // Abort any previous local bindings (safe across repeated/rebuilt UI)
+    if (uploadDropdownBindingsController) {
+        uploadDropdownBindingsController.abort();
+    }
+    uploadDropdownBindingsController = new AbortController();
+    const signal = uploadDropdownBindingsController.signal;
     
     // Toggle dropdown on button click
     uploadBtn.addEventListener('click', (e) => {
@@ -345,33 +515,18 @@ function setupUploadDropdown() {
         if (!isOpen) {
             menu.classList.add('show');
         }
-    });
-    
-    // Upload files option
-    if (uploadFilesBtn) {
-        uploadFilesBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            menu.classList.remove('show');
-            elements.fileInput.click();
-        });
-    }
-    
-    // Upload folder option
-    if (uploadFolderBtn) {
-        uploadFolderBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            menu.classList.remove('show');
-            const folderInput = document.getElementById('folder-input');
-            if (folderInput) {
-                folderInput.click();
-            }
-        });
-    }
-    
+    }, { signal });
+
     // Close dropdown when clicking outside
-    document.addEventListener('click', () => {
+    // remove+add stable handler: guarantees exactly one global listener
+    if (uploadDropdownDocumentClickHandler) {
+        document.removeEventListener('click', uploadDropdownDocumentClickHandler);
+    }
+    uploadDropdownDocumentClickHandler = (e) => {
+        if (e.target.closest('#upload-dropdown')) return;
         document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
-    });
+    };
+    document.addEventListener('click', uploadDropdownDocumentClickHandler);
 }
 
 /**
@@ -435,6 +590,10 @@ function setupEventListeners() {
     
     // Upload dropdown
     setupUploadDropdown();
+    setupActionsBarDelegation();
+    if (elements.actionsBar) {
+        elements.actionsBar.dataset.mode = 'files';
+    }
     
     // File input
     elements.fileInput.addEventListener('change', (e) => {
@@ -454,18 +613,6 @@ function setupEventListeners() {
             }
         });
     }
-    
-    // New folder button
-    elements.newFolderBtn.addEventListener('click', async () => {
-        const folderName = await window.Modal.promptNewFolder();
-        if (folderName) {
-            fileOps.createFolder(folderName);
-        }
-    });
-    
-    // View toggle
-    elements.gridViewBtn.addEventListener('click', ui.switchToGridView);
-    elements.listViewBtn.addEventListener('click', ui.switchToListView);
     
     // Sidebar navigation
     elements.navItems.forEach(item => {
@@ -529,22 +676,7 @@ function setupEventListeners() {
                 // Update UI
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';
                 elements.pageTitle.setAttribute('data-i18n', 'nav.trash');
-                elements.actionsBar.innerHTML = `
-                    <div class="action-buttons">
-                        <button class="btn btn-danger" id="empty-trash-btn">
-                            <i class="fas fa-trash-alt"></i>
-                            <span>${window.i18n ? window.i18n.t('trash.empty_trash') : 'Empty trash'}</span>
-                        </button>
-                    </div>
-                `;
-                elements.actionsBar.style.display = 'flex';
-                
-                // Add event listener to empty trash button
-                document.getElementById('empty-trash-btn').addEventListener('click', async () => {
-                    if (await fileOps.emptyTrash()) {
-                        loadTrashItems();
-                    }
-                });
+                setActionsBarMode('trash');
                 
                 // Load trash items
                 loadTrashItems();
@@ -572,64 +704,13 @@ function setupEventListeners() {
                 
                 // Reset UI
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
-                elements.actionsBar.innerHTML = `
-                    <div class="action-buttons">
-                        <div class="upload-dropdown" id="upload-dropdown">
-                            <button class="btn btn-primary" id="upload-btn">
-                                <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
-                                <span data-i18n="actions.upload">Upload</span>
-                                <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
-                            </button>
-                            <div class="upload-dropdown-menu" id="upload-dropdown-menu">
-                                <button class="upload-dropdown-item" id="upload-files-btn">
-                                    <i class="fas fa-file"></i>
-                                    <span data-i18n="actions.upload_files">Upload files</span>
-                                </button>
-                                <button class="upload-dropdown-item" id="upload-folder-btn">
-                                    <i class="fas fa-folder-open"></i>
-                                    <span data-i18n="actions.upload_folder">Upload folder</span>
-                                </button>
-                            </div>
-                        </div>
-                        <button class="btn btn-secondary" id="new-folder-btn">
-                            <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">New folder</span>
-                        </button>
-                    </div>
-                    <div class="view-toggle">
-                        <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                            <i class="fas fa-th"></i>
-                        </button>
-                        <button class="toggle-btn" id="list-view-btn" title="List view">
-                            <i class="fas fa-list"></i>
-                        </button>
-                    </div>
-                `;
-                elements.actionsBar.style.display = 'flex';
+                setActionsBarMode('files');
                 
                 // Show files containers
                 const filesGrid = document.getElementById('files-grid');
                 const filesListView = document.getElementById('files-list-view');
                 if (filesGrid) filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none';
                 if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
-                
-                // Restore event listeners
-                setupUploadDropdown();
-                
-                document.getElementById('new-folder-btn').addEventListener('click', async () => {
-                    const folderName = await window.Modal.promptNewFolder();
-                    if (folderName) {
-                        fileOps.createFolder(folderName);
-                    }
-                });
-                
-                document.getElementById('grid-view-btn').addEventListener('click', ui.switchToGridView);
-                document.getElementById('list-view-btn').addEventListener('click', ui.switchToListView);
-                
-                // Restore cached elements
-                elements.uploadBtn = document.getElementById('upload-btn');
-                elements.newFolderBtn = document.getElementById('new-folder-btn');
-                elements.gridViewBtn = document.getElementById('grid-view-btn');
-                elements.listViewBtn = document.getElementById('list-view-btn');
                 
                 // Load regular files
                 app.currentPath = '';
@@ -1188,58 +1269,7 @@ function switchToFilesView() {
     }
     
     // Reset UI
-    elements.actionsBar.innerHTML = `
-        <div class="action-buttons">
-            <div class="upload-dropdown" id="upload-dropdown">
-                <button class="btn btn-primary" id="upload-btn">
-                    <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
-                    <span data-i18n="actions.upload">Upload</span>
-                    <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
-                </button>
-                <div class="upload-dropdown-menu" id="upload-dropdown-menu">
-                    <button class="upload-dropdown-item" id="upload-files-btn">
-                        <i class="fas fa-file"></i>
-                        <span data-i18n="actions.upload_files">Upload files</span>
-                    </button>
-                    <button class="upload-dropdown-item" id="upload-folder-btn">
-                        <i class="fas fa-folder-open"></i>
-                        <span data-i18n="actions.upload_folder">Upload folder</span>
-                    </button>
-                </div>
-            </div>
-            <button class="btn btn-secondary" id="new-folder-btn">
-                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i> <span data-i18n="actions.new_folder">New folder</span>
-            </button>
-        </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
-    `;
-    elements.actionsBar.style.display = 'flex';
-    
-    // Restore event listeners
-    setupUploadDropdown();
-    
-    document.getElementById('new-folder-btn').addEventListener('click', async () => {
-        const folderName = await window.Modal.promptNewFolder();
-        if (folderName) {
-            fileOps.createFolder(folderName);
-        }
-    });
-    
-    document.getElementById('grid-view-btn').addEventListener('click', ui.switchToGridView);
-    document.getElementById('list-view-btn').addEventListener('click', ui.switchToListView);
-    
-    // Restore cached elements
-    elements.uploadBtn = document.getElementById('upload-btn');
-    elements.newFolderBtn = document.getElementById('new-folder-btn');
-    elements.gridViewBtn = document.getElementById('grid-view-btn');
-    elements.listViewBtn = document.getElementById('list-view-btn');
+    setActionsBarMode('files');
     
     // Hide shared view if it exists
     if (window.sharedView) {
@@ -1302,28 +1332,7 @@ function switchToFavoritesView() {
     }
     
     // Configure actions bar for favorites view
-    elements.actionsBar.innerHTML = `
-        <div class="action-buttons">
-            <!-- No actions needed for favorites view -->
-        </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
-    `;
-    elements.actionsBar.style.display = 'flex';
-    
-    // Restore view toggle event listeners
-    document.getElementById('grid-view-btn').addEventListener('click', ui.switchToGridView);
-    document.getElementById('list-view-btn').addEventListener('click', ui.switchToListView);
-    
-    // Update cached elements
-    elements.gridViewBtn = document.getElementById('grid-view-btn');
-    elements.listViewBtn = document.getElementById('list-view-btn');
+    setActionsBarMode('favorites');
     
     // Show standard files containers
     const filesGrid = document.getElementById('files-grid');
@@ -1392,39 +1401,7 @@ function switchToRecentFilesView() {
     }
     
     // Configure actions bar for recent view
-    elements.actionsBar.innerHTML = `
-        <div class="action-buttons">
-            <button class="btn btn-secondary" id="clear-recent-btn">
-                <i class="fas fa-broom" style="margin-right: 5px;"></i> <span data-i18n="actions.clear_recent">Clear recent</span>
-            </button>
-        </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
-    `;
-    elements.actionsBar.style.display = 'flex';
-    
-    // Add event listener for clear button
-    document.getElementById('clear-recent-btn').addEventListener('click', () => {
-        if (window.recent) {
-            window.recent.clearRecentFiles();
-            window.recent.displayRecentFiles();
-            window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
-        }
-    });
-    
-    // Restore view toggle event listeners
-    document.getElementById('grid-view-btn').addEventListener('click', ui.switchToGridView);
-    document.getElementById('list-view-btn').addEventListener('click', ui.switchToListView);
-    
-    // Update cached elements
-    elements.gridViewBtn = document.getElementById('grid-view-btn');
-    elements.listViewBtn = document.getElementById('list-view-btn');
+    setActionsBarMode('recent');
     
     // Show standard files containers
     const filesGrid = document.getElementById('files-grid');

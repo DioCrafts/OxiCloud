@@ -183,7 +183,12 @@
       "audio": "Áudio",
       "pdf": "PDF",
       "text": "Texto",
-      "folder": "Pasta"
+      "folder": "Pasta",
+      "spreadsheet": "Planilha",
+      "presentation": "Apresentação",
+      "archive": "Arquivo compactado",
+      "installer": "Instalador",
+      "code": "Código"
     }
   },
   "dialogs": {
@@ -320,7 +325,11 @@
     "empty_state": "Nenhum favorito ainda",
     "empty_hint": "Marque arquivos ou pastas com estrela para adicioná-los aos seus favoritos",
     "add": "Adicionar aos favoritos",
-    "remove": "Remover dos favoritos"
+    "remove": "Remover dos favoritos",
+    "added_title": "Adicionado aos favoritos",
+    "added_msg": "adicionado aos favoritos",
+    "removed_title": "Removido dos favoritos",
+    "removed_msg": "removido dos favoritos"
   },
   "recent": {
     "title": "Recentes",

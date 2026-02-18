@@ -183,7 +183,12 @@
       "audio": "Audio",
       "pdf": "PDF",
       "text": "Text",
-      "folder": "Folder"
+      "folder": "Folder",
+      "spreadsheet": "Spreadsheet",
+      "presentation": "Presentation",
+      "archive": "Archive",
+      "installer": "Installer",
+      "code": "Code"
     }
   },
   "dialogs": {
@@ -320,7 +325,11 @@
     "empty_state": "No favorites yet",
     "empty_hint": "Star files or folders to add them to your favorites",
     "add": "Add to favorites",
-    "remove": "Remove from favorites"
+    "remove": "Remove from favorites",
+    "added_title": "Added to favorites",
+    "added_msg": "added to favorites",
+    "removed_title": "Removed from favorites",
+    "removed_msg": "removed from favorites"
   },
   "recent": {
     "title": "Recent",

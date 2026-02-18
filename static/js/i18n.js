@@ -116,11 +116,40 @@ function t(key, params = {}) {
     }
     
     // Get the translation value
-    const value = getNestedValue(localeData, key);
+    let value = getNestedValue(localeData, key);
+
+    // Compatibility aliases for legacy share.* keys used in some views
+    if (!value) {
+        const aliasMap = {
+            'share.enablePassword': 'share.password',
+            'share.enableExpiration': 'share.expiration',
+            'share.notifyEmail': 'share.notifyEmailLabel',
+            'share.notifyMessage': 'share.notifyMessageLabel'
+        };
+        const aliasKey = aliasMap[key];
+        if (aliasKey) {
+            value = getNestedValue(localeData, aliasKey);
+        }
+    }
+
     if (!value) {
         // Try fallback to English
         if (currentLocale !== 'en' && translations['en']) {
-            const fallbackValue = getNestedValue(translations['en'], key);
+            let fallbackValue = getNestedValue(translations['en'], key);
+
+            if (!fallbackValue) {
+                const aliasMap = {
+                    'share.enablePassword': 'share.password',
+                    'share.enableExpiration': 'share.expiration',
+                    'share.notifyEmail': 'share.notifyEmailLabel',
+                    'share.notifyMessage': 'share.notifyMessageLabel'
+                };
+                const aliasKey = aliasMap[key];
+                if (aliasKey) {
+                    fallbackValue = getNestedValue(translations['en'], aliasKey);
+                }
+            }
+
             if (fallbackValue) {
                 return interpolate(fallbackValue, params);
             }

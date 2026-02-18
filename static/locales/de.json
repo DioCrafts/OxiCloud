@@ -183,7 +183,12 @@
       "audio": "Audio",
       "pdf": "PDF",
       "text": "Text",
-      "folder": "Ordner"
+      "folder": "Ordner",
+      "spreadsheet": "Tabelle",
+      "presentation": "Präsentation",
+      "archive": "Archiv",
+      "installer": "Installationsdatei",
+      "code": "Code"
     }
   },
   "dialogs": {
@@ -320,7 +325,11 @@
     "empty_state": "Noch keine Favoriten",
     "empty_hint": "Markieren Sie Dateien oder Ordner mit einem Stern, um sie zu Ihren Favoriten hinzuzufügen",
     "add": "Zu Favoriten hinzufügen",
-    "remove": "Aus Favoriten entfernen"
+    "remove": "Aus Favoriten entfernen",
+    "added_title": "Zu Favoriten hinzugefügt",
+    "added_msg": "zu Favoriten hinzugefügt",
+    "removed_title": "Aus Favoriten entfernt",
+    "removed_msg": "aus Favoriten entfernt"
   },
   "recent": {
     "title": "Zuletzt verwendet",

@@ -114,11 +114,6 @@ const favorites = {
                 );
             }
 
-            // Refresh view to update star icons
-            if (window.app && window.app.currentSection === 'files' && typeof window.loadFiles === 'function') {
-                window.loadFiles();
-            }
-
             return true;
         } catch (error) {
             console.error('Error adding to favorites:', error);
@@ -152,11 +147,6 @@ const favorites = {
                     window.i18n ? window.i18n.t('favorites.removed_title') : 'Removed from favorites',
                     `"${itemName}" ${window.i18n ? window.i18n.t('favorites.removed_msg') : 'removed from favorites'}`
                 );
-            }
-
-            // Refresh view to update star icons
-            if (window.app && window.app.currentSection === 'files' && typeof window.loadFiles === 'function') {
-                window.loadFiles();
             }
 
             return true;

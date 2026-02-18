@@ -122,6 +122,8 @@ pub struct SearchFileResultDto {
     pub size_formatted: String,
     /// CSS icon class for the file type (e.g., "fas fa-file-pdf")
     pub icon_class: String,
+    /// Extra CSS class for icon styling (e.g., "pdf-icon", "code-icon js-icon")
+    pub icon_special_class: String,
     /// Content category: "document", "image", "video", "audio", "archive", "code", "other"
     pub category: String,
 }
@@ -246,6 +248,8 @@ pub struct SearchSuggestionItem {
     pub path: String,
     /// CSS icon class
     pub icon_class: String,
+    /// Extra CSS class for icon styling
+    pub icon_special_class: String,
     /// Relevance score
     pub relevance_score: u32,
 }

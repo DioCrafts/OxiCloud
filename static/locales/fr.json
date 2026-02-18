@@ -183,7 +183,12 @@
       "audio": "Audio",
       "pdf": "PDF",
       "text": "Texte",
-      "folder": "Dossier"
+      "folder": "Dossier",
+      "spreadsheet": "Tableur",
+      "presentation": "Présentation",
+      "archive": "Archive",
+      "installer": "Installateur",
+      "code": "Code"
     }
   },
   "dialogs": {
@@ -320,7 +325,11 @@
     "empty_state": "Aucun favori pour le moment",
     "empty_hint": "Marquez des fichiers ou dossiers avec une étoile pour les ajouter à vos favoris",
     "add": "Ajouter aux favoris",
-    "remove": "Retirer des favoris"
+    "remove": "Retirer des favoris",
+    "added_title": "Ajouté aux favoris",
+    "added_msg": "ajouté aux favoris",
+    "removed_title": "Retiré des favoris",
+    "removed_msg": "retiré des favoris"
   },
   "recent": {
     "title": "Récents",

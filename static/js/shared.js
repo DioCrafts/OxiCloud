@@ -82,7 +82,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (filterType) filterType.addEventListener('change', filterAndSortItems);
     if (sortBy) sortBy.addEventListener('change', filterAndSortItems);
     if (sharedSearchBtn) sharedSearchBtn.addEventListener('click', filterAndSortItems);
-    if (sharedSearch) sharedSearch.addEventListener('keyup', e => { if (e.key === 'Enter') filterAndSortItems(); });
+    if (sharedSearch) {
+        let searchDebounce;
+        sharedSearch.addEventListener('input', () => {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(filterAndSortItems, 250);
+        });
+        sharedSearch.addEventListener('keyup', e => { if (e.key === 'Enter') { clearTimeout(searchDebounce); filterAndSortItems(); } });
+    }
     if (goToFilesBtn) goToFilesBtn.addEventListener('click', () => window.location.href = '/');
 
     if (shareDialogCloseBtn) shareDialogCloseBtn.addEventListener('click', closeShareDialog);

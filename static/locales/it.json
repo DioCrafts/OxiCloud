@@ -183,7 +183,12 @@
  "audio": "Audio",
  "pdf": "PDF",
  "text": "Testo",
- "folder": "Cartella"
+ "folder": "Cartella",
+ "spreadsheet": "Foglio di calcolo",
+ "presentation": "Presentazione",
+ "archive": "Archivio",
+ "installer": "Programma di installazione",
+ "code": "Codice"
  }
  },
  "dialogs": {
@@ -321,7 +326,11 @@
  "empty_state": "Ancora nessun preferito",
  "empty_hint": "Aggiungi file o cartelle ai preferiti per inserirli qui",
  "add": "Aggiungi ai preferiti",
- "remove": "Rimuovi dai preferiti"
+        "remove": "Rimuovi dai preferiti",
+        "added_title": "Aggiunto ai preferiti",
+        "added_msg": "aggiunto ai preferiti",
+        "removed_title": "Rimosso dai preferiti",
+        "removed_msg": "rimosso dai preferiti"
  },
  "recent": {
  "title": "Recenti",

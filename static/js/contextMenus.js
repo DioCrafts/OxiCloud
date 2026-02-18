@@ -5,6 +5,33 @@
 
 // Context Menus Module
 const contextMenus = {
+    _setFavoriteOptionLabel(optionId, isFavorite) {
+        const option = document.getElementById(optionId);
+        if (!option) return;
+        const label = option.querySelector('span');
+        if (!label) return;
+        label.textContent = window.i18n
+            ? window.i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite')
+            : (isFavorite ? 'Remove from favorites' : 'Add to favorites');
+    },
+
+    syncFavoriteOptionLabels() {
+        if (!window.favorites) return;
+
+        const targetFile = window.app && window.app.contextMenuTargetFile;
+        const targetFolder = window.app && window.app.contextMenuTargetFolder;
+
+        if (targetFile) {
+            const isFav = window.favorites.isFavorite(targetFile.id, 'file');
+            this._setFavoriteOptionLabel('favorite-file-option', isFav);
+        }
+
+        if (targetFolder) {
+            const isFav = window.favorites.isFavorite(targetFolder.id, 'folder');
+            this._setFavoriteOptionLabel('favorite-folder-option', isFav);
+        }
+    },
+
     /**
      * Assign events to menu items and dialogs
      */
@@ -20,29 +47,30 @@ const contextMenus = {
             window.ui.closeContextMenu();
         });
         
-        document.getElementById('favorite-folder-option').addEventListener('click', () => {
+        document.getElementById('favorite-folder-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFolder) {
                 const folder = window.app.contextMenuTargetFolder;
-                
+
                 // Check if folder is already in favorites to toggle
                 if (window.favorites && window.favorites.isFavorite(folder.id, 'folder')) {
                     // Remove from favorites
-                    window.favorites.removeFromFavorites(folder.id, 'folder');
-                    // Update menu item text
-                    document.getElementById('favorite-folder-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.favorite') : 'Add to favorites';
+                    const ok = await window.favorites.removeFromFavorites(folder.id, 'folder');
+                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
+                        window.ui.setFavoriteVisualState(folder.id, 'folder', false);
+                    }
                 } else {
                     // Add to favorites
-                    window.favorites.addToFavorites(
+                    const ok = await window.favorites.addToFavorites(
                         folder.id,
                         folder.name,
                         'folder',
                         folder.parent_id
                     );
-                    // Update menu item text
-                    document.getElementById('favorite-folder-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Remove from favorites';
+                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
+                        window.ui.setFavoriteVisualState(folder.id, 'folder', true);
+                    }
                 }
+                this.syncFavoriteOptionLabels();
             }
             window.ui.closeContextMenu();
         });
@@ -120,29 +148,30 @@ const contextMenus = {
             window.ui.closeFileContextMenu();
         });
         
-        document.getElementById('favorite-file-option').addEventListener('click', () => {
+        document.getElementById('favorite-file-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFile) {
                 const file = window.app.contextMenuTargetFile;
-                
+
                 // Check if file is already in favorites to toggle
                 if (window.favorites && window.favorites.isFavorite(file.id, 'file')) {
                     // Remove from favorites
-                    window.favorites.removeFromFavorites(file.id, 'file');
-                    // Update menu item text
-                    document.getElementById('favorite-file-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.favorite') : 'Add to favorites';
+                    const ok = await window.favorites.removeFromFavorites(file.id, 'file');
+                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
+                        window.ui.setFavoriteVisualState(file.id, 'file', false);
+                    }
                 } else {
                     // Add to favorites
-                    window.favorites.addToFavorites(
+                    const ok = await window.favorites.addToFavorites(
                         file.id,
                         file.name,
                         'file',
                         file.folder_id
                     );
-                    // Update menu item text
-                    document.getElementById('favorite-file-option').querySelector('span').textContent = 
-                        window.i18n ? window.i18n.t('actions.unfavorite') : 'Remove from favorites';
+                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
+                        window.ui.setFavoriteVisualState(file.id, 'file', true);
+                    }
                 }
+                this.syncFavoriteOptionLabels();
             }
             window.ui.closeFileContextMenu();
         });

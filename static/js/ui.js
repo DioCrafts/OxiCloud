@@ -275,6 +275,57 @@ const ui = {
     setupDragAndDrop() {
         const dropzone = document.getElementById('dropzone');
 
+        const collectDroppedEntries = async (dataTransfer) => {
+            const items = Array.from(dataTransfer?.items || []);
+            const rootEntries = items
+                .map(it => (typeof it.webkitGetAsEntry === 'function' ? it.webkitGetAsEntry() : null))
+                .filter(Boolean);
+
+            if (rootEntries.length === 0) return null;
+
+            const out = [];
+
+            const walkEntry = async (entry, prefix = '') => {
+                if (!entry) return;
+
+                if (entry.isFile) {
+                    await new Promise((resolve) => {
+                        entry.file(
+                            (file) => {
+                                out.push({ file, relativePath: `${prefix}${file.name}` });
+                                resolve();
+                            },
+                            () => resolve()
+                        );
+                    });
+                    return;
+                }
+
+                if (entry.isDirectory) {
+                    const dirPrefix = `${prefix}${entry.name}/`;
+                    const reader = entry.createReader();
+
+                    while (true) {
+                        const children = await new Promise((resolve) => {
+                            reader.readEntries(resolve, () => resolve([]));
+                        });
+                        if (!children || children.length === 0) break;
+                        for (const child of children) {
+                            // eslint-disable-next-line no-await-in-loop
+                            await walkEntry(child, dirPrefix);
+                        }
+                    }
+                }
+            };
+
+            for (const root of rootEntries) {
+                // eslint-disable-next-line no-await-in-loop
+                await walkEntry(root, '');
+            }
+
+            return out;
+        };
+
         // Dropzone events
         dropzone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -285,12 +336,27 @@ const ui = {
             dropzone.classList.remove('active');
         });
 
-        dropzone.addEventListener('drop', (e) => {
+        dropzone.addEventListener('drop', async (e) => {
             e.preventDefault();
             e.stopPropagation(); // Prevent bubbling to document's drop handler (avoids double upload)
             e._oxiHandled = true;  // Mark as handled for document-level fallback
             dropzone.classList.remove('active');
             if (e.dataTransfer.files.length > 0) {
+                // First try directory-aware extraction (Finder folder drag & drop)
+                const droppedEntries = await collectDroppedEntries(e.dataTransfer);
+                if (droppedEntries && droppedEntries.length > 0) {
+                    const hasFolderStructure = droppedEntries.some(x => x.relativePath && x.relativePath.includes('/'));
+                    if (hasFolderStructure) {
+                        fileOps.uploadFolderEntries(droppedEntries);
+                    } else {
+                        fileOps.uploadFiles(droppedEntries.map(x => x.file));
+                    }
+                    setTimeout(() => {
+                        dropzone.style.display = 'none';
+                    }, 500);
+                    return;
+                }
+
                 // Detect folder drops: files from folder drops have webkitRelativePath set
                 const hasRelativePaths = Array.from(e.dataTransfer.files).some(
                     f => f.webkitRelativePath && f.webkitRelativePath.includes('/')
@@ -327,7 +393,7 @@ const ui = {
             }
         });
 
-        document.addEventListener('drop', (e) => {
+        document.addEventListener('drop', async (e) => {
             e.preventDefault();
             dropzone.classList.remove('active');
 
@@ -335,6 +401,21 @@ const ui = {
             if (e._oxiHandled) return;
 
             if (e.dataTransfer.files.length > 0) {
+                // First try directory-aware extraction (Finder folder drag & drop)
+                const droppedEntries = await collectDroppedEntries(e.dataTransfer);
+                if (droppedEntries && droppedEntries.length > 0) {
+                    const hasFolderStructure = droppedEntries.some(x => x.relativePath && x.relativePath.includes('/'));
+                    if (hasFolderStructure) {
+                        fileOps.uploadFolderEntries(droppedEntries);
+                    } else {
+                        fileOps.uploadFiles(droppedEntries.map(x => x.file));
+                    }
+                    setTimeout(() => {
+                        dropzone.style.display = 'none';
+                    }, 500);
+                    return;
+                }
+
                 // Detect folder drops: files from folder drops have webkitRelativePath set
                 const hasRelativePaths = Array.from(e.dataTransfer.files).some(
                     f => f.webkitRelativePath && f.webkitRelativePath.includes('/')
@@ -361,6 +442,8 @@ const ui = {
         const gridViewBtn = document.getElementById('grid-view-btn');
         const listViewBtn = document.getElementById('list-view-btn');
 
+        this._hydrateViewIfNeeded('grid');
+
         filesGrid.style.display = 'grid';
         filesListView.style.display = 'none';
         gridViewBtn.classList.add('active');
@@ -377,6 +460,8 @@ const ui = {
         const filesListView = document.getElementById('files-list-view');
         const gridViewBtn = document.getElementById('grid-view-btn');
         const listViewBtn = document.getElementById('list-view-btn');
+
+        this._hydrateViewIfNeeded('list');
 
         filesGrid.style.display = 'none';
         filesListView.style.display = 'flex';
@@ -503,11 +588,79 @@ const ui = {
     },
 
     /**
+     * Get CSS special class for icon styling based on filename extension.
+     * Used as fallback when the backend DTO doesn't include icon_special_class.
+     */
+    getIconSpecialClass(fileName) {
+        if (!fileName) return '';
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
+        const map = {
+            pdf:'pdf-icon',
+            doc:'doc-icon', docx:'doc-icon', odt:'doc-icon', rtf:'doc-icon',
+            xls:'spreadsheet-icon', xlsx:'spreadsheet-icon', ods:'spreadsheet-icon', csv:'spreadsheet-icon',
+            ppt:'presentation-icon', pptx:'presentation-icon', odp:'presentation-icon', key:'presentation-icon',
+            jpg:'image-icon', jpeg:'image-icon', png:'image-icon', gif:'image-icon',
+            svg:'image-icon', webp:'image-icon', bmp:'image-icon', ico:'image-icon',
+            heic:'image-icon', heif:'image-icon', avif:'image-icon', tiff:'image-icon',
+            mp4:'video-icon', avi:'video-icon', mkv:'video-icon', mov:'video-icon',
+            wmv:'video-icon', flv:'video-icon', webm:'video-icon', m4v:'video-icon',
+            mp3:'audio-icon', wav:'audio-icon', ogg:'audio-icon', flac:'audio-icon',
+            aac:'audio-icon', wma:'audio-icon', m4a:'audio-icon', opus:'audio-icon',
+            zip:'archive-icon', rar:'archive-icon', '7z':'archive-icon',
+            tar:'archive-icon', gz:'archive-icon', bz2:'archive-icon', xz:'archive-icon',
+            exe:'installer-icon', msi:'installer-icon', dmg:'installer-icon',
+            deb:'installer-icon', rpm:'installer-icon', appimage:'installer-icon',
+            py:'code-icon py-icon', rs:'code-icon rust-icon', go:'code-icon go-icon',
+            js:'code-icon js-icon', jsx:'code-icon js-icon', mjs:'code-icon js-icon',
+            ts:'code-icon ts-icon', tsx:'code-icon ts-icon',
+            java:'code-icon java-icon', c:'code-icon c-icon', cpp:'code-icon c-icon',
+            cs:'code-icon cs-icon', rb:'code-icon ruby-icon', php:'code-icon php-icon',
+            swift:'code-icon swift-icon',
+            html:'code-icon html-icon', htm:'code-icon html-icon',
+            css:'code-icon css-icon', scss:'code-icon css-icon',
+            json:'code-icon json-icon', xml:'code-icon html-icon',
+            yaml:'code-icon config-icon', yml:'code-icon config-icon',
+            toml:'code-icon config-icon', ini:'code-icon config-icon',
+            sql:'code-icon sql-icon', vue:'code-icon js-icon', svelte:'code-icon js-icon',
+            sh:'script-icon', bash:'script-icon', zsh:'script-icon', bat:'script-icon',
+            md:'code-icon md-icon', txt:'doc-icon',
+        };
+        return map[ext] || '';
+    },
+
+    /**
      * Show notification
      * @param {string} title - Notification title
      * @param {string} message - Notification message
      */
     showNotification(title, message) {
+        // Prefer the bell notification center
+        if (window.notifications && typeof window.notifications.addNotification === 'function') {
+            const t = String(title || '').toLowerCase();
+            let icon = 'fa-info-circle';
+            let iconClass = 'upload';
+
+            if (t.includes('error') || t.includes('failed') || t.includes('fail')) {
+                icon = 'fa-exclamation-circle';
+                iconClass = 'error';
+            } else if (t.includes('favorite') || t.includes('favorit') || t.includes('fav')) {
+                icon = 'fa-star';
+                iconClass = 'success';
+            } else if (t.includes('delete') || t.includes('removed') || t.includes('trash') || t.includes('rename') || t.includes('complete')) {
+                icon = 'fa-check-circle';
+                iconClass = 'success';
+            }
+
+            window.notifications.addNotification({
+                icon,
+                iconClass,
+                title: title || '',
+                text: message || ''
+            });
+            return;
+        }
+
+        // Legacy floating toast fallback (pages without bell)
         let notification = document.querySelector('.notification');
         if (!notification) {
             notification = document.createElement('div');
@@ -560,8 +713,91 @@ const ui = {
     /** @type {Map<string, Object>} item data keyed by id */
     _items: new Map(),
 
+    /** @type {Array<Object>} last rendered folder dataset */
+    _lastFolders: [],
+
+    /** @type {Array<Object>} last rendered file dataset */
+    _lastFiles: [],
+
     /** @type {boolean} */
     _delegationReady: false,
+
+    _getActiveView() {
+        if (window.app && window.app.currentView === 'list') return 'list';
+        if (window.app && window.app.currentView === 'grid') return 'grid';
+
+        const stored = localStorage.getItem('oxicloud-view');
+        return stored === 'list' ? 'list' : 'grid';
+    },
+
+    _renderFoldersToView(folders, view) {
+        if (!Array.isArray(folders) || folders.length === 0) return;
+        const target = view === 'list'
+            ? document.getElementById('files-list-view')
+            : document.getElementById('files-grid');
+        if (!target) return;
+
+        const frag = document.createDocumentFragment();
+        for (const folder of folders) {
+            frag.appendChild(view === 'list'
+                ? this._createFolderItem(folder)
+                : this._createFolderCard(folder));
+        }
+        target.appendChild(frag);
+    },
+
+    _renderFilesToView(files, view) {
+        if (!Array.isArray(files) || files.length === 0) return;
+        const target = view === 'list'
+            ? document.getElementById('files-list-view')
+            : document.getElementById('files-grid');
+        if (!target) return;
+
+        const frag = document.createDocumentFragment();
+        for (const file of files) {
+            frag.appendChild(view === 'list'
+                ? this._createFileItem(file)
+                : this._createFileCard(file));
+        }
+        target.appendChild(frag);
+    },
+
+    _upsertById(arr, item) {
+        if (!Array.isArray(arr) || !item || !item.id) return;
+        const idx = arr.findIndex(x => x && x.id === item.id);
+        if (idx >= 0) {
+            arr[idx] = item;
+        } else {
+            arr.push(item);
+        }
+    },
+
+    _hydrateViewIfNeeded(view) {
+        // Only hydrate if there is at least one rendered item in the opposite/current DOM.
+        // This prevents stale cache hydration in empty-state screens.
+        const hasAnyRenderedItem = !!document.querySelector('#files-grid .file-card, #files-list-view .file-item');
+        if (!hasAnyRenderedItem) return;
+
+        if (view === 'grid') {
+            const grid = document.getElementById('files-grid');
+            if (!grid) return;
+            if (grid.children.length > 0) return;
+
+            this._renderFoldersToView(this._lastFolders, 'grid');
+            this._renderFilesToView(this._lastFiles, 'grid');
+            return;
+        }
+
+        if (view === 'list') {
+            const list = document.getElementById('files-list-view');
+            if (!list) return;
+            // list view keeps a static header row as first child
+            if (list.querySelector('.file-item')) return;
+
+            this._renderFoldersToView(this._lastFolders, 'list');
+            this._renderFilesToView(this._lastFiles, 'list');
+        }
+    },
 
     /**
      * Attach a fixed set of delegated event listeners to the two
@@ -622,7 +858,7 @@ const ui = {
             }
         };
 
-        // ── GRID: click (select) ──────────────────────────────────
+        // ── GRID: click (open / navigate; select only via checkbox) ──
         grid.addEventListener('click', (e) => {
             const card = e.target.closest('.file-card');
             if (!card) return;
@@ -645,26 +881,10 @@ const ui = {
                 return;
             }
 
-            // In favorites/recent view, single-click navigates/opens (like list)
-            if (window.app.isFavoritesView || window.app.isRecentView) {
-                const info = itemInfo(card);
-                if (info) {
-                    if (info.type === 'folder') navigateFolder(card);
-                    else openFile(info.data);
-                }
-                return;
-            }
+            // Favorite star – handled by direct onclick on the button
+            if (e.target.closest('.favorite-star')) return;
 
-            toggleCardSelection(card, e);
-        });
-
-        // ── GRID: dblclick (navigate / open) ──────────────────────
-        grid.addEventListener('dblclick', (e) => {
-            const card = e.target.closest('.file-card');
-            if (!card) return;
-            if (e.target.closest('.file-card-more') ||
-                e.target.closest('.file-card-checkbox')) return;
-
+            // Single-click opens/navigates (selection is only via checkbox)
             const info = itemInfo(card);
             if (!info) return;
 
@@ -673,6 +893,13 @@ const ui = {
             } else {
                 openFile(info.data);
             }
+        });
+
+        // ── GRID: dblclick (navigate / open) ──────────────────────
+        grid.addEventListener('dblclick', (e) => {
+            // Single-click already handles open/navigate.
+            // Prevent duplicate actions on double-click.
+            e.preventDefault();
         });
 
         // ── LIST: click (navigate / open) ─────────────────────────
@@ -712,6 +939,9 @@ const ui = {
                 const menuId = info.type === 'folder'
                     ? 'folder-context-menu' : 'file-context-menu';
                 const menu = document.getElementById(menuId);
+                if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
+                    window.contextMenus.syncFavoriteOptionLabels();
+                }
                 menu.style.left = `${e.pageX}px`;
                 menu.style.top  = `${e.pageY}px`;
                 menu.style.display = 'block';
@@ -794,7 +1024,99 @@ const ui = {
     },
 
     /* ================================================================
-     *  Pure element-creation helpers (no addEventListener)
+     *  Favorite star helper – attaches a direct click handler to a
+     *  star <button> so the event never bubbles to the card.
+     * ================================================================ */
+    _bindStarClick(el) {
+        const star = el.querySelector('.favorite-star');
+        if (!star) return;
+
+        star.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+
+            if (!window.favorites) return;
+
+            const itemId   = star.dataset.itemId;
+            const itemType = star.dataset.itemType;
+            const itemName = star.dataset.itemName;
+
+            const isActive = star.classList.contains('active');
+
+            if (isActive) {
+                this.setFavoriteVisualState(itemId, itemType, false);
+                window.favorites.removeFromFavorites(itemId, itemType);
+            } else {
+                this.setFavoriteVisualState(itemId, itemType, true);
+                window.favorites.addToFavorites(itemId, itemName, itemType);
+            }
+
+            // Keep context-menu label in sync if available
+            if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
+                window.contextMenus.syncFavoriteOptionLabels();
+            }
+        });
+    },
+
+    /**
+     * Sync favorite visuals for a file/folder across grid and list views.
+     */
+    setFavoriteVisualState(itemId, itemType, isFavorite) {
+        const cardSelector = itemType === 'folder'
+            ? `.file-card[data-folder-id="${itemId}"]`
+            : `.file-card[data-file-id="${itemId}"]`;
+
+        const listSelector = itemType === 'folder'
+            ? `.file-item[data-folder-id="${itemId}"]`
+            : `.file-item[data-file-id="${itemId}"]`;
+
+        const card = document.querySelector(cardSelector);
+        const starBtn = card ? card.querySelector('.favorite-star') : null;
+
+        if (starBtn) {
+            starBtn.classList.toggle('active', !!isFavorite);
+
+            // SVG icon path (after icons.js replacement)
+            const svg = starBtn.querySelector('svg');
+            const filledPath = window.OxiIcons && window.OxiIcons['star'];
+            const outlinePath = window.OxiIcons && window.OxiIcons['star-outline'];
+            const targetPath = isFavorite ? filledPath : outlinePath;
+            if (svg && targetPath) {
+                const p = svg.querySelector('path');
+                if (p) p.setAttribute('d', targetPath[1]);
+                svg.setAttribute('viewBox', `0 0 ${targetPath[0]} 512`);
+            }
+
+            // Fallback <i> icon (before icons.js replacement)
+            const i = starBtn.querySelector('i');
+            if (i) {
+                i.classList.remove('fas', 'far');
+                i.classList.add(isFavorite ? 'fas' : 'far');
+            }
+        }
+
+        const listItem = document.querySelector(listSelector);
+        if (listItem) {
+            const nameCell = listItem.querySelector('.name-cell');
+            if (nameCell) {
+                let inlineStar = nameCell.querySelector('.favorite-star-inline');
+                if (isFavorite && !inlineStar) {
+                    inlineStar = document.createElement('i');
+                    inlineStar.className = 'fas fa-star favorite-star-inline';
+                    nameCell.appendChild(inlineStar);
+                    if (window.OxiIcons && typeof window.OxiIcons.replaceIconsInElement === 'function') {
+                        window.OxiIcons.replaceIconsInElement(nameCell);
+                    }
+                } else if (!isFavorite && inlineStar) {
+                    inlineStar.remove();
+                }
+            }
+        }
+    },
+
+    /* ================================================================
+     *  Element-creation helpers
      * ================================================================ */
 
     /** Create a grid card for a folder */
@@ -811,7 +1133,9 @@ const ui = {
         el.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
-            ${isFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
+            <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
+                <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
+            </button>
             <div class="file-icon folder-icon">
                 <i class="fas fa-folder"></i>
             </div>
@@ -822,6 +1146,7 @@ const ui = {
         if (window.app.currentPath !== "") {
             el.setAttribute('draggable', 'true');
         }
+        this._bindStarClick(el);
         return el;
     },
 
@@ -859,8 +1184,8 @@ const ui = {
 
     /** Create a grid card for a file */
     _createFileCard(file) {
-        const iconClass = file.icon_class || 'fas fa-file';
-        const iconSpecialClass = file.icon_special_class || '';
+        const iconClass = file.icon_class || this.getIconClass(file.name);
+        const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
         const isFileFav = window.favorites &&
             window.favorites.isFavorite(file.id, 'file');
         const formattedDate = window.formatDateTime(file.modified_at);
@@ -875,20 +1200,23 @@ const ui = {
         el.innerHTML = `
             <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
             <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
-            ${isFileFav ? '<div class="favorite-star active"><i class="fas fa-star"></i></div>' : ''}
+            <button class="favorite-star${isFileFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
+                <i class="${isFileFav ? 'fas' : 'far'} fa-star"></i>
+            </button>
             <div class="file-icon ${iconSpecialClass}">
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
+        this._bindStarClick(el);
         return el;
     },
 
     /** Create a list row for a file */
     _createFileItem(file) {
-        const iconClass = file.icon_class || 'fas fa-file';
-        const iconSpecialClass = file.icon_special_class || '';
+        const iconClass = file.icon_class || this.getIconClass(file.name);
+        const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
         const cat = file.category || '';
         const typeLabel = cat
             ? (window.i18n
@@ -935,17 +1263,14 @@ const ui = {
      */
     renderFolders(folders) {
         if (!this._delegationReady) this.initDelegation();
-        const gridFrag = document.createDocumentFragment();
-        const listFrag = document.createDocumentFragment();
+        const safeFolders = Array.isArray(folders) ? folders : [];
+        this._lastFolders = safeFolders.slice();
 
-        for (const folder of folders) {
+        for (const folder of safeFolders) {
             this._items.set(folder.id, folder);
-            gridFrag.appendChild(this._createFolderCard(folder));
-            listFrag.appendChild(this._createFolderItem(folder));
         }
 
-        document.getElementById('files-grid').appendChild(gridFrag);
-        document.getElementById('files-list-view').appendChild(listFrag);
+        this._renderFoldersToView(safeFolders, this._getActiveView());
     },
 
     /**
@@ -954,17 +1279,14 @@ const ui = {
      */
     renderFiles(files) {
         if (!this._delegationReady) this.initDelegation();
-        const gridFrag = document.createDocumentFragment();
-        const listFrag = document.createDocumentFragment();
+        const safeFiles = Array.isArray(files) ? files : [];
+        this._lastFiles = safeFiles.slice();
 
-        for (const file of files) {
+        for (const file of safeFiles) {
             this._items.set(file.id, file);
-            gridFrag.appendChild(this._createFileCard(file));
-            listFrag.appendChild(this._createFileItem(file));
         }
 
-        document.getElementById('files-grid').appendChild(gridFrag);
-        document.getElementById('files-list-view').appendChild(listFrag);
+        this._renderFilesToView(safeFiles, this._getActiveView());
     },
 
     /* ================================================================
@@ -972,7 +1294,7 @@ const ui = {
      * ================================================================ */
 
     /**
-     * Add a single folder to both views.
+     * Add a single folder to the active view.
      * @param {Object} folder - Folder object
      */
     addFolderToView(folder) {
@@ -986,14 +1308,12 @@ const ui = {
         }
 
         this._items.set(folder.id, folder);
-        document.getElementById('files-grid')
-            .appendChild(this._createFolderCard(folder));
-        document.getElementById('files-list-view')
-            .appendChild(this._createFolderItem(folder));
+        this._upsertById(this._lastFolders, folder);
+        this._renderFoldersToView([folder], this._getActiveView());
     },
 
     /**
-     * Add a single file to both views.
+     * Add a single file to the active view.
      * @param {Object} file - File object
      */
     addFileToView(file) {
@@ -1007,10 +1327,8 @@ const ui = {
         }
 
         this._items.set(file.id, file);
-        document.getElementById('files-grid')
-            .appendChild(this._createFileCard(file));
-        document.getElementById('files-list-view')
-            .appendChild(this._createFileItem(file));
+        this._upsertById(this._lastFiles, file);
+        this._renderFilesToView([file], this._getActiveView());
     }
 };
 
@@ -1049,6 +1367,10 @@ function showContextMenuAtElement(triggerElement, menuId) {
     if (left < 8) left = 8;
     if (top + 300 > window.innerHeight + window.scrollY) {
         top = rect.top - 4 + window.scrollY; // flip above if no room
+    }
+
+    if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
+        window.contextMenus.syncFavoriteOptionLabels();
     }
 
     menu.style.left = `${left}px`;

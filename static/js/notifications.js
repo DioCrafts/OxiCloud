@@ -130,9 +130,11 @@ const notifications = (() => {
 
     /**
      * Start tracking a new upload batch.  Returns a batchId string.
-     * This also auto-opens the panel so users see progress.
+     * Always uses compact folder-level display: one progress bar + counter.
+     * @param {number} totalFiles
+     * @param {string} [folderName]  root folder name (for folder uploads)
      */
-    function addUploadBatch(totalFiles) {
+    function addUploadBatch(totalFiles, folderName) {
         const batchId = 'batch-' + (++_batchSeq);
         const body = $('notif-panel-body');
         if (!body) return batchId;
@@ -141,17 +143,22 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const uploadingText = (window.i18n && window.i18n.t) ? window.i18n.t('upload.uploading') : 'Uploading…';
+        const locale = window.i18n?.getCurrentLocale?.() || 'en';
+        const uploadingText = folderName
+            ? (locale.startsWith('es') ? `📁 Subiendo ${_esc(folderName)}…` : `📁 Uploading ${_esc(folderName)}…`)
+            : (locale.startsWith('es') ? 'Subiendo…' : 'Uploading…');
+        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+
         item.innerHTML = `
             <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
             <div class="notif-item-body">
-                <div class="notif-item-title">${_esc(uploadingText)}</div>
-                <div class="notif-upload-files" id="${batchId}-files"></div>
+                <div class="notif-item-title">${uploadingText}</div>
+                <div class="notif-upload-current" id="${batchId}-current" style="font-size:11px;color:#64748b;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
                 <div class="notif-upload-progress">
                     <div class="notif-upload-bar"><div class="notif-upload-fill" id="${batchId}-fill"></div></div>
                     <div class="notif-upload-detail">
                         <span class="notif-upload-pct" id="${batchId}-pct">0%</span>
-                        <span class="notif-upload-stats" id="${batchId}-stats">0 / ${totalFiles}</span>
+                        <span class="notif-upload-stats" id="${batchId}-stats">0 / ${totalFiles} ${filesLabel}</span>
                     </div>
                 </div>
                 <div class="notif-item-time">${_timeAgo()}</div>
@@ -161,7 +168,15 @@ const notifications = (() => {
         // Insert at top
         body.insertBefore(item, body.firstChild);
 
-        _batches[batchId] = { el: item, files: {}, totalFiles, completed: 0, successCount: 0 };
+        _batches[batchId] = {
+            el: item,
+            totalFiles,
+            completed: 0,
+            successCount: 0,
+            errorCount: 0,
+            lastLabelUpdateTs: 0,
+            lastLabelFile: ''
+        };
         _showEmptyIfNeeded();
 
         // Auto open
@@ -176,7 +191,8 @@ const notifications = (() => {
     }
 
     /**
-     * Add / update a single file row inside a batch.
+     * Update the current-file label inside a batch.
+     * This does NOT create any DOM rows — just a single text update.
      * @param {string} batchId
      * @param {string} fileName
      * @param {number} pct       0-100
@@ -186,39 +202,29 @@ const notifications = (() => {
         const batch = _batches[batchId];
         if (!batch) return;
 
-        const filesEl = $(batchId + '-files');
-        if (!filesEl) return;
+        if (status === 'error') batch.errorCount = (batch.errorCount || 0) + 1;
 
-        let row = batch.files[fileName];
-        if (!row) {
-            row = document.createElement('div');
-            row.className = 'notif-upload-file-row';
-            row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:2px 0;font-size:12px;';
-            row.innerHTML = `
-                <span class="notif-file-icon" style="width:16px;text-align:center;color:#999;flex-shrink:0;"><i class="fas fa-spinner fa-spin"></i></span>
-                <span class="notif-file-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;" title="${_esc(fileName)}">${_esc(fileName)}</span>
-                <span class="notif-file-pct" style="width:34px;text-align:right;color:#94a3b8;flex-shrink:0;">0%</span>
-            `;
-            filesEl.appendChild(row);
-            batch.files[fileName] = row;
-        }
+        // Only update the current-file label (single DOM element)
+        const curEl = $(batchId + '-current');
+        if (curEl && status === 'uploading') {
+            const now = Date.now();
+            const fileChanged = batch.lastLabelFile !== fileName;
+            const shouldUpdate = fileChanged || now - (batch.lastLabelUpdateTs || 0) >= 300 || pct >= 100;
+            if (!shouldUpdate) return;
 
-        const iconEl = row.querySelector('.notif-file-icon');
-        const pctEl  = row.querySelector('.notif-file-pct');
-
-        pctEl.textContent = pct + '%';
-
-        if (status === 'done') {
-            iconEl.innerHTML = '<i class="fas fa-check-circle" style="color:#34c759"></i>';
-            pctEl.textContent = '100%';
-        } else if (status === 'error') {
-            iconEl.innerHTML = '<i class="fas fa-exclamation-circle" style="color:#ff3b30"></i>';
-            pctEl.textContent = 'ERR';
+            // Show just the file name being uploaded (truncate long paths)
+            const shortName = fileName.length > 50
+                ? '…' + fileName.slice(-49)
+                : fileName;
+            curEl.textContent = shortName;
+            batch.lastLabelFile = fileName;
+            batch.lastLabelUpdateTs = now;
         }
     }
 
     /**
      * Mark a file as completed within a batch (updates overall bar).
+     * DOM updates are throttled to every 5 files to avoid reflow starvation.
      */
     function fileCompleted(batchId, success) {
         const batch = _batches[batchId];
@@ -226,14 +232,21 @@ const notifications = (() => {
         batch.completed++;
         if (success) batch.successCount++;
 
+        // Throttle DOM updates: every 5 files, or on the very last file
+        const isLast = batch.completed >= batch.totalFiles;
+        if (!isLast && batch.completed % 5 !== 0) return;
+
         const pctVal = Math.round((batch.completed / batch.totalFiles) * 100);
         const fillEl  = $(batchId + '-fill');
         const pctEl   = $(batchId + '-pct');
         const statsEl = $(batchId + '-stats');
 
+        const locale = window.i18n?.getCurrentLocale?.() || 'en';
+        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+
         if (fillEl)  fillEl.style.width = pctVal + '%';
         if (pctEl)   pctEl.textContent = pctVal + '%';
-        if (statsEl) statsEl.textContent = `${batch.completed} / ${batch.totalFiles}`;
+        if (statsEl) statsEl.textContent = `${batch.completed} / ${batch.totalFiles} ${filesLabel}`;
     }
 
     /**
@@ -252,9 +265,15 @@ const notifications = (() => {
         const titleEl = batch.el.querySelector('.notif-item-title');
         const iconEl  = batch.el.querySelector('.notif-item-icon');
 
-        const completeText = (window.i18n && window.i18n.t)
-            ? window.i18n.t('upload.complete', { count: successCount, total: totalFiles })
-            : `${successCount} / ${totalFiles} uploaded`;
+        // Clear the current-file label
+        const curEl = $(batchId + '-current');
+        if (curEl) curEl.textContent = '';
+
+        const locale = window.i18n?.getCurrentLocale?.() || 'en';
+        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+        const completeText = locale.startsWith('es')
+            ? `✅ ${successCount} / ${totalFiles} ${filesLabel} subidos`
+            : `✅ ${successCount} / ${totalFiles} ${filesLabel} uploaded`;
         if (titleEl) titleEl.textContent = completeText;
 
         if (iconEl) {

@@ -1168,7 +1168,7 @@ select:focus {
     background-color: white;
     border-radius: 12px;
     border: 2px solid #e2e8f0;
-    padding: 20px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -1176,7 +1176,7 @@ select:focus {
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
     width: 100%;
-    min-height: 180px;
+    min-height: 160px;
     position: relative;
 }
 
@@ -1261,6 +1261,46 @@ select:focus {
     color: #334155;
 }
 
+/* Favorite star (mirrors file-card-more button pattern) */
+button.favorite-star {
+    position: absolute;
+    top: 8px;
+    right: 38px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, background 0.15s;
+    z-index: 12;
+    cursor: pointer;
+    color: #cbd5e0;
+    font-size: 15px;
+    padding: 0;
+    line-height: 1;
+}
+
+.file-card:hover .favorite-star {
+    opacity: 1;
+}
+
+.favorite-star:hover {
+    color: #fbbf24;
+}
+
+.favorite-star.active {
+    opacity: 1;
+    color: #f59e0b;
+}
+
+.favorite-star.active:hover {
+    color: #d97706;
+}
+
 .file-card.dragging {
     opacity: 0.5;
     transform: scale(0.95);
@@ -1270,6 +1310,15 @@ select:focus {
 .file-card.drop-target {
     background-color: rgba(255, 193, 7, 0.1);
     border: 2px dashed #ffc107;
+}
+
+/* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
+   CSS shapes (::before / ::after) already convey the file type visually.
+   Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
+   List-view icons (.file-item .file-icon) are NOT affected. */
+.file-card .file-icon > i,
+.file-card .file-icon > svg {
+    display: none !important;
 }
 
 /* Styles for folders as in the mockup */
@@ -1296,42 +1345,6 @@ select:focus {
     border-radius: 8px 8px 0 0;
 }
 
-.file-icon.folder-icon i {
-    display: none; /* Hide Font Awesome icon */
-}
-
-/* Style for documents */
-.file-icon.doc-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #e2e8f0; /* Light gray background */
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-}
-
-.file-icon.doc-icon::before {
-    content: "";
-    position: absolute;
-    top: 15px;
-    left: 20px;
-    right: 20px;
-    height: 4px;
-    background-color: #a0aec0;
-    border-radius: 2px;
-}
-
-.file-icon.doc-icon::after {
-    content: "";
-    position: absolute;
-    top: 25px;
-    left: 20px;
-    right: 30px;
-    height: 4px;
-    background-color: #a0aec0;
-    border-radius: 2px;
-}
-
 /* Style for PDF files */
 .file-icon.pdf-icon {
     width: 100px;
@@ -1345,10 +1358,13 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.pdf-icon i {
-    font-size: 28px;
+.file-icon.pdf-icon::after {
+    content: "PDF";
+    font-size: 16px;
+    font-weight: 700;
     color: #e53e3e;
-    opacity: 0.7;
+    opacity: 0.65;
+    letter-spacing: 1px;
 }
 
 /* Style for document files (doc, docx, txt, rtf, odt) */
@@ -1360,14 +1376,25 @@ select:focus {
     position: relative;
     margin-bottom: 10px;
     border-top: 3px solid #2b6cb0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
 }
-.file-icon.doc-icon i {
-    font-size: 28px;
-    color: #2b6cb0;
-    opacity: 0.7;
+.file-icon.doc-icon::before {
+    content: "";
+    position: absolute;
+    top: 18px; left: 18px; right: 18px;
+    height: 3px;
+    background-color: #2b6cb0;
+    opacity: 0.3;
+    border-radius: 2px;
+}
+.file-icon.doc-icon::after {
+    content: "";
+    position: absolute;
+    top: 28px; left: 18px; right: 28px;
+    height: 3px;
+    background-color: #2b6cb0;
+    opacity: 0.25;
+    border-radius: 2px;
 }
 
 /* Style for shell/script files */
@@ -1383,10 +1410,13 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.script-icon i {
-    font-size: 28px;
+.file-icon.script-icon::after {
+    content: ">_";
+    font-size: 18px;
+    font-weight: 700;
+    font-family: monospace;
     color: #4eaa25;
-    opacity: 0.7;
+    opacity: 0.55;
 }
 
 /* Style for config files */
@@ -1398,14 +1428,25 @@ select:focus {
     position: relative;
     margin-bottom: 10px;
     border-top: 3px solid #718096;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    overflow: hidden;
 }
-.file-icon.config-icon i {
-    font-size: 28px;
-    color: #718096;
-    opacity: 0.7;
+.file-icon.config-icon::before {
+    content: "";
+    position: absolute;
+    top: 15px; left: 16px;
+    width: 10px; height: 10px;
+    border: 2px solid #718096;
+    border-radius: 50%;
+    opacity: 0.4;
+}
+.file-icon.config-icon::after {
+    content: "";
+    position: absolute;
+    top: 19px; left: 34px; right: 16px;
+    height: 3px;
+    background-color: #718096;
+    opacity: 0.3;
+    border-radius: 2px;
 }
 
 /* Style for images */
@@ -1647,7 +1688,6 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.spreadsheet-icon i { display: none; }
 .file-icon.spreadsheet-icon::before {
     content: "";
     position: absolute;
@@ -1673,7 +1713,6 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.presentation-icon i { display: none; }
 .file-icon.presentation-icon::before {
     content: "";
     position: absolute;
@@ -1708,7 +1747,6 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.audio-icon i { display: none; }
 .file-icon.audio-icon::before {
     content: "♪";
     font-size: 28px;
@@ -1730,7 +1768,6 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.archive-icon i { display: none; }
 .file-icon.archive-icon::before {
     content: "";
     position: absolute;
@@ -1754,7 +1791,6 @@ select:focus {
     align-items: center;
     justify-content: center;
 }
-.file-icon.installer-icon i { display: none; }
 .file-icon.installer-icon::before {
     content: "⬇";
     font-size: 24px;
@@ -1764,30 +1800,46 @@ select:focus {
 
 /* List view icon colors for new types */
 .file-item .file-icon.spreadsheet-icon { background-color: #e6f4ea; width: 36px; height: 36px; margin-bottom: 0; border-top: none; }
-.file-item .file-icon.spreadsheet-icon i { color: #0d904f; display: flex; }
-.file-item .file-icon.spreadsheet-icon::before { display: none; }
+.file-item .file-icon.spreadsheet-icon i,
+.file-item .file-icon.spreadsheet-icon svg { color: #0d904f; display: flex !important; }
+.file-item .file-icon.spreadsheet-icon::before,
+.file-item .file-icon.spreadsheet-icon::after { display: none; }
 
 .file-item .file-icon.presentation-icon { background-color: #fef3e2; width: 36px; height: 36px; margin-bottom: 0; border-top: none; }
-.file-item .file-icon.presentation-icon i { color: #d04423; display: flex; }
-.file-item .file-icon.presentation-icon::before, .file-item .file-icon.presentation-icon::after { display: none; }
+.file-item .file-icon.presentation-icon i,
+.file-item .file-icon.presentation-icon svg { color: #d04423; display: flex !important; }
+.file-item .file-icon.presentation-icon::before,
+.file-item .file-icon.presentation-icon::after { display: none; }
 
 .file-item .file-icon.audio-icon { background-color: #fff3e0; width: 36px; height: 36px; margin-bottom: 0; border-top: none; }
-.file-item .file-icon.audio-icon i { color: #f57c00; display: flex; }
-.file-item .file-icon.audio-icon::before { display: none; }
+.file-item .file-icon.audio-icon i,
+.file-item .file-icon.audio-icon svg { color: #f57c00; display: flex !important; }
+.file-item .file-icon.audio-icon::before,
+.file-item .file-icon.audio-icon::after { display: none; }
 
 .file-item .file-icon.archive-icon { background-color: #f5f0eb; width: 36px; height: 36px; margin-bottom: 0; border-top: none; }
-.file-item .file-icon.archive-icon i { color: #8d6e63; display: flex; }
-.file-item .file-icon.archive-icon::before { display: none; }
+.file-item .file-icon.archive-icon i,
+.file-item .file-icon.archive-icon svg { color: #8d6e63; display: flex !important; }
+.file-item .file-icon.archive-icon::before,
+.file-item .file-icon.archive-icon::after { display: none; }
 
 .file-item .file-icon.installer-icon { background-color: #f3e8ff; width: 36px; height: 36px; margin-bottom: 0; border-top: none; }
-.file-item .file-icon.installer-icon i { color: #7c3aed; display: flex; }
-.file-item .file-icon.installer-icon::before { display: none; }
+.file-item .file-icon.installer-icon i,
+.file-item .file-icon.installer-icon svg { color: #7c3aed; display: flex !important; }
+.file-item .file-icon.installer-icon::before,
+.file-item .file-icon.installer-icon::after { display: none; }
 
 .file-item .file-icon.script-icon { background-color: #e8f5e9; }
-.file-item .file-icon.script-icon i { color: #4eaa25; }
+.file-item .file-icon.script-icon i,
+.file-item .file-icon.script-icon svg { color: #4eaa25; display: flex !important; }
+.file-item .file-icon.script-icon::before,
+.file-item .file-icon.script-icon::after { display: none; }
 
 .file-item .file-icon.config-icon { background-color: #f1f3f5; }
-.file-item .file-icon.config-icon i { color: #718096; }
+.file-item .file-icon.config-icon i,
+.file-item .file-icon.config-icon svg { color: #718096; display: flex !important; }
+.file-item .file-icon.config-icon::before,
+.file-item .file-icon.config-icon::after { display: none; }
 
 .file-name {
     font-size: 14px;
@@ -1906,7 +1958,22 @@ select:focus {
     border-radius: 8px 8px 0 0;
 }
 
-.file-item .file-icon.folder-icon i {
+.file-item .file-icon.folder-icon i,
+.file-item .file-icon.folder-icon svg {
+    display: none;
+}
+
+/* List view: show FA/SVG icons, hide grid-only decorative pseudo-elements */
+.file-item .file-icon.doc-icon {
+    background-color: #e0ecff;
+}
+.file-item .file-icon.doc-icon i,
+.file-item .file-icon.doc-icon svg {
+    color: #3171d8;
+    display: flex !important;
+}
+.file-item .file-icon.doc-icon::before,
+.file-item .file-icon.doc-icon::after {
     display: none;
 }
 
@@ -1915,40 +1982,56 @@ select:focus {
     background-color: #fee2e2;
 }
 
-.file-item .file-icon.pdf-icon i {
+.file-item .file-icon.pdf-icon i,
+.file-item .file-icon.pdf-icon svg {
     color: #e53e3e;
+    display: flex !important;
+}
+.file-item .file-icon.pdf-icon::before,
+.file-item .file-icon.pdf-icon::after {
+    display: none;
 }
 
 .file-item .file-icon.image-icon {
     background-color: #e0f2fe;
 }
 
-.file-item .file-icon.image-icon i {
+.file-item .file-icon.image-icon i,
+.file-item .file-icon.image-icon svg {
     color: #3b82f6;
+    display: flex !important;
+}
+.file-item .file-icon.image-icon::before,
+.file-item .file-icon.image-icon::after {
+    display: none;
 }
 
 .file-item .file-icon.video-icon {
     background: linear-gradient(135deg, #ede9fe, #fce7f3);
 }
 
-.file-item .file-icon.video-icon i {
+.file-item .file-icon.video-icon i,
+.file-item .file-icon.video-icon svg {
     color: #8b5cf6;
+    display: flex !important;
+}
+.file-item .file-icon.video-icon::before,
+.file-item .file-icon.video-icon::after {
+    display: none;
 }
 
 .file-item .file-icon.audio-icon {
     background-color: #fef3c7;
 }
 
-.file-item .file-icon.audio-icon i {
+.file-item .file-icon.audio-icon i,
+.file-item .file-icon.audio-icon svg {
     color: #f59e0b;
+    display: flex !important;
 }
-
-.file-item .file-icon.text-icon {
-    background-color: #f3f4f6;
-}
-
-.file-item .file-icon.text-icon i {
-    color: #6b7280;
+.file-item .file-icon.audio-icon::before,
+.file-item .file-icon.audio-icon::after {
+    display: none;
 }
 
 .file-item .date-cell {
