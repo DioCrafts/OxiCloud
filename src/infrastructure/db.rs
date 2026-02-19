@@ -1,6 +1,6 @@
 use crate::common::config::AppConfig;
 use anyhow::Result;
-use sqlx::{PgPool, Row, postgres::PgPoolOptions};
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
 
 pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
@@ -37,25 +37,16 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
                     Ok(_) => {
                         tracing::info!("PostgreSQL connection established successfully");
 
-                        if !tables_exist(&pool).await {
-                            tracing::warn!("Database tables do not exist. Auto-applying schema...");
-                            if let Err(e) = apply_schema(&pool).await {
-                                return Err(anyhow::anyhow!(
-                                    "Database schema could not be applied: {}. \
-                                         Run manually: psql -f db/schema.sql",
-                                    e
-                                ));
-                            }
-
-                            // Verify tables were actually created
-                            if !tables_exist(&pool).await {
-                                return Err(anyhow::anyhow!(
-                                    "Database schema was applied but tables still missing. \
-                                         Check db/schema.sql for errors."
-                                ));
-                            }
-                            tracing::info!("Database schema applied and verified successfully");
+                        // Always apply schema - it's idempotent (uses IF NOT EXISTS and CREATE OR REPLACE)
+                        tracing::info!("Applying database schema...");
+                        if let Err(e) = apply_schema(&pool).await {
+                            return Err(anyhow::anyhow!(
+                                "Database schema could not be applied: {}. \
+                                     Run manually: psql -f db/schema.sql",
+                                e
+                            ));
                         }
+                        tracing::info!("Database schema applied successfully");
 
                         return Ok(pool);
                     }
@@ -89,17 +80,6 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
         "Could not establish PostgreSQL connection after {} attempts",
         MAX_ATTEMPTS
     ))
-}
-
-/// Check whether the core auth tables exist in the database.
-async fn tables_exist(pool: &PgPool) -> bool {
-    sqlx::query(
-        "SELECT EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'auth' AND tablename = 'users')",
-    )
-    .fetch_one(pool)
-    .await
-    .map(|row| row.get::<bool, _>(0))
-    .unwrap_or(false)
 }
 
 /// Apply the embedded schema.sql to the database.
