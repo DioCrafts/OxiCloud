@@ -171,7 +171,7 @@ impl AdminSettingsService {
             admin_groups: effective.admin_groups,
             disable_password_login: effective.disable_password_login,
             provider_name: effective.provider_name,
-            callback_url: self.callback_url(),
+            callback_url: effective.redirect_uri.clone(),
             env_overrides: self.get_env_overrides(),
         })
     }
