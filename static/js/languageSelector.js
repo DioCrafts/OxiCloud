@@ -24,6 +24,10 @@ function getAvailableLanguages() {
 // RTL languages
 const rtlLanguages = ['fa']; // ['fa', 'ar']
 
+function icon(name, extraClass = '') {
+    return window.oxiIcon ? window.oxiIcon(name, extraClass) : '';
+}
+
 // Update HTML lang attribute and dir for RTL languages
 function updateHtmlAttributes(langCode) {
     const htmlElement = document.documentElement;
@@ -72,9 +76,9 @@ function createLanguageSelector(containerId = 'language-selector') {
     toggle.setAttribute('aria-expanded', 'false');
     toggle.setAttribute('tabindex', '0');
     toggle.innerHTML = `
-        <i class="fas fa-globe"></i>
+        ${icon('globe')}
         <span class="lang-code">${currentLang.code.toUpperCase()}</span>
-        <i class="fas fa-chevron-down dropdown-arrow"></i>
+        ${icon('chevron-down', 'dropdown-arrow')}
     `;
     
     // Create dropdown menu
@@ -92,7 +96,7 @@ function createLanguageSelector(containerId = 'language-selector') {
         option.innerHTML = `
             <span class="lang-flag">${lang.flag}</span>
             <span class="lang-name">${lang.name}</span>
-            <i class="fas fa-check lang-check"></i>
+            ${icon('check', 'lang-check')}
         `;
         
         option.addEventListener('click', async (e) => {

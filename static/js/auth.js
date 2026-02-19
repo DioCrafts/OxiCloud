@@ -127,6 +127,10 @@ function detectBrowserLanguage() {
     return ALL_LANGUAGES[0]; // fallback to English
 }
 
+function authIcon(name, extraClass = '') {
+    return window.oxiIcon ? window.oxiIcon(name, extraClass) : '';
+}
+
 // Build a language option element (card style)
 function buildLanguageCard(lang, isSelected) {
     const item = document.createElement('div');
@@ -138,7 +142,7 @@ function buildLanguageCard(lang, isSelected) {
         <span class="lang-picker-item-flag">${lang.flag}</span>
         <span class="lang-picker-item-name">${lang.nativeName}</span>
         <span class="lang-picker-item-english">${lang.name}</span>
-        ${isSelected ? '<i class="fas fa-check lang-picker-item-check"></i>' : ''}
+        ${isSelected ? authIcon('check', 'lang-picker-item-check') : ''}
     `;
     return item;
 }

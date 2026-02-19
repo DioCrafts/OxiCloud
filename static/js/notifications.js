@@ -100,6 +100,12 @@ const notifications = (() => {
         empty.style.display = hasItems ? 'none' : '';
     }
 
+    function _iconSvg(iconName, extraClass = '') {
+        const normalized = String(iconName || '').trim();
+        const faClass = normalized.startsWith('fa-') ? `fas ${normalized}` : normalized;
+        return window.oxiIconFromFaClass(faClass, extraClass);
+    }
+
     /* ── generic notification ───────────────────────────────── */
     function addNotification({ icon = 'fa-info-circle', iconClass = 'upload', title = '', text = '' }) {
         const body  = $('notif-panel-body');
@@ -108,7 +114,7 @@ const notifications = (() => {
         const item = document.createElement('div');
         item.className = 'notif-item';
         item.innerHTML = `
-            <div class="notif-item-icon ${iconClass}"><i class="fas ${icon}"></i></div>
+            <div class="notif-item-icon ${iconClass}">${_iconSvg(icon)}</div>
             <div class="notif-item-body">
                 <div class="notif-item-title">${_esc(title)}</div>
                 <div class="notif-item-text" title="${_esc(text)}">${_esc(text)}</div>
@@ -150,7 +156,7 @@ const notifications = (() => {
         const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
 
         item.innerHTML = `
-            <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
+            <div class="notif-item-icon upload">${_iconSvg('fa-cloud-upload-alt')}</div>
             <div class="notif-item-body">
                 <div class="notif-item-title">${uploadingText}</div>
                 <div class="notif-upload-current" id="${batchId}-current" style="font-size:11px;color:#64748b;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
@@ -279,10 +285,10 @@ const notifications = (() => {
         if (iconEl) {
             if (successCount === totalFiles) {
                 iconEl.className = 'notif-item-icon success';
-                iconEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+                iconEl.innerHTML = _iconSvg('fa-check-circle');
             } else {
                 iconEl.className = 'notif-item-icon error';
-                iconEl.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+                iconEl.innerHTML = _iconSvg('fa-exclamation-triangle');
             }
         }
 

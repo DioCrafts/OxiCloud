@@ -5,6 +5,10 @@
 
 // Context Menus Module
 const contextMenus = {
+    _icon(name, extraClass = '') {
+        return window.oxiIcon(name, extraClass);
+    },
+
     _setFavoriteOptionLabel(optionId, isFavorite) {
         const option = document.getElementById(optionId);
         if (!option) return;
@@ -393,7 +397,7 @@ const contextMenus = {
         const titleText = mode === 'file' ?
             (window.i18n ? window.i18n.t('dialogs.move_file') : 'Move file') :
             (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
-        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
+        dialogHeader.innerHTML = `${this._icon('arrows-alt')} <span>${titleText}</span>`;
 
         // Load all available folders
         await this.loadAllFolders(item.id, mode);
@@ -465,7 +469,7 @@ const contextMenus = {
                 // Clear container except root option
                 folderSelectContainer.innerHTML = `
                     <div class="folder-select-item selected" data-folder-id="">
-                        <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
+                        ${this._icon('folder')} <span data-i18n="dialogs.root">Root</span>
                     </div>
                 `;
 
@@ -494,7 +498,7 @@ const contextMenus = {
                         const folderItem = document.createElement('div');
                         folderItem.className = 'folder-select-item';
                         folderItem.dataset.folderId = folder.id;
-                        folderItem.innerHTML = `<i class="fas fa-folder"></i> ${escapeHtml(folder.name)}`;
+                        folderItem.innerHTML = `${this._icon('folder')} ${escapeHtml(folder.name)}`;
 
                         folderItem.addEventListener('click', () => {
                             // Deselect all
@@ -608,7 +612,7 @@ const contextMenus = {
                 if (share.has_password) {
                     const protectedSpan = document.createElement('span');
                     protectedSpan.className = 'share-protected';
-                    protectedSpan.innerHTML = '<i class="fas fa-lock"></i> Password protected';
+                    protectedSpan.innerHTML = `${this._icon('lock')} Password protected`;
                     infoDiv.appendChild(protectedSpan);
                 }
                 const expirationSpan = document.createElement('span');
@@ -624,13 +628,13 @@ const contextMenus = {
                 const copyBtn = document.createElement('button');
                 copyBtn.className = 'btn btn-small copy-link-btn';
                 copyBtn.dataset.shareUrl = share.url;
-                copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                copyBtn.innerHTML = `${this._icon('copy')} Copy`;
                 actionsDiv.appendChild(copyBtn);
 
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'btn btn-small btn-danger delete-link-btn';
                 deleteBtn.dataset.shareId = share.id;
-                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                deleteBtn.innerHTML = `${this._icon('trash')} Delete`;
                 actionsDiv.appendChild(deleteBtn);
 
                 shareEl.appendChild(actionsDiv);

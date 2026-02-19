@@ -87,6 +87,24 @@ cargo fmt                   # Format
 RUST_LOG=debug cargo run
 ```
 
+## Frontend Asset Pipeline (No Node)
+
+OxiCloud includes a Rust-native assets builder with `swc_ecma_minifier` for JavaScript.
+
+```bash
+# Build bundles/chunks + minified assets into static/dist (keeps HTML untouched)
+cargo run --bin assets -- --no-rewrite-html
+
+# Build bundles/chunks and rewrite HTML entries to hashed dist assets
+cargo run --bin assets -- --rewrite-html
+```
+
+What it does:
+- Minifies JS with SWC (`swc_ecma_minifier`)
+- Bundles and splits into shared chunk + per-page chunks
+- Minifies CSS (Rust pipeline)
+- Emits content-hashed filenames and `static/dist/manifest.json`
+
 ## Current Features
 
 - File upload, download, and organization

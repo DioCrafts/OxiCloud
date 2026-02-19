@@ -16,24 +16,24 @@ const ui = {
             folderMenu.id = 'folder-context-menu';
             folderMenu.innerHTML = `
                 <div class="context-menu-item" id="download-folder-option">
-                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
+                    ${this._icon('download')} <span data-i18n="actions.download">Download</span>
                 </div>
                 <div class="context-menu-item" id="favorite-folder-option">
-                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Add to favorites</span>
+                    ${this._icon('star')} <span data-i18n="actions.favorite">Add to favorites</span>
                 </div>
                 <div class="context-menu-item" id="share-folder-option">
-                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
+                    ${this._icon('share-alt')} <span data-i18n="actions.share">Share</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="rename-folder-option">
-                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Rename</span>
+                    ${this._icon('pen')} <span data-i18n="actions.rename">Rename</span>
                 </div>
                 <div class="context-menu-item" id="move-folder-option">
-                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Move to...</span>
+                    ${this._icon('arrows-alt')} <span data-i18n="actions.move">Move to...</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item context-menu-item-danger" id="delete-folder-option">
-                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Delete</span>
+                    ${this._icon('trash-alt')} <span data-i18n="actions.delete">Delete</span>
                 </div>
             `;
             document.body.appendChild(folderMenu);
@@ -46,28 +46,28 @@ const ui = {
             fileMenu.id = 'file-context-menu';
             fileMenu.innerHTML = `
                 <div class="context-menu-item" id="view-file-option">
-                    <i class="fas fa-eye"></i> <span data-i18n="actions.view">View</span>
+                    ${this._icon('eye')} <span data-i18n="actions.view">View</span>
                 </div>
                 <div class="context-menu-item" id="download-file-option">
-                    <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
+                    ${this._icon('download')} <span data-i18n="actions.download">Download</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="favorite-file-option">
-                    <i class="fas fa-star"></i> <span data-i18n="actions.favorite">Add to favorites</span>
+                    ${this._icon('star')} <span data-i18n="actions.favorite">Add to favorites</span>
                 </div>
                 <div class="context-menu-item" id="share-file-option">
-                    <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
+                    ${this._icon('share-alt')} <span data-i18n="actions.share">Share</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="rename-file-option">
-                    <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Rename</span>
+                    ${this._icon('pen')} <span data-i18n="actions.rename">Rename</span>
                 </div>
                 <div class="context-menu-item" id="move-file-option">
-                    <i class="fas fa-arrows-alt"></i> <span data-i18n="actions.move">Move to...</span>
+                    ${this._icon('arrows-alt')} <span data-i18n="actions.move">Move to...</span>
                 </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item context-menu-item-danger" id="delete-file-option">
-                    <i class="fas fa-trash-alt"></i> <span data-i18n="actions.delete">Delete</span>
+                    ${this._icon('trash-alt')} <span data-i18n="actions.delete">Delete</span>
                 </div>
             `;
             document.body.appendChild(fileMenu);
@@ -81,7 +81,7 @@ const ui = {
             renameDialog.innerHTML = `
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
-                        <i class="fas fa-pen" style="color:#ff5e3a"></i>
+                        ${this._icon('pen')}
                         <span data-i18n="dialogs.rename_folder">Rename</span>
                     </div>
                     <div class="rename-dialog-body">
@@ -104,14 +104,14 @@ const ui = {
             moveDialog.innerHTML = `
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
-                        <i class="fas fa-arrows-alt" style="color:#ff5e3a"></i>
+                        ${this._icon('arrows-alt')}
                         <span data-i18n="dialogs.move_file">Move</span>
                     </div>
                     <div class="rename-dialog-body">
                         <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Select destination folder:</p>
                         <div id="folder-select-container" style="max-height:220px;overflow-y:auto;">
                             <div class="folder-select-item selected" data-folder-id="">
-                                <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
+                                ${this._icon('folder')} <span data-i18n="dialogs.root">Root</span>
                             </div>
                         </div>
                     </div>
@@ -132,7 +132,7 @@ const ui = {
             shareDialog.innerHTML = `
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
-                        <i class="fas fa-share-alt" style="color:#ff5e3a"></i>
+                        ${this._icon('share-alt')}
                         <span data-i18n="dialogs.share_file">Share file</span>
                     </div>
                     <div class="shared-item-info">
@@ -182,10 +182,10 @@ const ui = {
                             <input type="text" id="generated-share-url" readonly>
                             <div class="share-link-actions">
                                 <button class="btn btn-small" id="copy-share-btn">
-                                    <i class="fas fa-copy"></i> <span data-i18n="actions.copy">Copy</span>
+                                    ${this._icon('copy')} <span data-i18n="actions.copy">Copy</span>
                                 </button>
                                 <button class="btn btn-small" id="notify-share-btn">
-                                    <i class="fas fa-envelope"></i> <span data-i18n="actions.notify">Notify</span>
+                                    ${this._icon('envelope')} <span data-i18n="actions.notify">Notify</span>
                                 </button>
                             </div>
                         </div>
@@ -227,7 +227,7 @@ const ui = {
             notificationDialog.innerHTML = `
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
-                        <i class="fas fa-envelope" style="color:#ff5e3a"></i>
+                        ${this._icon('envelope')}
                         <span data-i18n="dialogs.notify">Notify shared link</span>
                     </div>
                     
@@ -562,35 +562,48 @@ const ui = {
         return window.isTextViewable ? window.isTextViewable(file.mime_type) : false;
     },
 
+    _icon(name, extraClass = '') {
+        return window.oxiIcon(name, extraClass);
+    },
+
+    _iconFromClass(iconClass, extraClass = '') {
+        const value = String(iconClass || '').trim();
+        if (!value) return '';
+        if (value.includes('fa-')) {
+            return window.oxiIconFromFaClass(value, extraClass);
+        }
+        return window.oxiIcon(value, extraClass);
+    },
+
     /**
-     * Get FontAwesome icon class for a filename based on its extension.
+     * Get icon name for a filename based on its extension.
      * Used as fallback when the backend DTO doesn't include icon_class
      * (e.g. trash items).
      */
     getIconClass(fileName) {
-        if (!fileName) return 'fas fa-file';
+        if (!fileName) return 'file';
         const ext = (fileName.split('.').pop() || '').toLowerCase();
         const map = {
-            pdf:'fas fa-file-pdf', doc:'fas fa-file-word', docx:'fas fa-file-word',
-            txt:'fas fa-file-alt', rtf:'fas fa-file-alt', odt:'fas fa-file-alt',
-            xls:'fas fa-file-excel', xlsx:'fas fa-file-excel', csv:'fas fa-file-excel', ods:'fas fa-file-excel',
-            ppt:'fas fa-file-powerpoint', pptx:'fas fa-file-powerpoint', odp:'fas fa-file-powerpoint',
-            jpg:'fas fa-file-image', jpeg:'fas fa-file-image', png:'fas fa-file-image',
-            gif:'fas fa-file-image', svg:'fas fa-file-image', webp:'fas fa-file-image',
-            bmp:'fas fa-file-image', ico:'fas fa-file-image',
-            mp4:'fas fa-file-video', avi:'fas fa-file-video', mov:'fas fa-file-video',
-            mkv:'fas fa-file-video', webm:'fas fa-file-video', flv:'fas fa-file-video',
-            mp3:'fas fa-file-audio', wav:'fas fa-file-audio', ogg:'fas fa-file-audio',
-            flac:'fas fa-file-audio', aac:'fas fa-file-audio', m4a:'fas fa-file-audio',
-            zip:'fas fa-file-archive', rar:'fas fa-file-archive', '7z':'fas fa-file-archive',
-            tar:'fas fa-file-archive', gz:'fas fa-file-archive',
-            js:'fas fa-file-code', ts:'fas fa-file-code', py:'fas fa-file-code',
-            rs:'fas fa-file-code', java:'fas fa-file-code', html:'fas fa-file-code',
-            css:'fas fa-file-code', json:'fas fa-file-code', xml:'fas fa-file-code',
-            sh:'fas fa-terminal', bash:'fas fa-terminal', bat:'fas fa-terminal',
-            md:'fas fa-file-alt',
+            pdf:'file-pdf', doc:'file-word', docx:'file-word',
+            txt:'file-alt', rtf:'file-alt', odt:'file-alt',
+            xls:'file-excel', xlsx:'file-excel', csv:'file-excel', ods:'file-excel',
+            ppt:'file-powerpoint', pptx:'file-powerpoint', odp:'file-powerpoint',
+            jpg:'file-image', jpeg:'file-image', png:'file-image',
+            gif:'file-image', svg:'file-image', webp:'file-image',
+            bmp:'file-image', ico:'file-image',
+            mp4:'file-video', avi:'file-video', mov:'file-video',
+            mkv:'file-video', webm:'file-video', flv:'file-video',
+            mp3:'file-audio', wav:'file-audio', ogg:'file-audio',
+            flac:'file-audio', aac:'file-audio', m4a:'file-audio',
+            zip:'file-archive', rar:'file-archive', '7z':'file-archive',
+            tar:'file-archive', gz:'file-archive',
+            js:'file-code', ts:'file-code', py:'file-code',
+            rs:'file-code', java:'file-code', html:'file-code',
+            css:'file-code', json:'file-code', xml:'file-code',
+            sh:'terminal', bash:'terminal', bat:'terminal',
+            md:'file-alt',
         };
-        return map[ext] || 'fas fa-file';
+        return map[ext] || 'file';
     },
 
     /**
@@ -1558,12 +1571,6 @@ const ui = {
                 svg.setAttribute('viewBox', `0 0 ${targetPath[0]} 512`);
             }
 
-            // Fallback <i> icon (before icons.js replacement)
-            const i = starBtn.querySelector('i');
-            if (i) {
-                i.classList.remove('fas', 'far');
-                i.classList.add(isFavorite ? 'fas' : 'far');
-            }
         }
 
         const listItem = document.querySelector(listSelector);
@@ -1572,11 +1579,11 @@ const ui = {
             if (nameCell) {
                 let inlineStar = nameCell.querySelector('.favorite-star-inline');
                 if (isFavorite && !inlineStar) {
-                    inlineStar = document.createElement('i');
-                    inlineStar.className = 'fas fa-star favorite-star-inline';
-                    nameCell.appendChild(inlineStar);
-                    if (window.OxiIcons && typeof window.OxiIcons.replaceIconsInElement === 'function') {
-                        window.OxiIcons.replaceIconsInElement(nameCell);
+                    const inlineWrap = document.createElement('span');
+                    inlineWrap.innerHTML = this._icon('star', 'favorite-star-inline');
+                    inlineStar = inlineWrap.firstElementChild;
+                    if (inlineStar) {
+                        nameCell.appendChild(inlineStar);
                     }
                 } else if (!isFavorite && inlineStar) {
                     inlineStar.remove();
@@ -1601,13 +1608,13 @@ const ui = {
             window.favorites.isFavorite(folder.id, 'folder');
 
         el.innerHTML = `
-            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
-            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
+            <div class="file-card-checkbox">${this._icon('check')}</div>
+            <button class="file-card-more">${this._icon('ellipsis-v')}</button>
             <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
-                <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
+                ${this._icon(isFav ? 'star' : 'star-outline')}
             </button>
             <div class="file-icon folder-icon">
-                <i class="fas fa-folder"></i>
+                ${this._icon('folder')}
             </div>
             <div class="file-name">${escapeHtml(folder.name)}</div>
             <div class="file-info">Folder</div>
@@ -1640,10 +1647,10 @@ const ui = {
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon folder-icon">
-                    <i class="fas fa-folder"></i>
+                    ${this._icon('folder')}
                 </div>
                 <span>${escapeHtml(folder.name)}</span>
-                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isFav ? this._icon('star', 'favorite-star-inline') : ''}
             </div>
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
@@ -1668,13 +1675,13 @@ const ui = {
         el.setAttribute('draggable', 'true');
 
         el.innerHTML = `
-            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
-            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
+            <div class="file-card-checkbox">${this._icon('check')}</div>
+            <button class="file-card-more">${this._icon('ellipsis-v')}</button>
             <button class="favorite-star${isFileFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
-                <i class="${isFileFav ? 'fas' : 'far'} fa-star"></i>
+                ${this._icon(isFileFav ? 'star' : 'star-outline')}
             </button>
             <div class="file-icon ${iconSpecialClass}">
-                <i class="${iconClass}"></i>
+                ${this._iconFromClass(iconClass)}
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
@@ -1711,10 +1718,10 @@ const ui = {
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
-                    <i class="${iconClass}"></i>
+                    ${this._iconFromClass(iconClass)}
                 </div>
                 <span>${escapeHtml(file.name)}</span>
-                ${isFileFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isFileFav ? this._icon('star', 'favorite-star-inline') : ''}
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>
@@ -2028,7 +2035,7 @@ function showConfirmDialog({ title, message, confirmText, cancelText, danger = t
         overlay.innerHTML = `
             <div class="confirm-dialog-content">
                 <div class="confirm-dialog-icon">
-                    <i class="fas ${danger ? 'fa-exclamation-triangle' : 'fa-question-circle'}"></i>
+                    ${window.oxiIcon(danger ? 'exclamation-triangle' : 'question-circle')}
                 </div>
                 <div class="confirm-dialog-title">${t}</div>
                 <div class="confirm-dialog-message">${message || ''}</div>

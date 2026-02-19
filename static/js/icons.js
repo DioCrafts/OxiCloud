@@ -146,7 +146,41 @@ function oxiIcon(name, extraClass) {
 }
 
 /**
- * Replace all <i class="fas/fab fa-xxx"> elements inside a container
+ * Build an SVG string from legacy class formats.
+ * Examples: "fa-folder", "fa-star", "fa-file-pdf"
+ * @param {string} faClasses
+ * @param {string} [extraClass]
+ * @returns {string}
+ */
+function oxiIconFromFaClass(faClasses, extraClass) {
+  const classes = String(faClasses || "").split(/\s+/).filter(Boolean);
+  let iconName = null;
+  let isSpin = false;
+  let isRegular = false;
+
+  for (const cls of classes) {
+    if (cls === "fa-spin") { isSpin = true; continue; }
+    if (cls === "far") { isRegular = true; continue; }
+    if (cls.startsWith("fa-") && cls !== "fa") {
+      iconName = cls.substring(3);
+    }
+  }
+
+  if (!iconName) return "";
+  if (isRegular && _ICONS[iconName + "-outline"]) {
+    iconName = iconName + "-outline";
+  }
+
+  let mergedClass = extraClass || "";
+  if (isSpin) {
+    mergedClass = mergedClass ? `${mergedClass} oxi-icon-spin` : "oxi-icon-spin";
+  }
+
+  return oxiIcon(iconName, mergedClass);
+}
+
+/**
+ * Replace all legacy icon tag elements inside a container
  * with equivalent inline SVGs.
  *
  * This is the migration bridge: existing code keeps generating <i> tags
@@ -211,15 +245,18 @@ function replaceIconsInElement(container) {
 
 // ── Expose globally ────────────────────────────────────────────
 window.oxiIcon = oxiIcon;
+window.oxiIconFromFaClass = oxiIconFromFaClass;
 window.replaceIconsInElement = replaceIconsInElement;
-window.OxiIcons = _ICONS;
+window.OxiIcons = Object.assign({}, _ICONS, {
+  oxiIcon,
+  fromFaClass: oxiIconFromFaClass,
+  replaceIconsInElement,
+});
 
-// ── Auto-replace: MutationObserver bridge ──────────────────────
-// Watches the DOM for new <i class="fa-..."> elements and converts them
-// to inline SVGs automatically.  Debounced to at most once per frame.
-(function autoReplace() {
-  let raf = 0;
-  const scan = () => { raf = 0; replaceIconsInElement(); };
+// ── Bootstrap scan (one-time) ──────────────────────────────────
+// Converts any static FA-like markup present at startup.
+(function bootstrapScan() {
+  const scan = () => replaceIconsInElement();
 
   // Initial sweep once the DOM is ready
   if (document.readyState === "loading") {
@@ -227,15 +264,4 @@ window.OxiIcons = _ICONS;
   } else {
     scan();
   }
-
-  // Observe future mutations (dynamic renders, modals, etc.)
-  new MutationObserver(function (mutations) {
-    if (raf) return;
-    for (let i = 0; i < mutations.length; i++) {
-      if (mutations[i].addedNodes.length) {
-        raf = requestAnimationFrame(scan);
-        return;
-      }
-    }
-  }).observe(document.documentElement, { childList: true, subtree: true });
 })();

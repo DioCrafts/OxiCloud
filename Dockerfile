@@ -22,6 +22,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY src src
 COPY static static
 COPY db db
+# Build frontend assets first (minify + bundle + code splitting + html rewrite)
+# so embedded HTML pages (include_str!) and static/dist are aligned.
+RUN cargo run --release --bin assets -- --rewrite-html
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
 RUN DATABASE_URL="${DATABASE_URL}" cargo build --release

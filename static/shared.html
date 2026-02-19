@@ -6,9 +6,17 @@
     <title>OxiCloud - Shared Resources</title>
     <!-- Apply saved theme immediately to prevent flash of light mode -->
     <script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
-    <link rel="stylesheet" href="/css/style.css">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <script src="/js/icons.js" defer></script>
+    
+
+
+
+
+<!-- OXICLOUD_ASSETS_START -->
+<link rel="stylesheet" href="/dist/css/shared.33ae6c5d98a9c657.css">
+<script defer src="/dist/js/shared.3ed499f91df29fed.js"></script>
+<script defer src="/dist/js/page-shared.967165b914222013.js"></script>
+<!-- OXICLOUD_ASSETS_END -->
 </head>
 <body>
     <!-- Main layout similar to index.html -->
@@ -247,9 +255,6 @@
         <button id="close-notification" class="close-notification-btn">×</button>
     </div>
 
-    <script src="/js/i18n.js"></script>
-    <script src="/js/languageSelector.js"></script>
-    <script src="/js/fileSharing.js"></script>
     <script>
         // Auth check — redirect to login if no token
         (function() {
@@ -306,6 +311,5 @@
             }
         })();
     </script>
-    <script src="/js/shared.js"></script>
-</body>
+    </body>
 </html>

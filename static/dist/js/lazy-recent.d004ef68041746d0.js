@@ -1,0 +1,13 @@
+let e={MAX_RECENT_FILES:20,_authHeaders(){let e=localStorage.getItem("oxicloud_token"),i={};return e&&(i.Authorization=`Bearer ${e}`),i;},_icon:(e,i="")=>window.oxiIcon?window.oxiIcon(e,i):"",init(){console.log("Initializing recent files module (server-authoritative)"),this.setupEventListeners();},setupEventListeners(){document.addEventListener("file-accessed",e=>{if(e.detail&&e.detail.file){let i=e.detail.file,t=i.item_type||"file";this._recordAccess(i.id,t);}});},async _recordAccess(e,i){try{await fetch(`/api/recent/${i}/${e}`,{method:"POST",headers:this._authHeaders()});}catch(e){console.warn("Failed to record recent access:",e);}},async clearRecentFiles(){try{await fetch("/api/recent/clear",{method:"DELETE",headers:this._authHeaders()});}catch(e){console.error("Error clearing recent files:",e);}},async displayRecentFiles(){try{let e=await fetch(`/api/recent?limit=${this.MAX_RECENT_FILES}`,{headers:this._authHeaders()});if(!e.ok)throw Error(`Server returned ${e.status}`);let i=await e.json(),t=document.getElementById("files-grid"),r=document.getElementById("files-list-view");if(t.innerHTML="",r.innerHTML=`
+                <div class="list-header">
+                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
+                    <div data-i18n="files.name">Name</div>
+                    <div data-i18n="files.type">Type</div>
+                    <div data-i18n="files.size">Size</div>
+                    <div data-i18n="recent.accessed">Accessed</div>
+                </div>
+            `,window.ui.updateBreadcrumb(""),0===i.length){let e=document.createElement("div");e.className="empty-state",e.innerHTML=`
+                    ${this._icon("clock")}
+                    <p>${window.i18n?window.i18n.t("recent.empty_state"):"No recent files"}</p>
+                    <p>${window.i18n?window.i18n.t("recent.empty_hint"):"Files you open will appear here"}</p>
+                `,t.appendChild(e);return;}let a=[],n=[];for(let e of i)"folder"===e.item_type?a.push({id:e.item_id,name:e.item_name||e.item_id,parent_id:e.parent_id||"",modified_at:e.accessed_at}):n.push({id:e.item_id,name:e.item_name||e.item_id,folder_id:e.parent_id||"",mime_type:e.item_mime_type,icon_class:e.icon_class,icon_special_class:e.icon_special_class,category:e.category,size:e.item_size||0,size_formatted:e.size_formatted,modified_at:e.accessed_at});a.length&&window.ui.renderFolders(a),n.length&&window.ui.renderFiles(n);}catch(e){console.error("Error displaying recent files:",e),window.ui&&window.ui.showNotification&&window.ui.showNotification("Error","Error loading recent files");}}};window.recent=e;

@@ -3,6 +3,10 @@
  * A simpler approach to viewing files that doesn't rely on complex DOM manipulation
  */
 
+function inlineViewerIcon(name, extraClass = '') {
+  return window.oxiIcon(name, extraClass);
+}
+
 class InlineViewer {
   constructor() {
     this.setupViewer();
@@ -30,15 +34,15 @@ class InlineViewer {
       <div class="inline-viewer-content">
         <div class="inline-viewer-header">
           <div class="inline-viewer-title">File Viewer</div>
-          <button class="inline-viewer-close"><i class="fas fa-times"></i></button>
+          <button class="inline-viewer-close">${inlineViewerIcon('times')}</button>
         </div>
         <div class="inline-viewer-container"></div>
         <div class="inline-viewer-toolbar">
-          <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
+          <button class="inline-viewer-download">${inlineViewerIcon('download')} Download</button>
           <div class="inline-viewer-controls">
-            <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
-            <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand"></i></button>
-            <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+            <button class="inline-viewer-zoom-out" title="Zoom Out">${inlineViewerIcon('search-minus')}</button>
+            <button class="inline-viewer-zoom-reset" title="Reset Zoom">${inlineViewerIcon('expand')}</button>
+            <button class="inline-viewer-zoom-in" title="Zoom In">${inlineViewerIcon('search-plus')}</button>
           </div>
         </div>
       </div>
@@ -114,7 +118,7 @@ class InlineViewer {
       // Show loading indicator
       const loader = document.createElement('div');
       loader.className = 'inline-viewer-loader';
-      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      loader.innerHTML = inlineViewerIcon('spinner', 'oxi-icon-spin');
       container.appendChild(loader);
       
       // Create image viewer using a blob URL
@@ -127,7 +131,7 @@ class InlineViewer {
       // Show loading indicator
       const loader = document.createElement('div');
       loader.className = 'inline-viewer-loader';
-      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      loader.innerHTML = inlineViewerIcon('spinner', 'oxi-icon-spin');
       container.appendChild(loader);
       
       // Create PDF viewer using object tag with blob URL
@@ -140,7 +144,7 @@ class InlineViewer {
       // Show loading indicator
       const loader = document.createElement('div');
       loader.className = 'inline-viewer-loader';
-      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      loader.innerHTML = inlineViewerIcon('spinner', 'oxi-icon-spin');
       container.appendChild(loader);
       
       // Create text viewer using authenticated fetch
@@ -154,7 +158,7 @@ class InlineViewer {
       const message = document.createElement('div');
       message.className = 'inline-viewer-message';
       message.innerHTML = `
-        <div class="inline-viewer-icon"><i class="fas fa-file"></i></div>
+        <div class="inline-viewer-icon">${inlineViewerIcon('file')}</div>
         <div class="inline-viewer-text">
           <p>This file type cannot be previewed.</p>
           <p>Click "Download" to get the file.</p>
@@ -325,7 +329,7 @@ class InlineViewer {
     const message = document.createElement('div');
     message.className = 'inline-viewer-message';
     message.innerHTML = `
-      <div class="inline-viewer-icon"><i class="fas fa-exclamation-triangle"></i></div>
+      <div class="inline-viewer-icon">${inlineViewerIcon('exclamation-triangle')}</div>
       <div class="inline-viewer-text">
         <p>Error loading the file.</p>
         <p>Try downloading it directly.</p>

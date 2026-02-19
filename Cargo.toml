@@ -49,6 +49,15 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 base64 = "0.22.1"
 fs2 = "0.4"
 rayon = "1.10"
+regex = "1.11"
+walkdir = "2.5"
+swc_common = "18"
+swc_ecma_ast = "20"
+swc_ecma_parser = "34"
+swc_ecma_codegen = "23"
+swc_ecma_minifier = "45"
+swc_ecma_visit = "20"
+swc_ecma_transforms_base = "37"
 
 [features]
 default = []

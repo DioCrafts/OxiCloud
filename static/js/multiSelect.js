@@ -38,6 +38,10 @@ const multiSelect = {
         return null;
     },
 
+    _icon(name, extraClass = '') {
+        return window.oxiIcon ? window.oxiIcon(name, extraClass) : '';
+    },
+
     // ── Selection state management ──────────────────────────
 
     toggle(id, name, type, parentId) {
@@ -169,19 +173,19 @@ const multiSelect = {
                 <span class="batch-bar-count">${countText}</span>
                 <div class="batch-bar-actions">
                     <button class="batch-btn" id="batch-fav" title="${favLabel}">
-                        <i class="fas fa-star"></i>
+                        ${this._icon('star')}
                         <span>${favLabel}</span>
                     </button>
                     <button class="batch-btn" id="batch-move" title="${moveLabel}">
-                        <i class="fas fa-arrows-alt"></i>
+                        ${this._icon('arrows-alt')}
                         <span>${moveLabel}</span>
                     </button>
                     <button class="batch-btn" id="batch-download" title="${dlLabel}">
-                        <i class="fas fa-download"></i>
+                        ${this._icon('download')}
                         <span>${dlLabel}</span>
                     </button>
                     <button class="batch-btn batch-btn-danger" id="batch-delete" title="${delLabel}">
-                        <i class="fas fa-trash-alt"></i>
+                        ${this._icon('trash-alt')}
                         <span>${delLabel}</span>
                     </button>
                 </div>
@@ -238,7 +242,7 @@ const multiSelect = {
                     gridBar.innerHTML = `
                         <div class="batch-bar-left">
                             <button class="batch-bar-close" id="batch-grid-close" title="Cancel selection">
-                                <i class="fas fa-times"></i>
+                                ${this._icon('times')}
                             </button>
                             <span class="batch-bar-count">${
                                 n === 1
@@ -248,19 +252,19 @@ const multiSelect = {
                         </div>
                         <div class="batch-bar-actions">
                             <button class="batch-btn" id="batch-fav" title="Add to favorites">
-                                <i class="fas fa-star"></i>
+                                ${this._icon('star')}
                                 <span>${this._t('batch.add_favorites') || 'Add to favorites'}</span>
                             </button>
                             <button class="batch-btn" id="batch-move" title="Move or copy">
-                                <i class="fas fa-arrows-alt"></i>
+                                ${this._icon('arrows-alt')}
                                 <span>${this._t('batch.move_copy') || 'Move or copy'}</span>
                             </button>
                             <button class="batch-btn" id="batch-download" title="Download">
-                                <i class="fas fa-download"></i>
+                                ${this._icon('download')}
                                 <span>${this._t('actions.download') || 'Download'}</span>
                             </button>
                             <button class="batch-btn batch-btn-danger" id="batch-delete" title="Delete">
-                                <i class="fas fa-trash-alt"></i>
+                                ${this._icon('trash-alt')}
                                 <span>${this._t('actions.delete') || 'Delete'}</span>
                             </button>
                         </div>
@@ -401,7 +405,7 @@ const multiSelect = {
         const n = items.length;
         const titleText = this._t('batch.move_title', { count: n })
             || `Move ${n} item${n !== 1 ? 's' : ''}`;
-        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
+        dialogHeader.innerHTML = `${this._icon('arrows-alt')} <span>${titleText}</span>`;
 
         const excludeIds = items.filter(i => i.type === 'folder').map(i => i.id);
         await contextMenus.loadAllFolders(excludeIds[0] || null, 'batch');

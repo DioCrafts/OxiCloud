@@ -1,0 +1,171 @@
+{
+  "version": 1,
+  "generated_by": "oxicloud-assets (swc_ecma_minifier)",
+  "pages": {
+    "admin.html": {
+      "js": [
+        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/page-admin.27cdc1cefa20c33c.js"
+      ],
+      "css": [
+        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/page-admin.4050aa1017160336.css"
+      ]
+    },
+    "index.html": {
+      "js": [
+        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/page-index.67b8aae6bec5ef70.js"
+      ],
+      "css": [
+        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/page-index.919244b0bcbeef79.css"
+      ]
+    },
+    "login.html": {
+      "js": [
+        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/page-login.672398291617194c.js"
+      ],
+      "css": [
+        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/page-login.9d7c8cc29fb8711d.css"
+      ]
+    },
+    "profile.html": {
+      "js": [
+        "/dist/js/shared.3ed499f91df29fed.js"
+      ],
+      "css": [
+        "/dist/css/shared.33ae6c5d98a9c657.css"
+      ]
+    },
+    "shared.html": {
+      "js": [
+        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/page-shared.967165b914222013.js"
+      ],
+      "css": [
+        "/dist/css/shared.33ae6c5d98a9c657.css"
+      ]
+    }
+  },
+  "chunks": [
+    {
+      "kind": "js",
+      "logical_name": "shared",
+      "file": "/dist/js/shared.3ed499f91df29fed.js",
+      "inputs": [
+        "/js/icons.js",
+        "/js/i18n.js",
+        "/js/languageSelector.js",
+        "/js/fileSharing.js"
+      ]
+    },
+    {
+      "kind": "css",
+      "logical_name": "shared",
+      "file": "/dist/css/shared.33ae6c5d98a9c657.css",
+      "inputs": [
+        "/css/style.css"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "lazy-search",
+      "file": "/dist/js/lazy-search.419937d99a53323d.js",
+      "inputs": [
+        "/js/search.js"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "lazy-favorites",
+      "file": "/dist/js/lazy-favorites.21b82727fb2d5060.js",
+      "inputs": [
+        "/js/favorites.js"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "lazy-recent",
+      "file": "/dist/js/lazy-recent.d004ef68041746d0.js",
+      "inputs": [
+        "/js/recent.js"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "lazy-shared-view",
+      "file": "/dist/js/lazy-shared-view.9e623a80e05685ec.js",
+      "inputs": [
+        "/js/components/sharedView.js"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "page-admin",
+      "file": "/dist/js/page-admin.27cdc1cefa20c33c.js",
+      "inputs": [
+        "/js/admin.js"
+      ]
+    },
+    {
+      "kind": "css",
+      "logical_name": "page-admin",
+      "file": "/dist/css/page-admin.4050aa1017160336.css",
+      "inputs": [
+        "/css/admin.css"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "page-index",
+      "file": "/dist/js/page-index.67b8aae6bec5ef70.js",
+      "inputs": [
+        "/js/notifications.js",
+        "/js/modal.js",
+        "/js/ui.js",
+        "/js/contextMenus.js",
+        "/js/fileOperations.js",
+        "/js/multiSelect.js",
+        "/js/inlineViewer.js",
+        "/js/app.js"
+      ]
+    },
+    {
+      "kind": "css",
+      "logical_name": "page-index",
+      "file": "/dist/css/page-index.919244b0bcbeef79.css",
+      "inputs": [
+        "/css/inlineViewer.css",
+        "/css/favorites.css",
+        "/css/recent.css"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "page-login",
+      "file": "/dist/js/page-login.672398291617194c.js",
+      "inputs": [
+        "/js/auth.js"
+      ]
+    },
+    {
+      "kind": "css",
+      "logical_name": "page-login",
+      "file": "/dist/css/page-login.9d7c8cc29fb8711d.css",
+      "inputs": [
+        "/css/auth.css"
+      ]
+    },
+    {
+      "kind": "js",
+      "logical_name": "page-shared",
+      "file": "/dist/js/page-shared.967165b914222013.js",
+      "inputs": [
+        "/js/shared.js"
+      ]
+    }
+  ]
+}

@@ -26,6 +26,10 @@ const favorites = {
         return `${type}:${id}`;
     },
 
+    _icon(name, extraClass = '') {
+        return window.oxiIcon ? window.oxiIcon(name, extraClass) : '';
+    },
+
     /**
      * Replace the entire in-memory cache from an array of FavoriteItemDto
      * objects (as returned by the batch endpoint). Avoids an extra
@@ -190,7 +194,7 @@ const favorites = {
                 const emptyState = document.createElement('div');
                 emptyState.className = 'empty-state';
                 emptyState.innerHTML = `
-                    <i class="fas fa-star" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+                    ${this._icon('star')}
                     <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No favorite items'}</p>
                     <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
                 `;

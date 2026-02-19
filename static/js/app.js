@@ -20,6 +20,15 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+function svgIcon(name, extraClass = '', style = '') {
+    const svg = window.oxiIcon(name, extraClass);
+    return style ? svg.replace('<svg ', `<svg style="${style}" `) : svg;
+}
+
+function svgFromFaClass(faClass, extraClass = '') {
+    return window.oxiIconFromFaClass(faClass, extraClass);
+}
+
 // Global state
 const app = {
     currentView: 'grid',   // Current view mode: 'grid' or 'list'
@@ -56,39 +65,39 @@ const ACTIONS_BAR_TEMPLATES = {
         <div class="action-buttons">
             <div class="upload-dropdown" id="upload-dropdown">
                 <button class="btn btn-primary" id="upload-btn">
-                    <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
+                    ${svgIcon('cloud-upload-alt', '', 'margin-right: 5px;')}
                     <span data-i18n="actions.upload">Upload</span>
-                    <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                    ${svgIcon('caret-down', '', 'margin-left: 4px; font-size: 12px;')}
                 </button>
                 <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                     <button class="upload-dropdown-item" id="upload-files-btn">
-                        <i class="fas fa-file"></i>
+                        ${svgIcon('file')}
                         <span data-i18n="actions.upload_files">Upload files</span>
                     </button>
                     <button class="upload-dropdown-item" id="upload-folder-btn">
-                        <i class="fas fa-folder-open"></i>
+                        ${svgIcon('folder-open')}
                         <span data-i18n="actions.upload_folder">Upload folder</span>
                     </button>
                 </div>
             </div>
             <button class="btn btn-secondary" id="new-folder-btn">
-                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i>
+                ${svgIcon('folder-plus', '', 'margin-right: 5px;')}
                 <span data-i18n="actions.new_folder">New folder</span>
             </button>
         </div>
         <div class="view-toggle">
             <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
+                ${svgIcon('th')}
             </button>
             <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
+                ${svgIcon('list')}
             </button>
         </div>
     `,
     trash: `
         <div class="action-buttons">
             <button class="btn btn-danger" id="empty-trash-btn">
-                <i class="fas fa-trash-alt"></i>
+                ${svgIcon('trash-alt')}
                 <span data-i18n="trash.empty_trash">Empty trash</span>
             </button>
         </div>
@@ -97,26 +106,26 @@ const ACTIONS_BAR_TEMPLATES = {
         <div class="action-buttons"></div>
         <div class="view-toggle">
             <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
+                ${svgIcon('th')}
             </button>
             <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
+                ${svgIcon('list')}
             </button>
         </div>
     `,
     recent: `
         <div class="action-buttons">
             <button class="btn btn-secondary" id="clear-recent-btn">
-                <i class="fas fa-broom" style="margin-right: 5px;"></i>
+                ${svgIcon('broom', '', 'margin-right: 5px;')}
                 <span data-i18n="actions.clear_recent">Clear recent</span>
             </button>
         </div>
         <div class="view-toggle">
             <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
+                ${svgIcon('th')}
             </button>
             <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
+                ${svgIcon('list')}
             </button>
         </div>
     `
@@ -124,24 +133,69 @@ const ACTIONS_BAR_TEMPLATES = {
 
 const LAZY_MODULES = {
     search: {
-        url: '/js/search.js',
+        logicalName: 'lazy-search',
         isReady: () => !!window.search,
     },
     favorites: {
-        url: '/js/favorites.js',
+        logicalName: 'lazy-favorites',
         isReady: () => !!window.favorites,
     },
     recent: {
-        url: '/js/recent.js',
+        logicalName: 'lazy-recent',
         isReady: () => !!window.recent,
     },
     sharedView: {
-        url: '/js/components/sharedView.js',
+        logicalName: 'lazy-shared-view',
         isReady: () => !!window.sharedView,
     },
 };
 
 const lazyLoadPromises = new Map();
+const ASSET_MANIFEST_URL = '/dist/manifest.json';
+let lazyModuleUrlMapPromise = null;
+
+function getLazyModuleUrlMap() {
+    if (lazyModuleUrlMapPromise) {
+        return lazyModuleUrlMapPromise;
+    }
+
+    lazyModuleUrlMapPromise = fetch(ASSET_MANIFEST_URL, { cache: 'no-store' })
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`Manifest fetch failed: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then((manifest) => {
+            const chunkList = Array.isArray(manifest?.chunks) ? manifest.chunks : [];
+            const urlByLogicalName = new Map();
+            chunkList.forEach((chunk) => {
+                if (chunk && chunk.kind === 'js' && typeof chunk.logical_name === 'string' && typeof chunk.file === 'string') {
+                    urlByLogicalName.set(chunk.logical_name, chunk.file);
+                }
+            });
+            return urlByLogicalName;
+        })
+        .catch((error) => {
+            throw new Error(`Lazy manifest unavailable: ${error?.message || error}`);
+        });
+
+    return lazyModuleUrlMapPromise;
+}
+
+async function resolveLazyModuleUrl(moduleConfig) {
+    if (!moduleConfig) return null;
+    if (!moduleConfig.logicalName) {
+        throw new Error('Lazy module configuration missing logicalName');
+    }
+
+    const urlByLogicalName = await getLazyModuleUrlMap();
+    const resolvedUrl = urlByLogicalName.get(moduleConfig.logicalName);
+    if (!resolvedUrl) {
+        throw new Error(`Lazy module not found in manifest: ${moduleConfig.logicalName}`);
+    }
+    return resolvedUrl;
+}
 
 function loadScriptOnce(url) {
     if (lazyLoadPromises.has(url)) {
@@ -192,7 +246,8 @@ async function ensureModule(moduleName) {
 
     if (moduleConfig.isReady()) return;
 
-    await loadScriptOnce(moduleConfig.url);
+    const resolvedUrl = await resolveLazyModuleUrl(moduleConfig);
+    await loadScriptOnce(resolvedUrl);
 
     if (!moduleConfig.isReady()) {
         throw new Error(`Module loaded but not ready: ${moduleName}`);
@@ -1044,7 +1099,7 @@ async function loadTrashItems() {
             const emptyState = document.createElement('div');
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
-                <i class="fas fa-trash" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+                ${svgIcon('trash', '', 'font-size: 48px; color: #ddd; margin-bottom: 16px;')}
                 <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'The trash is empty'}</p>
             `;
             elements.filesGrid.appendChild(emptyState);
@@ -1077,17 +1132,21 @@ function addTrashItemToView(item) {
     let iconClass;
     let typeLabel;
     if (!isFile) {
-        iconClass = item.icon_class || 'fas fa-folder';
+        iconClass = item.icon_class || 'folder';
         typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
     } else {
         iconClass = item.icon_class || (window.ui && window.ui.getIconClass
             ? window.ui.getIconClass(item.name)
-            : 'fas fa-file');
+            : 'file');
         const cat = item.category || '';
         typeLabel = cat
             ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
             : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
     }
+
+    const renderedIcon = String(iconClass).includes('fa-')
+        ? svgFromFaClass(iconClass)
+        : svgIcon(iconClass);
     
     // Grid view element
     const gridElement = document.createElement('div');
@@ -1097,16 +1156,16 @@ function addTrashItemToView(item) {
     gridElement.dataset.itemType = item.item_type;
     gridElement.innerHTML = `
         <div class="file-icon">
-            <i class="${iconClass}"></i>
+            ${renderedIcon}
         </div>
         <div class="file-name">${escapeHtml(item.name)}</div>
         <div class="file-info">${escapeHtml(typeLabel)} - ${escapeHtml(formattedDate)}</div>
         <div class="trash-actions">
             <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
-                <i class="fas fa-undo"></i>
+                ${svgIcon('undo')}
             </button>
             <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
-                <i class="fas fa-trash"></i>
+                ${svgIcon('trash')}
             </button>
         </div>
     `;
@@ -1138,7 +1197,7 @@ function addTrashItemToView(item) {
     listElement.innerHTML = `
         <div class="name-cell">
             <div class="file-icon">
-                <i class="${iconClass}"></i>
+                ${svgFromFaClass(iconClass)}
             </div>
             <span>${escapeHtml(item.name)}</span>
         </div>
@@ -1147,10 +1206,10 @@ function addTrashItemToView(item) {
         <div class="date-cell">${escapeHtml(formattedDate)}</div>
         <div class="actions-cell">
             <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
-                <i class="fas fa-undo"></i>
+                ${svgIcon('undo')}
             </button>
             <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
-                <i class="fas fa-trash"></i>
+                ${svgIcon('trash')}
             </button>
         </div>
     `;
@@ -1193,7 +1252,7 @@ async function performSearch(query, sortBy) {
         if (filesGrid) {
             filesGrid.innerHTML = `
                 <div class="search-results-header">
-                    <h3><i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Searching for "${query}"...</h3>
+                    <h3>${svgIcon('spinner', 'oxi-icon-spin')} Searching for "${query}"...</h3>
                 </div>
             `;
         }
@@ -1486,7 +1545,7 @@ async function switchToFavoritesView() {
         if (filesGrid) {
             filesGrid.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
+                    ${svgIcon('exclamation-circle', '', 'font-size: 48px; color: #f44336; margin-bottom: 16px;')}
                     <p>Error loading the favorites module</p>
                 </div>
             `;
@@ -1565,7 +1624,7 @@ async function switchToRecentFilesView() {
         if (filesGrid) {
             filesGrid.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
+                    ${svgIcon('exclamation-circle', '', 'font-size: 48px; color: #f44336; margin-bottom: 16px;')}
                     <p>Error loading the recent files module</p>
                 </div>
             `;

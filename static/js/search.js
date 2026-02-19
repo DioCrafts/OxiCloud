@@ -8,6 +8,10 @@
  */
 
 const search = {
+    _icon(name, extraClass = '') {
+        return window.oxiIcon ? window.oxiIcon(name, extraClass) : '';
+    },
+
     /**
      * Perform a search using query parameters.
      * The backend handles all processing and returns enriched results with
@@ -138,7 +142,7 @@ const search = {
                     <option value="size"${results.sort_by === 'size' ? ' selected' : ''}>Smallest first</option>
                 </select>
                 <button class="btn btn-secondary" id="clear-search-btn">
-                    <i class="fas fa-times"></i> Clear search
+                    ${this._icon('times')} Clear search
                 </button>
             </div>
         `;
@@ -175,7 +179,7 @@ const search = {
             const emptyState = document.createElement('div');
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
-                <i class="fas fa-search" style="font-size: 48px; color: var(--empty-icon, #ccc); margin-bottom: 16px;"></i>
+                ${this._icon('search')}
                 <p style="color: var(--text-secondary, #64748b);">No results found for this search</p>
             `;
             filesGrid.appendChild(emptyState);

@@ -88,7 +88,12 @@ const Modal = {
             } = options;
             
             // Set modal content
-            this.icon.className = `fas ${icon}`;
+            const iconClass = String(icon || '').trim();
+            if (this.icon) {
+                this.icon.innerHTML = window.oxiIconFromFaClass
+                    ? window.oxiIconFromFaClass(`fas ${iconClass}`)
+                    : '';
+            }
             this.title.textContent = title;
             this.label.textContent = label;
             this.input.placeholder = placeholder;
