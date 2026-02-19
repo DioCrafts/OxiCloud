@@ -8,7 +8,7 @@
         "/dist/js/page-admin.27cdc1cefa20c33c.js"
       ],
       "css": [
-        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/shared.e5a2c86951456639.css",
         "/dist/css/page-admin.4050aa1017160336.css"
       ]
     },
@@ -18,7 +18,7 @@
         "/dist/js/page-index.e4fc6a79a6ae718c.js"
       ],
       "css": [
-        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/shared.e5a2c86951456639.css",
         "/dist/css/page-index.919244b0bcbeef79.css"
       ]
     },
@@ -28,7 +28,7 @@
         "/dist/js/page-login.672398291617194c.js"
       ],
       "css": [
-        "/dist/css/shared.33ae6c5d98a9c657.css",
+        "/dist/css/shared.e5a2c86951456639.css",
         "/dist/css/page-login.9d7c8cc29fb8711d.css"
       ]
     },
@@ -37,7 +37,7 @@
         "/dist/js/shared.e45098ea39a294cb.js"
       ],
       "css": [
-        "/dist/css/shared.33ae6c5d98a9c657.css"
+        "/dist/css/shared.e5a2c86951456639.css"
       ]
     },
     "shared.html": {
@@ -46,7 +46,7 @@
         "/dist/js/page-shared.967165b914222013.js"
       ],
       "css": [
-        "/dist/css/shared.33ae6c5d98a9c657.css"
+        "/dist/css/shared.e5a2c86951456639.css"
       ]
     }
   },
@@ -64,7 +64,7 @@
     {
       "kind": "css",
       "logical_name": "shared",
-      "file": "/dist/css/shared.33ae6c5d98a9c657.css",
+      "file": "/dist/css/shared.e5a2c86951456639.css",
       "inputs": [
         "/css/style.css"
       ]

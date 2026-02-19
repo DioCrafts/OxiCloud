@@ -4,9 +4,28 @@ use axum::http::header::{CACHE_CONTROL, HeaderValue};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, get_service};
 use axum::Router;
+use serde::Deserialize;
+use std::collections::BTreeMap;
+use std::sync::OnceLock;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
+
+const ASSETS_START_MARKER: &str = "<!-- OXICLOUD_ASSETS_START -->";
+const ASSETS_END_MARKER: &str = "<!-- OXICLOUD_ASSETS_END -->";
+
+#[derive(Debug, Clone, Deserialize)]
+struct PageManifestEntry {
+    js: Vec<String>,
+    css: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct BuildManifest {
+    pages: BTreeMap<String, PageManifestEntry>,
+}
+
+static BUILD_MANIFEST: OnceLock<Option<BuildManifest>> = OnceLock::new();
 
 /// Creates web routes for serving static files
 pub fn create_web_routes() -> Router<AppState> {
@@ -81,9 +100,83 @@ fn no_cache_html_response(content: &'static str) -> Response {
         .into_response()
 }
 
+fn no_cache_html_response_owned(content: String) -> Response {
+    (
+        [(
+            CACHE_CONTROL,
+            HeaderValue::from_static("no-cache, max-age=0, must-revalidate"),
+        )],
+        Html(content),
+    )
+        .into_response()
+}
+
+fn build_manifest() -> Option<&'static BuildManifest> {
+    BUILD_MANIFEST
+        .get_or_init(|| {
+            serde_json::from_str::<BuildManifest>(include_str!("../../../static/dist/manifest.json")).ok()
+        })
+        .as_ref()
+}
+
+fn render_index_with_dist_assets() -> String {
+    let original = include_str!("../../../static/index.html");
+    let Some(manifest) = build_manifest() else {
+        return original.to_string();
+    };
+
+    let Some(page) = manifest.pages.get("index.html") else {
+        return original.to_string();
+    };
+
+    let mut block = String::new();
+    block.push('\n');
+    block.push_str(ASSETS_START_MARKER);
+    block.push('\n');
+    for href in &page.css {
+        block.push_str("<link rel=\"stylesheet\" href=\"");
+        block.push_str(href);
+        block.push_str("\">\n");
+    }
+    for src in &page.js {
+        block.push_str("<script defer src=\"");
+        block.push_str(src);
+        block.push_str("\"></script>\n");
+    }
+    block.push_str(ASSETS_END_MARKER);
+    block.push('\n');
+
+    let with_managed_block = if let (Some(start), Some(end)) = (
+        original.find(ASSETS_START_MARKER),
+        original.find(ASSETS_END_MARKER),
+    ) {
+        let mut out = String::with_capacity(original.len() + 256);
+        out.push_str(&original[..start]);
+        out.push_str(&block);
+        out.push_str(&original[end + ASSETS_END_MARKER.len()..]);
+        out
+    } else {
+        original.to_string()
+    };
+
+    if with_managed_block.contains("/dist/") {
+        return with_managed_block;
+    }
+
+    if let Some(head_idx) = with_managed_block.find("</head>") {
+        let mut out = String::with_capacity(with_managed_block.len() + 256);
+        out.push_str(&with_managed_block[..head_idx]);
+        out.push_str(&block);
+        out.push_str(&with_managed_block[head_idx..]);
+        return out;
+    }
+
+    with_managed_block
+}
+
 /// Serve the index page
 async fn serve_index_page() -> Response {
-    no_cache_html_response(include_str!("../../../static/index.html"))
+    no_cache_html_response_owned(render_index_with_dist_assets())
 }
 
 /// Serve the login page
