@@ -142,13 +142,3 @@ self.addEventListener('fetch', (event) => {
     throw new Error('Network request failed and no cache entry available.');
   })());
 });
-
-// Background sync for failed requests
-self.addEventListener('sync', event => {
-  if (event.tag === 'oxicloud-sync') {
-    event.waitUntil(
-      // Implement background sync for pending file operations
-      Promise.resolve() // Placeholder for actual implementation
-    );
-  }
-});
