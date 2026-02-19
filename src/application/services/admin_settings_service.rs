@@ -149,7 +149,6 @@ impl AdminSettingsService {
     /// Get OIDC settings for display in admin UI (secrets masked).
     pub async fn get_oidc_settings(&self) -> Result<OidcSettingsDto, DomainError> {
         let db = self.settings_repo.get_by_category("oidc").await?;
-        let d = OidcConfig::default();
 
         let has_secret = db
             .get("oidc.client_secret")
@@ -159,28 +158,19 @@ impl AdminSettingsService {
                 .map(|s| !s.is_empty())
                 .unwrap_or(false);
 
+        // Load effective config with env var overrides applied
+        let effective = self.load_effective_oidc_config().await?;
+
         Ok(OidcSettingsDto {
-            enabled: db
-                .get("oidc.enabled")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(d.enabled),
-            issuer_url: db.get("oidc.issuer_url").cloned().unwrap_or_default(),
-            client_id: db.get("oidc.client_id").cloned().unwrap_or_default(),
+            enabled: effective.enabled,
+            issuer_url: effective.issuer_url,
+            client_id: effective.client_id,
             client_secret_set: has_secret,
-            scopes: db.get("oidc.scopes").cloned().unwrap_or(d.scopes),
-            auto_provision: db
-                .get("oidc.auto_provision")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(d.auto_provision),
-            admin_groups: db.get("oidc.admin_groups").cloned().unwrap_or_default(),
-            disable_password_login: db
-                .get("oidc.disable_password_login")
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(d.disable_password_login),
-            provider_name: db
-                .get("oidc.provider_name")
-                .cloned()
-                .unwrap_or(d.provider_name),
+            scopes: effective.scopes,
+            auto_provision: effective.auto_provision,
+            admin_groups: effective.admin_groups,
+            disable_password_login: effective.disable_password_login,
+            provider_name: effective.provider_name,
             callback_url: self.callback_url(),
             env_overrides: self.get_env_overrides(),
         })
