@@ -55,7 +55,16 @@ const LANGUAGE_TEXTS = {
         moreLanguages: 'زبان‌های بیشتر...',
         modalTitle: 'انتخاب زبان',
         searchPlaceholder: 'جستجوی زبان...'
-    }
+    },
+    nl: {
+        title: 'Welkom bij OxiCloud',
+        subtitle: 'Selecteer uw taal',
+        continue: 'Doorgaan',
+        autodetected: 'We hebben uw taal gedetecteerd',
+        moreLanguages: 'Meer talen...',
+        modalTitle: 'Taal selecteren',
+        searchPlaceholder: 'Zoek taal...'
+    },
 };
 
 // Complete language registry — add new languages here, they'll appear automatically

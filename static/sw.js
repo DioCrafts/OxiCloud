@@ -11,6 +11,7 @@ const ASSETS_TO_CACHE = [
   '/locales/es.json',
   '/locales/fa.json',
   '/locales/de.json',
+  '/locales/nl.json',
   '/favicon.ico'
 ];
 
