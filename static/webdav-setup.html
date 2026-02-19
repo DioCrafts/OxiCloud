@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebDAV Setup Guide — OxiCloud</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif}
+body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-direction:column}
+
+/* Header */
+.header{
+  background:linear-gradient(135deg,#2a3042 0%,#232838 100%);
+  padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,.15);position:sticky;top:0;z-index:100;
+}
+.header-left{display:flex;align-items:center;gap:14px}
+.logo{
+  width:38px;height:38px;background:linear-gradient(135deg,#ff5e3a,#ff2d55);border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 3px 10px rgba(255,94,58,.35);
+}
+.logo svg{width:20px;height:20px;fill:#fff}
+.title-text{font-size:17px;font-weight:700;color:#fff;letter-spacing:.3px}
+.title-separator{font-size:17px;color:rgba(255,255,255,.5);font-weight:400;margin-left:6px}
+.header-right a{
+  color:rgba(255,255,255,.65);text-decoration:none;font-size:13px;font-weight:500;
+  display:flex;align-items:center;gap:6px;transition:color .2s;
+}
+.header-right a:hover{color:#fff}
+
+/* Container */
+.container{max-width:900px;margin:0 auto;padding:32px 24px 60px;width:100%}
+
+/* Card */
+.card{background:#fff;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.03);padding:32px;margin-bottom:22px}
+.card h1{font-size:28px;font-weight:700;margin-bottom:8px;color:#1e293b}
+.card h2{font-size:20px;font-weight:700;margin:28px 0 16px;color:#1e293b;display:flex;align-items:center;gap:10px}
+.card h2 i{color:#ff5e3a;font-size:18px}
+.card h3{font-size:16px;font-weight:600;margin:20px 0 12px;color:#334155}
+.card p{line-height:1.7;color:#475569;margin-bottom:14px}
+.card ul, .card ol{margin-left:24px;margin-bottom:14px;color:#475569;line-height:1.7}
+.card li{margin-bottom:8px}
+.card code{
+  background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:13px;color:#be123c;
+}
+.card pre{
+  background:#1e293b;color:#e2e8f0;padding:16px;border-radius:10px;overflow-x:auto;margin:12px 0;
+  font-family:monospace;font-size:13px;line-height:1.6;
+}
+.card pre code{background:none;color:#e2e8f0;padding:0}
+
+.info-box{
+  background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px;margin:16px 0;
+}
+.info-box-header{
+  display:flex;align-items:center;gap:8px;font-weight:600;color:#1e40af;margin-bottom:8px;
+}
+.info-box-header i{color:#3b82f6}
+.info-box p{color:#1e40af;margin:0}
+
+.platform-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin:20px 0;
+}
+.platform-card{
+  background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;
+  transition:all .2s;cursor:pointer;
+}
+.platform-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.1);transform:translateY(-2px)}
+.platform-card h4{
+  font-size:16px;font-weight:600;color:#1e293b;margin-bottom:4px;
+  display:flex;align-items:center;gap:8px;
+}
+.platform-card p{font-size:13px;color:#64748b;margin:0}
+
+.btn{
+  padding:10px 22px;border:none;border-radius:10px;font-size:14px;font-weight:600;
+  cursor:pointer;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;
+  text-decoration:none;
+}
+.btn-primary{background:linear-gradient(135deg,#ff5e3a,#ff2d55);color:#fff;box-shadow:0 2px 8px rgba(255,94,58,.25)}
+.btn-primary:hover{box-shadow:0 4px 14px rgba(255,94,58,.35);transform:translateY(-1px)}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <a href="/" class="logo-link" style="text-decoration:none;color:inherit;display:flex;align-items:center;gap:14px">
+      <div class="logo">
+        <svg viewBox="0 0 500 500">
+          <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"/>
+        </svg>
+      </div>
+      <span class="title-text">OxiCloud</span>
+    </a>
+    <span class="title-separator">· WebDAV Setup</span>
+  </div>
+  <div class="header-right">
+    <a href="/profile"><i class="fas fa-arrow-left"></i> Back to Profile</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Introduction -->
+  <div class="card">
+    <h1><i class="fas fa-network-wired"></i> WebDAV Setup Guide</h1>
+    <p>
+      WebDAV allows you to connect your OxiCloud storage to your computer or mobile device 
+      as if it were a local drive. Access your files from any WebDAV-compatible application, 
+      including File Explorer (Windows), Finder (macOS), and many mobile apps.
+    </p>
+
+    <div class="info-box">
+      <div class="info-box-header">
+        <i class="fas fa-info-circle"></i>
+        <span>Your WebDAV URL</span>
+      </div>
+      <p id="webdav-url-display" style="font-family:monospace;font-size:14px;font-weight:600"></p>
+    </div>
+
+    <h2><i class="fas fa-desktop"></i> Quick Setup</h2>
+    <p>Select your platform to see step-by-step instructions:</p>
+
+    <div class="platform-grid">
+      <div class="platform-card" onclick="scrollTo('#windows')">
+        <h4><i class="fab fa-windows"></i> Windows</h4>
+        <p>Windows 10/11 File Explorer</p>
+      </div>
+      <div class="platform-card" onclick="scrollTo('#macos')">
+        <h4><i class="fab fa-apple"></i> macOS</h4>
+        <p>Finder connection</p>
+      </div>
+      <div class="platform-card" onclick="scrollTo('#linux')">
+        <h4><i class="fab fa-linux"></i> Linux</h4>
+        <p>GNOME, KDE, or command line</p>
+      </div>
+      <div class="platform-card" onclick="scrollTo('#mobile')">
+        <h4><i class="fas fa-mobile-alt"></i> Mobile</h4>
+        <p>iOS and Android apps</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Windows -->
+  <div class="card" id="windows">
+    <h2><i class="fab fa-windows"></i> Windows Setup</h2>
+    
+    <h3>Method 1: Add Network Location</h3>
+    <ol>
+      <li>Open <strong>File Explorer</strong></li>
+      <li>Right-click on <strong>This PC</strong> and select <strong>Add a network location</strong></li>
+      <li>Click <strong>Next</strong></li>
+      <li>Select <strong>Choose a custom network location</strong> and click <strong>Next</strong></li>
+      <li>Enter your WebDAV URL (shown above)</li>
+      <li>Enter your OxiCloud username and password when prompted</li>
+      <li>Give the connection a name (e.g., "OxiCloud")</li>
+      <li>Click <strong>Finish</strong></li>
+    </ol>
+
+    <h3>Method 2: Map Network Drive</h3>
+    <ol>
+      <li>Open <strong>File Explorer</strong></li>
+      <li>Click <strong>This PC</strong> in the left sidebar</li>
+      <li>Click <strong>Map network drive</strong> in the toolbar</li>
+      <li>Choose a drive letter</li>
+      <li>Enter your WebDAV URL</li>
+      <li>Check <strong>Connect using different credentials</strong></li>
+      <li>Click <strong>Finish</strong> and enter your credentials</li>
+    </ol>
+
+    <div class="info-box">
+      <div class="info-box-header">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>Windows Troubleshooting</span>
+      </div>
+      <p>
+        If connection fails, you may need to enable Basic Authentication. 
+        Open Registry Editor and navigate to:<br>
+        <code>HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\WebClient\Parameters</code><br>
+        Set <code>BasicAuthLevel</code> to <code>2</code> and restart the WebClient service.
+      </p>
+    </div>
+  </div>
+
+  <!-- macOS -->
+  <div class="card" id="macos">
+    <h2><i class="fab fa-apple"></i> macOS Setup</h2>
+    
+    <h3>Using Finder</h3>
+    <ol>
+      <li>Open <strong>Finder</strong></li>
+      <li>From the menu bar, click <strong>Go</strong> → <strong>Connect to Server</strong> (or press <kbd>Cmd</kbd> + <kbd>K</kbd>)</li>
+      <li>Enter your WebDAV URL (shown above)</li>
+      <li>Click <strong>Connect</strong></li>
+      <li>Enter your OxiCloud username and password</li>
+      <li>Click <strong>Connect</strong> again</li>
+    </ol>
+    <p>Your OxiCloud storage will appear as a mounted drive in Finder's sidebar.</p>
+  </div>
+
+  <!-- Linux -->
+  <div class="card" id="linux">
+    <h2><i class="fab fa-linux"></i> Linux Setup</h2>
+    
+    <h3>GNOME (Nautilus/Files)</h3>
+    <ol>
+      <li>Open <strong>Files</strong> (Nautilus)</li>
+      <li>Press <kbd>Ctrl</kbd> + <kbd>L</kbd> to show the location bar</li>
+      <li>Enter: <code>davs://[your-server]/webdav/</code></li>
+      <li>Press <kbd>Enter</kbd></li>
+      <li>Enter your credentials when prompted</li>
+    </ol>
+
+    <h3>KDE (Dolphin)</h3>
+    <ol>
+      <li>Open <strong>Dolphin</strong></li>
+      <li>In the address bar, enter: <code>webdavs://[your-server]/webdav/</code></li>
+      <li>Enter your credentials when prompted</li>
+    </ol>
+
+    <h3>Command Line (davfs2)</h3>
+    <pre><code># Install davfs2
+sudo apt-get install davfs2
+
+# Create mount point
+sudo mkdir /mnt/oxicloud
+
+# Mount WebDAV
+sudo mount -t davfs https://[your-server]/webdav/ /mnt/oxicloud</code></pre>
+  </div>
+
+  <!-- Mobile -->
+  <div class="card" id="mobile">
+    <h2><i class="fas fa-mobile-alt"></i> Mobile Setup</h2>
+    
+    <h3>iOS</h3>
+    <p>
+      iOS doesn't have native WebDAV support in Files app. Use a third-party app like:
+    </p>
+    <ul>
+      <li><strong>Documents by Readdle</strong> (free)</li>
+      <li><strong>FE File Explorer</strong> (free with in-app purchases)</li>
+      <li><strong>WebDAV Navigator</strong> (paid)</li>
+    </ul>
+    <p>
+      In any of these apps, add a new connection using your WebDAV URL and credentials.
+    </p>
+
+    <h3>Android</h3>
+    <p>Recommended apps:</p>
+    <ul>
+      <li><strong>Solid Explorer</strong> — supports WebDAV natively</li>
+      <li><strong>FX File Explorer</strong> — free with WebDAV support</li>
+      <li><strong>Total Commander</strong> with WebDAV plugin</li>
+    </ul>
+    <p>
+      Add a new WebDAV connection in the app's settings using your URL and credentials.
+    </p>
+  </div>
+
+  <!-- Credentials -->
+  <div class="card">
+    <h2><i class="fas fa-key"></i> Authentication</h2>
+    <p>When connecting to WebDAV, use your OxiCloud credentials:</p>
+    <ul>
+      <li><strong>Server URL:</strong> <span id="webdav-url-display2" style="font-family:monospace"></span></li>
+      <li><strong>Username:</strong> Your OxiCloud username</li>
+      <li><strong>Password:</strong> Your OxiCloud password</li>
+    </ul>
+    <div class="info-box">
+      <div class="info-box-header">
+        <i class="fas fa-shield-alt"></i>
+        <span>Security Note</span>
+      </div>
+      <p>
+        Always use <code>https://</code> (not <code>http://</code>) to ensure your connection is encrypted.
+      </p>
+    </div>
+  </div>
+
+  <!-- Back to Profile -->
+  <div style="text-align:center;margin-top:32px">
+    <a href="/profile" class="btn btn-primary"><i class="fas fa-arrow-left"></i> Back to Profile</a>
+  </div>
+</div>
+
+<script>
+function scrollTo(selector) {
+  document.querySelector(selector).scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function getWebDAVUrl() {
+  return window.location.protocol + '//' + window.location.host + '/webdav/';
+}
+
+// Display WebDAV URL
+const webdavUrl = getWebDAVUrl();
+document.getElementById('webdav-url-display').textContent = webdavUrl;
+document.getElementById('webdav-url-display2').textContent = webdavUrl;
+</script>
+</body>
+</html>

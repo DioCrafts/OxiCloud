@@ -241,6 +241,23 @@ body{background:#f5f7fa;color:#1e293b;min-height:100vh;display:flex;flex-directi
       </div>
     </div>
 
+    <!-- WebDAV Connection -->
+    <div class="profile-card">
+      <h2><i class="fas fa-network-wired"></i> WebDAV Connection</h2>
+      <p style="color:#64748b;font-size:14px;margin-bottom:16px;line-height:1.5">
+        Connect your desktop or mobile device to OxiCloud using WebDAV for seamless file synchronization.
+      </p>
+      <div class="info-item" style="margin-bottom:12px">
+        <div class="info-label"><i class="fas fa-link"></i> Server URL</div>
+        <div class="info-value" id="webdav-url" style="font-family:monospace;font-size:14px;word-break:break-all">—</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="copyWebDAVUrl()"><i class="fas fa-copy"></i> Copy URL</button>
+        <a href="/webdav-setup.html" target="_blank" rel="noopener noreferrer" class="btn" style="background:#f1f5f9;color:#475569" aria-label="Open WebDAV Setup Guide in new tab"><i class="fas fa-book"></i> Setup Guide <i class="fas fa-external-link-alt" style="font-size:10px"></i></a>
+      </div>
+      <div id="webdav-copy-status" style="margin-top:10px"></div>
+    </div>
+
     <!-- Change Password -->
     <div class="profile-card" id="password-section">
       <h2><i class="fas fa-key"></i> Change Password</h2>
@@ -271,6 +288,10 @@ const token = localStorage.getItem('oxicloud_token') || localStorage.getItem('to
 
 function headers() {
   return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+}
+
+function getWebDAVUrl() {
+  return window.location.protocol + '//' + window.location.host + '/webdav/';
 }
 
 function formatBytes(bytes) {
@@ -334,6 +355,9 @@ async function init() {
     bar.style.width = pct + '%';
     bar.className = 'storage-fill ' + (pct > 90 ? 'red' : pct > 70 ? 'orange' : 'green');
     document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : 'Unlimited');
+
+    // WebDAV URL
+    document.getElementById('webdav-url').textContent = getWebDAVUrl();
 
     // Hide change password for OIDC-only users
     if (user.auth_provider && user.auth_provider !== 'local') {
@@ -408,6 +432,31 @@ async function changePassword(e) {
   btn.disabled = false;
   btn.innerHTML = '<i class="fas fa-save"></i> Update Password';
   return false;
+}
+
+function copyWebDAVUrl() {
+  const statusEl = document.getElementById('webdav-copy-status');
+  
+  navigator.clipboard.writeText(getWebDAVUrl()).then(() => {
+    // Create success message safely
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success';
+    alertDiv.innerHTML = '<i class="fas fa-check-circle"></i> ';
+    const successText = document.createTextNode('WebDAV URL copied to clipboard');
+    alertDiv.appendChild(successText);
+    statusEl.innerHTML = '';
+    statusEl.appendChild(alertDiv);
+    setTimeout(() => { statusEl.innerHTML = ''; }, 3000);
+  }).catch(err => {
+    // Create error message safely to prevent XSS
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-error';
+    alertDiv.innerHTML = '<i class="fas fa-exclamation-circle"></i> Failed to copy: ';
+    const errorText = document.createTextNode(err.message);
+    alertDiv.appendChild(errorText);
+    statusEl.innerHTML = '';
+    statusEl.appendChild(alertDiv);
+  });
 }
 
 init();
