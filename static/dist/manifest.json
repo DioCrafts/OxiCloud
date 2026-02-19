@@ -4,7 +4,7 @@
   "pages": {
     "admin.html": {
       "js": [
-        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/shared.e45098ea39a294cb.js",
         "/dist/js/page-admin.27cdc1cefa20c33c.js"
       ],
       "css": [
@@ -14,8 +14,8 @@
     },
     "index.html": {
       "js": [
-        "/dist/js/shared.3ed499f91df29fed.js",
-        "/dist/js/page-index.67b8aae6bec5ef70.js"
+        "/dist/js/shared.e45098ea39a294cb.js",
+        "/dist/js/page-index.e4fc6a79a6ae718c.js"
       ],
       "css": [
         "/dist/css/shared.33ae6c5d98a9c657.css",
@@ -24,7 +24,7 @@
     },
     "login.html": {
       "js": [
-        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/shared.e45098ea39a294cb.js",
         "/dist/js/page-login.672398291617194c.js"
       ],
       "css": [
@@ -34,7 +34,7 @@
     },
     "profile.html": {
       "js": [
-        "/dist/js/shared.3ed499f91df29fed.js"
+        "/dist/js/shared.e45098ea39a294cb.js"
       ],
       "css": [
         "/dist/css/shared.33ae6c5d98a9c657.css"
@@ -42,7 +42,7 @@
     },
     "shared.html": {
       "js": [
-        "/dist/js/shared.3ed499f91df29fed.js",
+        "/dist/js/shared.e45098ea39a294cb.js",
         "/dist/js/page-shared.967165b914222013.js"
       ],
       "css": [
@@ -54,12 +54,11 @@
     {
       "kind": "js",
       "logical_name": "shared",
-      "file": "/dist/js/shared.3ed499f91df29fed.js",
+      "file": "/dist/js/shared.e45098ea39a294cb.js",
       "inputs": [
         "/js/icons.js",
         "/js/i18n.js",
-        "/js/languageSelector.js",
-        "/js/fileSharing.js"
+        "/js/languageSelector.js"
       ]
     },
     {
@@ -121,8 +120,9 @@
     {
       "kind": "js",
       "logical_name": "page-index",
-      "file": "/dist/js/page-index.67b8aae6bec5ef70.js",
+      "file": "/dist/js/page-index.e4fc6a79a6ae718c.js",
       "inputs": [
+        "/js/fileSharing.js",
         "/js/notifications.js",
         "/js/modal.js",
         "/js/ui.js",

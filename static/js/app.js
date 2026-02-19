@@ -993,19 +993,14 @@ async function loadFiles(options = {}) {
         console.log(`Loading listing from ${url}`);
         const response = await fetch(url, requestOptions);
         
-        // Critical error handling
+        // Critical error handling — auth failure means session is invalid
         if (response.status === 401 || response.status === 403) {
-            console.warn("Auth error when loading files, showing empty list");
-            elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
-            elements.filesListView.innerHTML = `
-                <div class="list-header">
-                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                    <div>Name</div>
-                    <div>Type</div>
-                    <div>Size</div>
-                    <div>Modified</div>
-                </div>
-            `;
+            console.warn("Auth error when loading files, redirecting to login");
+            localStorage.removeItem('oxicloud_token');
+            localStorage.removeItem('oxicloud_refresh_token');
+            localStorage.removeItem('oxicloud_token_expiry');
+            localStorage.removeItem('oxicloud_user');
+            window.location.href = '/login?source=invalid_session';
             return;
         }
         
@@ -1782,65 +1777,42 @@ async function checkAuthentication() {
             return;
         }
 
-        // Token exists, proceed with app initialization
-        console.log('Token found, proceeding with app initialization');
+        // Token exists — ALWAYS validate against the server before rendering UI.
+        // This prevents stale tokens from a previous installation from bypassing login.
+        console.log('Token found, validating against server...');
         
-        // Display user information if available
-        const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-        if (userData.username) {
-            // Update user avatar with initials
-            const userInitials = userData.username.substring(0, 2).toUpperCase();
-            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => {
-                el.textContent = userInitials;
-            });
-            // Update user menu info
-            const menuName = document.getElementById('user-menu-name');
-            const menuEmail = document.getElementById('user-menu-email');
-            if (menuName) menuName.textContent = userData.username;
-            if (menuEmail) menuEmail.textContent = userData.email || '';
-            
-            // Update storage usage information with cached data first (for fast display)
-            updateStorageUsageDisplay(userData);
-            
-            // Then refresh user data from server in the background to get updated storage
-            refreshUserData().then(freshData => {
-                if (freshData) {
-                    console.log('Storage usage updated from server');
-                }
-            }).catch(err => {
-                console.warn('Could not refresh user data:', err);
-            });
-            
-            // Find and load the user's home folder
-            resolveHomeFolder().then(() => loadFiles());
-        } else {
-            // No user data but token exists — try to fetch from server
-            console.log('No user data, attempting to fetch from server');
-            try {
-                const freshData = await refreshUserData();
-                if (freshData && freshData.username) {
-                    const userInitials = freshData.username.substring(0, 2).toUpperCase();
-                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
-                    updateStorageUsageDisplay(freshData);
-                    resolveHomeFolder().then(() => loadFiles());
-                } else {
-                    // Server didn't return valid user data — token is likely invalid
-                    console.warn('Could not retrieve user data, redirecting to login');
-                    localStorage.removeItem(TOKEN_KEY);
-                    localStorage.removeItem(REFRESH_TOKEN_KEY);
-                    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-                    localStorage.removeItem(USER_DATA_KEY);
-                    window.location.href = '/login?source=invalid_session';
-                }
-            } catch (err) {
-                console.error('Failed to fetch user data:', err);
-                localStorage.removeItem(TOKEN_KEY);
-                localStorage.removeItem(REFRESH_TOKEN_KEY);
-                localStorage.removeItem(TOKEN_EXPIRY_KEY);
-                localStorage.removeItem(USER_DATA_KEY);
-                window.location.href = '/login?source=session_error';
-            }
+        const freshData = await refreshUserData();
+        
+        if (!freshData || !freshData.username) {
+            // Token is invalid/expired or server is a fresh install — clear everything and redirect
+            console.warn('Token validation failed (server rejected or no user data). Redirecting to login.');
+            localStorage.removeItem(TOKEN_KEY);
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
+            localStorage.removeItem(TOKEN_EXPIRY_KEY);
+            localStorage.removeItem(USER_DATA_KEY);
+            window.location.href = '/login?source=invalid_session';
+            return;
         }
+        
+        // Token is valid — proceed with app initialization
+        console.log('Token validated, proceeding with app initialization');
+        
+        // Update user avatar with initials
+        const userInitials = freshData.username.substring(0, 2).toUpperCase();
+        document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => {
+            el.textContent = userInitials;
+        });
+        // Update user menu info
+        const menuName = document.getElementById('user-menu-name');
+        const menuEmail = document.getElementById('user-menu-email');
+        if (menuName) menuName.textContent = freshData.username;
+        if (menuEmail) menuEmail.textContent = freshData.email || '';
+        
+        // Update storage usage information
+        updateStorageUsageDisplay(freshData);
+        
+        // Find and load the user's home folder
+        resolveHomeFolder().then(() => loadFiles());
     } catch (error) {
         console.error('Error during authentication check:', error);
         // On error, redirect to login cleanly — never create fake tokens

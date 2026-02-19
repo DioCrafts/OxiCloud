@@ -115,6 +115,20 @@ fn main() -> Result<()> {
                 page.js.len(),
                 page.css.len()
             );
+            continue;
+        }
+
+        if page.has_dist_asset_refs {
+            if let Some(fallback) = recover_page_inputs_from_known_layout(&page.html_name) {
+                page.js = fallback.js;
+                page.css = fallback.css;
+                println!(
+                    "[assets] recovered inputs for {} from built-in fallback (js: {}, css: {})",
+                    page.html_name,
+                    page.js.len(),
+                    page.css.len()
+                );
+            }
         }
     }
 
@@ -763,4 +777,69 @@ fn recover_page_inputs_from_previous_manifest(dist_dir: &Path) -> Result<HashMap
     }
 
     Ok(recovered)
+}
+
+fn recover_page_inputs_from_known_layout(html_name: &str) -> Option<RecoveredPageInputs> {
+    let inputs = match html_name {
+        "index.html" => RecoveredPageInputs {
+            js: vec![
+                "/js/icons.js".to_string(),
+                "/js/i18n.js".to_string(),
+                "/js/languageSelector.js".to_string(),
+                "/js/fileSharing.js".to_string(),
+                "/js/notifications.js".to_string(),
+                "/js/modal.js".to_string(),
+                "/js/ui.js".to_string(),
+                "/js/contextMenus.js".to_string(),
+                "/js/fileOperations.js".to_string(),
+                "/js/multiSelect.js".to_string(),
+                "/js/inlineViewer.js".to_string(),
+                "/js/app.js".to_string(),
+            ],
+            css: vec![
+                "/css/style.css".to_string(),
+                "/css/inlineViewer.css".to_string(),
+                "/css/favorites.css".to_string(),
+                "/css/recent.css".to_string(),
+            ],
+        },
+        "login.html" => RecoveredPageInputs {
+            js: vec![
+                "/js/icons.js".to_string(),
+                "/js/i18n.js".to_string(),
+                "/js/languageSelector.js".to_string(),
+                "/js/auth.js".to_string(),
+            ],
+            css: vec!["/css/style.css".to_string(), "/css/auth.css".to_string()],
+        },
+        "admin.html" => RecoveredPageInputs {
+            js: vec![
+                "/js/icons.js".to_string(),
+                "/js/i18n.js".to_string(),
+                "/js/languageSelector.js".to_string(),
+                "/js/admin.js".to_string(),
+            ],
+            css: vec!["/css/style.css".to_string(), "/css/admin.css".to_string()],
+        },
+        "profile.html" => RecoveredPageInputs {
+            js: vec![
+                "/js/icons.js".to_string(),
+                "/js/i18n.js".to_string(),
+                "/js/languageSelector.js".to_string(),
+            ],
+            css: vec!["/css/style.css".to_string()],
+        },
+        "shared.html" => RecoveredPageInputs {
+            js: vec![
+                "/js/icons.js".to_string(),
+                "/js/i18n.js".to_string(),
+                "/js/languageSelector.js".to_string(),
+                "/js/shared.js".to_string(),
+            ],
+            css: vec!["/css/style.css".to_string()],
+        },
+        _ => return None,
+    };
+
+    Some(inputs)
 }
