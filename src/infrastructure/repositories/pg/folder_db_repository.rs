@@ -457,7 +457,24 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {
-        // Hard delete folder and all descendants (CASCADE handles children)
+        // First, delete all files in this folder and descendant folders
+        // to avoid constraint violations from ON DELETE SET NULL
+        sqlx::query(
+            r#"
+            WITH RECURSIVE descendants AS (
+                SELECT id FROM storage.folders WHERE id = $1::uuid
+                UNION ALL
+                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
+            )
+            DELETE FROM storage.files WHERE folder_id IN (SELECT id FROM descendants)
+            "#,
+        )
+        .bind(id)
+        .execute(self.pool())
+        .await
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("delete files: {e}")))?;
+
+        // Then delete the folder (CASCADE will remove descendant folders)
         let result = sqlx::query("DELETE FROM storage.folders WHERE id = $1::uuid")
             .bind(id)
             .execute(self.pool())
@@ -501,9 +518,10 @@ impl FolderRepository for FolderDbRepository {
     // ── Trash operations ──
 
     async fn move_to_trash(&self, folder_id: &str) -> Result<(), DomainError> {
-        // Atomic CTE: trash folder + all descendant files in a single statement.
-        // PostgreSQL executes the entire CTE as one atomic operation — no
-        // intermediate state where the folder is trashed but files are not.
+        // Only mark the folder itself as trashed.
+        // Child files and sub-folders are implicitly hidden because their
+        // ancestor is trashed — list queries already filter NOT is_trashed,
+        // and folder navigation won't reach a trashed folder's children.
         let result = sqlx::query_scalar::<_, i64>(
             r#"
             WITH trash_folder AS (
@@ -513,17 +531,6 @@ impl FolderRepository for FolderDbRepository {
                        original_parent_id = parent_id,
                        updated_at = NOW()
                  WHERE id = $1::uuid AND NOT is_trashed
-                RETURNING id
-            ),
-            descendants AS (
-                SELECT id FROM trash_folder
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            ),
-            trash_files AS (
-                UPDATE storage.files
-                   SET is_trashed = TRUE, trashed_at = NOW(), original_folder_id = folder_id
-                 WHERE folder_id IN (SELECT id FROM descendants) AND NOT is_trashed
                 RETURNING 1
             )
             SELECT COUNT(*) FROM trash_folder
@@ -546,7 +553,9 @@ impl FolderRepository for FolderDbRepository {
         folder_id: &str,
         _original_path: &str,
     ) -> Result<(), DomainError> {
-        // Atomic CTE: restore folder + all descendant files in a single statement.
+        // Only restore the folder itself.
+        // Child files were never marked as trashed — they become visible
+        // again automatically once their parent folder is un-trashed.
         // The BEFORE UPDATE trigger on parent_id will recompute path/lpath
         // automatically when original_parent_id is restored.
         let result = sqlx::query_scalar::<_, i64>(
@@ -559,20 +568,6 @@ impl FolderRepository for FolderDbRepository {
                        original_parent_id = NULL,
                        updated_at = NOW()
                  WHERE id = $1::uuid AND is_trashed
-                RETURNING id
-            ),
-            descendants AS (
-                SELECT id FROM restore_folder
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            ),
-            restore_files AS (
-                UPDATE storage.files
-                   SET is_trashed = FALSE,
-                       trashed_at = NULL,
-                       folder_id = COALESCE(original_folder_id, folder_id),
-                       original_folder_id = NULL
-                 WHERE folder_id IN (SELECT id FROM descendants) AND is_trashed
                 RETURNING 1
             )
             SELECT COUNT(*) FROM restore_folder
@@ -591,7 +586,23 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn delete_folder_permanently(&self, folder_id: &str) -> Result<(), DomainError> {
-        // Permanently delete — CASCADE handles children
+        // First, delete all files in this folder and descendant folders
+        sqlx::query(
+            r#"
+            WITH RECURSIVE descendants AS (
+                SELECT id FROM storage.folders WHERE id = $1::uuid
+                UNION ALL
+                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
+            )
+            DELETE FROM storage.files WHERE folder_id IN (SELECT id FROM descendants)
+            "#,
+        )
+        .bind(folder_id)
+        .execute(self.pool())
+        .await
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("perm delete files: {e}")))?;
+
+        // Then permanently delete folder — CASCADE handles descendant folders
         let result = sqlx::query("DELETE FROM storage.folders WHERE id = $1::uuid")
             .bind(folder_id)
             .execute(self.pool())

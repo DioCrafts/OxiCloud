@@ -549,11 +549,7 @@ const ui = {
      * @returns {boolean}
      */
     isViewableFile(file) {
-        if (!file || !file.mime_type) return false;
-        if (file.mime_type.startsWith('image/')) return true;
-        if (file.mime_type === 'application/pdf') return true;
-        // Delegate text-viewability to the single global definition
-        return window.isTextViewable ? window.isTextViewable(file.mime_type) : false;
+        return window.uiFileTypes.isViewableFile(file);
     },
 
     /**
@@ -562,29 +558,7 @@ const ui = {
      * (e.g. trash items).
      */
     getIconClass(fileName) {
-        if (!fileName) return 'fas fa-file';
-        const ext = (fileName.split('.').pop() || '').toLowerCase();
-        const map = {
-            pdf:'fas fa-file-pdf', doc:'fas fa-file-word', docx:'fas fa-file-word',
-            txt:'fas fa-file-alt', rtf:'fas fa-file-alt', odt:'fas fa-file-alt',
-            xls:'fas fa-file-excel', xlsx:'fas fa-file-excel', csv:'fas fa-file-excel', ods:'fas fa-file-excel',
-            ppt:'fas fa-file-powerpoint', pptx:'fas fa-file-powerpoint', odp:'fas fa-file-powerpoint',
-            jpg:'fas fa-file-image', jpeg:'fas fa-file-image', png:'fas fa-file-image',
-            gif:'fas fa-file-image', svg:'fas fa-file-image', webp:'fas fa-file-image',
-            bmp:'fas fa-file-image', ico:'fas fa-file-image',
-            mp4:'fas fa-file-video', avi:'fas fa-file-video', mov:'fas fa-file-video',
-            mkv:'fas fa-file-video', webm:'fas fa-file-video', flv:'fas fa-file-video',
-            mp3:'fas fa-file-audio', wav:'fas fa-file-audio', ogg:'fas fa-file-audio',
-            flac:'fas fa-file-audio', aac:'fas fa-file-audio', m4a:'fas fa-file-audio',
-            zip:'fas fa-file-archive', rar:'fas fa-file-archive', '7z':'fas fa-file-archive',
-            tar:'fas fa-file-archive', gz:'fas fa-file-archive',
-            js:'fas fa-file-code', ts:'fas fa-file-code', py:'fas fa-file-code',
-            rs:'fas fa-file-code', java:'fas fa-file-code', html:'fas fa-file-code',
-            css:'fas fa-file-code', json:'fas fa-file-code', xml:'fas fa-file-code',
-            sh:'fas fa-terminal', bash:'fas fa-terminal', bat:'fas fa-terminal',
-            md:'fas fa-file-alt',
-        };
-        return map[ext] || 'fas fa-file';
+        return window.uiFileTypes.getIconClass(fileName);
     },
 
     /**
@@ -592,40 +566,7 @@ const ui = {
      * Used as fallback when the backend DTO doesn't include icon_special_class.
      */
     getIconSpecialClass(fileName) {
-        if (!fileName) return '';
-        const ext = (fileName.split('.').pop() || '').toLowerCase();
-        const map = {
-            pdf:'pdf-icon',
-            doc:'doc-icon', docx:'doc-icon', odt:'doc-icon', rtf:'doc-icon',
-            xls:'spreadsheet-icon', xlsx:'spreadsheet-icon', ods:'spreadsheet-icon', csv:'spreadsheet-icon',
-            ppt:'presentation-icon', pptx:'presentation-icon', odp:'presentation-icon', key:'presentation-icon',
-            jpg:'image-icon', jpeg:'image-icon', png:'image-icon', gif:'image-icon',
-            svg:'image-icon', webp:'image-icon', bmp:'image-icon', ico:'image-icon',
-            heic:'image-icon', heif:'image-icon', avif:'image-icon', tiff:'image-icon',
-            mp4:'video-icon', avi:'video-icon', mkv:'video-icon', mov:'video-icon',
-            wmv:'video-icon', flv:'video-icon', webm:'video-icon', m4v:'video-icon',
-            mp3:'audio-icon', wav:'audio-icon', ogg:'audio-icon', flac:'audio-icon',
-            aac:'audio-icon', wma:'audio-icon', m4a:'audio-icon', opus:'audio-icon',
-            zip:'archive-icon', rar:'archive-icon', '7z':'archive-icon',
-            tar:'archive-icon', gz:'archive-icon', bz2:'archive-icon', xz:'archive-icon',
-            exe:'installer-icon', msi:'installer-icon', dmg:'installer-icon',
-            deb:'installer-icon', rpm:'installer-icon', appimage:'installer-icon',
-            py:'code-icon py-icon', rs:'code-icon rust-icon', go:'code-icon go-icon',
-            js:'code-icon js-icon', jsx:'code-icon js-icon', mjs:'code-icon js-icon',
-            ts:'code-icon ts-icon', tsx:'code-icon ts-icon',
-            java:'code-icon java-icon', c:'code-icon c-icon', cpp:'code-icon c-icon',
-            cs:'code-icon cs-icon', rb:'code-icon ruby-icon', php:'code-icon php-icon',
-            swift:'code-icon swift-icon',
-            html:'code-icon html-icon', htm:'code-icon html-icon',
-            css:'code-icon css-icon', scss:'code-icon css-icon',
-            json:'code-icon json-icon', xml:'code-icon html-icon',
-            yaml:'code-icon config-icon', yml:'code-icon config-icon',
-            toml:'code-icon config-icon', ini:'code-icon config-icon',
-            sql:'code-icon sql-icon', vue:'code-icon js-icon', svelte:'code-icon js-icon',
-            sh:'script-icon', bash:'script-icon', zsh:'script-icon', bat:'script-icon',
-            md:'code-icon md-icon', txt:'doc-icon',
-        };
-        return map[ext] || '';
+        return window.uiFileTypes.getIconSpecialClass(fileName);
     },
 
     /**
@@ -634,52 +575,7 @@ const ui = {
      * @param {string} message - Notification message
      */
     showNotification(title, message) {
-        // Prefer the bell notification center
-        if (window.notifications && typeof window.notifications.addNotification === 'function') {
-            const t = String(title || '').toLowerCase();
-            let icon = 'fa-info-circle';
-            let iconClass = 'upload';
-
-            if (t.includes('error') || t.includes('failed') || t.includes('fail')) {
-                icon = 'fa-exclamation-circle';
-                iconClass = 'error';
-            } else if (t.includes('favorite') || t.includes('favorit') || t.includes('fav')) {
-                icon = 'fa-star';
-                iconClass = 'success';
-            } else if (t.includes('delete') || t.includes('removed') || t.includes('trash') || t.includes('rename') || t.includes('complete')) {
-                icon = 'fa-check-circle';
-                iconClass = 'success';
-            }
-
-            window.notifications.addNotification({
-                icon,
-                iconClass,
-                title: title || '',
-                text: message || ''
-            });
-            return;
-        }
-
-        // Legacy floating toast fallback (pages without bell)
-        let notification = document.querySelector('.notification');
-        if (!notification) {
-            notification = document.createElement('div');
-            notification.className = 'notification';
-            notification.innerHTML = `
-                <div class="notification-title">${title}</div>
-                <div class="notification-message">${message}</div>
-            `;
-            document.body.appendChild(notification);
-        } else {
-            notification.querySelector('.notification-title').textContent = title;
-            notification.querySelector('.notification-message').textContent = message;
-        }
-
-        notification.style.display = 'block';
-
-        setTimeout(() => {
-            notification.style.display = 'none';
-        }, 5000);
+        window.uiNotifications.show(title, message);
     },
 
     /**

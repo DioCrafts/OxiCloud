@@ -424,7 +424,7 @@ CREATE OR REPLACE TRIGGER trg_folders_cascade_path
 CREATE TABLE IF NOT EXISTS storage.files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    folder_id UUID REFERENCES storage.folders(id) ON DELETE SET NULL,
+    folder_id UUID REFERENCES storage.folders(id) ON DELETE CASCADE,
     user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     blob_hash VARCHAR(64) NOT NULL,
     size BIGINT NOT NULL DEFAULT 0,
@@ -448,15 +448,27 @@ CREATE INDEX IF NOT EXISTS idx_files_blob_hash ON storage.files(blob_hash);
 CREATE INDEX IF NOT EXISTS idx_files_trashed ON storage.files(user_id, is_trashed);
 CREATE INDEX IF NOT EXISTS idx_files_name_search ON storage.files(user_id, name text_pattern_ops);
 
--- Trash view combining trashed files and folders for the TrashRepository
+-- Trash view combining trashed files and folders for the TrashRepository.
+-- Only shows top-level trashed items: excludes files/folders whose parent
+-- is also trashed (they are implicitly in trash as children of a trashed folder).
 CREATE OR REPLACE VIEW storage.trash_items AS
-    SELECT id, name, 'file' AS item_type, user_id, trashed_at,
-           original_folder_id AS original_parent_id, created_at
-    FROM storage.files WHERE is_trashed = TRUE
+    SELECT f.id, f.name, 'file' AS item_type, f.user_id, f.trashed_at,
+           f.original_folder_id AS original_parent_id, f.created_at
+    FROM storage.files f
+    WHERE f.is_trashed = TRUE
+      AND (f.folder_id IS NULL
+           OR NOT EXISTS (
+               SELECT 1 FROM storage.folders p
+                WHERE p.id = f.folder_id AND p.is_trashed = TRUE))
     UNION ALL
-    SELECT id, name, 'folder' AS item_type, user_id, trashed_at,
-           original_parent_id, created_at
-    FROM storage.folders WHERE is_trashed = TRUE;
+    SELECT fo.id, fo.name, 'folder' AS item_type, fo.user_id, fo.trashed_at,
+           fo.original_parent_id, fo.created_at
+    FROM storage.folders fo
+    WHERE fo.is_trashed = TRUE
+      AND (fo.parent_id IS NULL
+           OR NOT EXISTS (
+               SELECT 1 FROM storage.folders p
+                WHERE p.id = fo.parent_id AND p.is_trashed = TRUE));
 
 COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy with ltree — no physical directories on disk';
 COMMENT ON TABLE storage.files IS 'File metadata pointing to content-addressable blobs';

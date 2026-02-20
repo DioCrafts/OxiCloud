@@ -8,7 +8,7 @@
     <script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
     <link rel="stylesheet" href="/css/style.css">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <script src="/js/icons.js" defer></script>
+    <script src="/js/core/icons.js" defer></script>
 </head>
 <body>
     <!-- Main layout similar to index.html -->
@@ -247,9 +247,10 @@
         <button id="close-notification" class="close-notification-btn">×</button>
     </div>
 
-    <script src="/js/i18n.js"></script>
-    <script src="/js/languageSelector.js"></script>
-    <script src="/js/fileSharing.js"></script>
+    <script src="/js/core/i18n.js"></script>
+    <script src="/js/core/languageSelector.js"></script>
+    <script src="/js/core/formatters.js"></script>
+    <script src="/js/features/sharing/fileSharing.js"></script>
     <script>
         // Auth check — redirect to login if no token
         (function() {
@@ -306,6 +307,6 @@
             }
         })();
     </script>
-    <script src="/js/shared.js"></script>
+    <script src="/js/views/shared/shared.js"></script>
 </body>
 </html>
