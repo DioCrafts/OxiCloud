@@ -1,0 +1,9 @@
+:root {
+    --color-bg-page: #f5f7fa;
+    --color-bg-surface: #ffffff;
+    --color-border: #e2e8f0;
+    --color-text: #2d3748;
+    --color-text-muted: #718096;
+    --color-accent: #ff5e3a;
+    --color-accent-hover: #e04520;
+}

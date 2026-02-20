@@ -87,8 +87,18 @@ const Modal = {
                 cancelText = null
             } = options;
             
-            // Set modal content
-            this.icon.className = `fas ${icon}`;
+            // Set modal content - update the icon
+            const iconContainer = document.querySelector('.modal-icon');
+            if (iconContainer) {
+                // Replace contents with a fresh <i> that icons.js will convert
+                iconContainer.innerHTML = `<i id="modal-icon" class="fas ${icon}"></i>`;
+                this.icon = document.getElementById('modal-icon');
+                // Let icons.js convert it to SVG
+                if (window.replaceIconsInElement) {
+                    window.replaceIconsInElement(iconContainer);
+                    this.icon = document.getElementById('modal-icon');
+                }
+            }
             this.title.textContent = title;
             this.label.textContent = label;
             this.input.placeholder = placeholder;

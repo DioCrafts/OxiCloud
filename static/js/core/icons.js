@@ -200,6 +200,9 @@ function replaceIconsInElement(container) {
     // Copy inline style if present
     if (el.style.cssText) svg.style.cssText = el.style.cssText;
 
+    // Preserve id attribute if present
+    if (el.id) svg.id = el.id;
+
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
     path.setAttribute("fill", "currentColor");
     path.setAttribute("d", d);

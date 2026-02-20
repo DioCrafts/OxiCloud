@@ -1,0 +1,68 @@
+.trash-item {
+	position: relative;
+}
+
+.trash-actions {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	display: none;
+	gap: 8px;
+}
+
+.file-card.trash-item:hover .trash-actions,
+.file-item.trash-item:hover .actions-cell {
+	display: flex;
+}
+
+.trash-actions button,
+.actions-cell button {
+	background: #fff;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	padding: 4px 8px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	transition: all 0.2s;
+}
+
+.trash-actions button:hover,
+.actions-cell button:hover {
+	background: #f0f0f0;
+}
+
+.btn-restore {
+	color: #4caf50;
+}
+
+.btn-delete {
+	color: #f44336;
+}
+
+.actions-cell {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-start;
+	align-items: center;
+}
+
+.btn-danger {
+	background-color: #f44336;
+	color: white;
+}
+
+[data-theme="dark"] .trash-actions button,
+[data-theme="dark"] .actions-cell button {
+	background: #1e293b;
+	border-color: #334155;
+	color: #e2e8f0;
+}
+
+[data-theme="dark"] .trash-actions button:hover,
+[data-theme="dark"] .actions-cell button:hover {
+	background: #334155;
+}

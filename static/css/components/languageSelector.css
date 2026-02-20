@@ -1,0 +1,138 @@
+/* Language Selector - Custom Dropdown */
+.language-selector {
+	position: relative;
+	margin-right: 15px;
+}
+
+.language-selector-toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	background-color: #f0f3f7;
+	border: 1px solid #e2e8f0;
+	border-radius: 50px;
+	cursor: pointer;
+	font-size: 14px;
+	font-weight: 500;
+	color: #4a5568;
+	transition: all 0.2s ease;
+	user-select: none;
+}
+
+.language-selector-toggle:hover {
+	background-color: #e2e8f0;
+	border-color: #cbd5e0;
+}
+
+.language-selector-toggle i {
+	font-size: 14px;
+	color: #718096;
+}
+
+.language-selector-toggle .lang-code {
+	font-weight: 600;
+	color: #2d3748;
+}
+
+.language-selector-toggle .dropdown-arrow {
+	font-size: 10px;
+	color: #718096;
+	transition: transform 0.2s ease;
+	margin-left: 2px;
+}
+
+.language-selector.open .dropdown-arrow {
+	transform: rotate(180deg);
+}
+
+.language-selector-dropdown {
+	position: absolute;
+	top: calc(100% + 8px);
+	right: 0;
+	min-width: 160px;
+	background-color: white;
+	border-radius: 12px;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+	border: 1px solid #e2e8f0;
+	opacity: 0;
+	visibility: hidden;
+	transform: translateY(-10px);
+	transition: all 0.2s ease;
+	z-index: 1000;
+	overflow: hidden;
+}
+
+.language-selector.open .language-selector-dropdown {
+	opacity: 1;
+	visibility: visible;
+	transform: translateY(0);
+}
+
+.language-option {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 16px;
+	cursor: pointer;
+	font-size: 14px;
+	color: #4a5568;
+	transition: background-color 0.15s ease;
+}
+
+.language-option:hover {
+	background-color: #f7fafc;
+}
+
+.language-option.active {
+	background-color: #fff5f3;
+	color: #ff5e3a;
+}
+
+.language-option .lang-flag {
+	font-size: 18px;
+	line-height: 1;
+}
+
+.language-option .lang-name {
+	flex: 1;
+}
+
+.language-option .lang-check {
+	color: #ff5e3a;
+	font-size: 12px;
+	opacity: 0;
+}
+
+.language-option.active .lang-check {
+	opacity: 1;
+}
+
+[data-theme="dark"] .language-selector-toggle {
+	background-color: #1e293b;
+	border-color: #334155;
+	color: #cbd5e1;
+}
+
+[data-theme="dark"] .language-selector-toggle:hover {
+	background-color: #334155;
+}
+
+[data-theme="dark"] .language-selector-dropdown {
+	background-color: #1e293b;
+	border-color: #334155;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .language-option {
+	color: #cbd5e1;
+}
+
+[data-theme="dark"] .language-option:hover {
+	background-color: #334155;
+}
+
+[data-theme="dark"] .language-option.active {
+	background-color: rgba(255, 94, 58, 0.1);
+	color: #ff5e3a;
+}

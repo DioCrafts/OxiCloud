@@ -1,0 +1,76 @@
+/* Loading spinner overlay */
+.files-loading-spinner {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 80px 20px;
+	gap: 16px;
+	grid-column: 1 / -1;
+}
+
+.files-loading-spinner .spinner {
+	width: 36px;
+	height: 36px;
+	border: 3px solid #e2e8f0;
+	border-top-color: #ff5e3a;
+	border-radius: 50%;
+	animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.files-loading-spinner span {
+	font-size: 14px;
+	color: #a0aec0;
+	font-weight: 500;
+}
+
+.dropzone {
+	border: 2px dashed #ddd;
+	border-radius: 8px;
+	padding: 20px;
+	text-align: center;
+	margin: 20px 0;
+	color: #666;
+	display: none;
+}
+
+.dropzone.active {
+	border-color: #ff5e3a;
+	background-color: rgba(255, 94, 58, 0.05);
+}
+
+.upload-progress {
+	margin-top: 15px;
+	width: 100%;
+	display: none;
+}
+
+.progress-bar {
+	background-color: #f0f0f0;
+	height: 6px;
+	border-radius: 3px;
+	overflow: hidden;
+}
+
+.progress-fill {
+	height: 100%;
+	background-color: #ff5e3a;
+	width: 0%;
+	transition: width 0.3s;
+}
+
+[data-theme="dark"] .dropzone {
+	border-color: #475569;
+	color: #94a3b8;
+	background-color: #0f172a;
+}
+
+[data-theme="dark"] .progress-bar {
+	background-color: #334155;
+}

@@ -69,24 +69,35 @@ const sharedView = {
         container.innerHTML = `
             <div class="shared-header">
                 <div class="shared-filters">
-                    <select id="filter-type" class="shared-filter-select">
-                        <option value="all" data-i18n="shared_filterAll">All</option>
-                        <option value="file" data-i18n="shared_filterFiles">Files</option>
-                        <option value="folder" data-i18n="shared_filterFolders">Folders</option>
-                    </select>
-                    <select id="sort-by" class="shared-filter-select">
-                        <option value="date" data-i18n="shared_sortByDate">Sort by date</option>
-                        <option value="name" data-i18n="shared_sortByName">Sort by name</option>
-                        <option value="expiration" data-i18n="shared_sortByExpiration">Sort by expiration</option>
-                    </select>
+                    <div class="shared-custom-select" id="filter-type-wrapper">
+                        <button class="shared-select-toggle" id="filter-type-toggle">
+                            <span class="shared-select-label" data-i18n="shared_filterAll">All</span>
+                            <i class="fas fa-chevron-down shared-select-arrow"></i>
+                        </button>
+                        <div class="shared-select-dropdown" id="filter-type-dropdown">
+                            <div class="shared-select-option active" data-value="all" data-i18n="shared_filterAll">All</div>
+                            <div class="shared-select-option" data-value="file" data-i18n="shared_filterFiles">Files</div>
+                            <div class="shared-select-option" data-value="folder" data-i18n="shared_filterFolders">Folders</div>
+                        </div>
+                    </div>
+                    <div class="shared-custom-select" id="sort-by-wrapper">
+                        <button class="shared-select-toggle" id="sort-by-toggle">
+                            <span class="shared-select-label" data-i18n="shared_sortByDate">Sort by date</span>
+                            <i class="fas fa-chevron-down shared-select-arrow"></i>
+                        </button>
+                        <div class="shared-select-dropdown" id="sort-by-dropdown">
+                            <div class="shared-select-option active" data-value="date" data-i18n="shared_sortByDate">Sort by date</div>
+                            <div class="shared-select-option" data-value="name" data-i18n="shared_sortByName">Sort by name</div>
+                            <div class="shared-select-option" data-value="expiration" data-i18n="shared_sortByExpiration">Sort by expiration</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div id="empty-shared-state" class="empty-state" style="display:none;">
-                <div class="empty-state-icon">📤</div>
-                <h3 data-i18n="shared_emptyStateTitle">No shared items</h3>
+                <i class="fas fa-share-alt" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+                <p data-i18n="shared_emptyStateTitle">No shared items</p>
                 <p data-i18n="shared_emptyStateDesc">Items you share will appear here</p>
-                <button id="empty-go-to-files" class="button primary" data-i18n="shared_goToFiles">Go to Files</button>
             </div>
 
             <div class="shared-list-container" style="display:none;">
@@ -183,13 +194,17 @@ const sharedView = {
 
     // Attach event listeners
     attachEventListeners() {
-        const filterType = document.getElementById('filter-type');
-        const sortBy = document.getElementById('sort-by');
-        const emptyGoToFiles = document.getElementById('empty-go-to-files');
+        // Custom dropdown logic for filter-type
+        this._initCustomSelect('filter-type-wrapper', 'filter-type-toggle', 'filter-type-dropdown');
+        // Custom dropdown logic for sort-by
+        this._initCustomSelect('sort-by-wrapper', 'sort-by-toggle', 'sort-by-dropdown');
 
-        if (filterType) filterType.addEventListener('change', () => this.filterAndSortItems());
-        if (sortBy) sortBy.addEventListener('change', () => this.filterAndSortItems());
-        if (emptyGoToFiles) emptyGoToFiles.addEventListener('click', () => window.switchToFilesView());
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            document.querySelectorAll('.shared-custom-select.open').forEach(sel => {
+                if (!sel.contains(e.target)) sel.classList.remove('open');
+            });
+        });
 
         // Share dialog (sharedView-specific IDs)
         const shareDialog = document.getElementById('shared-view-edit-dialog');
@@ -226,13 +241,46 @@ const sharedView = {
         }
     },
 
+    // Initialize a custom select dropdown
+    _initCustomSelect(wrapperId, toggleId, dropdownId) {
+        const wrapper = document.getElementById(wrapperId);
+        const toggle = document.getElementById(toggleId);
+        const dropdown = document.getElementById(dropdownId);
+        if (!wrapper || !toggle || !dropdown) return;
+
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // Close other open selects
+            document.querySelectorAll('.shared-custom-select.open').forEach(sel => {
+                if (sel !== wrapper) sel.classList.remove('open');
+            });
+            wrapper.classList.toggle('open');
+        });
+
+        dropdown.querySelectorAll('.shared-select-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Update active state
+                dropdown.querySelectorAll('.shared-select-option').forEach(o => o.classList.remove('active'));
+                option.classList.add('active');
+                // Update label
+                const label = toggle.querySelector('.shared-select-label');
+                if (label) label.textContent = option.textContent;
+                // Close dropdown
+                wrapper.classList.remove('open');
+                // Trigger filter
+                this.filterAndSortItems();
+            });
+        });
+    },
+
     // Filter and sort items
     filterAndSortItems() {
-        const filterType = document.getElementById('filter-type');
-        const sortBy = document.getElementById('sort-by');
+        const filterTypeActive = document.querySelector('#filter-type-dropdown .shared-select-option.active');
+        const sortByActive = document.querySelector('#sort-by-dropdown .shared-select-option.active');
 
-        const type = filterType ? filterType.value : 'all';
-        const sort = sortBy ? sortBy.value : 'date';
+        const type = filterTypeActive ? filterTypeActive.dataset.value : 'all';
+        const sort = sortByActive ? sortByActive.dataset.value : 'date';
 
         // Use the top-bar search if available, otherwise no filter
         const topSearch = document.getElementById('shared-search');

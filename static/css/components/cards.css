@@ -1,0 +1,785 @@
+/* Files grid */
+.files-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(200px, 240px));
+	gap: 20px;
+	justify-content: start;
+	position: relative;
+}
+
+/* Rubber band / lasso selection rectangle */
+.selection-rect {
+	position: fixed;
+	border: 1.5px solid var(--primary-color, #e67e22);
+	background-color: rgba(230, 126, 34, 0.08);
+	pointer-events: none;
+	z-index: 1000;
+	border-radius: 3px;
+	display: none;
+}
+
+.file-card {
+	background-color: white;
+	border-radius: 12px;
+	border: 2px solid #e2e8f0;
+	padding: 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+	cursor: pointer;
+	transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+	width: 100%;
+	min-height: 160px;
+	position: relative;
+}
+
+.file-card:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+	border-color: #cbd5e0;
+}
+
+.file-card.selected {
+	border-color: #ff5e3a;
+	background: #fff8f6;
+	box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.15), 0 4px 12px rgba(255, 94, 58, 0.1);
+}
+
+.file-card.selected:hover {
+	border-color: #ff5e3a;
+	box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.2), 0 6px 18px rgba(255, 94, 58, 0.15);
+}
+
+/* Selection checkbox */
+.file-card-checkbox {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	width: 22px;
+	height: 22px;
+	border-radius: 6px;
+	border: 2px solid #cbd5e0;
+	background: white;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.15s, background 0.15s, border-color 0.15s;
+	z-index: 10;
+	cursor: pointer;
+}
+
+.file-card:hover .file-card-checkbox {
+	opacity: 1;
+}
+
+.file-card.selected .file-card-checkbox {
+	opacity: 1;
+	background: #ff5e3a;
+	border-color: #ff5e3a;
+}
+
+.file-card.selected .file-card-checkbox i {
+	color: white;
+	font-size: 11px;
+}
+
+/* More actions button (three dots) */
+.file-card-more {
+	position: absolute;
+	top: 8px;
+	right: 8px;
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: none;
+	background: transparent;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.15s, background 0.15s;
+	z-index: 10;
+	cursor: pointer;
+	color: #64748b;
+	font-size: 16px;
+}
+
+.file-card:hover .file-card-more {
+	opacity: 1;
+}
+
+.file-card-more:hover {
+	background: #f1f5f9;
+	color: #334155;
+}
+
+/* Favorite star (mirrors file-card-more button pattern) */
+button.favorite-star {
+	position: absolute;
+	top: 8px;
+	right: 38px;
+	width: 30px;
+	height: 30px;
+	border-radius: 8px;
+	border: none;
+	background: transparent;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.15s, color 0.15s, background 0.15s;
+	z-index: 12;
+	cursor: pointer;
+	color: #cbd5e0;
+	font-size: 15px;
+	padding: 0;
+	line-height: 1;
+}
+
+.file-card:hover .favorite-star {
+	opacity: 1;
+}
+
+.favorite-star:hover {
+	color: #fbbf24;
+}
+
+.favorite-star.active {
+	opacity: 1;
+	color: #f59e0b;
+}
+
+.favorite-star.active:hover {
+	color: #d97706;
+}
+
+.file-card.dragging {
+	opacity: 0.5;
+	transform: scale(0.95);
+	box-shadow: none;
+}
+
+.file-card.drop-target {
+	background-color: rgba(255, 193, 7, 0.1);
+	border: 2px dashed #ffc107;
+}
+
+/* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
+   CSS shapes (::before / ::after) already convey the file type visually.
+   Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
+   List-view icons (.file-item .file-icon) are NOT affected. */
+.file-card .file-icon > i,
+.file-card .file-icon > svg {
+	display: none !important;
+}
+
+.file-icon.folder-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #ffeaa7;
+	border-radius: 8px;
+	position: relative;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.folder-icon::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 20px;
+	background-color: #fdcb6e;
+	border-radius: 8px 8px 0 0;
+}
+
+.file-icon.pdf-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #fee2e2;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #e53e3e;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.pdf-icon::after {
+	content: "PDF";
+	font-size: 16px;
+	font-weight: 700;
+	color: #e53e3e;
+	opacity: 0.65;
+	letter-spacing: 1px;
+}
+
+.file-icon.doc-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #ebf5fb;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #2b6cb0;
+	overflow: hidden;
+}
+
+.file-icon.doc-icon::before {
+	content: "";
+	position: absolute;
+	top: 18px;
+	left: 18px;
+	right: 18px;
+	height: 3px;
+	background-color: #2b6cb0;
+	opacity: 0.3;
+	border-radius: 2px;
+}
+
+.file-icon.doc-icon::after {
+	content: "";
+	position: absolute;
+	top: 28px;
+	left: 18px;
+	right: 28px;
+	height: 3px;
+	background-color: #2b6cb0;
+	opacity: 0.25;
+	border-radius: 2px;
+}
+
+.file-icon.script-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #e8f5e9;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #4eaa25;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.script-icon::after {
+	content: ">_";
+	font-size: 18px;
+	font-weight: 700;
+	font-family: monospace;
+	color: #4eaa25;
+	opacity: 0.55;
+}
+
+.file-icon.config-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #f1f3f5;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #718096;
+	overflow: hidden;
+}
+
+.file-icon.config-icon::before {
+	content: "";
+	position: absolute;
+	top: 15px;
+	left: 16px;
+	width: 10px;
+	height: 10px;
+	border: 2px solid #718096;
+	border-radius: 50%;
+	opacity: 0.4;
+}
+
+.file-icon.config-icon::after {
+	content: "";
+	position: absolute;
+	top: 19px;
+	left: 34px;
+	right: 16px;
+	height: 3px;
+	background-color: #718096;
+	opacity: 0.3;
+	border-radius: 2px;
+}
+
+.file-icon.image-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #74b9ff;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	overflow: hidden;
+}
+
+.file-icon.image-icon::before {
+	content: "";
+	position: absolute;
+	top: 10px;
+	left: 15px;
+	width: 20px;
+	height: 20px;
+	background-color: #ffda79;
+	border-radius: 50%;
+}
+
+.file-icon.video-icon {
+	width: 100px;
+	height: 70px;
+	background: linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #fce7f3 100%);
+	border-radius: 10px;
+	position: relative;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px solid rgba(139, 92, 246, 0.15);
+}
+
+.file-icon.video-icon::before {
+	content: "";
+	width: 36px;
+	height: 36px;
+	background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+	border-radius: 50%;
+	position: absolute;
+	box-shadow: 0 3px 10px rgba(139, 92, 246, 0.35);
+}
+
+.file-icon.video-icon::after {
+	content: "";
+	width: 0;
+	height: 0;
+	border-top: 7px solid transparent;
+	border-bottom: 7px solid transparent;
+	border-left: 11px solid white;
+	position: absolute;
+	margin-left: 3px;
+}
+
+.file-icon.code-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #e2e8f0;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #556ee6;
+	overflow: hidden;
+}
+
+.file-icon.code-icon::before,
+.file-icon.code-icon::after {
+	content: "";
+	position: absolute;
+	left: 10px;
+	right: 10px;
+	height: 2px;
+	background-color: #556ee6;
+}
+
+.file-icon.code-icon::before {
+	top: 15px;
+	width: 80%;
+}
+
+.file-icon.code-icon::after {
+	top: 25px;
+	width: 60%;
+}
+
+.file-icon.code-icon .code-line-1,
+.file-icon.code-icon .code-line-2,
+.file-icon.code-icon .code-line-3 {
+	position: absolute;
+	left: 10px;
+	height: 2px;
+	background-color: #a0aec0;
+}
+
+.file-icon.code-icon .code-line-1 {
+	top: 35px;
+	width: 70%;
+}
+
+.file-icon.code-icon .code-line-2 {
+	top: 45px;
+	width: 85%;
+}
+
+.file-icon.code-icon .code-line-3 {
+	top: 55px;
+	width: 50%;
+}
+
+.file-icon.json-icon {
+	border-top-color: #ffb86c;
+}
+
+.file-icon.json-icon::before,
+.file-icon.json-icon::after {
+	background-color: #ffb86c;
+}
+
+.file-icon.js-icon {
+	border-top-color: #ffd43b;
+}
+
+.file-icon.js-icon::before,
+.file-icon.js-icon::after {
+	background-color: #ffd43b;
+}
+
+.file-icon.html-icon {
+	border-top-color: #e34c26;
+}
+
+.file-icon.html-icon::before,
+.file-icon.html-icon::after {
+	background-color: #e34c26;
+}
+
+.file-icon.css-icon {
+	border-top-color: #2965f1;
+}
+
+.file-icon.css-icon::before,
+.file-icon.css-icon::after {
+	background-color: #2965f1;
+}
+
+.file-icon.py-icon {
+	border-top-color: #3776ab;
+}
+
+.file-icon.py-icon::before,
+.file-icon.py-icon::after {
+	background-color: #3776ab;
+}
+
+.file-icon.ts-icon {
+	border-top-color: #3178c6;
+}
+
+.file-icon.ts-icon::before,
+.file-icon.ts-icon::after {
+	background-color: #3178c6;
+}
+
+.file-icon.rust-icon {
+	border-top-color: #dea584;
+}
+
+.file-icon.rust-icon::before,
+.file-icon.rust-icon::after {
+	background-color: #dea584;
+}
+
+.file-icon.go-icon {
+	border-top-color: #00add8;
+}
+
+.file-icon.go-icon::before,
+.file-icon.go-icon::after {
+	background-color: #00add8;
+}
+
+.file-icon.java-icon {
+	border-top-color: #e76f00;
+}
+
+.file-icon.java-icon::before,
+.file-icon.java-icon::after {
+	background-color: #e76f00;
+}
+
+.file-icon.c-icon {
+	border-top-color: #555;
+}
+
+.file-icon.c-icon::before,
+.file-icon.c-icon::after {
+	background-color: #555;
+}
+
+.file-icon.cs-icon {
+	border-top-color: #68217a;
+}
+
+.file-icon.cs-icon::before,
+.file-icon.cs-icon::after {
+	background-color: #68217a;
+}
+
+.file-icon.php-icon {
+	border-top-color: #8892be;
+}
+
+.file-icon.php-icon::before,
+.file-icon.php-icon::after {
+	background-color: #8892be;
+}
+
+.file-icon.ruby-icon {
+	border-top-color: #cc342d;
+}
+
+.file-icon.ruby-icon::before,
+.file-icon.ruby-icon::after {
+	background-color: #cc342d;
+}
+
+.file-icon.swift-icon {
+	border-top-color: #fa7343;
+}
+
+.file-icon.swift-icon::before,
+.file-icon.swift-icon::after {
+	background-color: #fa7343;
+}
+
+.file-icon.kotlin-icon {
+	border-top-color: #7f52ff;
+}
+
+.file-icon.kotlin-icon::before,
+.file-icon.kotlin-icon::after {
+	background-color: #7f52ff;
+}
+
+.file-icon.sql-icon {
+	border-top-color: #e38c00;
+}
+
+.file-icon.sql-icon::before,
+.file-icon.sql-icon::after {
+	background-color: #e38c00;
+}
+
+.file-icon.yaml-icon {
+	border-top-color: #cb171e;
+}
+
+.file-icon.yaml-icon::before,
+.file-icon.yaml-icon::after {
+	background-color: #cb171e;
+}
+
+.file-icon.toml-icon {
+	border-top-color: #9c4221;
+}
+
+.file-icon.toml-icon::before,
+.file-icon.toml-icon::after {
+	background-color: #9c4221;
+}
+
+.file-icon.md-icon {
+	border-top-color: #083fa1;
+}
+
+.file-icon.md-icon::before,
+.file-icon.md-icon::after {
+	background-color: #083fa1;
+}
+
+.file-icon.spreadsheet-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #e6f4ea;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #0d904f;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.spreadsheet-icon::before {
+	content: "";
+	position: absolute;
+	top: 12px;
+	left: 18px;
+	width: 64px;
+	height: 44px;
+	background: repeating-linear-gradient(to bottom, #0d904f 0px, #0d904f 1px, transparent 1px, transparent 11px),
+		repeating-linear-gradient(to right, #0d904f 0px, #0d904f 1px, transparent 1px, transparent 22px);
+	opacity: 0.35;
+}
+
+.file-icon.presentation-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #fef3e2;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #d04423;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.presentation-icon::before {
+	content: "";
+	position: absolute;
+	top: 14px;
+	left: 22px;
+	width: 56px;
+	height: 38px;
+	border: 2px solid #d04423;
+	border-radius: 4px;
+	opacity: 0.4;
+}
+
+.file-icon.presentation-icon::after {
+	content: "";
+	position: absolute;
+	top: 24px;
+	left: 38px;
+	width: 0;
+	height: 0;
+	border-top: 10px solid transparent;
+	border-bottom: 10px solid transparent;
+	border-left: 14px solid #d04423;
+	opacity: 0.5;
+}
+
+.file-icon.audio-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #fff3e0;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #f57c00;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.audio-icon::before {
+	content: "♪";
+	font-size: 28px;
+	color: #f57c00;
+	opacity: 0.6;
+}
+
+.file-icon.archive-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #f5f0eb;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #8d6e63;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.archive-icon::before {
+	content: "";
+	position: absolute;
+	top: 10px;
+	left: 45px;
+	width: 10px;
+	height: 46px;
+	background: repeating-linear-gradient(to bottom, #8d6e63 0px, #8d6e63 5px, #f5f0eb 5px, #f5f0eb 10px);
+	opacity: 0.5;
+}
+
+.file-icon.installer-icon {
+	width: 100px;
+	height: 70px;
+	background-color: #f3e8ff;
+	border-radius: 4px;
+	position: relative;
+	margin-bottom: 10px;
+	border-top: 3px solid #7c3aed;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.file-icon.installer-icon::before {
+	content: "⬇";
+	font-size: 24px;
+	color: #7c3aed;
+	opacity: 0.5;
+}
+
+.file-name {
+	font-size: 14px;
+	font-weight: 500;
+	text-align: center;
+	margin-bottom: 5px;
+	color: #2d3748;
+	max-width: 100%;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.file-info {
+	font-size: 12px;
+	color: #718096;
+	text-align: center;
+}
+
+[data-theme="dark"] .file-card {
+	background-color: #1e293b;
+	border-color: #334155;
+}
+
+[data-theme="dark"] .file-card:hover {
+	border-color: #475569;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .file-card.selected {
+	border-color: #ff5e3a;
+	background: #1a1520;
+}
+
+[data-theme="dark"] .file-card-checkbox {
+	background: #1e293b;
+	border-color: #475569;
+}
+
+[data-theme="dark"] .file-card-more {
+	color: #94a3b8;
+}
+
+[data-theme="dark"] .file-card-more:hover {
+	background: #334155;
+	color: #e2e8f0;
+}
+
+[data-theme="dark"] .file-name {
+	color: #e2e8f0;
+}
+
+[data-theme="dark"] .file-info {
+	color: #94a3b8;
+}
+
+[data-theme="dark"] .file-card.drop-target {
+	background-color: rgba(255, 193, 7, 0.05);
+}

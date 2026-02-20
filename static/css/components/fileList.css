@@ -1,0 +1,379 @@
+/* File list - Improved style */
+.files-list-view {
+	--files-list-columns: 36px minmax(200px, 2fr) 100px 110px 160px;
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	border-radius: 10px;
+	overflow: hidden;
+	background-color: white;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.list-header {
+	display: grid;
+	grid-template-columns: var(--files-list-columns);
+	padding: 15px;
+	font-weight: 600;
+	color: #2d3748;
+	background-color: #f8f9fa;
+	border-bottom: 1px solid #e0e6ed;
+	align-items: center;
+}
+
+.file-item {
+	display: grid;
+	grid-template-columns: var(--files-list-columns);
+	padding: 12px 15px;
+	border-bottom: 1px solid #f0f0f0;
+	align-items: center;
+	cursor: pointer;
+	transition: background-color 0.2s;
+	background-color: white;
+}
+
+.file-item.selected {
+	background-color: #fff8f6;
+}
+
+.file-item.selected:hover {
+	background-color: #fff0ec;
+}
+
+.list-header.trash-header {
+	grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
+}
+
+.trash-item.file-item {
+	grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
+}
+
+.file-item:hover {
+	background-color: #f0f8ff;
+}
+
+.list-header > div,
+.file-item > div {
+	min-width: 0;
+}
+
+.list-header > div:nth-child(4),
+.file-item .size-cell {
+	justify-self: end;
+	text-align: right;
+}
+
+.file-item .name-cell {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.file-item .name-cell span {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.file-item .file-icon {
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	font-size: 20px;
+	margin-bottom: 0;
+	flex-shrink: 0;
+}
+
+.file-item .file-icon.folder-icon {
+	background-color: #ffeaa7;
+	position: relative;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+}
+
+.file-item .file-icon.folder-icon::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 8px;
+	background-color: #fdcb6e;
+	border-radius: 8px 8px 0 0;
+}
+
+.file-item .file-icon.folder-icon i,
+.file-item .file-icon.folder-icon svg {
+	display: none;
+}
+
+.file-item .file-icon.doc-icon {
+	background-color: #e0ecff;
+}
+
+.file-item .file-icon.doc-icon i,
+.file-item .file-icon.doc-icon svg {
+	color: #3171d8;
+	display: flex !important;
+}
+
+.file-item .file-icon.doc-icon::before,
+.file-item .file-icon.doc-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.pdf-icon {
+	background-color: #fee2e2;
+}
+
+.file-item .file-icon.pdf-icon i,
+.file-item .file-icon.pdf-icon svg {
+	color: #e53e3e;
+	display: flex !important;
+}
+
+.file-item .file-icon.pdf-icon::before,
+.file-item .file-icon.pdf-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.image-icon {
+	background-color: #e0f2fe;
+}
+
+.file-item .file-icon.image-icon i,
+.file-item .file-icon.image-icon svg {
+	color: #3b82f6;
+	display: flex !important;
+}
+
+.file-item .file-icon.image-icon::before,
+.file-item .file-icon.image-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.video-icon {
+	background: linear-gradient(135deg, #ede9fe, #fce7f3);
+}
+
+.file-item .file-icon.video-icon i,
+.file-item .file-icon.video-icon svg {
+	color: #8b5cf6;
+	display: flex !important;
+}
+
+.file-item .file-icon.video-icon::before,
+.file-item .file-icon.video-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.audio-icon {
+	background-color: #fef3c7;
+}
+
+.file-item .file-icon.audio-icon i,
+.file-item .file-icon.audio-icon svg {
+	color: #f59e0b;
+	display: flex !important;
+}
+
+.file-item .file-icon.audio-icon::before,
+.file-item .file-icon.audio-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.spreadsheet-icon {
+	background-color: #e6f4ea;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+	border-top: none;
+}
+
+.file-item .file-icon.spreadsheet-icon i,
+.file-item .file-icon.spreadsheet-icon svg {
+	color: #0d904f;
+	display: flex !important;
+}
+
+.file-item .file-icon.spreadsheet-icon::before,
+.file-item .file-icon.spreadsheet-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.presentation-icon {
+	background-color: #fef3e2;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+	border-top: none;
+}
+
+.file-item .file-icon.presentation-icon i,
+.file-item .file-icon.presentation-icon svg {
+	color: #d04423;
+	display: flex !important;
+}
+
+.file-item .file-icon.presentation-icon::before,
+.file-item .file-icon.presentation-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.audio-icon {
+	background-color: #fff3e0;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+	border-top: none;
+}
+
+.file-item .file-icon.archive-icon {
+	background-color: #f5f0eb;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+	border-top: none;
+}
+
+.file-item .file-icon.archive-icon i,
+.file-item .file-icon.archive-icon svg {
+	color: #8d6e63;
+	display: flex !important;
+}
+
+.file-item .file-icon.archive-icon::before,
+.file-item .file-icon.archive-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.installer-icon {
+	background-color: #f3e8ff;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+	border-top: none;
+}
+
+.file-item .file-icon.installer-icon i,
+.file-item .file-icon.installer-icon svg {
+	color: #7c3aed;
+	display: flex !important;
+}
+
+.file-item .file-icon.installer-icon::before,
+.file-item .file-icon.installer-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.script-icon {
+	background-color: #e8f5e9;
+}
+
+.file-item .file-icon.script-icon i,
+.file-item .file-icon.script-icon svg {
+	color: #4eaa25;
+	display: flex !important;
+}
+
+.file-item .file-icon.script-icon::before,
+.file-item .file-icon.script-icon::after {
+	display: none;
+}
+
+.file-item .file-icon.config-icon {
+	background-color: #f1f3f5;
+}
+
+.file-item .file-icon.config-icon i,
+.file-item .file-icon.config-icon svg {
+	color: #718096;
+	display: flex !important;
+}
+
+.file-item .file-icon.config-icon::before,
+.file-item .file-icon.config-icon::after {
+	display: none;
+}
+
+.file-item .date-cell {
+	color: #718096;
+	font-size: 14px;
+}
+
+.file-item .size-cell {
+	color: #718096;
+	font-size: 14px;
+	text-align: right;
+}
+
+.file-item .type-cell {
+	color: #4b5563;
+	font-weight: 500;
+	font-size: 14px;
+}
+
+.file-item.dragging {
+	opacity: 0.5;
+	background-color: #f9fafb;
+}
+
+.file-item.drop-target {
+	background-color: rgba(255, 193, 7, 0.1);
+	border: 2px dashed #ffc107;
+}
+
+[data-theme="dark"] .files-list-view {
+	background-color: #1e293b;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .list-header {
+	background-color: #162032;
+	color: #94a3b8;
+	border-bottom-color: #334155;
+}
+
+[data-theme="dark"] .file-item {
+	background-color: #1e293b;
+	border-bottom-color: #293548;
+}
+
+[data-theme="dark"] .file-item:hover {
+	background-color: #253345;
+}
+
+[data-theme="dark"] .file-item.selected {
+	background-color: #1a1520;
+}
+
+[data-theme="dark"] .file-item.selected:hover {
+	background-color: #231a2a;
+}
+
+[data-theme="dark"] .file-item .name-cell {
+	color: #e2e8f0;
+}
+
+[data-theme="dark"] .file-item .date-cell,
+[data-theme="dark"] .file-item .size-cell {
+	color: #64748b;
+}
+
+[data-theme="dark"] .file-item .type-cell {
+	color: #94a3b8;
+}
+
+[data-theme="dark"] .file-item.dragging {
+	background-color: #334155;
+}
+
+[data-theme="dark"] .file-item.drop-target {
+	background-color: rgba(255, 193, 7, 0.05);
+}

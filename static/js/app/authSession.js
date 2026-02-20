@@ -205,17 +205,20 @@ async function resolveHomeFolder() {
             app.userHomeFolderId = home.id;
             app.userHomeFolderName = home.name;
             app.currentPath = home.id;
-            window.ui.updateBreadcrumb(home.name);
+            app.breadcrumbPath = [];
+            window.ui.updateBreadcrumb();
             console.log(`Home folder resolved: ${home.name} (${home.id})`);
         } else {
             console.warn('No root folders found for user');
             app.currentPath = '';
-            window.ui.updateBreadcrumb('');
+            app.breadcrumbPath = [];
+            window.ui.updateBreadcrumb();
         }
     } catch (error) {
         console.error('Error resolving home folder:', error);
         app.currentPath = '';
-        window.ui.updateBreadcrumb('');
+        app.breadcrumbPath = [];
+        window.ui.updateBreadcrumb();
     }
 }
 

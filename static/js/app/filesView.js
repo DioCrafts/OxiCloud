@@ -36,7 +36,8 @@ async function loadFiles(options = {}) {
             if (app.userHomeFolderId) {
                 url = `/api/folders/${app.userHomeFolderId}/listing?t=${timestamp}`;
                 app.currentPath = app.userHomeFolderId;
-                window.ui.updateBreadcrumb(app.userHomeFolderName || 'Home');
+                app.breadcrumbPath = [];
+                window.ui.updateBreadcrumb();
                 console.log(`Loading user folder: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
             } else {
                 url = `/api/folders?t=${timestamp}`;

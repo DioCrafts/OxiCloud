@@ -76,7 +76,8 @@ function switchToFilesView() {
 
     if (window.app.userHomeFolderId) {
         window.app.currentPath = window.app.userHomeFolderId;
-        window.ui.updateBreadcrumb(window.app.userHomeFolderName || 'Home');
+        window.app.breadcrumbPath = [];
+        window.ui.updateBreadcrumb();
     } else {
         window.app.currentPath = '';
     }

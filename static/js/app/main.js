@@ -52,6 +52,14 @@ const ACTIONS_BAR_TEMPLATES = {
                 <span data-i18n="trash.empty_trash">Empty trash</span>
             </button>
         </div>
+        <div class="view-toggle">
+            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
+                <i class="fas fa-th"></i>
+            </button>
+            <button class="toggle-btn" id="list-view-btn" title="List view">
+                <i class="fas fa-list"></i>
+            </button>
+        </div>
     `,
     favorites: `
         <div class="action-buttons"></div>
@@ -537,8 +545,9 @@ window.setActionsBarMode = setActionsBarMode;
 
 // Set up global selectFolder function for navigation
 window.selectFolder = (id, name) => {
+    app.breadcrumbPath.push({ id, name });
     app.currentPath = id;
-    ui.updateBreadcrumb(name);
+    ui.updateBreadcrumb();
     window.loadFiles();
 };
 

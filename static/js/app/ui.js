@@ -472,75 +472,72 @@ const ui = {
     },
 
     /**
-     * Update breadcrumb navigation
-     * @param {string} folderName - Name of the current folder
+     * Update breadcrumb navigation from the breadcrumbPath array.
+     * Renders: Home > folder1 > folder2 > ...
+     * Each segment is clickable to navigate back to that level.
      */
-    updateBreadcrumb(folderName) {
+    updateBreadcrumb() {
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = '';
-        
-        // Get user info to help determine home folder
-        const USER_DATA_KEY = 'oxicloud_user';
-        const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
-        const username = userData.username || '';
-        
-        // Create the home item - for users, this is their personal folder
-        const homeItem = document.createElement('span');
-        homeItem.className = 'breadcrumb-item';
-        
+
+        const self = this;
+        const path = window.app.breadcrumbPath; // [{id, name}, ...]
+
         // Helper function to safely get translation text
         const getTranslatedText = (key, defaultValue) => {
             if (!window.i18n || !window.i18n.t) return defaultValue;
             return window.i18n.t(key);
         };
-        
-        // First determine if the current view is the user's home folder 
-        const isUserHomeFolder = username && window.app.userHomeFolderName && 
-            window.app.userHomeFolderName.includes(username) && 
-            folderName === window.app.userHomeFolderName;
-            
-        // Set appropriate text for home item
-        if (isUserHomeFolder) {
-            // If the current folder is the user's home folder, label it as "Home"
-            homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
-        } else if (folderName && folderName.startsWith('My Folder')) {
-            // If viewing a root folder but not the user's home folder, use its full name
-            homeItem.textContent = folderName;
-        } else {
-            // Default - use "Home" label
-            homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
-            
-            // For searching, we might have a custom breadcrumb text
-            if (folderName && folderName.startsWith('Search:')) {
-                // We're in search mode - don't add click handler
-                breadcrumb.appendChild(homeItem);
-                return;
-            }
-        }
-        
-        // Add click handler - but only if we have a user home folder to return to
-        if (window.app.userHomeFolderId) {
+
+        // -- Home item (always present) --
+        const homeItem = document.createElement('span');
+        homeItem.className = 'breadcrumb-item';
+        homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
+
+        // If we have deeper segments, Home is clickable
+        if (path.length > 0 && window.app.userHomeFolderId) {
+            homeItem.classList.add('breadcrumb-link');
             homeItem.addEventListener('click', () => {
+                window.app.breadcrumbPath = [];
                 window.app.currentPath = window.app.userHomeFolderId;
-                this.updateBreadcrumb(window.app.userHomeFolderName || 'Home');
+                self.updateBreadcrumb();
                 window.loadFiles();
             });
+        } else {
+            homeItem.classList.add('breadcrumb-current');
         }
-        
         breadcrumb.appendChild(homeItem);
 
-        // If we have a subfolder, add it to the breadcrumb
-        if (folderName && !folderName.startsWith('Mi Carpeta') && !folderName.startsWith('Search:')) {
+        // -- Intermediate + current segments --
+        path.forEach((segment, index) => {
+            const isLast = index === path.length - 1;
+
+            // Separator
             const separator = document.createElement('span');
             separator.className = 'breadcrumb-separator';
             separator.textContent = '>';
             breadcrumb.appendChild(separator);
 
-            const folderItem = document.createElement('span');
-            folderItem.className = 'breadcrumb-item';
-            folderItem.textContent = folderName;
-            breadcrumb.appendChild(folderItem);
-        }
+            // Segment item
+            const item = document.createElement('span');
+            item.className = 'breadcrumb-item';
+            item.textContent = segment.name;
+
+            if (!isLast) {
+                // Intermediate segment: clickable – truncate path to this level
+                item.classList.add('breadcrumb-link');
+                item.addEventListener('click', () => {
+                    window.app.breadcrumbPath = path.slice(0, index + 1);
+                    window.app.currentPath = segment.id;
+                    self.updateBreadcrumb();
+                    window.loadFiles();
+                });
+            } else {
+                // Last segment: current location, not clickable
+                item.classList.add('breadcrumb-current');
+            }
+            breadcrumb.appendChild(item);
+        });
     },
 
     /**
@@ -733,8 +730,11 @@ const ui = {
         };
 
         const navigateFolder = (card) => {
-            window.app.currentPath = card.dataset.folderId;
-            self.updateBreadcrumb(card.dataset.folderName);
+            const folderId = card.dataset.folderId;
+            const folderName = card.dataset.folderName;
+            window.app.breadcrumbPath.push({ id: folderId, name: folderName });
+            window.app.currentPath = folderId;
+            self.updateBreadcrumb();
             window.loadFiles();
         };
 

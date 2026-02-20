@@ -19,7 +19,8 @@ window.app = {
     isSearchMode: false,
     shareDialogItem: null,
     shareDialogItemType: null,
-    notificationShareUrl: null
+    notificationShareUrl: null,
+    breadcrumbPath: [] // Array of {id, name} tracking folder navigation hierarchy
 };
 
 window.appElements = {

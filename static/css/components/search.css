@@ -1,0 +1,45 @@
+/* Styles for search results */
+.search-results-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 10px 0;
+	margin-bottom: 15px;
+	border-bottom: 1px solid #eee;
+	width: 100%;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.search-results-header h3 {
+	margin: 0;
+	font-size: 16px;
+	color: #555;
+}
+
+.search-results-header .search-time {
+	font-size: 12px;
+	font-weight: normal;
+	color: #999;
+}
+
+.search-controls {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.search-sort-select {
+	padding: 4px 8px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	font-size: 13px;
+	background: #fff;
+	color: #333;
+	cursor: pointer;
+	outline: none;
+}
+
+.search-sort-select:focus {
+	border-color: var(--primary-color, #4a90d9);
+}

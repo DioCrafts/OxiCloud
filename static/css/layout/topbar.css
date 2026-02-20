@@ -1,0 +1,127 @@
+/* Main content */
+.main-content {
+	flex-grow: 1;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* Top bar */
+.top-bar {
+	height: 70px;
+	min-height: 70px;
+	max-height: 70px;
+	background-color: white;
+	border-bottom: 1px solid #e6e6e6;
+	display: flex;
+	align-items: center;
+	padding: 0 30px;
+	justify-content: space-between;
+	flex-shrink: 0;
+}
+
+.search-container {
+	flex-grow: 1;
+	max-width: 600px;
+	position: relative;
+	margin-right: 20px;
+	display: flex;
+	align-items: center;
+
+	[dir='rtl'] & {
+		margin-left: 20px;
+		margin-right: unset;
+	}
+}
+
+.search-container input {
+	width: 100%;
+	padding: 12px 50px 12px 44px;
+	border-radius: 12px;
+	border: 2px solid #e2e8f0;
+	background-color: #f8fafc;
+	font-size: 14px;
+	height: 46px;
+	color: #1a202c;
+	transition: all 0.2s ease;
+}
+
+.search-container input:hover {
+	border-color: #cbd5e0;
+	background-color: #fff;
+}
+
+.search-container input:focus {
+	outline: none;
+	border-color: #ff5e3a;
+	background-color: #fff;
+	box-shadow: 0 0 0 4px rgba(255, 94, 58, 0.1);
+}
+
+.search-container input::placeholder {
+	color: #a0aec0;
+}
+
+.search-icon {
+	position: absolute;
+	left: 16px;
+	top: 50%;
+	transform: translateY(-50%);
+	color: #a0aec0;
+	font-size: 16px;
+	pointer-events: none;
+	transition: color 0.2s ease;
+
+	[dir='rtl'] & {
+		right: 16px;
+		left: unset;
+	}
+}
+
+.search-container input:focus + .search-icon,
+.search-container:focus-within .search-icon {
+	color: #ff5e3a;
+}
+
+.search-button {
+	position: absolute;
+	right: 6px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
+	color: white;
+	border: none;
+	border-radius: 10px;
+	width: 36px;
+	height: 36px;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: all 0.2s ease;
+	box-shadow: 0 2px 8px rgba(255, 94, 58, 0.3);
+
+	[dir='rtl'] & {
+		left: 6px;
+		right: unset;
+	}
+}
+
+.search-button:hover {
+	transform: translateY(-50%) scale(1.05);
+	box-shadow: 0 4px 12px rgba(255, 94, 58, 0.4);
+}
+
+.search-button:active {
+	transform: translateY(-50%) scale(0.98);
+}
+
+.search-button i {
+	font-size: 14px;
+}
+
+.user-controls {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
