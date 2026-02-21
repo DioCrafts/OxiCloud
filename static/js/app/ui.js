@@ -48,6 +48,12 @@ const ui = {
                 <div class="context-menu-item" id="view-file-option">
                     <i class="fas fa-eye"></i> <span data-i18n="actions.view">View</span>
                 </div>
+                <div class="context-menu-item" id="wopi-edit-file-option" style="display:none">
+                    <i class="fas fa-file-word"></i> <span>Edit in Office</span>
+                </div>
+                <div class="context-menu-item" id="wopi-edit-file-tab-option" style="display:none">
+                    <i class="fas fa-external-link-alt"></i> <span>Edit in Office (new tab)</span>
+                </div>
                 <div class="context-menu-item" id="download-file-option">
                     <i class="fas fa-download"></i> <span data-i18n="actions.download">Download</span>
                 </div>
@@ -721,6 +727,11 @@ const ui = {
             if (window.recent) {
                 document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file } }));
             }
+            // WOPI editor intercept: open Office documents in the WOPI editor
+            if (window.wopiEditor && window.wopiEditor.canEdit(file.name)) {
+                window.wopiEditor.openInModal(file.id, file.name, 'edit');
+                return;
+            }
             if (self.isViewableFile(file)) {
                 if (window.inlineViewer) window.inlineViewer.openFile(file);
                 else window.fileOps.downloadFile(file.id, file.name);
@@ -837,6 +848,9 @@ const ui = {
                 const menu = document.getElementById(menuId);
                 if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
                     window.contextMenus.syncFavoriteOptionLabels();
+                }
+                if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
+                    window.contextMenus.syncWopiOptionVisibility().catch(function(){});
                 }
                 menu.style.left = `${e.pageX}px`;
                 menu.style.top  = `${e.pageY}px`;
@@ -1267,6 +1281,9 @@ function showContextMenuAtElement(triggerElement, menuId) {
 
     if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
         window.contextMenus.syncFavoriteOptionLabels();
+    }
+    if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
+        window.contextMenus.syncWopiOptionVisibility().catch(function(){});
     }
 
     menu.style.left = `${left}px`;

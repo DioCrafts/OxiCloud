@@ -90,6 +90,13 @@ class InlineViewer {
   
   openFile(file) {
     console.log('Opening file:', file);
+
+    // WOPI editor intercept: open Office documents in the WOPI editor
+    if (window.wopiEditor && window.wopiEditor.canEdit(file.name)) {
+        window.wopiEditor.openInModal(file.id, file.name, 'edit');
+        return;
+    }
+
     this.currentFile = file;
     
     // Get container

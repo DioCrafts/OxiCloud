@@ -1,0 +1,31 @@
+# WOPI editor services for local development.
+# Usage: docker compose -f docker-compose.dev.yml -f docker-compose.wopi.yml up -d
+# Then run OxiCloud natively: cargo run
+
+services:
+  collabora:
+    image: collabora/code:latest
+    restart: unless-stopped
+    cap_add:
+      - MKNOD
+    environment:
+      # Allow OxiCloud running on host to use Collabora
+      - "aliasgroup1=http://host.docker.internal:8086"
+      # Disable SSL and SSL termination (dev only, plain HTTP on localhost)
+      - "extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:net.frame_ancestors=http://localhost:* http://127.0.0.1:*"
+      # Admin console (optional)
+      - "username=admin"
+      - "password=admin"
+    ports:
+      - "9980:9980"
+
+  # Uncomment to use OnlyOffice instead of / alongside Collabora:
+  # onlyoffice:
+  #   image: onlyoffice/documentserver:latest
+  #   restart: unless-stopped
+  #   environment:
+  #     - "WOPI_ENABLED=true"
+  #     - "JWT_SECRET=oxicloud-dev-secret"
+  #     - "JWT_ENABLED=true"
+  #   ports:
+  #     - "8088:80"

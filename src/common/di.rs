@@ -515,6 +515,9 @@ impl AppServiceFactory {
             calendar_use_case: None,
             addressbook_use_case: None,
             contact_use_case: None,
+            wopi_token_service: None,
+            wopi_lock_service: None,
+            wopi_discovery_service: None,
         };
 
         // 9b. Wire admin settings service when auth is available
@@ -632,6 +635,46 @@ impl AppServiceFactory {
             tracing::info!("CalDAV and CardDAV services initialized with PostgreSQL repositories");
         }
 
+        // 11. Wire WOPI services if enabled
+        if self.config.wopi.enabled {
+            let discovery_url = &self.config.wopi.discovery_url;
+            if discovery_url.is_empty() {
+                tracing::error!(
+                    "WOPI is enabled but WOPI_DISCOVERY_URL is empty — WOPI services will NOT be available"
+                );
+            } else {
+                use crate::application::services::wopi_lock_service::WopiLockService;
+                use crate::application::services::wopi_token_service::WopiTokenService;
+                use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
+
+                let wopi_secret = if self.config.wopi.secret.is_empty() {
+                    self.config.auth.jwt_secret.clone()
+                } else {
+                    self.config.wopi.secret.clone()
+                };
+
+                let wopi_token_service = Arc::new(WopiTokenService::new(
+                    wopi_secret,
+                    self.config.wopi.token_ttl_secs,
+                ));
+
+                let wopi_lock_service =
+                    Arc::new(WopiLockService::new(self.config.wopi.lock_ttl_secs));
+                wopi_lock_service.start_cleanup_task();
+
+                let wopi_discovery_service = Arc::new(WopiDiscoveryService::new(
+                    discovery_url.clone(),
+                    86400, // 24 hour cache TTL
+                ));
+
+                app_state.wopi_token_service = Some(wopi_token_service);
+                app_state.wopi_lock_service = Some(wopi_lock_service);
+                app_state.wopi_discovery_service = Some(wopi_discovery_service);
+
+                tracing::info!("WOPI services initialized (discovery: {})", discovery_url);
+            }
+        }
+
         Ok(app_state)
     }
 }
@@ -710,6 +753,12 @@ pub struct AppState {
     pub addressbook_use_case:
         Option<Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>>,
     pub contact_use_case: Option<Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>>,
+    pub wopi_token_service:
+        Option<Arc<crate::application::services::wopi_token_service::WopiTokenService>>,
+    pub wopi_lock_service:
+        Option<Arc<crate::application::services::wopi_lock_service::WopiLockService>>,
+    pub wopi_discovery_service:
+        Option<Arc<crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService>>,
 }
 
 impl Default for AppState {
@@ -844,6 +893,9 @@ impl Default for AppState {
             calendar_use_case: None,
             addressbook_use_case: None,
             contact_use_case: None,
+            wopi_token_service: None,
+            wopi_lock_service: None,
+            wopi_discovery_service: None,
         }
     }
 }
@@ -871,6 +923,9 @@ impl AppState {
             calendar_use_case: None,
             addressbook_use_case: None,
             contact_use_case: None,
+            wopi_token_service: None,
+            wopi_lock_service: None,
+            wopi_discovery_service: None,
         }
     }
 

@@ -15,6 +15,8 @@ pub mod search_service;
 pub mod share_service;
 pub mod storage_usage_service;
 pub mod trash_service;
+pub mod wopi_lock_service;
+pub mod wopi_token_service;
 
 #[cfg(test)]
 mod trash_service_test;

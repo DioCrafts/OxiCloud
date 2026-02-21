@@ -44,6 +44,10 @@ pub struct FileDto {
 
     /// Human-readable formatted size (e.g. "3.27 MB")
     pub size_formatted: String,
+
+    /// Owner user ID (omitted from JSON when None)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner_id: Option<String>,
 }
 
 impl From<File> for FileDto {
@@ -65,6 +69,7 @@ impl From<File> for FileDto {
             icon_special_class: icon_special_class_for(name, mime).to_string(),
             category: category_for(name, mime).to_string(),
             size_formatted: format_file_size(size),
+            owner_id: file.owner_id().map(String::from),
         }
     }
 }
@@ -103,6 +108,7 @@ impl FileDto {
             icon_special_class: String::new(),
             category: "Document".to_string(),
             size_formatted: "0 Bytes".to_string(),
+            owner_id: None,
         }
     }
 }

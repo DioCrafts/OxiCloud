@@ -40,6 +40,9 @@ use interfaces::{create_api_routes, create_public_api_routes, web::create_web_ro
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Load .env file if present (for local development)
+    dotenvy::dotenv().ok();
+
     // Initialize tracing
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -98,6 +101,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let carddav_router = carddav_handler::carddav_routes();
     let webdav_router = webdav_handler::webdav_routes();
 
+    // Build WOPI routes if enabled
+    use oxicloud::interfaces::api::handlers::wopi_handler;
+    let wopi_routes = if config.wopi.enabled {
+        if let (Some(token_svc), Some(lock_svc), Some(discovery_svc)) = (
+            &app_state.wopi_token_service,
+            &app_state.wopi_lock_service,
+            &app_state.wopi_discovery_service,
+        ) {
+            let wopi_base_url = std::env::var("OXICLOUD_WOPI_BASE_URL")
+                .map(|v| v.trim_end_matches('/').to_string())
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| config.base_url());
+
+            let wopi_state = wopi_handler::WopiState {
+                token_service: token_svc.clone(),
+                lock_service: lock_svc.clone(),
+                discovery_service: discovery_svc.clone(),
+                app_state: app_state.clone(),
+                public_base_url: config.base_url(),
+                wopi_base_url,
+            };
+
+            let (protocol, api) = wopi_handler::wopi_routes(wopi_state);
+            Some((protocol, api))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Apply auth middleware to protected API routes when auth is enabled
     if config.features.enable_auth && app_state.auth_service.is_some() {
         use interfaces::api::handlers::auth_handler::auth_routes;
@@ -139,6 +174,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(webdav_protected)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
+
+        // Mount WOPI routes (protocol routes use own token auth, API routes behind auth middleware)
+        if let Some((wopi_protocol, wopi_api)) = wopi_routes {
+            let wopi_api_protected = wopi_api.layer(axum::middleware::from_fn_with_state(
+                Arc::new(app_state.clone()),
+                auth_middleware,
+            ));
+            app = app
+                .nest("/wopi", wopi_protocol)
+                .nest("/api/wopi", wopi_api_protected);
+        }
     } else {
         // Auth disabled — no middleware applied
         tracing::warn!("Authentication is DISABLED — all API routes are publicly accessible");
@@ -151,6 +197,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(webdav_router)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
+
+        // Mount WOPI routes (no auth middleware when auth is disabled)
+        if let Some((wopi_protocol, wopi_api)) = wopi_routes {
+            app = app.nest("/wopi", wopi_protocol).nest("/api/wopi", wopi_api);
+        }
     }
 
     // Apply the redirect middleware for legacy routes

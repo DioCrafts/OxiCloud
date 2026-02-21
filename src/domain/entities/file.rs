@@ -41,6 +41,9 @@ pub struct File {
 
     /// Last modification timestamp (seconds since UNIX epoch)
     modified_at: u64,
+
+    /// Owner user ID (from storage.files.user_id)
+    owner_id: Option<String>,
 }
 
 // We no longer need this module, now we use a String directly
@@ -57,6 +60,7 @@ impl Default for File {
             folder_id: None,
             created_at: 0,
             modified_at: 0,
+            owner_id: None,
         }
     }
 }
@@ -94,6 +98,7 @@ impl File {
             folder_id,
             created_at: now,
             modified_at: now,
+            owner_id: None,
         })
     }
 
@@ -124,6 +129,7 @@ impl File {
             folder_id: parent_id,
             created_at,
             modified_at,
+            owner_id: None,
         })
     }
 
@@ -137,6 +143,7 @@ impl File {
         folder_id: Option<String>,
         created_at: u64,
         modified_at: u64,
+        owner_id: Option<String>,
     ) -> FileResult<Self> {
         // Validate file name
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -156,6 +163,7 @@ impl File {
             folder_id,
             created_at,
             modified_at,
+            owner_id,
         })
     }
 
@@ -196,6 +204,10 @@ impl File {
         self.modified_at
     }
 
+    pub fn owner_id(&self) -> Option<&str> {
+        self.owner_id.as_deref()
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub fn from_dto(
         id: String,
@@ -221,6 +233,7 @@ impl File {
             folder_id,
             created_at,
             modified_at,
+            owner_id: None,
         }
     }
 
@@ -258,6 +271,7 @@ impl File {
             folder_id: self.folder_id.clone(),
             created_at: self.created_at,
             modified_at: now,
+            owner_id: self.owner_id.clone(),
         })
     }
 
@@ -291,6 +305,7 @@ impl File {
             folder_id,
             created_at: self.created_at,
             modified_at: now,
+            owner_id: self.owner_id.clone(),
         })
     }
 
@@ -311,6 +326,7 @@ impl File {
             folder_id: self.folder_id.clone(),
             created_at: self.created_at,
             modified_at: now,
+            owner_id: self.owner_id.clone(),
         }
     }
 }
