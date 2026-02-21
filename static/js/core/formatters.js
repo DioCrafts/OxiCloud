@@ -23,6 +23,12 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+/// Formats a byte count for quota display. When bytes is 0, returns "∞" (unlimited).
+function formatQuotaSize(bytes) {
+    if (bytes === 0) return '∞';
+    return formatFileSize(bytes);
+}
+
 function formatDateTime(value) {
     if (!value) return '';
     let dateValue;
@@ -58,6 +64,7 @@ function isTextViewable(mimeType) {
 
 window.escapeHtml = escapeHtml;
 window.formatFileSize = formatFileSize;
+window.formatQuotaSize = formatQuotaSize;
 window.formatDateTime = formatDateTime;
 window.formatDateShort = formatDateShort;
 window.isTextViewable = isTextViewable;

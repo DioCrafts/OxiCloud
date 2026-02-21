@@ -135,14 +135,14 @@ function updateUserMenuData() {
     }
 
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes || (10 * 1024 * 1024 * 1024);
+    const quotaBytes = userData.storage_quota_bytes == null ? (10 * 1024 * 1024 * 1024) : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
 
     if (storageFill) storageFill.style.width = percentage + '%';
     if (storageText) {
         const used = window.formatFileSize(usedBytes);
-        const total = window.formatFileSize(quotaBytes);
-        storageText.textContent = `${percentage}% · ${used} / ${total}`;
+        const total = window.formatQuotaSize(quotaBytes);
+        storageText.textContent = `${quotaBytes > 0 ? `${percentage}% · ` : ''}${used} / ${total}`;
     }
 }
 
@@ -169,7 +169,7 @@ function showUserProfileModal() {
     const role = userData.role || 'user';
     const initials = username.substring(0, 2).toUpperCase();
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes || (10 * 1024 * 1024 * 1024);
+    const quotaBytes = userData.storage_quota_bytes == null ? (10 * 1024 * 1024 * 1024) : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
@@ -200,7 +200,7 @@ function showUserProfileModal() {
                 <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px">
                     <div style="height:100%;width:${percentage}%;background:${barColor};border-radius:6px;transition:width .3s"></div>
                 </div>
-                <div style="font-size:12px;color:#64748b;text-align:right">${percentage}% · ${window.formatFileSize(usedBytes)} / ${quotaBytes > 0 ? window.formatFileSize(quotaBytes) : '∞'}</div>
+                <div style="font-size:12px;color:#64748b;text-align:right">${percentage}% · ${window.formatFileSize(usedBytes)} / ${window.formatQuotaSize(quotaBytes)}</div>
             </div>
             <div style="padding:0 20px 16px;display:flex;justify-content:center">
                 <button id="profile-modal-close" style="padding:8px 24px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s">${t('actions.close', 'Close')}</button>
