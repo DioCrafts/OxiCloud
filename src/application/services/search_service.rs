@@ -514,8 +514,12 @@ impl SearchUseCase for SearchService {
     /**
      * Performs a search based on the specified criteria.
      *
+     * Optimization: For non-recursive searches, uses database-level pagination
+     * for better performance. For recursive searches, uses the parallel approach.
+     *
      * All processing happens server-side:
-     * - Parallel recursive traversal
+     * - Database-level pagination for non-recursive searches
+     * - Parallel recursive traversal for recursive searches
      * - Filtering by name, type, dates, size
      * - Relevance scoring
      * - Sorting (relevance, name, date, size)
@@ -535,7 +539,110 @@ impl SearchUseCase for SearchService {
             return Ok(cached_results);
         }
 
-        // ── Parallel recursive search ──
+        let query = criteria.name_contains.as_deref().unwrap_or("");
+
+        // For non-recursive searches, use efficient database-level pagination
+        // This avoids loading all files into memory
+        if !criteria.recursive {
+            // Use database-level pagination
+            let (files, total_file_count) = self
+                .file_repository
+                .search_files_paginated(criteria.folder_id.as_deref(), &criteria, user_id)
+                .await?;
+
+            // Convert to DTOs and enrich with metadata
+            let file_dtos: Vec<FileDto> = files.into_iter().map(FileDto::from).collect();
+            let enriched_files: Vec<SearchFileResultDto> = file_dtos
+                .iter()
+                .map(|f| Self::enrich_file(f, query))
+                .collect();
+
+            // Get folders for this folder (non-recursive)
+            let folders = self
+                .folder_repository
+                .list_folders(criteria.folder_id.as_deref())
+                .await?;
+
+            // Filter folders if name criteria present
+            let filtered_folders: Vec<FolderDto> = if let Some(name_query) = &criteria.name_contains
+            {
+                let query_lower = name_query.to_lowercase();
+                folders
+                    .into_iter()
+                    .map(FolderDto::from)
+                    .filter(|f| f.name.to_lowercase().contains(&query_lower))
+                    .collect()
+            } else {
+                folders.into_iter().map(FolderDto::from).collect()
+            };
+
+            // For folders, apply sorting and pagination in memory (usually fewer folders)
+            let mut enriched_folders: Vec<SearchFolderResultDto> = filtered_folders
+                .iter()
+                .map(|f| Self::enrich_folder(f, query))
+                .collect();
+
+            // Sort folders
+            match criteria.sort_by.as_str() {
+                "name" => {
+                    enriched_folders
+                        .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                }
+                "name_desc" => {
+                    enriched_folders
+                        .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                }
+                "date" => {
+                    enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
+                }
+                "date_desc" => {
+                    enriched_folders.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+                }
+                _ => {
+                    enriched_folders.sort_by(|a, b| b.relevance_score.cmp(&a.relevance_score));
+                }
+            }
+
+            let folder_count = enriched_folders.len();
+            let total_count = total_file_count + folder_count;
+
+            // Combine and paginate (folders first, then files)
+            let start_idx = criteria.offset.min(total_count);
+            let end_idx = (criteria.offset + criteria.limit).min(total_count);
+
+            let mut paginated_folders = Vec::new();
+            let mut paginated_files = Vec::new();
+
+            for i in start_idx..end_idx {
+                if i < folder_count {
+                    paginated_folders.push(enriched_folders[i].clone());
+                } else {
+                    let file_idx = i - folder_count;
+                    if file_idx < enriched_files.len() {
+                        paginated_files.push(enriched_files[file_idx].clone());
+                    }
+                }
+            }
+
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+
+            let search_results = SearchResultsDto::new(
+                paginated_files,
+                paginated_folders,
+                criteria.limit,
+                criteria.offset,
+                Some(total_count),
+                elapsed_ms,
+                criteria.sort_by.clone(),
+            );
+
+            self.store_in_cache(cache_key, search_results.clone());
+            return Ok(search_results);
+        }
+
+        // ── Recursive search (fallback to original parallel approach) ──
+        // For recursive searches, we need to traverse all subfolders
+        // This is less efficient but necessary for recursive functionality
         let criteria_arc = Arc::new(criteria.clone());
         let (found_files, found_folders) = Self::search_parallel(
             self.file_repository.clone(),
@@ -544,8 +651,6 @@ impl SearchUseCase for SearchService {
             criteria_arc,
         )
         .await?;
-
-        let query = criteria.name_contains.as_deref().unwrap_or("");
 
         // ── Enrich results with server-computed metadata ──
         let mut enriched_files: Vec<SearchFileResultDto> = found_files
