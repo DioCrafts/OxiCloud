@@ -134,6 +134,7 @@ tr:hover{background:#fafbfd}
 .badge-active{background:#d1fae5;color:#065f46}
 .badge-inactive{background:#fee2e2;color:#991b1b}
 .badge-oidc{background:#ede9fe;color:#6d28d9}
+.badge-local{background:#f1f5f9;color:#64748b}
 .badge-env{background:#fef3c7;color:#92400e;font-size:10px;padding:1px 6px;margin-left:4px}
 
 /* ── Buttons ── */
@@ -257,6 +258,7 @@ details[open] summary{margin-bottom:14px;color:#ff5e3a}
 [data-theme="dark"] .badge-active{background:#052e16;color:#86efac}
 [data-theme="dark"] .badge-inactive{background:#3b1111;color:#fca5a5}
 [data-theme="dark"] .badge-oidc{background:#2e1065;color:#c4b5fd}
+[data-theme="dark"] .badge-local{background:#334155;color:#94a3b8}
 [data-theme="dark"] .btn-secondary{background:#1e293b;color:#e2e8f0;border-color:#334155}
 [data-theme="dark"] .btn-secondary:hover{background:#334155;border-color:#475569}
 [data-theme="dark"] .btn-danger{background:#3b1111;color:#fca5a5;border-color:#991b1b}

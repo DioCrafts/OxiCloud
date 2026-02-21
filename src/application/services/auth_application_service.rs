@@ -490,6 +490,15 @@ impl AuthApplicationService {
         // Get user
         let mut user = self.user_storage.get_user_by_id(user_id).await?;
 
+        // Block password changes for OIDC-provisioned users
+        if user.is_oidc_user() {
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "Auth",
+                "Password changes are not available for SSO/OIDC accounts. Your password is managed by your identity provider.",
+            ));
+        }
+
         // Verify current password using the injected hasher
         let is_valid = self
             .password_hasher
@@ -780,6 +789,16 @@ impl AuthApplicationService {
         user_id: &str,
         new_password: &str,
     ) -> Result<(), DomainError> {
+        // Block password reset for OIDC-provisioned users
+        let user = self.user_storage.get_user_by_id(user_id).await?;
+        if user.is_oidc_user() {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "Auth",
+                "Cannot reset password for SSO/OIDC accounts. The user's password is managed by their identity provider.",
+            ));
+        }
+
         if new_password.len() < 8 {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,

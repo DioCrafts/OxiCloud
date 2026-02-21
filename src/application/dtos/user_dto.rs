@@ -14,6 +14,7 @@ pub struct UserDto {
     pub updated_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
     pub active: bool,
+    pub auth_provider: String,
 }
 
 impl From<User> for UserDto {
@@ -29,6 +30,7 @@ impl From<User> for UserDto {
             updated_at: user.updated_at(),
             last_login_at: user.last_login_at(),
             active: user.is_active(),
+            auth_provider: user.oidc_provider().unwrap_or("local").to_string(),
         }
     }
 }

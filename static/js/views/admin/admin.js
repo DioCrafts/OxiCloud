@@ -93,29 +93,34 @@ async function loadDashboard() {
 
 async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
   try {
     const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers() });
-    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="6" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Failed to load users</td></tr>'; return; }
+    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Failed to load users</td></tr>'; return; }
     const data = await resp.json();
     totalUsers = data.total;
     const users = data.users;
-    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="table-status-empty">No users found</td></tr>'; return; }
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-empty">No users found</td></tr>'; return; }
 
     tbody.innerHTML = users.map(u => {
       const quotaPct = u.storage_quota_bytes > 0 ? ((u.storage_used_bytes / u.storage_quota_bytes) * 100) : 0;
       const quotaColor = quotaPct > 90 ? 'red' : quotaPct > 70 ? 'orange' : 'green';
       const quotaText = u.storage_quota_bytes > 0 ? formatBytes(u.storage_used_bytes) + ' / ' + formatBytes(u.storage_quota_bytes) : formatBytes(u.storage_used_bytes) + ' / ∞';
       const isSelf = u.id === currentAdminId;
+      const isOidc = u.auth_provider && u.auth_provider !== 'local';
+      const authBadge = isOidc
+        ? '<span class="badge badge-oidc" title="Authenticated via ' + u.auth_provider + '"><i class="fas fa-key badge-admin-icon-small"></i> ' + u.auth_provider + '</span>'
+        : '<span class="badge badge-local">Local</span>';
       return '<tr>' +
         '<td><div class="user-info"><span class="user-name">' + u.username + (isSelf ? ' <span class="user-self-badge">(you)</span>' : '') + '</span><span class="user-email">' + u.email + '</span></div></td>' +
         '<td><span class="badge badge-' + u.role + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt badge-admin-icon-small"></i> ' : '') + u.role + '</span></td>' +
+        '<td>' + authBadge + '</td>' +
         '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
         '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' + quotaColor + '" style="width:' + Math.min(quotaPct, 100) + '%"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
         '<td class="user-last-login-cell">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
           '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
-          '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + u.id + '\',\'' + u.username + '\')" title="Reset password"><i class="fas fa-key"></i></button>' +
+          (isOidc ? '' : '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + u.id + '\',\'' + u.username + '\')" title="Reset password"><i class="fas fa-key"></i></button>') +
           '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
           '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
           '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
@@ -126,7 +131,7 @@ async function loadUsers() {
     document.getElementById('prev-btn').disabled = usersPage === 0;
     document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="6" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Error: ' + e.message + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Error: ' + e.message + '</td></tr>';
   }
 }
 
