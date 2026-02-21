@@ -60,23 +60,26 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
 
         let favorites = rows
             .iter()
-            .map(|row| FavoriteItemDto {
-                id: row.get("id"),
-                user_id: row.get("user_id"),
-                item_id: row.get("item_id"),
-                item_type: row.get("item_type"),
-                created_at: row.get("created_at"),
-                item_name: row.try_get("item_name").ok(),
-                item_size: row.try_get("item_size").ok(),
-                item_mime_type: row.try_get("item_mime_type").ok(),
-                parent_id: row.try_get("parent_id").ok(),
-                modified_at: row.try_get("modified_at").ok(),
-                // Temporary defaults; with_display_fields() computes the real values
-                icon_class: String::new(),
-                icon_special_class: String::new(),
-                category: String::new(),
-                size_formatted: String::new(),
-            }.with_display_fields())
+            .map(|row| {
+                FavoriteItemDto {
+                    id: row.get("id"),
+                    user_id: row.get("user_id"),
+                    item_id: row.get("item_id"),
+                    item_type: row.get("item_type"),
+                    created_at: row.get("created_at"),
+                    item_name: row.try_get("item_name").ok(),
+                    item_size: row.try_get("item_size").ok(),
+                    item_mime_type: row.try_get("item_mime_type").ok(),
+                    parent_id: row.try_get("parent_id").ok(),
+                    modified_at: row.try_get("modified_at").ok(),
+                    // Temporary defaults; with_display_fields() computes the real values
+                    icon_class: String::new(),
+                    icon_special_class: String::new(),
+                    category: String::new(),
+                    size_formatted: String::new(),
+                }
+                .with_display_fields()
+            })
             .collect();
 
         Ok(favorites)
@@ -163,11 +166,7 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         Ok(row.try_get("is_favorite").unwrap_or(false))
     }
 
-    async fn add_favorites_batch(
-        &self,
-        user_id: &str,
-        items: &[(String, String)],
-    ) -> Result<u64> {
+    async fn add_favorites_batch(&self, user_id: &str, items: &[(String, String)]) -> Result<u64> {
         if items.is_empty() {
             return Ok(0);
         }

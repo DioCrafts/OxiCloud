@@ -140,10 +140,18 @@ impl FileReadPort for FileBlobReadRepository {
     }
 
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
-        let rows: Vec<(String, String, Option<String>, Option<String>, i64, String, i64, i64)> =
-            if let Some(fid) = folder_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            String,
+            i64,
+            i64,
+        )> = if let Some(fid) = folder_id {
+            sqlx::query_as(
+                r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
@@ -153,13 +161,13 @@ impl FileReadPort for FileBlobReadRepository {
                  WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
                  ORDER BY fi.name
                 "#,
-                )
-                .bind(fid)
-                .fetch_all(self.pool.as_ref())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(fid)
+            .fetch_all(self.pool.as_ref())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
@@ -169,11 +177,11 @@ impl FileReadPort for FileBlobReadRepository {
                  WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
                  ORDER BY fi.name
                 "#,
-                )
-                .fetch_all(self.pool.as_ref())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FileBlobRead", format!("list: {e}")))?;
+            )
+            .fetch_all(self.pool.as_ref())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("list: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, fid, fpath, size, mime, ca, ma)| {
@@ -289,7 +297,19 @@ impl FileReadPort for FileBlobReadRepository {
 
         let row = if folder_path.is_empty() {
             // File at root level (no parent folder)
-            sqlx::query_as::<_, (String, String, Option<String>, Option<String>, i64, String, i64, i64)>(
+            sqlx::query_as::<
+                _,
+                (
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                ),
+            >(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                        fi.size, fi.mime_type,
@@ -305,7 +325,19 @@ impl FileReadPort for FileBlobReadRepository {
             .await
         } else {
             // File inside a folder — look up by folder path + filename
-            sqlx::query_as::<_, (String, String, Option<String>, Option<String>, i64, String, i64, i64)>(
+            sqlx::query_as::<
+                _,
+                (
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                ),
+            >(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                        fi.size, fi.mime_type,

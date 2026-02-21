@@ -113,18 +113,21 @@ pub fn icon_class_for(name: &str, mime: &str) -> &'static str {
             "doc" | "docx" | "odt" | "rtf" => "fas fa-file-word",
             "xls" | "xlsx" | "ods" | "csv" => "fas fa-file-excel",
             "ppt" | "pptx" | "odp" | "key" => "fas fa-file-powerpoint",
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "tif" | "heic" | "heif" | "avif" => "fas fa-file-image",
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "tif"
+            | "heic" | "heif" | "avif" => "fas fa-file-image",
             "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" => "fas fa-file-video",
             "mp3" | "wav" | "ogg" | "flac" | "aac" | "wma" | "m4a" | "opus" => "fas fa-file-audio",
-            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "lz4" => "fas fa-file-archive",
-            "exe" | "msi" | "dmg" | "deb" | "rpm" | "appimage" | "pkg" | "snap" | "flatpak" => "fas fa-hdd",
-            "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx"
-            | "py" | "pyw" | "rs" | "go" | "java" | "kt" | "kts" | "scala"
-            | "c" | "h" | "cpp" | "hpp" | "cc" | "cxx" | "cs"
-            | "rb" | "php" | "swift" | "r" | "lua" | "pl" | "pm"
-            | "html" | "htm" | "css" | "scss" | "sass" | "less"
-            | "json" | "xml" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf"
-            | "sql" | "graphql" | "proto" | "vue" | "svelte" => "fas fa-file-code",
+            "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "lz4" => {
+                "fas fa-file-archive"
+            }
+            "exe" | "msi" | "dmg" | "deb" | "rpm" | "appimage" | "pkg" | "snap" | "flatpak" => {
+                "fas fa-hdd"
+            }
+            "js" | "jsx" | "mjs" | "cjs" | "ts" | "tsx" | "py" | "pyw" | "rs" | "go" | "java"
+            | "kt" | "kts" | "scala" | "c" | "h" | "cpp" | "hpp" | "cc" | "cxx" | "cs" | "rb"
+            | "php" | "swift" | "r" | "lua" | "pl" | "pm" | "html" | "htm" | "css" | "scss"
+            | "sass" | "less" | "json" | "xml" | "yaml" | "yml" | "toml" | "ini" | "cfg"
+            | "conf" | "sql" | "graphql" | "proto" | "vue" | "svelte" => "fas fa-file-code",
             "sh" | "bash" | "zsh" | "fish" | "ps1" | "bat" | "cmd" => "fas fa-terminal",
             "md" | "markdown" | "rst" | "txt" => "fas fa-file-alt",
             _ => "fas fa-file",
@@ -173,7 +176,7 @@ pub fn icon_special_class_for(name: &str, mime: &str) -> &'static str {
         "application/x-yaml" | "application/toml" => return "code-icon config-icon",
         "application/x-httpd-php" => return "code-icon php-icon",
         "application/x-sh" | "application/x-shellscript" | "application/x-csh" => {
-            return "script-icon"
+            return "script-icon";
         }
         "application/x-apple-diskimage"
         | "application/x-ms-dos-executable"
@@ -227,11 +230,14 @@ pub fn icon_special_class_for(name: &str, mime: &str) -> &'static str {
             "doc" | "docx" | "odt" | "rtf" => "doc-icon",
             "xls" | "xlsx" | "ods" | "csv" => "spreadsheet-icon",
             "ppt" | "pptx" | "odp" | "key" => "presentation-icon",
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "tif" | "heic" | "heif" | "avif" => "image-icon",
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "tif"
+            | "heic" | "heif" | "avif" => "image-icon",
             "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" => "video-icon",
             "mp3" | "wav" | "ogg" | "flac" | "aac" | "wma" | "m4a" | "opus" => "audio-icon",
             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" | "zst" | "lz4" => "archive-icon",
-            "exe" | "msi" | "dmg" | "deb" | "rpm" | "appimage" | "pkg" | "snap" | "flatpak" => "installer-icon",
+            "exe" | "msi" | "dmg" | "deb" | "rpm" | "appimage" | "pkg" | "snap" | "flatpak" => {
+                "installer-icon"
+            }
             "py" | "pyw" => "code-icon py-icon",
             "rs" => "code-icon rust-icon",
             "go" => "code-icon go-icon",
@@ -305,7 +311,8 @@ pub fn category_for(name: &str, mime: &str) -> &'static str {
         return "Video";
     } else if mime.starts_with("audio/") {
         return "Audio";
-    } else if mime.starts_with("text/x-") || mime.contains("script") || mime.contains("javascript") {
+    } else if mime.starts_with("text/x-") || mime.contains("script") || mime.contains("javascript")
+    {
         return "Code";
     } else if mime.starts_with("text/markdown") {
         return "Markdown";
@@ -322,15 +329,16 @@ pub fn category_for(name: &str, mime: &str) -> &'static str {
             "doc" | "docx" | "odt" | "rtf" | "txt" => "Document",
             "xls" | "xlsx" | "ods" | "csv" => "Spreadsheet",
             "ppt" | "pptx" | "odp" | "key" => "Presentation",
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "heic" | "avif" => "Image",
+            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "svg" | "webp" | "ico" | "tiff" | "heic"
+            | "avif" => "Image",
             "mp4" | "avi" | "mkv" | "mov" | "wmv" | "flv" | "webm" | "m4v" => "Video",
             "mp3" | "wav" | "ogg" | "flac" | "aac" | "wma" | "m4a" | "opus" => "Audio",
             "zip" | "rar" | "7z" | "tar" | "gz" | "bz2" | "xz" => "Archive",
             "exe" | "msi" | "dmg" | "deb" | "rpm" | "appimage" => "Installer",
             "js" | "jsx" | "ts" | "tsx" | "py" | "rs" | "go" | "java" | "c" | "cpp" | "cs"
-            | "rb" | "php" | "swift" | "kt" | "scala" | "r" | "lua" | "pl"
-            | "html" | "htm" | "css" | "scss" | "json" | "xml" | "yaml" | "yml"
-            | "toml" | "sql" | "sh" | "bash" | "bat" | "ps1" | "vue" | "svelte" => "Code",
+            | "rb" | "php" | "swift" | "kt" | "scala" | "r" | "lua" | "pl" | "html" | "htm"
+            | "css" | "scss" | "json" | "xml" | "yaml" | "yml" | "toml" | "sql" | "sh" | "bash"
+            | "bat" | "ps1" | "vue" | "svelte" => "Code",
             "md" | "markdown" | "rst" => "Markdown",
             _ => "Document",
         };
@@ -360,21 +368,9 @@ pub fn format_file_size(bytes: u64) -> String {
 
     // Two decimal places, then strip trailing zeros (matches JS parseFloat behaviour)
     let formatted = format!("{:.2}", value);
-    let formatted = formatted
-        .trim_end_matches('0')
-        .trim_end_matches('.');
+    let formatted = formatted.trim_end_matches('0').trim_end_matches('.');
 
     format!("{} {}", formatted, SIZES[i])
-}
-
-/// Formats a byte count for quota display. When bytes is 0, returns "∞" (unlimited).
-///
-/// Matches the JavaScript `formatQuotaSize()` output.
-pub fn format_quota_size(bytes: u64) -> String {
-    if bytes == 0 {
-        return "∞".to_string();
-    }
-    format_file_size(bytes)
 }
 
 #[cfg(test)]
@@ -393,26 +389,41 @@ mod tests {
     }
 
     #[test]
-    fn test_format_quota_size() {
-        // Unlimited quota (0) should show infinity symbol
-        assert_eq!(format_quota_size(0), "∞");
-        // Non-zero values should format normally
-        assert_eq!(format_quota_size(500), "500 Bytes");
-        assert_eq!(format_quota_size(1_073_741_824), "1 GB");
-    }
-
-    #[test]
     fn test_icon_class_for_with_extension_fallback() {
         // Specific MIME types
-        assert_eq!(icon_class_for("doc.pdf", "application/pdf"), "fas fa-file-pdf");
-        assert_eq!(icon_class_for("file.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"), "fas fa-file-word");
+        assert_eq!(
+            icon_class_for("doc.pdf", "application/pdf"),
+            "fas fa-file-pdf"
+        );
+        assert_eq!(
+            icon_class_for(
+                "file.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ),
+            "fas fa-file-word"
+        );
 
         // Extension fallback when MIME is generic
-        assert_eq!(icon_class_for("script.py", "application/octet-stream"), "fas fa-file-code");
-        assert_eq!(icon_class_for("app.dmg", "application/octet-stream"), "fas fa-hdd");
-        assert_eq!(icon_class_for("archive.zip", "application/octet-stream"), "fas fa-file-archive");
-        assert_eq!(icon_class_for("data.xlsx", "application/octet-stream"), "fas fa-file-excel");
-        assert_eq!(icon_class_for("run.sh", "application/octet-stream"), "fas fa-terminal");
+        assert_eq!(
+            icon_class_for("script.py", "application/octet-stream"),
+            "fas fa-file-code"
+        );
+        assert_eq!(
+            icon_class_for("app.dmg", "application/octet-stream"),
+            "fas fa-hdd"
+        );
+        assert_eq!(
+            icon_class_for("archive.zip", "application/octet-stream"),
+            "fas fa-file-archive"
+        );
+        assert_eq!(
+            icon_class_for("data.xlsx", "application/octet-stream"),
+            "fas fa-file-excel"
+        );
+        assert_eq!(
+            icon_class_for("run.sh", "application/octet-stream"),
+            "fas fa-terminal"
+        );
     }
 
     #[test]
@@ -420,15 +431,36 @@ mod tests {
         // MIME-based
         assert_eq!(icon_special_class_for("", "image/png"), "image-icon");
         assert_eq!(icon_special_class_for("", "application/pdf"), "pdf-icon");
-        assert_eq!(icon_special_class_for("", "application/json"), "code-icon json-icon");
+        assert_eq!(
+            icon_special_class_for("", "application/json"),
+            "code-icon json-icon"
+        );
 
         // Extension-based fallback
-        assert_eq!(icon_special_class_for("main.py", "application/octet-stream"), "code-icon py-icon");
-        assert_eq!(icon_special_class_for("lib.rs", "application/octet-stream"), "code-icon rust-icon");
-        assert_eq!(icon_special_class_for("style.css", "application/octet-stream"), "code-icon css-icon");
-        assert_eq!(icon_special_class_for("data.xlsx", "application/octet-stream"), "spreadsheet-icon");
-        assert_eq!(icon_special_class_for("backup.tar", "application/octet-stream"), "archive-icon");
-        assert_eq!(icon_special_class_for("setup.dmg", "application/octet-stream"), "installer-icon");
+        assert_eq!(
+            icon_special_class_for("main.py", "application/octet-stream"),
+            "code-icon py-icon"
+        );
+        assert_eq!(
+            icon_special_class_for("lib.rs", "application/octet-stream"),
+            "code-icon rust-icon"
+        );
+        assert_eq!(
+            icon_special_class_for("style.css", "application/octet-stream"),
+            "code-icon css-icon"
+        );
+        assert_eq!(
+            icon_special_class_for("data.xlsx", "application/octet-stream"),
+            "spreadsheet-icon"
+        );
+        assert_eq!(
+            icon_special_class_for("backup.tar", "application/octet-stream"),
+            "archive-icon"
+        );
+        assert_eq!(
+            icon_special_class_for("setup.dmg", "application/octet-stream"),
+            "installer-icon"
+        );
     }
 
     #[test]
@@ -442,8 +474,14 @@ mod tests {
 
         // Extension-based fallback
         assert_eq!(category_for("main.rs", "application/octet-stream"), "Code");
-        assert_eq!(category_for("photo.jpg", "application/octet-stream"), "Image");
-        assert_eq!(category_for("notes.md", "application/octet-stream"), "Markdown");
+        assert_eq!(
+            category_for("photo.jpg", "application/octet-stream"),
+            "Image"
+        );
+        assert_eq!(
+            category_for("notes.md", "application/octet-stream"),
+            "Markdown"
+        );
     }
 
     #[test]

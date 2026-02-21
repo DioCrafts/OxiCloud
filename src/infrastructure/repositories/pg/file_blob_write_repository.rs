@@ -55,16 +55,18 @@ impl FileBlobWriteRepository {
     ) -> Result<Option<String>, DomainError> {
         match folder_id {
             Some(fid) => {
-                let path: String = sqlx::query_scalar(
-                    "SELECT path FROM storage.folders WHERE id = $1::uuid",
-                )
-                .bind(fid)
-                .fetch_optional(self.pool.as_ref())
-                .await
-                .map_err(|e| {
-                    DomainError::internal_error("FileBlobWrite", format!("folder path: {e}"))
-                })?
-                .ok_or_else(|| DomainError::not_found("Folder", fid))?;
+                let path: String =
+                    sqlx::query_scalar("SELECT path FROM storage.folders WHERE id = $1::uuid")
+                        .bind(fid)
+                        .fetch_optional(self.pool.as_ref())
+                        .await
+                        .map_err(|e| {
+                            DomainError::internal_error(
+                                "FileBlobWrite",
+                                format!("folder path: {e}"),
+                            )
+                        })?
+                        .ok_or_else(|| DomainError::not_found("Folder", fid))?;
                 Ok(Some(path))
             }
             None => Ok(None),
@@ -179,7 +181,16 @@ impl FileWritePort for FileBlobWriteRepository {
         );
 
         let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
-        Self::row_to_file(row.0, name, folder_id, folder_path, size, content_type, row.1, row.2)
+        Self::row_to_file(
+            row.0,
+            name,
+            folder_id,
+            folder_path,
+            size,
+            content_type,
+            row.1,
+            row.2,
+        )
     }
 
     async fn save_file_from_temp(

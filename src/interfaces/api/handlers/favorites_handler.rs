@@ -1,4 +1,9 @@
-use axum::{Json, extract::{Path, State}, http::StatusCode, response::IntoResponse};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+    response::IntoResponse,
+};
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};

@@ -1,7 +1,9 @@
 use crate::domain::entities::file::File;
 use serde::{Deserialize, Serialize};
 
-use super::display_helpers::{format_file_size, icon_class_for, icon_special_class_for, category_for};
+use super::display_helpers::{
+    category_for, format_file_size, icon_class_for, icon_special_class_for,
+};
 
 /// DTO for file responses
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,7 +33,6 @@ pub struct FileDto {
     pub modified_at: u64,
 
     // ── Pre-computed display fields ──
-
     /// FontAwesome icon CSS class (e.g. "fas fa-file-image")
     pub icon_class: String,
 

@@ -19,7 +19,9 @@ use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
 };
 use crate::application::dtos::pagination::{PaginatedResponseDto, PaginationRequestDto};
-use crate::application::dtos::search_dto::{SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto};
+use crate::application::dtos::search_dto::{
+    SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto,
+};
 use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
@@ -415,7 +417,12 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
-    async fn move_folder(&self, _id: &str, _dto: MoveFolderDto, _caller_id: &str) -> Result<FolderDto, DomainError> {
+    async fn move_folder(
+        &self,
+        _id: &str,
+        _dto: MoveFolderDto,
+        _caller_id: &str,
+    ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
@@ -423,7 +430,11 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(())
     }
 
-    async fn create_home_folder(&self, _user_id: &str, _name: String) -> Result<FolderDto, DomainError> {
+    async fn create_home_folder(
+        &self,
+        _user_id: &str,
+        _name: String,
+    ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 }

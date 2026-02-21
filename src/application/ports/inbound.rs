@@ -47,17 +47,30 @@ pub trait FolderUseCase: Send + Sync + 'static {
     ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>;
 
     /// Renames a folder (ownership verified against caller_id)
-    async fn rename_folder(&self, id: &str, dto: RenameFolderDto, caller_id: &str)
-    -> Result<FolderDto, DomainError>;
+    async fn rename_folder(
+        &self,
+        id: &str,
+        dto: RenameFolderDto,
+        caller_id: &str,
+    ) -> Result<FolderDto, DomainError>;
 
     /// Moves a folder to another parent (ownership verified against caller_id)
-    async fn move_folder(&self, id: &str, dto: MoveFolderDto, caller_id: &str) -> Result<FolderDto, DomainError>;
+    async fn move_folder(
+        &self,
+        id: &str,
+        dto: MoveFolderDto,
+        caller_id: &str,
+    ) -> Result<FolderDto, DomainError>;
 
     /// Deletes a folder (ownership verified against caller_id)
     async fn delete_folder(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
 
     /// Creates a root-level home folder for a user during registration.
-    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<FolderDto, DomainError>;
+    async fn create_home_folder(
+        &self,
+        user_id: &str,
+        name: String,
+    ) -> Result<FolderDto, DomainError>;
 }
 
 /**

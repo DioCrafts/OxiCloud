@@ -112,7 +112,11 @@ impl FolderService {
                 Ok(())
             }
 
-            async fn create_home_folder(&self, _user_id: &str, _name: String) -> Result<FolderDto, DomainError> {
+            async fn create_home_folder(
+                &self,
+                _user_id: &str,
+                _name: String,
+            ) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
             }
         }
@@ -159,7 +163,11 @@ impl FolderUseCase for FolderService {
     }
 
     /// Creates a root-level home folder for a user during registration.
-    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<FolderDto, DomainError> {
+    async fn create_home_folder(
+        &self,
+        user_id: &str,
+        name: String,
+    ) -> Result<FolderDto, DomainError> {
         let folder = self
             .folder_storage
             .create_home_folder(user_id, name)
@@ -256,12 +264,7 @@ impl FolderUseCase for FolderService {
 
         let (folders, total_items) = self
             .folder_storage
-            .list_folders_paginated(
-                parent_id,
-                pagination.offset(),
-                pagination.limit(),
-                true,
-            )
+            .list_folders_paginated(parent_id, pagination.offset(), pagination.limit(), true)
             .await
             .map_err(|e| {
                 DomainError::internal_error(
@@ -354,7 +357,9 @@ impl FolderUseCase for FolderService {
         if existing_folder.owner_id() != Some(caller_id) {
             tracing::warn!(
                 "rename_folder: user '{}' attempted to rename folder '{}' owned by '{:?}'",
-                caller_id, id, existing_folder.owner_id()
+                caller_id,
+                id,
+                existing_folder.owner_id()
             );
             return Err(DomainError::not_found("Folder", id));
         }
@@ -412,7 +417,12 @@ impl FolderUseCase for FolderService {
     }
 
     /// Moves a folder to a new parent after verifying ownership.
-    async fn move_folder(&self, id: &str, dto: MoveFolderDto, caller_id: &str) -> Result<FolderDto, DomainError> {
+    async fn move_folder(
+        &self,
+        id: &str,
+        dto: MoveFolderDto,
+        caller_id: &str,
+    ) -> Result<FolderDto, DomainError> {
         // Verify the source folder exists and belongs to the caller
         let source_folder = self.folder_storage.get_folder(id).await.map_err(|e| {
             DomainError::internal_error(
@@ -424,7 +434,9 @@ impl FolderUseCase for FolderService {
         if source_folder.owner_id() != Some(caller_id) {
             tracing::warn!(
                 "move_folder: user '{}' attempted to move folder '{}' owned by '{:?}'",
-                caller_id, id, source_folder.owner_id()
+                caller_id,
+                id,
+                source_folder.owner_id()
             );
             return Err(DomainError::not_found("Folder", id));
         }
@@ -517,7 +529,9 @@ impl FolderUseCase for FolderService {
         if folder.owner_id() != Some(caller_id) {
             tracing::warn!(
                 "delete_folder: user '{}' attempted to delete folder '{}' owned by '{:?}'",
-                caller_id, id, folder.owner_id()
+                caller_id,
+                id,
+                folder.owner_id()
             );
             return Err(DomainError::not_found("Folder", id));
         }

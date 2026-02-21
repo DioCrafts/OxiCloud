@@ -90,9 +90,12 @@ impl FolderHandler {
                     if owner != &auth_user.id {
                         tracing::warn!(
                             "get_folder: user '{}' attempted to access folder '{}' owned by '{}'",
-                            auth_user.id, id, owner
+                            auth_user.id,
+                            id,
+                            owner
                         );
-                        return (StatusCode::NOT_FOUND, "Folder not found".to_string()).into_response();
+                        return (StatusCode::NOT_FOUND, "Folder not found".to_string())
+                            .into_response();
                     }
                 }
                 (StatusCode::OK, Json(folder)).into_response()
@@ -144,7 +147,10 @@ impl FolderHandler {
         Path(id): Path<String>,
         pagination: Query<PaginationRequestDto>,
     ) -> axum::response::Response {
-        match service.list_folders_for_owner_paginated(Some(&id), &auth_user.id, &pagination).await {
+        match service
+            .list_folders_for_owner_paginated(Some(&id), &auth_user.id, &pagination)
+            .await
+        {
             Ok(paginated_result) => (StatusCode::OK, Json(paginated_result)).into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -168,7 +174,10 @@ impl FolderHandler {
         parent_id: Option<&str>,
         auth_user: &AuthUser,
     ) -> axum::response::Response {
-        match service.list_folders_for_owner(parent_id, &auth_user.id).await {
+        match service
+            .list_folders_for_owner(parent_id, &auth_user.id)
+            .await
+        {
             Ok(folders) => (StatusCode::OK, Json(folders)).into_response(),
             Err(err) => {
                 let status = match err.kind {
@@ -360,7 +369,9 @@ impl FolderHandler {
                 if folder.owner_id.as_deref() != Some(&auth_user.id) {
                     tracing::warn!(
                         "download_folder_zip: user '{}' attempted to download folder '{}' owned by '{:?}'",
-                        auth_user.id, id, folder.owner_id
+                        auth_user.id,
+                        id,
+                        folder.owner_id
                     );
                     return (
                         StatusCode::NOT_FOUND,

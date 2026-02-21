@@ -765,7 +765,11 @@ async fn handle_move(
         };
 
         folder_service
-            .move_folder(&folder.id, move_dto, folder.owner_id.as_deref().unwrap_or("webdav"))
+            .move_folder(
+                &folder.id,
+                move_dto,
+                folder.owner_id.as_deref().unwrap_or("webdav"),
+            )
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
 
@@ -775,7 +779,11 @@ async fn handle_move(
             };
 
             folder_service
-                .rename_folder(&folder.id, rename_dto, folder.owner_id.as_deref().unwrap_or("webdav"))
+                .rename_folder(
+                    &folder.id,
+                    rename_dto,
+                    folder.owner_id.as_deref().unwrap_or("webdav"),
+                )
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
         }
