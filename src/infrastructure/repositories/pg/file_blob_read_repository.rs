@@ -393,8 +393,8 @@ impl FileReadPort for FileBlobReadRepository {
         criteria: &SearchCriteriaDto,
         user_id: &str,
     ) -> Result<(Vec<File>, usize), DomainError> {
-        let offset = criteria.offset;
-        let limit = criteria.limit;
+        let offset = criteria.offset as i64;
+        let limit = criteria.limit as i64;
 
         // Determine sort order
         let (order_column, order_dir) = match criteria.sort_by.as_str() {
@@ -439,21 +439,23 @@ impl FileReadPort for FileBlobReadRepository {
                     Option<String>,
                 )> = sqlx::query_as(&format!(
                     "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                                fi.size, fi.mime_type,
-                                EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                                EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                                fi.user_id::text
-                           FROM storage.files fi
-                           LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                          WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                            AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3
-                          ORDER BY {} {}
-                          LIMIT {} OFFSET {}",
-                    order_column, order_dir, limit, offset
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                        AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3
+                      ORDER BY {} {}
+                      LIMIT $4 OFFSET $5",
+                    order_column, order_dir
                 ))
                 .bind(user_id)
                 .bind(fid)
                 .bind(&name_pattern)
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(self.pool.as_ref())
                 .await
                 .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
@@ -485,20 +487,22 @@ impl FileReadPort for FileBlobReadRepository {
                     Option<String>,
                 )> = sqlx::query_as(&format!(
                     "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                                fi.size, fi.mime_type,
-                                EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                                EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                                fi.user_id::text
-                           FROM storage.files fi
-                           LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                          WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                            AND fi.is_trashed = false
-                          ORDER BY {} {}
-                          LIMIT {} OFFSET {}",
-                    order_column, order_dir, limit, offset
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                        AND fi.is_trashed = false
+                      ORDER BY {} {}
+                      LIMIT $3 OFFSET $4",
+                    order_column, order_dir
                 ))
                 .bind(user_id)
                 .bind(fid)
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(self.pool.as_ref())
                 .await
                 .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
@@ -532,20 +536,22 @@ impl FileReadPort for FileBlobReadRepository {
                     Option<String>,
                 )> = sqlx::query_as(&format!(
                     "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                                fi.size, fi.mime_type,
-                                EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                                EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                                fi.user_id::text
-                           FROM storage.files fi
-                           LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                          WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
-                            AND LOWER(fi.name) LIKE $2
-                          ORDER BY {} {}
-                          LIMIT {} OFFSET {}",
-                    order_column, order_dir, limit, offset
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
+                        AND LOWER(fi.name) LIKE $2
+                      ORDER BY {} {}
+                      LIMIT $3 OFFSET $4",
+                    order_column, order_dir
                 ))
                 .bind(user_id)
                 .bind(&name_pattern)
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(self.pool.as_ref())
                 .await
                 .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
@@ -575,18 +581,20 @@ impl FileReadPort for FileBlobReadRepository {
                     Option<String>,
                 )> = sqlx::query_as(&format!(
                     "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                                fi.size, fi.mime_type,
-                                EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                                EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                                fi.user_id::text
-                           FROM storage.files fi
-                           LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                          WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
-                          ORDER BY {} {}
-                          LIMIT {} OFFSET {}",
-                    order_column, order_dir, limit, offset
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
+                      ORDER BY {} {}
+                      LIMIT $2 OFFSET $3",
+                    order_column, order_dir
                 ))
                 .bind(user_id)
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(self.pool.as_ref())
                 .await
                 .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;

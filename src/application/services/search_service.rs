@@ -18,6 +18,7 @@ use crate::application::ports::inbound::SearchUseCase;
 use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::Result;
+use crate::domain::errors::DomainError;
 
 /**
  * High-performance search service implementation for files and folders.
@@ -181,12 +182,21 @@ impl SearchService {
     }
 
     /// Creates a cache key from the search criteria.
-    fn create_cache_key(&self, criteria: &SearchCriteriaDto, user_id: &str) -> SearchCacheKey {
-        let criteria_str = serde_json::to_string(criteria).unwrap_or_default();
-        SearchCacheKey {
+    fn create_cache_key(
+        &self,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<SearchCacheKey> {
+        let criteria_str = serde_json::to_string(criteria).map_err(|e| {
+            DomainError::internal_error(
+                "SearchService",
+                format!("Failed to serialize criteria: {}", e),
+            )
+        })?;
+        Ok(SearchCacheKey {
             criteria_hash: criteria_str,
             user_id: user_id.to_string(),
-        }
+        })
     }
 
     /// Attempts to retrieve results from the cache.
@@ -195,13 +205,13 @@ impl SearchService {
             return None;
         }
 
-        if let Ok(cache) = self.search_cache.lock()
-            && let Some(cached_result) = cache.get(key)
-        {
-            let now = Instant::now();
-            let ttl = Duration::from_secs(self.cache_ttl);
-            if now.duration_since(cached_result.timestamp) < ttl {
-                return Some(cached_result.results.clone());
+        if let Ok(cache) = self.search_cache.lock() {
+            if let Some(cached_result) = cache.get(key) {
+                let now = Instant::now();
+                let ttl = Duration::from_secs(self.cache_ttl);
+                if now.duration_since(cached_result.timestamp) < ttl {
+                    return Some(cached_result.results.clone());
+                }
             }
         }
 
@@ -215,12 +225,28 @@ impl SearchService {
         }
 
         if let Ok(mut cache) = self.search_cache.lock() {
-            if cache.len() >= self.max_cache_size
-                && let Some((oldest_key, _)) =
+            let now = Instant::now();
+            let ttl = Duration::from_secs(self.cache_ttl);
+
+            // Remove expired entries
+            let mut expired_keys = Vec::new();
+            for (key, result) in cache.iter() {
+                if now.duration_since(result.timestamp) > ttl {
+                    expired_keys.push(key.clone());
+                }
+            }
+            for key in expired_keys {
+                cache.remove(&key);
+            }
+
+            // Remove oldest if cache is full
+            if cache.len() >= self.max_cache_size {
+                if let Some((oldest_key, _)) =
                     cache.iter().min_by_key(|(_, result)| result.timestamp)
-            {
-                let key_to_remove = oldest_key.clone();
-                cache.remove(&key_to_remove);
+                {
+                    let key_to_remove = oldest_key.clone();
+                    cache.remove(&key_to_remove);
+                }
             }
 
             cache.insert(
@@ -350,7 +376,7 @@ impl SearchService {
             }
 
             Ok((all_files, all_folders))
-        }) // end Box::pin
+        })
     }
 
     /// Quick suggestions search — returns up to `limit` name suggestions
@@ -532,11 +558,13 @@ impl SearchUseCase for SearchService {
 
         // TODO: Get user ID from the authentication context
         let user_id = "default-user";
-        let cache_key = self.create_cache_key(&criteria, user_id);
 
-        // Try cache
-        if let Some(cached_results) = self.get_from_cache(&cache_key) {
-            return Ok(cached_results);
+        // Try to get from cache
+        let cache_key = self.create_cache_key(&criteria, user_id).ok();
+        if let Some(ref key) = cache_key {
+            if let Some(cached_results) = self.get_from_cache(key) {
+                return Ok(cached_results);
+            }
         }
 
         let query = criteria.name_contains.as_deref().unwrap_or("");
@@ -570,7 +598,10 @@ impl SearchUseCase for SearchService {
                 folders
                     .into_iter()
                     .map(FolderDto::from)
-                    .filter(|f| f.name.to_lowercase().contains(&query_lower))
+                    .filter(|f| {
+                        let folder_name_lower = f.name.to_lowercase();
+                        folder_name_lower.contains(&query_lower)
+                    })
                     .collect()
             } else {
                 folders.into_iter().map(FolderDto::from).collect()
@@ -636,7 +667,9 @@ impl SearchUseCase for SearchService {
                 criteria.sort_by.clone(),
             );
 
-            self.store_in_cache(cache_key, search_results.clone());
+            if let Some(key) = cache_key {
+                self.store_in_cache(key, search_results.clone());
+            }
             return Ok(search_results);
         }
 
@@ -644,7 +677,7 @@ impl SearchUseCase for SearchService {
         // For recursive searches, we need to traverse all subfolders
         // This is less efficient but necessary for recursive functionality
         let criteria_arc = Arc::new(criteria.clone());
-        let (found_files, found_folders) = Self::search_parallel(
+        let (found_files, found_folders): (Vec<FileDto>, Vec<FolderDto>) = Self::search_parallel(
             self.file_repository.clone(),
             self.folder_repository.clone(),
             criteria.folder_id.clone(),
@@ -743,7 +776,9 @@ impl SearchUseCase for SearchService {
         );
 
         // Store in cache
-        self.store_in_cache(cache_key, search_results.clone());
+        if let Some(key) = cache_key {
+            self.store_in_cache(key, search_results.clone());
+        }
 
         Ok(search_results)
     }
@@ -767,7 +802,7 @@ impl SearchUseCase for SearchService {
     }
 }
 
-// ── Stub for testing ────────────────────────────────────────────────────
+// ─── Stub for testing ────────────────────────────────────────────────────
 
 impl SearchService {
     /// Creates a stub version of the service for testing
