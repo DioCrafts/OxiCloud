@@ -18,6 +18,7 @@ function getAvailableLanguages() {
         { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
         { code: 'pt', name: 'Português', flag: '🇧🇷' },
         { code: 'it', name: 'Italiano', flag: '🇮🇹' }
+        { code: 'nl', name: 'Nederlands', flag: '🇳🇱' }
     ];
 }
 
