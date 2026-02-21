@@ -13,7 +13,7 @@ let currentLocale =
 
 // Supported locales (languages that have locale files on the server)
 // When a locale file is not found, the system gracefully falls back to English
-const supportedLocales = ['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt'];
+const supportedLocales = ['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'nl'];
 
 // Fallback to English if locale is not supported
 if (!supportedLocales.includes(currentLocale)) {
