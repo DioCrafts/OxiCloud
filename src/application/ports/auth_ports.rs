@@ -140,6 +140,7 @@ pub struct OidcTokenSet {
 pub struct OidcIdClaims {
     pub sub: String,
     pub email: Option<String>,
+    pub email_verified: Option<bool>,
     pub preferred_username: Option<String>,
     pub name: Option<String>,
     pub groups: Vec<String>,

@@ -991,6 +991,7 @@ impl AuthApplicationService {
                     email: user_info.email.or(claims.email),
                     preferred_username: user_info.preferred_username.or(claims.preferred_username),
                     name: user_info.name.or(claims.name),
+                    email_verified: user_info.email_verified.or(claims.email_verified),
                     groups: if user_info.groups.is_empty() {
                         claims.groups
                     } else {
@@ -1011,6 +1012,22 @@ impl AuthApplicationService {
         };
 
         let provider_name = oidc.provider_name().to_string();
+        // Check email_verified - only if email is present in claims
+        if let Some(email) = &claims.email {
+            let verified = claims.email_verified.unwrap_or(false);
+            if !verified {
+                tracing::warn!(
+                    "OIDC login rejected: email not verified (provider: {}, email: {})",
+                    provider_name,
+                    email
+                );
+                return Err(DomainError::new(
+                    ErrorKind::AccessDenied,
+                    "OIDC",
+                    "Email verification required. Please verify your email at the identity provider.",
+                ));
+            }
+        }
 
         // 4. Determine username and email
         let oidc_username = claims

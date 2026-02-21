@@ -58,6 +58,7 @@ struct TokenResponse {
 struct IdTokenClaims {
     sub: String,
     email: Option<String>,
+    email_verified: Option<bool>,
     preferred_username: Option<String>,
     name: Option<String>,
     groups: Option<Vec<String>>,
@@ -81,6 +82,7 @@ struct IdTokenClaims {
 struct UserInfoResponse {
     sub: String,
     email: Option<String>,
+    email_verified: Option<bool>,
     preferred_username: Option<String>,
     name: Option<String>,
     groups: Option<Vec<String>>,
@@ -437,6 +439,7 @@ impl OidcServicePort for OidcService {
         Ok(OidcIdClaims {
             sub: claims.sub,
             email: claims.email,
+            email_verified: claims.email_verified,
             preferred_username: claims.preferred_username,
             name: claims.name,
             groups: claims.groups.unwrap_or_default(),
@@ -487,6 +490,7 @@ impl OidcServicePort for OidcService {
         Ok(OidcIdClaims {
             sub: info.sub,
             email: info.email,
+            email_verified: info.email_verified,
             preferred_username: info.preferred_username,
             name: info.name,
             groups: info.groups.unwrap_or_default(),
