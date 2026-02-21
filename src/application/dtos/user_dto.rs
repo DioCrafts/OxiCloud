@@ -30,10 +30,7 @@ impl From<User> for UserDto {
             updated_at: user.updated_at(),
             last_login_at: user.last_login_at(),
             active: user.is_active(),
-            auth_provider: user
-                .oidc_provider()
-                .unwrap_or("local")
-                .to_string(),
+            auth_provider: user.oidc_provider().unwrap_or("local").to_string(),
         }
     }
 }
