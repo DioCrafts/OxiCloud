@@ -367,6 +367,16 @@ pub fn format_file_size(bytes: u64) -> String {
     format!("{} {}", formatted, SIZES[i])
 }
 
+/// Formats a byte count for quota display. When bytes is 0, returns "∞" (unlimited).
+///
+/// Matches the JavaScript `formatQuotaSize()` output.
+pub fn format_quota_size(bytes: u64) -> String {
+    if bytes == 0 {
+        return "∞".to_string();
+    }
+    format_file_size(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,6 +390,15 @@ mod tests {
         assert_eq!(format_file_size(1_048_576), "1 MB");
         assert_eq!(format_file_size(3_423_744), "3.27 MB");
         assert_eq!(format_file_size(1_073_741_824), "1 GB");
+    }
+
+    #[test]
+    fn test_format_quota_size() {
+        // Unlimited quota (0) should show infinity symbol
+        assert_eq!(format_quota_size(0), "∞");
+        // Non-zero values should format normally
+        assert_eq!(format_quota_size(500), "500 Bytes");
+        assert_eq!(format_quota_size(1_073_741_824), "1 GB");
     }
 
     #[test]

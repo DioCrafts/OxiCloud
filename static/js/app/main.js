@@ -567,7 +567,8 @@ function updateStorageUsageDisplay(userData) {
     // Get values from user data if available
     if (userData) {
         usedBytes = userData.storage_used_bytes || 0;
-        quotaBytes = userData.storage_quota_bytes || DEFAULT_QUOTA;
+        // Use == null to allow 0 (unlimited) to pass through; only default to DEFAULT_QUOTA when null/undefined
+        quotaBytes = userData.storage_quota_bytes == null ? DEFAULT_QUOTA : userData.storage_quota_bytes;
         
         // Calculate percentage (avoid division by zero)
         if (quotaBytes > 0) {
@@ -577,7 +578,7 @@ function updateStorageUsageDisplay(userData) {
 
     // Format the numbers for display
     const usedFormatted = formatFileSize(usedBytes);
-    const quotaFormatted = formatFileSize(quotaBytes);
+    const quotaFormatted = formatQuotaSize(quotaBytes);
 
     // Update the storage display elements
     const storageFill = document.querySelector('.storage-fill');
