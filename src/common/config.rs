@@ -228,7 +228,7 @@ impl Default for DatabaseConfig {
     fn default() -> Self {
         Self {
             // Updated connection string with default credentials that PostgreSQL often uses
-            connection_string: "postgres://postgres:postgres@localhost:5432/oxicloud".to_string(),
+            connection_string: "postgres://postgres:postgres@localhost:5439/oxicloud".to_string(),
             max_connections: 20,
             min_connections: 5,
             connect_timeout_secs: 10,
@@ -350,6 +350,35 @@ impl OidcConfig {
     }
 }
 
+/// WOPI (Web Application Open Platform Interface) configuration
+#[derive(Debug, Clone)]
+pub struct WopiConfig {
+    /// Whether WOPI integration is enabled
+    pub enabled: bool,
+    /// URL to the WOPI client's discovery endpoint
+    /// e.g., "http://collabora:9980/hosting/discovery"
+    pub discovery_url: String,
+    /// Secret key for signing WOPI access tokens
+    /// Falls back to JWT secret if empty
+    pub secret: String,
+    /// Access token TTL in seconds (default: 86400 = 24 hours)
+    pub token_ttl_secs: i64,
+    /// Lock expiration in seconds (default: 1800 = 30 minutes)
+    pub lock_ttl_secs: u64,
+}
+
+impl Default for WopiConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            discovery_url: String::new(),
+            secret: String::new(),
+            token_ttl_secs: 86400,
+            lock_ttl_secs: 1800,
+        }
+    }
+}
+
 /// Feature configuration (feature flags)
 #[derive(Debug, Clone)]
 pub struct FeaturesConfig {
@@ -401,6 +430,8 @@ pub struct AppConfig {
     pub features: FeaturesConfig,
     /// OIDC configuration
     pub oidc: OidcConfig,
+    /// WOPI configuration
+    pub wopi: WopiConfig,
 }
 
 impl Default for AppConfig {
@@ -419,6 +450,7 @@ impl Default for AppConfig {
             auth: AuthConfig::default(),
             features: FeaturesConfig::default(),
             oidc: OidcConfig::default(),
+            wopi: WopiConfig::default(),
         }
     }
 }
@@ -579,6 +611,33 @@ impl AppConfig {
                 "OIDC is enabled but OXICLOUD_OIDC_ISSUER_URL, OXICLOUD_OIDC_CLIENT_ID, or OXICLOUD_OIDC_CLIENT_SECRET are not set"
             );
             config.oidc.enabled = false;
+        }
+
+        // WOPI configuration
+        if let Ok(v) = env::var("OXICLOUD_WOPI_ENABLED") {
+            config.wopi.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_WOPI_DISCOVERY_URL") {
+            config.wopi.discovery_url = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_WOPI_SECRET") {
+            config.wopi.secret = v;
+        }
+        if let Ok(v) = env::var("OXICLOUD_WOPI_TOKEN_TTL_SECS")
+            && let Ok(val) = v.parse::<i64>()
+        {
+            config.wopi.token_ttl_secs = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_WOPI_LOCK_TTL_SECS")
+            && let Ok(val) = v.parse::<u64>()
+        {
+            config.wopi.lock_ttl_secs = val;
+        }
+
+        // WOPI secret fallback: use JWT secret if WOPI secret not set
+        if config.wopi.enabled && config.wopi.secret.is_empty() {
+            config.wopi.secret = config.auth.jwt_secret.clone();
+            tracing::info!("WOPI secret not set, falling back to JWT secret");
         }
 
         config

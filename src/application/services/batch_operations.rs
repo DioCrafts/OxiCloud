@@ -702,22 +702,20 @@ impl BatchOperationService {
         // Add individual files at the root of the ZIP
         for file_id in &file_ids {
             match self.file_retrieval.get_file(file_id).await {
-                Ok(file_dto) => {
-                    match self.file_retrieval.get_file_content(file_id).await {
-                        Ok(content) => {
-                            if let Err(e) = zip.start_file(&file_dto.name, options) {
-                                info!("Could not start zip entry for {}: {}", file_dto.name, e);
-                                continue;
-                            }
-                            if let Err(e) = zip.write_all(&content) {
-                                info!("Could not write zip entry for {}: {}", file_dto.name, e);
-                            }
+                Ok(file_dto) => match self.file_retrieval.get_file_content(file_id).await {
+                    Ok(content) => {
+                        if let Err(e) = zip.start_file(&file_dto.name, options) {
+                            info!("Could not start zip entry for {}: {}", file_dto.name, e);
+                            continue;
                         }
-                        Err(e) => {
-                            info!("Could not read file content {}: {}", file_id, e);
+                        if let Err(e) = zip.write_all(&content) {
+                            info!("Could not write zip entry for {}: {}", file_dto.name, e);
                         }
                     }
-                }
+                    Err(e) => {
+                        info!("Could not read file content {}: {}", file_id, e);
+                    }
+                },
                 Err(e) => {
                     info!("Could not get file metadata {}: {}", file_id, e);
                 }

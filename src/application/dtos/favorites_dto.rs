@@ -1,7 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::display_helpers::{format_file_size, icon_class_for, icon_special_class_for, category_for};
+use super::display_helpers::{
+    category_for, format_file_size, icon_class_for, icon_special_class_for,
+};
 
 /// DTO for favorites item, enriched with item metadata via SQL JOIN
 /// so the frontend does not need N+1 requests to resolve names/sizes.
@@ -23,7 +25,6 @@ pub struct FavoriteItemDto {
     pub created_at: DateTime<Utc>,
 
     // ── Enriched metadata (resolved via JOIN) ──
-
     /// Display name of the file or folder
     #[serde(skip_serializing_if = "Option::is_none")]
     pub item_name: Option<String>,
@@ -45,7 +46,6 @@ pub struct FavoriteItemDto {
     pub modified_at: Option<DateTime<Utc>>,
 
     // ── Pre-computed display fields ──
-
     /// FontAwesome icon CSS class (e.g. "fas fa-file-image", "fas fa-folder")
     pub icon_class: String,
 
@@ -70,7 +70,10 @@ impl FavoriteItemDto {
             self.size_formatted = "--".to_string();
         } else {
             let name = self.item_name.as_deref().unwrap_or("");
-            let mime = self.item_mime_type.as_deref().unwrap_or("application/octet-stream");
+            let mime = self
+                .item_mime_type
+                .as_deref()
+                .unwrap_or("application/octet-stream");
             self.icon_class = icon_class_for(name, mime).to_string();
             self.icon_special_class = icon_special_class_for(name, mime).to_string();
             self.category = category_for(name, mime).to_string();

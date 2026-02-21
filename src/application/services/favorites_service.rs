@@ -1,4 +1,6 @@
-use crate::application::dtos::favorites_dto::{BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto};
+use crate::application::dtos::favorites_dto::{
+    BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto,
+};
 use crate::application::ports::favorites_ports::{FavoritesRepositoryPort, FavoritesUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
 use async_trait::async_trait;

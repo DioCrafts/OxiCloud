@@ -175,9 +175,10 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> = if let Some(pid) = parent_id {
-            sqlx::query_as(
-                r#"
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+            if let Some(pid) = parent_id {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -185,13 +186,13 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id = $1::uuid AND NOT is_trashed
                  ORDER BY name
                 "#,
-            )
-            .bind(pid)
-            .fetch_all(self.pool())
-            .await
-        } else {
-            sqlx::query_as(
-                r#"
+                )
+                .bind(pid)
+                .fetch_all(self.pool())
+                .await
+            } else {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -199,11 +200,11 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id IS NULL AND NOT is_trashed
                  ORDER BY name
                 "#,
-            )
-            .fetch_all(self.pool())
-            .await
-        }
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("list: {e}")))?;
+                )
+                .fetch_all(self.pool())
+                .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("list: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -217,9 +218,10 @@ impl FolderRepository for FolderDbRepository {
         parent_id: Option<&str>,
         owner_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> = if let Some(pid) = parent_id {
-            sqlx::query_as(
-                r#"
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+            if let Some(pid) = parent_id {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -227,14 +229,14 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
                  ORDER BY name
                 "#,
-            )
-            .bind(pid)
-            .bind(owner_id)
-            .fetch_all(self.pool())
-            .await
-        } else {
-            sqlx::query_as(
-                r#"
+                )
+                .bind(pid)
+                .bind(owner_id)
+                .fetch_all(self.pool())
+                .await
+            } else {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -242,12 +244,12 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
                  ORDER BY name
                 "#,
-            )
-            .bind(owner_id)
-            .fetch_all(self.pool())
-            .await
-        }
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("list_by_owner: {e}")))?;
+                )
+                .bind(owner_id)
+                .fetch_all(self.pool())
+                .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("list_by_owner: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -284,9 +286,10 @@ impl FolderRepository for FolderDbRepository {
             None
         };
 
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> = if let Some(pid) = parent_id {
-            sqlx::query_as(
-                r#"
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+            if let Some(pid) = parent_id {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -295,15 +298,15 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $2 OFFSET $3
                 "#,
-            )
-            .bind(pid)
-            .bind(limit as i64)
-            .bind(offset as i64)
-            .fetch_all(self.pool())
-            .await
-        } else {
-            sqlx::query_as(
-                r#"
+                )
+                .bind(pid)
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(self.pool())
+                .await
+            } else {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -312,13 +315,13 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $1 OFFSET $2
                 "#,
-            )
-            .bind(limit as i64)
-            .bind(offset as i64)
-            .fetch_all(self.pool())
-            .await
-        }
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate: {e}")))?;
+                )
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(self.pool())
+                .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate: {e}")))?;
 
         let folders: Result<Vec<Folder>, DomainError> = rows
             .into_iter()
@@ -360,9 +363,10 @@ impl FolderRepository for FolderDbRepository {
             None
         };
 
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> = if let Some(pid) = parent_id {
-            sqlx::query_as(
-                r#"
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+            if let Some(pid) = parent_id {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -371,16 +375,16 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $3 OFFSET $4
                 "#,
-            )
-            .bind(pid)
-            .bind(owner_id)
-            .bind(limit as i64)
-            .bind(offset as i64)
-            .fetch_all(self.pool())
-            .await
-        } else {
-            sqlx::query_as(
-                r#"
+                )
+                .bind(pid)
+                .bind(owner_id)
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(self.pool())
+                .await
+            } else {
+                sqlx::query_as(
+                    r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -389,14 +393,16 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $2 OFFSET $3
                 "#,
-            )
-            .bind(owner_id)
-            .bind(limit as i64)
-            .bind(offset as i64)
-            .fetch_all(self.pool())
-            .await
-        }
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}")))?;
+                )
+                .bind(owner_id)
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(self.pool())
+                .await
+            }
+            .map_err(|e| {
+                DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}"))
+            })?;
 
         let folders: Result<Vec<Folder>, DomainError> = rows
             .into_iter()
@@ -503,14 +509,13 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn get_folder_path(&self, id: &str) -> Result<StoragePath, DomainError> {
-        let path: String = sqlx::query_scalar(
-            "SELECT path FROM storage.folders WHERE id = $1::uuid",
-        )
-        .bind(id)
-        .fetch_optional(self.pool())
-        .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("get_path: {e}")))?
-        .ok_or_else(|| DomainError::not_found("Folder", id))?;
+        let path: String =
+            sqlx::query_scalar("SELECT path FROM storage.folders WHERE id = $1::uuid")
+                .bind(id)
+                .fetch_optional(self.pool())
+                .await
+                .map_err(|e| DomainError::internal_error("FolderDb", format!("get_path: {e}")))?
+                .ok_or_else(|| DomainError::not_found("Folder", id))?;
 
         Ok(StoragePath::from_string(&path))
     }
@@ -615,11 +620,7 @@ impl FolderRepository for FolderDbRepository {
         Ok(())
     }
 
-    async fn create_home_folder(
-        &self,
-        user_id: &str,
-        name: String,
-    ) -> Result<Folder, DomainError> {
+    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError> {
         let row = sqlx::query_as::<_, (String, String, i64, i64)>(
             r#"
             INSERT INTO storage.folders (name, parent_id, user_id)
@@ -638,7 +639,15 @@ impl FolderRepository for FolderDbRepository {
         .map_err(|e| DomainError::internal_error("FolderDb", format!("home folder: {e}")))?;
 
         match row {
-            Some((id, path, ca, ma)) => Self::row_to_folder(id, name.clone(), path, None, Some(user_id.to_string()), ca, ma),
+            Some((id, path, ca, ma)) => Self::row_to_folder(
+                id,
+                name.clone(),
+                path,
+                None,
+                Some(user_id.to_string()),
+                ca,
+                ma,
+            ),
             None => {
                 // Already exists — fetch it
                 let existing = sqlx::query_as::<_, (String, String, i64, i64)>(
@@ -656,7 +665,15 @@ impl FolderRepository for FolderDbRepository {
                 .fetch_one(self.pool())
                 .await
                 .map_err(|e| DomainError::internal_error("FolderDb", format!("home fetch: {e}")))?;
-                Self::row_to_folder(existing.0, name, existing.1, None, Some(user_id.to_string()), existing.2, existing.3)
+                Self::row_to_folder(
+                    existing.0,
+                    name,
+                    existing.1,
+                    None,
+                    Some(user_id.to_string()),
+                    existing.2,
+                    existing.3,
+                )
             }
         }
     }

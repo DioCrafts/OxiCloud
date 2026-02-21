@@ -55,16 +55,18 @@ impl FileBlobWriteRepository {
     ) -> Result<Option<String>, DomainError> {
         match folder_id {
             Some(fid) => {
-                let path: String = sqlx::query_scalar(
-                    "SELECT path FROM storage.folders WHERE id = $1::uuid",
-                )
-                .bind(fid)
-                .fetch_optional(self.pool.as_ref())
-                .await
-                .map_err(|e| {
-                    DomainError::internal_error("FileBlobWrite", format!("folder path: {e}"))
-                })?
-                .ok_or_else(|| DomainError::not_found("Folder", fid))?;
+                let path: String =
+                    sqlx::query_scalar("SELECT path FROM storage.folders WHERE id = $1::uuid")
+                        .bind(fid)
+                        .fetch_optional(self.pool.as_ref())
+                        .await
+                        .map_err(|e| {
+                            DomainError::internal_error(
+                                "FileBlobWrite",
+                                format!("folder path: {e}"),
+                            )
+                        })?
+                        .ok_or_else(|| DomainError::not_found("Folder", fid))?;
                 Ok(Some(path))
             }
             None => Ok(None),
@@ -81,6 +83,7 @@ impl FileBlobWriteRepository {
         mime_type: String,
         created_at: i64,
         modified_at: i64,
+        owner_id: Option<String>,
     ) -> Result<File, DomainError> {
         let storage_path = Self::make_file_path(folder_path.as_deref(), &name);
         File::with_timestamps(
@@ -92,6 +95,7 @@ impl FileBlobWriteRepository {
             folder_id,
             created_at as u64,
             modified_at as u64,
+            owner_id,
         )
         .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("entity: {e}")))
     }
@@ -179,7 +183,17 @@ impl FileWritePort for FileBlobWriteRepository {
         );
 
         let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
-        Self::row_to_file(row.0, name, folder_id, folder_path, size, content_type, row.1, row.2)
+        Self::row_to_file(
+            row.0,
+            name,
+            folder_id,
+            folder_path,
+            size,
+            content_type,
+            row.1,
+            row.2,
+            Some(user_id),
+        )
     }
 
     async fn save_file_from_temp(
@@ -261,6 +275,7 @@ impl FileWritePort for FileBlobWriteRepository {
             content_type,
             row.1,
             row.2,
+            Some(user_id),
         )
     }
 
@@ -288,7 +303,17 @@ impl FileWritePort for FileBlobWriteRepository {
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
 
         let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
-        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
+        Self::row_to_file(
+            row.0,
+            row.1,
+            row.2,
+            folder_path,
+            row.3,
+            row.4,
+            row.5,
+            row.6,
+            None,
+        )
     }
 
     async fn copy_file(
@@ -371,7 +396,17 @@ impl FileWritePort for FileBlobWriteRepository {
         );
 
         let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
-        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
+        Self::row_to_file(
+            row.0,
+            row.1,
+            row.2,
+            folder_path,
+            row.3,
+            row.4,
+            row.5,
+            row.6,
+            None,
+        )
     }
 
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<File, DomainError> {
@@ -400,7 +435,17 @@ impl FileWritePort for FileBlobWriteRepository {
         .ok_or_else(|| DomainError::not_found("File", file_id))?;
 
         let folder_path = self.lookup_folder_path(row.2.as_deref()).await?;
-        Self::row_to_file(row.0, row.1, row.2, folder_path, row.3, row.4, row.5, row.6)
+        Self::row_to_file(
+            row.0,
+            row.1,
+            row.2,
+            folder_path,
+            row.3,
+            row.4,
+            row.5,
+            row.6,
+            None,
+        )
     }
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
@@ -532,6 +577,7 @@ impl FileWritePort for FileBlobWriteRepository {
             content_type,
             row.1,
             row.2,
+            Some(user_id),
         )?;
 
         // The target_path is not meaningful for blob storage (content goes to .blobs/)

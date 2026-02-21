@@ -54,7 +54,6 @@ pub struct FolderDto {
     pub is_root: bool,
 
     // ── Pre-computed display fields ──
-
     /// FontAwesome icon CSS class (always "fas fa-folder")
     pub icon_class: String,
 

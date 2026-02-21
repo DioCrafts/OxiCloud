@@ -5,9 +5,11 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tokio::time;
 
+use crate::application::dtos::display_helpers::{
+    category_for, icon_class_for, icon_special_class_for,
+};
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
-use crate::application::dtos::display_helpers::{icon_class_for, icon_special_class_for, category_for};
 use crate::application::dtos::search_dto::{
     SearchCriteriaDto, SearchFileResultDto, SearchFolderResultDto, SearchResultsDto,
     SearchSuggestionItem, SearchSuggestionsDto,
@@ -287,67 +289,67 @@ impl SearchService {
         folder_repo: Arc<dyn FolderStoragePort>,
         current_folder_id: Option<String>,
         criteria: Arc<SearchCriteriaDto>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(Vec<FileDto>, Vec<FolderDto>)>> + Send>> {
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<(Vec<FileDto>, Vec<FolderDto>)>> + Send>,
+    > {
         Box::pin(async move {
-        // List files in the current folder
-        let files = file_repo
-            .list_files(current_folder_id.as_deref())
-            .await?;
+            // List files in the current folder
+            let files = file_repo.list_files(current_folder_id.as_deref()).await?;
 
-        let filtered_files: Vec<FileDto> = files
-            .into_iter()
-            .map(FileDto::from)
-            .filter(|file| passes_file_filter(file, &criteria))
-            .collect();
-
-        let mut all_files = filtered_files;
-        let mut all_folders: Vec<FolderDto> = Vec::new();
-
-        // If recursive, process subfolders in parallel
-        if criteria.recursive {
-            let folders = folder_repo
-                .list_folders(current_folder_id.as_deref())
-                .await?;
-
-            let folder_dtos: Vec<FolderDto> = folders
+            let filtered_files: Vec<FileDto> = files
                 .into_iter()
-                .map(FolderDto::from)
-                .filter(|f| passes_folder_filter(f, &criteria))
+                .map(FileDto::from)
+                .filter(|file| passes_file_filter(file, &criteria))
                 .collect();
 
-            all_folders.extend(folder_dtos.iter().cloned());
+            let mut all_files = filtered_files;
+            let mut all_folders: Vec<FolderDto> = Vec::new();
 
-            // Spawn parallel tasks for each subfolder
-            let mut handles = Vec::with_capacity(folder_dtos.len());
-            for subfolder in &folder_dtos {
-                let fr = file_repo.clone();
-                let fdr = folder_repo.clone();
-                let crit = criteria.clone();
-                let folder_id = subfolder.id.clone();
+            // If recursive, process subfolders in parallel
+            if criteria.recursive {
+                let folders = folder_repo
+                    .list_folders(current_folder_id.as_deref())
+                    .await?;
 
-                handles.push(tokio::spawn(async move {
-                    Self::search_parallel(fr, fdr, Some(folder_id), crit).await
-                }));
-            }
+                let folder_dtos: Vec<FolderDto> = folders
+                    .into_iter()
+                    .map(FolderDto::from)
+                    .filter(|f| passes_folder_filter(f, &criteria))
+                    .collect();
 
-            // Collect results from all parallel tasks
-            for handle in handles {
-                match handle.await {
-                    Ok(Ok((sub_files, sub_folders))) => {
-                        all_files.extend(sub_files);
-                        all_folders.extend(sub_folders);
-                    }
-                    Ok(Err(e)) => {
-                        tracing::warn!("Parallel search subtask error: {}", e);
-                    }
-                    Err(e) => {
-                        tracing::warn!("Parallel search task join error: {}", e);
+                all_folders.extend(folder_dtos.iter().cloned());
+
+                // Spawn parallel tasks for each subfolder
+                let mut handles = Vec::with_capacity(folder_dtos.len());
+                for subfolder in &folder_dtos {
+                    let fr = file_repo.clone();
+                    let fdr = folder_repo.clone();
+                    let crit = criteria.clone();
+                    let folder_id = subfolder.id.clone();
+
+                    handles.push(tokio::spawn(async move {
+                        Self::search_parallel(fr, fdr, Some(folder_id), crit).await
+                    }));
+                }
+
+                // Collect results from all parallel tasks
+                for handle in handles {
+                    match handle.await {
+                        Ok(Ok((sub_files, sub_folders))) => {
+                            all_files.extend(sub_files);
+                            all_folders.extend(sub_folders);
+                        }
+                        Ok(Err(e)) => {
+                            tracing::warn!("Parallel search subtask error: {}", e);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Parallel search task join error: {}", e);
+                        }
                     }
                 }
             }
-        }
 
-        Ok((all_files, all_folders))
+            Ok((all_files, all_folders))
         }) // end Box::pin
     }
 
@@ -560,13 +562,11 @@ impl SearchUseCase for SearchService {
         match criteria.sort_by.as_str() {
             "name" => {
                 enriched_files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                enriched_folders
-                    .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                enriched_folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
             }
             "name_desc" => {
                 enriched_files.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
-                enriched_folders
-                    .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                enriched_folders.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
             }
             "date" => {
                 enriched_files.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));

@@ -102,7 +102,15 @@ impl Folder {
         created_at: u64,
         modified_at: u64,
     ) -> FolderResult<Self> {
-        Self::with_timestamps_and_owner(id, name, storage_path, parent_id, None, created_at, modified_at)
+        Self::with_timestamps_and_owner(
+            id,
+            name,
+            storage_path,
+            parent_id,
+            None,
+            created_at,
+            modified_at,
+        )
     }
 
     /// Creates a folder with specific timestamps and owner (for DB reconstruction)

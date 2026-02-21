@@ -56,9 +56,5 @@ pub trait FavoritesRepositoryPort: Send + Sync + 'static {
 
     /// Insert multiple items in a single transaction.
     /// Returns the number of rows actually inserted (ignoring duplicates).
-    async fn add_favorites_batch(
-        &self,
-        user_id: &str,
-        items: &[(String, String)],
-    ) -> Result<u64>;
+    async fn add_favorites_batch(&self, user_id: &str, items: &[(String, String)]) -> Result<u64>;
 }

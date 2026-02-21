@@ -317,7 +317,8 @@ impl AuthApplicationService {
         let created_user = self.user_storage.create_user(user).await?;
 
         // Create personal folder for the user
-        self.create_personal_folder(&dto.username, created_user.id()).await;
+        self.create_personal_folder(&dto.username, created_user.id())
+            .await;
 
         tracing::info!("User registered: {}", created_user.id());
         Ok(UserDto::from(created_user))
@@ -659,7 +660,8 @@ impl AuthApplicationService {
         let created_user = self.user_storage.create_user(user).await?;
 
         // 5. Create personal folder for the new admin
-        self.create_personal_folder(&dto.username, created_user.id()).await;
+        self.create_personal_folder(&dto.username, created_user.id())
+            .await;
 
         tracing::info!("Custom admin created: {}", created_user.id());
         Ok(UserDto::from(created_user))
@@ -765,7 +767,8 @@ impl AuthApplicationService {
         }
 
         // Create personal folder
-        self.create_personal_folder(&dto.username, created.id()).await;
+        self.create_personal_folder(&dto.username, created.id())
+            .await;
 
         tracing::info!("Admin created user: {} ({})", dto.username, created.id());
         Ok(UserDto::from(created))

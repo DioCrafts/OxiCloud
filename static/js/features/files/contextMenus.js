@@ -15,6 +15,23 @@ const contextMenus = {
             : (isFavorite ? 'Remove from favorites' : 'Add to favorites');
     },
 
+    /**
+     * Show or hide WOPI editor options based on current target file
+     */
+    async syncWopiOptionVisibility() {
+        const wopiEdit = document.getElementById('wopi-edit-file-option');
+        const wopiEditTab = document.getElementById('wopi-edit-file-tab-option');
+        if (!wopiEdit || !wopiEditTab) return;
+
+        const targetFile = window.app && window.app.contextMenuTargetFile;
+        const show = targetFile &&
+            window.wopiEditor &&
+            await window.wopiEditor.canEdit(targetFile.name);
+
+        wopiEdit.style.display = show ? '' : 'none';
+        wopiEditTab.style.display = show ? '' : 'none';
+    },
+
     syncFavoriteOptionLabels() {
         if (!window.favorites) return;
 
@@ -137,7 +154,23 @@ const contextMenus = {
             }
             window.ui.closeFileContextMenu();
         });
-        
+
+        document.getElementById('wopi-edit-file-option').addEventListener('click', () => {
+            if (window.app.contextMenuTargetFile) {
+                const file = window.app.contextMenuTargetFile;
+                window.wopiEditor.openInModal(file.id, file.name, 'edit');
+            }
+            window.ui.closeFileContextMenu();
+        });
+
+        document.getElementById('wopi-edit-file-tab-option').addEventListener('click', () => {
+            if (window.app.contextMenuTargetFile) {
+                const file = window.app.contextMenuTargetFile;
+                window.wopiEditor.openInTab(file.id, file.name, 'edit');
+            }
+            window.ui.closeFileContextMenu();
+        });
+
         document.getElementById('download-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
                 window.fileOps.downloadFile(
