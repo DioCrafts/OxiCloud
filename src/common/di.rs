@@ -459,21 +459,32 @@ impl AppServiceFactory {
 
             // Auth services
             if self.config.features.enable_auth {
-                match crate::infrastructure::auth_factory::create_auth_services(
+                let services = crate::infrastructure::auth_factory::create_auth_services(
                     &self.config,
                     pool.clone(),
                     Some(apps.folder_service_concrete.clone()),
                 )
                 .await
-                {
-                    Ok(services) => {
-                        tracing::info!("Authentication services initialized successfully");
-                        auth_services = Some(services);
-                    }
-                    Err(e) => {
-                        tracing::error!("Failed to initialize authentication services: {}", e);
-                    }
-                }
+                .map_err(|e| {
+                    // SECURITY: fail-closed. If auth is required but the auth
+                    // services cannot be created, propagate the error so the
+                    // server refuses to start — never degrade to public mode.
+                    tracing::error!(
+                        "FATAL: enable_auth=true but auth services failed to initialize: {}",
+                        e
+                    );
+                    DomainError::internal_error(
+                        "AuthInit",
+                        format!(
+                            "Authentication is enabled but auth services failed: {}. \
+                             Refusing to start without authentication.",
+                            e
+                        ),
+                    )
+                })?;
+
+                tracing::info!("Authentication services initialized successfully");
+                auth_services = Some(services);
             }
         }
 

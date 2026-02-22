@@ -72,8 +72,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some(Arc::new(pool))
             }
             Err(e) => {
-                tracing::error!("Failed to initialize database pool: {}", e);
-                None
+                // SECURITY: fail-closed. If auth is required but the database
+                // is unreachable, the server MUST NOT start in public mode.
+                panic!(
+                    "FATAL: enable_auth=true but database connection failed: {}. \
+                     Refusing to start without authentication.",
+                    e
+                );
             }
         }
     } else {
@@ -134,7 +139,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Apply auth middleware to protected API routes when auth is enabled
-    if config.features.enable_auth && app_state.auth_service.is_some() {
+    if config.features.enable_auth {
+        // SECURITY: if auth is required, auth_service MUST be present at this
+        // point.  The earlier guards in di.rs and main.rs guarantee this, but
+        // add a defensive check so a future refactor cannot silently degrade.
+        assert!(
+            app_state.auth_service.is_some(),
+            "FATAL: enable_auth=true but auth_service is None. \
+             This should have been caught during initialization."
+        );
+    }
+    if config.features.enable_auth {
         use interfaces::api::handlers::auth_handler::auth_routes;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
 
