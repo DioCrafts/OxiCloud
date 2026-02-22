@@ -231,6 +231,7 @@ impl FolderUseCase for FolderService {
     }
 
     /// Lists folders scoped to a specific owner.
+    /// Self-healing: if listing root folders and none exist, creates a home folder.
     async fn list_folders_for_owner(
         &self,
         parent_id: Option<&str>,
@@ -249,6 +250,34 @@ impl FolderUseCase for FolderService {
                     ),
                 )
             })?;
+
+        // Self-healing: if listing root folders and none exist, create a home folder
+        // This ensures the frontend always gets a valid userHomeFolderId
+        if parent_id.is_none() && folders.is_empty() {
+            tracing::info!(
+                "No root folders found for user {}, creating home folder automatically",
+                owner_id
+            );
+            let folder_name = format!("My Folder - {}", &owner_id[..8.min(owner_id.len())]);
+            match self
+                .folder_storage
+                .create_home_folder(owner_id, folder_name.clone())
+                .await
+            {
+                Ok(home_folder) => {
+                    tracing::info!(
+                        "Created home folder '{}' for user {}",
+                        folder_name,
+                        owner_id
+                    );
+                    return Ok(vec![FolderDto::from(home_folder)]);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to create home folder for user {}: {}", owner_id, e);
+                    // Return empty list rather than failing - user might not have storage quota, etc.
+                }
+            }
+        }
 
         Ok(folders.into_iter().map(FolderDto::from).collect())
     }
