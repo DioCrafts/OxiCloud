@@ -103,6 +103,25 @@ pub trait FileReadPort: Send + Sync + 'static {
         user_id: &str,
     ) -> Result<(Vec<File>, usize), DomainError>;
 
+    /// Search files recursively in a folder subtree using ltree.
+    ///
+    /// When `root_folder_id` is Some, uses ltree descendant queries to find
+    /// all files within the subtree rooted at that folder. When None, searches
+    /// all files for the user. This replaces the O(N) recursive spawn-per-folder
+    /// approach with O(1) SQL queries.
+    ///
+    /// Returns a tuple of (matching files, total count for pagination).
+    async fn search_files_in_subtree(
+        &self,
+        root_folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<(Vec<File>, usize), DomainError> {
+        // Default: delegate to paginated search (non-recursive fallback)
+        self.search_files_paginated(root_folder_id, criteria, user_id)
+            .await
+    }
+
     /// Count files matching the search criteria (without loading them).
     ///
     /// Used for pagination metadata without fetching the actual files.

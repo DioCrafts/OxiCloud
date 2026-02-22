@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
  * to filter files and folders in the system. It supports various filter types
  * including name matching, file types, date ranges, and size constraints.
  */
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct SearchCriteriaDto {
     /// Optional text to search in file/folder names
     #[serde(skip_serializing_if = "Option::is_none")]

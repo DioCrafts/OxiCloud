@@ -15,7 +15,8 @@ use crate::application::ports::inbound::SearchUseCase;
 use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::Result;
-use crate::domain::errors::DomainError;
+use crate::domain::entities::folder::Folder;
+use std::hash::{Hash, Hasher};
 
 /**
  * High-performance search service implementation for files and folders.
@@ -25,7 +26,7 @@ use crate::domain::errors::DomainError;
  * The frontend acts as a thin rendering client only.
  *
  * Features:
- * - Parallel recursive folder traversal using tokio tasks
+ * - Single-query recursive subtree search via PostgreSQL ltree
  * - Relevance scoring (exact match > starts-with > contains)
  * - Content categorization and icon mapping
  * - Multiple sort options (relevance, name, date, size)
@@ -41,17 +42,7 @@ pub struct SearchService {
     folder_repository: Arc<dyn FolderStoragePort>,
 
     /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka)
-    search_cache: moka::sync::Cache<SearchCacheKey, SearchResultsDto>,
-}
-
-/// Key for the search cache
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct SearchCacheKey {
-    /// Serialized representation of the search criteria
-    criteria_hash: String,
-
-    /// User ID (to isolate searches between users)
-    user_id: String,
+    search_cache: moka::sync::Cache<u64, SearchResultsDto>,
 }
 
 // ─── Utility functions (pure, no self — computed on the server) ─────────
@@ -132,31 +123,21 @@ impl SearchService {
         }
     }
 
-    /// Creates a cache key from the search criteria.
-    fn create_cache_key(
-        &self,
-        criteria: &SearchCriteriaDto,
-        user_id: &str,
-    ) -> Result<SearchCacheKey> {
-        let criteria_str = serde_json::to_string(criteria).map_err(|e| {
-            DomainError::internal_error(
-                "SearchService",
-                format!("Failed to serialize criteria: {}", e),
-            )
-        })?;
-        Ok(SearchCacheKey {
-            criteria_hash: criteria_str,
-            user_id: user_id.to_string(),
-        })
+    /// Creates a cache key from the search criteria using zero-allocation hashing.
+    fn create_cache_key(criteria: &SearchCriteriaDto, user_id: &str) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        criteria.hash(&mut hasher);
+        user_id.hash(&mut hasher);
+        hasher.finish()
     }
 
     /// Attempts to retrieve results from the cache.
-    fn get_from_cache(&self, key: &SearchCacheKey) -> Option<SearchResultsDto> {
-        self.search_cache.get(key)
+    fn get_from_cache(&self, key: u64) -> Option<SearchResultsDto> {
+        self.search_cache.get(&key)
     }
 
     /// Stores results in the cache.
-    fn store_in_cache(&self, key: SearchCacheKey, results: SearchResultsDto) {
+    fn store_in_cache(&self, key: u64, results: SearchResultsDto) {
         self.search_cache.insert(key, results);
     }
 
@@ -203,81 +184,6 @@ impl SearchService {
             is_root: folder.is_root,
             relevance_score: relevance,
         }
-    }
-
-    /**
-     * Parallel recursive search through folders using tokio tasks.
-     *
-     * Instead of searching subfolders sequentially, we spawn a task
-     * per subfolder and join them all concurrently.
-     */
-    fn search_parallel(
-        file_repo: Arc<dyn FileReadPort>,
-        folder_repo: Arc<dyn FolderStoragePort>,
-        current_folder_id: Option<String>,
-        criteria: Arc<SearchCriteriaDto>,
-    ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<(Vec<FileDto>, Vec<FolderDto>)>> + Send>,
-    > {
-        Box::pin(async move {
-            // List files in the current folder
-            let files = file_repo.list_files(current_folder_id.as_deref()).await?;
-
-            let filtered_files: Vec<FileDto> = files
-                .into_iter()
-                .map(FileDto::from)
-                .filter(|file| passes_file_filter(file, &criteria))
-                .collect();
-
-            let mut all_files = filtered_files;
-            let mut all_folders: Vec<FolderDto> = Vec::new();
-
-            // If recursive, process subfolders in parallel
-            if criteria.recursive {
-                let folders = folder_repo
-                    .list_folders(current_folder_id.as_deref())
-                    .await?;
-
-                let folder_dtos: Vec<FolderDto> = folders
-                    .into_iter()
-                    .map(FolderDto::from)
-                    .filter(|f| passes_folder_filter(f, &criteria))
-                    .collect();
-
-                all_folders.extend(folder_dtos.iter().cloned());
-
-                // Spawn parallel tasks for each subfolder
-                let mut handles = Vec::with_capacity(folder_dtos.len());
-                for subfolder in &folder_dtos {
-                    let fr = file_repo.clone();
-                    let fdr = folder_repo.clone();
-                    let crit = criteria.clone();
-                    let folder_id = subfolder.id.clone();
-
-                    handles.push(tokio::spawn(async move {
-                        Self::search_parallel(fr, fdr, Some(folder_id), crit).await
-                    }));
-                }
-
-                // Collect results from all parallel tasks
-                for handle in handles {
-                    match handle.await {
-                        Ok(Ok((sub_files, sub_folders))) => {
-                            all_files.extend(sub_files);
-                            all_folders.extend(sub_folders);
-                        }
-                        Ok(Err(e)) => {
-                            tracing::warn!("Parallel search subtask error: {}", e);
-                        }
-                        Err(e) => {
-                            tracing::warn!("Parallel search task join error: {}", e);
-                        }
-                    }
-                }
-            }
-
-            Ok((all_files, all_folders))
-        })
     }
 
     /// Quick suggestions search — returns up to `limit` name suggestions
@@ -344,96 +250,6 @@ impl SearchService {
     }
 }
 
-// ─── Standalone filter functions for use in parallel tasks ──────────────
-
-/// Check if a file passes all filter criteria (standalone, no &self needed).
-fn passes_file_filter(file: &FileDto, criteria: &SearchCriteriaDto) -> bool {
-    if let Some(name_query) = &criteria.name_contains
-        && !file
-            .name
-            .to_lowercase()
-            .contains(&name_query.to_lowercase())
-    {
-        return false;
-    }
-    if let Some(file_types) = &criteria.file_types {
-        if let Some(extension) = file.name.split('.').next_back() {
-            if !file_types
-                .iter()
-                .any(|ext| ext.eq_ignore_ascii_case(extension))
-            {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.created_after {
-        if file.created_at < v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.created_before {
-        if file.created_at > v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.modified_after {
-        if file.modified_at < v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.modified_before {
-        if file.modified_at > v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.min_size {
-        if file.size < v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.max_size {
-        if file.size > v {
-            return false;
-        }
-    }
-    true
-}
-
-/// Check if a folder passes all filter criteria (standalone).
-fn passes_folder_filter(folder: &FolderDto, criteria: &SearchCriteriaDto) -> bool {
-    if let Some(name_query) = &criteria.name_contains
-        && !folder
-            .name
-            .to_lowercase()
-            .contains(&name_query.to_lowercase())
-    {
-        return false;
-    }
-    if let Some(v) = criteria.created_after {
-        if folder.created_at < v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.created_before {
-        if folder.created_at > v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.modified_after {
-        if folder.modified_at < v {
-            return false;
-        }
-    }
-    if let Some(v) = criteria.modified_before {
-        if folder.modified_at > v {
-            return false;
-        }
-    }
-    true
-}
-
 // ─── SearchUseCase trait implementation ──────────────────────────────────
 
 #[async_trait]
@@ -461,11 +277,9 @@ impl SearchUseCase for SearchService {
         let user_id = "default-user";
 
         // Try to get from cache
-        let cache_key = self.create_cache_key(&criteria, user_id).ok();
-        if let Some(ref key) = cache_key {
-            if let Some(cached_results) = self.get_from_cache(key) {
-                return Ok(cached_results);
-            }
+        let cache_key = Self::create_cache_key(&criteria, user_id);
+        if let Some(cached_results) = self.get_from_cache(cache_key) {
+            return Ok(cached_results);
         }
 
         let query = criteria.name_contains.as_deref().unwrap_or("");
@@ -568,99 +382,89 @@ impl SearchUseCase for SearchService {
                 criteria.sort_by.clone(),
             );
 
-            if let Some(key) = cache_key {
-                self.store_in_cache(key, search_results.clone());
-            }
+            self.store_in_cache(cache_key, search_results.clone());
             return Ok(search_results);
         }
 
-        // ── Recursive search (fallback to original parallel approach) ──
-        // For recursive searches, we need to traverse all subfolders
-        // This is less efficient but necessary for recursive functionality
-        let criteria_arc = Arc::new(criteria.clone());
-        let (found_files, found_folders): (Vec<FileDto>, Vec<FolderDto>) = Self::search_parallel(
-            self.file_repository.clone(),
-            self.folder_repository.clone(),
-            criteria.folder_id.clone(),
-            criteria_arc,
-        )
-        .await?;
+        // ── Recursive search via ltree (single SQL query per entity type) ──
+        // Uses PostgreSQL ltree GiST index to find all files and folders
+        // in the subtree in O(1) queries, replacing the O(N) spawn-per-folder
+        // approach that could saturate the connection pool.
+        let (found_files, total_file_count) = self
+            .file_repository
+            .search_files_in_subtree(criteria.folder_id.as_deref(), &criteria, user_id)
+            .await?;
 
-        // ── Enrich results with server-computed metadata ──
-        let mut enriched_files: Vec<SearchFileResultDto> = found_files
+        // Get descendant folders (ltree-based when folder_id is specified)
+        let found_folders: Vec<Folder> = if let Some(ref fid) = criteria.folder_id {
+            self.folder_repository
+                .list_descendant_folders(fid, criteria.name_contains.as_deref(), user_id)
+                .await?
+        } else {
+            // No folder scope → search all user folders
+            let all_folders = self.folder_repository.list_folders(None).await?;
+            if let Some(ref name_query) = criteria.name_contains {
+                let q = name_query.to_lowercase();
+                all_folders
+                    .into_iter()
+                    .filter(|f| f.name().to_lowercase().contains(&q))
+                    .collect()
+            } else {
+                all_folders
+            }
+        };
+
+        // ── Convert to DTOs and enrich with server-computed metadata ──
+        let file_dtos: Vec<FileDto> = found_files.into_iter().map(FileDto::from).collect();
+        let enriched_files: Vec<SearchFileResultDto> = file_dtos
             .iter()
             .map(|f| Self::enrich_file(f, query))
             .collect();
 
-        let mut enriched_folders: Vec<SearchFolderResultDto> = found_folders
+        let folder_dtos: Vec<FolderDto> = found_folders.into_iter().map(FolderDto::from).collect();
+        let mut enriched_folders: Vec<SearchFolderResultDto> = folder_dtos
             .iter()
             .map(|f| Self::enrich_folder(f, query))
             .collect();
 
-        // ── Sort based on criteria.sort_by ──
+        // ── Sort folders (files already sorted by SQL ORDER BY) ──
         match criteria.sort_by.as_str() {
             "name" => {
-                enriched_files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-                enriched_folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                enriched_folders
+                    .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
             }
             "name_desc" => {
-                enriched_files.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
-                enriched_folders.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                enriched_folders
+                    .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
             }
             "date" => {
-                enriched_files.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
                 enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
             }
             "date_desc" => {
-                enriched_files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
                 enriched_folders.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
             }
-            "size" => {
-                enriched_files.sort_by(|a, b| a.size.cmp(&b.size));
-            }
-            "size_desc" => {
-                enriched_files.sort_by(|a, b| b.size.cmp(&a.size));
-            }
             _ => {
-                // "relevance" (default) — highest relevance first, tie-break by date desc
-                enriched_files.sort_by(|a, b| {
-                    b.relevance_score
-                        .cmp(&a.relevance_score)
-                        .then_with(|| b.modified_at.cmp(&a.modified_at))
-                });
-                enriched_folders.sort_by(|a, b| {
-                    b.relevance_score
-                        .cmp(&a.relevance_score)
-                        .then_with(|| b.modified_at.cmp(&a.modified_at))
-                });
+                enriched_folders.sort_by(|a, b| b.relevance_score.cmp(&a.relevance_score));
             }
         }
 
-        // ── Pagination ──
-        let total_count = enriched_files.len() + enriched_folders.len();
+        // ── Pagination (folders first, then files) ──
+        let folder_count = enriched_folders.len();
+        let total_count = total_file_count + folder_count;
         let start_idx = criteria.offset.min(total_count);
         let end_idx = (criteria.offset + criteria.limit).min(total_count);
-
-        let paginated_items: Vec<(bool, usize)> = (start_idx..end_idx)
-            .map(|i| {
-                if i < enriched_folders.len() {
-                    (true, i) // folder
-                } else {
-                    (false, i - enriched_folders.len()) // file
-                }
-            })
-            .collect();
 
         let mut paginated_folders = Vec::new();
         let mut paginated_files = Vec::new();
 
-        for (is_folder, idx) in paginated_items {
-            if is_folder {
-                if idx < enriched_folders.len() {
-                    paginated_folders.push(enriched_folders[idx].clone());
+        for i in start_idx..end_idx {
+            if i < folder_count {
+                paginated_folders.push(enriched_folders[i].clone());
+            } else {
+                let file_idx = i - folder_count;
+                if file_idx < enriched_files.len() {
+                    paginated_files.push(enriched_files[file_idx].clone());
                 }
-            } else if idx < enriched_files.len() {
-                paginated_files.push(enriched_files[idx].clone());
             }
         }
 
@@ -677,9 +481,7 @@ impl SearchUseCase for SearchService {
         );
 
         // Store in cache
-        if let Some(key) = cache_key {
-            self.store_in_cache(key, search_results.clone());
-        }
+        self.store_in_cache(cache_key, search_results.clone());
 
         Ok(search_results)
     }

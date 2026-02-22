@@ -103,4 +103,21 @@ pub trait FolderRepository: Send + Sync + 'static {
     /// Creates a root-level home folder for a user.
     /// This is used during user registration to create the user's personal folder.
     async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError>;
+
+    /// Lists all descendant folders in a subtree (ltree-based).
+    ///
+    /// Returns all folders whose lpath is a descendant of the given folder's
+    /// lpath. Used for recursive search — O(1) SQL via GiST index instead
+    /// of O(N) recursive traversal.
+    ///
+    /// The default implementation returns an empty vec (stubs / mocks).
+    async fn list_descendant_folders(
+        &self,
+        folder_id: &str,
+        name_contains: Option<&str>,
+        user_id: &str,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let _ = (folder_id, name_contains, user_id);
+        Ok(Vec::new())
+    }
 }

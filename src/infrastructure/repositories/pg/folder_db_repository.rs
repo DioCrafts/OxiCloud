@@ -677,6 +677,63 @@ impl FolderRepository for FolderDbRepository {
             }
         }
     }
+
+    /// Lists all descendant folders in a subtree using ltree GiST index.
+    ///
+    /// Single SQL query: `fo.lpath <@ (root's lpath)` fetches the entire
+    /// subtree in one indexed scan. Optional name filter is pushed to SQL.
+    async fn list_descendant_folders(
+        &self,
+        folder_id: &str,
+        name_contains: Option<&str>,
+        user_id: &str,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let (where_extra, name_pattern) = match name_contains {
+            Some(name) if !name.is_empty() => {
+                (" AND LOWER(fo.name) LIKE $3", Some(format!("%{}%", name.to_lowercase())))
+            }
+            _ => ("", None),
+        };
+
+        let sql = format!(
+            "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
+                    fo.user_id::text, \
+                    EXTRACT(EPOCH FROM fo.created_at)::bigint, \
+                    EXTRACT(EPOCH FROM fo.updated_at)::bigint \
+               FROM storage.folders fo \
+              WHERE fo.user_id = $1 \
+                AND fo.is_trashed = false \
+                AND fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid) \
+                AND fo.id != $2::uuid \
+                {where_extra} \
+              ORDER BY fo.name"
+        );
+
+        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
+            if let Some(ref pattern) = name_pattern {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .bind(folder_id)
+                    .bind(pattern)
+                    .fetch_all(self.pool())
+                    .await
+            } else {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .bind(folder_id)
+                    .fetch_all(self.pool())
+                    .await
+            }
+            .map_err(|e| {
+                DomainError::internal_error("FolderDb", format!("descendant search: {e}"))
+            })?;
+
+        rows.into_iter()
+            .map(|(id, name, path, pid, uid, ca, ma)| {
+                Self::row_to_folder(id, name, path, pid, uid, ca, ma)
+            })
+            .collect()
+    }
 }
 
 // ── Extra helpers for blob-storage bootstrap ──

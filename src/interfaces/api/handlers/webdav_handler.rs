@@ -515,8 +515,8 @@ async fn handle_put(
     let file_upload_service = &state.applications.file_upload_service;
 
     // Check if path is empty (root folder)
-    if path.is_empty() || path == \"/\" {
-        return Err(AppError::bad_request(\"Cannot PUT to root folder\"));
+    if path.is_empty() || path == "/" {
+        return Err(AppError::bad_request("Cannot PUT to root folder"));
     }
 
     // Hard upload size limit from config
@@ -527,17 +527,17 @@ async fn handle_put(
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .unwrap_or(\"application/octet-stream\")
+        .unwrap_or("application/octet-stream")
         .to_string();
 
     // ── Streaming spool: body → temp file + incremental hash ──
     let temp_file = tempfile::NamedTempFile::new()
-        .map_err(|e| AppError::internal_error(format!(\"Failed to create temp file: {}\", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to create temp file: {}", e)))?;
     let temp_path = temp_file.path().to_path_buf();
 
     let mut file = tokio::fs::File::create(&temp_path)
         .await
-        .map_err(|e| AppError::internal_error(format!(\"Failed to open temp file: {}\", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to open temp file: {}", e)))?;
 
     let mut hasher = Sha256::new();
     let mut total_bytes: usize = 0;
@@ -545,7 +545,7 @@ async fn handle_put(
 
     while let Some(frame_result) = stream.next().await {
         let frame = frame_result
-            .map_err(|e| AppError::bad_request(format!(\"Failed to read request body: {}\", e)))?;
+            .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
         if let Some(chunk) = frame.data_ref() {
             total_bytes += chunk.len();
             if total_bytes > max_upload {
@@ -553,18 +553,18 @@ async fn handle_put(
                 drop(file);
                 let _ = tokio::fs::remove_file(&temp_path).await;
                 return Err(AppError::payload_too_large(format!(
-                    \"Upload exceeds maximum size of {} bytes\",
+                    "Upload exceeds maximum size of {} bytes",
                     max_upload
                 )));
             }
             hasher.update(chunk);
             file.write_all(chunk)
                 .await
-                .map_err(|e| AppError::internal_error(format!(\"Failed to write to temp file: {}\", e)))?;
+                .map_err(|e| AppError::internal_error(format!("Failed to write to temp file: {}", e)))?;
         }
     }
     file.flush().await
-        .map_err(|e| AppError::internal_error(format!(\"Failed to flush temp file: {}\", e)))?;
+        .map_err(|e| AppError::internal_error(format!("Failed to flush temp file: {}", e)))?;
     drop(file);
 
     let hash = hex::encode(hasher.finalize());
@@ -589,7 +589,7 @@ async fn handle_put(
             .body(Body::empty())
             .unwrap()),
         Err(e) => Err(AppError::internal_error(format!(
-            \"Failed to put file: {}\",
+            "Failed to put file: {}",
             e
         ))),
     }

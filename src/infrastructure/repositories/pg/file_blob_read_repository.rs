@@ -617,6 +617,215 @@ impl FileReadPort for FileBlobReadRepository {
         Ok((files, total_count))
     }
 
+    /// Recursive subtree search using ltree — O(1) SQL queries.
+    ///
+    /// When `root_folder_id` is Some, JOINs `storage.files` with
+    /// `storage.folders` using `lpath <@ (root's lpath)` to find all
+    /// files in the entire subtree in a single indexed query.
+    /// When None, searches all files for the user (no ltree needed).
+    ///
+    /// All filter criteria (name, file types, dates, sizes) and sorting
+    /// are pushed down to SQL for maximum efficiency.
+    async fn search_files_in_subtree(
+        &self,
+        root_folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<(Vec<File>, usize), DomainError> {
+        // When no root folder specified, delegate to existing paginated search
+        // which already handles "all files for user" efficiently
+        let root_id = match root_folder_id {
+            None => {
+                return self
+                    .search_files_paginated(None, criteria, user_id)
+                    .await;
+            }
+            Some(id) => id,
+        };
+
+        let offset = criteria.offset as i64;
+        let limit = criteria.limit as i64;
+
+        // Determine sort order
+        let (order_column, order_dir) = match criteria.sort_by.as_str() {
+            "name" => ("fi.name", "ASC"),
+            "name_desc" => ("fi.name", "DESC"),
+            "date" => ("fi.updated_at", "ASC"),
+            "date_desc" => ("fi.updated_at", "DESC"),
+            "size" => ("fi.size", "ASC"),
+            "size_desc" => ("fi.size", "DESC"),
+            _ => ("fi.name", "ASC"),
+        };
+
+        // ── Build dynamic WHERE clauses ──
+        let mut conditions = Vec::new();
+        let mut bind_idx = 3u32; // $1 = user_id, $2 = root_folder_id
+
+        conditions.push("fi.is_trashed = false".to_string());
+        conditions.push("fi.user_id = $1".to_string());
+        // ltree subtree match: folder's lpath is a descendant of root's lpath
+        conditions.push(format!(
+            "fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid)"
+        ));
+
+        if let Some(name) = &criteria.name_contains {
+            if !name.is_empty() {
+                bind_idx += 1;
+                conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
+            }
+        }
+        if let Some(types) = &criteria.file_types {
+            if !types.is_empty() {
+                bind_idx += 1;
+                // Match file extension against ANY of the provided types
+                conditions.push(format!(
+                    "LOWER(SUBSTRING(fi.name FROM '\\.([^.]+)$')) = ANY(${bind_idx})"
+                ));
+            }
+        }
+        if criteria.created_after.is_some() {
+            bind_idx += 1;
+            conditions.push(format!(
+                "EXTRACT(EPOCH FROM fi.created_at)::bigint >= ${bind_idx}"
+            ));
+        }
+        if criteria.created_before.is_some() {
+            bind_idx += 1;
+            conditions.push(format!(
+                "EXTRACT(EPOCH FROM fi.created_at)::bigint <= ${bind_idx}"
+            ));
+        }
+        if criteria.modified_after.is_some() {
+            bind_idx += 1;
+            conditions.push(format!(
+                "EXTRACT(EPOCH FROM fi.updated_at)::bigint >= ${bind_idx}"
+            ));
+        }
+        if criteria.modified_before.is_some() {
+            bind_idx += 1;
+            conditions.push(format!(
+                "EXTRACT(EPOCH FROM fi.updated_at)::bigint <= ${bind_idx}"
+            ));
+        }
+        if criteria.min_size.is_some() {
+            bind_idx += 1;
+            conditions.push(format!("fi.size >= ${bind_idx}"));
+        }
+        if criteria.max_size.is_some() {
+            bind_idx += 1;
+            conditions.push(format!("fi.size <= ${bind_idx}"));
+        }
+
+        let where_clause = conditions.join(" AND ");
+        let limit_bind = bind_idx + 1;
+        let offset_bind = bind_idx + 2;
+
+        // ── Count query ──
+        let count_sql = format!(
+            "SELECT COUNT(*) FROM storage.files fi \
+             JOIN storage.folders fo ON fo.id = fi.folder_id \
+             WHERE {where_clause}"
+        );
+
+        // ── Data query ──
+        let data_sql = format!(
+            "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path, \
+                    fi.size, fi.mime_type, \
+                    EXTRACT(EPOCH FROM fi.created_at)::bigint, \
+                    EXTRACT(EPOCH FROM fi.updated_at)::bigint, \
+                    fi.user_id::text \
+               FROM storage.files fi \
+               JOIN storage.folders fo ON fo.id = fi.folder_id \
+              WHERE {where_clause} \
+              ORDER BY {order_column} {order_dir} \
+              LIMIT ${limit_bind} OFFSET ${offset_bind}"
+        );
+
+        // ── Bind parameters dynamically ──
+        // Count query
+        let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql)
+            .bind(user_id)
+            .bind(root_id);
+
+        let mut data_query = sqlx::query_as::<_, (
+            String, String, Option<String>, Option<String>,
+            i64, String, i64, i64, Option<String>,
+        )>(&data_sql)
+            .bind(user_id)
+            .bind(root_id);
+
+        // Bind optional parameters in the same order as the conditions
+        if let Some(name) = &criteria.name_contains {
+            if !name.is_empty() {
+                let pattern = format!("%{}%", name.to_lowercase());
+                count_query = count_query.bind(pattern.clone());
+                data_query = data_query.bind(pattern);
+            }
+        }
+        if let Some(types) = &criteria.file_types {
+            if !types.is_empty() {
+                let lower_types: Vec<String> =
+                    types.iter().map(|t| t.to_lowercase()).collect();
+                count_query = count_query.bind(lower_types.clone());
+                data_query = data_query.bind(lower_types);
+            }
+        }
+        if let Some(v) = criteria.created_after {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+        if let Some(v) = criteria.created_before {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+        if let Some(v) = criteria.modified_after {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+        if let Some(v) = criteria.modified_before {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+        if let Some(v) = criteria.min_size {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+        if let Some(v) = criteria.max_size {
+            count_query = count_query.bind(v as i64);
+            data_query = data_query.bind(v as i64);
+        }
+
+        // Bind LIMIT / OFFSET (data_query only)
+        data_query = data_query.bind(limit).bind(offset);
+
+        // ── Execute ──
+        let total_count: i64 = count_query
+            .fetch_one(self.pool.as_ref())
+            .await
+            .map_err(|e| {
+                DomainError::internal_error("FileBlobRead", format!("subtree count: {e}"))
+            })?;
+
+        let rows = data_query
+            .fetch_all(self.pool.as_ref())
+            .await
+            .map_err(|e| {
+                DomainError::internal_error("FileBlobRead", format!("subtree search: {e}"))
+            })?;
+
+        let files = rows
+            .into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| {
+                DomainError::internal_error("FileBlobRead", format!("subtree mapping: {e}"))
+            })?;
+
+        Ok((files, total_count as usize))
+    }
+
     /// Count files matching the search criteria (without loading them).
     async fn count_files(
         &self,
@@ -624,8 +833,6 @@ impl FileReadPort for FileBlobReadRepository {
         criteria: &SearchCriteriaDto,
         user_id: &str,
     ) -> Result<usize, DomainError> {
-        // Simplified count - delegates to search_files_paginated for actual counting
-        // In a full implementation, this would be a separate optimized query
         let (_, count) = self
             .search_files_paginated(folder_id, criteria, user_id)
             .await?;
