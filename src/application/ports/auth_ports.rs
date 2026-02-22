@@ -11,12 +11,16 @@ use async_trait::async_trait;
 ///
 /// This trait abstracts cryptographic password operations, allowing the domain
 /// layer to remain independent of specific hashing implementations (argon2, bcrypt, etc.)
+///
+/// Methods are async because implementations (e.g. Argon2) are CPU-intensive
+/// and must run on a blocking thread pool to avoid starving Tokio workers.
+#[async_trait]
 pub trait PasswordHasherPort: Send + Sync + 'static {
     /// Hash a plain text password
-    fn hash_password(&self, password: &str) -> Result<String, DomainError>;
+    async fn hash_password(&self, password: &str) -> Result<String, DomainError>;
 
     /// Verify a plain text password against a hash
-    fn verify_password(&self, password: &str, hash: &str) -> Result<bool, DomainError>;
+    async fn verify_password(&self, password: &str, hash: &str) -> Result<bool, DomainError>;
 }
 
 /// Claims contained in a JWT token

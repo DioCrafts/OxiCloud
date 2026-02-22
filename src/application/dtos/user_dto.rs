@@ -2,7 +2,7 @@ use crate::domain::entities::user::User;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserDto {
     pub id: String,
     pub username: String,
@@ -49,7 +49,7 @@ pub struct RegisterDto {
     pub role: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthResponseDto {
     pub user: UserDto,
     pub access_token: String,

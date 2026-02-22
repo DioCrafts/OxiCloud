@@ -120,9 +120,6 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     /// Lists files in a folder
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError>;
 
-    /// Gets file content as bytes (for small files)
-    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
-
     /// Gets file content as a stream (for large files)
     async fn get_file_stream(
         &self,

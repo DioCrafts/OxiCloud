@@ -936,7 +936,7 @@ async fn handle_copy(
 
     // Get services from state
     let file_retrieval_service = &state.applications.file_retrieval_service;
-    let file_upload_service = &state.applications.file_upload_service;
+    let _file_upload_service = &state.applications.file_upload_service;
     let folder_service = &state.applications.folder_service;
 
     // Check if destination already exists (for Overwrite header compliance)
@@ -996,26 +996,24 @@ async fn handle_copy(
             })?;
 
         if recursive {
-            // Copy subfolders and files (simplified implementation)
+            // Copy files via zero-copy dedup (only increments blob ref_count)
             let files = file_retrieval_service
                 .list_files(Some(&folder.id))
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list files: {}", e)))?;
 
+            let file_management_service = &state.applications.file_management_service;
+            let new_folder_id = Some(_new_folder.id.clone());
             for file in files {
-                // Get file content
-                if let Ok(content) = file_retrieval_service.get_file_content(&file.id).await {
-                    // Create new file in destination
-                    file_upload_service
-                        .create_file(&destination_path, &file.name, &content, &file.mime_type)
-                        .await
-                        .map_err(|e| {
-                            AppError::internal_error(format!(
-                                "Failed to copy file {}: {}",
-                                file.name, e
-                            ))
-                        })?;
-                }
+                file_management_service
+                    .copy_file(&file.id, new_folder_id.clone())
+                    .await
+                    .map_err(|e| {
+                        AppError::internal_error(format!(
+                            "Failed to copy file {}: {}",
+                            file.name, e
+                        ))
+                    })?;
             }
         }
     } else {

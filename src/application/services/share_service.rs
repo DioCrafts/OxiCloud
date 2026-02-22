@@ -348,7 +348,7 @@ impl ShareUseCase for ShareService {
 
         // Verify the password using the infrastructure port
         match share.password_hash() {
-            Some(hash) => self.password_hasher.verify_password(password, hash),
+            Some(hash) => self.password_hasher.verify_password(password, hash).await,
             None => Ok(true), // No password required
         }
     }
@@ -395,12 +395,13 @@ mod tests {
 
     struct MockPasswordHasher;
 
+    #[async_trait]
     impl PasswordHasherPort for MockPasswordHasher {
-        fn hash_password(&self, password: &str) -> Result<String, DomainError> {
+        async fn hash_password(&self, password: &str) -> Result<String, DomainError> {
             Ok(format!("hashed_{}", password))
         }
 
-        fn verify_password(&self, _password: &str, _hash: &str) -> Result<bool, DomainError> {
+        async fn verify_password(&self, _password: &str, _hash: &str) -> Result<bool, DomainError> {
             Ok(true)
         }
     }
@@ -439,10 +440,6 @@ mod tests {
             unimplemented!()
         }
 
-        async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
-            unimplemented!()
-        }
-
         async fn get_file_stream(
             &self,
             _id: &str,
@@ -462,10 +459,6 @@ mod tests {
             Box<dyn futures::Stream<Item = Result<bytes::Bytes, std::io::Error>> + Send>,
             DomainError,
         > {
-            unimplemented!()
-        }
-
-        async fn get_file_mmap(&self, _id: &str) -> Result<bytes::Bytes, DomainError> {
             unimplemented!()
         }
 

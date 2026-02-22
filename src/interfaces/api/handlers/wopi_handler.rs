@@ -117,6 +117,9 @@ async fn check_file_info(
 }
 
 /// GET /wopi/files/{file_id}/contents — GetFile
+///
+/// Streams the file content to Collabora/OnlyOffice in 64 KB chunks.
+/// Memory usage is constant (~64 KB) regardless of file size.
 async fn get_file(
     Path(file_id): Path<String>,
     Query(token_query): Query<WopiTokenQuery>,
@@ -138,10 +141,13 @@ async fn get_file(
         .app_state
         .applications
         .file_retrieval_service
-        .get_file_content(&file_id)
+        .get_file_stream(&file_id)
         .await
     {
-        Ok(content) => (StatusCode::OK, content).into_response(),
+        Ok(stream) => {
+            let body = axum::body::Body::from_stream(std::pin::Pin::from(stream));
+            (StatusCode::OK, body).into_response()
+        }
         Err(_) => StatusCode::NOT_FOUND.into_response(),
     }
 }

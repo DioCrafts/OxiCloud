@@ -122,15 +122,7 @@ pub trait DedupPort: Send + Sync + 'static {
     /// Get metadata for a blob.
     async fn get_blob_metadata(&self, hash: &str) -> Option<BlobMetadataDto>;
 
-    /// Read blob content as raw bytes.
-    async fn read_blob(&self, hash: &str) -> Result<Vec<u8>, DomainError>;
-
-    /// Read blob content as `Bytes`.
-    async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError>;
-
     /// Stream blob content in chunks (64 KB default) — constant memory usage.
-    ///
-    /// Unlike `read_blob()`, this never loads the entire file into RAM.
     async fn read_blob_stream(
         &self,
         hash: &str,

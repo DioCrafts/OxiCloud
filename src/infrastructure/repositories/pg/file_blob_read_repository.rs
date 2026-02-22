@@ -207,11 +207,6 @@ impl FileReadPort for FileBlobReadRepository {
         self.resolve_blob_hash(file_id).await
     }
 
-    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError> {
-        let blob_hash = self.resolve_blob_hash(id).await?;
-        self.dedup.read_blob(&blob_hash).await
-    }
-
     async fn get_file_stream(
         &self,
         id: &str,
@@ -237,13 +232,6 @@ impl FileReadPort for FileBlobReadRepository {
             .read_blob_range_stream(&blob_hash, start, end)
             .await?;
         Ok(Box::new(stream))
-    }
-
-    async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError> {
-        // For RPi targets, mmap is less beneficial than streaming.
-        // Keep as a fallback that loads content for small/medium files.
-        let blob_hash = self.resolve_blob_hash(id).await?;
-        self.dedup.read_blob_bytes(&blob_hash).await
     }
 
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError> {

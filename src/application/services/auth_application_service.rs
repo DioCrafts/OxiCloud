@@ -10,29 +10,23 @@ use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::session::Session;
 use crate::domain::entities::user::{User, UserRole};
-use std::collections::HashMap;
+use moka::sync::Cache;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::sync::RwLock;
-use std::time::Instant;
-
-/// Maximum age for pending OIDC flows (10 minutes)
-const OIDC_FLOW_TTL_SECS: u64 = 600;
-/// Maximum age for pending one-time token codes (60 seconds)
-const OIDC_TOKEN_TTL_SECS: u64 = 60;
+use std::time::Duration;
 
 /// Tracks a pending OIDC authorization flow (CSRF + PKCE + nonce)
+#[derive(Clone)]
 struct PendingOidcFlow {
-    created_at: Instant,
     pkce_verifier: String,
     nonce: String,
 }
 
 /// Tracks a pending one-time token exchange after successful OIDC callback
+#[derive(Clone)]
 struct PendingOidcToken {
     auth_response: AuthResponseDto,
-    created_at: Instant,
 }
 
 /// Interior state for OIDC — protected by RwLock for hot-reload.
@@ -54,10 +48,12 @@ pub struct AuthApplicationService {
     /// Path to the storage directory, used for disk-space–aware quota calculation
     storage_path: PathBuf,
     oidc: RwLock<OidcState>,
-    /// Pending OIDC authorization flows keyed by state token (CSRF + PKCE + nonce)
-    pending_oidc_flows: Mutex<HashMap<String, PendingOidcFlow>>,
-    /// Pending one-time token codes for secure token delivery after OIDC callback
-    pending_oidc_tokens: Mutex<HashMap<String, PendingOidcToken>>,
+    /// Pending OIDC authorization flows keyed by state token (CSRF + PKCE + nonce).
+    /// Auto-expires after 10 minutes via moka TTL; max 10 000 entries for DoS protection.
+    pending_oidc_flows: Cache<String, PendingOidcFlow>,
+    /// Pending one-time token codes for secure token delivery after OIDC callback.
+    /// Auto-expires after 60 seconds via moka TTL; max 10 000 entries for DoS protection.
+    pending_oidc_tokens: Cache<String, PendingOidcToken>,
 }
 
 impl AuthApplicationService {
@@ -79,8 +75,14 @@ impl AuthApplicationService {
                 service: None,
                 config: None,
             }),
-            pending_oidc_flows: Mutex::new(HashMap::new()),
-            pending_oidc_tokens: Mutex::new(HashMap::new()),
+            pending_oidc_flows: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_live(Duration::from_secs(600))
+                .build(),
+            pending_oidc_tokens: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_live(Duration::from_secs(60))
+                .build(),
         }
     }
 
@@ -300,7 +302,7 @@ impl AuthApplicationService {
         }
 
         // Hash the password using the infrastructure service
-        let password_hash = self.password_hasher.hash_password(&dto.password)?;
+        let password_hash = self.password_hasher.hash_password(&dto.password).await?;
 
         // Create user with the pre-generated hash
         let user = User::new(dto.username.clone(), dto.email, password_hash, role, quota).map_err(
@@ -346,7 +348,8 @@ impl AuthApplicationService {
         // Verify password using the injected hasher
         let is_valid = self
             .password_hasher
-            .verify_password(&dto.password, user.password_hash())?;
+            .verify_password(&dto.password, user.password_hash())
+            .await?;
 
         if !is_valid {
             return Err(DomainError::new(
@@ -502,7 +505,8 @@ impl AuthApplicationService {
         // Verify current password using the injected hasher
         let is_valid = self
             .password_hasher
-            .verify_password(&dto.current_password, user.password_hash())?;
+            .verify_password(&dto.current_password, user.password_hash())
+            .await?;
 
         if !is_valid {
             return Err(DomainError::new(
@@ -522,7 +526,7 @@ impl AuthApplicationService {
         }
 
         // Hash new password and update user
-        let new_hash = self.password_hasher.hash_password(&dto.new_password)?;
+        let new_hash = self.password_hasher.hash_password(&dto.new_password).await?;
         user.update_password_hash(new_hash);
 
         // Save updated user
@@ -641,13 +645,7 @@ impl AuthApplicationService {
         let password_hash = self
             .password_hasher
             .hash_password(&dto.password)
-            .map_err(|e| {
-                DomainError::new(
-                    ErrorKind::InternalError,
-                    "User",
-                    format!("Error hashing password: {}", e),
-                )
-            })?;
+            .await?;
 
         // Create the new admin user
         let user = User::new(
@@ -753,7 +751,7 @@ impl AuthApplicationService {
         });
 
         // Hash password
-        let password_hash = self.password_hasher.hash_password(&dto.password)?;
+        let password_hash = self.password_hasher.hash_password(&dto.password).await?;
 
         // Create domain entity
         let user =
@@ -806,7 +804,7 @@ impl AuthApplicationService {
                 "Password must be at least 8 characters long".to_string(),
             ));
         }
-        let hash = self.password_hasher.hash_password(new_password)?;
+        let hash = self.password_hasher.hash_password(new_password).await?;
         self.user_storage.change_password(user_id, &hash).await
     }
 
@@ -917,22 +915,14 @@ impl AuthApplicationService {
             base64_url_encode(&hash)
         };
 
-        // Store pending flow
-        {
-            let mut flows = self.pending_oidc_flows.lock().unwrap();
-            // Cleanup expired entries
-            let now = Instant::now();
-            flows.retain(|_, f| now.duration_since(f.created_at).as_secs() < OIDC_FLOW_TTL_SECS);
-
-            flows.insert(
-                state_token.clone(),
-                PendingOidcFlow {
-                    created_at: now,
-                    pkce_verifier,
-                    nonce: nonce.clone(),
-                },
-            );
-        }
+        // Store pending flow (auto-expires after 10 min via moka TTL)
+        self.pending_oidc_flows.insert(
+            state_token.clone(),
+            PendingOidcFlow {
+                pkce_verifier,
+                nonce: nonce.clone(),
+            },
+        );
 
         // Build authorization URL with state, nonce, and PKCE challenge
         let authorize_url = oidc
@@ -952,28 +942,15 @@ impl AuthApplicationService {
     /// issue internal tokens, and return a one-time exchange code.
     pub async fn oidc_callback(&self, code: &str, state: &str) -> Result<String, DomainError> {
         // 0. Validate CSRF state and retrieve PKCE verifier + nonce
-        let (pkce_verifier, nonce) = {
-            let mut flows = self.pending_oidc_flows.lock().unwrap();
-            let flow = flows.remove(state).ok_or_else(|| {
-                tracing::warn!("OIDC callback with invalid/expired state token");
-                DomainError::new(
-                    ErrorKind::AccessDenied, "OIDC",
-                    "Invalid or expired OIDC state — possible CSRF attack. Please try logging in again.",
-                )
-            })?;
-
-            // Check TTL
-            if Instant::now().duration_since(flow.created_at).as_secs() >= OIDC_FLOW_TTL_SECS {
-                tracing::warn!("OIDC callback with expired state token");
-                return Err(DomainError::new(
-                    ErrorKind::AccessDenied,
-                    "OIDC",
-                    "OIDC authorization flow expired. Please try logging in again.",
-                ));
-            }
-
-            (flow.pkce_verifier, flow.nonce)
-        };
+        //    (entry is auto-expired by moka TTL — remove returns None if expired)
+        let flow = self.pending_oidc_flows.remove(state).ok_or_else(|| {
+            tracing::warn!("OIDC callback with invalid/expired state token");
+            DomainError::new(
+                ErrorKind::AccessDenied, "OIDC",
+                "Invalid or expired OIDC state — possible CSRF attack. Please try logging in again.",
+            )
+        })?;
+        let (pkce_verifier, nonce) = (flow.pkce_verifier, flow.nonce);
 
         // Clone the Arc and config out of the RwLock so we don't hold the lock across await points
         let (oidc, oidc_config) = {
@@ -1178,20 +1155,11 @@ impl AuthApplicationService {
         OsRng.fill_bytes(&mut code_bytes);
         let exchange_code = hex::encode(code_bytes);
 
-        {
-            let mut tokens = self.pending_oidc_tokens.lock().unwrap();
-            // Cleanup expired entries
-            let now = Instant::now();
-            tokens.retain(|_, t| now.duration_since(t.created_at).as_secs() < OIDC_TOKEN_TTL_SECS);
-
-            tokens.insert(
-                exchange_code.clone(),
-                PendingOidcToken {
-                    auth_response,
-                    created_at: now,
-                },
-            );
-        }
+        // Store auth response (auto-expires after 60 s via moka TTL)
+        self.pending_oidc_tokens.insert(
+            exchange_code.clone(),
+            PendingOidcToken { auth_response },
+        );
 
         tracing::info!("OIDC login successful, one-time exchange code generated");
 
@@ -1199,25 +1167,15 @@ impl AuthApplicationService {
     }
 
     /// Exchange a one-time code for the authentication tokens.
-    /// The code is single-use and expires after 60 seconds.
+    /// The code is single-use and expires after 60 seconds (moka TTL).
     pub fn exchange_oidc_token(&self, one_time_code: &str) -> Result<AuthResponseDto, DomainError> {
-        let mut tokens = self.pending_oidc_tokens.lock().unwrap();
-        let pending = tokens.remove(one_time_code).ok_or_else(|| {
+        let pending = self.pending_oidc_tokens.remove(one_time_code).ok_or_else(|| {
             DomainError::new(
                 ErrorKind::AccessDenied,
                 "OIDC",
                 "Invalid or expired exchange code. Please try logging in again.",
             )
         })?;
-
-        // Check TTL
-        if Instant::now().duration_since(pending.created_at).as_secs() >= OIDC_TOKEN_TTL_SECS {
-            return Err(DomainError::new(
-                ErrorKind::AccessDenied,
-                "OIDC",
-                "Exchange code expired. Please try logging in again.",
-            ));
-        }
 
         Ok(pending.auth_response)
     }

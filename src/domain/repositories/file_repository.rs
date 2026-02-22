@@ -34,9 +34,6 @@ pub trait FileReadRepository: Send + Sync + 'static {
     /// Lists files in a folder.
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
 
-    /// Gets full content as bytes (only for small/medium files).
-    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError>;
-
     /// Gets content as a stream (ideal for large files).
     async fn get_file_stream(
         &self,
@@ -50,9 +47,6 @@ pub trait FileReadRepository: Send + Sync + 'static {
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
-
-    /// Memory-mapped file for zero-copy access (10–100 MB).
-    async fn get_file_mmap(&self, id: &str) -> Result<Bytes, DomainError>;
 
     /// Gets the logical storage path of a file.
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;

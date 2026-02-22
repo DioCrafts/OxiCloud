@@ -313,13 +313,26 @@ impl DedupHandler {
             .and_then(|m| m.content_type.clone())
             .unwrap_or_else(|| "application/octet-stream".to_string());
 
-        match dedup.read_blob_bytes(&hash).await {
-            Ok(content) => Response::builder()
+        // Stream blob in 64 KB chunks — constant memory regardless of size
+        let size = match dedup.blob_size(&hash).await {
+            Ok(s) => s,
+            Err(_) => {
+                return Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(r#"{"error": "Blob not found"}"#))
+                    .unwrap()
+                    .into_response();
+            }
+        };
+
+        match dedup.read_blob_stream(&hash).await {
+            Ok(stream) => Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, content_type)
-                .header(header::CONTENT_LENGTH, content.len().to_string())
+                .header(header::CONTENT_LENGTH, size.to_string())
                 .header("X-Dedup-Hash", &hash)
-                .body(Body::from(content))
+                .body(Body::from_stream(stream))
                 .unwrap()
                 .into_response(),
             Err(_) => Response::builder()

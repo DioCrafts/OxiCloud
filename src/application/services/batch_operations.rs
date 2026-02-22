@@ -1,4 +1,4 @@
-use futures::{Future, future::join_all};
+use futures::{Future, StreamExt, future::join_all};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::Semaphore;
@@ -702,18 +702,30 @@ impl BatchOperationService {
         // Add individual files at the root of the ZIP
         for file_id in &file_ids {
             match self.file_retrieval.get_file(file_id).await {
-                Ok(file_dto) => match self.file_retrieval.get_file_content(file_id).await {
-                    Ok(content) => {
+                Ok(file_dto) => match self.file_retrieval.get_file_stream(file_id).await {
+                    Ok(stream) => {
+                        let mut stream = std::pin::Pin::from(stream);
                         if let Err(e) = zip.start_file(&file_dto.name, options) {
                             info!("Could not start zip entry for {}: {}", file_dto.name, e);
                             continue;
                         }
-                        if let Err(e) = zip.write_all(&content) {
-                            info!("Could not write zip entry for {}: {}", file_dto.name, e);
+                        while let Some(chunk) = stream.next().await {
+                            match chunk {
+                                Ok(bytes) => {
+                                    if let Err(e) = zip.write_all(&bytes) {
+                                        info!("Could not write zip chunk for {}: {}", file_dto.name, e);
+                                        break;
+                                    }
+                                }
+                                Err(e) => {
+                                    info!("Stream error for {}: {}", file_dto.name, e);
+                                    break;
+                                }
+                            }
                         }
                     }
                     Err(e) => {
-                        info!("Could not read file content {}: {}", file_id, e);
+                        info!("Could not stream file content {}: {}", file_id, e);
                     }
                 },
                 Err(e) => {
@@ -805,13 +817,21 @@ impl BatchOperationService {
             let dir_path = format!("{}/", current.path);
             let _ = zip.add_directory(&dir_path, *options);
 
-            // Add files
+            // Add files via streaming (constant ~64 KB memory per file)
             if let Ok(files) = self.file_retrieval.list_files(Some(&current.id)).await {
                 for file in files {
                     let file_path = format!("{}{}", dir_path, file.name);
-                    if let Ok(content) = self.file_retrieval.get_file_content(&file.id).await {
+                    if let Ok(stream) = self.file_retrieval.get_file_stream(&file.id).await {
+                        let mut stream = std::pin::Pin::from(stream);
                         if zip.start_file(&file_path, *options).is_ok() {
-                            let _ = zip.write_all(&content);
+                            while let Some(chunk) = stream.next().await {
+                                match chunk {
+                                    Ok(bytes) => {
+                                        let _ = zip.write_all(&bytes);
+                                    }
+                                    Err(_) => break,
+                                }
+                            }
                         }
                     }
                 }

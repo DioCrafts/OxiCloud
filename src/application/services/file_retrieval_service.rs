@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use bytes::Bytes;
-use futures::Stream;
+use bytes::{Bytes, BytesMut};
+use futures::{Stream, StreamExt};
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
@@ -9,7 +9,7 @@ use crate::application::ports::file_ports::{FileRetrievalUseCase, OptimizedFileC
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::application::ports::transcode_ports::{ImageTranscodePort, OutputFormat};
 use crate::common::errors::DomainError;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Threshold below which files are served from RAM cache (10 MB).
 const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
@@ -183,10 +183,17 @@ impl FileRetrievalService {
                 ));
             }
 
-            // Cache miss – load from disk
+            // Cache miss – load from disk via streaming (constant 64 KB memory)
             debug!("💾 TIER 1 Cache MISS: {} – loading from disk", file_name);
-            let content = self.file_read.get_file_content(id).await?;
-            let content_bytes = Bytes::from(content);
+            let stream = self.file_read.get_file_stream(id).await?;
+            let mut stream = std::pin::Pin::from(stream);
+            let mut buf = BytesMut::with_capacity(file_size as usize);
+            while let Some(chunk) = stream.next().await {
+                buf.extend_from_slice(&chunk.map_err(|e| {
+                    DomainError::internal_error("File", format!("Stream read error: {}", e))
+                })?);
+            }
+            let content_bytes = buf.freeze();
 
             // Store in cache
             if let Some(cache) = &self.content_cache {
@@ -231,21 +238,8 @@ impl FileRetrievalService {
             file_name,
             file_size / (1024 * 1024)
         );
-        match self.file_read.get_file_stream(id).await {
-            Ok(stream) => Ok((dto, OptimizedFileContent::Stream(Box::into_pin(stream)))),
-            Err(e) => {
-                warn!("Streaming failed, last-resort content load: {}", e);
-                let content = self.file_read.get_file_content(id).await?;
-                Ok((
-                    dto,
-                    OptimizedFileContent::Bytes {
-                        data: Bytes::from(content),
-                        mime_type: mime_type.clone(),
-                        was_transcoded: false,
-                    },
-                ))
-            }
-        }
+        let stream = self.file_read.get_file_stream(id).await?;
+        Ok((dto, OptimizedFileContent::Stream(Box::into_pin(stream))))
     }
 }
 
@@ -271,10 +265,6 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError> {
         let files = self.file_read.list_files(folder_id).await?;
         Ok(files.into_iter().map(FileDto::from).collect())
-    }
-
-    async fn get_file_content(&self, id: &str) -> Result<Vec<u8>, DomainError> {
-        self.file_read.get_file_content(id).await
     }
 
     async fn get_file_stream(

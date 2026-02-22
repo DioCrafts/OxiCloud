@@ -142,10 +142,6 @@ impl FileReadPort for MockFileRepository {
         Ok(vec![])
     }
 
-    async fn get_file_content(&self, _id: &str) -> std::result::Result<Vec<u8>, DomainError> {
-        Ok(vec![])
-    }
-
     async fn get_file_stream(
         &self,
         _id: &str,
@@ -165,10 +161,6 @@ impl FileReadPort for MockFileRepository {
         Box<dyn Stream<Item = std::result::Result<Bytes, std::io::Error>> + Send>,
         DomainError,
     > {
-        unimplemented!()
-    }
-
-    async fn get_file_mmap(&self, _id: &str) -> std::result::Result<Bytes, DomainError> {
         unimplemented!()
     }
 

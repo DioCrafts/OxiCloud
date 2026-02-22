@@ -74,10 +74,6 @@ impl FileReadPort for StubFileReadPort {
         Ok(Vec::new())
     }
 
-    async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
-        Ok(Vec::new())
-    }
-
     async fn get_file_stream(
         &self,
         _id: &str,
@@ -94,10 +90,6 @@ impl FileReadPort for StubFileReadPort {
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
         Ok(Box::new(empty_stream))
-    }
-
-    async fn get_file_mmap(&self, _id: &str) -> Result<Bytes, DomainError> {
-        Ok(Bytes::new())
     }
 
     async fn get_file_path(&self, _id: &str) -> Result<StoragePath, DomainError> {
@@ -525,10 +517,6 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
         Ok(Vec::new())
     }
 
-    async fn get_file_content(&self, _id: &str) -> Result<Vec<u8>, DomainError> {
-        Ok(Vec::new())
-    }
-
     async fn get_file_stream(
         &self,
         _id: &str,
@@ -695,20 +683,6 @@ impl DedupPort for StubDedupPort {
 
     async fn get_blob_metadata(&self, _hash: &str) -> Option<BlobMetadataDto> {
         None
-    }
-
-    async fn read_blob(&self, _hash: &str) -> Result<Vec<u8>, DomainError> {
-        Err(DomainError::internal_error(
-            "DedupService",
-            "DedupService not initialized",
-        ))
-    }
-
-    async fn read_blob_bytes(&self, _hash: &str) -> Result<Bytes, DomainError> {
-        Err(DomainError::internal_error(
-            "DedupService",
-            "DedupService not initialized",
-        ))
     }
 
     async fn read_blob_stream(
