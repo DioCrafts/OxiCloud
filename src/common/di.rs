@@ -398,7 +398,7 @@ impl AppServiceFactory {
     /// Creates the storage usage service (requires database)
     pub fn create_storage_usage_service(
         &self,
-        repos: &RepositoryServices,
+        _repos: &RepositoryServices,
         db_pool: &Arc<PgPool>,
     ) -> Arc<dyn crate::application::ports::storage_ports::StorageUsagePort> {
         let user_repository = Arc::new(
@@ -406,7 +406,7 @@ impl AppServiceFactory {
         );
         let service = Arc::new(
             crate::application::services::storage_usage_service::StorageUsageService::new(
-                repos.file_read_repository.clone(),
+                db_pool.clone(),
                 user_repository,
             ),
         );
