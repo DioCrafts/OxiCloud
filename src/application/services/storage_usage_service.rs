@@ -57,11 +57,12 @@ impl StorageUsageService {
 
         // Direct SQL query to sum all file sizes for this user
         // This is much more efficient than recursively walking folders
+        // Note: user_id is stored as varchar, not uuid, so we bind it directly as text
         let total_size: i64 = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(size), 0)::bigint
               FROM storage.files
-             WHERE user_id = $1::uuid AND NOT is_trashed
+             WHERE user_id = $1 AND NOT is_trashed
             "#,
         )
         .bind(user_id)
