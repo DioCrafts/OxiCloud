@@ -449,19 +449,18 @@ impl FileWritePort for FileBlobWriteRepository {
     }
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
-        // Atomic DELETE RETURNING — one round-trip instead of SELECT + DELETE
-        let hash = sqlx::query_scalar::<_, String>(
-            "DELETE FROM storage.files WHERE id = $1::uuid RETURNING blob_hash",
-        )
-        .bind(id)
-        .fetch_optional(self.pool.as_ref())
-        .await
-        .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("delete: {e}")))?
-        .ok_or_else(|| DomainError::not_found("File", id))?;
+        // The PG trigger `trg_files_decrement_blob_ref` automatically
+        // decrements storage.blobs.ref_count for the deleted row's blob_hash.
+        // Disk cleanup of orphaned blobs (ref_count = 0) is handled by
+        // garbage_collect().
+        let result = sqlx::query("DELETE FROM storage.files WHERE id = $1::uuid")
+            .bind(id)
+            .execute(self.pool.as_ref())
+            .await
+            .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("delete: {e}")))?;
 
-        // Decrement blob reference (best-effort after successful DELETE)
-        if let Err(e) = self.dedup.remove_reference(&hash).await {
-            tracing::warn!("Failed to decrement blob ref for {}: {}", &hash[..12], e);
+        if result.rows_affected() == 0 {
+            return Err(DomainError::not_found("File", id));
         }
 
         Ok(())

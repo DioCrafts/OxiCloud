@@ -470,6 +470,31 @@ CREATE OR REPLACE VIEW storage.trash_items AS
                SELECT 1 FROM storage.folders p
                 WHERE p.id = fo.parent_id AND p.is_trashed = TRUE));
 
+-- ── Trigger: auto-decrement blob ref_count when a file row is deleted ──
+--
+-- This is the single source of truth for ref_count bookkeeping on deletion.
+-- It fires for ALL delete paths: explicit DELETE, ON DELETE CASCADE from
+-- folders, trash emptying, and any future code that removes file rows.
+-- Rust code must NOT call remove_reference() after deleting a file row
+-- to avoid double-decrementing.
+CREATE OR REPLACE FUNCTION storage.decrement_blob_ref()
+RETURNS trigger AS $$
+BEGIN
+    UPDATE storage.blobs
+       SET ref_count = GREATEST(ref_count - 1, 0)
+     WHERE hash = OLD.blob_hash;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_files_decrement_blob_ref ON storage.files;
+CREATE TRIGGER trg_files_decrement_blob_ref
+    AFTER DELETE ON storage.files
+    FOR EACH ROW
+    EXECUTE FUNCTION storage.decrement_blob_ref();
+
+COMMENT ON FUNCTION storage.decrement_blob_ref() IS 'Auto-decrement blob ref_count when a file referencing it is deleted';
+
 COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy with ltree — no physical directories on disk';
 COMMENT ON TABLE storage.files IS 'File metadata pointing to content-addressable blobs';
 COMMENT ON VIEW storage.trash_items IS 'Unified view of all trashed files and folders';

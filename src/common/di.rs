@@ -241,12 +241,10 @@ impl AppServiceFactory {
             core.image_transcode_service.clone(),
         ));
 
-        // FileManagementService with dedup and trash
-        let file_management_service = Arc::new(FileManagementService::new_full(
+        // FileManagementService — ref_count handled by PG trigger, no dedup port needed
+        let file_management_service = Arc::new(FileManagementService::with_trash(
             repos.file_write_repository.clone(),
-            repos.file_read_repository.clone(),
             trash_service.clone(),
-            core.dedup_service.clone(),
         ));
 
         let file_use_case_factory = Arc::new(AppFileUseCaseFactory::new(
