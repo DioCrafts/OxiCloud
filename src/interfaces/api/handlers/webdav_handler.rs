@@ -29,6 +29,13 @@ const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 const HEADER_LOCK_TOKEN: HeaderName = HeaderName::from_static("lock-token");
 // const HEADER_IF: HeaderName = HeaderName::from_static("if");
 
+/// Maximum body size for XML-based WebDAV requests (PROPFIND, PROPPATCH, LOCK).
+/// 1 MB is generous — a typical PROPFIND body is < 1 KB.
+const MAX_XML_BODY: usize = 1_048_576;
+
+/// Maximum body size for MKCOL requests (RFC 4918: body must be empty).
+const MAX_MKCOL_BODY: usize = 4096;
+
 /**
  * Creates and returns the WebDAV router with all required endpoints.
  *
@@ -167,8 +174,8 @@ async fn handle_propfind(
         // Convert the request into a body
         let body = req.into_body();
 
-        // Read request body
-        body::to_bytes(body, usize::MAX)
+        // Read request body (PROPFIND is XML, 1 MB is more than enough)
+        body::to_bytes(body, MAX_XML_BODY)
             .await
             .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
     };
@@ -340,12 +347,10 @@ async fn handle_proppatch(
         .get::<CurrentUser>()
         .ok_or_else(|| AppError::unauthorized("Authentication required"))?;
 
-    // Read request body
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    // Read request body (XML — bounded to 1 MB)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_XML_BODY)
         .await
-        .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
-
-    // Parse PROPPATCH request
+        .map_err(|e| AppError::payload_too_large(format!("PROPPATCH body too large or unreadable: {}", e)))?;
     let (props_to_set, props_to_remove) = WebDavAdapter::parse_proppatch(body_bytes.reader())
         .map_err(|e| AppError::bad_request(format!("Failed to parse PROPPATCH request: {}", e)))?;
 
@@ -486,10 +491,12 @@ async fn handle_head(
 /**
  * Handles PUT requests to create or update files.
  *
- * This handler creates a new file or updates an existing file at the specified path.
+ * **Streaming implementation**: the request body is spooled to a temp file
+ * with incremental SHA-256 hashing. Peak RAM usage is ~256 KB regardless
+ * of file size. The temp file is then atomically moved into blob storage
+ * via `update_file_streaming`.
  *
  * @param state The application state containing service dependencies
- * @param user The authenticated user information
  * @param path The requested resource path
  * @param req The HTTP request containing the file contents
  * @return HTTP response indicating success
@@ -499,46 +506,90 @@ async fn handle_put(
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
+    use http_body_util::BodyStream;
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncWriteExt;
+    use tokio_stream::StreamExt;
+
     // Get file service from state
     let file_upload_service = &state.applications.file_upload_service;
 
     // Check if path is empty (root folder)
-    if path.is_empty() || path == "/" {
-        return Err(AppError::bad_request("Cannot PUT to root folder"));
+    if path.is_empty() || path == \"/\" {
+        return Err(AppError::bad_request(\"Cannot PUT to root folder\"));
     }
 
+    // Hard upload size limit from config
+    let max_upload = state.core.config.storage.max_upload_size;
+
     // Extract content type before consuming the request
-    let _content_type = req
+    let content_type = req
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("application/octet-stream")
+        .unwrap_or(\"application/octet-stream\")
         .to_string();
 
-    // Read request body
-    let body_bytes = {
-        // Convert the request into a body
-        let body = req.into_body();
+    // ── Streaming spool: body → temp file + incremental hash ──
+    let temp_file = tempfile::NamedTempFile::new()
+        .map_err(|e| AppError::internal_error(format!(\"Failed to create temp file: {}\", e)))?;
+    let temp_path = temp_file.path().to_path_buf();
 
-        // Read request body
-        body::to_bytes(body, usize::MAX)
-            .await
-            .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
-    };
+    let mut file = tokio::fs::File::create(&temp_path)
+        .await
+        .map_err(|e| AppError::internal_error(format!(\"Failed to open temp file: {}\", e)))?;
 
-    // Check if file exists
-    let file_exists = file_upload_service.update_file(&path, &body_bytes).await;
+    let mut hasher = Sha256::new();
+    let mut total_bytes: usize = 0;
+    let mut stream = BodyStream::new(req.into_body());
 
-    match file_exists {
-        Ok(_) => {
-            // update_file handles both update and create-if-not-found
-            Ok(Response::builder()
-                .status(StatusCode::NO_CONTENT)
-                .body(Body::empty())
-                .unwrap())
+    while let Some(frame_result) = stream.next().await {
+        let frame = frame_result
+            .map_err(|e| AppError::bad_request(format!(\"Failed to read request body: {}\", e)))?;
+        if let Some(chunk) = frame.data_ref() {
+            total_bytes += chunk.len();
+            if total_bytes > max_upload {
+                // Abort early — stop reading, delete temp file
+                drop(file);
+                let _ = tokio::fs::remove_file(&temp_path).await;
+                return Err(AppError::payload_too_large(format!(
+                    \"Upload exceeds maximum size of {} bytes\",
+                    max_upload
+                )));
+            }
+            hasher.update(chunk);
+            file.write_all(chunk)
+                .await
+                .map_err(|e| AppError::internal_error(format!(\"Failed to write to temp file: {}\", e)))?;
         }
+    }
+    file.flush().await
+        .map_err(|e| AppError::internal_error(format!(\"Failed to flush temp file: {}\", e)))?;
+    drop(file);
+
+    let hash = hex::encode(hasher.finalize());
+
+    // ── Atomic store: temp file → dedup blob + DB metadata update ──
+    let result = file_upload_service
+        .update_file_streaming(
+            &path,
+            &temp_path,
+            total_bytes as u64,
+            &content_type,
+            Some(hash),
+        )
+        .await;
+
+    // Clean up temp file (may already be moved by dedup, ignore error)
+    let _ = tokio::fs::remove_file(&temp_path).await;
+
+    match result {
+        Ok(_) => Ok(Response::builder()
+            .status(StatusCode::NO_CONTENT)
+            .body(Body::empty())
+            .unwrap()),
         Err(e) => Err(AppError::internal_error(format!(
-            "Failed to put file: {}",
+            \"Failed to put file: {}\",
             e
         ))),
     }
@@ -572,10 +623,10 @@ async fn handle_mkcol(
         // Convert the request into a body
         let body = req.into_body();
 
-        // Read request body
-        body::to_bytes(body, usize::MAX)
+        // Read request body (MKCOL — must be empty per RFC 4918)
+        body::to_bytes(body, MAX_MKCOL_BODY)
             .await
-            .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
+            .map_err(|e| AppError::payload_too_large(format!("MKCOL body too large: {}", e)))?
     };
 
     if !body_bytes.is_empty() {
@@ -1055,8 +1106,8 @@ async fn handle_lock(
         // Convert the request into a body
         let body = req.into_body();
 
-        // Read request body
-        body::to_bytes(body, usize::MAX)
+        // Read request body (LOCK is XML, 1 MB is more than enough)
+        body::to_bytes(body, MAX_XML_BODY)
             .await
             .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
     };

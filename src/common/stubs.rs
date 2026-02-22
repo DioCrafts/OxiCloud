@@ -193,6 +193,17 @@ impl FileWritePort for StubFileWritePort {
         Ok(())
     }
 
+    async fn update_file_content_from_temp(
+        &self,
+        _file_id: &str,
+        _temp_path: &Path,
+        _size: u64,
+        _content_type: Option<String>,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
     async fn register_file_deferred(
         &self,
         _name: String,
@@ -483,6 +494,17 @@ impl FileUploadUseCase for StubFileUploadUseCase {
     }
 
     async fn update_file(&self, _path: &str, _content: &[u8]) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn update_file_streaming(
+        &self,
+        _path: &str,
+        _temp_path: &Path,
+        _size: u64,
+        _content_type: &str,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 }

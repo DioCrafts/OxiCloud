@@ -8,10 +8,15 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use crate::application::ports::auth_ports::{OidcIdClaims, OidcServicePort, OidcTokenSet};
 use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
+
+/// How long discovery/JWKS documents stay cached before re-fetching.
+/// 1 hour balances freshness against unnecessary network requests.
+const OIDC_CACHE_TTL: Duration = Duration::from_secs(3600);
 
 // ============================================================================
 // OIDC Discovery Document
@@ -92,13 +97,33 @@ struct UserInfoResponse {
 // OIDC Service
 // ============================================================================
 
+/// A cached value with a fetch timestamp for TTL-based expiry.
+#[derive(Clone)]
+struct Cached<T: Clone> {
+    value: T,
+    fetched_at: Instant,
+}
+
+impl<T: Clone> Cached<T> {
+    fn new(value: T) -> Self {
+        Self {
+            value,
+            fetched_at: Instant::now(),
+        }
+    }
+
+    fn is_expired(&self) -> bool {
+        self.fetched_at.elapsed() > OIDC_CACHE_TTL
+    }
+}
+
 pub struct OidcService {
     config: OidcConfig,
     http_client: reqwest::Client,
-    /// Cached discovery document
-    discovery: RwLock<Option<OidcDiscovery>>,
-    /// Cached JWKS (typed JWK keys)
-    jwks: RwLock<Option<JwksDocument>>,
+    /// Cached discovery document (expires after OIDC_CACHE_TTL)
+    discovery: RwLock<Option<Cached<OidcDiscovery>>>,
+    /// Cached JWKS (expires after OIDC_CACHE_TTL)
+    jwks: RwLock<Option<Cached<JwksDocument>>>,
 }
 
 impl OidcService {
@@ -116,16 +141,19 @@ impl OidcService {
         }
     }
 
-    /// Fetch and cache the OIDC discovery document
+    /// Fetch and cache the OIDC discovery document (TTL: 1 hour)
     async fn get_discovery(&self) -> Result<OidcDiscovery, DomainError> {
-        // Check cache first
+        // Check cache first (return cached value only if not expired)
         {
             let cache = self
                 .discovery
                 .read()
                 .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
-            if let Some(ref disc) = *cache {
-                return Ok(disc.clone());
+            if let Some(ref cached) = *cache {
+                if !cached.is_expired() {
+                    return Ok(cached.value.clone());
+                }
+                tracing::debug!("OIDC discovery cache expired, re-fetching");
             }
         }
 
@@ -164,28 +192,31 @@ impl OidcService {
             )
         })?;
 
-        // Cache it
+        // Cache it with timestamp
         {
             let mut cache = self
                 .discovery
                 .write()
                 .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
-            *cache = Some(discovery.clone());
+            *cache = Some(Cached::new(discovery.clone()));
         }
 
         Ok(discovery)
     }
 
-    /// Fetch and cache JWKS document for ID token validation
+    /// Fetch and cache JWKS document for ID token validation (TTL: 1 hour)
     async fn get_jwks(&self) -> Result<JwksDocument, DomainError> {
-        // Check cache first
+        // Check cache first (return cached value only if not expired)
         {
             let cache = self
                 .jwks
                 .read()
                 .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
-            if let Some(ref jwks) = *cache {
-                return Ok(jwks.clone());
+            if let Some(ref cached) = *cache {
+                if !cached.is_expired() {
+                    return Ok(cached.value.clone());
+                }
+                tracing::debug!("OIDC JWKS cache expired, re-fetching");
             }
         }
 
@@ -214,13 +245,13 @@ impl OidcService {
             )
         })?;
 
-        // Cache it
+        // Cache it with timestamp
         {
             let mut cache = self
                 .jwks
                 .write()
                 .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
-            *cache = Some(jwks.clone());
+            *cache = Some(Cached::new(jwks.clone()));
         }
 
         Ok(jwks)

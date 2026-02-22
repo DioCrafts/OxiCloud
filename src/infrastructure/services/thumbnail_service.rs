@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use image::{ImageFormat, imageops::FilterType};
-use lru::LruCache;
-use std::num::NonZeroUsize;
 /**
  * Thumbnail Generation Service
  *
@@ -12,13 +10,12 @@ use std::num::NonZeroUsize;
  * - Background thumbnail generation after upload
  * - Multiple sizes (icon 150x150, preview 800x600)
  * - WebP output for smaller file sizes
- * - LRU cache for hot thumbnails
+ * - Lock-free moka cache with weight-based eviction
  * - Lazy generation on first request if not pre-generated
  */
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::RwLock;
 
 use crate::application::ports::thumbnail_ports::{
     ThumbnailPort, ThumbnailSize as PortThumbnailSize, ThumbnailStatsDto,
@@ -76,12 +73,10 @@ struct ThumbnailCacheKey {
 pub struct ThumbnailService {
     /// Root path for thumbnail storage
     thumbnails_root: PathBuf,
-    /// In-memory LRU cache for hot thumbnails
-    cache: Arc<RwLock<LruCache<ThumbnailCacheKey, Bytes>>>,
-    /// Maximum cache size in bytes
-    max_cache_bytes: usize,
-    /// Current cache size in bytes
-    current_cache_bytes: Arc<RwLock<usize>>,
+    /// Lock-free concurrent cache (moka) with weight-based eviction
+    cache: moka::future::Cache<ThumbnailCacheKey, Bytes>,
+    /// Configured maximum cache weight (for stats reporting)
+    max_cache_bytes: u64,
 }
 
 impl ThumbnailService {
@@ -89,18 +84,27 @@ impl ThumbnailService {
     ///
     /// # Arguments
     /// * `storage_root` - Root path of file storage
-    /// * `max_cache_entries` - Maximum number of thumbnails to cache in memory
+    /// * `max_cache_entries` - (ignored — moka uses weight-based eviction)
     /// * `max_cache_bytes` - Maximum total bytes to cache
     pub fn new(storage_root: &Path, max_cache_entries: usize, max_cache_bytes: usize) -> Self {
         let thumbnails_root = storage_root.join(".thumbnails");
 
+        // Ignore max_cache_entries — weight-based eviction is more accurate
+        // for variable-size thumbnails than entry-count limits.
+        let _ = max_cache_entries;
+
+        let cache = moka::future::Cache::builder()
+            .max_capacity(max_cache_bytes as u64)
+            .weigher(|_key: &ThumbnailCacheKey, value: &Bytes| -> u32 {
+                value.len().min(u32::MAX as usize) as u32
+            })
+            .time_to_live(std::time::Duration::from_secs(600))
+            .build();
+
         Self {
             thumbnails_root,
-            cache: Arc::new(RwLock::new(LruCache::new(
-                NonZeroUsize::new(max_cache_entries).unwrap_or(NonZeroUsize::new(1000).unwrap()),
-            ))),
-            max_cache_bytes,
-            current_cache_bytes: Arc::new(RwLock::new(0)),
+            cache,
+            max_cache_bytes: max_cache_bytes as u64,
         }
     }
 
@@ -158,13 +162,10 @@ impl ThumbnailService {
             size,
         };
 
-        // Check in-memory cache first
-        {
-            let cache = self.cache.read().await;
-            if let Some(data) = cache.peek(&cache_key) {
-                tracing::debug!("🔥 Thumbnail cache HIT: {} {:?}", file_id, size);
-                return Ok(data.clone());
-            }
+        // Check lock-free cache first
+        if let Some(data) = self.cache.get(&cache_key).await {
+            tracing::debug!("🔥 Thumbnail cache HIT: {} {:?}", file_id, size);
+            return Ok(data);
         }
 
         // Check if thumbnail exists on disk
@@ -177,8 +178,8 @@ impl ThumbnailService {
                 .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
             let bytes = Bytes::from(data);
 
-            // Add to cache
-            self.add_to_cache(cache_key, bytes.clone()).await;
+            // Add to cache (lock-free insert — moka handles eviction)
+            self.cache.insert(cache_key, bytes.clone()).await;
 
             tracing::debug!("💾 Thumbnail loaded from disk: {} {:?}", file_id, size);
             return Ok(bytes);
@@ -198,8 +199,8 @@ impl ThumbnailService {
             .await
             .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
 
-        // Add to cache
-        self.add_to_cache(cache_key, bytes.clone()).await;
+        // Add to cache (lock-free insert)
+        self.cache.insert(cache_key, bytes.clone()).await;
 
         Ok(bytes)
     }
@@ -243,31 +244,6 @@ impl ThumbnailService {
         .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
 
         result.map(Bytes::from)
-    }
-
-    /// Add a thumbnail to the in-memory cache
-    async fn add_to_cache(&self, key: ThumbnailCacheKey, data: Bytes) {
-        let data_size = data.len();
-
-        // Check if adding this would exceed max cache size
-        let mut current_size = self.current_cache_bytes.write().await;
-
-        // Evict items if needed to make room
-        if *current_size + data_size > self.max_cache_bytes {
-            let mut cache = self.cache.write().await;
-            while *current_size + data_size > self.max_cache_bytes && !cache.is_empty() {
-                if let Some((_, evicted)) = cache.pop_lru() {
-                    *current_size = current_size.saturating_sub(evicted.len());
-                }
-            }
-        }
-
-        // Add to cache
-        let mut cache = self.cache.write().await;
-        if let Some(old) = cache.put(key, data) {
-            *current_size = current_size.saturating_sub(old.len());
-        }
-        *current_size += data_size;
     }
 
     /// Generate all thumbnail sizes for a file in the background
@@ -316,16 +292,12 @@ impl ThumbnailService {
                     .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
             }
 
-            // Remove from cache
+            // Remove from cache (lock-free invalidation)
             let cache_key = ThumbnailCacheKey {
                 file_id: file_id.to_string(),
                 size: *size,
             };
-            let mut cache = self.cache.write().await;
-            if let Some(removed) = cache.pop(&cache_key) {
-                let mut current_size = self.current_cache_bytes.write().await;
-                *current_size = current_size.saturating_sub(removed.len());
-            }
+            self.cache.invalidate(&cache_key).await;
         }
 
         tracing::debug!("🗑️ Deleted thumbnails for: {}", file_id);
@@ -334,13 +306,10 @@ impl ThumbnailService {
 
     /// Get cache statistics
     pub async fn get_stats(&self) -> ThumbnailStats {
-        let cache = self.cache.read().await;
-        let current_size = *self.current_cache_bytes.read().await;
-
         ThumbnailStats {
-            cached_thumbnails: cache.len(),
-            cache_size_bytes: current_size,
-            max_cache_bytes: self.max_cache_bytes,
+            cached_thumbnails: self.cache.entry_count() as usize,
+            cache_size_bytes: self.cache.weighted_size() as usize,
+            max_cache_bytes: self.max_cache_bytes as usize,
         }
     }
 }

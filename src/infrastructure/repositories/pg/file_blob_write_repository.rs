@@ -110,6 +110,74 @@ impl FileBlobWriteRepository {
             )),
         }
     }
+
+    /// Atomically swap the blob hash of a file.
+    ///
+    /// Uses a CTE to capture the old hash before updating so the old blob
+    /// reference can be decremented afterwards. Compensates on failure by
+    /// removing the new blob reference.
+    async fn swap_blob_hash(
+        &self,
+        file_id: &str,
+        new_hash: &str,
+        new_size: i64,
+    ) -> Result<(), DomainError> {
+        // Atomic CTE: capture old hash then update in one round-trip, no TOCTOU.
+        let old_hash = match sqlx::query_scalar::<_, String>(
+            r#"
+            WITH old AS (
+                SELECT id, blob_hash FROM storage.files WHERE id = $3::uuid FOR UPDATE
+            )
+            UPDATE storage.files f
+               SET blob_hash = $1, size = $2, updated_at = NOW()
+              FROM old
+             WHERE f.id = old.id
+            RETURNING old.blob_hash
+            "#,
+        )
+        .bind(new_hash)
+        .bind(new_size)
+        .bind(file_id)
+        .fetch_optional(self.pool.as_ref())
+        .await
+        {
+            Ok(Some(old)) => old,
+            Ok(None) => {
+                // File not found — compensate: remove the new blob ref
+                if let Err(e) = self.dedup.remove_reference(new_hash).await {
+                    tracing::error!("Blob orphaned after missing file: {}", e);
+                }
+                return Err(DomainError::not_found("File", file_id));
+            }
+            Err(e) => {
+                // UPDATE failed — compensate: remove the new blob ref
+                if let Err(rollback_err) = self.dedup.remove_reference(new_hash).await {
+                    tracing::error!(
+                        "Blob orphaned after failed UPDATE — hash: {}, err: {}",
+                        &new_hash[..12],
+                        rollback_err
+                    );
+                }
+                return Err(DomainError::internal_error(
+                    "FileBlobWrite",
+                    format!("update: {e}"),
+                ));
+            }
+        };
+
+        // Decrement old blob ref (only if hash changed, best-effort)
+        if old_hash != new_hash {
+            if let Err(e) = self.dedup.remove_reference(&old_hash).await {
+                tracing::warn!(
+                    "Failed to decrement old blob ref {}: {}",
+                    &old_hash[..12],
+                    e
+                );
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -476,62 +544,25 @@ impl FileWritePort for FileBlobWriteRepository {
         let dedup_result = self.dedup.store_bytes(&content, None).await?;
         let new_hash = dedup_result.hash().to_string();
 
-        // Atomic CTE: capture old hash then update in one round-trip, no TOCTOU.
-        // The `old` CTE locks + reads the row *before* the update touches it.
-        let old_hash = match sqlx::query_scalar::<_, String>(
-            r#"
-            WITH old AS (
-                SELECT id, blob_hash FROM storage.files WHERE id = $3::uuid FOR UPDATE
-            )
-            UPDATE storage.files f
-               SET blob_hash = $1, size = $2, updated_at = NOW()
-              FROM old
-             WHERE f.id = old.id
-            RETURNING old.blob_hash
-            "#,
-        )
-        .bind(&new_hash)
-        .bind(new_size)
-        .bind(file_id)
-        .fetch_optional(self.pool.as_ref())
-        .await
-        {
-            Ok(Some(old)) => old,
-            Ok(None) => {
-                // File not found — compensate: remove the new blob ref
-                if let Err(e) = self.dedup.remove_reference(&new_hash).await {
-                    tracing::error!("Blob orphaned after missing file: {}", e);
-                }
-                return Err(DomainError::not_found("File", file_id));
-            }
-            Err(e) => {
-                // UPDATE failed — compensate: remove the new blob ref
-                if let Err(rollback_err) = self.dedup.remove_reference(&new_hash).await {
-                    tracing::error!(
-                        "Blob orphaned after failed UPDATE — hash: {}, err: {}",
-                        &new_hash[..12],
-                        rollback_err
-                    );
-                }
-                return Err(DomainError::internal_error(
-                    "FileBlobWrite",
-                    format!("update: {e}"),
-                ));
-            }
-        };
+        self.swap_blob_hash(file_id, &new_hash, new_size).await
+    }
 
-        // Decrement old blob ref (only if hash changed, best-effort)
-        if old_hash != new_hash
-            && let Err(e) = self.dedup.remove_reference(&old_hash).await
-        {
-            tracing::warn!(
-                "Failed to decrement old blob ref {}: {}",
-                &old_hash[..12],
-                e
-            );
-        }
+    async fn update_file_content_from_temp(
+        &self,
+        file_id: &str,
+        temp_path: &std::path::Path,
+        size: u64,
+        content_type: Option<String>,
+        pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError> {
+        // Streaming: pass pre-computed hash so dedup skips re-reading the file.
+        let dedup_result = self
+            .dedup
+            .store_from_file(temp_path, content_type, pre_computed_hash)
+            .await?;
+        let new_hash = dedup_result.hash().to_string();
 
-        Ok(())
+        self.swap_blob_hash(file_id, &new_hash, size as i64).await
     }
 
     async fn register_file_deferred(

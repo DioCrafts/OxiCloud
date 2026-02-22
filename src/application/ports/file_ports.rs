@@ -70,6 +70,20 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
 
     /// Updates the content of an existing file (for WebDAV)
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError>;
+
+    /// Streaming update — spools body to a temp file with incremental hash,
+    /// then atomically replaces the file content via dedup store.
+    ///
+    /// Peak RAM: ~256 KB regardless of file size.
+    /// Used by WebDAV PUT for large files.
+    async fn update_file_streaming(
+        &self,
+        path: &str,
+        temp_path: &Path,
+        size: u64,
+        content_type: &str,
+        pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError>;
 }
 
 // ─────────────────────────────────────────────────────

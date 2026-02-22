@@ -164,6 +164,20 @@ pub trait FileWritePort: Send + Sync + 'static {
     async fn update_file_content(&self, file_id: &str, content: Vec<u8>)
     -> Result<(), DomainError>;
 
+    /// Streaming update — replaces file content from a temp file on disk.
+    ///
+    /// When `pre_computed_hash` is provided, the dedup service skips the
+    /// hash re-read — zero extra I/O beyond the initial spool.
+    /// Peak RAM: ~256 KB regardless of file size.
+    async fn update_file_content_from_temp(
+        &self,
+        file_id: &str,
+        temp_path: &std::path::Path,
+        size: u64,
+        content_type: Option<String>,
+        pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError>;
+
     /// Registers file metadata WITHOUT writing content to disk (write-behind).
     ///
     /// Returns `(File, PathBuf)` where `PathBuf` is the destination path for the

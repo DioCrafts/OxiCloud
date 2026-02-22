@@ -95,6 +95,15 @@ impl AppError {
             "PreconditionFailed",
         )
     }
+
+    /// Create a 413 Payload Too Large error.
+    pub fn payload_too_large(message: impl Into<String>) -> Self {
+        Self::new(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            message,
+            "PayloadTooLarge",
+        )
+    }
 }
 
 impl From<DomainError> for AppError {

@@ -5,6 +5,7 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use tower_http::trace::TraceLayer;
+use tower_http::limit::RequestBodyLimitLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// OxiCloud - Cloud Storage Platform
@@ -105,6 +106,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let caldav_router = caldav_handler::caldav_routes();
     let carddav_router = carddav_handler::carddav_routes();
     let webdav_router = webdav_handler::webdav_routes();
+
+    // CalDAV/CardDAV only carry XML payloads — cap at 1 MB at the transport
+    // level so `body::to_bytes()` cannot be abused to OOM the server.
+    // WebDAV is excluded: its streaming PUT handler enforces its own per-upload
+    // limit from StorageConfig::max_upload_size.
+    let caldav_router = caldav_router.layer(RequestBodyLimitLayer::new(1_048_576));
+    let carddav_router = carddav_router.layer(RequestBodyLimitLayer::new(1_048_576));
 
     // Build WOPI routes if enabled
     use oxicloud::interfaces::api::handlers::wopi_handler;

@@ -237,4 +237,66 @@ impl FileUploadUseCase for FileUploadService {
             .await?;
         Ok(())
     }
+
+    /// Streaming update — replaces file content from a temp file on disk.
+    ///
+    /// Uses `update_file_content_from_temp` which passes the pre-computed hash
+    /// to dedup, avoiding a second full read of the file.
+    /// For new files (not found at `path`), falls back to `upload_file_streaming`.
+    ///
+    /// Peak RAM: ~256 KB regardless of file size.
+    async fn update_file_streaming(
+        &self,
+        path: &str,
+        temp_path: &Path,
+        size: u64,
+        content_type: &str,
+        pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError> {
+        // Try to find the existing file first
+        if let Some(file_read) = &self.file_read
+            && let Some(file) = file_read.find_file_by_path(path).await?
+        {
+            self.file_write
+                .update_file_content_from_temp(
+                    file.id(),
+                    temp_path,
+                    size,
+                    Some(content_type.to_string()),
+                    pre_computed_hash,
+                )
+                .await?;
+            return Ok(());
+        }
+
+        // File doesn't exist — create it via streaming upload
+        let path_normalized = path.trim_start_matches('/').trim_end_matches('/');
+        let (parent_path, filename) = if let Some(idx) = path_normalized.rfind('/') {
+            (&path_normalized[..idx], &path_normalized[idx + 1..])
+        } else {
+            ("", path_normalized)
+        };
+
+        let parent_id = if !parent_path.is_empty() {
+            if let Some(file_read) = &self.file_read {
+                file_read.get_parent_folder_id(parent_path).await.ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        self.file_write
+            .save_file_from_temp(
+                filename.to_string(),
+                parent_id,
+                content_type.to_string(),
+                temp_path,
+                size,
+                pre_computed_hash,
+            )
+            .await?;
+        Ok(())
+    }
 }
