@@ -14,6 +14,7 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::DomainError;
@@ -374,5 +375,257 @@ impl FileReadPort for FileBlobReadRepository {
             )?)),
             None => Ok(None),
         }
+    }
+
+    /// Search files with filtering and pagination at database level.
+    /// This is much more efficient than loading all files and filtering in memory.
+    ///
+    /// Note: This implements a simplified version focusing on the key optimizations:
+    /// - LIMIT/OFFSET at database level (not loading all rows)
+    /// - Basic name filtering
+    /// - Sorting at database level
+    ///
+    /// For full criteria support (file types, date ranges, size ranges),
+    /// the search service will continue to use in-memory filtering.
+    async fn search_files_paginated(
+        &self,
+        folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<(Vec<File>, usize), DomainError> {
+        let offset = criteria.offset as i64;
+        let limit = criteria.limit as i64;
+
+        // Determine sort order
+        let (order_column, order_dir) = match criteria.sort_by.as_str() {
+            "name" => ("fi.name", "ASC"),
+            "name_desc" => ("fi.name", "DESC"),
+            "date" => ("fi.updated_at", "ASC"),
+            "date_desc" => ("fi.updated_at", "DESC"),
+            "size" => ("fi.size", "ASC"),
+            "size_desc" => ("fi.size", "DESC"),
+            _ => ("fi.name", "ASC"),
+        };
+
+        // Build query based on whether we have a folder_id and name filter
+        let (rows, total_count) = match (folder_id, &criteria.name_contains) {
+            (Some(fid), Some(name)) if !name.is_empty() => {
+                // Folder scope + name search
+                let name_pattern = format!("%{}%", name.to_lowercase());
+
+                // Count query
+                let count: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.files fi
+                     WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                     AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3",
+                )
+                .bind(user_id)
+                .bind(fid)
+                .bind(&name_pattern)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+
+                // Data query with LIMIT/OFFSET
+                let rows: Vec<(
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                    Option<String>,
+                )> = sqlx::query_as(&format!(
+                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                        AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3
+                      ORDER BY {} {}
+                      LIMIT $4 OFFSET $5",
+                    order_column, order_dir
+                ))
+                .bind(user_id)
+                .bind(fid)
+                .bind(&name_pattern)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
+
+                (rows, count as usize)
+            }
+            (Some(fid), None) | (Some(fid), Some(_)) => {
+                // Folder scope only (no name filter)
+                let count: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.files fi
+                     WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                     AND fi.is_trashed = false",
+                )
+                .bind(user_id)
+                .bind(fid)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+
+                let rows: Vec<(
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                    Option<String>,
+                )> = sqlx::query_as(&format!(
+                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
+                        AND fi.is_trashed = false
+                      ORDER BY {} {}
+                      LIMIT $3 OFFSET $4",
+                    order_column, order_dir
+                ))
+                .bind(user_id)
+                .bind(fid)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
+
+                (rows, count as usize)
+            }
+            (None, Some(name)) if !name.is_empty() => {
+                // Global search with name filter
+                let name_pattern = format!("%{}%", name.to_lowercase());
+
+                let count: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.files fi
+                     WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
+                     AND LOWER(fi.name) LIKE $2",
+                )
+                .bind(user_id)
+                .bind(&name_pattern)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+
+                let rows: Vec<(
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                    Option<String>,
+                )> = sqlx::query_as(&format!(
+                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
+                        AND LOWER(fi.name) LIKE $2
+                      ORDER BY {} {}
+                      LIMIT $3 OFFSET $4",
+                    order_column, order_dir
+                ))
+                .bind(user_id)
+                .bind(&name_pattern)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
+
+                (rows, count as usize)
+            }
+            (None, _) => {
+                // No folder scope, no name filter - get all files for user
+                let count: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM storage.files fi
+                     WHERE fi.user_id = $1::uuid AND fi.is_trashed = false",
+                )
+                .bind(user_id)
+                .fetch_one(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+
+                let rows: Vec<(
+                    String,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    i64,
+                    String,
+                    i64,
+                    i64,
+                    Option<String>,
+                )> = sqlx::query_as(&format!(
+                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                            fi.size, fi.mime_type,
+                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                            fi.user_id::text
+                       FROM storage.files fi
+                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
+                      ORDER BY {} {}
+                      LIMIT $2 OFFSET $3",
+                    order_column, order_dir
+                ))
+                .bind(user_id)
+                .bind(limit)
+                .bind(offset)
+                .fetch_all(self.pool.as_ref())
+                .await
+                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
+
+                (rows, count as usize)
+            }
+        };
+
+        let files = rows
+            .into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| DomainError::internal_error("FileBlobRead", format!("mapping: {e}")))?;
+
+        Ok((files, total_count))
+    }
+
+    /// Count files matching the search criteria (without loading them).
+    async fn count_files(
+        &self,
+        folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<usize, DomainError> {
+        // Simplified count - delegates to search_files_paginated for actual counting
+        // In a full implementation, this would be a separate optimized query
+        let (_, count) = self
+            .search_files_paginated(folder_id, criteria, user_id)
+            .await?;
+        Ok(count)
     }
 }

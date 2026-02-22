@@ -137,6 +137,24 @@ impl FileReadPort for StubFileReadPort {
     async fn get_blob_hash(&self, _file_id: &str) -> Result<String, DomainError> {
         Ok(String::new())
     }
+
+    async fn search_files_paginated(
+        &self,
+        _folder_id: Option<&str>,
+        _criteria: &SearchCriteriaDto,
+        _user_id: &str,
+    ) -> Result<(Vec<File>, usize), DomainError> {
+        Ok((Vec::new(), 0))
+    }
+
+    async fn count_files(
+        &self,
+        _folder_id: Option<&str>,
+        _criteria: &SearchCriteriaDto,
+        _user_id: &str,
+    ) -> Result<usize, DomainError> {
+        Ok(0)
+    }
 }
 
 // ---------------------------------------------------------------------------

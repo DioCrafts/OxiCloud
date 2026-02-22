@@ -4,6 +4,7 @@ use futures::Stream;
 use serde_json::Value;
 use std::path::PathBuf;
 
+use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
@@ -82,6 +83,35 @@ pub trait FileReadPort: Send + Sync + 'static {
         }
         Ok(None)
     }
+
+    /// Search files with pagination and filtering at database level.
+    ///
+    /// This is more efficient than loading all files and filtering in memory,
+    /// especially for large datasets. The filtering is pushed to the SQL layer.
+    ///
+    /// # Arguments
+    /// * `folder_id` - Optional folder ID to scope the search (for recursive search, pass None)
+    /// * `criteria` - Search criteria including name_contains, file_types, date ranges, size ranges
+    /// * `user_id` - User ID for ownership filtering
+    ///
+    /// # Returns
+    /// A tuple of (files, total_count) where files are paginated and filtered
+    async fn search_files_paginated(
+        &self,
+        folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<(Vec<File>, usize), DomainError>;
+
+    /// Count files matching the search criteria (without loading them).
+    ///
+    /// Used for pagination metadata without fetching the actual files.
+    async fn count_files(
+        &self,
+        folder_id: Option<&str>,
+        criteria: &SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<usize, DomainError>;
 }
 
 // ─────────────────────────────────────────────────────
