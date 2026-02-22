@@ -6,18 +6,16 @@ use axum::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
-use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tower::{Layer, Service};
-use tracing::{debug, info};
+use tracing::debug;
 
-const MAX_CACHE_ENTRIES: usize = 1000; // Maximum number of cache entries
+const MAX_CACHE_ENTRIES: u64 = 1000; // Maximum number of cache entries
 const DEFAULT_MAX_AGE: u64 = 60; // Default time-to-live in seconds
 
 // Type definitions for clarity
@@ -33,18 +31,18 @@ struct CacheEntry {
     data: Option<Bytes>,
     /// The original headers
     headers: HeaderMap,
-    /// Timestamp of when it was stored
-    timestamp: SystemTime,
-    /// Time-to-live in seconds
-    max_age: u64,
 }
 
-/// Cache for HTTP responses with ETag support
+/// Lock-free HTTP response cache with ETag support.
+///
+/// Backed by `moka::sync::Cache` — all reads and writes are lock-free and
+/// safe to call from async Tokio tasks without risking worker-thread stalls.
+/// TTL expiration and LRU eviction are handled automatically.
 #[derive(Clone)]
 pub struct HttpCache {
-    /// Cache entry storage
-    cache: Arc<Mutex<HashMap<CacheKey, CacheEntry>>>,
-    /// Default time-to-live for entries
+    /// Concurrent cache (lock-free, automatic TTL + LRU)
+    cache: moka::sync::Cache<CacheKey, CacheEntry>,
+    /// Default max-age value used in HTTP Cache-Control headers
     default_max_age: u64,
 }
 
@@ -55,10 +53,13 @@ impl Default for HttpCache {
 }
 
 impl HttpCache {
-    /// Creates a new cache instance
+    /// Creates a new cache instance with the default TTL
     pub fn new() -> Self {
         Self {
-            cache: Arc::new(Mutex::new(HashMap::with_capacity(100))),
+            cache: moka::sync::Cache::builder()
+                .max_capacity(MAX_CACHE_ENTRIES)
+                .time_to_live(Duration::from_secs(DEFAULT_MAX_AGE))
+                .build(),
             default_max_age: DEFAULT_MAX_AGE,
         }
     }
@@ -66,45 +67,12 @@ impl HttpCache {
     /// Creates a new instance with a specified time-to-live
     pub fn with_max_age(max_age: u64) -> Self {
         Self {
-            cache: Arc::new(Mutex::new(HashMap::with_capacity(100))),
+            cache: moka::sync::Cache::builder()
+                .max_capacity(MAX_CACHE_ENTRIES)
+                .time_to_live(Duration::from_secs(max_age))
+                .build(),
             default_max_age: max_age,
         }
-    }
-
-    /// Gets cache statistics
-    pub fn stats(&self) -> (usize, usize) {
-        let lock = self.cache.lock().unwrap();
-        let total = lock.len();
-
-        // Count valid entries
-        let _now = SystemTime::now();
-        let valid = lock
-            .values()
-            .filter(|entry| match entry.timestamp.elapsed() {
-                Ok(elapsed) => elapsed.as_secs() < entry.max_age,
-                Err(_) => false,
-            })
-            .count();
-
-        (total, valid)
-    }
-
-    /// Cleans up expired entries
-    pub fn cleanup(&self) -> usize {
-        let mut lock = self.cache.lock().unwrap();
-        let initial_count = lock.len();
-
-        // Remove expired entries
-        let _now = SystemTime::now();
-        lock.retain(|_, entry| match entry.timestamp.elapsed() {
-            Ok(elapsed) => elapsed.as_secs() < entry.max_age,
-            Err(_) => false,
-        });
-
-        let removed = initial_count - lock.len();
-        debug!("HttpCache cleanup: removed {} expired entries", removed);
-
-        removed
     }
 
     /// Sets an entry in the cache
@@ -114,76 +82,27 @@ impl HttpCache {
         etag: EntityTag,
         data: Option<Bytes>,
         headers: HeaderMap,
-        max_age: Option<u64>,
     ) {
-        let mut lock = self.cache.lock().unwrap();
-
-        // Apply eviction policy if the cache is full
-        if lock.len() >= MAX_CACHE_ENTRIES {
-            debug!("Cache full, removing oldest entries");
-            // Remove the oldest 10% of entries
-            self.evict_oldest(&mut lock, MAX_CACHE_ENTRIES / 10);
-        }
-
-        // Store the new entry
-        lock.insert(
+        self.cache.insert(
             key.to_string(),
             CacheEntry {
                 etag,
                 data,
                 headers,
-                timestamp: SystemTime::now(),
-                max_age: max_age.unwrap_or(self.default_max_age),
             },
         );
     }
 
-    /// Removes the oldest entries from the cache
-    fn evict_oldest(&self, cache: &mut HashMap<CacheKey, CacheEntry>, count: usize) {
-        // Sort by timestamp
-        let mut entries: Vec<(CacheKey, SystemTime)> = cache
-            .iter()
-            .map(|(key, entry)| (key.clone(), entry.timestamp))
-            .collect();
-
-        // Sort by timestamp (oldest first)
-        entries.sort_by(|a, b| a.1.cmp(&b.1));
-
-        // Remove the oldest entries
-        for (key, _) in entries.iter().take(count) {
-            cache.remove(key);
-        }
-    }
-
-    /// Gets an entry from the cache
+    /// Gets an entry from the cache (returns None for expired / missing)
     fn get(&self, key: &str) -> Option<CacheEntry> {
-        let lock = self.cache.lock().unwrap();
-
-        // Look up the entry
-        if let Some(entry) = lock.get(key) {
-            // Check if it has expired
-            match entry.timestamp.elapsed() {
-                Ok(elapsed) if elapsed.as_secs() < entry.max_age => {
-                    // Entry is still valid
-                    return Some(entry.clone());
-                }
-                _ => {
-                    // Entry has expired
-                    return None;
-                }
-            }
-        }
-
-        None
+        self.cache.get(key)
     }
 
     /// Generates a simple ETag for a block of bytes
     fn calculate_etag_for_bytes(&self, bytes: &[u8]) -> EntityTag {
-        // Calculate hash
         let mut hasher = DefaultHasher::new();
         bytes.hash(&mut hasher);
         let hash = hasher.finish();
-
         format!("\"{}\"", hash)
     }
 }
@@ -239,7 +158,7 @@ where
             set_cache_headers(
                 &mut response,
                 &cache_entry.etag,
-                max_age.unwrap_or(cache_entry.max_age),
+                max_age.unwrap_or(cache.default_max_age),
             );
 
             return Ok(response);
@@ -270,7 +189,6 @@ where
         etag.clone(),
         Some(bytes.clone()),
         parts.headers.clone(),
-        max_age,
     );
 
     // Create the response with ETag
@@ -439,7 +357,7 @@ where
                 set_cache_headers(
                     &mut response,
                     &cache_entry.etag,
-                    max_age.unwrap_or(cache_entry.max_age),
+                    max_age.unwrap_or(cache_clone.default_max_age),
                 );
 
                 Box::pin(async move { Ok(response) })
@@ -474,7 +392,6 @@ where
                         etag.clone(),
                         Some(bytes.clone()),
                         parts.headers.clone(),
-                        max_age,
                     );
 
                     // Create the response with ETag
@@ -513,24 +430,6 @@ where
         .unwrap_or_default();
 
     Response::from_parts(parts, Body::from(collected))
-}
-
-/// Starts a periodic cleanup task for the cache
-pub fn start_cache_cleanup_task(cache: HttpCache) {
-    tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_secs(300)); // Every 5 minutes
-
-        loop {
-            interval.tick().await;
-            let removed = cache.cleanup();
-            let (total, valid) = cache.stats();
-
-            info!(
-                "HTTP Cache cleanup: removed {}, current: {}/{}",
-                removed, valid, total
-            );
-        }
-    });
 }
 
 #[cfg(test)]
@@ -584,7 +483,7 @@ mod tests {
         let headers1 = HeaderMap::new();
 
         let etag1 = cache.calculate_etag_for_bytes(&bytes1);
-        cache.set("test", etag1.clone(), Some(bytes1.clone()), headers1, None);
+        cache.set("test", etag1.clone(), Some(bytes1.clone()), headers1);
 
         // Verify cache hit
         let entry = cache.get("test").unwrap();

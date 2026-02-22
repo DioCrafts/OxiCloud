@@ -17,8 +17,6 @@ async fn get_version() -> AxumJson<serde_json::Value> {
     }))
 }
 
-use crate::interfaces::middleware::cache::{HttpCache, start_cache_cleanup_task};
-
 use crate::application::services::batch_operations::BatchOperationService;
 
 use crate::interfaces::api::handlers::admin_handler;
@@ -109,17 +107,6 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
     let batch_handler_state = BatchHandlerState {
         batch_service: batch_service.clone(),
     };
-
-    // Implement HTTP Cache
-    let http_cache = HttpCache::new();
-
-    // Define TTL values for different resource types (in seconds)
-    let _folders_ttl = 300; // 5 minutes
-    let _files_list_ttl = 300; // 5 minutes
-    let _i18n_ttl = 3600; // 1 hour
-
-    // Start the cleanup task for HTTP cache
-    start_cache_cleanup_task(http_cache.clone());
 
     // Create the basic folders router with service operations
     let folders_basic_router = Router::new()

@@ -1,9 +1,6 @@
 use async_trait::async_trait;
-use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tokio::time;
 
 use crate::application::dtos::display_helpers::{
     category_for, icon_class_for, icon_special_class_for,
@@ -43,14 +40,8 @@ pub struct SearchService {
     /// Repository for folder operations
     folder_repository: Arc<dyn FolderStoragePort>,
 
-    /// Search results cache with expiration time
-    search_cache: Arc<Mutex<HashMap<SearchCacheKey, CachedSearchResult>>>,
-
-    /// Cache validity duration in seconds
-    cache_ttl: u64,
-
-    /// Maximum cache size (number of stored results)
-    max_cache_size: usize,
+    /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka)
+    search_cache: moka::sync::Cache<SearchCacheKey, SearchResultsDto>,
 }
 
 /// Key for the search cache
@@ -61,15 +52,6 @@ struct SearchCacheKey {
 
     /// User ID (to isolate searches between users)
     user_id: String,
-}
-
-/// Cached search result with expiration time
-struct CachedSearchResult {
-    /// Search results
-    results: SearchResultsDto,
-
-    /// Time when the cache entry was created
-    timestamp: Instant,
 }
 
 // ─── Utility functions (pure, no self — computed on the server) ─────────
@@ -138,47 +120,16 @@ impl SearchService {
         cache_ttl: u64,
         max_cache_size: usize,
     ) -> Self {
-        let search_service = Self {
+        let search_cache = moka::sync::Cache::builder()
+            .max_capacity(max_cache_size as u64)
+            .time_to_live(Duration::from_secs(cache_ttl))
+            .build();
+
+        Self {
             file_repository,
             folder_repository,
-            search_cache: Arc::new(Mutex::new(HashMap::new())),
-            cache_ttl,
-            max_cache_size,
-        };
-
-        // Start cache cleanup task if TTL > 0
-        if cache_ttl > 0 {
-            Self::start_cache_cleanup_task(search_service.search_cache.clone(), cache_ttl);
+            search_cache,
         }
-
-        search_service
-    }
-
-    /// Starts an asynchronous task to clean up expired cache entries.
-    fn start_cache_cleanup_task(
-        cache_ref: Arc<Mutex<HashMap<SearchCacheKey, CachedSearchResult>>>,
-        ttl_seconds: u64,
-    ) {
-        tokio::spawn(async move {
-            let cleanup_interval = Duration::from_secs(ttl_seconds / 2);
-            let ttl = Duration::from_secs(ttl_seconds);
-
-            loop {
-                time::sleep(cleanup_interval).await;
-
-                if let Ok(mut cache) = cache_ref.lock() {
-                    let now = Instant::now();
-                    let expired_keys: Vec<SearchCacheKey> = cache
-                        .iter()
-                        .filter(|(_, result)| now.duration_since(result.timestamp) > ttl)
-                        .map(|(key, _)| key.clone())
-                        .collect();
-                    for key in expired_keys {
-                        cache.remove(&key);
-                    }
-                }
-            }
-        });
     }
 
     /// Creates a cache key from the search criteria.
@@ -201,62 +152,12 @@ impl SearchService {
 
     /// Attempts to retrieve results from the cache.
     fn get_from_cache(&self, key: &SearchCacheKey) -> Option<SearchResultsDto> {
-        if self.cache_ttl == 0 {
-            return None;
-        }
-
-        if let Ok(cache) = self.search_cache.lock() {
-            if let Some(cached_result) = cache.get(key) {
-                let now = Instant::now();
-                let ttl = Duration::from_secs(self.cache_ttl);
-                if now.duration_since(cached_result.timestamp) < ttl {
-                    return Some(cached_result.results.clone());
-                }
-            }
-        }
-
-        None
+        self.search_cache.get(key)
     }
 
     /// Stores results in the cache.
     fn store_in_cache(&self, key: SearchCacheKey, results: SearchResultsDto) {
-        if self.cache_ttl == 0 {
-            return;
-        }
-
-        if let Ok(mut cache) = self.search_cache.lock() {
-            let now = Instant::now();
-            let ttl = Duration::from_secs(self.cache_ttl);
-
-            // Remove expired entries
-            let mut expired_keys = Vec::new();
-            for (key, result) in cache.iter() {
-                if now.duration_since(result.timestamp) > ttl {
-                    expired_keys.push(key.clone());
-                }
-            }
-            for key in expired_keys {
-                cache.remove(&key);
-            }
-
-            // Remove oldest if cache is full
-            if cache.len() >= self.max_cache_size {
-                if let Some((oldest_key, _)) =
-                    cache.iter().min_by_key(|(_, result)| result.timestamp)
-                {
-                    let key_to_remove = oldest_key.clone();
-                    cache.remove(&key_to_remove);
-                }
-            }
-
-            cache.insert(
-                key,
-                CachedSearchResult {
-                    results,
-                    timestamp: Instant::now(),
-                },
-            );
-        }
+        self.search_cache.insert(key, results);
     }
 
     /// Enrich a FileDto → SearchFileResultDto with server-computed metadata.
@@ -795,9 +696,7 @@ impl SearchUseCase for SearchService {
 
     /// Clears the search results cache.
     async fn clear_search_cache(&self) -> Result<()> {
-        if let Ok(mut cache) = self.search_cache.lock() {
-            cache.clear();
-        }
+        self.search_cache.invalidate_all();
         Ok(())
     }
 }
