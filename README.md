@@ -46,11 +46,15 @@ cargo run --bin migrate --features migrations
 cargo run --release
 ```
 
-Open `http://localhost:8085` in your browser.
+Open `http://localhost:8086` in your browser.
 
 ### Docker (alternative)
 
 ```bash
+# Copy example environment file and customize
+cp example.env .env
+# Edit .env with your settings (optional - defaults work for quick testing)
+
 docker compose up -d
 ```
 
