@@ -9,5 +9,4 @@ pub mod interfaces;
 pub use application::services::folder_service::FolderService;
 pub use application::services::i18n_application_service::I18nApplicationService;
 pub use domain::services::path_service::StoragePath;
-pub use infrastructure::services::compression_service::GzipCompressionService;
 pub use infrastructure::services::path_service::PathService;

@@ -7,7 +7,7 @@ use crate::application::services::auth_application_service::AuthApplicationServi
 
 use crate::application::ports::cache_ports::ContentCachePort;
 use crate::application::ports::chunked_upload_ports::ChunkedUploadPort;
-use crate::application::ports::compression_ports::CompressionPort;
+
 use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::favorites_ports::FavoritesUseCase;
 use crate::application::ports::file_ports::{
@@ -46,7 +46,7 @@ use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 
 use crate::common::stubs::{
-    StubCompressionPort, StubDedupPort, StubFileManagementUseCase, StubFileReadPort,
+    StubDedupPort, StubFileManagementUseCase, StubFileReadPort,
     StubFileRetrievalUseCase, StubFileUploadUseCase, StubFileUseCaseFactory, StubFileWritePort,
     StubFolderStoragePort, StubFolderUseCase, StubI18nService, StubSearchUseCase, StubZipPort,
 };
@@ -124,7 +124,8 @@ impl AppServiceFactory {
         let chunked_upload_service = Arc::new(
             crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
                 chunked_temp_dir,
-            ),
+            )
+            .await,
         );
 
         // Image transcoding service for automatic WebP conversion
@@ -146,13 +147,8 @@ impl AppServiceFactory {
         );
         dedup_service.initialize().await?;
 
-        // Compression service (gzip)
-        let compression_service: Arc<dyn CompressionPort> = Arc::new(
-            crate::infrastructure::services::compression_service::GzipCompressionService::new(),
-        );
-
         tracing::info!(
-            "Core services initialized: path service, file content cache, thumbnails, chunked upload, image transcode, dedup (PRIMARY blob storage), compression"
+            "Core services initialized: path service, file content cache, thumbnails, chunked upload, image transcode, dedup (PRIMARY blob storage)"
         );
 
         Ok(CoreServices {
@@ -162,7 +158,6 @@ impl AppServiceFactory {
             chunked_upload_service,
             image_transcode_service,
             dedup_service,
-            compression_service,
             zip_service: Arc::new(StubZipPort), // Placeholder - replaced after app services init
             config: self.config.clone(),
         })
@@ -688,7 +683,6 @@ pub struct CoreServices {
     pub chunked_upload_service: Arc<dyn ChunkedUploadPort>,
     pub image_transcode_service: Arc<dyn ImageTranscodePort>,
     pub dedup_service: Arc<dyn DedupPort>,
-    pub compression_service: Arc<dyn CompressionPort>,
     pub zip_service: Arc<dyn ZipPort>,
     pub config: AppConfig,
 }
@@ -800,7 +794,7 @@ impl Default for AppState {
 
         // Create dummy chunked upload service
         let dummy_chunked_upload_service: Arc<dyn ChunkedUploadPort> = Arc::new(
-            crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new(
+            crate::infrastructure::services::chunked_upload_service::ChunkedUploadService::new_stub(
                 std::path::PathBuf::from("./storage/.uploads"),
             ),
         );
@@ -825,7 +819,6 @@ impl Default for AppState {
             chunked_upload_service: dummy_chunked_upload_service,
             image_transcode_service: dummy_image_transcode_service,
             dedup_service: dummy_dedup_service,
-            compression_service: Arc::new(StubCompressionPort) as Arc<dyn CompressionPort>,
             zip_service: Arc::new(StubZipPort) as Arc<dyn ZipPort>,
             config: config.clone(),
         };

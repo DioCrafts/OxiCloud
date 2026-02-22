@@ -10,7 +10,6 @@ use http_range_header::parse_range_header;
 use serde::Deserialize;
 use std::collections::HashMap;
 
-use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::{AuthUser, OptionalUserId};
@@ -464,11 +463,7 @@ impl FileHandler {
                     &mime_type,
                     &disposition,
                     &etag,
-                    file_dto.size,
-                    &params,
-                    &*state.core.compression_service,
                 )
-                .await
                 .into_response(),
                 OptimizedFileContent::Mmap(mmap_data) => Response::builder()
                     .status(StatusCode::OK)
@@ -862,69 +857,30 @@ impl FileHandler {
             .unwrap()
     }
 
-    /// Build response for cached/small files with optional compression.
-    async fn build_cached_response(
+    /// Build response for cached/small files.
+    ///
+    /// Compression is handled uniformly by `CompressionLayer` (tower-http)
+    /// which negotiates `Accept-Encoding` and applies gzip/brotli in streaming
+    /// mode. No manual compression is done here to avoid double-encoding.
+    fn build_cached_response(
         content: Bytes,
         mime_type: &str,
         disposition: &str,
         etag: &str,
-        file_size: u64,
-        params: &HashMap<String, String>,
-        compression_service: &dyn CompressionPort,
     ) -> Response<Body> {
-        let compression_param = params.get("compress").map(|v| v.as_str());
-        let force_compress = compression_param == Some("true") || compression_param == Some("1");
-        let force_no_compress =
-            compression_param == Some("false") || compression_param == Some("0");
-
-        let should_compress = if force_no_compress {
-            false
-        } else if force_compress {
-            true
-        } else {
-            compression_service.should_compress(mime_type, file_size)
-        };
-
-        let compression_level = match params.get("compression_level").map(|v| v.as_str()) {
-            Some("fast") => CompressionLevel::Fast,
-            Some("best") => CompressionLevel::Best,
-            _ => CompressionLevel::Default,
-        };
-
-        let builder = Response::builder()
+        Response::builder()
             .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, mime_type)
             .header(header::CONTENT_DISPOSITION, disposition)
             .header(header::ETAG, etag)
             .header(
                 header::CACHE_CONTROL,
                 "private, max-age=3600, must-revalidate",
             )
-            .header(header::VARY, "Accept-Encoding");
-
-        if should_compress {
-            match compression_service
-                .compress_data(&content, compression_level)
-                .await
-            {
-                Ok(compressed) => builder
-                    .header(header::CONTENT_TYPE, mime_type)
-                    .header(header::CONTENT_ENCODING, "gzip")
-                    .header(header::CONTENT_LENGTH, compressed.len())
-                    .body(Body::from(compressed))
-                    .unwrap(),
-                Err(_) => builder
-                    .header(header::CONTENT_TYPE, mime_type)
-                    .header(header::CONTENT_LENGTH, content.len())
-                    .body(Body::from(content))
-                    .unwrap(),
-            }
-        } else {
-            builder
-                .header(header::CONTENT_TYPE, mime_type)
-                .header(header::CONTENT_LENGTH, content.len())
-                .body(Body::from(content))
-                .unwrap()
-        }
+            .header(header::VARY, "Accept-Encoding")
+            .header(header::CONTENT_LENGTH, content.len())
+            .body(Body::from(content))
+            .unwrap()
     }
 }
 

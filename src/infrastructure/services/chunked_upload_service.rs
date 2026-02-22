@@ -1,10 +1,13 @@
-//! Chunked Upload Service - TUS-like Protocol for Large File Uploads
+//! Chunked Upload Service — TUS-like Protocol for Large File Uploads
 //!
-//! Enables parallel chunk uploads for files >10MB with:
-//! - Resumable uploads (persist progress)
+//! Enables parallel chunk uploads for files >10 MB with:
+//! - **Persistent, resumable uploads** — progress survives server restarts.
+//!   A `session.json` (written once on create) + a `progress.bin` bitmask
+//!   (updated atomically on each chunk) are stored alongside the chunk files.
+//!   On boot the service scans `temp_base_dir` and recovers any active sessions.
 //! - Parallel chunk transfers (up to 6 concurrent)
-//! - Automatic reassembly
-//! - Expiration cleanup (24h)
+//! - Automatic reassembly with hash-on-write (SHA-256)
+//! - Expiration cleanup (24 h)
 //!
 //! Protocol:
 //! 1. POST /api/uploads     → Create upload session, get upload_id
@@ -13,11 +16,13 @@
 //! 4. POST /api/uploads/:id/complete → Finalize and assemble
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::fs::{self, File, OpenOptions};
 use tokio::io::{AsyncWriteExt, BufWriter};
 use tokio::sync::RwLock;
@@ -28,20 +33,26 @@ use crate::application::ports::chunked_upload_ports::{
 };
 use crate::domain::errors::{DomainError, ErrorKind};
 
-/// Minimum file size to use chunked upload (10MB)
+/// Minimum file size to use chunked upload (10 MB)
 pub const CHUNKED_UPLOAD_THRESHOLD: usize = 10 * 1024 * 1024;
 
-/// Default chunk size (5MB) - optimized for parallel transfers
+/// Default chunk size (5 MB) — optimised for parallel transfers
 pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;
 
 /// Maximum concurrent chunks per upload
 pub const MAX_PARALLEL_CHUNKS: usize = 6;
 
-/// Upload session expiration time
-const SESSION_EXPIRATION: Duration = Duration::from_secs(24 * 60 * 60); // 24 hours
+/// Upload session expiration time (24 h)
+const SESSION_EXPIRATION: Duration = Duration::from_secs(24 * 60 * 60);
+
+/// Sentinel file names inside each session directory
+const SESSION_META_FILE: &str = "session.json";
+const PROGRESS_FILE: &str = "progress.bin";
+
+// ─── Serialisable types ──────────────────────────────────────────────────────
 
 /// Chunk status
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ChunkStatus {
     Pending,
     Uploading,
@@ -50,7 +61,7 @@ pub enum ChunkStatus {
 }
 
 /// Individual chunk metadata
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChunkInfo {
     pub index: usize,
     pub offset: u64,
@@ -59,8 +70,8 @@ pub struct ChunkInfo {
     pub checksum: Option<String>,
 }
 
-/// Upload session state
-#[derive(Debug, Clone)]
+/// Upload session state — fully serialisable for crash recovery.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadSession {
     pub id: String,
     pub filename: String,
@@ -69,8 +80,8 @@ pub struct UploadSession {
     pub total_size: u64,
     pub chunk_size: usize,
     pub chunks: Vec<ChunkInfo>,
-    pub created_at: Instant,
-    pub last_activity: Instant,
+    pub created_at: DateTime<Utc>,
+    pub last_activity: DateTime<Utc>,
     pub temp_dir: PathBuf,
     pub bytes_received: u64,
 }
@@ -81,7 +92,7 @@ impl UploadSession {
         (total_size as usize).div_ceil(chunk_size).max(1)
     }
 
-    /// Get upload progress (0.0 - 1.0)
+    /// Get upload progress (0.0 – 1.0)
     pub fn progress(&self) -> f64 {
         if self.total_size == 0 {
             return 1.0;
@@ -108,41 +119,71 @@ impl UploadSession {
 
     /// Check if session has expired
     pub fn is_expired(&self) -> bool {
-        self.last_activity.elapsed() > SESSION_EXPIRATION
+        let elapsed = Utc::now()
+            .signed_duration_since(self.last_activity)
+            .to_std()
+            .unwrap_or(Duration::ZERO);
+        elapsed > SESSION_EXPIRATION
+    }
+
+    // ── Persistence helpers ──────────────────────────────────────────────
+
+    /// Build the completed-chunks bitmask (1 bit per chunk).
+    fn build_progress_bitmask(&self) -> Vec<u8> {
+        let len = (self.chunks.len() + 7) / 8;
+        let mut bitmask = vec![0u8; len];
+        for chunk in &self.chunks {
+            if chunk.status == ChunkStatus::Complete {
+                bitmask[chunk.index / 8] |= 1 << (chunk.index % 8);
+            }
+        }
+        bitmask
+    }
+
+    /// Apply a bitmask read from disk, marking matching chunks as `Complete`
+    /// and recalculating `bytes_received`.
+    fn apply_progress_bitmask(&mut self, bitmask: &[u8]) {
+        self.bytes_received = 0;
+        for chunk in &mut self.chunks {
+            let byte_idx = chunk.index / 8;
+            let bit_idx = chunk.index % 8;
+            if byte_idx < bitmask.len() && (bitmask[byte_idx] & (1 << bit_idx)) != 0 {
+                chunk.status = ChunkStatus::Complete;
+                self.bytes_received += chunk.size as u64;
+            }
+        }
+    }
+
+    /// Persist the full session metadata once (on create).
+    async fn persist_metadata(&self) -> Result<(), String> {
+        let path = self.temp_dir.join(SESSION_META_FILE);
+        let json = serde_json::to_vec(self)
+            .map_err(|e| format!("Failed to serialise session: {e}"))?;
+        // Atomic write: write to .tmp then rename
+        let tmp = self.temp_dir.join("session.json.tmp");
+        fs::write(&tmp, &json)
+            .await
+            .map_err(|e| format!("Failed to write session metadata: {e}"))?;
+        fs::rename(&tmp, &path)
+            .await
+            .map_err(|e| format!("Failed to rename session metadata: {e}"))?;
+        Ok(())
+    }
+
+    /// Persist the lightweight progress bitmask (on each chunk upload).
+    async fn persist_progress(&self) -> Result<(), String> {
+        let bitmask = self.build_progress_bitmask();
+        let path = self.temp_dir.join(PROGRESS_FILE);
+        // Bitmask is tiny (< 512 B for up to 4 096 chunks).
+        // A single write() of < 512 B is atomic on POSIX.
+        fs::write(&path, &bitmask)
+            .await
+            .map_err(|e| format!("Failed to write progress bitmask: {e}"))?;
+        Ok(())
     }
 }
 
-/// Response for upload session creation
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct CreateUploadResponse {
-    pub upload_id: String,
-    pub chunk_size: usize,
-    pub total_chunks: usize,
-    pub expires_at: u64,
-}
-
-/// Response for chunk upload
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ChunkUploadResponse {
-    pub chunk_index: usize,
-    pub bytes_received: u64,
-    pub progress: f64,
-    pub is_complete: bool,
-}
-
-/// Response for upload status
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct UploadStatusResponse {
-    pub upload_id: String,
-    pub filename: String,
-    pub total_size: u64,
-    pub bytes_received: u64,
-    pub progress: f64,
-    pub total_chunks: usize,
-    pub completed_chunks: usize,
-    pub pending_chunks: Vec<usize>,
-    pub is_complete: bool,
-}
+// ─── Service ─────────────────────────────────────────────────────────────────
 
 /// Chunked Upload Service
 pub struct ChunkedUploadService {
@@ -151,12 +192,26 @@ pub struct ChunkedUploadService {
 }
 
 impl ChunkedUploadService {
-    /// Create new service with temp directory for chunks
-    pub fn new(temp_base_dir: PathBuf) -> Self {
+    /// Create the service, recover any persisted sessions, and start the
+    /// background cleanup task.
+    pub async fn new(temp_base_dir: PathBuf) -> Self {
+        // Ensure the base directory exists
+        let _ = fs::create_dir_all(&temp_base_dir).await;
+
+        // Recover sessions that survived a restart
+        let recovered = Self::recover_sessions(&temp_base_dir).await;
+        let recovered_count = recovered.len();
+
         let service = Self {
-            sessions: Arc::new(RwLock::new(HashMap::new())),
+            sessions: Arc::new(RwLock::new(recovered)),
             temp_base_dir,
         };
+
+        if recovered_count > 0 {
+            tracing::info!(
+                "♻️  Recovered {recovered_count} chunked-upload session(s) from disk"
+            );
+        }
 
         // Start cleanup task
         let sessions_clone = service.sessions.clone();
@@ -167,6 +222,102 @@ impl ChunkedUploadService {
 
         service
     }
+
+    /// Lightweight constructor that skips recovery and cleanup.
+    /// Used only by `AppState::default()` (stub wiring).
+    pub fn new_stub(temp_base_dir: PathBuf) -> Self {
+        Self {
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+            temp_base_dir,
+        }
+    }
+
+    // ── Recovery ─────────────────────────────────────────────────────────
+
+    /// Scan `temp_base_dir` for directories containing `session.json`,
+    /// deserialise each session, apply the `progress.bin` bitmask, and
+    /// verify the chunk files on disk actually exist for completed chunks.
+    async fn recover_sessions(base: &Path) -> HashMap<String, UploadSession> {
+        let mut sessions = HashMap::new();
+        let mut entries = match fs::read_dir(base).await {
+            Ok(e) => e,
+            Err(_) => return sessions,
+        };
+
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            let dir = entry.path();
+            if !dir.is_dir() {
+                continue;
+            }
+
+            let meta_path = dir.join(SESSION_META_FILE);
+            let meta_bytes = match fs::read(&meta_path).await {
+                Ok(b) => b,
+                Err(_) => continue, // no session.json → orphaned dir, skip
+            };
+
+            let mut session: UploadSession = match serde_json::from_slice(&meta_bytes) {
+                Ok(s) => s,
+                Err(e) => {
+                    tracing::warn!("Skipping corrupt session in {:?}: {e}", dir);
+                    continue;
+                }
+            };
+
+            // Apply progress bitmask if present
+            if let Ok(bitmask) = fs::read(dir.join(PROGRESS_FILE)).await {
+                session.apply_progress_bitmask(&bitmask);
+            } else {
+                // No progress file → all chunks still pending (freshly created)
+                session.bytes_received = 0;
+                for chunk in &mut session.chunks {
+                    chunk.status = ChunkStatus::Pending;
+                }
+            }
+
+            // Verify chunk files on disk — downgrade to Pending if missing
+            for chunk in &mut session.chunks {
+                if chunk.status == ChunkStatus::Complete {
+                    let chunk_path = dir.join(format!("chunk_{:06}", chunk.index));
+                    if !chunk_path.exists() {
+                        tracing::warn!(
+                            "Chunk {} missing on disk for session {}, marking pending",
+                            chunk.index,
+                            session.id
+                        );
+                        chunk.status = ChunkStatus::Pending;
+                        session.bytes_received =
+                            session.bytes_received.saturating_sub(chunk.size as u64);
+                    }
+                }
+            }
+
+            // Skip expired sessions
+            if session.is_expired() {
+                tracing::info!("Skipping expired recovered session: {}", session.id);
+                let _ = fs::remove_dir_all(&dir).await;
+                continue;
+            }
+
+            tracing::info!(
+                "♻️  Recovered session {} — {}/{} chunks ({:.0}%)",
+                session.id,
+                session
+                    .chunks
+                    .iter()
+                    .filter(|c| c.status == ChunkStatus::Complete)
+                    .count(),
+                session.chunks.len(),
+                session.progress() * 100.0
+            );
+
+            sessions.insert(session.id.clone(), session);
+        }
+
+        sessions
+    }
+
+    // ── Cleanup ──────────────────────────────────────────────────────────
 
     /// Background task to clean expired sessions
     async fn cleanup_loop(
@@ -190,7 +341,6 @@ impl ChunkedUploadService {
             for id in expired {
                 let mut sessions = sessions.write().await;
                 if let Some(session) = sessions.remove(&id) {
-                    // Clean up temp files
                     if let Err(e) = fs::remove_dir_all(&session.temp_dir).await {
                         tracing::warn!("Failed to cleanup expired upload {}: {}", id, e);
                     } else {
@@ -199,17 +349,15 @@ impl ChunkedUploadService {
                 }
             }
 
-            // Also clean orphaned temp directories
+            // Also clean orphaned temp directories (no session.json or very old)
             if let Ok(mut entries) = fs::read_dir(&temp_base_dir).await {
                 while let Ok(Some(entry)) = entries.next_entry().await {
                     let path = entry.path();
                     if path.is_dir() {
                         let dir_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
-                        // Check if this directory belongs to an active session
                         let sessions = sessions.read().await;
                         if !sessions.contains_key(dir_name) {
-                            // Check if directory is old (>24h)
                             if let Ok(metadata) = fs::metadata(&path).await
                                 && let Ok(modified) = metadata.modified()
                                 && modified.elapsed().unwrap_or_default() > SESSION_EXPIRATION
@@ -224,15 +372,17 @@ impl ChunkedUploadService {
         }
     }
 
-    /// Create a new upload session
-    pub async fn create_session(
+    // ── Core operations ──────────────────────────────────────────────────
+
+    /// Create a new upload session (persists `session.json` + empty `progress.bin`)
+    async fn create_session_inner(
         &self,
         filename: String,
         folder_id: Option<String>,
         content_type: String,
         total_size: u64,
         chunk_size: Option<usize>,
-    ) -> Result<CreateUploadResponse, String> {
+    ) -> Result<CreateUploadResponseDto, String> {
         let upload_id = Uuid::new_v4().to_string();
         let chunk_size = chunk_size.unwrap_or(DEFAULT_CHUNK_SIZE);
         let chunk_count = UploadSession::calculate_chunk_count(total_size, chunk_size);
@@ -241,15 +391,14 @@ impl ChunkedUploadService {
         let temp_dir = self.temp_base_dir.join(&upload_id);
         fs::create_dir_all(&temp_dir)
             .await
-            .map_err(|e| format!("Failed to create temp directory: {}", e))?;
+            .map_err(|e| format!("Failed to create temp directory: {e}"))?;
 
-        // Initialize chunk metadata
+        // Initialise chunk metadata
         let mut chunks = Vec::with_capacity(chunk_count);
         let mut offset: u64 = 0;
 
         for i in 0..chunk_count {
             let size = if i == chunk_count - 1 {
-                // Last chunk may be smaller
                 (total_size - offset) as usize
             } else {
                 chunk_size
@@ -266,7 +415,7 @@ impl ChunkedUploadService {
             offset += size as u64;
         }
 
-        let now = Instant::now();
+        let now = Utc::now();
         let session = UploadSession {
             id: upload_id.clone(),
             filename,
@@ -283,6 +432,10 @@ impl ChunkedUploadService {
 
         let expires_at = SESSION_EXPIRATION.as_secs();
 
+        // Persist metadata + empty progress to disk BEFORE inserting into RAM
+        session.persist_metadata().await?;
+        session.persist_progress().await?;
+
         {
             let mut sessions = self.sessions.write().await;
             sessions.insert(upload_id.clone(), session);
@@ -295,7 +448,7 @@ impl ChunkedUploadService {
             chunk_size
         );
 
-        Ok(CreateUploadResponse {
+        Ok(CreateUploadResponseDto {
             upload_id,
             chunk_size,
             total_chunks: chunk_count,
@@ -303,14 +456,14 @@ impl ChunkedUploadService {
         })
     }
 
-    /// Upload a single chunk
-    pub async fn upload_chunk(
+    /// Upload a single chunk (persists `progress.bin` after success)
+    async fn upload_chunk_inner(
         &self,
         upload_id: &str,
         chunk_index: usize,
         data: bytes::Bytes,
         checksum: Option<String>,
-    ) -> Result<ChunkUploadResponse, String> {
+    ) -> Result<ChunkUploadResponseDto, String> {
         // Validate session exists and chunk index is valid
         let (chunk_path, expected_size) = {
             let sessions = self.sessions.read().await;
@@ -360,16 +513,13 @@ impl ChunkedUploadService {
         // Write chunk to temp file
         let mut file = File::create(&chunk_path)
             .await
-            .map_err(|e| format!("Failed to create chunk file: {}", e))?;
+            .map_err(|e| format!("Failed to create chunk file: {e}"))?;
 
         file.write_all(&data)
             .await
-            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+            .map_err(|e| format!("Failed to write chunk: {e}"))?;
 
-        // Chunks are temporary — no need for fsync. The final assembled
-        // file is synced once after all chunks are merged.
-
-        // Update session state
+        // Update session state + persist progress bitmask
         let (bytes_received, progress, is_complete) = {
             let mut sessions = self.sessions.write().await;
             let session = sessions
@@ -379,7 +529,12 @@ impl ChunkedUploadService {
             session.chunks[chunk_index].status = ChunkStatus::Complete;
             session.chunks[chunk_index].checksum = checksum;
             session.bytes_received += data.len() as u64;
-            session.last_activity = Instant::now();
+            session.last_activity = Utc::now();
+
+            // Persist bitmask BEFORE releasing lock — guarantees disk matches RAM
+            if let Err(e) = session.persist_progress().await {
+                tracing::warn!("Failed to persist progress for {upload_id}: {e}");
+            }
 
             (
                 session.bytes_received,
@@ -396,7 +551,7 @@ impl ChunkedUploadService {
             progress * 100.0
         );
 
-        Ok(ChunkUploadResponse {
+        Ok(ChunkUploadResponseDto {
             chunk_index,
             bytes_received,
             progress,
@@ -405,7 +560,10 @@ impl ChunkedUploadService {
     }
 
     /// Get upload status
-    pub async fn get_status(&self, upload_id: &str) -> Result<UploadStatusResponse, String> {
+    async fn get_status_inner(
+        &self,
+        upload_id: &str,
+    ) -> Result<UploadStatusResponseDto, String> {
         let sessions = self.sessions.read().await;
         let session = sessions
             .get(upload_id)
@@ -417,7 +575,7 @@ impl ChunkedUploadService {
             .filter(|c| c.status == ChunkStatus::Complete)
             .count();
 
-        Ok(UploadStatusResponse {
+        Ok(UploadStatusResponseDto {
             upload_id: session.id.clone(),
             filename: session.filename.clone(),
             total_size: session.total_size,
@@ -437,7 +595,7 @@ impl ChunkedUploadService {
     /// would otherwise need.
     ///
     /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, sha256_hash)`.
-    pub async fn complete_upload(
+    async fn complete_upload_inner(
         &self,
         upload_id: &str,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), String> {
@@ -467,7 +625,7 @@ impl ChunkedUploadService {
             .truncate(true)
             .open(&assembled_path)
             .await
-            .map_err(|e| format!("Failed to create assembled file: {}", e))?;
+            .map_err(|e| format!("Failed to create assembled file: {e}"))?;
 
         // Pre-allocate assembled file to reduce fragmentation
         let _ = raw_output.set_len(session.total_size).await;
@@ -476,7 +634,7 @@ impl ChunkedUploadService {
         let mut output = BufWriter::with_capacity(524_288, raw_output);
         let mut hasher = Sha256::new();
 
-        // Stream each chunk into the assembled file + hash (no full-chunk RAM alloc)
+        // Stream each chunk into the assembled file + hash
         for chunk in &session.chunks {
             let chunk_path = session.temp_dir.join(format!("chunk_{:06}", chunk.index));
             let mut chunk_file = File::open(&chunk_path)
@@ -502,9 +660,7 @@ impl ChunkedUploadService {
 
         tokio::io::AsyncWriteExt::flush(&mut output)
             .await
-            .map_err(|e| format!("Failed to flush assembled file: {}", e))?;
-        // No sync_all() — durability guaranteed by PG WAL on tx commit.
-        // The file is immediately renamed to .blobs/ (atomic move).
+            .map_err(|e| format!("Failed to flush assembled file: {e}"))?;
 
         let hash = hex::encode(hasher.finalize());
 
@@ -531,11 +687,10 @@ impl ChunkedUploadService {
         ))
     }
 
-    /// Finalize upload: move assembled file to final location and cleanup session
-    pub async fn finalize_upload(&self, upload_id: &str) -> Result<(), String> {
+    /// Finalize upload: remove session from RAM and clean up temp directory
+    async fn finalize_upload_inner(&self, upload_id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.write().await;
         if let Some(session) = sessions.remove(upload_id) {
-            // Clean up entire temp directory
             if let Err(e) = fs::remove_dir_all(&session.temp_dir).await {
                 tracing::warn!("Failed to cleanup upload {}: {}", upload_id, e);
             }
@@ -544,7 +699,7 @@ impl ChunkedUploadService {
     }
 
     /// Cancel an upload and cleanup
-    pub async fn cancel_upload(&self, upload_id: &str) -> Result<(), String> {
+    async fn cancel_upload_inner(&self, upload_id: &str) -> Result<(), String> {
         let mut sessions = self.sessions.write().await;
         if let Some(session) = sessions.remove(upload_id) {
             if let Err(e) = fs::remove_dir_all(&session.temp_dir).await {
@@ -578,16 +733,9 @@ impl ChunkedUploadPort for ChunkedUploadService {
         total_size: u64,
         chunk_size: Option<usize>,
     ) -> Result<CreateUploadResponseDto, DomainError> {
-        let resp = self
-            .create_session(filename, folder_id, content_type, total_size, chunk_size)
+        self.create_session_inner(filename, folder_id, content_type, total_size, chunk_size)
             .await
-            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))?;
-        Ok(CreateUploadResponseDto {
-            upload_id: resp.upload_id,
-            chunk_size: resp.chunk_size,
-            total_chunks: resp.total_chunks,
-            expires_at: resp.expires_at,
-        })
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
     async fn upload_chunk(
@@ -597,53 +745,34 @@ impl ChunkedUploadPort for ChunkedUploadService {
         data: bytes::Bytes,
         checksum: Option<String>,
     ) -> Result<ChunkUploadResponseDto, DomainError> {
-        let resp = self
-            .upload_chunk(upload_id, chunk_index, data, checksum)
+        self.upload_chunk_inner(upload_id, chunk_index, data, checksum)
             .await
-            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))?;
-        Ok(ChunkUploadResponseDto {
-            chunk_index: resp.chunk_index,
-            bytes_received: resp.bytes_received,
-            progress: resp.progress,
-            is_complete: resp.is_complete,
-        })
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
     async fn get_status(&self, upload_id: &str) -> Result<UploadStatusResponseDto, DomainError> {
-        let resp = self
-            .get_status(upload_id)
+        self.get_status_inner(upload_id)
             .await
-            .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))?;
-        Ok(UploadStatusResponseDto {
-            upload_id: resp.upload_id,
-            filename: resp.filename,
-            total_size: resp.total_size,
-            bytes_received: resp.bytes_received,
-            progress: resp.progress,
-            total_chunks: resp.total_chunks,
-            completed_chunks: resp.completed_chunks,
-            pending_chunks: resp.pending_chunks,
-            is_complete: resp.is_complete,
-        })
+            .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))
     }
 
     async fn complete_upload(
         &self,
         upload_id: &str,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), DomainError> {
-        self.complete_upload(upload_id)
+        self.complete_upload_inner(upload_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
     async fn finalize_upload(&self, upload_id: &str) -> Result<(), DomainError> {
-        self.finalize_upload(upload_id)
+        self.finalize_upload_inner(upload_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
     async fn cancel_upload(&self, upload_id: &str) -> Result<(), DomainError> {
-        self.cancel_upload(upload_id)
+        self.cancel_upload_inner(upload_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
@@ -653,28 +782,23 @@ impl ChunkedUploadPort for ChunkedUploadService {
     }
 }
 
+// ─── Tests ───────────────────────────────────────────────────────────────────
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_chunk_count_calculation() {
-        // 10MB file with 5MB chunks = 2 chunks
         assert_eq!(
             UploadSession::calculate_chunk_count(10 * 1024 * 1024, 5 * 1024 * 1024),
             2
         );
-
-        // 11MB file with 5MB chunks = 3 chunks
         assert_eq!(
             UploadSession::calculate_chunk_count(11 * 1024 * 1024, 5 * 1024 * 1024),
             3
         );
-
-        // 1 byte file = 1 chunk
         assert_eq!(UploadSession::calculate_chunk_count(1, 5 * 1024 * 1024), 1);
-
-        // 0 byte file = 1 chunk
         assert_eq!(UploadSession::calculate_chunk_count(0, 5 * 1024 * 1024), 1);
     }
 
@@ -683,5 +807,359 @@ mod tests {
         assert!(!ChunkedUploadService::should_use_chunked(9 * 1024 * 1024));
         assert!(ChunkedUploadService::should_use_chunked(10 * 1024 * 1024));
         assert!(ChunkedUploadService::should_use_chunked(100 * 1024 * 1024));
+    }
+
+    #[test]
+    fn test_bitmask_roundtrip() {
+        let now = Utc::now();
+        let mut session = UploadSession {
+            id: "test-id".into(),
+            filename: "file.bin".into(),
+            folder_id: None,
+            content_type: "application/octet-stream".into(),
+            total_size: 15 * 1024 * 1024,
+            chunk_size: 5 * 1024 * 1024,
+            chunks: (0..3)
+                .map(|i| ChunkInfo {
+                    index: i,
+                    offset: i as u64 * 5 * 1024 * 1024,
+                    size: 5 * 1024 * 1024,
+                    status: ChunkStatus::Pending,
+                    checksum: None,
+                })
+                .collect(),
+            created_at: now,
+            last_activity: now,
+            temp_dir: PathBuf::from("/tmp/test-id"),
+            bytes_received: 0,
+        };
+
+        // Mark chunks 0 and 2 as complete
+        session.chunks[0].status = ChunkStatus::Complete;
+        session.chunks[2].status = ChunkStatus::Complete;
+        session.bytes_received = 10 * 1024 * 1024;
+
+        let bitmask = session.build_progress_bitmask();
+        assert_eq!(bitmask, vec![0b00000101]); // bits 0 and 2 set
+
+        // Reset and re-apply
+        for chunk in &mut session.chunks {
+            chunk.status = ChunkStatus::Pending;
+        }
+        session.bytes_received = 0;
+        session.apply_progress_bitmask(&bitmask);
+
+        assert_eq!(session.chunks[0].status, ChunkStatus::Complete);
+        assert_eq!(session.chunks[1].status, ChunkStatus::Pending);
+        assert_eq!(session.chunks[2].status, ChunkStatus::Complete);
+        assert_eq!(session.bytes_received, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_session_serialisation_roundtrip() {
+        let now = Utc::now();
+        let session = UploadSession {
+            id: "abc-123".into(),
+            filename: "photo.jpg".into(),
+            folder_id: Some("folder-1".into()),
+            content_type: "image/jpeg".into(),
+            total_size: 1024,
+            chunk_size: 512,
+            chunks: vec![
+                ChunkInfo {
+                    index: 0,
+                    offset: 0,
+                    size: 512,
+                    status: ChunkStatus::Complete,
+                    checksum: Some("aabb".into()),
+                },
+                ChunkInfo {
+                    index: 1,
+                    offset: 512,
+                    size: 512,
+                    status: ChunkStatus::Pending,
+                    checksum: None,
+                },
+            ],
+            created_at: now,
+            last_activity: now,
+            temp_dir: PathBuf::from("/tmp/abc-123"),
+            bytes_received: 512,
+        };
+
+        let json = serde_json::to_vec(&session).expect("serialise");
+        let restored: UploadSession =
+            serde_json::from_slice(&json).expect("deserialise");
+
+        assert_eq!(restored.id, session.id);
+        assert_eq!(restored.filename, session.filename);
+        assert_eq!(restored.folder_id, session.folder_id);
+        assert_eq!(restored.total_size, session.total_size);
+        assert_eq!(restored.chunks.len(), 2);
+        assert_eq!(restored.chunks[0].status, ChunkStatus::Complete);
+        assert_eq!(restored.chunks[1].status, ChunkStatus::Pending);
+        assert_eq!(restored.bytes_received, 512);
+    }
+
+    #[test]
+    fn test_session_expiry_check() {
+        let mut session = UploadSession {
+            id: "exp-test".into(),
+            filename: "f".into(),
+            folder_id: None,
+            content_type: "x".into(),
+            total_size: 0,
+            chunk_size: 1,
+            chunks: vec![],
+            created_at: Utc::now(),
+            last_activity: Utc::now(),
+            temp_dir: PathBuf::from("/tmp"),
+            bytes_received: 0,
+        };
+
+        assert!(!session.is_expired(), "Fresh session must not be expired");
+
+        // Simulate old activity
+        session.last_activity = Utc::now() - chrono::Duration::hours(25);
+        assert!(session.is_expired(), "25h-old session must be expired");
+    }
+
+    #[tokio::test]
+    async fn test_persist_and_recover_session() {
+        // Use a unique temp dir for this test
+        let base = std::env::temp_dir().join(format!("oxicloud_test_{}", Uuid::new_v4()));
+        let _ = fs::create_dir_all(&base).await;
+
+        let service = ChunkedUploadService::new(base.clone()).await;
+
+        // Create a session
+        let resp = service
+            .create_session_inner(
+                "bigfile.bin".into(),
+                Some("folder-x".into()),
+                "application/octet-stream".into(),
+                10 * 1024 * 1024,
+                Some(5 * 1024 * 1024),
+            )
+            .await
+            .expect("create_session");
+
+        let upload_id = resp.upload_id.clone();
+
+        // Upload first chunk (5 MB of zeros)
+        let chunk_data = bytes::Bytes::from(vec![0u8; 5 * 1024 * 1024]);
+        service
+            .upload_chunk_inner(&upload_id, 0, chunk_data, None)
+            .await
+            .expect("upload_chunk 0");
+
+        // Verify files exist on disk
+        let session_dir = base.join(&upload_id);
+        assert!(session_dir.join(SESSION_META_FILE).exists());
+        assert!(session_dir.join(PROGRESS_FILE).exists());
+        assert!(session_dir.join("chunk_000000").exists());
+
+        // Simulate restart: drop service, recover from disk
+        drop(service);
+
+        let recovered = ChunkedUploadService::recover_sessions(&base).await;
+        assert_eq!(recovered.len(), 1);
+        let session = recovered.get(&upload_id).expect("session must be recovered");
+        assert_eq!(session.filename, "bigfile.bin");
+        assert_eq!(session.folder_id, Some("folder-x".into()));
+        assert_eq!(session.chunks[0].status, ChunkStatus::Complete);
+        assert_eq!(session.chunks[1].status, ChunkStatus::Pending);
+        assert_eq!(session.bytes_received, 5 * 1024 * 1024);
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&base).await;
+    }
+
+    #[tokio::test]
+    async fn test_full_upload_lifecycle() {
+        let base = std::env::temp_dir().join(format!("oxicloud_test_{}", Uuid::new_v4()));
+        let service = ChunkedUploadService::new(base.clone()).await;
+
+        // 1. Create session (1024 bytes, 512 byte chunks → 2 chunks)
+        let resp = service
+            .create_session_inner(
+                "test.txt".into(),
+                None,
+                "text/plain".into(),
+                1024,
+                Some(512),
+            )
+            .await
+            .expect("create");
+
+        assert_eq!(resp.total_chunks, 2);
+        assert_eq!(resp.chunk_size, 512);
+        let id = resp.upload_id;
+
+        // 2. Upload chunks
+        let chunk0 = bytes::Bytes::from(vec![b'A'; 512]);
+        let r0 = service
+            .upload_chunk_inner(&id, 0, chunk0, None)
+            .await
+            .expect("chunk 0");
+        assert!(!r0.is_complete);
+
+        let chunk1 = bytes::Bytes::from(vec![b'B'; 512]);
+        let r1 = service
+            .upload_chunk_inner(&id, 1, chunk1, None)
+            .await
+            .expect("chunk 1");
+        assert!(r1.is_complete);
+        assert_eq!(r1.bytes_received, 1024);
+
+        // 3. Status check
+        let status = service.get_status_inner(&id).await.expect("status");
+        assert!(status.is_complete);
+        assert_eq!(status.completed_chunks, 2);
+        assert!(status.pending_chunks.is_empty());
+
+        // 4. Complete (assemble)
+        let (path, filename, _folder, _ct, size, hash) = service
+            .complete_upload_inner(&id)
+            .await
+            .expect("complete");
+        assert_eq!(filename, "test.txt");
+        assert_eq!(size, 1024);
+        assert!(!hash.is_empty());
+        assert!(path.exists());
+
+        // 5. Verify assembled content
+        let content = fs::read(&path).await.expect("read assembled");
+        assert_eq!(&content[..512], &[b'A'; 512]);
+        assert_eq!(&content[512..], &[b'B'; 512]);
+
+        // 6. Finalize
+        service.finalize_upload_inner(&id).await.expect("finalize");
+        assert_eq!(service.active_sessions().await, 0);
+
+        let _ = fs::remove_dir_all(&base).await;
+    }
+
+    #[tokio::test]
+    async fn test_cancel_removes_files() {
+        let base = std::env::temp_dir().join(format!("oxicloud_test_{}", Uuid::new_v4()));
+        let service = ChunkedUploadService::new(base.clone()).await;
+
+        let resp = service
+            .create_session_inner("x.bin".into(), None, "application/octet-stream".into(), 512, Some(512))
+            .await
+            .expect("create");
+
+        let session_dir = base.join(&resp.upload_id);
+        assert!(session_dir.exists());
+
+        service
+            .cancel_upload_inner(&resp.upload_id)
+            .await
+            .expect("cancel");
+
+        assert!(!session_dir.exists(), "temp dir must be removed on cancel");
+        assert_eq!(service.active_sessions().await, 0);
+
+        let _ = fs::remove_dir_all(&base).await;
+    }
+
+    #[tokio::test]
+    async fn test_recovery_skips_expired_sessions() {
+        let base = std::env::temp_dir().join(format!("oxicloud_test_{}", Uuid::new_v4()));
+        let _ = fs::create_dir_all(&base).await;
+
+        // Manually create an expired session on disk
+        let session_dir = base.join("expired-session");
+        let _ = fs::create_dir_all(&session_dir).await;
+
+        let expired_session = UploadSession {
+            id: "expired-session".into(),
+            filename: "old.bin".into(),
+            folder_id: None,
+            content_type: "application/octet-stream".into(),
+            total_size: 1024,
+            chunk_size: 1024,
+            chunks: vec![ChunkInfo {
+                index: 0,
+                offset: 0,
+                size: 1024,
+                status: ChunkStatus::Pending,
+                checksum: None,
+            }],
+            created_at: Utc::now() - chrono::Duration::hours(48),
+            last_activity: Utc::now() - chrono::Duration::hours(48),
+            temp_dir: session_dir.clone(),
+            bytes_received: 0,
+        };
+
+        let json = serde_json::to_vec(&expired_session).unwrap();
+        fs::write(session_dir.join(SESSION_META_FILE), &json)
+            .await
+            .unwrap();
+
+        let recovered = ChunkedUploadService::recover_sessions(&base).await;
+        assert!(
+            recovered.is_empty(),
+            "Expired sessions must not be recovered"
+        );
+
+        let _ = fs::remove_dir_all(&base).await;
+    }
+
+    #[tokio::test]
+    async fn test_recovery_downgrades_missing_chunk_files() {
+        let base = std::env::temp_dir().join(format!("oxicloud_test_{}", Uuid::new_v4()));
+        let _ = fs::create_dir_all(&base).await;
+
+        let session_dir = base.join("partial-session");
+        let _ = fs::create_dir_all(&session_dir).await;
+
+        let session = UploadSession {
+            id: "partial-session".into(),
+            filename: "file.bin".into(),
+            folder_id: None,
+            content_type: "application/octet-stream".into(),
+            total_size: 1024,
+            chunk_size: 512,
+            chunks: vec![
+                ChunkInfo {
+                    index: 0, offset: 0, size: 512,
+                    status: ChunkStatus::Pending, checksum: None,
+                },
+                ChunkInfo {
+                    index: 1, offset: 512, size: 512,
+                    status: ChunkStatus::Pending, checksum: None,
+                },
+            ],
+            created_at: Utc::now(),
+            last_activity: Utc::now(),
+            temp_dir: session_dir.clone(),
+            bytes_received: 0,
+        };
+
+        // Write metadata
+        let json = serde_json::to_vec(&session).unwrap();
+        fs::write(session_dir.join(SESSION_META_FILE), &json).await.unwrap();
+
+        // Write progress marking both chunks complete
+        let bitmask = vec![0b00000011u8]; // bits 0 and 1
+        fs::write(session_dir.join(PROGRESS_FILE), &bitmask).await.unwrap();
+
+        // But only create chunk_000000 on disk — chunk_000001 is "missing"
+        fs::write(session_dir.join("chunk_000000"), &[0u8; 512]).await.unwrap();
+
+        let recovered = ChunkedUploadService::recover_sessions(&base).await;
+        let s = recovered.get("partial-session").expect("must be recovered");
+
+        assert_eq!(s.chunks[0].status, ChunkStatus::Complete);
+        assert_eq!(
+            s.chunks[1].status,
+            ChunkStatus::Pending,
+            "Missing chunk file must be downgraded to Pending"
+        );
+        assert_eq!(s.bytes_received, 512);
+
+        let _ = fs::remove_dir_all(&base).await;
     }
 }

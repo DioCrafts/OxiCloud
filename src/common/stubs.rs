@@ -22,7 +22,6 @@ use crate::application::dtos::pagination::{PaginatedResponseDto, PaginationReque
 use crate::application::dtos::search_dto::{
     SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto,
 };
-use crate::application::ports::compression_ports::{CompressionLevel, CompressionPort};
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
     OptimizedFileContent,
@@ -56,31 +55,6 @@ impl ZipPort for StubZipPort {
             "ZipService",
             "ZipService not initialized",
         ))
-    }
-}
-
-// ---------------------------------------------------------------------------
-// CompressionPort
-// ---------------------------------------------------------------------------
-
-pub struct StubCompressionPort;
-
-#[async_trait]
-impl CompressionPort for StubCompressionPort {
-    async fn compress_data(
-        &self,
-        _data: &[u8],
-        _level: CompressionLevel,
-    ) -> Result<Vec<u8>, DomainError> {
-        Ok(Vec::new())
-    }
-
-    async fn decompress_data(&self, _compressed_data: &[u8]) -> Result<Vec<u8>, DomainError> {
-        Ok(Vec::new())
-    }
-
-    fn should_compress(&self, _mime_type: &str, _size: u64) -> bool {
-        false
     }
 }
 

@@ -10,9 +10,10 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
+use moka::sync::Cache;
 use sqlx::PgPool;
-use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::application::ports::dedup_ports::DedupPort;
@@ -25,10 +26,11 @@ use crate::domain::services::path_service::StoragePath;
 pub struct FileBlobReadRepository {
     pool: Arc<PgPool>,
     dedup: Arc<dyn DedupPort>,
-    /// Lightweight cache: file_id → blob_hash.
+    /// Lock-free cache: file_id → blob_hash.
     /// Populated by `get_file()`, consumed by `resolve_blob_hash()`.
     /// Avoids an extra SQL round-trip on the hot download path.
-    hash_cache: std::sync::Mutex<HashMap<String, String>>,
+    /// Uses moka with TTI eviction to prevent unbounded growth.
+    hash_cache: Cache<String, String>,
 }
 
 impl FileBlobReadRepository {
@@ -40,7 +42,10 @@ impl FileBlobReadRepository {
         Self {
             pool,
             dedup,
-            hash_cache: std::sync::Mutex::new(HashMap::new()),
+            hash_cache: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_idle(Duration::from_secs(30))
+                .build(),
         }
     }
 
@@ -80,10 +85,11 @@ impl FileBlobReadRepository {
     }
 
     /// Resolve the blob hash for a file (internal helper).
-    /// Checks the in-memory cache first (populated by `get_file`).
+    /// Checks the lock-free moka cache first (populated by `get_file`).
     async fn resolve_blob_hash(&self, file_id: &str) -> Result<String, DomainError> {
-        // Fast path: already cached from a prior get_file call
-        if let Some(hash) = self.hash_cache.lock().unwrap().remove(file_id) {
+        // Fast path: cached from a prior get_file call (lock-free read)
+        if let Some(hash) = self.hash_cache.get(file_id) {
+            self.hash_cache.invalidate(file_id);
             return Ok(hash);
         }
         // Slow path: DB round-trip
@@ -136,10 +142,7 @@ impl FileReadPort for FileBlobReadRepository {
 
         // Cache blob_hash so the subsequent get_file_stream / get_file_content
         // call doesn't need a separate DB round-trip.
-        self.hash_cache
-            .lock()
-            .unwrap()
-            .insert(id.to_string(), row.8.clone());
+        self.hash_cache.insert(id.to_string(), row.8.clone());
 
         Self::row_to_file(
             row.0, row.1, row.2, row.3, row.4, row.5, row.6, row.7, row.9,
@@ -627,5 +630,166 @@ impl FileReadPort for FileBlobReadRepository {
             .search_files_paginated(folder_id, criteria, user_id)
             .await?;
         Ok(count)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::common::stubs::StubDedupPort;
+    use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+
+    /// Helper: build a `FileBlobReadRepository` without a real PgPool.
+    /// Only the moka `hash_cache` is exercised — no SQL is executed.
+    fn make_repo() -> FileBlobReadRepository {
+        let _folder_repo = Arc::new(FolderDbRepository::new_stub());
+        // StubDedupPort satisfies the trait but is never called in cache-only tests
+        let dedup: Arc<dyn DedupPort> = Arc::new(StubDedupPort);
+        // PgPool is required by the struct but we won't hit any SQL in these tests.
+        // We create a repo with a stub pool placeholder — only hash_cache is tested.
+        FileBlobReadRepository {
+            pool: Arc::new(
+                // Use an intentionally invalid URL; tests never reach PG.
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+            dedup,
+            hash_cache: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_idle(Duration::from_secs(30))
+                .build(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cache_insert_and_consume() {
+        let repo = make_repo();
+
+        // Insert a hash
+        repo.hash_cache
+            .insert("file-1".to_string(), "abc123".to_string());
+
+        // First read should return the cached value
+        let cached = repo.hash_cache.get("file-1");
+        assert_eq!(cached.as_deref(), Some("abc123"));
+
+        // Simulate the one-shot consume pattern used in resolve_blob_hash
+        repo.hash_cache.invalidate("file-1");
+        assert!(
+            repo.hash_cache.get("file-1").is_none(),
+            "Entry must be gone after invalidation"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_miss_returns_none() {
+        let repo = make_repo();
+
+        assert!(
+            repo.hash_cache.get("nonexistent").is_none(),
+            "Cache miss must return None"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_multiple_files_independent() {
+        let repo = make_repo();
+
+        repo.hash_cache
+            .insert("file-a".to_string(), "hash-a".to_string());
+        repo.hash_cache
+            .insert("file-b".to_string(), "hash-b".to_string());
+
+        // Consuming file-a should not affect file-b
+        assert_eq!(repo.hash_cache.get("file-a").as_deref(), Some("hash-a"));
+        repo.hash_cache.invalidate("file-a");
+
+        assert!(repo.hash_cache.get("file-a").is_none());
+        assert_eq!(
+            repo.hash_cache.get("file-b").as_deref(),
+            Some("hash-b"),
+            "Independent entries must not interfere"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_overwrite_updates_value() {
+        let repo = make_repo();
+
+        repo.hash_cache
+            .insert("file-1".to_string(), "old-hash".to_string());
+        repo.hash_cache
+            .insert("file-1".to_string(), "new-hash".to_string());
+
+        assert_eq!(
+            repo.hash_cache.get("file-1").as_deref(),
+            Some("new-hash"),
+            "Last insert wins"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_capacity_eviction() {
+        // Build a tiny cache to verify eviction behaviour
+        let repo = FileBlobReadRepository {
+            pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+            dedup: Arc::new(StubDedupPort),
+            hash_cache: Cache::builder()
+                .max_capacity(2) // only 2 entries
+                .build(),
+        };
+
+        repo.hash_cache
+            .insert("a".to_string(), "ha".to_string());
+        repo.hash_cache
+            .insert("b".to_string(), "hb".to_string());
+        repo.hash_cache
+            .insert("c".to_string(), "hc".to_string());
+
+        // Force moka to run pending eviction tasks
+        repo.hash_cache.run_pending_tasks();
+
+        // At most 2 entries should survive
+        let alive = ["a", "b", "c"]
+            .iter()
+            .filter(|k| repo.hash_cache.get(**k).is_some())
+            .count();
+        assert!(
+            alive <= 2,
+            "Cache must evict when capacity is exceeded (alive: {alive})"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cache_concurrent_access() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let repo = Arc::new(make_repo());
+        let mut handles = vec![];
+
+        // Spawn 50 threads doing inserts + reads simultaneously
+        for i in 0..50 {
+            let repo = Arc::clone(&repo);
+            handles.push(thread::spawn(move || {
+                let key = format!("file-{i}");
+                let hash = format!("hash-{i}");
+                repo.hash_cache.insert(key.clone(), hash.clone());
+                // Read back — should be our value or already evicted, never panic
+                let _ = repo.hash_cache.get(&key);
+                repo.hash_cache.invalidate(&key);
+            }));
+        }
+
+        for h in handles {
+            h.join().expect("Thread must not panic — no poison possible with moka");
+        }
     }
 }
