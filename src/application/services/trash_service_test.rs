@@ -183,6 +183,24 @@ impl FileReadPort for MockFileRepository {
     async fn get_blob_hash(&self, _file_id: &str) -> std::result::Result<String, DomainError> {
         Ok(String::new())
     }
+
+    async fn search_files_paginated(
+        &self,
+        _folder_id: Option<&str>,
+        _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
+        _user_id: &str,
+    ) -> std::result::Result<(Vec<File>, usize), DomainError> {
+        Ok((Vec::new(), 0))
+    }
+
+    async fn count_files(
+        &self,
+        _folder_id: Option<&str>,
+        _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
+        _user_id: &str,
+    ) -> std::result::Result<usize, DomainError> {
+        Ok(0)
+    }
 }
 
 #[async_trait]
