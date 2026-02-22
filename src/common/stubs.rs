@@ -50,7 +50,7 @@ impl ZipPort for StubZipPort {
         &self,
         _folder_id: &str,
         _folder_name: &str,
-    ) -> Result<Vec<u8>, DomainError> {
+    ) -> Result<tempfile::NamedTempFile, DomainError> {
         Err(DomainError::internal_error(
             "ZipService",
             "ZipService not initialized",

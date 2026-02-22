@@ -7,8 +7,10 @@ use crate::{
     common::errors::{DomainError, ErrorKind, Result},
 };
 use async_trait::async_trait;
-use std::io::{Cursor, Read, Write};
+use futures::StreamExt;
+use std::io::Write;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
 use thiserror::Error;
 use tracing::*;
 use zip::{ZipWriter, write::SimpleFileOptions};
@@ -46,14 +48,17 @@ impl From<zip::result::ZipError> for DomainError {
     }
 }
 
-/// Service for creating ZIP files
+/// Service for creating ZIP files.
+///
+/// Writes the ZIP archive to a temporary file on disk so that only one file's
+/// stream-chunk (~64 KB) is held in memory at a time, regardless of archive size.
 pub struct ZipService {
     file_service: Arc<dyn FileRetrievalUseCase>,
     folder_service: Arc<dyn FolderUseCase>,
 }
 
 impl ZipService {
-    /// Creates a new instance of the ZIP service with a reference to the file service
+    /// Creates a new instance of the ZIP service
     pub fn new(
         file_service: Arc<dyn FileRetrievalUseCase>,
         folder_service: Arc<dyn FolderUseCase>,
@@ -64,15 +69,20 @@ impl ZipService {
         }
     }
 
-    /// Creates a ZIP file with the contents of a folder and all its subfolders
-    /// Returns the ZIP bytes
-    pub async fn create_folder_zip(&self, folder_id: &str, folder_name: &str) -> Result<Vec<u8>> {
+    /// Creates a ZIP file backed by a temporary file, containing the contents
+    /// of a folder and all its subfolders. Returns the `NamedTempFile` so the
+    /// caller can stream it and let the OS clean up on drop.
+    pub async fn create_folder_zip(
+        &self,
+        folder_id: &str,
+        folder_name: &str,
+    ) -> Result<NamedTempFile> {
         info!(
             "Creating ZIP for folder: {} (ID: {})",
             folder_name, folder_id
         );
 
-        // Verify if the folder exists
+        // Verify the folder exists
         let folder = match self.folder_service.get_folder(folder_id).await {
             Ok(folder) => folder,
             Err(e) => {
@@ -81,19 +91,20 @@ impl ZipService {
             }
         };
 
-        // Create an in-memory buffer for the ZIP
-        let buf = Cursor::new(Vec::new());
-        let mut zip = ZipWriter::new(buf);
+        // Create a temp file to back the ZIP archive (O(1) RAM)
+        let temp = NamedTempFile::new().map_err(ZipError::IoError)?;
+        let raw_file = temp.reopen().map_err(ZipError::IoError)?;
+        let mut zip = ZipWriter::new(raw_file);
 
         // Set compression options
         let options = SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
             .unix_permissions(0o755);
 
-        // Object to track processed folders and avoid cycles
+        // Track processed folders to avoid cycles
         let mut processed_folders = std::collections::HashSet::new();
 
-        // Process the root folder and build the ZIP
+        // Build the ZIP iteratively
         self.process_folder_recursively(
             &mut zip,
             &folder,
@@ -103,62 +114,50 @@ impl ZipService {
         )
         .await?;
 
-        // Finalize the ZIP and get the bytes
-        let mut zip_buf = zip.finish()?;
+        // Finalize the ZIP (flushes central directory)
+        zip.finish()?;
 
-        let mut bytes = Vec::new();
-        match zip_buf.read_to_end(&mut bytes) {
-            Ok(_) => Ok(bytes),
-            Err(e) => {
-                error!("Error reading finalized ZIP: {}", e);
-                Err(ZipError::IoError(e).into())
-            }
-        }
+        Ok(temp)
     }
 
-    // Alternative implementation to avoid recursion in async
+    /// Iterative BFS over the folder tree. Writes entries directly to the
+    /// file-backed `ZipWriter` so memory stays flat.
     async fn process_folder_recursively(
         &self,
-        zip: &mut ZipWriter<Cursor<Vec<u8>>>,
+        zip: &mut ZipWriter<std::fs::File>,
         folder: &FolderDto,
         path: &str,
         options: &SimpleFileOptions,
         processed_folders: &mut std::collections::HashSet<String>,
     ) -> Result<()> {
-        // Structure to represent pending work
         struct PendingFolder {
             folder: FolderDto,
             path: String,
         }
 
-        // Work queue for iterative processing
         let mut work_queue = vec![PendingFolder {
             folder: folder.clone(),
             path: path.to_string(),
         }];
 
-        // Process the queue while there are elements
         while let Some(current) = work_queue.pop() {
             let folder_id = current.folder.id.to_string();
 
-            // Avoid cycles
             if processed_folders.contains(&folder_id) {
                 continue;
             }
-
             processed_folders.insert(folder_id.clone());
 
-            // Create the directory entry in the ZIP
+            // Directory entry
             let folder_path = format!("{}/", current.path);
             match zip.add_directory(&folder_path, *options) {
                 Ok(_) => debug!("Folder added to ZIP: {}", folder_path),
                 Err(e) => {
-                    warn!("Could not add folder to ZIP (it may already exist): {}", e);
-                    // Continue even if creating the directory fails (it could be a duplicate)
+                    warn!("Could not add folder to ZIP (may already exist): {}", e);
                 }
             }
 
-            // Add files from the folder to the ZIP
+            // Files in this folder
             let files = match self.file_service.list_files(Some(&folder_id)).await {
                 Ok(files) => files,
                 Err(e) => {
@@ -171,13 +170,12 @@ impl ZipService {
                 }
             };
 
-            // Add each file to the ZIP
             for file in files {
-                self.add_file_to_zip(zip, &file, &folder_path, options)
+                self.add_file_to_zip_streamed(zip, &file, &folder_path, options)
                     .await?;
             }
 
-            // Process subfolders
+            // Subfolders
             let subfolders = match self.folder_service.list_folders(Some(&folder_id)).await {
                 Ok(folders) => folders,
                 Err(e) => {
@@ -190,7 +188,6 @@ impl ZipService {
                 }
             };
 
-            // Add subfolders to the queue
             for subfolder in subfolders {
                 let subfolder_path = format!("{}/{}", current.path, subfolder.name);
                 work_queue.push(PendingFolder {
@@ -203,10 +200,11 @@ impl ZipService {
         Ok(())
     }
 
-    // Adds a file to the ZIP
-    async fn add_file_to_zip(
+    /// Streams file content in chunks (~64 KB) into the ZIP entry, keeping
+    /// peak memory independent of individual file sizes.
+    async fn add_file_to_zip_streamed(
         &self,
-        zip: &mut ZipWriter<Cursor<Vec<u8>>>,
+        zip: &mut ZipWriter<std::fs::File>,
         file: &FileDto,
         folder_path: &str,
         options: &SimpleFileOptions,
@@ -214,37 +212,35 @@ impl ZipService {
         let file_path = format!("{}{}", folder_path, file.name);
         info!("Adding file to ZIP: {}", file_path);
 
-        // Get the file content
         let file_id = file.id.to_string();
-        let content = match self.file_service.get_file_content(&file_id).await {
-            Ok(content) => content,
+
+        // Start the ZIP entry
+        zip.start_file_from_path(std::path::Path::new(&file_path), *options)
+            .map_err(ZipError::ZipError)?;
+
+        // Stream file contents in chunks instead of loading all into RAM
+        let stream = match self.file_service.get_file_stream(&file_id).await {
+            Ok(s) => s,
             Err(e) => {
-                error!("Error reading file content {}: {}", file_id, e);
+                error!("Error opening file stream {}: {}", file_id, e);
                 return Err(ZipError::FileReadError(format!(
-                    "Error reading file {}: {}",
+                    "Error streaming file {}: {}",
                     file_id, e
                 ))
                 .into());
             }
         };
 
-        // Write file to the ZIP
-        match zip.start_file_from_path(std::path::Path::new(&file_path), *options) {
-            Ok(_) => match zip.write_all(&content) {
-                Ok(_) => {
-                    debug!("File added to ZIP: {}", file_path);
-                    Ok(())
-                }
-                Err(e) => {
-                    error!("Error writing file content {}: {}", file_path, e);
-                    Err(ZipError::IoError(e).into())
-                }
-            },
-            Err(e) => {
-                error!("Error starting file in ZIP {}: {}", file_path, e);
-                Err(ZipError::ZipError(e).into())
-            }
+        // Pin the stream so StreamExt::next() can be called
+        let mut stream = std::pin::Pin::from(stream);
+
+        while let Some(chunk_result) = stream.next().await {
+            let bytes = chunk_result.map_err(ZipError::IoError)?;
+            zip.write_all(&bytes).map_err(ZipError::IoError)?;
         }
+
+        debug!("File added to ZIP: {}", file_path);
+        Ok(())
     }
 }
 
@@ -256,7 +252,7 @@ impl ZipPort for ZipService {
         &self,
         folder_id: &str,
         folder_name: &str,
-    ) -> std::result::Result<Vec<u8>, DomainError> {
+    ) -> std::result::Result<NamedTempFile, DomainError> {
         self.create_folder_zip(folder_id, folder_name).await
     }
 }

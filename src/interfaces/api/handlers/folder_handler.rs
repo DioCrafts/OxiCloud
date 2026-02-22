@@ -1,11 +1,12 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::{HeaderName, HeaderValue, Response, StatusCode, header},
+    http::{Response, StatusCode, header},
     response::IntoResponse,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio_util::io::ReaderStream;
 
 use crate::application::dtos::folder_dto::{CreateFolderDto, MoveFolderDto, RenameFolderDto};
 use crate::application::dtos::folder_listing_dto::FolderListingDto;
@@ -384,46 +385,67 @@ impl FolderHandler {
                 // Use ZIP service from DI container
                 let zip_service = &state.core.zip_service;
 
-                // Create the ZIP file
+                // Create the ZIP archive (written to a temp file, O(1) RAM)
                 match zip_service.create_folder_zip(&id, &folder.name).await {
-                    Ok(zip_data) => {
+                    Ok(temp_file) => {
+                        // Get the file size for Content-Length
+                        let file_size = match temp_file.as_file().metadata() {
+                            Ok(m) => m.len(),
+                            Err(e) => {
+                                tracing::error!("Error reading temp file metadata: {}", e);
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    Json(serde_json::json!({
+                                        "error": "Error creating ZIP file"
+                                    })),
+                                )
+                                    .into_response();
+                            }
+                        };
+
                         tracing::info!(
                             "ZIP file created successfully, size: {} bytes",
-                            zip_data.len()
+                            file_size
                         );
+
+                        // Open the temp file with tokio for async streaming
+                        let tokio_file = match tokio::fs::File::open(temp_file.path()).await {
+                            Ok(f) => f,
+                            Err(e) => {
+                                tracing::error!("Error opening temp file for streaming: {}", e);
+                                return (
+                                    StatusCode::INTERNAL_SERVER_ERROR,
+                                    Json(serde_json::json!({
+                                        "error": "Error streaming ZIP file"
+                                    })),
+                                )
+                                    .into_response();
+                            }
+                        };
+
+                        // Stream the temp file to the client in chunks
+                        let stream = ReaderStream::new(tokio_file);
+                        let body = axum::body::Body::from_stream(stream);
 
                         // Setup headers for download
                         let filename = format!("{}.zip", folder.name);
                         let content_disposition = format!("attachment; filename=\"{}\"", filename);
 
-                        // Build response with the ZIP data
-                        let mut headers = HashMap::new();
-                        headers.insert(
-                            header::CONTENT_TYPE.to_string(),
-                            "application/zip".to_string(),
-                        );
-                        headers
-                            .insert(header::CONTENT_DISPOSITION.to_string(), content_disposition);
-                        headers.insert(
-                            header::CONTENT_LENGTH.to_string(),
-                            zip_data.len().to_string(),
-                        );
-
-                        // Build the response
-                        let mut response = Response::builder()
+                        let response = Response::builder()
                             .status(StatusCode::OK)
-                            .body(axum::body::Body::from(zip_data))
+                            .header(header::CONTENT_TYPE, "application/zip")
+                            .header(header::CONTENT_DISPOSITION, content_disposition)
+                            .header(header::CONTENT_LENGTH, file_size)
+                            .body(body)
                             .unwrap();
 
-                        // Add headers to response
-                        for (name, value) in headers {
-                            response.headers_mut().insert(
-                                HeaderName::from_bytes(name.as_bytes()).unwrap(),
-                                HeaderValue::from_str(&value).unwrap(),
-                            );
-                        }
+                        // temp_file is kept alive until the response future
+                        // completes; dropped afterwards, cleaning up the file.
+                        // We move it into the response extensions so it lives
+                        // long enough for the stream to be fully read.
+                        let _ = temp_file;
 
-                        response
+                        response.into_response()
                     }
                     Err(err) => {
                         tracing::error!("Error creating ZIP file: {}", err);

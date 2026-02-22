@@ -6,6 +6,7 @@
 
 use crate::common::errors::DomainError;
 use async_trait::async_trait;
+use tempfile::NamedTempFile;
 
 /// Port for ZIP archive operations.
 ///
@@ -15,10 +16,11 @@ use async_trait::async_trait;
 pub trait ZipPort: Send + Sync + 'static {
     /// Create a ZIP archive containing the contents of a folder (recursively).
     ///
-    /// Returns the ZIP file bytes.
+    /// Returns a temporary file containing the ZIP archive. The caller streams
+    /// it to the client and the file is automatically deleted when dropped.
     async fn create_folder_zip(
         &self,
         folder_id: &str,
         folder_name: &str,
-    ) -> Result<Vec<u8>, DomainError>;
+    ) -> Result<NamedTempFile, DomainError>;
 }
