@@ -347,7 +347,9 @@
     "file_deleted": "Datei in Papierkorb verschoben",
     "folder_deleted": "Ordner in Papierkorb verschoben",
     "item_deleted_permanently": "Element endgültig gelöscht",
-    "trash_emptied": "Papierkorb erfolgreich geleert"
+    "trash_emptied": "Papierkorb erfolgreich geleert",
+    "title": "Benachrichtigungen",
+    "empty": "Keine Benachrichtigungen"
   },
   "batch": {
     "one_selected": "1 Element ausgewählt",
@@ -358,3 +360,4 @@
     "move_copy": "Verschieben oder kopieren"
   }
 }
+
