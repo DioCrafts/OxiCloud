@@ -1055,7 +1055,6 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8086:8086"
-      - "8085:8085"
     networks:
       - oxicloud
     depends_on:

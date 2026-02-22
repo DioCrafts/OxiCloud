@@ -6,11 +6,26 @@ OxiCloud is deployed as a containerized application with PostgreSQL.
 
 ## Docker Setup
 
+### Quick Start
+
+1. **Copy the example environment file and customize it:**
+   ```bash
+   cp example.env .env
+   # Edit .env with your settings
+   ```
+
+2. **Start the services:**
+   ```bash
+   docker compose up -d
+   ```
+
+3. **Access OxiCloud:**
+   Open `http://localhost:8086` in your browser.
+
 ### Docker Compose
 
 ```yaml
 # docker-compose.yml
-version: '3'
 services:
   postgres:
     image: postgres:17.4-alpine
@@ -31,8 +46,8 @@ services:
     image: oxicloud:latest
     ports:
       - "8086:8086"
-    environment:
-      OXICLOUD_DB_CONNECTION_STRING: "postgres://postgres:postgres@postgres/oxicloud"
+    env_file:
+      - .env
     volumes:
       - storage_data:/app/storage
     depends_on:
@@ -63,8 +78,9 @@ Non-root user: `oxicloud` (UID/GID 1001). Exposed port: `8086`. Entrypoint: `ent
 |---|---|---|
 | `OXICLOUD_STORAGE_PATH` | `./storage` | Root storage directory |
 | `OXICLOUD_STATIC_PATH` | `./static` | Static files directory |
-| `OXICLOUD_SERVER_PORT` | `8085` | Server port (note: `main.rs` hardcodes `8086`) |
+| `OXICLOUD_SERVER_PORT` | `8086` | Server port |
 | `OXICLOUD_SERVER_HOST` | `127.0.0.1` | Server bind address |
+| `OXICLOUD_BASE_URL` | (auto-detected) | Public base URL for share links. If not set, uses `http://{host}:{port}` |
 
 ### Database
 
@@ -111,6 +127,16 @@ Non-root user: `oxicloud` (UID/GID 1001). Exposed port: `8086`. Entrypoint: `ent
 ### OIDC Validation
 
 If **OXICLOUD_OIDC_ENABLED** is `true` but **issuer_url**, **client_id**, or **client_secret** are empty, OIDC is automatically disabled with an error log.
+
+### WOPI (Office Document Editing)
+
+| Variable | Default | Description |
+|---|---|---|
+| `OXICLOUD_WOPI_ENABLED` | `false` | Enable WOPI integration for office document editing |
+| `OXICLOUD_WOPI_DISCOVERY_URL` | (empty) | WOPI client discovery URL (e.g., Collabora, OnlyOffice) |
+| `OXICLOUD_WOPI_SECRET` | (falls back to JWT secret) | Secret key for signing WOPI access tokens |
+| `OXICLOUD_WOPI_TOKEN_TTL_SECS` | `86400` (24h) | WOPI access token lifetime |
+| `OXICLOUD_WOPI_LOCK_TTL_SECS` | `1800` (30m) | WOPI lock expiration time |
 
 ---
 

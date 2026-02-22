@@ -439,7 +439,7 @@ impl Default for AppConfig {
         Self {
             storage_path: PathBuf::from("./storage"),
             static_path: PathBuf::from("./static"),
-            server_port: 8085,
+            server_port: 8086,
             server_host: "127.0.0.1".to_string(),
             cache: CacheConfig::default(),
             timeouts: TimeoutConfig::default(),
