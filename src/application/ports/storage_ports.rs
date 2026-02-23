@@ -125,6 +125,29 @@ pub trait FileReadPort: Send + Sync + 'static {
         criteria: &SearchCriteriaDto,
         user_id: &str,
     ) -> Result<usize, DomainError>;
+
+    /// Return up to `limit` files whose name contains `query` (case-insensitive).
+    ///
+    /// Results are ordered by relevance (exact > starts-with > contains) so the
+    /// caller can use them directly for autocomplete suggestions.
+    ///
+    /// The default implementation falls back to `list_files` + in-memory filter
+    /// so that stubs and mocks compile without changes.
+    async fn suggest_files_by_name(
+        &self,
+        folder_id: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<File>, DomainError> {
+        let all = self.list_files(folder_id).await?;
+        let q = query.to_lowercase();
+        let mut matched: Vec<File> = all
+            .into_iter()
+            .filter(|f| f.name().to_lowercase().contains(&q))
+            .collect();
+        matched.truncate(limit);
+        Ok(matched)
+    }
 }
 
 // ─────────────────────────────────────────────────────

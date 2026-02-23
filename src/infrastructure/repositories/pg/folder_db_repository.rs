@@ -734,6 +734,76 @@ impl FolderRepository for FolderDbRepository {
             })
             .collect()
     }
+
+    async fn suggest_folders_by_name(
+        &self,
+        parent_id: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let pattern = format!("%{}%", query.to_lowercase());
+        let query_lower = query.to_lowercase();
+        let limit_i64 = limit as i64;
+
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+            if let Some(pid) = parent_id {
+                sqlx::query_as(
+                    r#"
+                SELECT id::text, name, path, parent_id::text, user_id,
+                       EXTRACT(EPOCH FROM created_at)::bigint,
+                       EXTRACT(EPOCH FROM updated_at)::bigint
+                  FROM storage.folders
+                 WHERE parent_id = $1::uuid
+                   AND NOT is_trashed
+                   AND LOWER(name) LIKE $2
+                 ORDER BY CASE
+                            WHEN LOWER(name) = $3 THEN 0
+                            WHEN LOWER(name) LIKE $3 || '%' THEN 1
+                            ELSE 2
+                          END,
+                          name
+                 LIMIT $4
+                "#,
+                )
+                .bind(pid)
+                .bind(&pattern)
+                .bind(&query_lower)
+                .bind(limit_i64)
+                .fetch_all(self.pool())
+                .await
+            } else {
+                sqlx::query_as(
+                    r#"
+                SELECT id::text, name, path, parent_id::text, user_id,
+                       EXTRACT(EPOCH FROM created_at)::bigint,
+                       EXTRACT(EPOCH FROM updated_at)::bigint
+                  FROM storage.folders
+                 WHERE parent_id IS NULL
+                   AND NOT is_trashed
+                   AND LOWER(name) LIKE $1
+                 ORDER BY CASE
+                            WHEN LOWER(name) = $2 THEN 0
+                            WHEN LOWER(name) LIKE $2 || '%' THEN 1
+                            ELSE 2
+                          END,
+                          name
+                 LIMIT $3
+                "#,
+                )
+                .bind(&pattern)
+                .bind(&query_lower)
+                .bind(limit_i64)
+                .fetch_all(self.pool())
+                .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("suggest: {e}")))?;
+
+        rows.into_iter()
+            .map(|(id, name, path, pid, uid, ca, ma)| {
+                Self::row_to_folder(id, name, path, pid, Some(uid), ca, ma)
+            })
+            .collect()
+    }
 }
 
 // ── Extra helpers for blob-storage bootstrap ──

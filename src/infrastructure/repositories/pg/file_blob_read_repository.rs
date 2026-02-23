@@ -826,6 +826,91 @@ impl FileReadPort for FileBlobReadRepository {
             .await?;
         Ok(count)
     }
+
+    async fn suggest_files_by_name(
+        &self,
+        folder_id: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<File>, DomainError> {
+        let pattern = format!("%{}%", query.to_lowercase());
+        let limit_i64 = limit as i64;
+        let query_lower = query.to_lowercase();
+
+        let rows: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            String,
+            i64,
+            i64,
+            Option<String>,
+        )> = if let Some(fid) = folder_id {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id = $1::uuid
+                   AND NOT fi.is_trashed
+                   AND LOWER(fi.name) LIKE $2
+                 ORDER BY CASE
+                            WHEN LOWER(fi.name) = $3 THEN 0
+                            WHEN LOWER(fi.name) LIKE $3 || '%' THEN 1
+                            ELSE 2
+                          END,
+                          fi.name
+                 LIMIT $4
+                "#,
+            )
+            .bind(fid)
+            .bind(&pattern)
+            .bind(&query_lower)
+            .bind(limit_i64)
+            .fetch_all(self.pool.as_ref())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id IS NULL
+                   AND NOT fi.is_trashed
+                   AND LOWER(fi.name) LIKE $1
+                 ORDER BY CASE
+                            WHEN LOWER(fi.name) = $2 THEN 0
+                            WHEN LOWER(fi.name) LIKE $2 || '%' THEN 1
+                            ELSE 2
+                          END,
+                          fi.name
+                 LIMIT $3
+                "#,
+            )
+            .bind(&pattern)
+            .bind(&query_lower)
+            .bind(limit_i64)
+            .fetch_all(self.pool.as_ref())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("suggest: {e}")))?;
+
+        rows.into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect()
+    }
 }
 
 #[cfg(test)]

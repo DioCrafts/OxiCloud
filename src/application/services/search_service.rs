@@ -187,7 +187,8 @@ impl SearchService {
     }
 
     /// Quick suggestions search — returns up to `limit` name suggestions
-    /// matching the query prefix. Uses cache-friendly shallow search.
+    /// matching the query. Pushes filtering, relevance sort and LIMIT to SQL
+    /// so only a handful of rows cross the DB→app boundary.
     pub async fn suggest(
         &self,
         query: &str,
@@ -195,50 +196,49 @@ impl SearchService {
         limit: usize,
     ) -> Result<SearchSuggestionsDto> {
         let start = Instant::now();
-        let query_lower = query.to_lowercase();
 
-        let mut suggestions: Vec<SearchSuggestionItem> = Vec::new();
+        // Ask SQL for at most `limit` best-matching files and folders
+        let (files, folders) = tokio::join!(
+            self.file_repository
+                .suggest_files_by_name(folder_id, query, limit),
+            self.folder_repository
+                .suggest_folders_by_name(folder_id, query, limit),
+        );
+        let files = files?;
+        let folders = folders?;
 
-        // List files in the folder
-        let files = self.file_repository.list_files(folder_id).await?;
-        for file in files {
-            let file_dto = FileDto::from(file);
-            if file_dto.name.to_lowercase().contains(&query_lower) {
-                let score = compute_relevance(&file_dto.name, query);
-                suggestions.push(SearchSuggestionItem {
-                    name: file_dto.name.clone(),
-                    item_type: "file".to_string(),
-                    id: file_dto.id.clone(),
-                    path: file_dto.path.clone(),
-                    icon_class: get_icon_class(&file_dto.name, &file_dto.mime_type),
-                    icon_special_class: get_icon_special_class(&file_dto.name, &file_dto.mime_type),
-                    relevance_score: score,
-                });
-            }
-            if suggestions.len() >= limit * 2 {
-                break; // Collect enough candidates
-            }
+        let mut suggestions: Vec<SearchSuggestionItem> =
+            Vec::with_capacity(files.len() + folders.len());
+
+        for file in &files {
+            let file_dto = FileDto::from(file.clone());
+            let score = compute_relevance(&file_dto.name, query);
+            suggestions.push(SearchSuggestionItem {
+                name: file_dto.name.clone(),
+                item_type: "file".to_string(),
+                id: file_dto.id.clone(),
+                path: file_dto.path.clone(),
+                icon_class: get_icon_class(&file_dto.name, &file_dto.mime_type),
+                icon_special_class: get_icon_special_class(&file_dto.name, &file_dto.mime_type),
+                relevance_score: score,
+            });
         }
 
-        // List folders
-        let folders = self.folder_repository.list_folders(folder_id).await?;
-        for folder in folders {
-            let folder_dto = FolderDto::from(folder);
-            if folder_dto.name.to_lowercase().contains(&query_lower) {
-                let score = compute_relevance(&folder_dto.name, query);
-                suggestions.push(SearchSuggestionItem {
-                    name: folder_dto.name.clone(),
-                    item_type: "folder".to_string(),
-                    id: folder_dto.id.clone(),
-                    path: folder_dto.path.clone(),
-                    icon_class: "fas fa-folder".to_string(),
-                    icon_special_class: "folder-icon".to_string(),
-                    relevance_score: score,
-                });
-            }
+        for folder in &folders {
+            let folder_dto = FolderDto::from(folder.clone());
+            let score = compute_relevance(&folder_dto.name, query);
+            suggestions.push(SearchSuggestionItem {
+                name: folder_dto.name.clone(),
+                item_type: "folder".to_string(),
+                id: folder_dto.id.clone(),
+                path: folder_dto.path.clone(),
+                icon_class: "fas fa-folder".to_string(),
+                icon_special_class: "folder-icon".to_string(),
+                relevance_score: score,
+            });
         }
 
-        // Sort by relevance and truncate
+        // Merge files + folders by relevance and truncate to the final limit
         suggestions.sort_by(|a, b| b.relevance_score.cmp(&a.relevance_score));
         suggestions.truncate(limit);
 

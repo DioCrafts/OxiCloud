@@ -120,4 +120,27 @@ pub trait FolderRepository: Send + Sync + 'static {
         let _ = (folder_id, name_contains, user_id);
         Ok(Vec::new())
     }
+
+    /// Return up to `limit` folders whose name contains `query` (case-insensitive).
+    ///
+    /// Results are ordered by relevance (exact > starts-with > contains) for
+    /// autocomplete suggestions.
+    ///
+    /// The default implementation falls back to `list_folders` + in-memory
+    /// filter so that stubs and mocks compile without changes.
+    async fn suggest_folders_by_name(
+        &self,
+        parent_id: Option<&str>,
+        query: &str,
+        limit: usize,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let all = self.list_folders(parent_id).await?;
+        let q = query.to_lowercase();
+        let mut matched: Vec<Folder> = all
+            .into_iter()
+            .filter(|f| f.name().to_lowercase().contains(&q))
+            .collect();
+        matched.truncate(limit);
+        Ok(matched)
+    }
 }
