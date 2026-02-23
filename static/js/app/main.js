@@ -449,6 +449,10 @@ function setupEventListeners() {
                     }
                 }
                 
+                // Hide breadcrumb (only shown in Files view)
+                const breadcrumb = document.querySelector('.breadcrumb');
+                if (breadcrumb) breadcrumb.style.display = 'none';
+                
                 // Show trash view
                 app.isTrashView = true;
                 app.currentSection = 'trash';
