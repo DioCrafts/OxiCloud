@@ -68,9 +68,6 @@ const sharedView = {
         container.style.display = 'block';
         container.innerHTML = `
             <div class="shared-header">
-                <div class="shared-search">
-                    <input type="text" id="shared-search-input" data-i18n-placeholder="actions.search" placeholder="Search shared items...">
-                </div>
                 <div class="shared-filters">
                     <div class="shared-custom-select" id="filter-type-wrapper">
                         <button class="shared-select-toggle" id="filter-type-toggle">
@@ -251,22 +248,6 @@ const sharedView = {
                 if (window.switchToFilesView) window.switchToFilesView();
             });
         }
-
-        // Search input
-        const searchInput = document.getElementById('shared-search-input');
-        if (searchInput) {
-            let searchDebounce;
-            searchInput.addEventListener('input', () => {
-                clearTimeout(searchDebounce);
-                searchDebounce = setTimeout(() => this.filterAndSortItems(), 250);
-            });
-            searchInput.addEventListener('keyup', e => {
-                if (e.key === 'Enter') {
-                    clearTimeout(searchDebounce);
-                    this.filterAndSortItems();
-                }
-            });
-        }
     },
 
     // Initialize a custom select dropdown
@@ -310,8 +291,8 @@ const sharedView = {
         const type = filterTypeActive ? filterTypeActive.dataset.value : 'all';
         const sort = sortByActive ? sortByActive.dataset.value : 'date';
 
-        // Use the shared view search input
-        const searchInput = document.getElementById('shared-search-input');
+        // Use the main top-bar search input
+        const searchInput = document.getElementById('search-input');
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
         this.filteredItems = this.items.filter(item => {
