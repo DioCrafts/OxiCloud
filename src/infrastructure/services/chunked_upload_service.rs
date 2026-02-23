@@ -648,7 +648,7 @@ impl ChunkedUploadService {
             let mut chunk_file = File::open(&chunk_path)
                 .await
                 .map_err(|e| format!("Failed to open chunk {}: {}", chunk.index, e))?;
-            let mut buf = [0u8; 524_288];
+            let mut buf = vec![0u8; 524_288];
             loop {
                 let n = tokio::io::AsyncReadExt::read(&mut chunk_file, &mut buf)
                     .await
