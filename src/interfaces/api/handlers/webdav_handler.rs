@@ -202,15 +202,14 @@ async fn handle_propfind(
 
     // Check if path exists as a file or folder
     if path.is_empty() || path == "/" {
-        // Root folder
-        let subfolders = folder_service
-            .list_folders(None)
-            .await
+        // Root folder — run both queries concurrently
+        let (subfolders_result, files_result) = tokio::join!(
+            folder_service.list_folders(None),
+            file_retrieval_service.list_files(None)
+        );
+        let subfolders = subfolders_result
             .map_err(|e| AppError::internal_error(format!("Failed to get subfolders: {}", e)))?;
-
-        let files = file_retrieval_service
-            .list_files(None)
-            .await
+        let files = files_result
             .map_err(|e| AppError::internal_error(format!("Failed to get files: {}", e)))?;
 
         // Create root folder DTO for response
@@ -253,25 +252,18 @@ async fn handle_propfind(
         let folder_result = folder_service.get_folder_by_path(&path).await;
 
         if let Ok(folder) = folder_result {
-            // Path is a folder
-            let files = if depth != "0" {
-                file_retrieval_service
-                    .list_files(Some(&folder.id))
-                    .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to get files: {}", e)))?
+            // Path is a folder — run both queries concurrently
+            let (files, subfolders) = if depth != "0" {
+                let (files_r, folders_r) = tokio::join!(
+                    file_retrieval_service.list_files(Some(&folder.id)),
+                    folder_service.list_folders(Some(&folder.id))
+                );
+                (
+                    files_r.map_err(|e| AppError::internal_error(format!("Failed to get files: {}", e)))?,
+                    folders_r.map_err(|e| AppError::internal_error(format!("Failed to get subfolders: {}", e)))?,
+                )
             } else {
-                vec![]
-            };
-
-            let subfolders = if depth != "0" {
-                folder_service
-                    .list_folders(Some(&folder.id))
-                    .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!("Failed to get subfolders: {}", e))
-                    })?
-            } else {
-                vec![]
+                (vec![], vec![])
             };
 
             // Generate response
