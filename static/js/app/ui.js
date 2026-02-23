@@ -129,7 +129,7 @@ const ui = {
             `;
             document.body.appendChild(moveDialog);
         }
-        
+
         // Share dialog
         if (!document.getElementById('share-dialog')) {
             const shareDialog = document.createElement('div');
@@ -144,25 +144,25 @@ const ui = {
                     <div class="shared-item-info">
                         <strong>Item:</strong> <span id="shared-item-name"></span>
                     </div>
-                    
+
                     <div id="existing-shares-section" style="display:none; margin: 15px 0;">
                         <h3 data-i18n="dialogs.existing_shares">Existing shared links</h3>
                         <div id="existing-shares-container"></div>
                     </div>
-                    
+
                     <div class="share-options">
                         <h3 data-i18n="dialogs.share_options">Share options</h3>
-                        
+
                         <div class="form-group">
                             <label for="share-password" data-i18n="dialogs.password">Password (optional):</label>
                             <input type="password" id="share-password" placeholder="Protect with password">
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="share-expiration" data-i18n="dialogs.expiration">Expiration date (optional):</label>
                             <input type="date" id="share-expiration">
                         </div>
-                        
+
                         <div class="form-group">
                             <label data-i18n="dialogs.permissions">Permissions:</label>
                             <div class="permission-options">
@@ -181,7 +181,7 @@ const ui = {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div id="new-share-section" style="display:none; margin: 15px 0;">
                         <h3 data-i18n="dialogs.generated_link">Generated link</h3>
                         <div class="form-group">
@@ -196,7 +196,7 @@ const ui = {
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="share-dialog-buttons">
                         <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancel</button>
                         <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Share</button>
@@ -204,27 +204,27 @@ const ui = {
                 </div>
             `;
             document.body.appendChild(shareDialog);
-            
+
             // Add event listeners for share dialog
             document.getElementById('share-cancel-btn').addEventListener('click', () => {
                 contextMenus.closeShareDialog();
             });
-            
+
             document.getElementById('share-confirm-btn').addEventListener('click', async () => {
                 await contextMenus.createSharedLink();
             });
-            
+
             document.getElementById('copy-share-btn').addEventListener('click', async () => {
                 const shareUrl = document.getElementById('generated-share-url').value;
                 await fileSharing.copyLinkToClipboard(shareUrl);
             });
-            
+
             document.getElementById('notify-share-btn').addEventListener('click', () => {
                 const shareUrl = document.getElementById('generated-share-url').value;
                 contextMenus.showEmailNotificationDialog(shareUrl);
             });
         }
-        
+
         // Notification dialog
         if (!document.getElementById('notification-dialog')) {
             const notificationDialog = document.createElement('div');
@@ -236,19 +236,19 @@ const ui = {
                         <i class="fas fa-envelope" style="color:#ff5e3a"></i>
                         <span data-i18n="dialogs.notify">Notify shared link</span>
                     </div>
-                    
+
                     <p><strong>URL:</strong> <span id="notification-share-url"></span></p>
-                    
+
                     <div class="form-group">
                         <label for="notification-email" data-i18n="dialogs.recipient">Recipient:</label>
                         <input type="email" id="notification-email" placeholder="Email address">
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="notification-message" data-i18n="dialogs.message">Message (optional):</label>
                         <textarea id="notification-message" rows="3"></textarea>
                     </div>
-                    
+
                     <div class="share-dialog-buttons">
                         <button class="btn btn-secondary" id="notification-cancel-btn" data-i18n="actions.cancel">Cancel</button>
                         <button class="btn btn-primary" id="notification-send-btn" data-i18n="actions.send">Send</button>
@@ -256,12 +256,12 @@ const ui = {
                 </div>
             `;
             document.body.appendChild(notificationDialog);
-            
+
             // Add event listeners for notification dialog
             document.getElementById('notification-cancel-btn').addEventListener('click', () => {
                 contextMenus.closeNotificationDialog();
             });
-            
+
             document.getElementById('notification-send-btn').addEventListener('click', () => {
                 contextMenus.sendShareNotification();
             });
@@ -495,24 +495,50 @@ const ui = {
             return window.i18n.t(key);
         };
 
-        // -- Home item (always present) --
-        const homeItem = document.createElement('span');
-        homeItem.className = 'breadcrumb-item';
-        homeItem.textContent = getTranslatedText('breadcrumb.home', 'Home');
+        // -- Home icon (always present, clickable to go to root) --
+        const homeIcon = document.createElement('span');
+        homeIcon.className = 'breadcrumb-item breadcrumb-home';
+        homeIcon.innerHTML = '<i class="fas fa-home"></i>';
+        homeIcon.title = getTranslatedText('breadcrumb.home', 'Home');
 
-        // If we have deeper segments, Home is clickable
-        if (path.length > 0 && window.app.userHomeFolderId) {
-            homeItem.classList.add('breadcrumb-link');
-            homeItem.addEventListener('click', () => {
+        // Home is always clickable if we have a home folder
+        if (window.app.userHomeFolderId) {
+            homeIcon.classList.add('breadcrumb-link');
+            homeIcon.addEventListener('click', () => {
                 window.app.breadcrumbPath = [];
                 window.app.currentPath = window.app.userHomeFolderId;
                 self.updateBreadcrumb();
                 window.loadFiles();
             });
-        } else {
-            homeItem.classList.add('breadcrumb-current');
         }
-        breadcrumb.appendChild(homeItem);
+        breadcrumb.appendChild(homeIcon);
+
+        // -- Root/Home folder name (if available) --
+        if (window.app.userHomeFolderName) {
+            const separator1 = document.createElement('span');
+            separator1.className = 'breadcrumb-separator';
+            separator1.textContent = '>';
+            breadcrumb.appendChild(separator1);
+
+            const rootFolderItem = document.createElement('span');
+            rootFolderItem.className = 'breadcrumb-item';
+            rootFolderItem.textContent = window.app.userHomeFolderName;
+
+            // If we're at the home folder level (no deeper navigation), show as current
+            if (path.length === 0) {
+                rootFolderItem.classList.add('breadcrumb-current');
+            } else {
+                // Otherwise clickable to go back to home
+                rootFolderItem.classList.add('breadcrumb-link');
+                rootFolderItem.addEventListener('click', () => {
+                    window.app.breadcrumbPath = [];
+                    window.app.currentPath = window.app.userHomeFolderId;
+                    self.updateBreadcrumb();
+                    window.loadFiles();
+                });
+            }
+            breadcrumb.appendChild(rootFolderItem);
+        }
 
         // -- Intermediate + current segments --
         path.forEach((segment, index) => {

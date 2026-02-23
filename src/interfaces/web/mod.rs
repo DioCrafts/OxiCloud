@@ -23,7 +23,6 @@ pub fn create_web_routes() -> Router<AppState> {
         .route("/login", get(serve_login_page))
         .route("/profile", get(serve_profile_page))
         .route("/admin", get(serve_admin_page))
-        .route("/shared", get(serve_shared_page))
         // Serve static files with compression + cache headers
         .fallback_service(static_service)
         .layer(CompressionLayer::new().br(true).gzip(true))
@@ -46,9 +45,4 @@ async fn serve_profile_page() -> Html<&'static str> {
 /// Serve the admin page
 async fn serve_admin_page() -> Html<&'static str> {
     Html(include_str!("../../../static/admin.html"))
-}
-
-/// Serve the shared page
-async fn serve_shared_page() -> Html<&'static str> {
-    Html(include_str!("../../../static/shared.html"))
 }

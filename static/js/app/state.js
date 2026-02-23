@@ -11,6 +11,7 @@ window.app = {
     contextMenuTargetFile: null,
     selectedTargetFolderId: '',
     moveDialogMode: 'file',
+    isFilesView: true,
     isTrashView: false,
     isSharedView: false,
     isFavoritesView: false,
@@ -20,6 +21,8 @@ window.app = {
     shareDialogItem: null,
     shareDialogItemType: null,
     notificationShareUrl: null,
+    userHomeFolderId: null,
+    userHomeFolderName: null,
     breadcrumbPath: [] // Array of {id, name} tracking folder navigation hierarchy
 };
 

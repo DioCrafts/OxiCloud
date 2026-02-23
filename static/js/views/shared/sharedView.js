@@ -98,6 +98,7 @@ const sharedView = {
                 <i class="fas fa-share-alt" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
                 <p data-i18n="shared_emptyStateTitle">No shared items</p>
                 <p data-i18n="shared_emptyStateDesc">Items you share will appear here</p>
+                <button id="go-to-files-btn" class="button primary" data-i18n="shared.goToFiles">Go to Files</button>
             </div>
 
             <div class="shared-list-container" style="display:none;">
@@ -239,6 +240,14 @@ const sharedView = {
             const sendBtn = document.getElementById('sv-send-notification-btn');
             if (sendBtn) sendBtn.addEventListener('click', () => this.sendNotification());
         }
+
+        // "Go to Files" button in empty state
+        const goToFilesBtn = document.getElementById('go-to-files-btn');
+        if (goToFilesBtn) {
+            goToFilesBtn.addEventListener('click', () => {
+                if (window.switchToFilesView) window.switchToFilesView();
+            });
+        }
     },
 
     // Initialize a custom select dropdown
@@ -282,9 +291,9 @@ const sharedView = {
         const type = filterTypeActive ? filterTypeActive.dataset.value : 'all';
         const sort = sortByActive ? sortByActive.dataset.value : 'date';
 
-        // Use the top-bar search if available, otherwise no filter
-        const topSearch = document.getElementById('shared-search');
-        const searchTerm = topSearch ? topSearch.value.toLowerCase() : '';
+        // Use the main top-bar search input
+        const searchInput = document.getElementById('search-input');
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
         this.filteredItems = this.items.filter(item => {
             if (type !== 'all' && item.item_type !== type) return false;
