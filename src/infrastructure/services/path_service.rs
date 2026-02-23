@@ -133,27 +133,38 @@ impl StoragePort for PathService {
         // Resolve to physical path
         let physical_path = self.resolve_path(storage_path);
 
-        // Create directories if they don't exist
-        if !physical_path.exists() {
-            fs::create_dir_all(&physical_path).await.map_err(|e| {
-                DomainError::new(
-                    ErrorKind::AccessDenied,
+        // Check current state with a single async stat() — no worker blocking.
+        match fs::metadata(&physical_path).await {
+            Ok(meta) if meta.is_dir() => { /* already exists */ }
+            Ok(_) => {
+                return Err(DomainError::new(
+                    ErrorKind::InvalidInput,
                     "Storage",
-                    format!("Failed to create directory: {}", physical_path.display()),
-                )
-                .with_source(e)
-            })?;
+                    format!(
+                        "Path exists but is not a directory: {}",
+                        physical_path.display()
+                    ),
+                ));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                fs::create_dir_all(&physical_path).await.map_err(|e| {
+                    DomainError::new(
+                        ErrorKind::AccessDenied,
+                        "Storage",
+                        format!("Failed to create directory: {}", physical_path.display()),
+                    )
+                    .with_source(e)
+                })?;
 
-            tracing::debug!("Created directory: {}", physical_path.display());
-        } else if !physical_path.is_dir() {
-            return Err(DomainError::new(
-                ErrorKind::InvalidInput,
-                "Storage",
-                format!(
-                    "Path exists but is not a directory: {}",
-                    physical_path.display()
-                ),
-            ));
+                tracing::debug!("Created directory: {}", physical_path.display());
+            }
+            Err(e) => {
+                return Err(DomainError::new(
+                    ErrorKind::InternalError,
+                    "Storage",
+                    format!("Cannot stat {}: {e}", physical_path.display()),
+                ));
+            }
         }
 
         Ok(())
@@ -162,15 +173,31 @@ impl StoragePort for PathService {
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
         let physical_path = self.resolve_path(storage_path);
 
-        let exists = physical_path.exists() && physical_path.is_file();
-        Ok(exists)
+        // Single async stat() — no worker blocking, one syscall instead of two.
+        match fs::metadata(&physical_path).await {
+            Ok(meta) => Ok(meta.is_file()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(DomainError::new(
+                ErrorKind::InternalError,
+                "Storage",
+                format!("Cannot stat {}: {e}", physical_path.display()),
+            )),
+        }
     }
 
     async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
         let physical_path = self.resolve_path(storage_path);
 
-        let exists = physical_path.exists() && physical_path.is_dir();
-        Ok(exists)
+        // Single async stat() — no worker blocking, one syscall instead of two.
+        match fs::metadata(&physical_path).await {
+            Ok(meta) => Ok(meta.is_dir()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(DomainError::new(
+                ErrorKind::InternalError,
+                "Storage",
+                format!("Cannot stat {}: {e}", physical_path.display()),
+            )),
+        }
     }
 }
 
