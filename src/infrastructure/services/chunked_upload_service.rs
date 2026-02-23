@@ -499,10 +499,18 @@ impl ChunkedUploadService {
             ));
         }
 
-        // Verify checksum if provided
+        // Verify checksum if provided — MD5 is CPU-bound (~1.2 ms per 5 MB),
+        // so we offload it to the blocking thread-pool to keep the Tokio
+        // worker free for other connections.
         if let Some(ref expected_checksum) = checksum {
-            let actual_checksum = format!("{:x}", md5::compute(&data));
-            if &actual_checksum != expected_checksum {
+            let data_clone = data.clone(); // Bytes::clone is O(1) — just an Arc increment
+            let actual_checksum = tokio::task::spawn_blocking(move || {
+                format!("{:x}", md5::compute(&data_clone))
+            })
+            .await
+            .map_err(|e| format!("MD5 checksum task failed: {e}"))?;
+
+            if actual_checksum != *expected_checksum {
                 return Err(format!(
                     "Checksum mismatch: expected {}, got {}",
                     expected_checksum, actual_checksum
