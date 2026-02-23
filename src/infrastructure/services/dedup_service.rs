@@ -24,6 +24,7 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::stream::{self, StreamExt};
 use futures::Stream;
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
@@ -640,8 +641,13 @@ impl DedupService {
     // ── Maintenance ──────────────────────────────────────────────
 
     /// Verify integrity of all blobs (PG index vs filesystem).
+    ///
+    /// Hashes up to `VERIFY_CONCURRENCY` blobs in parallel using
+    /// `buffer_unordered`, saturating both disk I/O and CPU cores.
     pub async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
-        let mut corrupted = Vec::new();
+        /// Max blobs verified concurrently.  Each spawns a blocking
+        /// thread for SHA-256 so this also caps blocking-pool pressure.
+        const VERIFY_CONCURRENCY: usize = 16;
 
         let rows = sqlx::query_as::<_, (String, i64)>(
             "SELECT hash, size FROM storage.blobs ORDER BY hash",
@@ -652,43 +658,62 @@ impl DedupService {
             DomainError::internal_error("Dedup", format!("Failed to list blobs: {}", e))
         })?;
 
-        for (hash, expected_size) in &rows {
-            let blob_path = self.blob_path(hash);
+        let total = rows.len();
+        let blob_root = self.blob_root.clone();
 
-            // Check file exists
-            if !blob_path.exists() {
-                corrupted.push(format!("{}: file missing on disk", hash));
-                continue;
-            }
+        let corrupted: Vec<String> = stream::iter(rows)
+            .map(move |(hash, expected_size)| {
+                let blob_root = blob_root.clone();
+                async move {
+                    let prefix = &hash[0..2];
+                    let blob_path =
+                        blob_root.join(prefix).join(format!("{}.blob", hash));
 
-            // Verify hash
-            match Self::hash_file(&blob_path).await {
-                Ok(actual_hash) => {
-                    if actual_hash != *hash {
-                        corrupted
-                            .push(format!("{}: hash mismatch (actual: {})", hash, actual_hash));
+                    let mut issues = Vec::new();
+
+                    // Check file exists
+                    if !blob_path.exists() {
+                        issues.push(format!("{}: file missing on disk", hash));
+                        return issues;
                     }
-                }
-                Err(e) => {
-                    corrupted.push(format!("{}: read error ({})", hash, e));
-                }
-            }
 
-            // Check size
-            if let Ok(file_meta) = fs::metadata(&blob_path).await
-                && file_meta.len() != *expected_size as u64
-            {
-                corrupted.push(format!(
-                    "{}: size mismatch (expected: {}, actual: {})",
-                    hash,
-                    expected_size,
-                    file_meta.len()
-                ));
-            }
-        }
+                    // Verify hash
+                    match Self::hash_file(&blob_path).await {
+                        Ok(actual_hash) => {
+                            if actual_hash != hash {
+                                issues.push(format!(
+                                    "{}: hash mismatch (actual: {})",
+                                    hash, actual_hash,
+                                ));
+                            }
+                        }
+                        Err(e) => {
+                            issues.push(format!("{}: read error ({})", hash, e));
+                        }
+                    }
+
+                    // Check size
+                    if let Ok(file_meta) = fs::metadata(&blob_path).await
+                        && file_meta.len() != expected_size as u64
+                    {
+                        issues.push(format!(
+                            "{}: size mismatch (expected: {}, actual: {})",
+                            hash,
+                            expected_size,
+                            file_meta.len(),
+                        ));
+                    }
+
+                    issues
+                }
+            })
+            .buffer_unordered(VERIFY_CONCURRENCY)
+            .flat_map(stream::iter)
+            .collect()
+            .await;
 
         if corrupted.is_empty() {
-            tracing::info!("Integrity check passed for {} blobs", rows.len());
+            tracing::info!("Integrity check passed for {} blobs", total);
         } else {
             tracing::warn!("Integrity check found {} issues", corrupted.len());
         }
