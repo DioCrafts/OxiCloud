@@ -333,6 +333,13 @@ function setupEventListeners() {
             // Cancel any pending debounce
             if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
             const query = elements.searchInput.value.trim();
+            
+            // In shared view, filter locally
+            if (app.isSharedView && window.sharedView) {
+                window.sharedView.filterAndSortItems();
+                return;
+            }
+            
             if (query) {
                 window.performSearch(query);
             } else if (app.isSearchMode) {
