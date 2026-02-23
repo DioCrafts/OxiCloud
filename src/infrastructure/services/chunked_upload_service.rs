@@ -519,8 +519,10 @@ impl ChunkedUploadService {
             .await
             .map_err(|e| format!("Failed to write chunk: {e}"))?;
 
-        // Update session state + persist progress bitmask
-        let (bytes_received, progress, is_complete) = {
+        // Update session state — keep write lock as short as possible (RAM only).
+        // Disk I/O (persist_progress) is done AFTER releasing the lock so
+        // concurrent uploads across all sessions are never blocked by I/O.
+        let (bytes_received, progress, is_complete, persist_path, persist_bitmask) = {
             let mut sessions = self.sessions.write().await;
             let session = sessions
                 .get_mut(upload_id)
@@ -531,17 +533,23 @@ impl ChunkedUploadService {
             session.bytes_received += data.len() as u64;
             session.last_activity = Utc::now();
 
-            // Persist bitmask BEFORE releasing lock — guarantees disk matches RAM
-            if let Err(e) = session.persist_progress().await {
-                tracing::warn!("Failed to persist progress for {upload_id}: {e}");
-            }
+            // Build bitmask while under lock (CPU-only, ~microseconds)
+            let bitmask = session.build_progress_bitmask();
+            let path = session.temp_dir.join(PROGRESS_FILE);
 
             (
                 session.bytes_received,
                 session.progress(),
                 session.is_complete(),
+                path,
+                bitmask,
             )
-        };
+        }; // Write lock released here — held only for RAM updates (~microseconds)
+
+        // Persist bitmask to disk OUTSIDE the lock — no longer blocks other uploads
+        if let Err(e) = fs::write(&persist_path, &persist_bitmask).await {
+            tracing::warn!("Failed to persist progress for {upload_id}: {e}");
+        }
 
         tracing::debug!(
             "📦 Chunk {}/{} uploaded for {} ({:.1}% complete)",
