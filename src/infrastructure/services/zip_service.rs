@@ -7,13 +7,16 @@ use crate::{
     common::errors::{DomainError, ErrorKind, Result},
 };
 use async_trait::async_trait;
+use async_zip::base::write::ZipFileWriter;
+use async_zip::{Compression, ZipEntryBuilder};
+use futures::io::AsyncWriteExt as FuturesWriteExt;
 use futures::StreamExt;
-use std::io::Write;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use thiserror::Error;
+use tokio::io::BufWriter;
+use tokio_util::compat::Compat;
 use tracing::*;
-use zip::{ZipWriter, write::SimpleFileOptions};
 
 /// Error related to ZIP file creation
 #[derive(Debug, Error)]
@@ -22,7 +25,7 @@ pub enum ZipError {
     IoError(#[from] std::io::Error),
 
     #[error("ZIP error: {0}")]
-    ZipError(#[from] zip::result::ZipError),
+    AsyncZipError(#[from] async_zip::error::ZipError),
 
     #[error("Error reading file: {0}")]
     FileReadError(String),
@@ -34,24 +37,21 @@ pub enum ZipError {
     FolderNotFound(String),
 }
 
-// Implement From<ZipError> for DomainError to allow the use of ?
 impl From<ZipError> for DomainError {
     fn from(err: ZipError) -> Self {
         DomainError::new(ErrorKind::InternalError, "zip_service", err.to_string())
     }
 }
 
-// Implement From<zip::result::ZipError> for DomainError directly
-impl From<zip::result::ZipError> for DomainError {
-    fn from(err: zip::result::ZipError) -> Self {
-        DomainError::new(ErrorKind::InternalError, "zip_service", err.to_string())
-    }
-}
+/// Type alias for the fully-async ZIP writer backed by a buffered tokio file.
+type AsyncZipWriter = ZipFileWriter<Compat<BufWriter<tokio::fs::File>>>;
 
 /// Service for creating ZIP files.
 ///
-/// Writes the ZIP archive to a temporary file on disk so that only one file's
-/// stream-chunk (~64 KB) is held in memory at a time, regardless of archive size.
+/// Uses `async_zip` for fully-async archive creation.  Every write (headers,
+/// compressed chunk data, central directory) goes through
+/// `tokio::io::BufWriter` → `tokio::fs::File`, so **no Tokio worker is ever
+/// blocked** by disk I/O or compression.
 pub struct ZipService {
     file_service: Arc<dyn FileRetrievalUseCase>,
     folder_service: Arc<dyn FolderUseCase>,
@@ -70,7 +70,7 @@ impl ZipService {
     }
 
     /// Creates a ZIP file backed by a temporary file, containing the contents
-    /// of a folder and all its subfolders. Returns the `NamedTempFile` so the
+    /// of a folder and all its subfolders.  Returns the `NamedTempFile` so the
     /// caller can stream it and let the OS clean up on drop.
     pub async fn create_folder_zip(
         &self,
@@ -91,15 +91,15 @@ impl ZipService {
             }
         };
 
-        // Create a temp file to back the ZIP archive (O(1) RAM)
+        // Create a temp file; open a second async handle for writing.
         let temp = NamedTempFile::new().map_err(ZipError::IoError)?;
-        let raw_file = temp.reopen().map_err(ZipError::IoError)?;
-        let mut zip = ZipWriter::new(raw_file);
+        let tokio_file = tokio::fs::File::create(temp.path())
+            .await
+            .map_err(ZipError::IoError)?;
 
-        // Set compression options
-        let options = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated)
-            .unix_permissions(0o755);
+        // 256 KB buffer keeps syscall count low.
+        let buf_writer = BufWriter::with_capacity(256 * 1024, tokio_file);
+        let mut zip = ZipFileWriter::with_tokio(buf_writer);
 
         // Track processed folders to avoid cycles
         let mut processed_folders = std::collections::HashSet::new();
@@ -109,25 +109,24 @@ impl ZipService {
             &mut zip,
             &folder,
             folder_name,
-            &options,
             &mut processed_folders,
         )
         .await?;
 
-        // Finalize the ZIP (flushes central directory)
-        zip.finish()?;
+        // Finalize: writes central directory, then flush buffered data to disk.
+        let mut compat_writer = zip.close().await.map_err(ZipError::AsyncZipError)?;
+        compat_writer.close().await.map_err(ZipError::IoError)?;
 
         Ok(temp)
     }
 
-    /// Iterative BFS over the folder tree. Writes entries directly to the
-    /// file-backed `ZipWriter` so memory stays flat.
+    /// Iterative BFS over the folder tree.  Writes entries directly to the
+    /// async `ZipFileWriter` so memory stays flat.
     async fn process_folder_recursively(
         &self,
-        zip: &mut ZipWriter<std::fs::File>,
+        zip: &mut AsyncZipWriter,
         folder: &FolderDto,
         path: &str,
-        options: &SimpleFileOptions,
         processed_folders: &mut std::collections::HashSet<String>,
     ) -> Result<()> {
         struct PendingFolder {
@@ -148,10 +147,12 @@ impl ZipService {
             }
             processed_folders.insert(folder_id.clone());
 
-            // Directory entry
+            // Directory entry (Stored, zero-length body)
             let folder_path = format!("{}/", current.path);
-            match zip.add_directory(&folder_path, *options) {
-                Ok(_) => debug!("Folder added to ZIP: {}", folder_path),
+            let dir_entry =
+                ZipEntryBuilder::new(folder_path.clone().into(), Compression::Stored);
+            match zip.write_entry_whole(dir_entry, &[]).await {
+                Ok(()) => debug!("Folder added to ZIP: {}", folder_path),
                 Err(e) => {
                     warn!("Could not add folder to ZIP (may already exist): {}", e);
                 }
@@ -171,7 +172,7 @@ impl ZipService {
             };
 
             for file in files {
-                self.add_file_to_zip_streamed(zip, &file, &folder_path, options)
+                self.add_file_to_zip_streamed(zip, &file, &folder_path)
                     .await?;
             }
 
@@ -200,29 +201,33 @@ impl ZipService {
         Ok(())
     }
 
-    /// Streams file content in chunks (~64 KB) into the ZIP entry, keeping
-    /// peak memory independent of individual file sizes.
+    /// Streams file content in chunks (~64 KB) into an async ZIP entry,
+    /// keeping peak memory independent of individual file sizes.
     async fn add_file_to_zip_streamed(
         &self,
-        zip: &mut ZipWriter<std::fs::File>,
+        zip: &mut AsyncZipWriter,
         file: &FileDto,
         folder_path: &str,
-        options: &SimpleFileOptions,
     ) -> Result<()> {
         let file_path = format!("{}{}", folder_path, file.name);
         info!("Adding file to ZIP: {}", file_path);
 
         let file_id = file.id.to_string();
 
-        // Start the ZIP entry
-        zip.start_file_from_path(std::path::Path::new(&file_path), *options)
-            .map_err(ZipError::ZipError)?;
+        // Open a streaming entry with Deflate compression
+        let entry = ZipEntryBuilder::new(file_path.clone().into(), Compression::Deflate);
+        let mut entry_writer = zip
+            .write_entry_stream(entry)
+            .await
+            .map_err(ZipError::AsyncZipError)?;
 
         // Stream file contents in chunks instead of loading all into RAM
         let stream = match self.file_service.get_file_stream(&file_id).await {
             Ok(s) => s,
             Err(e) => {
                 error!("Error opening file stream {}: {}", file_id, e);
+                // Close the partially-opened entry before returning
+                let _ = entry_writer.close().await;
                 return Err(ZipError::FileReadError(format!(
                     "Error streaming file {}: {}",
                     file_id, e
@@ -236,8 +241,17 @@ impl ZipService {
 
         while let Some(chunk_result) = stream.next().await {
             let bytes = chunk_result.map_err(ZipError::IoError)?;
-            zip.write_all(&bytes).map_err(ZipError::IoError)?;
+            entry_writer
+                .write_all(&bytes)
+                .await
+                .map_err(ZipError::IoError)?;
         }
+
+        // Finalize the entry (writes data descriptor with CRC + sizes)
+        entry_writer
+            .close()
+            .await
+            .map_err(ZipError::AsyncZipError)?;
 
         debug!("File added to ZIP: {}", file_path);
         Ok(())
