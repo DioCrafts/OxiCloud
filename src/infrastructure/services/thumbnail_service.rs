@@ -136,13 +136,7 @@ impl ThumbnailService {
             .join(format!("{}.webp", file_id))
     }
 
-    /// Check if a thumbnail exists on disk
-    pub async fn thumbnail_exists(&self, file_id: &str, size: ThumbnailSize) -> bool {
-        let path = self.get_thumbnail_path(file_id, size);
-        fs::metadata(&path).await.is_ok()
-    }
-
-    /// Get a thumbnail, generating it if needed
+    /// Get a thumbnail, generating it if needed.
     ///
     /// # Arguments
     /// * `file_id` - ID of the original file
@@ -162,46 +156,64 @@ impl ThumbnailService {
             size,
         };
 
-        // Check lock-free cache first
-        if let Some(data) = self.cache.get(&cache_key).await {
-            tracing::debug!("🔥 Thumbnail cache HIT: {} {:?}", file_id, size);
-            return Ok(data);
-        }
-
-        // Check if thumbnail exists on disk
         let thumb_path = self.get_thumbnail_path(file_id, size);
+        let original_owned = original_path.to_path_buf();
+        let file_id_owned = file_id.to_string();
 
-        if fs::metadata(&thumb_path).await.is_ok() {
-            // Load from disk
-            let data = fs::read(&thumb_path)
-                .await
-                .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
-            let bytes = Bytes::from(data);
+        // Moka's entry().or_insert_with() guarantees that for the same key
+        // only ONE init closure runs; concurrent callers await the same
+        // computation instead of stampeding (thundering-herd protection).
+        let entry = self
+            .cache
+            .entry(cache_key)
+            .or_insert_with(async {
+                // 1. Try loading from disk
+                if let Ok(data) = fs::read(&thumb_path).await {
+                    tracing::debug!(
+                        "💾 Thumbnail loaded from disk: {} {:?}",
+                        file_id_owned,
+                        size
+                    );
+                    return Bytes::from(data);
+                }
 
-            // Add to cache (lock-free insert — moka handles eviction)
-            self.cache.insert(cache_key, bytes.clone()).await;
+                // 2. Generate thumbnail (CPU-bound, runs in spawn_blocking)
+                tracing::info!(
+                    "🎨 Generating thumbnail: {} {:?}",
+                    file_id_owned,
+                    size
+                );
+                match self.generate_thumbnail(&original_owned, size).await {
+                    Ok(bytes) => {
+                        // Save to disk (best-effort — don't fail the request)
+                        if let Some(parent) = thumb_path.parent() {
+                            let _ = fs::create_dir_all(parent).await;
+                        }
+                        let _ = fs::write(&thumb_path, &bytes).await;
+                        bytes
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Thumbnail generation failed for {} {:?}: {e}",
+                            file_id_owned,
+                            size
+                        );
+                        // Return empty sentinel — will be evicted quickly by
+                        // the weigher (weight 0) and retried on next request.
+                        Bytes::new()
+                    }
+                }
+            })
+            .await;
 
-            tracing::debug!("💾 Thumbnail loaded from disk: {} {:?}", file_id, size);
-            return Ok(bytes);
+        let bytes = entry.into_value();
+        if bytes.is_empty() {
+            return Err(ThumbnailError::ImageError(
+                "Thumbnail generation failed".to_string(),
+            ));
         }
 
-        // Generate thumbnail
-        tracing::info!("🎨 Generating thumbnail: {} {:?}", file_id, size);
-        let bytes = self.generate_thumbnail(original_path, size).await?;
-
-        // Save to disk
-        if let Some(parent) = thumb_path.parent() {
-            fs::create_dir_all(parent)
-                .await
-                .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
-        }
-        fs::write(&thumb_path, &bytes)
-            .await
-            .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
-
-        // Add to cache (lock-free insert)
-        self.cache.insert(cache_key, bytes.clone()).await;
-
+        tracing::debug!("🔥 Thumbnail served: {} {:?}", file_id, size);
         Ok(bytes)
     }
 
