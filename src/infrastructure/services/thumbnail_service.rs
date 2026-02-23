@@ -241,8 +241,14 @@ impl ThumbnailService {
                 ((orig_width as f32 * ratio) as u32, max_dim)
             };
 
-            // Resize using high-quality Lanczos3 filter
-            let thumbnail = img.resize(new_width, new_height, FilterType::Lanczos3);
+            // Adaptive filter: faster filters for smaller sizes where
+            // quality difference vs Lanczos3 is imperceptible
+            let filter = match size {
+                ThumbnailSize::Icon    => FilterType::Triangle,   // 150px — max speed
+                ThumbnailSize::Preview => FilterType::CatmullRom, // 400px — good balance
+                ThumbnailSize::Large   => FilterType::CatmullRom, // 800px — sufficient quality
+            };
+            let thumbnail = img.resize(new_width, new_height, filter);
 
             // Encode as WebP for smaller file size
             let mut buffer = Vec::new();
