@@ -68,6 +68,9 @@ const sharedView = {
         container.style.display = 'block';
         container.innerHTML = `
             <div class="shared-header">
+                <div class="shared-search">
+                    <input type="text" id="shared-search-input" data-i18n-placeholder="actions.search" placeholder="Search shared items...">
+                </div>
                 <div class="shared-filters">
                     <div class="shared-custom-select" id="filter-type-wrapper">
                         <button class="shared-select-toggle" id="filter-type-toggle">
@@ -98,6 +101,7 @@ const sharedView = {
                 <i class="fas fa-share-alt" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
                 <p data-i18n="shared_emptyStateTitle">No shared items</p>
                 <p data-i18n="shared_emptyStateDesc">Items you share will appear here</p>
+                <button id="go-to-files-btn" class="button primary" data-i18n="shared.goToFiles">Go to Files</button>
             </div>
 
             <div class="shared-list-container" style="display:none;">
@@ -239,6 +243,30 @@ const sharedView = {
             const sendBtn = document.getElementById('sv-send-notification-btn');
             if (sendBtn) sendBtn.addEventListener('click', () => this.sendNotification());
         }
+
+        // "Go to Files" button in empty state
+        const goToFilesBtn = document.getElementById('go-to-files-btn');
+        if (goToFilesBtn) {
+            goToFilesBtn.addEventListener('click', () => {
+                if (window.switchToFilesView) window.switchToFilesView();
+            });
+        }
+
+        // Search input
+        const searchInput = document.getElementById('shared-search-input');
+        if (searchInput) {
+            let searchDebounce;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(searchDebounce);
+                searchDebounce = setTimeout(() => this.filterAndSortItems(), 250);
+            });
+            searchInput.addEventListener('keyup', e => {
+                if (e.key === 'Enter') {
+                    clearTimeout(searchDebounce);
+                    this.filterAndSortItems();
+                }
+            });
+        }
     },
 
     // Initialize a custom select dropdown
@@ -282,9 +310,9 @@ const sharedView = {
         const type = filterTypeActive ? filterTypeActive.dataset.value : 'all';
         const sort = sortByActive ? sortByActive.dataset.value : 'date';
 
-        // Use the top-bar search if available, otherwise no filter
-        const topSearch = document.getElementById('shared-search');
-        const searchTerm = topSearch ? topSearch.value.toLowerCase() : '';
+        // Use the shared view search input
+        const searchInput = document.getElementById('shared-search-input');
+        const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
         this.filteredItems = this.items.filter(item => {
             if (type !== 'all' && item.item_type !== type) return false;

@@ -467,41 +467,8 @@ function setupEventListeners() {
                 // Load trash items
                 window.loadTrashItems();
             } else {
-                // Check if we need to reset shared view
-                if (app.isSharedView) {
-                    // Hide shared view
-                    if (window.sharedView) {
-                        window.sharedView.hide();
-                    }
-                    
-                    // Reset shared view flag
-                    app.isSharedView = false;
-                    
-                    // Clean up shared containers if they exist
-                    const sharedContainer = document.getElementById('shared-container');
-                    if (sharedContainer) {
-                        sharedContainer.style.display = 'none';
-                    }
-                }
-                
-                // Show regular files view
-                app.isTrashView = false;
-                app.currentSection = 'files';
-                
-                // Reset UI
-                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
-                setActionsBarMode('files');
-                
-                // Show files containers
-                const filesGrid = document.getElementById('files-grid');
-                const filesListView = document.getElementById('files-list-view');
-                if (filesGrid) filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none';
-                if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
-                
-                // Load regular files
-                app.currentPath = '';
-                ui.updateBreadcrumb('');
-                window.loadFiles();
+                // Use the proper switchToFilesView function which handles all UI restoration
+                window.switchToFilesView();
             }
         });
     });

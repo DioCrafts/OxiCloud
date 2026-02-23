@@ -3,35 +3,71 @@
  * Extracted from main.js to keep navigation concerns isolated.
  */
 
-function switchToSharedView() {
-    window.app.isTrashView = false;
-    window.app.isSharedView = true;
-    window.app.currentSection = 'shared';
+// Mapping of section names to their corresponding view flags
+const VIEW_FLAGS = {
+    'files': 'isFilesView',
+    'shared': 'isSharedView',
+    'recent': 'isRecentView',
+    'favorites': 'isFavoritesView',
+    'trash': 'isTrashView'
+};
 
-    window.appElements.navItems.forEach(navItem => navItem.classList.remove('active'));
+/**
+ * Derive section name from nav item's data-i18n attribute.
+ * @param {HTMLElement} navItem - The nav item element
+ * @returns {string|null} - Section name or null if not found
+ */
+function getSectionFromNavItem(navItem) {
+    const i18nKey = navItem.querySelector('span[data-i18n]')?.getAttribute('data-i18n');
+    return i18nKey ? i18nKey.replace('nav.', '') : null;
+}
 
-    const sharedNavItem = document.querySelector('.nav-item:nth-child(2)');
-    if (sharedNavItem) {
-        sharedNavItem.classList.add('active');
+/**
+ * Set the current active section, updating all view flags and nav UI.
+ * @param {string} section - The section to activate ('files', 'shared', 'recent', 'favorites', 'trash')
+ */
+function setCurrentSection(section) {
+    // Set all view flags - true for active section, false for others
+    Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {
+        window.app[flag] = (key === section);
+    });
+
+    window.app.currentSection = section;
+
+    // Update nav item active classes by finding matching item from DOM
+    window.appElements.navItems.forEach(item => {
+        const itemSection = getSectionFromNavItem(item);
+        item.classList.toggle('active', itemSection === section);
+    });
+
+    // Update page title
+    const titleKey = `nav.${section}`;
+    const defaultTitle = section.charAt(0).toUpperCase() + section.slice(1);
+    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t(titleKey) : defaultTitle;
+    window.appElements.pageTitle.setAttribute('data-i18n', titleKey);
+
+    // Hide sharedView when switching to any other section
+    if (section !== 'shared' && window.sharedView) {
+        window.sharedView.hide();
     }
+}
 
-    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.shared') : 'Shared';
-    window.appElements.pageTitle.setAttribute('data-i18n', 'nav.shared');
+function switchToSharedView() {
+    setCurrentSection('shared');
 
-    window.ui.updateBreadcrumb('');
-
+    // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
     if (breadcrumb) breadcrumb.style.display = 'none';
 
-    if (window.appElements.actionsBar) {
-        window.appElements.actionsBar.style.display = 'none';
-    }
+    // Hide actions-bar for shared view
+    window.setActionsBarMode('hidden');
 
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = 'none';
     if (filesListView) filesListView.style.display = 'none';
 
+    // Show shared view
     if (window.sharedView) {
         window.sharedView.init();
         window.sharedView.show();
@@ -39,92 +75,47 @@ function switchToSharedView() {
 }
 
 function switchToFilesView() {
-    window.app.isTrashView = false;
-    window.app.isSharedView = false;
-    window.app.isFavoritesView = false;
-    window.app.isRecentView = false;
-    window.app.currentSection = 'files';
+    setCurrentSection('files');
 
-    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.files') : 'Files';
-    window.appElements.pageTitle.setAttribute('data-i18n', 'nav.files');
+    // Set actions bar mode
+    window.setActionsBarMode('files', true);
 
+    // Show breadcrumb (only in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
     if (breadcrumb) breadcrumb.style.display = '';
 
-    window.appElements.navItems.forEach(navItem => navItem.classList.remove('active'));
-
-    const filesNavItem = document.querySelector('.nav-item:first-child');
-    if (filesNavItem) {
-        filesNavItem.classList.add('active');
-    }
-
-    window.setActionsBarMode('files');
-
-    if (window.sharedView) {
-        window.sharedView.hide();
-    }
-
     const filesGrid = document.getElementById('files-grid');
-    if (filesGrid) {
-        filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    }
-
     const filesListView = document.getElementById('files-list-view');
-    if (filesListView) {
-        filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
-    }
+    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
 
-    if (window.app.userHomeFolderId) {
-        window.app.currentPath = window.app.userHomeFolderId;
-        window.app.breadcrumbPath = [];
-        window.ui.updateBreadcrumb();
-    } else {
-        window.app.currentPath = '';
-    }
+    // Reset to home folder and update breadcrumb
+    window.app.currentPath = window.app.userHomeFolderId || '';
+    window.app.breadcrumbPath = [];
+    window.ui.updateBreadcrumb();
+
     window.loadFiles();
 }
 
 function switchToFavoritesView() {
-    window.app.isTrashView = false;
-    window.app.isSharedView = false;
+    setCurrentSection('favorites');
 
-    window.app.isFavoritesView = true;
-    window.app.currentSection = 'favorites';
-
-    window.appElements.navItems.forEach(navItem => navItem.classList.remove('active'));
-
-    const favoritesNavItem = document.querySelector('.nav-item:nth-child(4)');
-    if (favoritesNavItem) {
-        favoritesNavItem.classList.add('active');
-    }
-
-    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.favorites') : 'Favorites';
-    window.appElements.pageTitle.setAttribute('data-i18n', 'nav.favorites');
-
-    window.ui.updateBreadcrumb('');
-
-    if (window.sharedView) {
-        window.sharedView.hide();
-    }
-
+    // Set actions bar mode
     window.setActionsBarMode('favorites');
+
+    // Hide breadcrumb (only shown in Files view)
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
 
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
-
-    if (filesGrid) {
-        filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    }
-
-    if (filesListView) {
-        filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
-    }
+    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
 
     if (window.favorites) {
         window.favorites.displayFavorites();
     } else {
         console.error('Favorites module not loaded or initialized');
-
         const filesGridError = document.getElementById('files-grid');
         if (filesGridError) {
             filesGridError.innerHTML = `
@@ -138,47 +129,24 @@ function switchToFavoritesView() {
 }
 
 function switchToRecentFilesView() {
-    window.app.isTrashView = false;
-    window.app.isSharedView = false;
-    window.app.isFavoritesView = false;
+    setCurrentSection('recent');
 
-    window.app.isRecentView = true;
-    window.app.currentSection = 'recent';
-
-    window.appElements.navItems.forEach(navItem => navItem.classList.remove('active'));
-
-    const recentNavItem = document.querySelector('.nav-item:nth-child(3)');
-    if (recentNavItem) {
-        recentNavItem.classList.add('active');
-    }
-
-    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.recent') : 'Recent';
-    window.appElements.pageTitle.setAttribute('data-i18n', 'nav.recent');
-
-    window.ui.updateBreadcrumb('');
-
-    if (window.sharedView) {
-        window.sharedView.hide();
-    }
-
+    // Set actions bar mode
     window.setActionsBarMode('recent');
+
+    // Hide breadcrumb (only shown in Files view)
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
 
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
-
-    if (filesGrid) {
-        filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    }
-
-    if (filesListView) {
-        filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
-    }
+    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
 
     if (window.recent) {
         window.recent.displayRecentFiles();
     } else {
         console.error('Recent files module not loaded or initialized');
-
         const filesGridError = document.getElementById('files-grid');
         if (filesGridError) {
             filesGridError.innerHTML = `

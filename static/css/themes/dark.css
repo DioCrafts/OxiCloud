@@ -97,6 +97,15 @@
     color: #64748b;
 }
 
+[data-theme="dark"] .breadcrumb-home {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .breadcrumb-home.breadcrumb-link:hover {
+    color: #ff5e3a;
+    background: rgba(255, 94, 58, 0.15);
+}
+
 [data-theme="dark"] .btn-secondary {
     background-color: #1e293b;
     color: #cbd5e1;
