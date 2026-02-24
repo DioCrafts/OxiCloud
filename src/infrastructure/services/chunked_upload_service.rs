@@ -651,12 +651,13 @@ impl ChunkedUploadService {
         let mut hasher = Sha256::new();
 
         // Stream each chunk into the assembled file + hash
+        // Single 512 KB read buffer reused across all chunks (avoids N allocations)
+        let mut buf = vec![0u8; 524_288];
         for chunk in &session.chunks {
             let chunk_path = session.temp_dir.join(format!("chunk_{:06}", chunk.index));
             let mut chunk_file = File::open(&chunk_path)
                 .await
                 .map_err(|e| format!("Failed to open chunk {}: {}", chunk.index, e))?;
-            let mut buf = vec![0u8; 524_288];
             loop {
                 let n = tokio::io::AsyncReadExt::read(&mut chunk_file, &mut buf)
                     .await
