@@ -446,22 +446,13 @@ impl FolderHandler {
                             file_size
                         );
 
-                        // Open the temp file with tokio for async streaming
-                        let tokio_file = match tokio::fs::File::open(temp_file.path()).await {
-                            Ok(f) => f,
-                            Err(e) => {
-                                tracing::error!("Error opening temp file for streaming: {}", e);
-                                return (
-                                    StatusCode::INTERNAL_SERVER_ERROR,
-                                    Json(serde_json::json!({
-                                        "error": "Error streaming ZIP file"
-                                    })),
-                                )
-                                    .into_response();
-                            }
-                        };
+                        // Split the NamedTempFile into the already-open std File
+                        // and the TempPath (auto-deletes on drop).  This reuses
+                        // the existing fd instead of opening a second one.
+                        let (std_file, temp_path) = temp_file.into_parts();
+                        let tokio_file = tokio::fs::File::from_std(std_file);
 
-                        // Stream the temp file to the client in chunks
+                        // Stream the file to the client in chunks
                         let stream = ReaderStream::new(tokio_file);
                         let body = axum::body::Body::from_stream(stream);
 
@@ -469,7 +460,7 @@ impl FolderHandler {
                         let filename = format!("{}.zip", folder.name);
                         let content_disposition = format!("attachment; filename=\"{}\"", filename);
 
-                        let response = Response::builder()
+                        let mut response = Response::builder()
                             .status(StatusCode::OK)
                             .header(header::CONTENT_TYPE, "application/zip")
                             .header(header::CONTENT_DISPOSITION, content_disposition)
@@ -477,11 +468,9 @@ impl FolderHandler {
                             .body(body)
                             .unwrap();
 
-                        // temp_file is kept alive until the response future
-                        // completes; dropped afterwards, cleaning up the file.
-                        // We move it into the response extensions so it lives
-                        // long enough for the stream to be fully read.
-                        let _ = temp_file;
+                        // Keep TempPath alive in the response extensions so the
+                        // file is only deleted AFTER the body stream finishes.
+                        response.extensions_mut().insert(Arc::new(temp_path));
 
                         response.into_response()
                     }
