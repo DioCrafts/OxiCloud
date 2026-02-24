@@ -498,3 +498,27 @@ COMMENT ON FUNCTION storage.decrement_blob_ref() IS 'Auto-decrement blob ref_cou
 COMMENT ON TABLE storage.folders IS 'Virtual folder hierarchy with ltree — no physical directories on disk';
 COMMENT ON TABLE storage.files IS 'File metadata pointing to content-addressable blobs';
 COMMENT ON VIEW storage.trash_items IS 'Unified view of all trashed files and folders';
+
+-- ── Share links ──────────────────────────────────────────────────────────
+-- Replaces the legacy file-based shares.json with proper relational storage.
+CREATE TABLE IF NOT EXISTS storage.shares (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    item_id     TEXT NOT NULL,
+    item_name   TEXT,
+    item_type   TEXT NOT NULL CHECK (item_type IN ('file', 'folder')),
+    token       VARCHAR(36) NOT NULL UNIQUE,
+    password_hash TEXT,
+    expires_at  BIGINT,  -- unix epoch seconds, NULL = never expires
+    permissions_read    BOOLEAN NOT NULL DEFAULT TRUE,
+    permissions_write   BOOLEAN NOT NULL DEFAULT FALSE,
+    permissions_reshare BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at  BIGINT NOT NULL,  -- unix epoch seconds
+    created_by  VARCHAR(36) NOT NULL,
+    access_count BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_shares_token ON storage.shares(token);
+CREATE INDEX IF NOT EXISTS idx_shares_item ON storage.shares(item_id, item_type);
+CREATE INDEX IF NOT EXISTS idx_shares_created_by ON storage.shares(created_by);
+
+COMMENT ON TABLE storage.shares IS 'Shared links for files and folders with token-based access';

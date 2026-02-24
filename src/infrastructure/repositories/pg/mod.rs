@@ -8,6 +8,7 @@ mod favorites_pg_repository;
 mod recent_items_pg_repository;
 mod session_pg_repository;
 mod settings_pg_repository;
+mod share_pg_repository;
 mod transaction_utils;
 mod user_pg_repository;
 
@@ -30,5 +31,6 @@ pub use folder_db_repository::FolderDbRepository;
 pub use recent_items_pg_repository::RecentItemsPgRepository;
 pub use session_pg_repository::SessionPgRepository;
 pub use settings_pg_repository::SettingsPgRepository;
+pub use share_pg_repository::SharePgRepository;
 pub use trash_db_repository::TrashDbRepository;
 pub use user_pg_repository::UserPgRepository;

@@ -1,5 +1,3 @@
-pub mod share_fs_repository;
-
 // Repositorios PostgreSQL (blob-storage model)
 pub mod pg;
 

@@ -37,7 +37,7 @@ use crate::domain::services::i18n_service::I18nService;
 use crate::infrastructure::repositories::pg::{
     FileBlobReadRepository, FileBlobWriteRepository, FolderDbRepository, TrashDbRepository,
 };
-use crate::infrastructure::repositories::share_fs_repository::ShareFsRepository;
+use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::services::file_content_cache::{
     FileContentCache, FileContentCacheConfig,
 };
@@ -320,13 +320,14 @@ impl AppServiceFactory {
     pub fn create_share_service(
         &self,
         repos: &RepositoryServices,
+        db_pool: &Arc<PgPool>,
     ) -> Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>> {
         if !self.config.features.enable_file_sharing {
             tracing::info!("File sharing service is disabled in configuration");
             return None;
         }
 
-        let share_repository = Arc::new(ShareFsRepository::new(Arc::new(self.config.clone())));
+        let share_repository = Arc::new(SharePgRepository::new(db_pool.clone()));
 
         // Build a password hasher for share password verification
         let password_hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
@@ -435,7 +436,7 @@ impl AppServiceFactory {
         let mut apps = self.create_application_services(&core, &repos, trash_service.clone());
 
         // 5. Share service
-        let share_service = self.create_share_service(&repos);
+        let share_service = self.create_share_service(&repos, &pool);
         apps.share_service = share_service.clone();
 
         // 6. Database-dependent services (PgPool always available in blob model)
