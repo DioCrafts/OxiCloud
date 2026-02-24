@@ -88,7 +88,7 @@ impl FileRetrievalService {
             return None;
         }
         let format = OutputFormat::WebP;
-        match transcode.get_transcoded(id, content, mime, format).await {
+        match transcode.get_transcoded(id, content.clone(), mime, format).await {
             Ok((transcoded, webp_mime, true)) => {
                 debug!(
                     "🖼️ WebP transcode: {} -> {} bytes ({:.0}% smaller)",

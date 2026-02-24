@@ -192,10 +192,13 @@ impl ImageTranscodeService {
 
     /// Get transcoded version of an image.
     /// Returns `(content, mime_type, was_transcoded)`.
+    ///
+    /// Accepts `Bytes` (ref-counted) so callers avoid copying the buffer.
+    /// Cloning `Bytes` is O(1) — only an atomic increment.
     pub async fn get_transcoded(
         &self,
         file_id: &str,
-        original_content: &[u8],
+        original_content: Bytes,
         original_mime: &str,
         target_format: OutputFormat,
     ) -> Result<(Bytes, String, bool), String> {
@@ -228,13 +231,13 @@ impl ImageTranscodeService {
         }
 
         // ── 3. Transcode on dedicated rayon pool (never blocks Tokio) ──
-        let content_owned = original_content.to_vec();
+        let content_for_rayon = original_content.clone(); // O(1) ref-count bump
         let mime_owned = original_mime.to_string();
 
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         transcode_pool().spawn(move || {
-            let result = transcode_image_blocking(&content_owned, &mime_owned, target_format);
+            let result = transcode_image_blocking(&content_for_rayon, &mime_owned, target_format);
             let _ = tx.send(result);
         });
 
@@ -256,7 +259,7 @@ impl ImageTranscodeService {
                 transcoded_size
             );
             return Ok((
-                Bytes::from(original_content.to_vec()),
+                original_content,
                 original_mime.to_string(),
                 false,
             ));
@@ -394,7 +397,7 @@ impl ImageTranscodePort for ImageTranscodeService {
     async fn get_transcoded(
         &self,
         file_id: &str,
-        original_content: &[u8],
+        original_content: Bytes,
         original_mime: &str,
         target_format: PortOutputFormat,
     ) -> Result<(Bytes, String, bool), DomainError> {

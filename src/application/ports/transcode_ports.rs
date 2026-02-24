@@ -90,7 +90,7 @@ pub trait ImageTranscodePort: Send + Sync + 'static {
     async fn get_transcoded(
         &self,
         file_id: &str,
-        original_content: &[u8],
+        original_content: Bytes,
         original_mime: &str,
         target_format: OutputFormat,
     ) -> Result<(Bytes, String, bool), DomainError>;
