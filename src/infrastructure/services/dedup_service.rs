@@ -25,7 +25,7 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use sha2::{Digest, Sha256};
 use sqlx::PgPool;
 use std::path::{Path, PathBuf};
@@ -642,75 +642,99 @@ impl DedupService {
 
     /// Verify integrity of all blobs (PG index vs filesystem).
     ///
-    /// Hashes up to `VERIFY_CONCURRENCY` blobs in parallel using
-    /// `buffer_unordered`, saturating both disk I/O and CPU cores.
+    /// Uses a **streaming cursor** (`fetch()`) so memory stays O(batch)
+    /// instead of O(total_blobs).  Blobs are verified in micro-batches
+    /// of `VERIFY_CONCURRENCY` using `buffer_unordered`.
     pub async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
         /// Max blobs verified concurrently.  Each spawns a blocking
         /// thread for SHA-256 so this also caps blocking-pool pressure.
         const VERIFY_CONCURRENCY: usize = 16;
 
-        let rows = sqlx::query_as::<_, (String, i64)>(
+        let mut row_stream = sqlx::query_as::<_, (String, i64)>(
             "SELECT hash, size FROM storage.blobs ORDER BY hash",
         )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("Dedup", format!("Failed to list blobs: {}", e))
-        })?;
+        .fetch(self.pool.as_ref());
 
-        let total = rows.len();
-        let blob_root = self.blob_root.clone();
+        let mut total = 0usize;
+        let mut corrupted = Vec::<String>::new();
+        let mut batch = Vec::with_capacity(VERIFY_CONCURRENCY);
 
-        let corrupted: Vec<String> = stream::iter(rows)
-            .map(move |(hash, expected_size)| {
-                let blob_root = blob_root.clone();
-                async move {
-                    let prefix = &hash[0..2];
-                    let blob_path =
-                        blob_root.join(prefix).join(format!("{}.blob", hash));
+        loop {
+            let maybe_row = row_stream.try_next().await.map_err(|e| {
+                DomainError::internal_error("Dedup", format!("Failed to list blobs: {}", e))
+            })?;
 
-                    let mut issues = Vec::new();
+            let is_done = maybe_row.is_none();
 
-                    // Check file exists
-                    if !blob_path.exists() {
-                        issues.push(format!("{}: file missing on disk", hash));
-                        return issues;
-                    }
+            if let Some(row) = maybe_row {
+                total += 1;
+                batch.push(row);
+            }
 
-                    // Verify hash
-                    match Self::hash_file(&blob_path).await {
-                        Ok(actual_hash) => {
-                            if actual_hash != hash {
+            // Flush when batch is full or we've exhausted the cursor
+            if batch.len() >= VERIFY_CONCURRENCY || (is_done && !batch.is_empty()) {
+                let blob_root = self.blob_root.clone();
+                let current_batch =
+                    std::mem::replace(&mut batch, Vec::with_capacity(VERIFY_CONCURRENCY));
+
+                let issues: Vec<String> = stream::iter(current_batch)
+                    .map(move |(hash, expected_size)| {
+                        let blob_root = blob_root.clone();
+                        async move {
+                            let prefix = &hash[0..2];
+                            let blob_path =
+                                blob_root.join(prefix).join(format!("{}.blob", hash));
+
+                            let mut issues = Vec::new();
+
+                            // Check file exists
+                            if !blob_path.exists() {
+                                issues.push(format!("{}: file missing on disk", hash));
+                                return issues;
+                            }
+
+                            // Verify hash
+                            match Self::hash_file(&blob_path).await {
+                                Ok(actual_hash) => {
+                                    if actual_hash != hash {
+                                        issues.push(format!(
+                                            "{}: hash mismatch (actual: {})",
+                                            hash, actual_hash,
+                                        ));
+                                    }
+                                }
+                                Err(e) => {
+                                    issues.push(format!("{}: read error ({})", hash, e));
+                                }
+                            }
+
+                            // Check size
+                            if let Ok(file_meta) = fs::metadata(&blob_path).await
+                                && file_meta.len() != expected_size as u64
+                            {
                                 issues.push(format!(
-                                    "{}: hash mismatch (actual: {})",
-                                    hash, actual_hash,
+                                    "{}: size mismatch (expected: {}, actual: {})",
+                                    hash,
+                                    expected_size,
+                                    file_meta.len(),
                                 ));
                             }
-                        }
-                        Err(e) => {
-                            issues.push(format!("{}: read error ({})", hash, e));
-                        }
-                    }
 
-                    // Check size
-                    if let Ok(file_meta) = fs::metadata(&blob_path).await
-                        && file_meta.len() != expected_size as u64
-                    {
-                        issues.push(format!(
-                            "{}: size mismatch (expected: {}, actual: {})",
-                            hash,
-                            expected_size,
-                            file_meta.len(),
-                        ));
-                    }
+                            issues
+                        }
+                    })
+                    .buffer_unordered(VERIFY_CONCURRENCY)
+                    .flat_map(stream::iter)
+                    .collect()
+                    .await;
 
-                    issues
-                }
-            })
-            .buffer_unordered(VERIFY_CONCURRENCY)
-            .flat_map(stream::iter)
-            .collect()
-            .await;
+                corrupted.extend(issues);
+            }
+
+            if is_done {
+                break;
+            }
+        }
 
         if corrupted.is_empty() {
             tracing::info!("Integrity check passed for {} blobs", total);
@@ -724,26 +748,25 @@ impl DedupService {
     /// Garbage collect orphaned blobs (ref_count = 0).
     ///
     /// Uses `DELETE … RETURNING` for an atomic "find and remove" operation.
+    /// Results are streamed so memory stays O(1) even with millions of orphans.
     pub async fn garbage_collect(&self) -> Result<(u64, u64), DomainError> {
-        let orphans = sqlx::query_as::<_, (String, i64)>(
+        let mut orphan_stream = sqlx::query_as::<_, (String, i64)>(
             "DELETE FROM storage.blobs WHERE ref_count = 0 RETURNING hash, size",
         )
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("Dedup", format!("Failed to garbage collect: {}", e))
-        })?;
+        .fetch(self.pool.as_ref());
 
         let mut deleted_count = 0u64;
         let mut deleted_bytes = 0u64;
 
-        for (hash, size) in &orphans {
-            let blob_path = self.blob_path(hash);
+        while let Some((hash, size)) = orphan_stream.try_next().await.map_err(|e| {
+            DomainError::internal_error("Dedup", format!("Failed to garbage collect: {}", e))
+        })? {
+            let blob_path = self.blob_path(&hash);
             if let Err(e) = fs::remove_file(&blob_path).await {
                 tracing::warn!("Failed to delete orphaned blob file {}: {}", hash, e);
             }
             deleted_count += 1;
-            deleted_bytes += *size as u64;
+            deleted_bytes += size as u64;
         }
 
         if deleted_count > 0 {
