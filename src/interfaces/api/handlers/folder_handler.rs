@@ -1,10 +1,12 @@
 use axum::{
     Json,
+    body::Body,
     extract::{Path, Query, State},
-    http::{Response, StatusCode, header},
+    http::{HeaderMap, Response, StatusCode, header},
     response::IntoResponse,
 };
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use tokio_util::io::ReaderStream;
 
@@ -194,13 +196,29 @@ impl FolderHandler {
         }
     }
 
+    /// Compute a lightweight ETag from the maximum `modified_at` timestamp
+    /// and item count. No body buffering required.
+    fn compute_listing_etag(folders: &[crate::application::dtos::folder_dto::FolderDto], files: &[crate::application::dtos::file_dto::FileDto]) -> String {
+        let max_mod = folders.iter().map(|f| f.modified_at)
+            .chain(files.iter().map(|f| f.modified_at))
+            .max()
+            .unwrap_or(0);
+        let count = folders.len() + files.len();
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        max_mod.hash(&mut hasher);
+        count.hash(&mut hasher);
+        format!("\"{:x}\"", hasher.finish())
+    }
+
     /// Returns both sub-folders and files for a given folder in a single
     /// response, eliminating the double-fetch the frontend used to make.
     ///
     /// Both queries run concurrently via `tokio::join!`.
+    /// Supports `If-None-Match` / ETag for conditional responses (304).
     pub async fn list_folder_listing(
         State(state): State<GlobalAppState>,
         auth_user: AuthUser,
+        headers: HeaderMap,
         Path(id): Path<String>,
     ) -> axum::response::Response {
         let folder_service = &state.applications.folder_service;
@@ -214,8 +232,28 @@ impl FolderHandler {
 
         match (folders_result, files_result) {
             (Ok(folders), Ok(files)) => {
+                let etag = Self::compute_listing_etag(&folders, &files);
+
+                // 304 Not Modified if the client already has this version
+                if let Some(inm) = headers.get(header::IF_NONE_MATCH)
+                    && let Ok(client_etag) = inm.to_str()
+                    && client_etag == etag
+                {
+                    return Response::builder()
+                        .status(StatusCode::NOT_MODIFIED)
+                        .header(header::ETAG, &etag)
+                        .body(Body::empty())
+                        .unwrap()
+                        .into_response();
+                }
+
                 let listing = FolderListingDto { folders, files };
-                (StatusCode::OK, Json(listing)).into_response()
+                let mut resp = (StatusCode::OK, Json(listing)).into_response();
+                resp.headers_mut().insert(
+                    header::ETAG,
+                    header::HeaderValue::from_str(&etag).unwrap(),
+                );
+                resp
             }
             (Err(err), _) | (_, Err(err)) => {
                 let status = match err.kind {

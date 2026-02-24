@@ -516,6 +516,7 @@ impl FileHandler {
     /// Axum-compatible handler wrapper around [`Self::list_files`].
     pub async fn list_files_query(
         State(state): State<GlobalState>,
+        headers: HeaderMap,
         Query(params): Query<HashMap<String, String>>,
     ) -> impl IntoResponse {
         let folder_id = params.get("folder_id").map(|id| id.as_str());
@@ -524,8 +525,34 @@ impl FileHandler {
         let retrieval = &state.applications.file_retrieval_service;
         match retrieval.list_files(folder_id).await {
             Ok(files) => {
+                // Compute lightweight ETag from max modified_at + count
+                let max_mod = files.iter().map(|f| f.modified_at).max().unwrap_or(0);
+                let count = files.len();
+                let mut hasher = std::collections::hash_map::DefaultHasher::new();
+                std::hash::Hash::hash(&max_mod, &mut hasher);
+                std::hash::Hash::hash(&count, &mut hasher);
+                let etag = format!("\"{:x}\"", std::hash::Hasher::finish(&hasher));
+
+                // 304 Not Modified if client already has this version
+                if let Some(inm) = headers.get(header::IF_NONE_MATCH)
+                    && let Ok(client_etag) = inm.to_str()
+                    && client_etag == etag
+                {
+                    return Response::builder()
+                        .status(StatusCode::NOT_MODIFIED)
+                        .header(header::ETAG, &etag)
+                        .body(Body::empty())
+                        .unwrap()
+                        .into_response();
+                }
+
                 tracing::info!("Found {} files", files.len());
-                (StatusCode::OK, Json(files)).into_response()
+                let mut resp = (StatusCode::OK, Json(files)).into_response();
+                resp.headers_mut().insert(
+                    header::ETAG,
+                    header::HeaderValue::from_str(&etag).unwrap(),
+                );
+                resp
             }
             Err(err) => {
                 tracing::error!("Error listing files: {}", err);
