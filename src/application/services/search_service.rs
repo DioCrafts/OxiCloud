@@ -41,8 +41,10 @@ pub struct SearchService {
     /// Repository for folder operations
     folder_repository: Arc<dyn FolderStoragePort>,
 
-    /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka)
-    search_cache: moka::sync::Cache<u64, SearchResultsDto>,
+    /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka).
+    /// Uses `future::Cache` so `.get()` / `.insert()` never block the Tokio
+    /// runtime (maintenance work is deferred to an internal async task).
+    search_cache: moka::future::Cache<u64, SearchResultsDto>,
 }
 
 // ─── Utility functions (pure, no self — computed on the server) ─────────
@@ -111,7 +113,7 @@ impl SearchService {
         cache_ttl: u64,
         max_cache_size: usize,
     ) -> Self {
-        let search_cache = moka::sync::Cache::builder()
+        let search_cache = moka::future::Cache::builder()
             .max_capacity(max_cache_size as u64)
             .time_to_live(Duration::from_secs(cache_ttl))
             .build();
@@ -132,13 +134,13 @@ impl SearchService {
     }
 
     /// Attempts to retrieve results from the cache.
-    fn get_from_cache(&self, key: u64) -> Option<SearchResultsDto> {
-        self.search_cache.get(&key)
+    async fn get_from_cache(&self, key: u64) -> Option<SearchResultsDto> {
+        self.search_cache.get(&key).await
     }
 
     /// Stores results in the cache.
-    fn store_in_cache(&self, key: u64, results: SearchResultsDto) {
-        self.search_cache.insert(key, results);
+    async fn store_in_cache(&self, key: u64, results: SearchResultsDto) {
+        self.search_cache.insert(key, results).await;
     }
 
     /// Enrich a FileDto → SearchFileResultDto with server-computed metadata.
@@ -278,7 +280,7 @@ impl SearchUseCase for SearchService {
 
         // Try to get from cache
         let cache_key = Self::create_cache_key(&criteria, user_id);
-        if let Some(cached_results) = self.get_from_cache(cache_key) {
+        if let Some(cached_results) = self.get_from_cache(cache_key).await {
             return Ok(cached_results);
         }
 
@@ -382,7 +384,7 @@ impl SearchUseCase for SearchService {
                 criteria.sort_by.clone(),
             );
 
-            self.store_in_cache(cache_key, search_results.clone());
+            self.store_in_cache(cache_key, search_results.clone()).await;
             return Ok(search_results);
         }
 
@@ -481,7 +483,7 @@ impl SearchUseCase for SearchService {
         );
 
         // Store in cache
-        self.store_in_cache(cache_key, search_results.clone());
+        self.store_in_cache(cache_key, search_results.clone()).await;
 
         Ok(search_results)
     }
@@ -499,6 +501,7 @@ impl SearchUseCase for SearchService {
     /// Clears the search results cache.
     async fn clear_search_cache(&self) -> Result<()> {
         self.search_cache.invalidate_all();
+        self.search_cache.run_pending_tasks().await;
         Ok(())
     }
 }
