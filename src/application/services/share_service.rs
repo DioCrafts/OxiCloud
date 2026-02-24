@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use thiserror::Error;
+use tokio::sync::Semaphore;
 
 use crate::{
     application::{
@@ -57,12 +58,22 @@ impl From<ShareServiceError> for DomainError {
     }
 }
 
+/// Maximum number of concurrent Argon2 hashing operations.
+///
+/// Each Argon2id hash consumes ~19 MB of RAM and ~300 ms of CPU.
+/// Limiting concurrency prevents RAM exhaustion and thread-pool saturation
+/// under burst traffic (e.g. many share-creation requests with passwords).
+const MAX_CONCURRENT_HASHES: usize = 2;
+
 pub struct ShareService {
     config: Arc<AppConfig>,
     share_repository: Arc<dyn ShareStoragePort>,
     file_repository: Arc<dyn FileReadPort>,
     folder_repository: Arc<dyn FolderStoragePort>,
     password_hasher: Arc<dyn PasswordHasherPort>,
+    /// Bounds the number of in-flight Argon2 password hashes to avoid
+    /// saturating the blocking thread pool and consuming excessive RAM.
+    hash_semaphore: Arc<Semaphore>,
 }
 
 impl ShareService {
@@ -79,6 +90,7 @@ impl ShareService {
             file_repository,
             folder_repository,
             password_hasher,
+            hash_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_HASHES)),
         }
     }
 
@@ -115,19 +127,14 @@ impl ShareService {
         Ok(())
     }
 
-    /// Password hash using Argon2id (resistant to timing attacks and GPU attacks)
-    fn hash_password(&self, password: &str) -> String {
-        use argon2::password_hash::SaltString;
-        use argon2::{Argon2, PasswordHasher};
-        use rand_core::OsRng;
-
-        let salt = SaltString::generate(&mut OsRng);
-        let argon2 = Argon2::default();
-
-        argon2
-            .hash_password(password.as_bytes(), &salt)
-            .expect("Failed to hash share password")
-            .to_string()
+    /// Hash a password via the injected `PasswordHasherPort`, bounded by a
+    /// semaphore so at most `MAX_CONCURRENT_HASHES` Argon2 operations run
+    /// concurrently. This keeps RAM usage predictable (~19 MB × 2 = ~38 MB max)
+    /// and avoids starving the Tokio blocking thread pool.
+    async fn hash_password_async(&self, password: &str) -> Result<String, DomainError> {
+        let _permit = self.hash_semaphore.acquire().await
+            .map_err(|_| DomainError::internal_error("ShareService", "Hash semaphore closed".to_string()))?;
+        self.password_hasher.hash_password(password).await
     }
 }
 
@@ -148,8 +155,11 @@ impl ShareUseCase for ShareService {
         // Convert the permissions DTO if it exists
         let permissions = dto.permissions.map(|p| p.to_entity());
 
-        // Hash the password if provided
-        let password_hash = dto.password.map(|p| self.hash_password(&p));
+        // Hash the password if provided (async, semaphore-bounded)
+        let password_hash = match dto.password {
+            Some(p) => Some(self.hash_password_async(&p).await?),
+            None => None,
+        };
 
         // Create the Share entity
         let share = Share::new(
@@ -260,12 +270,12 @@ impl ShareUseCase for ShareService {
             share = share.with_permissions(permissions);
         }
 
-        // Update password if provided
+        // Update password if provided (async, semaphore-bounded)
         if let Some(password) = dto.password {
             let password_hash = if password.is_empty() {
                 None
             } else {
-                Some(self.hash_password(&password))
+                Some(self.hash_password_async(&password).await?)
             };
             share = share.with_password(password_hash);
         }
