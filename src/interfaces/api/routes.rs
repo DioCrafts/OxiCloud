@@ -28,12 +28,7 @@ use crate::interfaces::api::handlers::i18n_handler::I18nHandler;
 use crate::interfaces::api::handlers::trash_handler;
 
 /// Creates public API routes that should NOT require authentication.
-///
-/// Currently this includes:
-/// - `/s/{token}` — public access to shared items via share link
-/// - `/s/{token}/verify` — password verification for protected share links
-/// - `/i18n/*` — internationalization/translation endpoints
-pub fn create_public_api_routes(app_state: &AppState) -> Router<AppState> {
+pub fn create_public_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
     let share_service = app_state.share_service.clone();
     let i18n_service = Some(app_state.applications.i18n_service.clone());
 
@@ -79,7 +74,7 @@ pub fn create_public_api_routes(app_state: &AppState) -> Router<AppState> {
 /// These routes require authentication when auth is enabled.
 /// Receives the fully-assembled `AppState` and extracts all needed services
 /// from it, avoiding a long parameter list.
-pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
+pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
     // Extract services from the pre-built AppState
     let folder_service = app_state.applications.folder_service_concrete.clone();
     let file_retrieval_service = app_state.applications.file_retrieval_service.clone();
@@ -276,7 +271,7 @@ pub fn create_api_routes(app_state: &AppState) -> Router<AppState> {
             post(ChunkedUploadHandler::complete_upload),
         )
         .route("/{upload_id}", delete(ChunkedUploadHandler::cancel_upload))
-        .with_state(Arc::new(app_state.clone()));
+        .with_state(app_state.clone());
 
     // Create routes for deduplication endpoints
     let dedup_router = Router::new()

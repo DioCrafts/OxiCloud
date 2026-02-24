@@ -13,9 +13,10 @@ use crate::application::dtos::settings_dto::{
 };
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
+use std::sync::Arc;
 
 /// Admin API routes — all require admin role.
-pub fn admin_routes() -> Router<AppState> {
+pub fn admin_routes() -> Router<Arc<AppState>> {
     Router::new()
         // OIDC settings
         .route("/settings/oidc", get(get_oidc_settings))
@@ -69,7 +70,7 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, S
 
 /// GET /api/admin/settings/oidc — get OIDC settings for the admin panel
 async fn get_oidc_settings(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
@@ -89,7 +90,7 @@ async fn get_oidc_settings(
 
 /// PUT /api/admin/settings/oidc — save OIDC settings + hot-reload
 async fn save_oidc_settings(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(dto): Json<SaveOidcSettingsDto>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -114,7 +115,7 @@ async fn save_oidc_settings(
 
 /// POST /api/admin/settings/oidc/test — test OIDC discovery
 async fn test_oidc_connection(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(dto): Json<TestOidcConnectionDto>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -135,7 +136,7 @@ async fn test_oidc_connection(
 
 /// GET /api/admin/settings/general — system overview (backward compat)
 async fn get_general_settings(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
@@ -166,7 +167,7 @@ async fn get_general_settings(
 
 /// GET /api/admin/dashboard — full dashboard statistics
 async fn get_dashboard_stats(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
@@ -242,7 +243,7 @@ async fn get_dashboard_stats(
 
 /// GET /api/admin/users?limit=50&offset=0 — list all users
 async fn list_users(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Query(query): Query<ListUsersQueryDto>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -278,7 +279,7 @@ async fn list_users(
 
 /// GET /api/admin/users/:id — get single user
 async fn get_user(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -300,7 +301,7 @@ async fn get_user(
 
 /// DELETE /api/admin/users/:id — delete a user
 async fn delete_user(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -335,7 +336,7 @@ async fn delete_user(
 
 /// PUT /api/admin/users/:id/role — change user role
 async fn update_user_role(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(dto): Json<UpdateUserRoleDto>,
@@ -371,7 +372,7 @@ async fn update_user_role(
 
 /// PUT /api/admin/users/:id/active — activate/deactivate user
 async fn update_user_active(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(dto): Json<UpdateUserActiveDto>,
@@ -412,7 +413,7 @@ async fn update_user_active(
 
 /// PUT /api/admin/users/:id/quota — update user storage quota
 async fn update_user_quota(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(dto): Json<UpdateUserQuotaDto>,
@@ -444,7 +445,7 @@ async fn update_user_quota(
 
 /// POST /api/admin/users — create a new user (admin only)
 async fn create_user(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(dto): Json<AdminCreateUserDto>,
 ) -> Result<impl IntoResponse, AppError> {
@@ -472,7 +473,7 @@ async fn create_user(
 
 /// PUT /api/admin/users/:id/password — reset a user's password (admin only)
 async fn reset_user_password(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path(id): Path<String>,
     Json(dto): Json<AdminResetPasswordDto>,
@@ -509,7 +510,7 @@ async fn reset_user_password(
 
 /// GET /api/admin/settings/registration — check if public registration is enabled
 async fn get_registration_setting(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
@@ -528,7 +529,7 @@ async fn get_registration_setting(
 
 /// PUT /api/admin/settings/registration — enable/disable public registration
 async fn set_registration_setting(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse, AppError> {

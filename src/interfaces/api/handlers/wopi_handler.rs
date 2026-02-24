@@ -30,7 +30,7 @@ pub struct WopiState {
     pub token_service: Arc<WopiTokenService>,
     pub lock_service: Arc<WopiLockService>,
     pub discovery_service: Arc<WopiDiscoveryService>,
-    pub app_state: crate::common::di::AppState,
+    pub app_state: Arc<crate::common::di::AppState>,
     /// Public base URL for host page origin and postMessage origin
     pub public_base_url: String,
     /// Base URL used for WOPISrc callbacks from Collabora to OxiCloud
@@ -506,8 +506,8 @@ async fn get_supported_extensions(State(state): State<WopiState>) -> Response {
 pub fn wopi_routes(
     wopi_state: WopiState,
 ) -> (
-    Router<crate::common::di::AppState>,
-    Router<crate::common::di::AppState>,
+    Router<Arc<crate::common::di::AppState>>,
+    Router<Arc<crate::common::di::AppState>>,
 ) {
     let protocol_router = Router::new()
         // CheckFileInfo

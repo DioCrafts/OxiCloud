@@ -7,11 +7,12 @@ use tracing::{debug, error, instrument, warn};
 // use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::{AuthUser, OptionalAuthUser};
+use std::sync::Arc;
 
 /// Gets all items in the trash for the current user
 #[instrument(skip_all)]
 pub async fn get_trash_items(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
 ) -> (StatusCode, Json<serde_json::Value>) {
     // SECURITY: Always use the authenticated user's ID from the JWT token.
@@ -55,7 +56,7 @@ pub async fn get_trash_items(
 /// Moves an item (file or folder) to the trash (generic function, not used directly in routes)
 #[instrument(skip_all)]
 pub async fn move_to_trash(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     OptionalAuthUser(auth_user): OptionalAuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -109,7 +110,7 @@ pub async fn move_to_trash(
 /// Moves a file to the trash
 #[instrument(skip_all)]
 pub async fn move_file_to_trash(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     OptionalAuthUser(auth_user): OptionalAuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -163,7 +164,7 @@ pub async fn move_file_to_trash(
 /// Moves a folder to the trash
 #[instrument(skip_all)]
 pub async fn move_folder_to_trash(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     OptionalAuthUser(auth_user): OptionalAuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -219,7 +220,7 @@ pub async fn move_folder_to_trash(
 /// Restores an item from the trash to its original location
 #[instrument(skip_all)]
 pub async fn restore_from_trash(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
     Path(trash_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -280,7 +281,7 @@ pub async fn restore_from_trash(
 /// Permanently deletes an item from the trash
 #[instrument(skip_all)]
 pub async fn delete_permanently(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
     Path(trash_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
@@ -343,7 +344,7 @@ pub async fn delete_permanently(
 /// Empties the trash completely for the current user
 #[instrument(skip_all)]
 pub async fn empty_trash(
-    State(state): State<AppState>,
+    State(state): State<Arc<AppState>>,
     auth_user: AuthUser,
 ) -> (StatusCode, Json<serde_json::Value>) {
     debug!("Request to empty trash for user {}", auth_user.id);

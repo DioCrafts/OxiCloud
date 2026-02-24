@@ -40,7 +40,7 @@ const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 ///
 /// Uses `merge()` instead of `nest()` to avoid Axum's trailing-slash routing gap.
 /// Registers `/caldav`, `/caldav/`, and `/caldav/{*path}` explicitly.
-pub fn caldav_routes() -> Router<AppState> {
+pub fn caldav_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/caldav/{*path}", axum::routing::any(handle_caldav_methods))
         .route("/caldav/", axum::routing::any(handle_caldav_methods_root))
@@ -48,14 +48,14 @@ pub fn caldav_routes() -> Router<AppState> {
 }
 
 async fn handle_caldav_methods_root(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     handle_caldav_methods_inner(state, req, String::new()).await
 }
 
 async fn handle_caldav_methods(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     let uri = req.uri().clone();
@@ -64,12 +64,11 @@ async fn handle_caldav_methods(
 }
 
 async fn handle_caldav_methods_inner(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
     let method = req.method().clone();
-    let state = Arc::new(state);
 
     match method.as_str() {
         "OPTIONS" => handle_options().await,

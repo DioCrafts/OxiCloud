@@ -216,7 +216,7 @@ impl FolderHandler {
     /// Both queries run concurrently via `tokio::join!`.
     /// Supports `If-None-Match` / ETag for conditional responses (304).
     pub async fn list_folder_listing(
-        State(state): State<GlobalAppState>,
+        State(state): State<Arc<GlobalAppState>>,
         auth_user: AuthUser,
         headers: HeaderMap,
         Path(id): Path<String>,
@@ -339,7 +339,7 @@ impl FolderHandler {
 
     /// Deletes a folder with trash functionality (ownership enforced by service layer)
     pub async fn delete_folder_with_trash(
-        State(state): State<GlobalAppState>,
+        State(state): State<Arc<GlobalAppState>>,
         auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
@@ -392,7 +392,7 @@ impl FolderHandler {
 
     /// Downloads a folder as a ZIP file (ownership enforced)
     pub async fn download_folder_zip(
-        State(state): State<GlobalAppState>,
+        State(state): State<Arc<GlobalAppState>>,
         auth_user: AuthUser,
         Path(id): Path<String>,
         Query(_params): Query<HashMap<String, String>>,

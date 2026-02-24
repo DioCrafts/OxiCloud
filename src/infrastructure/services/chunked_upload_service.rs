@@ -23,8 +23,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::fs::{self, File, OpenOptions};
-use tokio::io::{AsyncWriteExt, BufWriter};
+use tokio::fs::{self, File};
+use tokio::io::AsyncWriteExt;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -633,59 +633,73 @@ impl ChunkedUploadService {
             session.clone()
         };
 
-        // Assemble file with hash-on-write
+        // Assemble file with hash-on-write.
+        //
+        // The entire loop is offloaded to spawn_blocking because SHA-256
+        // hashing is CPU-bound (~130 ms for 500 MB) and would otherwise
+        // block a Tokio worker, starving all other connections.
+        // Synchronous I/O is used inside the blocking thread — it avoids
+        // the async reactor overhead and is actually faster for this
+        // sequential workload.
         let assembled_path = session.temp_dir.join("assembled");
-        let raw_output = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&assembled_path)
-            .await
-            .map_err(|e| format!("Failed to create assembled file: {e}"))?;
+        let chunks_meta: Vec<(usize, PathBuf)> = session
+            .chunks
+            .iter()
+            .map(|c| (c.index, session.temp_dir.join(format!("chunk_{:06}", c.index))))
+            .collect();
+        let total_size = session.total_size;
 
-        // Pre-allocate assembled file to reduce fragmentation
-        let _ = raw_output.set_len(session.total_size).await;
+        let hash = tokio::task::spawn_blocking(move || -> Result<String, String> {
+            use std::io::{Read, Write, BufWriter as StdBufWriter};
 
-        // 512 KB I/O buffers — 8× fewer syscalls than 64 KB
-        let mut output = BufWriter::with_capacity(524_288, raw_output);
-        let mut hasher = Sha256::new();
+            let raw_output = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&assembled_path)
+                .map_err(|e| format!("Failed to create assembled file: {e}"))?;
 
-        // Stream each chunk into the assembled file + hash
-        // Single 512 KB read buffer reused across all chunks (avoids N allocations)
-        let mut buf = vec![0u8; 524_288];
-        for chunk in &session.chunks {
-            let chunk_path = session.temp_dir.join(format!("chunk_{:06}", chunk.index));
-            let mut chunk_file = File::open(&chunk_path)
-                .await
-                .map_err(|e| format!("Failed to open chunk {}: {}", chunk.index, e))?;
-            loop {
-                let n = tokio::io::AsyncReadExt::read(&mut chunk_file, &mut buf)
-                    .await
-                    .map_err(|e| format!("Failed to read chunk {}: {}", chunk.index, e))?;
-                if n == 0 {
-                    break;
+            // Pre-allocate assembled file to reduce fragmentation
+            let _ = raw_output.set_len(total_size);
+
+            // 512 KB I/O buffers — 8× fewer syscalls than 64 KB
+            let mut output = StdBufWriter::with_capacity(524_288, raw_output);
+            let mut hasher = Sha256::new();
+
+            // Single 512 KB read buffer reused across all chunks (avoids N allocations)
+            let mut buf = vec![0u8; 524_288];
+            for (index, chunk_path) in &chunks_meta {
+                let mut chunk_file = std::fs::File::open(chunk_path)
+                    .map_err(|e| format!("Failed to open chunk {index}: {e}"))?;
+                loop {
+                    let n = chunk_file
+                        .read(&mut buf)
+                        .map_err(|e| format!("Failed to read chunk {index}: {e}"))?;
+                    if n == 0 {
+                        break;
+                    }
+                    hasher.update(&buf[..n]);
+                    output.write_all(&buf[..n]).map_err(|e| {
+                        format!("Failed to write chunk {index} to assembled file: {e}")
+                    })?;
                 }
-                hasher.update(&buf[..n]);
-                output.write_all(&buf[..n]).await.map_err(|e| {
-                    format!(
-                        "Failed to write chunk {} to assembled file: {}",
-                        chunk.index, e
-                    )
-                })?;
             }
-        }
 
-        tokio::io::AsyncWriteExt::flush(&mut output)
-            .await
-            .map_err(|e| format!("Failed to flush assembled file: {e}"))?;
+            output
+                .flush()
+                .map_err(|e| format!("Failed to flush assembled file: {e}"))?;
 
-        let hash = hex::encode(hasher.finalize());
+            // Clean up chunk files (keep assembled) — already on a blocking thread
+            for (_index, chunk_path) in &chunks_meta {
+                let _ = std::fs::remove_file(chunk_path);
+            }
 
-        // Clean up chunk files (keep assembled)
-        for chunk in &session.chunks {
-            let chunk_path = session.temp_dir.join(format!("chunk_{:06}", chunk.index));
-            let _ = fs::remove_file(&chunk_path).await;
-        }
+            Ok(hex::encode(hasher.finalize()))
+        })
+        .await
+        .map_err(|e| format!("Assembly task panicked: {e}"))??;
+
+        let assembled_path = session.temp_dir.join("assembled");
 
         tracing::info!(
             "✅ Assembled chunked upload: {} ({} bytes from {} chunks)",

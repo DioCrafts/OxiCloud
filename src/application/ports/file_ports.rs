@@ -170,6 +170,20 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     ) -> Result<Vec<FileDto>, DomainError> {
         self.list_files(Some(folder_id)).await
     }
+
+    /// Lists files in a folder with LIMIT/OFFSET pagination.
+    ///
+    /// Used by streaming WebDAV PROPFIND to avoid loading all files at once.
+    /// Default: falls back to `list_files` (loads all, then slices in memory).
+    async fn list_files_batch(
+        &self,
+        folder_id: Option<&str>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let all = self.list_files(folder_id).await?;
+        Ok(all.into_iter().skip(offset as usize).take(limit as usize).collect())
+    }
 }
 
 // ─────────────────────────────────────────────────────

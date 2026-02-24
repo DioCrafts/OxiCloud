@@ -92,6 +92,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_state = factory.build_app_state(db_pool).await
         .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
 
+    // Wrap in Arc so that Axum clones a single refcount per request
+    // instead of deep-copying ~42 Arc fields + 16 String/PathBuf allocations.
+    let app_state = Arc::new(app_state);
+
     // Build application router
     let api_routes = create_api_routes(&app_state);
     let public_api_routes = create_public_api_routes(&app_state);
@@ -161,26 +165,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use interfaces::api::handlers::auth_handler::auth_routes;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
 
-        let app_state_arc = Arc::new(app_state.clone());
-        let auth_router = auth_routes().with_state(app_state_arc.clone());
+        let auth_router = auth_routes().with_state(app_state.clone());
 
         // Protected API routes — require valid JWT token
         let protected_api = api_routes.layer(axum::middleware::from_fn_with_state(
-            app_state_arc.clone(),
+            app_state.clone(),
             auth_middleware,
         ));
 
         // CalDAV/CardDAV/WebDAV with auth middleware (merged, not nested)
         let caldav_protected = caldav_router.layer(axum::middleware::from_fn_with_state(
-            app_state_arc.clone(),
+            app_state.clone(),
             auth_middleware,
         ));
         let carddav_protected = carddav_router.layer(axum::middleware::from_fn_with_state(
-            app_state_arc.clone(),
+            app_state.clone(),
             auth_middleware,
         ));
         let webdav_protected = webdav_router.layer(axum::middleware::from_fn_with_state(
-            app_state_arc,
+            app_state.clone(),
             auth_middleware,
         ));
 
@@ -201,7 +204,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Mount WOPI routes (protocol routes use own token auth, API routes behind auth middleware)
         if let Some((wopi_protocol, wopi_api)) = wopi_routes {
             let wopi_api_protected = wopi_api.layer(axum::middleware::from_fn_with_state(
-                Arc::new(app_state.clone()),
+                app_state.clone(),
                 auth_middleware,
             ));
             app = app

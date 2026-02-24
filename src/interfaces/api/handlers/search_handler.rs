@@ -8,6 +8,7 @@ use tracing::{error, info};
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::di::AppState;
+use std::sync::Arc;
 
 /**
  * Handler for search operations through the API.
@@ -21,7 +22,7 @@ pub struct SearchHandler;
 impl SearchHandler {
     /// GET /search — simple query-parameter-based search.
     pub async fn search_files_get(
-        State(state): State<AppState>,
+        State(state): State<Arc<AppState>>,
         Query(params): Query<SearchParams>,
     ) -> impl IntoResponse {
         info!("API: File search with parameters: {:?}", params);
@@ -79,7 +80,7 @@ impl SearchHandler {
 
     /// POST /search/advanced — full criteria in the request body.
     pub async fn search_files_post(
-        State(state): State<AppState>,
+        State(state): State<Arc<AppState>>,
         Json(criteria): Json<SearchCriteriaDto>,
     ) -> impl IntoResponse {
         info!("API: Advanced file search");
@@ -119,7 +120,7 @@ impl SearchHandler {
 
     /// GET /search/suggest — lightweight autocomplete suggestions.
     pub async fn suggest_files(
-        State(state): State<AppState>,
+        State(state): State<Arc<AppState>>,
         Query(params): Query<SuggestParams>,
     ) -> impl IntoResponse {
         info!("API: Search suggestions for {:?}", params.query);
@@ -162,7 +163,7 @@ impl SearchHandler {
     }
 
     /// DELETE /search/cache — clears the search results cache.
-    pub async fn clear_search_cache(State(state): State<AppState>) -> impl IntoResponse {
+    pub async fn clear_search_cache(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         info!("API: Clearing search cache");
 
         let search_service = match &state.applications.search_service {

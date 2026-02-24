@@ -9,9 +9,10 @@ use serde::Serialize;
 
 use crate::application::ports::dedup_ports::DedupResultDto;
 use crate::common::di::AppState;
+use std::sync::Arc;
 
 /// Global application state for dependency injection
-type GlobalState = AppState;
+type GlobalState = Arc<AppState>;
 
 /// Response for hash check endpoint
 #[derive(Debug, Serialize)]

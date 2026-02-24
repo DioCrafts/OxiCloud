@@ -13,12 +13,13 @@ use std::collections::HashMap;
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::{AuthUser, OptionalUserId};
+use std::sync::Arc;
 
 /**
  * Type aliases for dependency injection state.
  */
 /// Global application state for dependency injection
-type GlobalState = AppState;
+type GlobalState = Arc<AppState>;
 
 /**
  * API handler for file-related operations.

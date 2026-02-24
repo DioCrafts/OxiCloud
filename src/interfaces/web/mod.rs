@@ -2,12 +2,13 @@ use crate::common::config::AppConfig;
 use crate::common::di::AppState;
 use axum::http::header::{CACHE_CONTROL, HeaderValue};
 use axum::{Router, response::Html, routing::get};
+use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 /// Creates web routes for serving static files
-pub fn create_web_routes() -> Router<AppState> {
+pub fn create_web_routes() -> Router<Arc<AppState>> {
     // Get config to access static path
     let config = AppConfig::from_env();
     let static_path = config.static_path.clone();

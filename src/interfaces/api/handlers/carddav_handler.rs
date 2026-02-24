@@ -42,7 +42,7 @@ const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 ///
 /// Uses `merge()` instead of `nest()` to avoid Axum's trailing-slash routing gap.
 /// Registers `/carddav`, `/carddav/`, and `/carddav/{*path}` explicitly.
-pub fn carddav_routes() -> Router<AppState> {
+pub fn carddav_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route(
             "/carddav/{*path}",
@@ -53,14 +53,14 @@ pub fn carddav_routes() -> Router<AppState> {
 }
 
 async fn handle_carddav_methods_root(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     handle_carddav_methods_inner(state, req, String::new()).await
 }
 
 async fn handle_carddav_methods(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     let uri = req.uri().clone();
@@ -69,11 +69,10 @@ async fn handle_carddav_methods(
 }
 
 async fn handle_carddav_methods_inner(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
-    let state = Arc::new(state);
     let method = req.method().clone();
 
     match method.as_str() {

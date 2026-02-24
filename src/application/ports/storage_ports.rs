@@ -78,6 +78,22 @@ pub trait FileReadPort: Send + Sync + 'static {
         Ok(None)
     }
 
+    /// Lists files in a folder with LIMIT/OFFSET pagination.
+    ///
+    /// Used by streaming WebDAV PROPFIND to avoid loading all files at once.
+    /// Default: falls back to `list_files` (loads all, then slices in memory).
+    async fn list_files_batch(
+        &self,
+        folder_id: Option<&str>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<File>, DomainError> {
+        let all = self.list_files(folder_id).await?;
+        let start = (offset as usize).min(all.len());
+        let end = (start + limit as usize).min(all.len());
+        Ok(all.into_iter().skip(start).take(end - start).collect())
+    }
+
     /// Lists every file in the subtree rooted at `folder_id`.
     ///
     /// Uses an ltree `<@` join against `storage.folders` so the entire

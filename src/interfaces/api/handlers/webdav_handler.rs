@@ -12,17 +12,22 @@ use axum::{
     http::{HeaderName, Request, StatusCode, header},
     response::Response,
 };
-use bytes::Buf;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
+use quick_xml::Writer;
 use uuid::Uuid;
 
 use crate::application::adapters::webdav_adapter::{
     LockInfo, LockScope, LockType, PropFindRequest, WebDavAdapter,
 };
+use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
+use crate::application::ports::file_ports::FileRetrievalUseCase;
+use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
+use std::sync::Arc;
 
 // Create a custom DAV header since it's not in the standard headers
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
@@ -36,6 +41,10 @@ const MAX_XML_BODY: usize = 1_048_576;
 /// Maximum body size for MKCOL requests (RFC 4918: body must be empty).
 const MAX_MKCOL_BODY: usize = 4096;
 
+/// Batch size for streaming PROPFIND — files and folders are fetched in pages
+/// of this size to keep memory constant regardless of folder contents.
+const PROPFIND_BATCH_SIZE: i64 = 500;
+
 /**
  * Creates and returns the WebDAV router with all required endpoints.
  *
@@ -44,7 +53,7 @@ const MAX_MKCOL_BODY: usize = 4096;
  *
  * @return Router configured with WebDAV endpoints
  */
-pub fn webdav_routes() -> Router<AppState> {
+pub fn webdav_routes() -> Router<Arc<AppState>> {
     // Three explicit routes to avoid Axum trailing-slash gaps
     // (same pattern used for CalDAV/CardDAV)
     Router::new()
@@ -72,14 +81,14 @@ fn extract_webdav_path(uri: &axum::http::Uri) -> String {
 }
 
 async fn handle_webdav_methods_root(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     handle_webdav_dispatch(state, req, String::new()).await
 }
 
 async fn handle_webdav_methods(
-    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
     req: Request<Body>,
 ) -> Result<Response<Body>, AppError> {
     let path = extract_webdav_path(req.uri());
@@ -87,7 +96,7 @@ async fn handle_webdav_methods(
 }
 
 async fn handle_webdav_dispatch(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -140,27 +149,54 @@ async fn handle_options(_path: String) -> Result<Response<Body>, AppError> {
  *
  * This handler processes WebDAV PROPFIND requests according to RFC 4918,
  * retrieving properties of files and folders in the specified path.
- * It supports the Depth header to control recursion depth.
+ *
+ * **Security hardening (Sol.2):** `Depth: infinity` is rejected with
+ * `403 Forbidden` and the RFC 4918 `propfind-finite-depth` precondition
+ * error body.  The default depth when the header is absent is `1`.
+ *
+ * **Streaming response (Sol.3):** For `Depth: 1`, files and sub-folders
+ * are fetched in batches of `PROPFIND_BATCH_SIZE` and the XML response
+ * is written incrementally to a streaming body.  Memory usage is O(batch)
+ * regardless of how many children the folder contains.
  *
  * @param state The application state containing service dependencies
- * @param user The authenticated user information
- * @param path The requested resource path
- * @param req The HTTP request containing the PROPFIND XML body
- * @return XML response with resource properties
+ * @param req   The HTTP request containing the PROPFIND XML body
+ * @param path  The requested resource path
+ * @return      207 Multi-Status XML response with resource properties
  */
 async fn handle_propfind(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
-    // Extract depth header (cloning to avoid borrowing issues)
+    // ── 1. Extract and validate Depth header ─────────────────────
     let depth = req
         .headers()
         .get("Depth")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("infinity")
-        .to_string();
+        .unwrap_or("1");
 
+    // RFC 4918 §9.1: servers MAY reject Depth:infinity with 403
+    if depth == "infinity" {
+        let body = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:error xmlns:D="DAV:">
+  <D:propfind-finite-depth/>
+</D:error>"#;
+        return Ok(Response::builder()
+            .status(StatusCode::FORBIDDEN)
+            .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+            .body(Body::from(body))
+            .unwrap());
+    }
+
+    // Normalize: anything other than "0" or "1" is treated as "0"
+    let depth = match depth {
+        "0" | "1" => depth,
+        _ => "0",
+    };
+    let depth_owned = depth.to_string();
+
+    // ── 2. Authenticate ──────────────────────────────────────────
     let _user = {
         let user_ref = req
             .extensions()
@@ -169,50 +205,37 @@ async fn handle_propfind(
         user_ref.clone()
     };
 
-    // Extract the body separately to avoid borrow issues
+    // ── 3. Parse PROPFIND XML body ───────────────────────────────
     let body_bytes = {
-        // Convert the request into a body
         let body = req.into_body();
-
-        // Read request body (PROPFIND is XML, 1 MB is more than enough)
         body::to_bytes(body, MAX_XML_BODY)
             .await
             .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
     };
 
-    // Parse PROPFIND request
     let propfind_request = if body_bytes.is_empty() {
-        // Empty body means get all properties
         PropFindRequest {
             prop_find_type: crate::application::adapters::webdav_adapter::PropFindType::AllProp,
         }
     } else {
-        // Parse XML body
         WebDavAdapter::parse_propfind(body_bytes.reader()).map_err(|e| {
             AppError::bad_request(format!("Failed to parse PROPFIND request: {}", e))
         })?
     };
 
-    // Get folder service from state
-    let folder_service = &state.applications.folder_service;
-    let file_retrieval_service = &state.applications.file_retrieval_service;
+    // ── 4. Services ──────────────────────────────────────────────
+    let folder_service = state.applications.folder_service.clone();
+    let file_retrieval_service = state.applications.file_retrieval_service.clone();
 
-    // Determine base HREF
-    let base_href = format!("/webdav/{}/", path);
+    let base_href = if path.is_empty() || path == "/" {
+        "/webdav/".to_string()
+    } else {
+        format!("/webdav/{}/", path)
+    };
 
-    // Check if path exists as a file or folder
+    // ── 5. Determine target resource ─────────────────────────────
     if path.is_empty() || path == "/" {
-        // Root folder — run both queries concurrently
-        let (subfolders_result, files_result) = tokio::join!(
-            folder_service.list_folders(None),
-            file_retrieval_service.list_files(None)
-        );
-        let subfolders = subfolders_result
-            .map_err(|e| AppError::internal_error(format!("Failed to get subfolders: {}", e)))?;
-        let files = files_result
-            .map_err(|e| AppError::internal_error(format!("Failed to get files: {}", e)))?;
-
-        // Create root folder DTO for response
+        // Root folder
         let root_folder = FolderDto {
             id: "root".to_string(),
             name: "".to_string(),
@@ -227,94 +250,182 @@ async fn handle_propfind(
             category: "Folder".to_string(),
         };
 
-        // Generate response
-        let mut response_body = Vec::new();
-        WebDavAdapter::generate_propfind_response(
-            &mut response_body,
-            Some(&root_folder),
-            &files,
-            &subfolders,
-            &propfind_request,
-            &depth,
+        return build_streaming_propfind_response(
+            root_folder,
+            None, // folder_id = None → root children
+            &depth_owned,
             &base_href,
+            propfind_request,
+            folder_service,
+            file_retrieval_service,
         )
-        .map_err(|e| {
-            AppError::internal_error(format!("Failed to generate PROPFIND response: {}", e))
-        })?;
+        .await;
+    }
 
-        Ok(Response::builder()
-            .status(StatusCode::MULTI_STATUS)
-            .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-            .body(Body::from(response_body))
-            .unwrap())
-    } else {
-        // Check if path is a folder
-        let folder_result = folder_service.get_folder_by_path(&path).await;
+    // Try folder first
+    if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
+        let folder_id = folder.id.clone();
+        return build_streaming_propfind_response(
+            folder,
+            Some(folder_id),
+            &depth_owned,
+            &base_href,
+            propfind_request,
+            folder_service,
+            file_retrieval_service,
+        )
+        .await;
+    }
 
-        if let Ok(folder) = folder_result {
-            // Path is a folder — run both queries concurrently
-            let (files, subfolders) = if depth != "0" {
-                let (files_r, folders_r) = tokio::join!(
-                    file_retrieval_service.list_files(Some(&folder.id)),
-                    folder_service.list_folders(Some(&folder.id))
-                );
-                (
-                    files_r.map_err(|e| AppError::internal_error(format!("Failed to get files: {}", e)))?,
-                    folders_r.map_err(|e| AppError::internal_error(format!("Failed to get subfolders: {}", e)))?,
-                )
-            } else {
-                (vec![], vec![])
-            };
-
-            // Generate response
-            let mut response_body = Vec::new();
-            WebDavAdapter::generate_propfind_response(
-                &mut response_body,
-                Some(&folder),
-                &files,
-                &subfolders,
+    // Try file
+    if let Ok(file) = file_retrieval_service.get_file_by_path(&path).await {
+        let mut buf = Vec::with_capacity(1024);
+        {
+            let mut xml_writer = Writer::new(&mut buf);
+            WebDavAdapter::write_multistatus_start(&mut xml_writer)
+                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+            WebDavAdapter::write_file_entry(
+                &mut xml_writer,
+                &file,
                 &propfind_request,
-                &depth,
                 &base_href,
             )
-            .map_err(|e| {
-                AppError::internal_error(format!("Failed to generate PROPFIND response: {}", e))
-            })?;
+            .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+            WebDavAdapter::write_multistatus_end(&mut xml_writer)
+                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+        }
+        return Ok(Response::builder()
+            .status(StatusCode::MULTI_STATUS)
+            .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+            .body(Body::from(buf))
+            .unwrap());
+    }
 
-            Ok(Response::builder()
-                .status(StatusCode::MULTI_STATUS)
-                .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-                .body(Body::from(response_body))
-                .unwrap())
-        } else {
-            // Check if path is a file
-            let file_result = file_retrieval_service.get_file_by_path(&path).await;
+    Err(AppError::not_found(format!("Resource not found: {}", path)))
+}
 
-            if let Ok(file) = file_result {
-                // Path is a file
-                let mut response_body = Vec::new();
-                WebDavAdapter::generate_propfind_response_for_file(
-                    &mut response_body,
-                    &file,
-                    &propfind_request,
-                    &depth,
-                    &base_href,
-                )
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to generate PROPFIND response: {}", e))
-                })?;
+/// Builds a streaming 207 Multi-Status PROPFIND response.
+///
+/// The XML is written incrementally: first the folder itself, then children
+/// (sub-folders and files) are fetched in batches of `PROPFIND_BATCH_SIZE`.
+/// Each batch is serialised to XML and sent as a chunk, so memory stays
+/// constant at O(batch_size) regardless of the total number of children.
+async fn build_streaming_propfind_response(
+    folder: FolderDto,
+    folder_id: Option<String>,
+    depth: &str,
+    base_href: &str,
+    propfind_request: PropFindRequest,
+    folder_service: std::sync::Arc<dyn FolderUseCase>,
+    file_retrieval_service: std::sync::Arc<dyn FileRetrievalUseCase>,
+) -> Result<Response<Body>, AppError> {
+    let depth = depth.to_string();
+    let base_href = base_href.to_string();
+    let propfind_request = Arc::new(propfind_request);
 
-                Ok(Response::builder()
-                    .status(StatusCode::MULTI_STATUS)
-                    .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-                    .body(Body::from(response_body))
-                    .unwrap())
-            } else {
-                // Path does not exist
-                Err(AppError::not_found(format!("Resource not found: {}", path)))
+    let stream = async_stream::try_stream! {
+        // ── XML header + <D:multistatus> + folder entry ──────────
+        let mut buf = Vec::with_capacity(4096);
+        {
+            let mut w = Writer::new(&mut buf);
+            WebDavAdapter::write_multistatus_start(&mut w)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            WebDavAdapter::write_folder_entry(&mut w, &folder, &propfind_request, &base_href)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        }
+        yield Bytes::from(buf);
+
+        // ── Children (only if Depth == 1) ────────────────────────
+        if depth == "1" {
+            let pagination = crate::application::dtos::pagination::PaginationRequestDto {
+                page: 0,
+                page_size: PROPFIND_BATCH_SIZE as usize,
+            };
+            let fid_ref = folder_id.as_deref();
+
+            // Stream sub-folders in pages
+            let mut page = 0usize;
+            loop {
+                let pag = crate::application::dtos::pagination::PaginationRequestDto {
+                    page,
+                    page_size: pagination.page_size,
+                };
+                let result = folder_service
+                    .list_folders_paginated(fid_ref, &pag)
+                    .await
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+                if result.items.is_empty() {
+                    break;
+                }
+
+                let mut chunk = Vec::with_capacity(result.items.len() * 800);
+                {
+                    let mut w = Writer::new(&mut chunk);
+                    for subfolder in &result.items {
+                        let href = format!("{}{}/", base_href, subfolder.name);
+                        WebDavAdapter::write_folder_entry(&mut w, subfolder, &propfind_request, &href)
+                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                    }
+                }
+                let has_more = result.pagination.has_next;
+                yield Bytes::from(chunk);
+
+                if !has_more {
+                    break;
+                }
+                page += 1;
+            }
+
+            // Stream files in pages
+            let mut offset: i64 = 0;
+            loop {
+                let batch: Vec<FileDto> = file_retrieval_service
+                    .list_files_batch(fid_ref, offset, PROPFIND_BATCH_SIZE)
+                    .await
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+
+                if batch.is_empty() {
+                    break;
+                }
+
+                let batch_len = batch.len();
+                let mut chunk = Vec::with_capacity(batch_len * 800);
+                {
+                    let mut w = Writer::new(&mut chunk);
+                    for file in &batch {
+                        let href = format!("{}{}", base_href, file.name);
+                        WebDavAdapter::write_file_entry(&mut w, file, &propfind_request, &href)
+                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                    }
+                }
+                yield Bytes::from(chunk);
+
+                if (batch_len as i64) < PROPFIND_BATCH_SIZE {
+                    break;
+                }
+                offset += batch_len as i64;
             }
         }
-    }
+
+        // ── Close </D:multistatus> ───────────────────────────────
+        let mut buf = Vec::with_capacity(32);
+        {
+            let mut w = Writer::new(&mut buf);
+            WebDavAdapter::write_multistatus_end(&mut w)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        }
+        yield Bytes::from(buf);
+    };
+
+    use futures::TryStreamExt;
+    let stream = stream.map_err(|e: std::io::Error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) });
+
+    Ok(Response::builder()
+        .status(StatusCode::MULTI_STATUS)
+        .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+        .body(Body::from_stream(stream))
+        .unwrap())
 }
 
 /**
@@ -330,7 +441,7 @@ async fn handle_propfind(
  * @return XML response with property modification results
  */
 async fn handle_proppatch(
-    _state: AppState,
+    _state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -387,7 +498,7 @@ async fn handle_proppatch(
  * @return HTTP response with file contents
  */
 async fn handle_get(
-    state: AppState,
+    state: Arc<AppState>,
     _req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -431,7 +542,7 @@ async fn handle_get(
  * Handles HEAD requests — same as GET but returns only headers, no body.
  */
 async fn handle_head(
-    state: AppState,
+    state: Arc<AppState>,
     _req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -494,7 +605,7 @@ async fn handle_head(
  * @return HTTP response indicating success
  */
 async fn handle_put(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -598,7 +709,7 @@ async fn handle_put(
  * @return HTTP response indicating success
  */
 async fn handle_mkcol(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -673,7 +784,7 @@ async fn handle_mkcol(
  * @return HTTP response indicating success
  */
 async fn handle_delete(
-    state: AppState,
+    state: Arc<AppState>,
     _req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -728,7 +839,7 @@ async fn handle_delete(
  * @return HTTP response indicating success
  */
 async fn handle_move(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -889,7 +1000,7 @@ async fn handle_move(
  * @return HTTP response indicating success
  */
 async fn handle_copy(
-    state: AppState,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -1059,7 +1170,7 @@ async fn handle_copy(
  * @return XML response with lock information
  */
 async fn handle_lock(
-    _state: AppState,
+    _state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -1185,7 +1296,7 @@ async fn handle_lock(
  * @return HTTP response indicating success
  */
 async fn handle_unlock(
-    _state: AppState,
+    _state: Arc<AppState>,
     req: Request<Body>,
     _path: String,
 ) -> Result<Response<Body>, AppError> {

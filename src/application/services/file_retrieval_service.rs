@@ -317,4 +317,14 @@ impl FileRetrievalUseCase for FileRetrievalService {
         let files = self.file_read.list_files_in_subtree(folder_id).await?;
         Ok(files.into_iter().map(FileDto::from).collect())
     }
+
+    async fn list_files_batch(
+        &self,
+        folder_id: Option<&str>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let files = self.file_read.list_files_batch(folder_id, offset, limit).await?;
+        Ok(files.into_iter().map(FileDto::from).collect())
+    }
 }

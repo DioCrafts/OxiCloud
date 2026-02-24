@@ -213,81 +213,6 @@ impl WebDavAdapter {
         Ok(PropFindRequest { prop_find_type })
     }
 
-    /// Generate a PROPFIND response for files and folders
-    pub fn generate_propfind_response<W: Write>(
-        writer: W,
-        folder: Option<&FolderDto>,
-        files: &[FileDto],
-        subfolders: &[FolderDto],
-        request: &PropFindRequest,
-        _depth: &str,
-        base_href: &str,
-    ) -> Result<()> {
-        let mut xml_writer = Writer::new(writer);
-
-        // Start multistatus response
-        xml_writer.write_event(Event::Start(
-            BytesStart::new("D:multistatus").with_attributes([("xmlns:D", "DAV:")]),
-        ))?;
-
-        // Add response for current folder if provided
-        if let Some(folder) = folder {
-            Self::write_folder_response(&mut xml_writer, folder, request, base_href)?;
-        }
-
-        // If depth allows, add responses for files and subfolders
-        if _depth != "0" {
-            // Add responses for files
-            for file in files {
-                Self::write_file_response(
-                    &mut xml_writer,
-                    file,
-                    request,
-                    &format!("{}{}", base_href, file.name),
-                )?;
-            }
-
-            // Add responses for subfolders
-            for subfolder in subfolders {
-                Self::write_folder_response(
-                    &mut xml_writer,
-                    subfolder,
-                    request,
-                    &format!("{}{}/", base_href, subfolder.name),
-                )?;
-            }
-        }
-
-        // End multistatus
-        xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
-
-        Ok(())
-    }
-
-    /// Generate a PROPFIND response for a single file
-    pub fn generate_propfind_response_for_file<W: Write>(
-        writer: W,
-        file: &FileDto,
-        request: &PropFindRequest,
-        _depth: &str,
-        href: &str,
-    ) -> Result<()> {
-        let mut xml_writer = Writer::new(writer);
-
-        // Start multistatus response
-        xml_writer.write_event(Event::Start(
-            BytesStart::new("D:multistatus").with_attributes([("xmlns:D", "DAV:")]),
-        ))?;
-
-        // Add response for file
-        Self::write_file_response(&mut xml_writer, file, request, href)?;
-
-        // End multistatus
-        xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
-
-        Ok(())
-    }
-
     /// Write folder properties as a response
     fn write_folder_response<W: Write>(
         xml_writer: &mut Writer<W>,
@@ -1101,5 +1026,47 @@ impl WebDavAdapter {
             return name[idx + 1..].to_string();
         }
         name.to_string()
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Streaming PROPFIND helpers
+    //
+    // These methods write incremental XML fragments so the caller
+    // can flush chunks to the HTTP body without buffering the whole
+    // response in memory.
+    // ─────────────────────────────────────────────────────────────
+
+    /// Writes the opening `<D:multistatus>` tag.
+    pub fn write_multistatus_start<W: Write>(writer: &mut Writer<W>) -> Result<()> {
+        writer.write_event(Event::Start(
+            BytesStart::new("D:multistatus").with_attributes([("xmlns:D", "DAV:")]),
+        ))?;
+        Ok(())
+    }
+
+    /// Writes the closing `</D:multistatus>` tag.
+    pub fn write_multistatus_end<W: Write>(writer: &mut Writer<W>) -> Result<()> {
+        writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
+        Ok(())
+    }
+
+    /// Writes a single `<D:response>` element for a folder.
+    pub fn write_folder_entry<W: Write>(
+        writer: &mut Writer<W>,
+        folder: &FolderDto,
+        request: &PropFindRequest,
+        href: &str,
+    ) -> Result<()> {
+        Self::write_folder_response(writer, folder, request, href)
+    }
+
+    /// Writes a single `<D:response>` element for a file.
+    pub fn write_file_entry<W: Write>(
+        writer: &mut Writer<W>,
+        file: &FileDto,
+        request: &PropFindRequest,
+        href: &str,
+    ) -> Result<()> {
+        Self::write_file_response(writer, file, request, href)
     }
 }
