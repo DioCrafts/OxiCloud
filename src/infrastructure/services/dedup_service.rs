@@ -231,10 +231,14 @@ impl DedupService {
             DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
         })?;
 
-        fs::rename(&temp_path, &blob_path).await.map_err(|e| {
-            let _ = std::fs::remove_file(&temp_path);
-            DomainError::internal_error("Dedup", format!("Failed to move blob: {}", e))
-        })?;
+        if let Err(e) = fs::rename(&temp_path, &blob_path).await {
+            // Clean up temp file asynchronously (never block the Tokio worker)
+            let _ = fs::remove_file(&temp_path).await;
+            return Err(DomainError::internal_error(
+                "Dedup",
+                format!("Failed to move blob: {}", e),
+            ));
+        }
 
         // Register in PostgreSQL (ON CONFLICT handles rare race with another writer)
         sqlx::query(
@@ -687,10 +691,29 @@ impl DedupService {
 
                             let mut issues = Vec::new();
 
-                            // Check file exists
-                            if !blob_path.exists() {
-                                issues.push(format!("{}: file missing on disk", hash));
-                                return issues;
+                            // Single async metadata() replaces the previous
+                            // blocking .exists() + separate metadata() — one
+                            // stat() syscall instead of two, and non-blocking.
+                            let file_meta = match fs::metadata(&blob_path).await {
+                                Ok(m) => m,
+                                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                                    issues.push(format!("{}: file missing on disk", hash));
+                                    return issues;
+                                }
+                                Err(e) => {
+                                    issues.push(format!("{}: metadata error ({})", hash, e));
+                                    return issues;
+                                }
+                            };
+
+                            // Check size
+                            if file_meta.len() != expected_size as u64 {
+                                issues.push(format!(
+                                    "{}: size mismatch (expected: {}, actual: {})",
+                                    hash,
+                                    expected_size,
+                                    file_meta.len(),
+                                ));
                             }
 
                             // Verify hash
@@ -706,18 +729,6 @@ impl DedupService {
                                 Err(e) => {
                                     issues.push(format!("{}: read error ({})", hash, e));
                                 }
-                            }
-
-                            // Check size
-                            if let Ok(file_meta) = fs::metadata(&blob_path).await
-                                && file_meta.len() != expected_size as u64
-                            {
-                                issues.push(format!(
-                                    "{}: size mismatch (expected: {}, actual: {})",
-                                    hash,
-                                    expected_size,
-                                    file_meta.len(),
-                                ));
                             }
 
                             issues
