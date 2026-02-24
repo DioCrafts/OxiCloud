@@ -299,6 +299,14 @@ impl ChunkedUploadHandler {
                 }
             };
 
+        // ── MIME detection (magic bytes + extension fallback) ─────
+        let content_type = crate::common::mime_detect::refine_content_type_from_file(
+            &assembled_path,
+            &filename,
+            &content_type,
+        )
+        .await;
+
         // Upload from assembled file on disk — zero extra RAM copies, hash pre-computed
         match upload_service
             .upload_file_from_path(

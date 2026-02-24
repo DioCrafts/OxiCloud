@@ -179,6 +179,14 @@ impl FileHandler {
                 // Finalize hash
                 let hash = hex::encode(hasher.finalize());
 
+                // ── MIME detection (magic bytes + extension fallback) ─
+                let content_type = crate::common::mime_detect::refine_content_type_from_file(
+                    &temp_path,
+                    &filename,
+                    &content_type,
+                )
+                .await;
+
                 // ── Quota enforcement ────────────────────────────────
                 if let Some(storage_svc) = state.storage_usage_service.as_ref()
                     && let Err(err) = storage_svc

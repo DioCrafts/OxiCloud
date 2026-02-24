@@ -153,6 +153,32 @@ class InlineViewer {
       // Create text viewer using authenticated fetch
       this.createTextViewer(file, container, loader);
     }
+    else if (file.mime_type && file.mime_type.startsWith('audio/')) {
+      // Hide zoom controls for audio
+      controls.style.display = 'none';
+
+      // Show loading indicator
+      const loader = document.createElement('div');
+      loader.className = 'inline-viewer-loader';
+      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      container.appendChild(loader);
+
+      // Create audio player
+      this.createMediaViewer(file, 'audio', container, loader);
+    }
+    else if (file.mime_type && file.mime_type.startsWith('video/')) {
+      // Hide zoom controls for video
+      controls.style.display = 'none';
+
+      // Show loading indicator
+      const loader = document.createElement('div');
+      loader.className = 'inline-viewer-loader';
+      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      container.appendChild(loader);
+
+      // Create video player
+      this.createMediaViewer(file, 'video', container, loader);
+    }
     else {
       // Hide zoom controls for unsupported files
       controls.style.display = 'none';
@@ -326,6 +352,109 @@ class InlineViewer {
     }
   }
   
+  // Creates an audio or video player using blob URL (authenticated fetch)
+  async createMediaViewer(file, mediaType, container, loader) {
+    try {
+      console.log(`Creating ${mediaType} player for:`, file.name);
+
+      // Fetch file with auth header (same pattern as images/PDFs)
+      const token = localStorage.getItem('oxicloud_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { headers });
+
+      if (!response.ok) {
+        throw new Error(`Error fetching file: ${response.status} ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Remove loader
+      if (loader && loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+
+      if (mediaType === 'audio') {
+        // Wrapper with icon + player
+        const wrapper = document.createElement('div');
+        wrapper.className = 'inline-viewer-audio-wrapper';
+
+        const icon = document.createElement('div');
+        icon.className = 'inline-viewer-audio-icon';
+        icon.innerHTML = '<i class="fas fa-music"></i>';
+        wrapper.appendChild(icon);
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'inline-viewer-audio-name';
+        nameEl.textContent = file.name;
+        wrapper.appendChild(nameEl);
+
+        const audio = document.createElement('audio');
+        audio.className = 'inline-viewer-audio';
+        audio.controls = true;
+        audio.preload = 'metadata';
+        audio.src = blobUrl;
+        wrapper.appendChild(audio);
+
+        // Fallback message for unsupported codecs
+        audio.addEventListener('error', () => {
+          console.warn('Audio playback error — codec may not be supported');
+          wrapper.innerHTML = '';
+          const msg = document.createElement('div');
+          msg.className = 'inline-viewer-message';
+          msg.innerHTML = `
+            <div class="inline-viewer-icon"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="inline-viewer-text">
+              <p>Your browser cannot play this audio format.</p>
+              <p>Click "Download" to save the file.</p>
+            </div>
+          `;
+          wrapper.appendChild(msg);
+        });
+
+        container.appendChild(wrapper);
+      } else {
+        const video = document.createElement('video');
+        video.className = 'inline-viewer-video';
+        video.controls = true;
+        video.preload = 'metadata';
+        video.src = blobUrl;
+        video.setAttribute('playsinline', 'true');
+
+        // Fallback message for unsupported codecs
+        video.addEventListener('error', () => {
+          console.warn('Video playback error — codec may not be supported');
+          if (video.parentNode) {
+            video.parentNode.removeChild(video);
+          }
+          const msg = document.createElement('div');
+          msg.className = 'inline-viewer-message';
+          msg.innerHTML = `
+            <div class="inline-viewer-icon"><i class="fas fa-exclamation-circle"></i></div>
+            <div class="inline-viewer-text">
+              <p>Your browser cannot play this video format.</p>
+              <p>Click "Download" to save the file.</p>
+            </div>
+          `;
+          container.appendChild(msg);
+        });
+
+        container.appendChild(video);
+      }
+
+      // Store blob URL for cleanup on close
+      this.currentBlobUrl = blobUrl;
+    } catch (error) {
+      console.error(`Error creating ${mediaType} viewer:`, error);
+
+      if (loader && loader.parentNode) {
+        loader.parentNode.removeChild(loader);
+      }
+
+      this.showErrorMessage(container);
+    }
+  }
+
   // Helper to show error message
   showErrorMessage(container) {
     // Show error message
