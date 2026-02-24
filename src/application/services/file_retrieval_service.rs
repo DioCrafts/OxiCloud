@@ -197,13 +197,14 @@ impl FileRetrievalService {
 
             // Store in cache
             if let Some(cache) = &self.content_cache {
-                let etag = format!("\"{}-{}\"", id, modified_at);
+                let etag: Arc<str> = format!("\"{}-{}\"", id, modified_at).into();
+                let ct: Arc<str> = Arc::from(&*mime_type);
                 cache
                     .put(
                         id.to_string(),
                         content_bytes.clone(),
                         etag,
-                        mime_type.clone(),
+                        ct,
                     )
                     .await;
             }

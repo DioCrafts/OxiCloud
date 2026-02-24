@@ -12,6 +12,7 @@ use crate::common::errors::DomainError;
 use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Statistics for monitoring write-behind cache status.
 #[derive(Debug, Clone, Default)]
@@ -111,10 +112,13 @@ pub trait ContentCachePort: Send + Sync + 'static {
     fn should_cache(&self, size: usize) -> bool;
 
     /// Get cached content. Returns `(content, etag, content_type)` on hit.
-    async fn get(&self, file_id: &str) -> Option<(Bytes, String, String)>;
+    ///
+    /// `etag` and `content_type` are `Arc<str>` so cloning on cache hit is O(1)
+    /// (atomic ref-count increment) instead of O(n) heap allocation.
+    async fn get(&self, file_id: &str) -> Option<(Bytes, Arc<str>, Arc<str>)>;
 
     /// Store content in the cache (may evict older entries).
-    async fn put(&self, file_id: String, content: Bytes, etag: String, content_type: String);
+    async fn put(&self, file_id: String, content: Bytes, etag: Arc<str>, content_type: Arc<str>);
 
     /// Remove a file from the cache (e.g. on delete/update).
     async fn invalidate(&self, file_id: &str);

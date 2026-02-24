@@ -790,11 +790,11 @@ impl ContentCachePort for StubContentCachePort {
         false
     }
 
-    async fn get(&self, _file_id: &str) -> Option<(Bytes, String, String)> {
+    async fn get(&self, _file_id: &str) -> Option<(Bytes, Arc<str>, Arc<str>)> {
         None
     }
 
-    async fn put(&self, _file_id: String, _content: Bytes, _etag: String, _content_type: String) {}
+    async fn put(&self, _file_id: String, _content: Bytes, _etag: Arc<str>, _content_type: Arc<str>) {}
 
     async fn invalidate(&self, _file_id: &str) {}
 

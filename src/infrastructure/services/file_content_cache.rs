@@ -40,8 +40,8 @@ impl FileContentCacheConfig {
 #[derive(Clone)]
 struct CacheEntry {
     content: Bytes,
-    etag: String,
-    content_type: String,
+    etag: Arc<str>,
+    content_type: Arc<str>,
 }
 
 /// Lock-free concurrent file content cache backed by `moka`.
@@ -98,8 +98,9 @@ impl FileContentCache {
 
     /// Get file content from cache (lock-free read)
     ///
-    /// Returns (content, etag, content_type) if found
-    pub async fn get(&self, file_id: &str) -> Option<(Bytes, String, String)> {
+    /// Returns `(content, etag, content_type)` if found.
+    /// All three clones are O(1): `Bytes` and `Arc<str>` only bump a ref count.
+    pub async fn get(&self, file_id: &str) -> Option<(Bytes, Arc<str>, Arc<str>)> {
         if let Some(entry) = self.cache.get(file_id).await {
             self.hits.fetch_add(1, Ordering::Relaxed);
             debug!("Cache HIT for file: {}", file_id);
@@ -123,7 +124,7 @@ impl FileContentCache {
     /// Put file content into cache
     ///
     /// Moka handles eviction automatically based on weight (content size).
-    pub async fn put(&self, file_id: String, content: Bytes, etag: String, content_type: String) {
+    pub async fn put(&self, file_id: String, content: Bytes, etag: Arc<str>, content_type: Arc<str>) {
         let size = content.len();
 
         // Don't cache if too large
@@ -199,11 +200,11 @@ impl ContentCachePort for FileContentCache {
         FileContentCache::should_cache(self, size)
     }
 
-    async fn get(&self, file_id: &str) -> Option<(Bytes, String, String)> {
+    async fn get(&self, file_id: &str) -> Option<(Bytes, Arc<str>, Arc<str>)> {
         FileContentCache::get(self, file_id).await
     }
 
-    async fn put(&self, file_id: String, content: Bytes, etag: String, content_type: String) {
+    async fn put(&self, file_id: String, content: Bytes, etag: Arc<str>, content_type: Arc<str>) {
         FileContentCache::put(self, file_id, content, etag, content_type).await
     }
 
@@ -233,8 +234,8 @@ mod tests {
             .put(
                 "file1".to_string(),
                 content.clone(),
-                "etag1".to_string(),
-                "text/plain".to_string(),
+                "etag1".into(),
+                "text/plain".into(),
             )
             .await;
 
@@ -242,8 +243,8 @@ mod tests {
         assert!(result.is_some());
         let (cached_content, etag, content_type) = result.unwrap();
         assert_eq!(cached_content, content);
-        assert_eq!(etag, "etag1");
-        assert_eq!(content_type, "text/plain");
+        assert_eq!(&*etag, "etag1");
+        assert_eq!(&*content_type, "text/plain");
     }
 
     #[tokio::test]
@@ -260,8 +261,8 @@ mod tests {
             .put(
                 "small".to_string(),
                 small,
-                "e1".to_string(),
-                "app/bin".to_string(),
+                "e1".into(),
+                "app/bin".into(),
             )
             .await;
         assert!(cache.get("small").await.is_some());
@@ -272,8 +273,8 @@ mod tests {
             .put(
                 "big".to_string(),
                 big,
-                "e2".to_string(),
-                "app/bin".to_string(),
+                "e2".into(),
+                "app/bin".into(),
             )
             .await;
         assert!(
@@ -298,8 +299,8 @@ mod tests {
             .put(
                 "file1".to_string(),
                 content,
-                "e".to_string(),
-                "t".to_string(),
+                "e".into(),
+                "t".into(),
             )
             .await;
 
