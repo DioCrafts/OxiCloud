@@ -8,6 +8,51 @@
 	height: 100%;
 	flex-shrink: 0;
 	box-shadow: 2px 0 12px rgba(0,0,0,0.15);
+	transition: transform 0.3s ease;
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+	display: none;
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 998;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+}
+
+.sidebar-overlay.active {
+	display: block;
+	opacity: 1;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+	.sidebar {
+		position: fixed;
+		left: 0;
+		top: 0;
+		z-index: 999;
+		transform: translateX(-100%);
+	}
+
+	.sidebar.open {
+		transform: translateX(0);
+	}
+
+	[dir='rtl'] .sidebar {
+		left: auto;
+		right: 0;
+		transform: translateX(100%);
+	}
+
+	[dir='rtl'] .sidebar.open {
+		transform: translateX(0);
+	}
 }
 
 .logo-container {
