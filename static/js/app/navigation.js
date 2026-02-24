@@ -3,6 +3,70 @@
  * Extracted from main.js to keep navigation concerns isolated.
  */
 
+/**
+ * Mobile sidebar toggle functionality
+ */
+function initSidebarToggle() {
+	const sidebarToggle = document.getElementById('sidebar-toggle');
+	const sidebar = document.getElementById('sidebar');
+	const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+	if (!sidebarToggle || !sidebar || !sidebarOverlay) return;
+
+	function openSidebar() {
+		sidebar.classList.add('open');
+		sidebarOverlay.classList.add('active');
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeSidebar() {
+		sidebar.classList.remove('open');
+		sidebarOverlay.classList.remove('active');
+		document.body.style.overflow = '';
+	}
+
+	function toggleSidebar() {
+		if (sidebar.classList.contains('open')) {
+			closeSidebar();
+		} else {
+			openSidebar();
+		}
+	}
+
+	// Toggle button click
+	sidebarToggle.addEventListener('click', toggleSidebar);
+
+	// Close sidebar when clicking overlay
+	sidebarOverlay.addEventListener('click', closeSidebar);
+
+	// Close sidebar on escape key
+	document.addEventListener('keydown', (e) => {
+		if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+			closeSidebar();
+		}
+	});
+
+	// Close sidebar when navigating (nav item click on mobile)
+	const navItems = sidebar.querySelectorAll('.nav-item');
+	navItems.forEach(item => {
+		item.addEventListener('click', () => {
+			if (window.innerWidth <= 768) {
+				closeSidebar();
+			}
+		});
+	});
+
+	// Expose functions globally
+	window.sidebarToggle = {
+		open: openSidebar,
+		close: closeSidebar,
+		toggle: toggleSidebar
+	};
+}
+
+// Initialize sidebar toggle when DOM is ready
+document.addEventListener('DOMContentLoaded', initSidebarToggle);
+
 // Mapping of section names to their corresponding view flags
 const VIEW_FLAGS = {
     'files': 'isFilesView',
