@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use crate::application::ports::dedup_ports::DedupPort;
-use crate::application::ports::storage_ports::FileWritePort;
+use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePort};
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
@@ -671,5 +671,53 @@ impl FileWritePort for FileBlobWriteRepository {
     async fn delete_file_permanently(&self, file_id: &str) -> Result<(), DomainError> {
         // Same as delete_file — removes from DB and decrements blob ref
         self.delete_file(file_id).await
+    }
+
+    async fn copy_folder_tree(
+        &self,
+        source_folder_id: &str,
+        target_parent_id: Option<String>,
+        dest_name: Option<String>,
+    ) -> Result<CopyFolderTreeResult, DomainError> {
+        let row = sqlx::query_as::<_, (String, i64, i64)>(
+            "SELECT new_root_id, folders_copied, files_copied \
+               FROM storage.copy_folder_tree($1::uuid, $2::uuid, $3)",
+        )
+        .bind(source_folder_id)
+        .bind(&target_parent_id)
+        .bind(&dest_name)
+        .fetch_one(self.pool.as_ref())
+        .await
+        .map_err(|e| {
+            // Map PG P0002 (no_data_found) to NotFound
+            if let sqlx::Error::Database(ref db_err) = e {
+                if db_err.code().as_deref() == Some("P0002") {
+                    return DomainError::not_found("Folder", source_folder_id);
+                }
+                if db_err.code().as_deref() == Some("23505") {
+                    return DomainError::already_exists(
+                        "Folder",
+                        "A folder with that name already exists in the target".to_string(),
+                    );
+                }
+            }
+            DomainError::internal_error(
+                "FileBlobWrite",
+                format!("copy_folder_tree: {e}"),
+            )
+        })?;
+
+        tracing::info!(
+            "📂 TREE COPY: {} folders + {} files (root: {}, zero-copy via dedup)",
+            row.1,
+            row.2,
+            &row.0[..8]
+        );
+
+        Ok(CopyFolderTreeResult {
+            new_root_folder_id: row.0,
+            folders_copied: row.1,
+            files_copied: row.2,
+        })
     }
 }

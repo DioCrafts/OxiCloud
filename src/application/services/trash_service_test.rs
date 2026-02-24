@@ -247,6 +247,17 @@ impl FileWritePort for MockFileRepository {
         Ok(())
     }
 
+    async fn update_file_content_from_temp(
+        &self,
+        _file_id: &str,
+        _temp_path: &std::path::Path,
+        _size: u64,
+        _content_type: Option<String>,
+        _pre_computed_hash: Option<String>,
+    ) -> std::result::Result<(), DomainError> {
+        Ok(())
+    }
+
     async fn register_file_deferred(
         &self,
         _name: String,

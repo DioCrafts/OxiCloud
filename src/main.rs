@@ -36,7 +36,7 @@ use oxicloud::infrastructure;
 use oxicloud::interfaces;
 
 use common::di::AppServiceFactory;
-use infrastructure::db::create_database_pool;
+use infrastructure::db::create_database_pools;
 use interfaces::{create_api_routes, create_public_api_routes, web::create_web_routes};
 
 #[tokio::main]
@@ -65,12 +65,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(&locales_path).expect("Failed to create locales directory");
     }
 
-    // Initialize database pool if auth is enabled
-    let db_pool = if config.features.enable_auth {
-        match create_database_pool(&config).await {
-            Ok(pool) => {
-                tracing::info!("PostgreSQL database pool initialized successfully");
-                Some(Arc::new(pool))
+    // Initialize database pools if auth is enabled
+    let db_pools = if config.features.enable_auth {
+        match create_database_pools(&config).await {
+            Ok(pools) => {
+                tracing::info!("PostgreSQL database pools initialized successfully");
+                Some(pools)
             }
             Err(e) => {
                 // SECURITY: fail-closed. If auth is required but the database
@@ -89,7 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build all services via the factory
     let factory = AppServiceFactory::with_config(storage_path, locales_path, config.clone());
 
-    let app_state = factory.build_app_state(db_pool).await
+    let app_state = factory.build_app_state(db_pools).await
         .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
 
     // Wrap in Arc so that Axum clones a single refcount per request

@@ -183,6 +183,17 @@ pub trait FileReadPort: Send + Sync + 'static {
 // FileWritePort — all write / mutate operations
 // ─────────────────────────────────────────────────────
 
+/// Result of an atomic recursive folder tree copy.
+#[derive(Debug, Clone)]
+pub struct CopyFolderTreeResult {
+    /// UUID of the newly created root folder
+    pub new_root_folder_id: String,
+    /// Total folders created (including root)
+    pub folders_copied: i64,
+    /// Total files copied (zero-copy via dedup)
+    pub files_copied: i64,
+}
+
 /// Secondary port for file **writing**.
 ///
 /// Covers: upload (buffered + streaming), move, delete, update,
@@ -264,6 +275,28 @@ pub trait FileWritePort: Send + Sync + 'static {
         file_id: &str,
         target_folder_id: Option<String>,
     ) -> Result<File, DomainError>;
+
+    /// Copies an entire folder subtree atomically using ltree.
+    ///
+    /// Creates a copy of `source_folder_id` (with optional `dest_name`)
+    /// under `target_parent_id`, including ALL sub-folders and files.
+    /// Files are zero-copy (blob ref_counts are incremented in batch).
+    ///
+    /// Uses a PL/pgSQL function: O(depth) folder INSERTs + 1 file batch
+    /// + 1 ref_count batch.  Replaces the N+1 sequential copy pattern.
+    ///
+    /// Default: returns error (only PostgreSQL backend implements this).
+    async fn copy_folder_tree(
+        &self,
+        _source_folder_id: &str,
+        _target_parent_id: Option<String>,
+        _dest_name: Option<String>,
+    ) -> Result<CopyFolderTreeResult, DomainError> {
+        Err(DomainError::internal_error(
+            "FileWritePort",
+            "copy_folder_tree not implemented for this storage backend",
+        ))
+    }
 
     // ── Trash operations ──
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::file_ports::FileManagementUseCase;
-use crate::application::ports::storage_ports::FileWritePort;
+use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::errors::DomainError;
 use tracing::{error, info, warn};
@@ -159,5 +159,33 @@ impl FileManagementUseCase for FileManagementService {
         info!("File permanently deleted: {}", id);
 
         Ok(false) // permanently deleted
+    }
+
+    async fn copy_folder_tree(
+        &self,
+        source_folder_id: &str,
+        target_parent_id: Option<String>,
+        dest_name: Option<String>,
+    ) -> Result<CopyFolderTreeResult, DomainError> {
+        info!(
+            "Copying folder tree: source={}, target_parent={:?}, dest_name={:?}",
+            source_folder_id, target_parent_id, dest_name
+        );
+
+        let result = self
+            .file_repository
+            .copy_folder_tree(source_folder_id, target_parent_id, dest_name)
+            .await
+            .map_err(|e| {
+                error!("Error copying folder tree (source: {}): {}", source_folder_id, e);
+                e
+            })?;
+
+        info!(
+            "Folder tree copied: {} folders, {} files (new root: {})",
+            result.folders_copied, result.files_copied, result.new_root_folder_id
+        );
+
+        Ok(result)
     }
 }

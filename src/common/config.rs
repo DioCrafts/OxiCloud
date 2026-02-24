@@ -226,6 +226,12 @@ pub struct DatabaseConfig {
     pub connect_timeout_secs: u64,
     pub idle_timeout_secs: u64,
     pub max_lifetime_secs: u64,
+    /// Maximum connections for the maintenance pool (background/batch tasks).
+    /// Defaults to 25% of `max_connections` (minimum 2).
+    pub maintenance_max_connections: u32,
+    /// Minimum connections for the maintenance pool.
+    /// Defaults to 1.
+    pub maintenance_min_connections: u32,
 }
 
 impl Default for DatabaseConfig {
@@ -238,6 +244,8 @@ impl Default for DatabaseConfig {
             connect_timeout_secs: 10,
             idle_timeout_secs: 300,
             max_lifetime_secs: 1800,
+            maintenance_max_connections: 5,
+            maintenance_min_connections: 1,
         }
     }
 }
@@ -504,6 +512,20 @@ impl AppConfig {
             && let Ok(val) = min_connections
         {
             config.database.min_connections = val;
+        }
+
+        if let Ok(max_conn) =
+            env::var("OXICLOUD_DB_MAINTENANCE_MAX_CONNECTIONS").map(|v| v.parse::<u32>())
+            && let Ok(val) = max_conn
+        {
+            config.database.maintenance_max_connections = val;
+        }
+
+        if let Ok(min_conn) =
+            env::var("OXICLOUD_DB_MAINTENANCE_MIN_CONNECTIONS").map(|v| v.parse::<u32>())
+            && let Ok(val) = min_conn
+        {
+            config.database.maintenance_min_connections = val;
         }
 
         // Auth configuration

@@ -6,6 +6,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
+use crate::application::ports::storage_ports::CopyFolderTreeResult;
 use crate::common::errors::DomainError;
 
 // ─────────────────────────────────────────────────────
@@ -221,6 +222,25 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     ///
     /// Returns `Ok(true)` when trashed, `Ok(false)` when permanently deleted.
     async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError>;
+
+    /// Copies an entire folder subtree atomically (WebDAV COPY Depth: infinity).
+    ///
+    /// Creates a copy of `source_folder_id` (with optional name override) under
+    /// `target_parent_id`, including ALL sub-folders and files. Files are
+    /// zero-copy (blob ref_counts incremented in batch).
+    ///
+    /// Default: returns error (only available with PostgreSQL backend).
+    async fn copy_folder_tree(
+        &self,
+        _source_folder_id: &str,
+        _target_parent_id: Option<String>,
+        _dest_name: Option<String>,
+    ) -> Result<CopyFolderTreeResult, DomainError> {
+        Err(DomainError::internal_error(
+            "FileManagement",
+            "copy_folder_tree not implemented",
+        ))
+    }
 }
 
 /// Factory for creating file use case implementations

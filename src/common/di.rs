@@ -2,6 +2,8 @@ use sqlx::PgPool;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::infrastructure::db::DbPools;
+
 use crate::application::services::admin_settings_service::AdminSettingsService;
 use crate::application::services::auth_application_service::AuthApplicationService;
 
@@ -89,9 +91,13 @@ impl AppServiceFactory {
     /// Initializes the core system services.
     ///
     /// Requires a `PgPool` because `DedupService` stores its index in PostgreSQL.
+    /// The `maintenance_pool` is given to `DedupService` for long-running
+    /// operations (verify_integrity, garbage_collect) so they cannot starve
+    /// the primary pool.
     pub async fn create_core_services(
         &self,
         db_pool: &Arc<PgPool>,
+        maintenance_pool: &Arc<PgPool>,
     ) -> Result<CoreServices, DomainError> {
         // Path service (still needed for blob storage root + thumbnails)
         let path_service = Arc::new(PathService::new(self.storage_path.clone()));
@@ -139,6 +145,7 @@ impl AppServiceFactory {
             crate::infrastructure::services::dedup_service::DedupService::new(
                 &self.storage_path,
                 db_pool.clone(),
+                maintenance_pool.clone(),
             ),
         );
         dedup_service.initialize().await?;
@@ -390,17 +397,21 @@ impl AppServiceFactory {
     }
 
     /// Creates the storage usage service (requires database)
+    ///
+    /// Uses the `maintenance_pool` for batch operations
+    /// (`update_all_users_storage_usage`) to avoid starving user requests.
     pub fn create_storage_usage_service(
         &self,
         _repos: &RepositoryServices,
         db_pool: &Arc<PgPool>,
+        maintenance_pool: &Arc<PgPool>,
     ) -> Arc<dyn crate::application::ports::storage_ports::StorageUsagePort> {
         let user_repository = Arc::new(
             crate::infrastructure::repositories::pg::UserPgRepository::new(db_pool.clone()),
         );
         let service = Arc::new(
             crate::application::services::storage_usage_service::StorageUsageService::new(
-                db_pool.clone(),
+                maintenance_pool.clone(),
                 user_repository,
             ),
         );
@@ -413,18 +424,21 @@ impl AppServiceFactory {
     /// This is the main entry point that replaces all manual logic in `main.rs`.
     pub async fn build_app_state(
         &self,
-        db_pool: Option<Arc<PgPool>>,
+        db_pools: Option<DbPools>,
     ) -> Result<AppState, DomainError> {
         // Database is REQUIRED in 100% blob storage model
-        let pool = db_pool.clone().ok_or_else(|| {
+        let pools = db_pools.ok_or_else(|| {
             DomainError::internal_error(
                 "Database",
                 "PostgreSQL database is required for blob storage model",
             )
         })?;
 
+        let pool = Arc::new(pools.primary);
+        let maintenance_pool = Arc::new(pools.maintenance);
+
         // 1. Core services (PgPool needed for DedupService index)
-        let core = self.create_core_services(&pool).await?;
+        let core = self.create_core_services(&pool, &maintenance_pool).await?;
 
         // 2. Repository services (requires PgPool for all metadata)
         let repos = self.create_repository_services(&core, &pool);
@@ -456,7 +470,7 @@ impl AppServiceFactory {
             recent_service = Some(recent.clone());
             apps.recent_service = Some(recent);
 
-            storage_usage_service = Some(self.create_storage_usage_service(&repos, &pool));
+            storage_usage_service = Some(self.create_storage_usage_service(&repos, &pool, &maintenance_pool));
 
             // Auth services
             if self.config.features.enable_auth {
@@ -507,7 +521,8 @@ impl AppServiceFactory {
             core,
             repositories: repos,
             applications: apps,
-            db_pool: db_pool.clone(),
+            db_pool: Some(pool.clone()),
+            maintenance_pool: Some(maintenance_pool),
             auth_service: auth_services,
             admin_settings_service: None,
             trash_service,
@@ -742,6 +757,8 @@ pub struct AppState {
     pub repositories: RepositoryServices,
     pub applications: ApplicationServices,
     pub db_pool: Option<Arc<PgPool>>,
+    /// Isolated pool for background / batch operations.
+    pub maintenance_pool: Option<Arc<PgPool>>,
     pub auth_service: Option<AuthServices>,
     pub admin_settings_service: Option<Arc<AdminSettingsService>>,
     pub trash_service: Option<Arc<dyn TrashUseCase>>,

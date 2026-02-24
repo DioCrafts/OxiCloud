@@ -3,58 +3,125 @@ use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
 
-pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
+/// Segmented database pools.
+///
+/// `primary` is used for all user-facing request paths (REST, WebDAV, CalDAV,
+/// CardDAV).  `maintenance` is a smaller, isolated pool reserved for
+/// background / batch operations (verify_integrity, garbage_collect,
+/// update_all_users_storage_usage, trash cleanup) so they can never starve
+/// interactive requests.
+pub struct DbPools {
+    /// Pool for user-facing request paths.
+    pub primary: PgPool,
+    /// Pool for background / batch maintenance tasks.
+    pub maintenance: PgPool,
+}
+
+/// Create both the primary and maintenance database pools.
+///
+/// The schema is applied once via the primary pool.  The maintenance pool
+/// shares the same connection string but has its own, smaller budget.
+pub async fn create_database_pools(config: &AppConfig) -> Result<DbPools> {
     tracing::info!(
-        "Initializing PostgreSQL connection with URL: {}",
+        "Initializing PostgreSQL connections with URL: {}",
         config
             .database
             .connection_string
             .replace("postgres://", "postgres://[user]:[pass]@")
     );
 
+    // --- primary pool ---
+    let primary = create_pool_with_retries(
+        &config.database.connection_string,
+        config.database.max_connections,
+        config.database.min_connections,
+        config.database.connect_timeout_secs,
+        config.database.idle_timeout_secs,
+        config.database.max_lifetime_secs,
+        "primary",
+    )
+    .await?;
+
+    // Apply schema through the primary pool (idempotent)
+    tracing::info!("Applying database schema...");
+    if let Err(e) = apply_schema(&primary).await {
+        return Err(anyhow::anyhow!(
+            "Database schema could not be applied: {}. \
+             Run manually: psql -f db/schema.sql",
+            e
+        ));
+    }
+    tracing::info!("Database schema applied successfully");
+
+    // --- maintenance pool ---
+    let maintenance = create_pool_with_retries(
+        &config.database.connection_string,
+        config.database.maintenance_max_connections,
+        config.database.maintenance_min_connections,
+        config.database.connect_timeout_secs,
+        config.database.idle_timeout_secs,
+        config.database.max_lifetime_secs,
+        "maintenance",
+    )
+    .await?;
+
+    tracing::info!(
+        "Database pools ready — primary: {} max / {} min, maintenance: {} max / {} min",
+        config.database.max_connections,
+        config.database.min_connections,
+        config.database.maintenance_max_connections,
+        config.database.maintenance_min_connections,
+    );
+
+    Ok(DbPools {
+        primary,
+        maintenance,
+    })
+}
+
+/// Internal helper: create a single pool with retry logic.
+async fn create_pool_with_retries(
+    connection_string: &str,
+    max_connections: u32,
+    min_connections: u32,
+    connect_timeout_secs: u64,
+    idle_timeout_secs: u64,
+    max_lifetime_secs: u64,
+    label: &str,
+) -> Result<PgPool> {
     let mut attempt = 0;
     const MAX_ATTEMPTS: usize = 5;
 
     while attempt < MAX_ATTEMPTS {
         attempt += 1;
         tracing::info!(
-            "PostgreSQL connection attempt #{}/{}",
+            "PostgreSQL {} pool connection attempt #{}/{}",
+            label,
             attempt,
             MAX_ATTEMPTS
         );
 
         match PgPoolOptions::new()
-            .max_connections(config.database.max_connections)
-            .min_connections(config.database.min_connections)
-            .acquire_timeout(Duration::from_secs(config.database.connect_timeout_secs))
-            .idle_timeout(Duration::from_secs(config.database.idle_timeout_secs))
-            .max_lifetime(Duration::from_secs(config.database.max_lifetime_secs))
-            .connect(&config.database.connection_string)
+            .max_connections(max_connections)
+            .min_connections(min_connections)
+            .acquire_timeout(Duration::from_secs(connect_timeout_secs))
+            .idle_timeout(Duration::from_secs(idle_timeout_secs))
+            .max_lifetime(Duration::from_secs(max_lifetime_secs))
+            .connect(connection_string)
             .await
         {
             Ok(pool) => {
                 match sqlx::query("SELECT 1").execute(&pool).await {
                     Ok(_) => {
-                        tracing::info!("PostgreSQL connection established successfully");
-
-                        // Always apply schema - it's idempotent (uses IF NOT EXISTS and CREATE OR REPLACE)
-                        tracing::info!("Applying database schema...");
-                        if let Err(e) = apply_schema(&pool).await {
-                            return Err(anyhow::anyhow!(
-                                "Database schema could not be applied: {}. \
-                                     Run manually: psql -f db/schema.sql",
-                                e
-                            ));
-                        }
-                        tracing::info!("Database schema applied successfully");
-
+                        tracing::info!("PostgreSQL {} pool established successfully", label);
                         return Ok(pool);
                     }
                     Err(e) => {
-                        tracing::error!("Error verifying connection: {}", e);
+                        tracing::error!("Error verifying {} pool connection: {}", label, e);
                         if attempt >= MAX_ATTEMPTS {
                             return Err(anyhow::anyhow!(
-                                "Error verifying PostgreSQL connection: {}",
+                                "Error verifying PostgreSQL {} pool connection: {}",
+                                label,
                                 e
                             ));
                         }
@@ -63,13 +130,18 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
             }
             Err(e) => {
                 tracing::error!(
-                    "Error connecting to PostgreSQL (attempt {}/{}): {}",
+                    "Error connecting to PostgreSQL {} pool (attempt {}/{}): {}",
+                    label,
                     attempt,
                     MAX_ATTEMPTS,
                     e
                 );
                 if attempt >= MAX_ATTEMPTS {
-                    return Err(anyhow::anyhow!("Error in PostgreSQL connection: {}", e));
+                    return Err(anyhow::anyhow!(
+                        "Error in PostgreSQL {} pool connection: {}",
+                        label,
+                        e
+                    ));
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
@@ -77,7 +149,8 @@ pub async fn create_database_pool(config: &AppConfig) -> Result<PgPool> {
     }
 
     Err(anyhow::anyhow!(
-        "Could not establish PostgreSQL connection after {} attempts",
+        "Could not establish PostgreSQL {} pool connection after {} attempts",
+        label,
         MAX_ATTEMPTS
     ))
 }

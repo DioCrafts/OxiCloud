@@ -1039,7 +1039,6 @@ async fn handle_copy(
 
     // Get services from state
     let file_retrieval_service = &state.applications.file_retrieval_service;
-    let _file_upload_service = &state.applications.file_upload_service;
     let folder_service = &state.applications.folder_service;
 
     // Check if destination already exists (for Overwrite header compliance)
@@ -1076,48 +1075,45 @@ async fn handle_copy(
             ""
         };
 
-        // For now, just create a new folder and copy files individually
-        // In a real implementation, we would have a dedicated copy_folder service method
-        let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
-            name: dest_folder_name.to_string(),
-            parent_id: if dest_parent_path.is_empty() {
-                None
-            } else {
-                // Try to get the parent folder ID from its path
-                match folder_service.get_folder_by_path(dest_parent_path).await {
-                    Ok(parent) => Some(parent.id),
-                    Err(_) => None, // If not found, use root
-                }
-            },
+        let target_parent_id = if dest_parent_path.is_empty() {
+            None
+        } else {
+            match folder_service.get_folder_by_path(dest_parent_path).await {
+                Ok(parent) => Some(parent.id),
+                Err(_) => None,
+            }
         };
 
-        let _new_folder = folder_service
-            .create_folder(create_dto)
-            .await
-            .map_err(|e| {
-                AppError::internal_error(format!("Failed to create destination folder: {}", e))
-            })?;
-
         if recursive {
-            // Copy files via zero-copy dedup (only increments blob ref_count)
-            let files = file_retrieval_service
-                .list_files(Some(&folder.id))
-                .await
-                .map_err(|e| AppError::internal_error(format!("Failed to list files: {}", e)))?;
-
+            // Atomic recursive copy: single SQL function call copies the entire
+            // folder tree (all sub-folders + all files) with zero-copy dedup.
+            // O(depth) folder INSERTs + 1 batch file INSERT + 1 batch ref_count UPDATE.
             let file_management_service = &state.applications.file_management_service;
-            let new_folder_id = Some(_new_folder.id.clone());
-            for file in files {
-                file_management_service
-                    .copy_file(&file.id, new_folder_id.clone())
-                    .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!(
-                            "Failed to copy file {}: {}",
-                            file.name, e
-                        ))
-                    })?;
-            }
+            file_management_service
+                .copy_folder_tree(
+                    &folder.id,
+                    target_parent_id,
+                    Some(dest_folder_name.to_string()),
+                )
+                .await
+                .map_err(|e| {
+                    AppError::internal_error(format!("Failed to copy folder tree: {}", e))
+                })?;
+        } else {
+            // Depth: 0 — create empty folder only (no sub-folder or file copy)
+            let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
+                name: dest_folder_name.to_string(),
+                parent_id: target_parent_id,
+            };
+            folder_service
+                .create_folder(create_dto)
+                .await
+                .map_err(|e| {
+                    AppError::internal_error(format!(
+                        "Failed to create destination folder: {}",
+                        e
+                    ))
+                })?;
         }
     } else {
         // Copy file — use zero-copy dedup (only increments blob ref_count, no content loaded)

@@ -52,13 +52,20 @@ pub struct DedupService {
     blob_root: PathBuf,
     /// Root directory for temporary files during upload
     temp_root: PathBuf,
-    /// PostgreSQL connection pool (dedup index in `storage.blobs`)
+    /// PostgreSQL connection pool (dedup index in `storage.blobs`) — primary,
+    /// used by request-path operations (store_bytes, store_from_file, etc.).
     pool: Arc<PgPool>,
+    /// Isolated maintenance pool for long-running operations
+    /// (verify_integrity, garbage_collect) that must never starve the primary.
+    maintenance_pool: Arc<PgPool>,
 }
 
 impl DedupService {
     /// Create a new dedup service backed by PostgreSQL.
-    pub fn new(storage_root: &Path, pool: Arc<PgPool>) -> Self {
+    ///
+    /// * `pool` — primary pool for request-path operations.
+    /// * `maintenance_pool` — isolated pool for verify_integrity / garbage_collect.
+    pub fn new(storage_root: &Path, pool: Arc<PgPool>, maintenance_pool: Arc<PgPool>) -> Self {
         let blob_root = storage_root.join(".blobs");
         let temp_root = storage_root.join(".dedup_temp");
 
@@ -66,6 +73,7 @@ impl DedupService {
             blob_root,
             temp_root,
             pool,
+            maintenance_pool,
         }
     }
 
@@ -675,7 +683,7 @@ impl DedupService {
         let mut row_stream = sqlx::query_as::<_, (String, i64)>(
             "SELECT hash, size FROM storage.blobs ORDER BY hash",
         )
-        .fetch(self.pool.as_ref());
+        .fetch(self.maintenance_pool.as_ref());
 
         let mut total = 0usize;
         let mut corrupted = Vec::<String>::new();
@@ -782,7 +790,7 @@ impl DedupService {
         let mut orphan_stream = sqlx::query_as::<_, (String, i64)>(
             "DELETE FROM storage.blobs WHERE ref_count = 0 RETURNING hash, size",
         )
-        .fetch(self.pool.as_ref());
+        .fetch(self.maintenance_pool.as_ref());
 
         let mut deleted_count = 0u64;
         let mut deleted_bytes = 0u64;
