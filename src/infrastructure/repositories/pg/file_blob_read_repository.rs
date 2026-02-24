@@ -415,15 +415,10 @@ impl FileReadPort for FileBlobReadRepository {
     }
 
     /// Search files with filtering and pagination at database level.
-    /// This is much more efficient than loading all files and filtering in memory.
     ///
-    /// Note: This implements a simplified version focusing on the key optimizations:
-    /// - LIMIT/OFFSET at database level (not loading all rows)
-    /// - Basic name filtering
-    /// - Sorting at database level
-    ///
-    /// For full criteria support (file types, date ranges, size ranges),
-    /// the search service will continue to use in-memory filtering.
+    /// Uses `COUNT(*) OVER()` window function to return the total matching
+    /// count alongside the paginated rows in a **single query** — no separate
+    /// COUNT round-trip.
     async fn search_files_paginated(
         &self,
         folder_id: Option<&str>,
@@ -444,205 +439,72 @@ impl FileReadPort for FileBlobReadRepository {
             _ => ("fi.name", "ASC"),
         };
 
-        // Build query based on whether we have a folder_id and name filter
-        let (rows, total_count) = match (folder_id, &criteria.name_contains) {
-            (Some(fid), Some(name)) if !name.is_empty() => {
-                // Folder scope + name search
-                let name_pattern = format!("%{}%", name.to_lowercase());
+        // ── Build dynamic WHERE + bind indices ───────────────────────────
+        let mut conditions: Vec<String> = vec![
+            "fi.user_id = $1::uuid".to_string(),
+            "fi.is_trashed = false".to_string(),
+        ];
+        let mut bind_idx = 1u32; // $1 = user_id
 
-                // Count query
-                let count: i64 = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.files fi
-                     WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                     AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3",
-                )
-                .bind(user_id)
-                .bind(fid)
-                .bind(&name_pattern)
-                .fetch_one(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+        if folder_id.is_some() {
+            bind_idx += 1;
+            conditions.push(format!("fi.folder_id = ${bind_idx}::uuid"));
+        }
 
-                // Data query with LIMIT/OFFSET
-                let rows: Vec<(
-                    String,
-                    String,
-                    Option<String>,
-                    Option<String>,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    Option<String>,
-                )> = sqlx::query_as(&format!(
-                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                            fi.size, fi.mime_type,
-                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                            fi.user_id::text
-                       FROM storage.files fi
-                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                        AND fi.is_trashed = false AND LOWER(fi.name) LIKE $3
-                      ORDER BY {} {}
-                      LIMIT $4 OFFSET $5",
-                    order_column, order_dir
-                ))
-                .bind(user_id)
-                .bind(fid)
-                .bind(&name_pattern)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
-
-                (rows, count as usize)
+        if let Some(name) = &criteria.name_contains {
+            if !name.is_empty() {
+                bind_idx += 1;
+                conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
             }
-            (Some(fid), None) | (Some(fid), Some(_)) => {
-                // Folder scope only (no name filter)
-                let count: i64 = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.files fi
-                     WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                     AND fi.is_trashed = false",
-                )
-                .bind(user_id)
-                .bind(fid)
-                .fetch_one(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+        }
 
-                let rows: Vec<(
-                    String,
-                    String,
-                    Option<String>,
-                    Option<String>,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    Option<String>,
-                )> = sqlx::query_as(&format!(
-                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                            fi.size, fi.mime_type,
-                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                            fi.user_id::text
-                       FROM storage.files fi
-                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                      WHERE fi.user_id = $1::uuid AND fi.folder_id = $2::uuid
-                        AND fi.is_trashed = false
-                      ORDER BY {} {}
-                      LIMIT $3 OFFSET $4",
-                    order_column, order_dir
-                ))
-                .bind(user_id)
-                .bind(fid)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
+        let where_clause = conditions.join(" AND ");
+        let limit_bind = bind_idx + 1;
+        let offset_bind = bind_idx + 2;
 
-                (rows, count as usize)
+        let sql = format!(
+            "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path, \
+                    fi.size, fi.mime_type, \
+                    EXTRACT(EPOCH FROM fi.created_at)::bigint, \
+                    EXTRACT(EPOCH FROM fi.updated_at)::bigint, \
+                    fi.user_id::text, \
+                    COUNT(*) OVER() AS total_count \
+               FROM storage.files fi \
+               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id \
+              WHERE {where_clause} \
+              ORDER BY {order_column} {order_dir} \
+              LIMIT ${limit_bind} OFFSET ${offset_bind}"
+        );
+
+        // ── Bind parameters dynamically ──────────────────────────────────
+        let mut query = sqlx::query_as::<_, (
+            String, String, Option<String>, Option<String>,
+            i64, String, i64, i64, Option<String>, i64,
+        )>(&sql)
+            .bind(user_id);
+
+        if let Some(fid) = folder_id {
+            query = query.bind(fid);
+        }
+        if let Some(name) = &criteria.name_contains {
+            if !name.is_empty() {
+                query = query.bind(format!("%{}%", name.to_lowercase()));
             }
-            (None, Some(name)) if !name.is_empty() => {
-                // Global search with name filter
-                let name_pattern = format!("%{}%", name.to_lowercase());
+        }
+        query = query.bind(limit).bind(offset);
 
-                let count: i64 = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.files fi
-                     WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
-                     AND LOWER(fi.name) LIKE $2",
-                )
-                .bind(user_id)
-                .bind(&name_pattern)
-                .fetch_one(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
+        // ── Execute single query ─────────────────────────────────────────
+        let rows = query
+            .fetch_all(self.pool.as_ref())
+            .await
+            .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
 
-                let rows: Vec<(
-                    String,
-                    String,
-                    Option<String>,
-                    Option<String>,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    Option<String>,
-                )> = sqlx::query_as(&format!(
-                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                            fi.size, fi.mime_type,
-                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                            fi.user_id::text
-                       FROM storage.files fi
-                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
-                        AND LOWER(fi.name) LIKE $2
-                      ORDER BY {} {}
-                      LIMIT $3 OFFSET $4",
-                    order_column, order_dir
-                ))
-                .bind(user_id)
-                .bind(&name_pattern)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
-
-                (rows, count as usize)
-            }
-            (None, _) => {
-                // No folder scope, no name filter - get all files for user
-                let count: i64 = sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.files fi
-                     WHERE fi.user_id = $1::uuid AND fi.is_trashed = false",
-                )
-                .bind(user_id)
-                .fetch_one(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("count: {e}")))?;
-
-                let rows: Vec<(
-                    String,
-                    String,
-                    Option<String>,
-                    Option<String>,
-                    i64,
-                    String,
-                    i64,
-                    i64,
-                    Option<String>,
-                )> = sqlx::query_as(&format!(
-                    "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                            fi.size, fi.mime_type,
-                            EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                            EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                            fi.user_id::text
-                       FROM storage.files fi
-                       LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-                      WHERE fi.user_id = $1::uuid AND fi.is_trashed = false
-                      ORDER BY {} {}
-                      LIMIT $2 OFFSET $3",
-                    order_column, order_dir
-                ))
-                .bind(user_id)
-                .bind(limit)
-                .bind(offset)
-                .fetch_all(self.pool.as_ref())
-                .await
-                .map_err(|e| DomainError::internal_error("FileBlobRead", format!("search: {e}")))?;
-
-                (rows, count as usize)
-            }
-        };
+        // total_count is the same in every row; 0 when result set is empty.
+        let total_count = rows.first().map_or(0, |r| r.9) as usize;
 
         let files = rows
             .into_iter()
-            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid, _total)| {
                 Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
             })
             .collect::<Result<Vec<_>, _>>()
@@ -651,15 +513,15 @@ impl FileReadPort for FileBlobReadRepository {
         Ok((files, total_count))
     }
 
-    /// Recursive subtree search using ltree — O(1) SQL queries.
+    /// Recursive subtree search using ltree — single SQL query.
     ///
     /// When `root_folder_id` is Some, JOINs `storage.files` with
     /// `storage.folders` using `lpath <@ (root's lpath)` to find all
-    /// files in the entire subtree in a single indexed query.
-    /// When None, searches all files for the user (no ltree needed).
+    /// files in the entire subtree.
+    /// When None, delegates to `search_files_paginated`.
     ///
-    /// All filter criteria (name, file types, dates, sizes) and sorting
-    /// are pushed down to SQL for maximum efficiency.
+    /// Uses `COUNT(*) OVER()` to return the total count alongside the
+    /// paginated rows — no separate COUNT round-trip.
     async fn search_files_in_subtree(
         &self,
         root_folder_id: Option<&str>,
@@ -667,7 +529,6 @@ impl FileReadPort for FileBlobReadRepository {
         user_id: &str,
     ) -> Result<(Vec<File>, usize), DomainError> {
         // When no root folder specified, delegate to existing paginated search
-        // which already handles "all files for user" efficiently
         let root_id = match root_folder_id {
             None => {
                 return self
@@ -693,14 +554,13 @@ impl FileReadPort for FileBlobReadRepository {
 
         // ── Build dynamic WHERE clauses ──
         let mut conditions = Vec::new();
-        let mut bind_idx = 3u32; // $1 = user_id, $2 = root_folder_id
+        let mut bind_idx = 2u32; // $1 = user_id, $2 = root_folder_id
 
         conditions.push("fi.is_trashed = false".to_string());
         conditions.push("fi.user_id = $1".to_string());
-        // ltree subtree match: folder's lpath is a descendant of root's lpath
-        conditions.push(format!(
-            "fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid)"
-        ));
+        conditions.push(
+            "fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid)".to_string(),
+        );
 
         if let Some(name) = &criteria.name_contains {
             if !name.is_empty() {
@@ -711,7 +571,6 @@ impl FileReadPort for FileBlobReadRepository {
         if let Some(types) = &criteria.file_types {
             if !types.is_empty() {
                 bind_idx += 1;
-                // Match file extension against ANY of the provided types
                 conditions.push(format!(
                     "LOWER(SUBSTRING(fi.name FROM '\\.([^.]+)$')) = ANY(${bind_idx})"
                 ));
@@ -754,20 +613,14 @@ impl FileReadPort for FileBlobReadRepository {
         let limit_bind = bind_idx + 1;
         let offset_bind = bind_idx + 2;
 
-        // ── Count query ──
-        let count_sql = format!(
-            "SELECT COUNT(*) FROM storage.files fi \
-             JOIN storage.folders fo ON fo.id = fi.folder_id \
-             WHERE {where_clause}"
-        );
-
-        // ── Data query ──
-        let data_sql = format!(
+        // ── Single query with COUNT(*) OVER() ──
+        let sql = format!(
             "SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path, \
                     fi.size, fi.mime_type, \
                     EXTRACT(EPOCH FROM fi.created_at)::bigint, \
                     EXTRACT(EPOCH FROM fi.updated_at)::bigint, \
-                    fi.user_id::text \
+                    fi.user_id::text, \
+                    COUNT(*) OVER() AS total_count \
                FROM storage.files fi \
                JOIN storage.folders fo ON fo.id = fi.folder_id \
               WHERE {where_clause} \
@@ -776,80 +629,59 @@ impl FileReadPort for FileBlobReadRepository {
         );
 
         // ── Bind parameters dynamically ──
-        // Count query
-        let mut count_query = sqlx::query_scalar::<_, i64>(&count_sql)
-            .bind(user_id)
-            .bind(root_id);
-
-        let mut data_query = sqlx::query_as::<_, (
+        let mut query = sqlx::query_as::<_, (
             String, String, Option<String>, Option<String>,
-            i64, String, i64, i64, Option<String>,
-        )>(&data_sql)
+            i64, String, i64, i64, Option<String>, i64,
+        )>(&sql)
             .bind(user_id)
             .bind(root_id);
 
-        // Bind optional parameters in the same order as the conditions
         if let Some(name) = &criteria.name_contains {
             if !name.is_empty() {
-                let pattern = format!("%{}%", name.to_lowercase());
-                count_query = count_query.bind(pattern.clone());
-                data_query = data_query.bind(pattern);
+                query = query.bind(format!("%{}%", name.to_lowercase()));
             }
         }
         if let Some(types) = &criteria.file_types {
             if !types.is_empty() {
                 let lower_types: Vec<String> =
                     types.iter().map(|t| t.to_lowercase()).collect();
-                count_query = count_query.bind(lower_types.clone());
-                data_query = data_query.bind(lower_types);
+                query = query.bind(lower_types);
             }
         }
         if let Some(v) = criteria.created_after {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
         if let Some(v) = criteria.created_before {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
         if let Some(v) = criteria.modified_after {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
         if let Some(v) = criteria.modified_before {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
         if let Some(v) = criteria.min_size {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
         if let Some(v) = criteria.max_size {
-            count_query = count_query.bind(v as i64);
-            data_query = data_query.bind(v as i64);
+            query = query.bind(v as i64);
         }
 
-        // Bind LIMIT / OFFSET (data_query only)
-        data_query = data_query.bind(limit).bind(offset);
+        query = query.bind(limit).bind(offset);
 
-        // ── Execute ──
-        let total_count: i64 = count_query
-            .fetch_one(self.pool.as_ref())
-            .await
-            .map_err(|e| {
-                DomainError::internal_error("FileBlobRead", format!("subtree count: {e}"))
-            })?;
-
-        let rows = data_query
+        // ── Execute single query ──
+        let rows = query
             .fetch_all(self.pool.as_ref())
             .await
             .map_err(|e| {
                 DomainError::internal_error("FileBlobRead", format!("subtree search: {e}"))
             })?;
 
+        let total_count = rows.first().map_or(0, |r| r.9) as usize;
+
         let files = rows
             .into_iter()
-            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid, _total)| {
                 Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
             })
             .collect::<Result<Vec<_>, _>>()
@@ -857,7 +689,7 @@ impl FileReadPort for FileBlobReadRepository {
                 DomainError::internal_error("FileBlobRead", format!("subtree mapping: {e}"))
             })?;
 
-        Ok((files, total_count as usize))
+        Ok((files, total_count))
     }
 
     /// Count files matching the search criteria (without loading them).
