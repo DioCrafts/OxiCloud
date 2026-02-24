@@ -621,7 +621,7 @@ pub struct StubSearchUseCase;
 
 #[async_trait]
 impl SearchUseCase for StubSearchUseCase {
-    async fn search(&self, _criteria: SearchCriteriaDto) -> Result<SearchResultsDto, DomainError> {
+    async fn search(&self, _criteria: SearchCriteriaDto, _user_id: &str) -> Result<SearchResultsDto, DomainError> {
         Ok(SearchResultsDto::empty())
     }
 

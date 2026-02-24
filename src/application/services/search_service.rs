@@ -272,11 +272,8 @@ impl SearchUseCase for SearchService {
      * - Human-readable size formatting
      * - Pagination
      */
-    async fn search(&self, criteria: SearchCriteriaDto) -> Result<SearchResultsDto> {
+    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<SearchResultsDto> {
         let start = Instant::now();
-
-        // TODO: Get user ID from the authentication context
-        let user_id = "default-user";
 
         // Try to get from cache
         let cache_key = Self::create_cache_key(&criteria, user_id);
@@ -302,27 +299,19 @@ impl SearchUseCase for SearchService {
                 .map(|f| Self::enrich_file(f, query))
                 .collect();
 
-            // Get folders for this folder (non-recursive)
+            // Get folders for this folder (non-recursive, filtered in SQL)
             let folders = self
                 .folder_repository
-                .list_folders(criteria.folder_id.as_deref())
+                .search_folders(
+                    criteria.folder_id.as_deref(),
+                    criteria.name_contains.as_deref(),
+                    user_id,
+                    false,
+                )
                 .await?;
 
-            // Filter folders if name criteria present
-            let filtered_folders: Vec<FolderDto> = if let Some(name_query) = &criteria.name_contains
-            {
-                let query_lower = name_query.to_lowercase();
-                folders
-                    .into_iter()
-                    .map(FolderDto::from)
-                    .filter(|f| {
-                        let folder_name_lower = f.name.to_lowercase();
-                        folder_name_lower.contains(&query_lower)
-                    })
-                    .collect()
-            } else {
-                folders.into_iter().map(FolderDto::from).collect()
-            };
+            let filtered_folders: Vec<FolderDto> =
+                folders.into_iter().map(FolderDto::from).collect();
 
             // For folders, apply sorting and pagination in memory (usually fewer folders)
             let mut enriched_folders: Vec<SearchFolderResultDto> = filtered_folders
@@ -397,24 +386,16 @@ impl SearchUseCase for SearchService {
             .search_files_in_subtree(criteria.folder_id.as_deref(), &criteria, user_id)
             .await?;
 
-        // Get descendant folders (ltree-based when folder_id is specified)
-        let found_folders: Vec<Folder> = if let Some(ref fid) = criteria.folder_id {
-            self.folder_repository
-                .list_descendant_folders(fid, criteria.name_contains.as_deref(), user_id)
-                .await?
-        } else {
-            // No folder scope → search all user folders
-            let all_folders = self.folder_repository.list_folders(None).await?;
-            if let Some(ref name_query) = criteria.name_contains {
-                let q = name_query.to_lowercase();
-                all_folders
-                    .into_iter()
-                    .filter(|f| f.name().to_lowercase().contains(&q))
-                    .collect()
-            } else {
-                all_folders
-            }
-        };
+        // Get folders (SQL-filtered, user-scoped, recursive when applicable)
+        let found_folders: Vec<Folder> = self
+            .folder_repository
+            .search_folders(
+                criteria.folder_id.as_deref(),
+                criteria.name_contains.as_deref(),
+                user_id,
+                true,
+            )
+            .await?;
 
         // ── Convert to DTOs and enrich with server-computed metadata ──
         let file_dtos: Vec<FileDto> = found_files.into_iter().map(FileDto::from).collect();
@@ -515,7 +496,7 @@ impl SearchService {
 
         #[async_trait]
         impl SearchUseCase for SearchServiceStub {
-            async fn search(&self, _criteria: SearchCriteriaDto) -> Result<SearchResultsDto> {
+            async fn search(&self, _criteria: SearchCriteriaDto, _user_id: &str) -> Result<SearchResultsDto> {
                 Ok(SearchResultsDto::empty())
             }
 

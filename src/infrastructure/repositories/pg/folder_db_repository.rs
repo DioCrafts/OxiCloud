@@ -414,8 +414,9 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn rename_folder(&self, id: &str, new_name: String) -> Result<Folder, DomainError> {
-        // The BEFORE UPDATE trigger on `name` will recompute path/lpath
-        // and cascade to descendants automatically.
+        // The BEFORE UPDATE trigger recomputes path/lpath for this row;
+        // the AFTER UPDATE cascade trigger then batch-updates all
+        // descendants in a single UPDATE using the GiST lpath index.
         sqlx::query(
             r#"
             UPDATE storage.folders
@@ -444,8 +445,9 @@ impl FolderRepository for FolderDbRepository {
         id: &str,
         new_parent_id: Option<&str>,
     ) -> Result<Folder, DomainError> {
-        // The BEFORE UPDATE trigger on `parent_id` will recompute path/lpath
-        // and cascade to descendants automatically.
+        // The BEFORE UPDATE trigger recomputes path/lpath for this row;
+        // the AFTER UPDATE cascade trigger then batch-updates all
+        // descendants in a single UPDATE using the GiST lpath index.
         sqlx::query(
             r#"
             UPDATE storage.folders
@@ -561,8 +563,9 @@ impl FolderRepository for FolderDbRepository {
         // Only restore the folder itself.
         // Child files were never marked as trashed — they become visible
         // again automatically once their parent folder is un-trashed.
-        // The BEFORE UPDATE trigger on parent_id will recompute path/lpath
-        // automatically when original_parent_id is restored.
+        // The BEFORE UPDATE trigger recomputes path/lpath when
+        // original_parent_id is restored; the cascade trigger
+        // batch-updates all descendants via the GiST lpath index.
         let result = sqlx::query_scalar::<_, i64>(
             r#"
             WITH restore_folder AS (
@@ -703,6 +706,151 @@ impl FolderRepository for FolderDbRepository {
                 .map_err(|e| {
                     DomainError::internal_error("FolderDb", format!("subtree folders: {e}"))
                 })?;
+
+        rows.into_iter()
+            .map(|(id, name, path, pid, uid, ca, ma)| {
+                Self::row_to_folder(id, name, path, pid, uid, ca, ma)
+            })
+            .collect()
+    }
+
+    /// SQL-level folder search with name filter, user isolation, and
+    /// recursive / non-recursive modes.
+    ///
+    /// - Non-recursive: `WHERE parent_id = $1 AND user_id = $2 [AND LIKE]`
+    /// - Recursive + folder_id: delegates to `list_descendant_folders`
+    /// - Recursive + no folder_id: `WHERE user_id = $1 [AND LIKE]`
+    async fn search_folders(
+        &self,
+        parent_id: Option<&str>,
+        name_contains: Option<&str>,
+        user_id: &str,
+        recursive: bool,
+    ) -> Result<Vec<Folder>, DomainError> {
+        // Recursive with folder scope → existing optimised ltree scan
+        if recursive {
+            if let Some(fid) = parent_id {
+                return self.list_descendant_folders(fid, name_contains, user_id).await;
+            }
+        }
+
+        // Build optional name filter
+        let (name_clause, name_pattern) = match name_contains {
+            Some(name) if !name.is_empty() => (
+                if recursive {
+                    " AND LOWER(fo.name) LIKE $2"
+                } else {
+                    " AND LOWER(fo.name) LIKE $3"
+                },
+                Some(format!("%{}%", name.to_lowercase())),
+            ),
+            _ => ("", None),
+        };
+
+        if recursive {
+            // Recursive, no folder scope → ALL user folders
+            let sql = format!(
+                "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
+                        fo.user_id::text, \
+                        EXTRACT(EPOCH FROM fo.created_at)::bigint, \
+                        EXTRACT(EPOCH FROM fo.updated_at)::bigint \
+                   FROM storage.folders fo \
+                  WHERE fo.user_id = $1 \
+                    AND fo.is_trashed = false \
+                    {name_clause} \
+                  ORDER BY fo.name"
+            );
+
+            let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
+                if let Some(ref pattern) = name_pattern {
+                    sqlx::query_as(&sql)
+                        .bind(user_id)
+                        .bind(pattern)
+                        .fetch_all(self.pool())
+                        .await
+                } else {
+                    sqlx::query_as(&sql)
+                        .bind(user_id)
+                        .fetch_all(self.pool())
+                        .await
+                }
+                .map_err(|e| {
+                    DomainError::internal_error("FolderDb", format!("search_folders: {e}"))
+                })?;
+
+            return rows
+                .into_iter()
+                .map(|(id, name, path, pid, uid, ca, ma)| {
+                    Self::row_to_folder(id, name, path, pid, uid, ca, ma)
+                })
+                .collect();
+        }
+
+        // Non-recursive: direct children of parent_id, filtered by user
+        let sql = if parent_id.is_some() {
+            format!(
+                "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
+                        fo.user_id::text, \
+                        EXTRACT(EPOCH FROM fo.created_at)::bigint, \
+                        EXTRACT(EPOCH FROM fo.updated_at)::bigint \
+                   FROM storage.folders fo \
+                  WHERE fo.parent_id = $1::uuid \
+                    AND fo.user_id = $2 \
+                    AND fo.is_trashed = false \
+                    {name_clause} \
+                  ORDER BY fo.name"
+            )
+        } else {
+            // Root folders: parent_id IS NULL, reindex params ($1=user_id, $2=pattern)
+            let name_clause_root = match name_contains {
+                Some(name) if !name.is_empty() => " AND LOWER(fo.name) LIKE $2",
+                _ => "",
+            };
+            format!(
+                "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
+                        fo.user_id::text, \
+                        EXTRACT(EPOCH FROM fo.created_at)::bigint, \
+                        EXTRACT(EPOCH FROM fo.updated_at)::bigint \
+                   FROM storage.folders fo \
+                  WHERE fo.parent_id IS NULL \
+                    AND fo.user_id = $1 \
+                    AND fo.is_trashed = false \
+                    {name_clause_root} \
+                  ORDER BY fo.name"
+            )
+        };
+
+        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
+            if let Some(pid) = parent_id {
+                if let Some(ref pattern) = name_pattern {
+                    sqlx::query_as(&sql)
+                        .bind(pid)
+                        .bind(user_id)
+                        .bind(pattern)
+                        .fetch_all(self.pool())
+                        .await
+                } else {
+                    sqlx::query_as(&sql)
+                        .bind(pid)
+                        .bind(user_id)
+                        .fetch_all(self.pool())
+                        .await
+                }
+            } else if let Some(ref pattern) = name_pattern {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .bind(pattern)
+                    .fetch_all(self.pool())
+                    .await
+            } else {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .fetch_all(self.pool())
+                    .await
+            }
+            .map_err(|e| {
+                DomainError::internal_error("FolderDb", format!("search_folders: {e}"))
+            })?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {

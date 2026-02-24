@@ -24,8 +24,12 @@ pub async fn create_auth_services(
         config.auth.refresh_token_expiry_secs,
     ));
 
-    // Create password hashing service
-    let password_hasher = Arc::new(Argon2PasswordHasher::new());
+    // Create password hashing service with configured Argon2id parameters
+    let password_hasher = Arc::new(Argon2PasswordHasher::new(
+        config.auth.hash_memory_cost,
+        config.auth.hash_time_cost,
+        config.auth.hash_parallelism,
+    ));
 
     // Create PostgreSQL repositories
     let user_repository = Arc::new(UserPgRepository::new(pool.clone()));

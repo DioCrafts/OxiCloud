@@ -43,8 +43,24 @@ impl FileHandler {
     pub async fn upload_file(
         State(state): State<GlobalState>,
         auth_user: AuthUser,
-        mut multipart: Multipart,
+        multipart: Multipart,
     ) -> impl IntoResponse {
+        match Self::upload_file_inner(&state, &auth_user, multipart).await {
+            Ok(file) => Self::created_json_response(&file).into_response(),
+            Err(response) => response.into_response(),
+        }
+    }
+
+    /// Core upload logic shared by [`Self::upload_file`] and
+    /// [`Self::upload_file_with_thumbnails`].
+    ///
+    /// Returns the typed `FileDto` on success so callers can use it
+    /// directly (e.g. for thumbnail generation) without re-parsing JSON.
+    async fn upload_file_inner(
+        state: &GlobalState,
+        auth_user: &AuthUser,
+        mut multipart: Multipart,
+    ) -> Result<crate::application::dtos::file_dto::FileDto, Response<Body>> {
         use sha2::{Digest, Sha256};
 
         let upload_service = &state.applications.file_upload_service;
@@ -83,9 +99,6 @@ impl FileHandler {
                     .to_string();
 
                 // ── Early quota check (before spooling to disk) ──────
-                // Use the multipart field's Content-Length header if present.
-                // If the user is already over quota, reject immediately
-                // without wasting I/O on spooling the entire body.
                 if let Some(storage_svc) = state.storage_usage_service.as_ref() {
                     let estimated_size = field
                         .headers()
@@ -103,7 +116,7 @@ impl FileHandler {
                             filename,
                             estimated_size
                         );
-                        return Self::quota_error_response(err).into_response();
+                        return Err(Self::quota_error_response(err));
                     }
                 }
 
@@ -149,22 +162,18 @@ impl FileHandler {
                 if let Err(e) = spool_result {
                     let _ = tokio::fs::remove_file(&temp_path).await;
                     tracing::error!("❌ UPLOAD SPOOL FAILED: {} - {}", filename, e);
-                    return Self::domain_error_response(
+                    return Err(Self::domain_error_response(
                         crate::common::errors::DomainError::internal_error("FileUpload", e),
-                    )
-                    .into_response();
+                    ));
                 }
 
                 // Empty file — use in-memory path
                 if total_size == 0 {
                     let _ = tokio::fs::remove_file(&temp_path).await;
-                    return match upload_service
+                    return upload_service
                         .upload_file(filename, folder_id, content_type, vec![])
                         .await
-                    {
-                        Ok(file) => Self::created_json_response(&file).into_response(),
-                        Err(err) => Self::domain_error_response(err).into_response(),
-                    };
+                        .map_err(Self::domain_error_response);
                 }
 
                 // Finalize hash
@@ -183,7 +192,7 @@ impl FileHandler {
                         filename,
                         total_size
                     );
-                    return Self::quota_error_response(err).into_response();
+                    return Err(Self::quota_error_response(err));
                 }
 
                 // ── Streaming upload (temp file → blob store, hash pre-computed) ─
@@ -205,24 +214,24 @@ impl FileHandler {
                             total_size,
                             file.id
                         );
-                        return Self::created_json_response(&file).into_response();
+                        return Ok(file);
                     }
                     Err(err) => {
                         let _ = tokio::fs::remove_file(&temp_path).await;
                         tracing::error!("❌ UPLOAD FAILED: {} - {}", filename, err);
-                        return Self::domain_error_response(err).into_response();
+                        return Err(Self::domain_error_response(err));
                     }
                 }
             }
         }
 
-        (
+        Err((
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
                 "error": "No file provided"
             })),
         )
-            .into_response()
+            .into_response())
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -570,52 +579,34 @@ impl FileHandler {
 
     /// Uploads a file and generates thumbnails in the background for images.
     ///
-    /// Delegates to [`Self::upload_file`] (streaming) and, on success, spawns
-    /// a background task to generate all thumbnail sizes.
+    /// Delegates to [`Self::upload_file_inner`] and, on success, spawns
+    /// a background task to generate all thumbnail sizes before serialising
+    /// the `FileDto` once.
     pub async fn upload_file_with_thumbnails(
         State(state): State<GlobalState>,
         auth_user: AuthUser,
         multipart: Multipart,
     ) -> impl IntoResponse {
-        // Use the streaming upload handler
-        let response = Self::upload_file(State(state.clone()), auth_user, multipart).await;
+        let file = match Self::upload_file_inner(&state, &auth_user, multipart).await {
+            Ok(f) => f,
+            Err(response) => return response.into_response(),
+        };
 
-        // Try to extract file info for thumbnail generation
-        if let Ok(body_bytes) =
-            axum::body::to_bytes(response.into_response().into_body(), 10 * 1024).await
-            && let Ok(file_info) = serde_json::from_slice::<serde_json::Value>(&body_bytes)
-            && let (Some(file_id), Some(mime_type), Some(file_path_str)) = (
-                file_info.get("id").and_then(|v| v.as_str()),
-                file_info.get("mime_type").and_then(|v| v.as_str()),
-                file_info.get("path").and_then(|v| v.as_str()),
-            )
-        {
-            // Generate thumbnails for images in background
-            if state.core.thumbnail_service.is_supported_image(mime_type) {
-                let file_id = file_id.to_string();
-                let file_path_rel = file_path_str.to_string();
-                let thumbnail_service = state.core.thumbnail_service.clone();
-                let path_service = state.core.path_service.clone();
+        // Generate thumbnails for supported images in background
+        if state.core.thumbnail_service.is_supported_image(&file.mime_type) {
+            let file_id = file.id.clone();
+            let file_path_rel = file.path.clone();
+            let thumbnail_service = state.core.thumbnail_service.clone();
+            let path_service = state.core.path_service.clone();
 
-                tokio::spawn(async move {
-                    let file_path = path_service.get_root_path().join(&file_path_rel);
-                    tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                    thumbnail_service.generate_all_sizes_background(file_id, file_path);
-                });
-            }
-
-            // Return the response
-            return Response::builder()
-                .status(StatusCode::CREATED)
-                .header(header::CONTENT_TYPE, "application/json")
-                .header(header::CACHE_CONTROL, "no-cache, no-store, must-revalidate")
-                .body(Body::from(body_bytes))
-                .unwrap()
-                .into_response();
+            tokio::spawn(async move {
+                let file_path = path_service.get_root_path().join(&file_path_rel);
+                tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
+                thumbnail_service.generate_all_sizes_background(file_id, file_path);
+            });
         }
 
-        // Fallback for errors
-        (StatusCode::INTERNAL_SERVER_ERROR, "Upload processing error").into_response()
+        Self::created_json_response(&file).into_response()
     }
 
     /// Lists files, optionally filtered by folder ID

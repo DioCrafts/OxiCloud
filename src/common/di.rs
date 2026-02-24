@@ -327,7 +327,11 @@ impl AppServiceFactory {
 
         // Build a password hasher for share password verification
         let password_hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
-            Arc::new(crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new());
+            Arc::new(crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                self.config.auth.hash_memory_cost,
+                self.config.auth.hash_time_cost,
+                self.config.auth.hash_parallelism,
+            ));
 
         let service = Arc::new(ShareService::new(
             Arc::new(self.config.clone()),

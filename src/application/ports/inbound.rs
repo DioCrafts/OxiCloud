@@ -94,7 +94,10 @@ pub trait FolderUseCase: Send + Sync + 'static {
 #[async_trait]
 pub trait SearchUseCase: Send + Sync + 'static {
     /// Performs a full search based on the specified criteria.
-    async fn search(&self, criteria: SearchCriteriaDto) -> Result<SearchResultsDto, DomainError>;
+    ///
+    /// `user_id` identifies the authenticated user so that SQL queries filter
+    /// by owner and the result cache is isolated per tenant.
+    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<SearchResultsDto, DomainError>;
 
     /// Returns quick suggestions for autocomplete (lightweight, fast).
     async fn suggest(

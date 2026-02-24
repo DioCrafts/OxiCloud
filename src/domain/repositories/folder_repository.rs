@@ -135,6 +135,41 @@ pub trait FolderRepository: Send + Sync + 'static {
         Ok(Vec::new())
     }
 
+    /// Search folders with SQL-level filtering by name, user, and scope.
+    ///
+    /// - **Non-recursive** (`recursive = false`): searches direct children of
+    ///   `parent_id` (or root folders when `None`).
+    /// - **Recursive with `parent_id`**: delegates to `list_descendant_folders`
+    ///   (ltree GiST-indexed scan).
+    /// - **Recursive without `parent_id`**: searches ALL folders owned by
+    ///   `user_id` with optional name filter in SQL.
+    ///
+    /// The default implementation falls back to `list_folders` + in-memory
+    /// filter so that stubs and mocks compile without changes.
+    async fn search_folders(
+        &self,
+        parent_id: Option<&str>,
+        name_contains: Option<&str>,
+        user_id: &str,
+        recursive: bool,
+    ) -> Result<Vec<Folder>, DomainError> {
+        // Recursive with folder_id → use optimised ltree scan
+        if recursive {
+            if let Some(fid) = parent_id {
+                return self.list_descendant_folders(fid, name_contains, user_id).await;
+            }
+        }
+        // Fallback: load + filter in memory (stubs / mocks)
+        let all = self.list_folders(parent_id).await?;
+        match name_contains {
+            Some(q) if !q.is_empty() => {
+                let q = q.to_lowercase();
+                Ok(all.into_iter().filter(|f| f.name().to_lowercase().contains(&q)).collect())
+            }
+            _ => Ok(all),
+        }
+    }
+
     /// Return up to `limit` folders whose name contains `query` (case-insensitive).
     ///
     /// Results are ordered by relevance (exact > starts-with > contains) for

@@ -8,6 +8,7 @@ use tracing::{error, info};
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::di::AppState;
+use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
 /**
@@ -23,6 +24,7 @@ impl SearchHandler {
     /// GET /search — simple query-parameter-based search.
     pub async fn search_files_get(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Query(params): Query<SearchParams>,
     ) -> impl IntoResponse {
         info!("API: File search with parameters: {:?}", params);
@@ -57,7 +59,7 @@ impl SearchHandler {
             sort_by: params.sort_by.unwrap_or_else(|| "relevance".to_string()),
         };
 
-        match search_service.search(search_criteria).await {
+        match search_service.search(search_criteria, &auth_user.id).await {
             Ok(results) => {
                 info!(
                     "Search completed in {}ms — {} files, {} folders",
@@ -81,6 +83,7 @@ impl SearchHandler {
     /// POST /search/advanced — full criteria in the request body.
     pub async fn search_files_post(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Json(criteria): Json<SearchCriteriaDto>,
     ) -> impl IntoResponse {
         info!("API: Advanced file search");
@@ -97,7 +100,7 @@ impl SearchHandler {
             }
         };
 
-        match search_service.search(criteria).await {
+        match search_service.search(criteria, &auth_user.id).await {
             Ok(results) => {
                 info!(
                     "Advanced search completed in {}ms — {} files, {} folders",

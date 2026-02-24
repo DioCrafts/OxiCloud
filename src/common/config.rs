@@ -248,8 +248,12 @@ pub struct AuthConfig {
     pub jwt_secret: String,
     pub access_token_expiry_secs: i64,
     pub refresh_token_expiry_secs: i64,
+    /// Argon2id memory cost in KiB (default 65536 = 64 MiB)
     pub hash_memory_cost: u32,
+    /// Argon2id time cost / iterations (default 3)
     pub hash_time_cost: u32,
+    /// Argon2id parallelism lanes (default 2)
+    pub hash_parallelism: u32,
 }
 
 impl Default for AuthConfig {
@@ -261,8 +265,9 @@ impl Default for AuthConfig {
             jwt_secret: String::new(),
             access_token_expiry_secs: 3600,     // 1 hour
             refresh_token_expiry_secs: 2592000, // 30 days
-            hash_memory_cost: 65536,            // 64MB
+            hash_memory_cost: 65536,            // 64 MiB
             hash_time_cost: 3,
+            hash_parallelism: 2,
         }
     }
 }
@@ -535,6 +540,23 @@ impl AppConfig {
             && let Ok(val) = refresh_token_expiry
         {
             config.auth.refresh_token_expiry_secs = val;
+        }
+
+        // Argon2 hashing parameters
+        if let Ok(v) = env::var("OXICLOUD_HASH_MEMORY_COST").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.hash_memory_cost = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_HASH_TIME_COST").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.hash_time_cost = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_HASH_PARALLELISM").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.hash_parallelism = val;
         }
 
         // Feature flags

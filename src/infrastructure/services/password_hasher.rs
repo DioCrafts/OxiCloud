@@ -3,12 +3,15 @@
 //! This module provides a secure password hashing implementation using the Argon2id
 //! algorithm, which is the recommended choice for password hashing as of 2023+.
 //!
-//! Both `hash_password` and `verify_password` are CPU-intensive (~300-500 ms with
-//! default parameters) so they run inside `spawn_blocking` to avoid blocking Tokio
-//! worker threads.
+//! Both `hash_password` and `verify_password` are CPU-intensive so they run inside
+//! `spawn_blocking` to avoid blocking Tokio worker threads.
+//!
+//! The Argon2id parameters (`m_cost`, `t_cost`, `p_cost`) are injected at
+//! construction time from `AuthConfig`, so operators can tune security vs.
+//! latency via environment variables.
 
 use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHash, PasswordHasher, PasswordVerifier};
+use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
 use async_trait::async_trait;
 use rand_core::OsRng;
 
@@ -20,23 +23,38 @@ use crate::common::errors::{DomainError, ErrorKind};
 /// Uses Argon2id algorithm which provides resistance against both side-channel
 /// and GPU-based attacks. This is the recommended algorithm for password hashing.
 ///
-/// The struct is stateless — `Argon2::default()` is constructed per call inside
-/// `spawn_blocking` so it is `Send` without extra synchronisation.
+/// The struct stores the validated `Params` so that `Argon2` can be cheaply
+/// reconstructed inside each `spawn_blocking` call (it is not `Send`).
 #[derive(Debug, Clone)]
 pub struct Argon2PasswordHasher {
-    _private: (),
+    params: Params,
 }
 
 impl Argon2PasswordHasher {
-    /// Create a new Argon2PasswordHasher with default secure parameters.
-    pub fn new() -> Self {
-        Self { _private: () }
-    }
-}
+    /// Create a new hasher with explicit Argon2id parameters.
+    ///
+    /// - `memory_cost`:  memory in KiB (e.g. 65536 = 64 MiB)
+    /// - `time_cost`:    number of iterations (e.g. 3)
+    /// - `parallelism`:  lanes of parallelism (e.g. 2)
+    ///
+    /// Panics at startup if the parameters are invalid (caught immediately).
+    pub fn new(memory_cost: u32, time_cost: u32, parallelism: u32) -> Self {
+        let params = Params::new(memory_cost, time_cost, parallelism, None)
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Invalid Argon2 parameters (m={}, t={}, p={}): {}",
+                    memory_cost, time_cost, parallelism, e
+                )
+            });
 
-impl Default for Argon2PasswordHasher {
-    fn default() -> Self {
-        Self::new()
+        tracing::info!(
+            "Argon2PasswordHasher initialized: m_cost={} KiB, t_cost={}, p_cost={}",
+            memory_cost,
+            time_cost,
+            parallelism,
+        );
+
+        Self { params }
     }
 }
 
@@ -44,9 +62,11 @@ impl Default for Argon2PasswordHasher {
 impl PasswordHasherPort for Argon2PasswordHasher {
     async fn hash_password(&self, password: &str) -> Result<String, DomainError> {
         let pwd = password.to_owned();
+        let params = self.params.clone();
         tokio::task::spawn_blocking(move || {
             let salt = SaltString::generate(&mut OsRng);
-            Argon2::default()
+            let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
+            argon2
                 .hash_password(pwd.as_bytes(), &salt)
                 .map(|hash| hash.to_string())
                 .map_err(|e| {
@@ -79,6 +99,8 @@ impl PasswordHasherPort for Argon2PasswordHasher {
                 )
             })?;
 
+            // verify_password reads m/t/p from the hash string itself,
+            // so existing hashes (with old params) verify correctly.
             Ok(Argon2::default()
                 .verify_password(pwd.as_bytes(), &parsed_hash)
                 .is_ok())
@@ -98,9 +120,14 @@ impl PasswordHasherPort for Argon2PasswordHasher {
 mod tests {
     use super::*;
 
+    /// Test params: small values so tests are fast (~10 ms instead of ~400 ms)
+    fn test_hasher() -> Argon2PasswordHasher {
+        Argon2PasswordHasher::new(16384, 1, 1)
+    }
+
     #[tokio::test]
     async fn test_hash_and_verify_password() {
-        let hasher = Argon2PasswordHasher::new();
+        let hasher = test_hasher();
         let password = "test_password_123";
 
         let hash = hasher
@@ -123,7 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_different_hashes_for_same_password() {
-        let hasher = Argon2PasswordHasher::new();
+        let hasher = test_hasher();
         let password = "same_password";
 
         let hash1 = hasher.hash_password(password).await.expect("Should hash");

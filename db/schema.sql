@@ -402,15 +402,27 @@ CREATE OR REPLACE TRIGGER trg_folders_path
     BEFORE INSERT OR UPDATE OF name, parent_id ON storage.folders
     FOR EACH ROW EXECUTE FUNCTION storage.compute_folder_path();
 
--- ── Cascade trigger: when a folder's path/lpath changes, update all descendants ──
+-- ── Cascade trigger: when a folder's path/lpath changes, update ALL descendants
+--    in a single batch UPDATE using the GiST index on lpath.
+--    pg_trigger_depth() guard prevents re-firing on the rows touched by the
+--    batch UPDATE itself (they also change path/lpath, which would otherwise
+--    cause infinite recursion).
 CREATE OR REPLACE FUNCTION storage.cascade_folder_path()
 RETURNS trigger AS $$
 BEGIN
+    IF pg_trigger_depth() > 1 THEN
+        RETURN NEW;
+    END IF;
+
     IF OLD.path IS DISTINCT FROM NEW.path OR OLD.lpath IS DISTINCT FROM NEW.lpath THEN
-        -- Update all descendant folders (recursive via trigger re-fire)
+        -- Single batch update: rewrite path/lpath for every descendant at once.
+        -- Uses the GiST index idx_folders_lpath for the <@ operator.
+        -- Does NOT touch name or parent_id, so compute_folder_path does not fire.
         UPDATE storage.folders
-           SET parent_id = parent_id  -- no-op value change, but fires the BEFORE UPDATE trigger
-         WHERE parent_id = NEW.id;
+           SET path  = NEW.path || substr(path, length(OLD.path) + 1),
+               lpath = NEW.lpath || subpath(lpath, nlevel(OLD.lpath))
+         WHERE lpath <@ OLD.lpath
+           AND id != NEW.id;
     END IF;
     RETURN NEW;
 END;
