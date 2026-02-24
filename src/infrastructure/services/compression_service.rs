@@ -7,6 +7,7 @@ use flate2::write::GzEncoder as GzEncoderWrite;
 use futures::{Stream, StreamExt};
 use std::io;
 use std::io::{Read, Write};
+use tokio_util::io::{ReaderStream, StreamReader};
 use tracing::error;
 
 use crate::application::ports::compression_ports::{
@@ -181,10 +182,12 @@ impl CompressionService for GzipCompressionService {
 
     /// Decompresses a byte stream using true streaming — constant memory usage.
     ///
-    /// Collects compressed chunks, then decompresses in a blocking task.
-    /// For streaming decompression of very large data, a dedicated
-    /// async-compression crate would be better, but this avoids adding
-    /// new deps while still being correct.
+    /// Uses `async-compression` to wrap the incoming compressed stream as an
+    /// `AsyncBufRead`, then pipes it through a `GzipDecoder` that produces
+    /// decompressed bytes on-the-fly.
+    ///
+    /// Memory usage: ~128 KB constant (64 KB read buffer + 64 KB output chunks),
+    /// independent of the total file size.
     fn decompress_stream<S>(
         &self,
         compressed_stream: S,
@@ -192,48 +195,11 @@ impl CompressionService for GzipCompressionService {
     where
         S: Stream<Item = io::Result<Bytes>> + Send + 'static + Unpin,
     {
-        // Decompression is harder to stream without async-compression crate.
-        // We keep the collect-then-decompress approach here but decompress in
-        // a blocking task to avoid blocking the async runtime.
-        // This is acceptable because decompress_stream is rarely used in the
-        // hot path (downloads serve raw content, not compressed).
-        Box::pin(async_stream::stream! {
-            let mut compressed_data = Vec::new();
-
-            let mut stream = Box::pin(compressed_stream);
-            while let Some(result) = stream.next().await {
-                match result {
-                    Ok(bytes) => {
-                        compressed_data.extend_from_slice(&bytes);
-                    },
-                    Err(e) => {
-                        yield Err(e);
-                        return;
-                    }
-                }
-            }
-
-            // Decompress in a blocking task
-            match tokio::task::spawn_blocking(move || {
-                let mut decoder = GzDecoder::new(&compressed_data[..]);
-                let mut decompressed = Vec::new();
-                decoder.read_to_end(&mut decompressed)?;
-                Ok::<_, io::Error>(decompressed)
-            }).await {
-                Ok(Ok(decompressed)) => {
-                    // Yield in 64KB chunks to avoid a single huge allocation in the response
-                    for chunk in decompressed.chunks(64 * 1024) {
-                        yield Ok(Bytes::copy_from_slice(chunk));
-                    }
-                },
-                Ok(Err(e)) => {
-                    yield Err(e);
-                },
-                Err(e) => {
-                    yield Err(io::Error::other(e.to_string()));
-                }
-            }
-        })
+        // Stream<Bytes> → AsyncRead → BufReader → GzipDecoder → Stream<Bytes>
+        let reader = StreamReader::new(compressed_stream);
+        let buf_reader = tokio::io::BufReader::with_capacity(64 * 1024, reader);
+        let decoder = async_compression::tokio::bufread::GzipDecoder::new(buf_reader);
+        ReaderStream::with_capacity(decoder, 64 * 1024)
     }
 
     /// Determines whether a file should be compressed based on its MIME type and size

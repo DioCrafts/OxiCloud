@@ -1820,6 +1820,7 @@ version = "0.4.2"
 dependencies = [
  "anyhow",
  "argon2",
+ "async-compression",
  "async-stream",
  "async-trait",
  "async_zip",
