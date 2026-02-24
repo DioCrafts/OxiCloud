@@ -11,9 +11,9 @@
 use crate::interfaces::middleware::auth::AuthUser;
 use axum::{
     Router,
-    body::Bytes,
+    body::Body,
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode},
+    http::{HeaderMap, StatusCode, Request},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
@@ -153,13 +153,22 @@ async fn get_file(
 }
 
 /// POST /wopi/files/{file_id}/contents — PutFile
+///
+/// **Streaming implementation**: the request body is spooled to a temp file
+/// with incremental SHA-256 hashing.  Peak RAM usage is ~256 KB regardless
+/// of file size (previously buffered the entire body as `Bytes`).
 async fn put_file(
     Path(file_id): Path<String>,
     Query(token_query): Query<WopiTokenQuery>,
     headers: HeaderMap,
     State(state): State<WopiState>,
-    body: Bytes,
+    req: Request<Body>,
 ) -> Response {
+    use http_body_util::BodyStream;
+    use sha2::{Digest, Sha256};
+    use tokio::io::AsyncWriteExt;
+    use tokio_stream::StreamExt;
+
     let claims = match state
         .token_service
         .validate_token(&token_query.access_token)
@@ -197,7 +206,7 @@ async fn put_file(
         }
     }
 
-    // Get file path for update_file
+    // Get file metadata for the path
     let file = match state
         .app_state
         .applications
@@ -209,14 +218,75 @@ async fn put_file(
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };
 
-    // Save the file content using path-based update
-    match state
+    // ── Streaming spool: body → temp file + incremental SHA-256 ──
+    let temp_file = match tempfile::NamedTempFile::new() {
+        Ok(f) => f,
+        Err(e) => {
+            tracing::error!("WOPI PutFile: failed to create temp file: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let temp_path = temp_file.path().to_path_buf();
+
+    let mut file_out = match tokio::fs::File::create(&temp_path).await {
+        Ok(f) => f,
+        Err(e) => {
+            tracing::error!("WOPI PutFile: failed to open temp file: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let content_type = file.mime_type.clone();
+    let mut hasher = Sha256::new();
+    let mut total_bytes: u64 = 0;
+    let mut stream = BodyStream::new(req.into_body());
+
+    while let Some(frame_result) = stream.next().await {
+        let frame = match frame_result {
+            Ok(f) => f,
+            Err(e) => {
+                let _ = tokio::fs::remove_file(&temp_path).await;
+                tracing::error!("WOPI PutFile: body read error: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        };
+        if let Some(chunk) = frame.data_ref() {
+            total_bytes += chunk.len() as u64;
+            hasher.update(chunk);
+            if let Err(e) = file_out.write_all(chunk).await {
+                let _ = tokio::fs::remove_file(&temp_path).await;
+                tracing::error!("WOPI PutFile: temp write error: {}", e);
+                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+            }
+        }
+    }
+    if let Err(e) = file_out.flush().await {
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        tracing::error!("WOPI PutFile: flush error: {}", e);
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+    drop(file_out);
+
+    let hash = hex::encode(hasher.finalize());
+
+    // ── Atomic store: temp file → dedup blob + DB metadata update ──
+    let result = state
         .app_state
         .applications
         .file_upload_service
-        .update_file(&file.path, &body)
-        .await
-    {
+        .update_file_streaming(
+            &file.path,
+            &temp_path,
+            total_bytes,
+            &content_type,
+            Some(hash),
+        )
+        .await;
+
+    // Clean up temp file (may already be moved by dedup, ignore error)
+    let _ = tokio::fs::remove_file(&temp_path).await;
+
+    match result {
         Ok(_) => StatusCode::OK.into_response(),
         Err(e) => {
             tracing::error!("WOPI PutFile failed: {}", e);

@@ -16,6 +16,7 @@ use image::{ImageFormat, imageops::FilterType};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::fs;
+use tokio::sync::Semaphore;
 
 use crate::application::ports::thumbnail_ports::{
     ThumbnailPort, ThumbnailSize as PortThumbnailSize, ThumbnailStatsDto,
@@ -69,6 +70,14 @@ struct ThumbnailCacheKey {
     size: ThumbnailSize,
 }
 
+/// Maximum pixel count before rejecting decode (50 megapixels → ~200 MB RGBA).
+/// Images above this are silently skipped — protects against single-image OOM.
+const MAX_DECODE_PIXELS: u64 = 50_000_000;
+
+/// Default max concurrent thumbnail decode operations.
+/// 4 × 96 MB (6000×4000 RGBA) = 384 MB worst-case peak.
+const DEFAULT_MAX_CONCURRENT_DECODES: usize = 4;
+
 /// Thumbnail service for generating and caching image thumbnails
 pub struct ThumbnailService {
     /// Root path for thumbnail storage
@@ -77,6 +86,10 @@ pub struct ThumbnailService {
     cache: moka::future::Cache<ThumbnailCacheKey, Bytes>,
     /// Configured maximum cache weight (for stats reporting)
     max_cache_bytes: u64,
+    /// Limits how many images are decoded in parallel to bound RAM usage.
+    /// Without this, 50 simultaneous uploads would decode 50 bitmaps
+    /// (~96 MB each for 6000×4000) = 4.8 GB peak.
+    decode_semaphore: Arc<Semaphore>,
 }
 
 impl ThumbnailService {
@@ -105,6 +118,7 @@ impl ThumbnailService {
             thumbnails_root,
             cache,
             max_cache_bytes: max_cache_bytes as u64,
+            decode_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_CONCURRENT_DECODES)),
         }
     }
 
@@ -217,7 +231,11 @@ impl ThumbnailService {
         Ok(bytes)
     }
 
-    /// Generate a thumbnail from an image file
+    /// Generate a thumbnail from an image file.
+    ///
+    /// Concurrency is bounded by `decode_semaphore` to prevent OOM when
+    /// many images are uploaded simultaneously.  Resolution is also
+    /// capped at `MAX_DECODE_PIXELS` to reject pathologically large images.
     async fn generate_thumbnail(
         &self,
         original_path: &Path,
@@ -226,9 +244,25 @@ impl ThumbnailService {
         let path = original_path.to_path_buf();
         let max_dim = size.max_dimension();
 
+        // Acquire semaphore permit — bounds peak RAM from concurrent decodes
+        let _permit = self.decode_semaphore.acquire().await
+            .map_err(|_| ThumbnailError::TaskError("Decode semaphore closed".into()))?;
+
         // Run image processing in blocking thread pool
         let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
-            // Load image
+            // Safety check: read dimensions from headers only (no full decode)
+            let (w, h) = image::ImageReader::open(&path)
+                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
+                .into_dimensions()
+                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+            if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
+                return Err(ThumbnailError::ImageError(format!(
+                    "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
+                    w as u64 * h as u64 / 1_000_000
+                )));
+            }
+
+            // Load image (full decode — now safe within semaphore + resolution guard)
             let img = image::open(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
             // Calculate new dimensions preserving aspect ratio
@@ -274,10 +308,31 @@ impl ThumbnailService {
         tokio::spawn(async move {
             tracing::info!("🖼️ Background thumbnail generation starting: {}", file_id);
 
+            // Acquire semaphore permit — bounds peak RAM from concurrent decodes
+            let _permit = match self.decode_semaphore.acquire().await {
+                Ok(p) => p,
+                Err(_) => {
+                    tracing::warn!("Decode semaphore closed, skipping thumbnails for {}", file_id);
+                    return;
+                }
+            };
+
             let path = original_path.clone();
 
             // Single spawn_blocking: 1 read + 1 decode + 3 resize + 3 encode
             let results = tokio::task::spawn_blocking(move || {
+                // Safety check: read dimensions from headers only (no full decode)
+                let (w, h) = image::ImageReader::open(&path)
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
+                    .into_dimensions()
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+                if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
+                    return Err(ThumbnailError::ImageError(format!(
+                        "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
+                        w as u64 * h as u64 / 1_000_000
+                    )));
+                }
+
                 let img = image::open(&path)
                     .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 

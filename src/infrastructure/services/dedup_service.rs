@@ -155,15 +155,33 @@ impl DedupService {
 
     // ── Core store operations ────────────────────────────────────
 
+    /// Maximum payload accepted by `store_bytes`.  Anything larger
+    /// should use `store_from_file` (streaming — constant RAM).
+    const MAX_STORE_BYTES: usize = 10 * 1024 * 1024; // 10 MB
+
     /// Store content with deduplication (from bytes).
     ///
     /// Uses `SELECT … FOR UPDATE` + `INSERT … ON CONFLICT` for atomic
     /// upsert — completely TOCTOU-free.
+    ///
+    /// **Guard**: rejects payloads >10 MB.  Large content must go through
+    /// `store_from_file` which streams from disk with constant RAM.
     pub async fn store_bytes(
         &self,
         content: &[u8],
         content_type: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
+        if content.len() > Self::MAX_STORE_BYTES {
+            return Err(DomainError::internal_error(
+                "Dedup",
+                format!(
+                    "store_bytes called with {} bytes (max {}). Use store_from_file for large content.",
+                    content.len(),
+                    Self::MAX_STORE_BYTES
+                ),
+            ));
+        }
+
         let size = content.len() as u64;
         let hash = Self::hash_bytes(content);
 
