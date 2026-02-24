@@ -678,6 +678,39 @@ impl FolderRepository for FolderDbRepository {
         }
     }
 
+    /// Lists every folder in a subtree rooted at `folder_id` (inclusive).
+    ///
+    /// Single GiST-indexed query: `fo.lpath <@ (root's lpath)`.
+    /// Ordered by `fo.path` so callers can iterate in directory order.
+    async fn list_subtree_folders(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let sql = "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
+                          fo.user_id::text, \
+                          EXTRACT(EPOCH FROM fo.created_at)::bigint, \
+                          EXTRACT(EPOCH FROM fo.updated_at)::bigint \
+                     FROM storage.folders fo \
+                    WHERE fo.is_trashed = false \
+                      AND fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid) \
+                    ORDER BY fo.path";
+
+        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
+            sqlx::query_as(sql)
+                .bind(folder_id)
+                .fetch_all(self.pool())
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error("FolderDb", format!("subtree folders: {e}"))
+                })?;
+
+        rows.into_iter()
+            .map(|(id, name, path, pid, uid, ca, ma)| {
+                Self::row_to_folder(id, name, path, pid, uid, ca, ma)
+            })
+            .collect()
+    }
+
     /// Lists all descendant folders in a subtree using ltree GiST index.
     ///
     /// Single SQL query: `fo.lpath <@ (root's lpath)` fetches the entire

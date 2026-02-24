@@ -71,6 +71,18 @@ pub trait FolderUseCase: Send + Sync + 'static {
         user_id: &str,
         name: String,
     ) -> Result<FolderDto, DomainError>;
+
+    /// Lists every folder in a subtree rooted at `folder_id` (inclusive),
+    /// ordered by path.  Uses ltree `<@` — single GiST-indexed query.
+    ///
+    /// Default: returns an empty vec (stubs / mocks).
+    async fn list_subtree_folders(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<FolderDto>, DomainError> {
+        let _ = folder_id;
+        Ok(Vec::new())
+    }
 }
 
 /**

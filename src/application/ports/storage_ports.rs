@@ -78,6 +78,19 @@ pub trait FileReadPort: Send + Sync + 'static {
         Ok(None)
     }
 
+    /// Lists every file in the subtree rooted at `folder_id`.
+    ///
+    /// Uses an ltree `<@` join against `storage.folders` so the entire
+    /// subtree is fetched in a single GiST-indexed query.
+    ///
+    /// Default: falls back to `list_files(Some(folder_id))` (one level).
+    async fn list_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<File>, DomainError> {
+        self.list_files(Some(folder_id)).await
+    }
+
     /// Search files with pagination and filtering at database level.
     ///
     /// This is more efficient than loading all files and filtering in memory,

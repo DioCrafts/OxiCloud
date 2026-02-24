@@ -1,6 +1,5 @@
 use crate::{
     application::dtos::file_dto::FileDto,
-    application::dtos::folder_dto::FolderDto,
     application::ports::file_ports::FileRetrievalUseCase,
     application::ports::inbound::FolderUseCase,
     application::ports::zip_ports::ZipPort,
@@ -11,6 +10,7 @@ use async_zip::base::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
 use futures::io::AsyncWriteExt as FuturesWriteExt;
 use futures::StreamExt;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use thiserror::Error;
@@ -72,6 +72,9 @@ impl ZipService {
     /// Creates a ZIP file backed by a temporary file, containing the contents
     /// of a folder and all its subfolders.  Returns the `NamedTempFile` so the
     /// caller can stream it and let the OS clean up on drop.
+    ///
+    /// Uses **2 SQL queries** (ltree `<@`) to fetch the entire subtree instead
+    /// of the previous N+1 BFS traversal.
     pub async fn create_folder_zip(
         &self,
         folder_id: &str,
@@ -82,123 +85,101 @@ impl ZipService {
             folder_name, folder_id
         );
 
-        // Verify the folder exists
-        let folder = match self.folder_service.get_folder(folder_id).await {
-            Ok(folder) => folder,
+        // Verify the folder exists and get its path for prefix stripping
+        let root_folder = match self.folder_service.get_folder(folder_id).await {
+            Ok(f) => f,
             Err(e) => {
                 error!("Error getting folder {}: {}", folder_id, e);
                 return Err(ZipError::FolderNotFound(folder_id.to_string()).into());
             }
         };
 
-        // Create a temp file; open a second async handle for writing.
+        // ── 1. Bulk-fetch the entire subtree (2 queries total) ───────────
+        let all_folders = self
+            .folder_service
+            .list_subtree_folders(folder_id)
+            .await
+            .map_err(|e| {
+                ZipError::FolderContentsError(format!("subtree folders: {}", e))
+            })?;
+
+        let all_files = self
+            .file_service
+            .list_files_in_subtree(folder_id)
+            .await
+            .map_err(|e| {
+                ZipError::FolderContentsError(format!("subtree files: {}", e))
+            })?;
+
+        info!(
+            "ZIP subtree: {} folders, {} files",
+            all_folders.len(),
+            all_files.len()
+        );
+
+        // ── 2. Group files by folder_id ──────────────────────────────────
+        let mut files_by_folder: HashMap<String, Vec<FileDto>> =
+            HashMap::with_capacity(all_folders.len());
+        for file in all_files {
+            let fid = file.folder_id.clone().unwrap_or_default();
+            files_by_folder.entry(fid).or_default().push(file);
+        }
+
+        // ── 3. Build a mapping: folder_id → ZIP-relative path ────────────
+        //
+        // The root folder's DB path is e.g. "/users/alice/Documents".
+        // We want ZIP entries relative to `folder_name`, so we strip the
+        // root prefix and prepend `folder_name`.
+        let root_path = root_folder.path.trim_end_matches('/');
+        let folder_zip_path = |db_path: &str| -> String {
+            let db_path = db_path.trim_end_matches('/');
+            if db_path == root_path {
+                folder_name.to_string()
+            } else {
+                let suffix = db_path
+                    .strip_prefix(root_path)
+                    .unwrap_or(db_path)
+                    .trim_start_matches('/');
+                format!("{}/{}", folder_name, suffix)
+            }
+        };
+
+        // ── 4. Open the temp file + ZIP writer ───────────────────────────
         let temp = NamedTempFile::new().map_err(ZipError::IoError)?;
         let tokio_file = tokio::fs::File::create(temp.path())
             .await
             .map_err(ZipError::IoError)?;
-
-        // 256 KB buffer keeps syscall count low.
         let buf_writer = BufWriter::with_capacity(256 * 1024, tokio_file);
         let mut zip = ZipFileWriter::with_tokio(buf_writer);
 
-        // Track processed folders to avoid cycles
-        let mut processed_folders = std::collections::HashSet::new();
+        // ── 5. Write entries (folders are already sorted by path) ─────────
+        for folder in &all_folders {
+            let zip_dir = format!("{}/", folder_zip_path(&folder.path));
 
-        // Build the ZIP iteratively
-        self.process_folder_recursively(
-            &mut zip,
-            &folder,
-            folder_name,
-            &mut processed_folders,
-        )
-        .await?;
+            // Directory entry (Stored, zero-length body)
+            let dir_entry =
+                ZipEntryBuilder::new(zip_dir.clone().into(), Compression::Stored);
+            match zip.write_entry_whole(dir_entry, &[]).await {
+                Ok(()) => debug!("Folder added to ZIP: {}", zip_dir),
+                Err(e) => {
+                    warn!("Could not add folder entry (may already exist): {}", e);
+                }
+            }
 
-        // Finalize: writes central directory, then flush buffered data to disk.
+            // Files belonging to this folder
+            if let Some(files) = files_by_folder.get(&folder.id) {
+                for file in files {
+                    self.add_file_to_zip_streamed(&mut zip, file, &zip_dir)
+                        .await?;
+                }
+            }
+        }
+
+        // ── 6. Finalize ──────────────────────────────────────────────────
         let mut compat_writer = zip.close().await.map_err(ZipError::AsyncZipError)?;
         compat_writer.close().await.map_err(ZipError::IoError)?;
 
         Ok(temp)
-    }
-
-    /// Iterative BFS over the folder tree.  Writes entries directly to the
-    /// async `ZipFileWriter` so memory stays flat.
-    async fn process_folder_recursively(
-        &self,
-        zip: &mut AsyncZipWriter,
-        folder: &FolderDto,
-        path: &str,
-        processed_folders: &mut std::collections::HashSet<String>,
-    ) -> Result<()> {
-        struct PendingFolder {
-            folder: FolderDto,
-            path: String,
-        }
-
-        let mut work_queue = vec![PendingFolder {
-            folder: folder.clone(),
-            path: path.to_string(),
-        }];
-
-        while let Some(current) = work_queue.pop() {
-            let folder_id = current.folder.id.to_string();
-
-            if processed_folders.contains(&folder_id) {
-                continue;
-            }
-            processed_folders.insert(folder_id.clone());
-
-            // Directory entry (Stored, zero-length body)
-            let folder_path = format!("{}/", current.path);
-            let dir_entry =
-                ZipEntryBuilder::new(folder_path.clone().into(), Compression::Stored);
-            match zip.write_entry_whole(dir_entry, &[]).await {
-                Ok(()) => debug!("Folder added to ZIP: {}", folder_path),
-                Err(e) => {
-                    warn!("Could not add folder to ZIP (may already exist): {}", e);
-                }
-            }
-
-            // Files in this folder
-            let files = match self.file_service.list_files(Some(&folder_id)).await {
-                Ok(files) => files,
-                Err(e) => {
-                    error!("Error listing files in folder {}: {}", folder_id, e);
-                    return Err(ZipError::FolderContentsError(format!(
-                        "Error listing files: {}",
-                        e
-                    ))
-                    .into());
-                }
-            };
-
-            for file in files {
-                self.add_file_to_zip_streamed(zip, &file, &folder_path)
-                    .await?;
-            }
-
-            // Subfolders
-            let subfolders = match self.folder_service.list_folders(Some(&folder_id)).await {
-                Ok(folders) => folders,
-                Err(e) => {
-                    error!("Error listing subfolders in {}: {}", folder_id, e);
-                    return Err(ZipError::FolderContentsError(format!(
-                        "Error listing subfolders: {}",
-                        e
-                    ))
-                    .into());
-                }
-            };
-
-            for subfolder in subfolders {
-                let subfolder_path = format!("{}/{}", current.path, subfolder.name);
-                work_queue.push(PendingFolder {
-                    folder: subfolder,
-                    path: subfolder_path,
-                });
-            }
-        }
-
-        Ok(())
     }
 
     /// Streams file content in chunks (~64 KB) into an async ZIP entry,

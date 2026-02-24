@@ -160,6 +160,16 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
+
+    /// Lists every file in the subtree rooted at `folder_id`.
+    ///
+    /// Default: falls back to `list_files(Some(folder_id))` (one level).
+    async fn list_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        self.list_files(Some(folder_id)).await
+    }
 }
 
 // ─────────────────────────────────────────────────────

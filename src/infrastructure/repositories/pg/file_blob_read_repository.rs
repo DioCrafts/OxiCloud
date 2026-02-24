@@ -368,6 +368,52 @@ impl FileReadPort for FileBlobReadRepository {
         }
     }
 
+    /// Lists every file in the subtree rooted at `folder_id` (inclusive).
+    ///
+    /// Single GiST-indexed query via ltree `<@`.
+    /// Ordered by `(fo.path, fi.name)` so callers iterate in directory order.
+    async fn list_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<File>, DomainError> {
+        let rows: Vec<(
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            String,
+            i64,
+            i64,
+            Option<String>,
+        )> = sqlx::query_as(
+            r#"
+            SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                   fi.size, fi.mime_type,
+                   EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                   EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                   fi.user_id::text
+              FROM storage.files fi
+              JOIN storage.folders fo ON fo.id = fi.folder_id
+             WHERE fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid)
+               AND NOT fi.is_trashed
+             ORDER BY fo.path, fi.name
+            "#,
+        )
+        .bind(folder_id)
+        .fetch_all(self.pool.as_ref())
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("FileBlobRead", format!("subtree files: {e}"))
+        })?;
+
+        rows.into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect()
+    }
+
     /// Search files with filtering and pagination at database level.
     /// This is much more efficient than loading all files and filtering in memory.
     ///

@@ -308,4 +308,12 @@ impl FileRetrievalUseCase for FileRetrievalService {
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         self.file_read.get_file_range_stream(id, start, end).await
     }
+
+    async fn list_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let files = self.file_read.list_files_in_subtree(folder_id).await?;
+        Ok(files.into_iter().map(FileDto::from).collect())
+    }
 }

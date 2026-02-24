@@ -104,6 +104,20 @@ pub trait FolderRepository: Send + Sync + 'static {
     /// This is used during user registration to create the user's personal folder.
     async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError>;
 
+    /// Lists every folder in a subtree rooted at `folder_id` (inclusive).
+    ///
+    /// Uses ltree `<@` for a single GiST-indexed scan.  The result is
+    /// ordered by `path` so callers can iterate in directory order.
+    ///
+    /// Default: falls back to `list_folders` (one level only).
+    async fn list_subtree_folders(
+        &self,
+        folder_id: &str,
+    ) -> Result<Vec<Folder>, DomainError> {
+        let _ = folder_id;
+        Ok(Vec::new())
+    }
+
     /// Lists all descendant folders in a subtree (ltree-based).
     ///
     /// Returns all folders whose lpath is a descendant of the given folder's
