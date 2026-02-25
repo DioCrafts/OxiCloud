@@ -288,7 +288,6 @@ impl AppServiceFactory {
     /// Creates the trash service
     pub async fn create_trash_service(
         &self,
-        core: &CoreServices,
         repos: &RepositoryServices,
     ) -> Option<Arc<dyn TrashUseCase>> {
         if !self.config.features.enable_trash {
@@ -299,12 +298,12 @@ impl AppServiceFactory {
         let trash_repo = repos.trash_repository.as_ref()?;
 
         // Wire ports directly to TrashService — no adapter layer needed
+        // Note: Blob ref_count is handled by PG trigger trg_files_decrement_blob_ref
         let service = Arc::new(TrashService::new(
             trash_repo.clone(),
             repos.file_read_repository.clone(),
             repos.file_write_repository.clone(),
             repos.folder_repository.clone(),
-            core.dedup_service.clone(),
             self.config.storage.trash_retention_days,
         ));
 
@@ -446,7 +445,7 @@ impl AppServiceFactory {
         let repos = self.create_repository_services(&core, &pool);
 
         // 3. Trash service (needed before application services)
-        let trash_service = self.create_trash_service(&core, &repos).await;
+        let trash_service = self.create_trash_service(&repos).await;
 
         // 4. Application services (with trash already wired)
         let mut apps = self.create_application_services(&core, &repos, trash_service.clone());

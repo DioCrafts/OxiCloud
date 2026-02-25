@@ -4,7 +4,6 @@ use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
-use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
@@ -38,9 +37,6 @@ pub struct TrashService {
     /// Port for folder operations (get folder, trash, restore, delete)
     folder_storage_port: Arc<dyn FolderStoragePort>,
 
-    /// Port for dedup/blob operations (cleanup orphaned blobs)
-    dedup_port: Arc<dyn DedupPort>,
-
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
 }
@@ -51,7 +47,6 @@ impl TrashService {
         file_read_port: Arc<dyn FileReadPort>,
         file_write_port: Arc<dyn FileWritePort>,
         folder_storage_port: Arc<dyn FolderStoragePort>,
-        dedup_port: Arc<dyn DedupPort>,
         retention_days: u32,
     ) -> Self {
         Self {
@@ -59,7 +54,6 @@ impl TrashService {
             file_read_port,
             file_write_port,
             folder_storage_port,
-            dedup_port,
             retention_days,
         }
     }
@@ -680,15 +674,22 @@ impl TrashUseCase for TrashService {
 
         // Use bulk operations for O(1) SQL queries instead of N individual deletes.
         // This is a significant performance optimization for users with many trashed items.
+        //
+        // IMPORTANT: The PG trigger `trg_files_decrement_blob_ref` automatically decrements
+        // blob ref_counts when files are deleted. We do NOT call remove_reference manually
+        // here to avoid double-decrement. Physical blob cleanup is handled by garbage
+        // collection for blobs where ref_count = 0.
 
-        // Step 1: Bulk delete all trashed files, collecting blob hashes for dedup cleanup
-        let (files_deleted, blob_hashes) = self
+        // Step 1: Bulk delete all individually trashed files (is_trashed = TRUE)
+        let (files_deleted, _) = self
             .file_write_port
             .empty_trash_bulk(user_id)
             .await
             .unwrap_or((0, Vec::new()));
 
-        // Step 2: Bulk delete all trashed folders
+        // Step 2: Bulk delete all files in trashed folders and the folders themselves
+        // Note: Files in trashed folders may not have is_trashed=TRUE themselves,
+        // but their parent folder is trashed, so they need to be deleted too.
         let (folders_deleted, _) = self
             .folder_storage_port
             .bulk_delete_trashed_folders(user_id)
@@ -697,16 +698,6 @@ impl TrashUseCase for TrashService {
 
         // Step 3: Clear the trash index for this user
         self.trash_repository.clear_trash(&user_uuid).await?;
-
-        // Step 4: Clean up orphaned blobs via dedup port
-        // The blob hashes were collected during bulk file delete.
-        // Each hash needs its reference count decremented.
-        for hash in blob_hashes {
-            if let Err(e) = self.dedup_port.remove_reference(&hash).await {
-                // Log but don't fail - the blob will be cleaned up later by garbage collection
-                debug!("Failed to decrement blob ref {}: {}", &hash[..12], e);
-            }
-        }
 
         info!(
             "Trash emptied for user {}: {} files, {} folders deleted",
