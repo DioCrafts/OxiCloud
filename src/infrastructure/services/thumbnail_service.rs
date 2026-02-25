@@ -192,11 +192,7 @@ impl ThumbnailService {
                 }
 
                 // 2. Generate thumbnail (CPU-bound, runs in spawn_blocking)
-                tracing::info!(
-                    "🎨 Generating thumbnail: {} {:?}",
-                    file_id_owned,
-                    size
-                );
+                tracing::info!("🎨 Generating thumbnail: {} {:?}", file_id_owned, size);
                 match self.generate_thumbnail(&original_owned, size).await {
                     Ok(bytes) => {
                         // Save to disk (best-effort — don't fail the request)
@@ -245,14 +241,17 @@ impl ThumbnailService {
         let max_dim = size.max_dimension();
 
         // Acquire semaphore permit — bounds peak RAM from concurrent decodes
-        let _permit = self.decode_semaphore.acquire().await
+        let _permit = self
+            .decode_semaphore
+            .acquire()
+            .await
             .map_err(|_| ThumbnailError::TaskError("Decode semaphore closed".into()))?;
 
         // Run image processing in blocking thread pool
         let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
             // Single read: load file once into memory, then work from the buffer
-            let data = std::fs::read(&path)
-                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+            let data =
+                std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
             // Safety check: read dimensions from in-memory buffer (no 2nd I/O)
             let (w, h) = image::ImageReader::new(std::io::Cursor::new(&data))
@@ -284,9 +283,9 @@ impl ThumbnailService {
             // Adaptive filter: faster filters for smaller sizes where
             // quality difference vs Lanczos3 is imperceptible
             let filter = match size {
-                ThumbnailSize::Icon    => FilterType::Triangle,   // 150px — max speed
+                ThumbnailSize::Icon => FilterType::Triangle, // 150px — max speed
                 ThumbnailSize::Preview => FilterType::CatmullRom, // 400px — good balance
-                ThumbnailSize::Large   => FilterType::CatmullRom, // 800px — sufficient quality
+                ThumbnailSize::Large => FilterType::CatmullRom, // 800px — sufficient quality
             };
             let thumbnail = img.resize(new_width, new_height, filter);
 
@@ -318,7 +317,10 @@ impl ThumbnailService {
             let _permit = match self.decode_semaphore.acquire().await {
                 Ok(p) => p,
                 Err(_) => {
-                    tracing::warn!("Decode semaphore closed, skipping thumbnails for {}", file_id);
+                    tracing::warn!(
+                        "Decode semaphore closed, skipping thumbnails for {}",
+                        file_id
+                    );
                     return;
                 }
             };
@@ -328,8 +330,8 @@ impl ThumbnailService {
             // Single spawn_blocking: 1 read + 1 decode + 3 resize + 3 encode
             let results = tokio::task::spawn_blocking(move || {
                 // Single read: load file once into memory
-                let data = std::fs::read(&path)
-                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+                let data =
+                    std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
                 // Safety check: read dimensions from in-memory buffer (no 2nd I/O)
                 let (w, h) = image::ImageReader::new(std::io::Cursor::new(&data))
@@ -364,18 +366,15 @@ impl ThumbnailService {
                         };
 
                         let filter = match size {
-                            ThumbnailSize::Icon    => FilterType::Triangle,
+                            ThumbnailSize::Icon => FilterType::Triangle,
                             ThumbnailSize::Preview => FilterType::CatmullRom,
-                            ThumbnailSize::Large   => FilterType::CatmullRom,
+                            ThumbnailSize::Large => FilterType::CatmullRom,
                         };
                         let thumb = img.resize(new_w, new_h, filter);
 
                         let mut buf = Vec::new();
                         thumb
-                            .write_to(
-                                &mut std::io::Cursor::new(&mut buf),
-                                ImageFormat::WebP,
-                            )
+                            .write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::WebP)
                             .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
                         Ok((size, Bytes::from(buf)))
@@ -388,15 +387,11 @@ impl ThumbnailService {
             let thumbnails = match results {
                 Ok(Ok(t)) => t,
                 Ok(Err(e)) => {
-                    tracing::warn!(
-                        "Thumbnail generation failed for {}: {}", file_id, e
-                    );
+                    tracing::warn!("Thumbnail generation failed for {}: {}", file_id, e);
                     return;
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Thumbnail task panicked for {}: {}", file_id, e
-                    );
+                    tracing::warn!("Thumbnail task panicked for {}: {}", file_id, e);
                     return;
                 }
             };

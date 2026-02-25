@@ -616,10 +616,12 @@ pub async fn download_batch(
         .as_file()
         .metadata()
         .map(|m| m.len())
-        .map_err(|e| (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to read temp file metadata: {}", e),
-        ))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Failed to read temp file metadata: {}", e),
+            )
+        })?;
 
     // Split into the already-open fd + auto-delete path
     let (std_file, temp_path) = temp_file.into_parts();
@@ -644,7 +646,9 @@ pub async fn download_batch(
 
     // Keep TempPath alive in response extensions so the file is only
     // deleted AFTER the body stream finishes sending.
-    response.extensions_mut().insert(std::sync::Arc::new(temp_path));
+    response
+        .extensions_mut()
+        .insert(std::sync::Arc::new(temp_path));
 
     Ok(response)
 }

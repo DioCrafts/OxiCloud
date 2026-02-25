@@ -769,9 +769,7 @@ impl DedupService {
             .bind(BATCH_SIZE)
             .fetch_all(self.maintenance_pool.as_ref())
             .await
-            .map_err(|e| {
-                DomainError::internal_error("Dedup", format!("GC batch failed: {e}"))
-            })?;
+            .map_err(|e| DomainError::internal_error("Dedup", format!("GC batch failed: {e}")))?;
 
             if batch.is_empty() {
                 break;

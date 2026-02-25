@@ -510,7 +510,13 @@ mod tests {
             &self,
             _folder_id: &str,
         ) -> Result<
-            std::pin::Pin<Box<dyn futures::Stream<Item = Result<crate::domain::entities::file::File, DomainError>> + Send>>,
+            std::pin::Pin<
+                Box<
+                    dyn futures::Stream<
+                            Item = Result<crate::domain::entities::file::File, DomainError>,
+                        > + Send,
+                >,
+            >,
             DomainError,
         > {
             Ok(Box::pin(futures::stream::empty()))

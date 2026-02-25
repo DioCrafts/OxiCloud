@@ -17,10 +17,7 @@ pub struct TrashCleanupService {
 }
 
 impl TrashCleanupService {
-    pub fn new(
-        trash_repository: Arc<dyn TrashRepository>,
-        cleanup_interval_hours: u64,
-    ) -> Self {
+    pub fn new(trash_repository: Arc<dyn TrashRepository>, cleanup_interval_hours: u64) -> Self {
         Self {
             trash_repository,
             cleanup_interval_hours: cleanup_interval_hours.max(1), // Minimum 1 hour
@@ -60,9 +57,7 @@ impl TrashCleanupService {
 
     /// Bulk-delete all expired trash items in a single transaction.
     #[instrument(skip(trash_repository))]
-    async fn cleanup_expired_items(
-        trash_repository: Arc<dyn TrashRepository>,
-    ) -> Result<()> {
+    async fn cleanup_expired_items(trash_repository: Arc<dyn TrashRepository>) -> Result<()> {
         debug!("Starting bulk cleanup of expired trash items");
 
         let (files, folders) = trash_repository.delete_expired_bulk().await?;

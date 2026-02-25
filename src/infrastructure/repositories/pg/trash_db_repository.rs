@@ -150,38 +150,40 @@ impl TrashRepository for TrashDbRepository {
     async fn delete_expired_bulk(&self) -> Result<(u64, u64)> {
         let cutoff = Utc::now() - chrono::Duration::days(self.retention_days);
 
-        let mut tx = self.pool.begin().await.map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("begin tx: {e}"))
-        })?;
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| DomainError::internal_error("TrashDb", format!("begin tx: {e}")))?;
 
         // 1. Bulk-delete expired trashed files.
         //    The PG trigger `trg_files_decrement_blob_ref` automatically
         //    decrements blob ref_count for every deleted row.
-        let files_deleted = sqlx::query(
-            "DELETE FROM storage.files WHERE is_trashed = TRUE AND trashed_at < $1",
-        )
-        .bind(cutoff)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| DomainError::internal_error("TrashDb", format!("bulk delete files: {e}")))?
-        .rows_affected();
+        let files_deleted =
+            sqlx::query("DELETE FROM storage.files WHERE is_trashed = TRUE AND trashed_at < $1")
+                .bind(cutoff)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error("TrashDb", format!("bulk delete files: {e}"))
+                })?
+                .rows_affected();
 
         // 2. Bulk-delete expired trashed folders.
         //    FK ON DELETE CASCADE handles descendant folders and their files.
-        let folders_deleted = sqlx::query(
-            "DELETE FROM storage.folders WHERE is_trashed = TRUE AND trashed_at < $1",
-        )
-        .bind(cutoff)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("bulk delete folders: {e}"))
-        })?
-        .rows_affected();
+        let folders_deleted =
+            sqlx::query("DELETE FROM storage.folders WHERE is_trashed = TRUE AND trashed_at < $1")
+                .bind(cutoff)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error("TrashDb", format!("bulk delete folders: {e}"))
+                })?
+                .rows_affected();
 
-        tx.commit().await.map_err(|e| {
-            DomainError::internal_error("TrashDb", format!("commit tx: {e}"))
-        })?;
+        tx.commit()
+            .await
+            .map_err(|e| DomainError::internal_error("TrashDb", format!("commit tx: {e}")))?;
 
         Ok((files_deleted, folders_deleted))
     }

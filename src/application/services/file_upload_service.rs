@@ -194,12 +194,11 @@ impl FileUploadUseCase for FileUploadService {
         };
 
         // Spool to temp file + hash
-        let temp = tempfile::NamedTempFile::new().map_err(|e| {
-            DomainError::internal_error("FileUpload", format!("temp file: {e}"))
-        })?;
-        tokio::fs::write(temp.path(), content).await.map_err(|e| {
-            DomainError::internal_error("FileUpload", format!("write temp: {e}"))
-        })?;
+        let temp = tempfile::NamedTempFile::new()
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("temp file: {e}")))?;
+        tokio::fs::write(temp.path(), content)
+            .await
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
         let hash = hex::encode(Sha256::digest(content));
 
         let file = self
@@ -224,12 +223,11 @@ impl FileUploadUseCase for FileUploadService {
     /// then delegates to the streaming update/create path.
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError> {
         // Spool to temp file + hash
-        let temp = tempfile::NamedTempFile::new().map_err(|e| {
-            DomainError::internal_error("FileUpload", format!("temp file: {e}"))
-        })?;
-        tokio::fs::write(temp.path(), content).await.map_err(|e| {
-            DomainError::internal_error("FileUpload", format!("write temp: {e}"))
-        })?;
+        let temp = tempfile::NamedTempFile::new()
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("temp file: {e}")))?;
+        tokio::fs::write(temp.path(), content)
+            .await
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
         let hash = hex::encode(Sha256::digest(content));
 
         self.update_file_streaming(

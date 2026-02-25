@@ -208,7 +208,10 @@ impl FileReadPort for MockFileRepository {
     async fn stream_files_in_subtree(
         &self,
         _folder_id: &str,
-    ) -> std::result::Result<Pin<Box<dyn Stream<Item = std::result::Result<File, DomainError>> + Send>>, DomainError> {
+    ) -> std::result::Result<
+        Pin<Box<dyn Stream<Item = std::result::Result<File, DomainError>> + Send>>,
+        DomainError,
+    > {
         Ok(Box::pin(futures::stream::empty()))
     }
 }
@@ -502,7 +505,10 @@ mod tests {
         // Arrange
         let trashed_files = Arc::new(Mutex::new(HashMap::new()));
         let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
-        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let trash_repo = Arc::new(MockTrashRepository::new(
+            trashed_files.clone(),
+            trashed_folders.clone(),
+        ));
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
@@ -573,7 +579,10 @@ mod tests {
         // Arrange
         let trashed_files = Arc::new(Mutex::new(HashMap::new()));
         let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
-        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let trash_repo = Arc::new(MockTrashRepository::new(
+            trashed_files.clone(),
+            trashed_folders.clone(),
+        ));
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
@@ -635,7 +644,10 @@ mod tests {
         // Arrange
         let trashed_files = Arc::new(Mutex::new(HashMap::new()));
         let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
-        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let trash_repo = Arc::new(MockTrashRepository::new(
+            trashed_files.clone(),
+            trashed_folders.clone(),
+        ));
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
@@ -702,7 +714,10 @@ mod tests {
         // Arrange
         let trashed_files = Arc::new(Mutex::new(HashMap::new()));
         let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
-        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let trash_repo = Arc::new(MockTrashRepository::new(
+            trashed_files.clone(),
+            trashed_folders.clone(),
+        ));
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
@@ -768,7 +783,10 @@ mod tests {
         // Arrange
         let trashed_files = Arc::new(Mutex::new(HashMap::new()));
         let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
-        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let trash_repo = Arc::new(MockTrashRepository::new(
+            trashed_files.clone(),
+            trashed_folders.clone(),
+        ));
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 

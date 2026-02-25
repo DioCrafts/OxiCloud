@@ -36,10 +36,10 @@ use crate::application::services::{
 use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
 use crate::domain::services::i18n_service::I18nService;
+use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::repositories::pg::{
     FileBlobReadRepository, FileBlobWriteRepository, FolderDbRepository, TrashDbRepository,
 };
-use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::services::file_content_cache::{
     FileContentCache, FileContentCacheConfig,
 };
@@ -333,11 +333,13 @@ impl AppServiceFactory {
 
         // Build a password hasher for share password verification
         let password_hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
-            Arc::new(crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
-                self.config.auth.hash_memory_cost,
-                self.config.auth.hash_time_cost,
-                self.config.auth.hash_parallelism,
-            ));
+            Arc::new(
+                crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                    self.config.auth.hash_memory_cost,
+                    self.config.auth.hash_time_cost,
+                    self.config.auth.hash_parallelism,
+                ),
+            );
 
         let service = Arc::new(ShareService::new(
             Arc::new(self.config.clone()),
@@ -469,7 +471,8 @@ impl AppServiceFactory {
             recent_service = Some(recent.clone());
             apps.recent_service = Some(recent);
 
-            storage_usage_service = Some(self.create_storage_usage_service(&repos, &pool, &maintenance_pool));
+            storage_usage_service =
+                Some(self.create_storage_usage_service(&repos, &pool, &maintenance_pool));
 
             // Auth services
             if self.config.features.enable_auth {

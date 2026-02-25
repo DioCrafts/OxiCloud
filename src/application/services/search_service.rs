@@ -272,7 +272,11 @@ impl SearchUseCase for SearchService {
      * - Human-readable size formatting
      * - Pagination
      */
-    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<Arc<SearchResultsDto>> {
+    async fn search(
+        &self,
+        criteria: SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<Arc<SearchResultsDto>> {
         let start = Instant::now();
 
         // Try to get from cache
@@ -369,7 +373,8 @@ impl SearchUseCase for SearchService {
                 criteria.sort_by.clone(),
             ));
 
-            self.store_in_cache(cache_key, Arc::clone(&search_results)).await;
+            self.store_in_cache(cache_key, Arc::clone(&search_results))
+                .await;
             return Ok(search_results);
         }
 
@@ -454,7 +459,8 @@ impl SearchUseCase for SearchService {
         ));
 
         // Store in cache — Arc::clone is ~1 ns (atomic increment)
-        self.store_in_cache(cache_key, Arc::clone(&search_results)).await;
+        self.store_in_cache(cache_key, Arc::clone(&search_results))
+            .await;
 
         Ok(search_results)
     }
