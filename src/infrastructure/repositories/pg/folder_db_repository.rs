@@ -465,17 +465,15 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {
-        // First, delete all files in this folder and descendant folders
-        // to avoid constraint violations from ON DELETE SET NULL
+        // Delete all files whose folder is anywhere in the subtree.
+        // Uses the GiST-indexed ltree `<@` operator — O(log N) vs the
+        // O(depth × N) recursive CTE it replaces.
         sqlx::query(
-            r#"
-            WITH RECURSIVE descendants AS (
-                SELECT id FROM storage.folders WHERE id = $1::uuid
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            )
-            DELETE FROM storage.files WHERE folder_id IN (SELECT id FROM descendants)
-            "#,
+            "DELETE FROM storage.files \
+              WHERE folder_id IN ( \
+                  SELECT id FROM storage.folders \
+                   WHERE lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid) \
+              )",
         )
         .bind(id)
         .execute(self.pool())
@@ -594,16 +592,14 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn delete_folder_permanently(&self, folder_id: &str) -> Result<(), DomainError> {
-        // First, delete all files in this folder and descendant folders
+        // Delete all files whose folder is anywhere in the subtree
+        // (GiST ltree index, same pattern as delete_folder).
         sqlx::query(
-            r#"
-            WITH RECURSIVE descendants AS (
-                SELECT id FROM storage.folders WHERE id = $1::uuid
-                UNION ALL
-                SELECT f.id FROM storage.folders f JOIN descendants d ON f.parent_id = d.id
-            )
-            DELETE FROM storage.files WHERE folder_id IN (SELECT id FROM descendants)
-            "#,
+            "DELETE FROM storage.files \
+              WHERE folder_id IN ( \
+                  SELECT id FROM storage.folders \
+                   WHERE lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid) \
+              )",
         )
         .bind(folder_id)
         .execute(self.pool())
