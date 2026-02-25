@@ -197,15 +197,6 @@ pub struct CopyFolderTreeResult {
 /// and deferred registration for the write-behind cache.
 #[async_trait]
 pub trait FileWritePort: Send + Sync + 'static {
-    /// Saves a new file from bytes.
-    async fn save_file(
-        &self,
-        name: String,
-        folder_id: Option<String>,
-        content_type: String,
-        content: Vec<u8>,
-    ) -> Result<File, DomainError>;
-
     /// Streaming upload — saves a file from a temp file already on disk.
     ///
     /// When `pre_computed_hash` is provided, the dedup service skips the
@@ -232,10 +223,6 @@ pub trait FileWritePort: Send + Sync + 'static {
 
     /// Deletes a file.
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
-
-    /// Updates the content of an existing file.
-    async fn update_file_content(&self, file_id: &str, content: Vec<u8>)
-    -> Result<(), DomainError>;
 
     /// Streaming update — replaces file content from a temp file on disk.
     ///

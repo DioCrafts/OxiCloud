@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use sha2::{Digest, Sha256};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -29,12 +30,16 @@ fn extract_username_from_path(path: &str) -> Option<String> {
 
 /// Service for file upload operations.
 ///
-/// All upload paths converge on streaming-to-disk:
+/// **Every upload path converges on streaming-to-disk** — there is no
+/// `Vec<u8>` buffer path.
+///
 /// - **Normal uploads**: handler spools multipart to temp file → `upload_file_streaming`
 /// - **Chunked uploads**: chunks already on disk → `upload_file_from_path`
-/// - **WebDAV PUT / empty files**: small in-memory buffer → `upload_file`
+/// - **WebDAV PUT (large)**: handler streams body to temp file → `update_file_streaming`
+/// - **WebDAV PUT (small / compat)**: `create_file` / `update_file` spool `&[u8]`
+///   to a temp file internally, then call the streaming path.
 ///
-/// Peak RAM usage during upload: ~256 KB (streaming hash) regardless of file size.
+/// Peak RAM usage during any upload: ~256 KB (streaming hash) regardless of file size.
 pub struct FileUploadService {
     /// Write port — handles save, streaming, deferred registration
     file_write: Arc<dyn FileWritePort>,
@@ -136,23 +141,6 @@ impl FileUploadUseCase for FileUploadService {
         Ok(dto)
     }
 
-    /// Simple byte-based upload (for WebDAV and empty files only).
-    async fn upload_file(
-        &self,
-        name: String,
-        folder_id: Option<String>,
-        content_type: String,
-        content: Vec<u8>,
-    ) -> Result<FileDto, DomainError> {
-        let file = self
-            .file_write
-            .save_file(name, folder_id, content_type, content)
-            .await?;
-        let dto = FileDto::from(file);
-        self.maybe_update_storage_usage(&dto);
-        Ok(dto)
-    }
-
     /// Upload from a file already on disk (chunked uploads).
     async fn upload_file_from_path(
         &self,
@@ -184,6 +172,10 @@ impl FileUploadUseCase for FileUploadService {
     }
 
     /// Creates a file at a specific path (for WebDAV PUT on new resource).
+    ///
+    /// Spools the in-memory `&[u8]` to a temp file with hash-on-write,
+    /// then delegates to the streaming path.  Peak RAM: the caller's
+    /// buffer + ~256 KB for the hasher.
     async fn create_file(
         &self,
         parent_path: &str,
@@ -201,13 +193,24 @@ impl FileUploadUseCase for FileUploadService {
             None
         };
 
+        // Spool to temp file + hash
+        let temp = tempfile::NamedTempFile::new().map_err(|e| {
+            DomainError::internal_error("FileUpload", format!("temp file: {e}"))
+        })?;
+        tokio::fs::write(temp.path(), content).await.map_err(|e| {
+            DomainError::internal_error("FileUpload", format!("write temp: {e}"))
+        })?;
+        let hash = hex::encode(Sha256::digest(content));
+
         let file = self
             .file_write
-            .save_file(
+            .save_file_from_temp(
                 filename.to_string(),
                 parent_id,
                 content_type.to_string(),
-                content.to_vec(),
+                temp.path(),
+                content.len() as u64,
+                Some(hash),
             )
             .await?;
         let dto = FileDto::from(file);
@@ -216,26 +219,27 @@ impl FileUploadUseCase for FileUploadService {
     }
 
     /// Updates an existing file's content, or creates it if not found (for WebDAV PUT).
+    ///
+    /// Spools the in-memory `&[u8]` to a temp file with hash-on-write,
+    /// then delegates to the streaming update/create path.
     async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError> {
-        // Direct SQL lookup — O(folder_depth) instead of O(total_files)
-        if let Some(file_read) = &self.file_read
-            && let Some(file) = file_read.find_file_by_path(path).await?
-        {
-            self.file_write
-                .update_file_content(file.id(), content.to_vec())
-                .await?;
-            return Ok(());
-        }
+        // Spool to temp file + hash
+        let temp = tempfile::NamedTempFile::new().map_err(|e| {
+            DomainError::internal_error("FileUpload", format!("temp file: {e}"))
+        })?;
+        tokio::fs::write(temp.path(), content).await.map_err(|e| {
+            DomainError::internal_error("FileUpload", format!("write temp: {e}"))
+        })?;
+        let hash = hex::encode(Sha256::digest(content));
 
-        let path_normalized = path.trim_start_matches('/').trim_end_matches('/');
-        let (parent_path, filename) = if let Some(idx) = path_normalized.rfind('/') {
-            (&path_normalized[..idx], &path_normalized[idx + 1..])
-        } else {
-            ("", path_normalized)
-        };
-        self.create_file(parent_path, filename, content, "application/octet-stream")
-            .await?;
-        Ok(())
+        self.update_file_streaming(
+            path,
+            temp.path(),
+            content.len() as u64,
+            "application/octet-stream",
+            Some(hash),
+        )
+        .await
     }
 
     /// Streaming update — replaces file content from a temp file on disk.

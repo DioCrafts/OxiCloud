@@ -15,13 +15,18 @@ use crate::common::errors::DomainError;
 
 /// Primary port for file upload operations.
 ///
-/// All upload paths converge on streaming-to-disk:
+/// **All upload paths converge on streaming-to-disk** — no method accepts
+/// `Vec<u8>` for content.  Even `create_file` / `update_file` (WebDAV
+/// helpers that receive `&[u8]`) spool to a temp file internally so that
+/// peak RAM stays at ~256 KB regardless of file size.
+///
 /// - Normal uploads: handler spools multipart to temp file → `upload_file_streaming`
-/// - WebDAV PUT: small in-memory buffer → `upload_file`
 /// - Chunked uploads: chunks already on disk → `upload_file_from_path`
+/// - WebDAV PUT (new): handler streams to temp file → `update_file_streaming`
+/// - WebDAV PUT (small/compat): `create_file` / `update_file` spool internally
 #[async_trait]
 pub trait FileUploadUseCase: Send + Sync + 'static {
-    /// Upload from a temp file already on disk (true streaming, ~64 KB RAM).
+    /// Upload from a temp file already on disk (true streaming, ~256 KB RAM).
     ///
     /// When `pre_computed_hash` is `Some`, the blob store skips the hash
     /// re-read — the handler already computed it during the multipart spool.
@@ -33,19 +38,6 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         temp_path: &Path,
         size: u64,
         pre_computed_hash: Option<String>,
-    ) -> Result<FileDto, DomainError>;
-
-    /// Upload from in-memory bytes (for small payloads: WebDAV, empty files).
-    ///
-    /// Only used for WebDAV PUT and empty files where the content is already
-    /// buffered by the protocol handler. For normal uploads, prefer
-    /// `upload_file_streaming`.
-    async fn upload_file(
-        &self,
-        name: String,
-        folder_id: Option<String>,
-        content_type: String,
-        content: Vec<u8>,
     ) -> Result<FileDto, DomainError>;
 
     /// Upload from a file already assembled on disk (chunked uploads).

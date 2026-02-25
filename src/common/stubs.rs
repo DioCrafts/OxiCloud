@@ -131,16 +131,6 @@ pub struct StubFileWritePort;
 
 #[async_trait]
 impl FileWritePort for StubFileWritePort {
-    async fn save_file(
-        &self,
-        _name: String,
-        _folder_id: Option<String>,
-        _content_type: String,
-        _content: Vec<u8>,
-    ) -> Result<File, DomainError> {
-        Ok(File::default())
-    }
-
     async fn save_file_from_temp(
         &self,
         _name: String,
@@ -174,14 +164,6 @@ impl FileWritePort for StubFileWritePort {
     }
 
     async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-
-    async fn update_file_content(
-        &self,
-        _file_id: &str,
-        _content: Vec<u8>,
-    ) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -450,16 +432,6 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         _temp_path: &Path,
         _size: u64,
         _pre_computed_hash: Option<String>,
-    ) -> Result<FileDto, DomainError> {
-        Ok(FileDto::default())
-    }
-
-    async fn upload_file(
-        &self,
-        _name: String,
-        _folder_id: Option<String>,
-        _content_type: String,
-        _content: Vec<u8>,
     ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }

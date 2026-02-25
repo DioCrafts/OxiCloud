@@ -167,11 +167,18 @@ impl FileHandler {
                     ));
                 }
 
-                // Empty file — use in-memory path
+                // Empty file — use streaming path with the (empty) temp file
                 if total_size == 0 {
-                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    let hash = hex::encode(hasher.finalize());
                     return upload_service
-                        .upload_file(filename, folder_id, content_type, vec![])
+                        .upload_file_streaming(
+                            filename,
+                            folder_id,
+                            content_type,
+                            &temp_path,
+                            0,
+                            Some(hash),
+                        )
                         .await
                         .map_err(Self::domain_error_response);
                 }

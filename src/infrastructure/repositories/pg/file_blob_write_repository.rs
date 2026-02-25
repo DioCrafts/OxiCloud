@@ -182,88 +182,6 @@ impl FileBlobWriteRepository {
 
 #[async_trait]
 impl FileWritePort for FileBlobWriteRepository {
-    async fn save_file(
-        &self,
-        name: String,
-        folder_id: Option<String>,
-        content_type: String,
-        content: Vec<u8>,
-    ) -> Result<File, DomainError> {
-        let user_id = self.resolve_user_id(folder_id.as_deref()).await?;
-        let size = content.len() as i64;
-
-        // Store content in blob store
-        let dedup_result = self
-            .dedup
-            .store_bytes(&content, Some(content_type.clone()))
-            .await?;
-        let blob_hash = dedup_result.hash().to_string();
-
-        // Insert file metadata — if this fails, compensate by removing the blob ref
-        let row = match sqlx::query_as::<_, (String, i64, i64)>(
-            r#"
-            INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
-            VALUES ($1, $2::uuid, $3, $4, $5, $6)
-            RETURNING id::text,
-                      EXTRACT(EPOCH FROM created_at)::bigint,
-                      EXTRACT(EPOCH FROM updated_at)::bigint
-            "#,
-        )
-        .bind(&name)
-        .bind(&folder_id)
-        .bind(&user_id)
-        .bind(&blob_hash)
-        .bind(size)
-        .bind(&content_type)
-        .fetch_one(self.pool.as_ref())
-        .await
-        {
-            Ok(row) => row,
-            Err(e) => {
-                // ── Compensation: undo the blob ref so it doesn't become orphaned ──
-                if let Err(rollback_err) = self.dedup.remove_reference(&blob_hash).await {
-                    tracing::error!(
-                        "Blob orphaned after failed INSERT — hash: {}, err: {}",
-                        &blob_hash[..12],
-                        rollback_err
-                    );
-                }
-                if let sqlx::Error::Database(ref db_err) = e
-                    && db_err.code().as_deref() == Some("23505")
-                {
-                    return Err(DomainError::already_exists(
-                        "File",
-                        format!("{name} already exists in folder"),
-                    ));
-                }
-                return Err(DomainError::internal_error(
-                    "FileBlobWrite",
-                    format!("insert: {e}"),
-                ));
-            }
-        };
-
-        tracing::info!(
-            "💾 BLOB WRITE: {} ({} bytes, hash: {})",
-            name,
-            size,
-            &blob_hash[..12]
-        );
-
-        let folder_path = self.lookup_folder_path(folder_id.as_deref()).await?;
-        Self::row_to_file(
-            row.0,
-            name,
-            folder_id,
-            folder_path,
-            size,
-            content_type,
-            row.1,
-            row.2,
-            Some(user_id),
-        )
-    }
-
     async fn save_file_from_temp(
         &self,
         name: String,
@@ -532,19 +450,6 @@ impl FileWritePort for FileBlobWriteRepository {
         }
 
         Ok(())
-    }
-
-    async fn update_file_content(
-        &self,
-        file_id: &str,
-        content: Vec<u8>,
-    ) -> Result<(), DomainError> {
-        // Store new content first (blob store is idempotent)
-        let new_size = content.len() as i64;
-        let dedup_result = self.dedup.store_bytes(&content, None).await?;
-        let new_hash = dedup_result.hash().to_string();
-
-        self.swap_blob_hash(file_id, &new_hash, new_size).await
     }
 
     async fn update_file_content_from_temp(
