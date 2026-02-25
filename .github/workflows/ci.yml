@@ -70,9 +70,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      # RUSTSEC-2023-0071 (Marvin Attack): rsa crate is a transitive dependency from jsonwebtoken.
+      # Not affected: This application uses HS256 for internal JWT signing and only performs
+      # RSA public key verification (not private key operations) for OIDC/OAuth2 tokens.
       - uses: rustsec/audit-check@v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          ignore: RUSTSEC-2023-0071
 
   build:
     name: Build Check
