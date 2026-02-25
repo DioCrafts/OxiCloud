@@ -20,12 +20,21 @@ use crate::domain::services::path_service::StoragePath;
 // Mock repositories for testing
 struct MockTrashRepository {
     trash_items: Mutex<HashMap<Uuid, TrashedItem>>,
+    /// Shared refs to the file/folder trashed maps so `clear_trash` can
+    /// simulate the PG CASCADE + trigger behaviour.
+    trashed_files: Arc<Mutex<HashMap<String, File>>>,
+    trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
 }
 
 impl MockTrashRepository {
-    fn new() -> Self {
+    fn new(
+        trashed_files: Arc<Mutex<HashMap<String, File>>>,
+        trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
+    ) -> Self {
         Self {
             trash_items: Mutex::new(HashMap::new()),
+            trashed_files,
+            trashed_folders,
         }
     }
 }
@@ -80,6 +89,9 @@ impl TrashRepository for MockTrashRepository {
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
         items.retain(|_, item| item.user_id() != *user_id);
+        // Simulate PG CASCADE: clear trashed file/folder storage too
+        self.trashed_files.lock().unwrap().clear();
+        self.trashed_folders.lock().unwrap().clear();
         Ok(())
     }
 
@@ -97,14 +109,14 @@ impl TrashRepository for MockTrashRepository {
 
 struct MockFileRepository {
     files: Mutex<HashMap<String, File>>,
-    trashed_files: Mutex<HashMap<String, File>>,
+    trashed_files: Arc<Mutex<HashMap<String, File>>>,
 }
 
 impl MockFileRepository {
-    fn new() -> Self {
+    fn new(trashed_files: Arc<Mutex<HashMap<String, File>>>) -> Self {
         Self {
             files: Mutex::new(HashMap::new()),
-            trashed_files: Mutex::new(HashMap::new()),
+            trashed_files,
         }
     }
 
@@ -322,14 +334,14 @@ impl FileWritePort for MockFileRepository {
 
 struct MockFolderRepository {
     folders: Mutex<HashMap<String, Folder>>,
-    trashed_folders: Mutex<HashMap<String, Folder>>,
+    trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
 }
 
 impl MockFolderRepository {
-    fn new() -> Self {
+    fn new(trashed_folders: Arc<Mutex<HashMap<String, Folder>>>) -> Self {
         Self {
             folders: Mutex::new(HashMap::new()),
-            trashed_folders: Mutex::new(HashMap::new()),
+            trashed_folders,
         }
     }
 
@@ -500,9 +512,11 @@ mod tests {
     #[tokio::test]
     async fn test_move_file_to_trash() {
         // Arrange
-        let trash_repo = Arc::new(MockTrashRepository::new());
-        let file_repo = Arc::new(MockFileRepository::new());
-        let folder_repo = Arc::new(MockFolderRepository::new());
+        let trashed_files = Arc::new(Mutex::new(HashMap::new()));
+        let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
+        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let file_repo = Arc::new(MockFileRepository::new(trashed_files));
+        let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
         let service = TrashService::new(
             trash_repo.clone(),
@@ -569,9 +583,11 @@ mod tests {
     #[tokio::test]
     async fn test_move_folder_to_trash() {
         // Arrange
-        let trash_repo = Arc::new(MockTrashRepository::new());
-        let file_repo = Arc::new(MockFileRepository::new());
-        let folder_repo = Arc::new(MockFolderRepository::new());
+        let trashed_files = Arc::new(Mutex::new(HashMap::new()));
+        let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
+        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let file_repo = Arc::new(MockFileRepository::new(trashed_files));
+        let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
         let service = TrashService::new(
             trash_repo.clone(),
@@ -629,9 +645,11 @@ mod tests {
     #[tokio::test]
     async fn test_restore_file_from_trash() {
         // Arrange
-        let trash_repo = Arc::new(MockTrashRepository::new());
-        let file_repo = Arc::new(MockFileRepository::new());
-        let folder_repo = Arc::new(MockFolderRepository::new());
+        let trashed_files = Arc::new(Mutex::new(HashMap::new()));
+        let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
+        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let file_repo = Arc::new(MockFileRepository::new(trashed_files));
+        let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
         let service = TrashService::new(
             trash_repo.clone(),
@@ -694,9 +712,11 @@ mod tests {
     #[tokio::test]
     async fn test_delete_permanently() {
         // Arrange
-        let trash_repo = Arc::new(MockTrashRepository::new());
-        let file_repo = Arc::new(MockFileRepository::new());
-        let folder_repo = Arc::new(MockFolderRepository::new());
+        let trashed_files = Arc::new(Mutex::new(HashMap::new()));
+        let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
+        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let file_repo = Arc::new(MockFileRepository::new(trashed_files));
+        let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
         let service = TrashService::new(
             trash_repo.clone(),
@@ -758,9 +778,11 @@ mod tests {
     #[tokio::test]
     async fn test_empty_trash() {
         // Arrange
-        let trash_repo = Arc::new(MockTrashRepository::new());
-        let file_repo = Arc::new(MockFileRepository::new());
-        let folder_repo = Arc::new(MockFolderRepository::new());
+        let trashed_files = Arc::new(Mutex::new(HashMap::new()));
+        let trashed_folders = Arc::new(Mutex::new(HashMap::new()));
+        let trash_repo = Arc::new(MockTrashRepository::new(trashed_files.clone(), trashed_folders.clone()));
+        let file_repo = Arc::new(MockFileRepository::new(trashed_files));
+        let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
         let service = TrashService::new(
             trash_repo.clone(),
