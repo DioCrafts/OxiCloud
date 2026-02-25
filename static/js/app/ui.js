@@ -121,6 +121,7 @@ const ui = {
                     </div>
                     <div class="rename-dialog-buttons">
                         <button class="btn btn-secondary" id="move-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-outline" id="copy-confirm-btn" data-i18n="actions.copy">Copy</button>
                         <button class="btn btn-primary" id="move-confirm-btn" data-i18n="actions.move_to">Move</button>
                     </div>
                 </div>

@@ -77,6 +77,17 @@
 	border-top: 1px solid #e2e8f0;
 }
 
+.rename-dialog-buttons .btn-outline {
+	background: transparent;
+	color: #4a5568;
+	border: 1px solid #cbd5e0;
+}
+
+.rename-dialog-buttons .btn-outline:hover {
+	background: #f7fafc;
+	border-color: #a0aec0;
+}
+
 /* Share Dialog — Modern Style */
 .share-dialog {
 	position: fixed;
@@ -343,7 +354,7 @@
 
 /* Move dialog breadcrumb navigation */
 .move-dialog-breadcrumb {
-	display: flex;
+	display: none; /* Hidden by default, shown via JS when navigating into subfolders */
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 4px;
@@ -655,6 +666,17 @@
 [data-theme="dark"] .rename-dialog-buttons {
 	background: #162032;
 	border-top-color: #334155;
+}
+
+[data-theme="dark"] .rename-dialog-buttons .btn-outline {
+	background: transparent;
+	color: #94a3b8;
+	border-color: #475569;
+}
+
+[data-theme="dark"] .rename-dialog-buttons .btn-outline:hover {
+	background: #334155;
+	border-color: #64748b;
 }
 
 [data-theme="dark"] .shared-dialog-content {

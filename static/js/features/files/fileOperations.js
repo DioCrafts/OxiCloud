@@ -767,6 +767,63 @@ const fileOps = {
     },
 
     /**
+     * Copy a file to another folder
+     * @param {string} fileId - File ID
+     * @param {string} targetFolderId - Target folder ID
+     * @returns {Promise<boolean>} - Success status
+     */
+    async copyFile(fileId, targetFolderId) {
+        try {
+            const response = await fetch('/api/batch/files/copy', {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    file_ids: [fileId],
+                    target_folder_id: targetFolderId === "" ? null : targetFolderId
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                // Reload files after copying
+                await window.loadFiles();
+                window.ui.showNotification('File copied', 'File copied successfully');
+                return true;
+            } else {
+                let errorMessage = 'Unknown error';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || 'Unknown error';
+                } catch (e) {
+                    errorMessage = 'Error processing server response';
+                }
+                window.ui.showNotification('Error', `Error copying the file: ${errorMessage}`);
+                return false;
+            }
+        } catch (error) {
+            console.error('Error copying file:', error);
+            window.ui.showNotification('Error', 'Error copying the file');
+            return false;
+        }
+    },
+
+    /**
+     * Copy a folder to another folder
+     * Note: Backend folder copy is not yet implemented, this shows a notification
+     * @param {string} folderId - Folder ID
+     * @param {string} targetFolderId - Target folder ID
+     * @returns {Promise<boolean>} - Success status
+     */
+    async copyFolder(folderId, targetFolderId) {
+        // Folder copy is not yet implemented in the backend
+        window.ui.showNotification('Not implemented', 'Folder copy is not yet supported');
+        return false;
+    },
+
+    /**
      * Rename a file
      * @param {string} fileId - File ID
      * @param {string} newName - New file name
