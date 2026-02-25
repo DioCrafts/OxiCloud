@@ -96,15 +96,13 @@ impl TrashRepository for MockTrashRepository {
         Ok(())
     }
 
-    async fn get_expired_items(&self) -> Result<Vec<TrashedItem>> {
-        let items = self.trash_items.lock().unwrap();
+    async fn delete_expired_bulk(&self) -> Result<(u64, u64)> {
+        let mut items = self.trash_items.lock().unwrap();
         let now = Utc::now();
-        let expired = items
-            .values()
-            .filter(|item| item.deletion_date() <= now)
-            .cloned()
-            .collect();
-        Ok(expired)
+        let before = items.len() as u64;
+        items.retain(|_, item| item.deletion_date() > now);
+        let deleted = before - items.len() as u64;
+        Ok((deleted, 0))
     }
 }
 

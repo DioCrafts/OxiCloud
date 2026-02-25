@@ -12,5 +12,8 @@ pub trait TrashRepository: Send + Sync {
     async fn restore_from_trash(&self, id: &Uuid, user_id: &Uuid) -> Result<()>;
     async fn delete_permanently(&self, id: &Uuid, user_id: &Uuid) -> Result<()>;
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()>;
-    async fn get_expired_items(&self) -> Result<Vec<TrashedItem>>;
+
+    /// Bulk-delete all expired trash items (files + folders) in a single
+    /// transaction.  Returns `(files_deleted, folders_deleted)`.
+    async fn delete_expired_bulk(&self) -> Result<(u64, u64)>;
 }

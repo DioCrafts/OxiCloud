@@ -147,27 +147,42 @@ impl TrashRepository for TrashDbRepository {
         Ok(())
     }
 
-    async fn get_expired_items(&self) -> Result<Vec<TrashedItem>> {
+    async fn delete_expired_bulk(&self) -> Result<(u64, u64)> {
         let cutoff = Utc::now() - chrono::Duration::days(self.retention_days);
 
-        let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<DateTime<Utc>>)>(
-            r#"
-            SELECT id, name, item_type, user_id, trashed_at
-              FROM storage.trash_items
-             WHERE trashed_at < $1
-             ORDER BY trashed_at ASC
-            "#,
+        let mut tx = self.pool.begin().await.map_err(|e| {
+            DomainError::internal_error("TrashDb", format!("begin tx: {e}"))
+        })?;
+
+        // 1. Bulk-delete expired trashed files.
+        //    The PG trigger `trg_files_decrement_blob_ref` automatically
+        //    decrements blob ref_count for every deleted row.
+        let files_deleted = sqlx::query(
+            "DELETE FROM storage.files WHERE is_trashed = TRUE AND trashed_at < $1",
         )
         .bind(cutoff)
-        .fetch_all(self.pool.as_ref())
+        .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::internal_error("TrashDb", format!("expired: {e}")))?;
+        .map_err(|e| DomainError::internal_error("TrashDb", format!("bulk delete files: {e}")))?
+        .rows_affected();
 
-        Ok(rows
-            .into_iter()
-            .map(|(id, name, item_type, uid, trashed_at)| {
-                self.row_to_trashed_item(id, name, item_type, uid, trashed_at)
-            })
-            .collect())
+        // 2. Bulk-delete expired trashed folders.
+        //    FK ON DELETE CASCADE handles descendant folders and their files.
+        let folders_deleted = sqlx::query(
+            "DELETE FROM storage.folders WHERE is_trashed = TRUE AND trashed_at < $1",
+        )
+        .bind(cutoff)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("TrashDb", format!("bulk delete folders: {e}"))
+        })?
+        .rows_affected();
+
+        tx.commit().await.map_err(|e| {
+            DomainError::internal_error("TrashDb", format!("commit tx: {e}"))
+        })?;
+
+        Ok((files_deleted, folders_deleted))
     }
 }
