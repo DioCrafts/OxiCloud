@@ -51,6 +51,7 @@ rayon = "1.10"
 infer = "0.19"
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 async_zip = { version = "0.0.18", features = ["tokio", "deflate"] }
+dashmap = "6"
 
 [features]
 default = []
