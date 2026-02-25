@@ -124,7 +124,13 @@ impl FileContentCache {
     /// Put file content into cache
     ///
     /// Moka handles eviction automatically based on weight (content size).
-    pub async fn put(&self, file_id: String, content: Bytes, etag: Arc<str>, content_type: Arc<str>) {
+    pub async fn put(
+        &self,
+        file_id: String,
+        content: Bytes,
+        etag: Arc<str>,
+        content_type: Arc<str>,
+    ) {
         let size = content.len();
 
         // Don't cache if too large
@@ -258,24 +264,14 @@ mod tests {
         // A file within the limit should be cached
         let small = Bytes::from(vec![0u8; 50]);
         cache
-            .put(
-                "small".to_string(),
-                small,
-                "e1".into(),
-                "app/bin".into(),
-            )
+            .put("small".to_string(), small, "e1".into(), "app/bin".into())
             .await;
         assert!(cache.get("small").await.is_some());
 
         // A file exceeding max_file_size is rejected by our own logic
         let big = Bytes::from(vec![1u8; 51]);
         cache
-            .put(
-                "big".to_string(),
-                big,
-                "e2".into(),
-                "app/bin".into(),
-            )
+            .put("big".to_string(), big, "e2".into(), "app/bin".into())
             .await;
         assert!(
             cache.get("big").await.is_none(),
@@ -296,12 +292,7 @@ mod tests {
 
         let content = Bytes::from("test");
         cache
-            .put(
-                "file1".to_string(),
-                content,
-                "e".into(),
-                "t".into(),
-            )
+            .put("file1".to_string(), content, "e".into(), "t".into())
             .await;
 
         assert!(cache.get("file1").await.is_some());

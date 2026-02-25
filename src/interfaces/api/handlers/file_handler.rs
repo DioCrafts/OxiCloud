@@ -476,13 +476,8 @@ impl FileHandler {
             Ok((_file, content)) => match content {
                 OptimizedFileContent::Bytes {
                     data, mime_type, ..
-                } => Self::build_cached_response(
-                    data,
-                    &mime_type,
-                    &disposition,
-                    &etag,
-                )
-                .into_response(),
+                } => Self::build_cached_response(data, &mime_type, &disposition, &etag)
+                    .into_response(),
                 OptimizedFileContent::Mmap(mmap_data) => Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, &file_dto.mime_type)
@@ -566,10 +561,8 @@ impl FileHandler {
 
                 tracing::info!("Found {} files", files.len());
                 let mut resp = (StatusCode::OK, Json(files)).into_response();
-                resp.headers_mut().insert(
-                    header::ETAG,
-                    header::HeaderValue::from_str(&etag).unwrap(),
-                );
+                resp.headers_mut()
+                    .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
             Err(err) => {
@@ -601,7 +594,11 @@ impl FileHandler {
         };
 
         // Generate thumbnails for supported images in background
-        if state.core.thumbnail_service.is_supported_image(&file.mime_type) {
+        if state
+            .core
+            .thumbnail_service
+            .is_supported_image(&file.mime_type)
+        {
             let file_id = file.id.clone();
             let file_path_rel = file.path.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();

@@ -166,14 +166,14 @@ impl FileBlobWriteRepository {
         };
 
         // Decrement old blob ref (only if hash changed, best-effort)
-        if old_hash != new_hash {
-            if let Err(e) = self.dedup.remove_reference(&old_hash).await {
-                tracing::warn!(
-                    "Failed to decrement old blob ref {}: {}",
-                    &old_hash[..12],
-                    e
-                );
-            }
+        if old_hash != new_hash
+            && let Err(e) = self.dedup.remove_reference(&old_hash).await
+        {
+            tracing::warn!(
+                "Failed to decrement old blob ref {}: {}",
+                &old_hash[..12],
+                e
+            );
         }
 
         Ok(())
@@ -701,10 +701,7 @@ impl FileWritePort for FileBlobWriteRepository {
                     );
                 }
             }
-            DomainError::internal_error(
-                "FileBlobWrite",
-                format!("copy_folder_tree: {e}"),
-            )
+            DomainError::internal_error("FileBlobWrite", format!("copy_folder_tree: {e}"))
         })?;
 
         tracing::info!(

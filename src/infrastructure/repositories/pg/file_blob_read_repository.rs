@@ -441,10 +441,7 @@ impl FileReadPort for FileBlobReadRepository {
     ///
     /// Single GiST-indexed query via ltree `<@`.
     /// Ordered by `(fo.path, fi.name)` so callers iterate in directory order.
-    async fn list_files_in_subtree(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<File>, DomainError> {
+    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<File>, DomainError> {
         let rows: Vec<(
             String,
             String,
@@ -472,9 +469,7 @@ impl FileReadPort for FileBlobReadRepository {
         .bind(folder_id)
         .fetch_all(self.pool.as_ref())
         .await
-        .map_err(|e| {
-            DomainError::internal_error("FileBlobRead", format!("subtree files: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("subtree files: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
@@ -520,11 +515,11 @@ impl FileReadPort for FileBlobReadRepository {
             conditions.push(format!("fi.folder_id = ${bind_idx}::uuid"));
         }
 
-        if let Some(name) = &criteria.name_contains {
-            if !name.is_empty() {
-                bind_idx += 1;
-                conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
-            }
+        if let Some(name) = &criteria.name_contains
+            && !name.is_empty()
+        {
+            bind_idx += 1;
+            conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
         }
 
         let where_clause = conditions.join(" AND ");
@@ -546,19 +541,30 @@ impl FileReadPort for FileBlobReadRepository {
         );
 
         // ── Bind parameters dynamically ──────────────────────────────────
-        let mut query = sqlx::query_as::<_, (
-            String, String, Option<String>, Option<String>,
-            i64, String, i64, i64, Option<String>, i64,
-        )>(&sql)
-            .bind(user_id);
+        let mut query = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                i64,
+                String,
+                i64,
+                i64,
+                Option<String>,
+                i64,
+            ),
+        >(&sql)
+        .bind(user_id);
 
         if let Some(fid) = folder_id {
             query = query.bind(fid);
         }
-        if let Some(name) = &criteria.name_contains {
-            if !name.is_empty() {
-                query = query.bind(format!("%{}%", name.to_lowercase()));
-            }
+        if let Some(name) = &criteria.name_contains
+            && !name.is_empty()
+        {
+            query = query.bind(format!("%{}%", name.to_lowercase()));
         }
         query = query.bind(limit).bind(offset);
 
@@ -600,9 +606,7 @@ impl FileReadPort for FileBlobReadRepository {
         // When no root folder specified, delegate to existing paginated search
         let root_id = match root_folder_id {
             None => {
-                return self
-                    .search_files_paginated(None, criteria, user_id)
-                    .await;
+                return self.search_files_paginated(None, criteria, user_id).await;
             }
             Some(id) => id,
         };
@@ -631,19 +635,19 @@ impl FileReadPort for FileBlobReadRepository {
             "fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid)".to_string(),
         );
 
-        if let Some(name) = &criteria.name_contains {
-            if !name.is_empty() {
-                bind_idx += 1;
-                conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
-            }
+        if let Some(name) = &criteria.name_contains
+            && !name.is_empty()
+        {
+            bind_idx += 1;
+            conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
         }
-        if let Some(types) = &criteria.file_types {
-            if !types.is_empty() {
-                bind_idx += 1;
-                conditions.push(format!(
-                    "LOWER(SUBSTRING(fi.name FROM '\\.([^.]+)$')) = ANY(${bind_idx})"
-                ));
-            }
+        if let Some(types) = &criteria.file_types
+            && !types.is_empty()
+        {
+            bind_idx += 1;
+            conditions.push(format!(
+                "LOWER(SUBSTRING(fi.name FROM '\\.([^.]+)$')) = ANY(${bind_idx})"
+            ));
         }
         if criteria.created_after.is_some() {
             bind_idx += 1;
@@ -698,24 +702,34 @@ impl FileReadPort for FileBlobReadRepository {
         );
 
         // ── Bind parameters dynamically ──
-        let mut query = sqlx::query_as::<_, (
-            String, String, Option<String>, Option<String>,
-            i64, String, i64, i64, Option<String>, i64,
-        )>(&sql)
-            .bind(user_id)
-            .bind(root_id);
+        let mut query = sqlx::query_as::<
+            _,
+            (
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                i64,
+                String,
+                i64,
+                i64,
+                Option<String>,
+                i64,
+            ),
+        >(&sql)
+        .bind(user_id)
+        .bind(root_id);
 
-        if let Some(name) = &criteria.name_contains {
-            if !name.is_empty() {
-                query = query.bind(format!("%{}%", name.to_lowercase()));
-            }
+        if let Some(name) = &criteria.name_contains
+            && !name.is_empty()
+        {
+            query = query.bind(format!("%{}%", name.to_lowercase()));
         }
-        if let Some(types) = &criteria.file_types {
-            if !types.is_empty() {
-                let lower_types: Vec<String> =
-                    types.iter().map(|t| t.to_lowercase()).collect();
-                query = query.bind(lower_types);
-            }
+        if let Some(types) = &criteria.file_types
+            && !types.is_empty()
+        {
+            let lower_types: Vec<String> = types.iter().map(|t| t.to_lowercase()).collect();
+            query = query.bind(lower_types);
         }
         if let Some(v) = criteria.created_after {
             query = query.bind(v as i64);
@@ -739,12 +753,9 @@ impl FileReadPort for FileBlobReadRepository {
         query = query.bind(limit).bind(offset);
 
         // ── Execute single query ──
-        let rows = query
-            .fetch_all(self.pool.as_ref())
-            .await
-            .map_err(|e| {
-                DomainError::internal_error("FileBlobRead", format!("subtree search: {e}"))
-            })?;
+        let rows = query.fetch_all(self.pool.as_ref()).await.map_err(|e| {
+            DomainError::internal_error("FileBlobRead", format!("subtree search: {e}"))
+        })?;
 
         let total_count = rows.first().map_or(0, |r| r.9) as usize;
 
@@ -973,12 +984,9 @@ mod tests {
                 .build(),
         };
 
-        repo.hash_cache
-            .insert("a".to_string(), "ha".to_string());
-        repo.hash_cache
-            .insert("b".to_string(), "hb".to_string());
-        repo.hash_cache
-            .insert("c".to_string(), "hc".to_string());
+        repo.hash_cache.insert("a".to_string(), "ha".to_string());
+        repo.hash_cache.insert("b".to_string(), "hb".to_string());
+        repo.hash_cache.insert("c".to_string(), "hc".to_string());
 
         // Force moka to run pending eviction tasks
         repo.hash_cache.run_pending_tasks();
@@ -1016,7 +1024,8 @@ mod tests {
         }
 
         for h in handles {
-            h.join().expect("Thread must not panic — no poison possible with moka");
+            h.join()
+                .expect("Thread must not panic — no poison possible with moka");
         }
     }
 }

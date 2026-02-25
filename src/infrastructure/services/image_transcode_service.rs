@@ -258,11 +258,7 @@ impl ImageTranscodeService {
                 original_size,
                 transcoded_size
             );
-            return Ok((
-                original_content,
-                original_mime.to_string(),
-                false,
-            ));
+            return Ok((original_content, original_mime.to_string(), false));
         }
 
         let saved = original_size - transcoded_size;

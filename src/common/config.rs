@@ -209,9 +209,9 @@ impl Default for StorageConfig {
     fn default() -> Self {
         Self {
             root_dir: "storage".to_string(),
-            chunk_size: 1024 * 1024,               // 1 MB
-            parallel_threshold: 100 * 1024 * 1024, // 100 MB
-            trash_retention_days: 30,              // 30 days
+            chunk_size: 1024 * 1024,                  // 1 MB
+            parallel_threshold: 100 * 1024 * 1024,    // 100 MB
+            trash_retention_days: 30,                 // 30 days
             max_upload_size: 10 * 1024 * 1024 * 1024, // 10 GB
         }
     }
@@ -615,8 +615,7 @@ impl AppConfig {
         }
 
         // Storage limits
-        if let Ok(max_upload) = env::var("OXICLOUD_MAX_UPLOAD_SIZE")
-            .map(|v| v.parse::<usize>())
+        if let Ok(max_upload) = env::var("OXICLOUD_MAX_UPLOAD_SIZE").map(|v| v.parse::<usize>())
             && let Ok(val) = max_upload
         {
             config.storage.max_upload_size = val;

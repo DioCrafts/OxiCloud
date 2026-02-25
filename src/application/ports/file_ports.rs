@@ -165,10 +165,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     /// Lists every file in the subtree rooted at `folder_id`.
     ///
     /// Default: falls back to `list_files(Some(folder_id))` (one level).
-    async fn list_files_in_subtree(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<FileDto>, DomainError> {
+    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<FileDto>, DomainError> {
         self.list_files(Some(folder_id)).await
     }
 
@@ -183,7 +180,11 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         limit: i64,
     ) -> Result<Vec<FileDto>, DomainError> {
         let all = self.list_files(folder_id).await?;
-        Ok(all.into_iter().skip(offset as usize).take(limit as usize).collect())
+        Ok(all
+            .into_iter()
+            .skip(offset as usize)
+            .take(limit as usize)
+            .collect())
     }
 }
 

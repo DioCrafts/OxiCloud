@@ -222,7 +222,7 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
 
             let mut q = sqlx::query(&query);
             for (item_id, item_type) in chunk {
-                q = q.bind(&user_uuid).bind(item_id).bind(item_type);
+                q = q.bind(user_uuid).bind(item_id).bind(item_type);
             }
 
             let result = q.execute(&mut *tx).await.map_err(|e| {

@@ -88,7 +88,10 @@ impl FileRetrievalService {
             return None;
         }
         let format = OutputFormat::WebP;
-        match transcode.get_transcoded(id, content.clone(), mime, format).await {
+        match transcode
+            .get_transcoded(id, content.clone(), mime, format)
+            .await
+        {
             Ok((transcoded, webp_mime, true)) => {
                 debug!(
                     "🖼️ WebP transcode: {} -> {} bytes ({:.0}% smaller)",
@@ -200,12 +203,7 @@ impl FileRetrievalService {
                 let etag: Arc<str> = format!("\"{}-{}\"", id, modified_at).into();
                 let ct: Arc<str> = Arc::from(&*mime_type);
                 cache
-                    .put(
-                        id.to_string(),
-                        content_bytes.clone(),
-                        etag,
-                        ct,
-                    )
+                    .put(id.to_string(), content_bytes.clone(), etag, ct)
                     .await;
             }
 
@@ -310,10 +308,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
         self.file_read.get_file_range_stream(id, start, end).await
     }
 
-    async fn list_files_in_subtree(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<FileDto>, DomainError> {
+    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<FileDto>, DomainError> {
         let files = self.file_read.list_files_in_subtree(folder_id).await?;
         Ok(files.into_iter().map(FileDto::from).collect())
     }
@@ -324,7 +319,10 @@ impl FileRetrievalUseCase for FileRetrievalService {
         offset: i64,
         limit: i64,
     ) -> Result<Vec<FileDto>, DomainError> {
-        let files = self.file_read.list_files_batch(folder_id, offset, limit).await?;
+        let files = self
+            .file_read
+            .list_files_batch(folder_id, offset, limit)
+            .await?;
         Ok(files.into_iter().map(FileDto::from).collect())
     }
 }

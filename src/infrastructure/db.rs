@@ -110,24 +110,22 @@ async fn create_pool_with_retries(
             .connect(connection_string)
             .await
         {
-            Ok(pool) => {
-                match sqlx::query("SELECT 1").execute(&pool).await {
-                    Ok(_) => {
-                        tracing::info!("PostgreSQL {} pool established successfully", label);
-                        return Ok(pool);
-                    }
-                    Err(e) => {
-                        tracing::error!("Error verifying {} pool connection: {}", label, e);
-                        if attempt >= MAX_ATTEMPTS {
-                            return Err(anyhow::anyhow!(
-                                "Error verifying PostgreSQL {} pool connection: {}",
-                                label,
-                                e
-                            ));
-                        }
+            Ok(pool) => match sqlx::query("SELECT 1").execute(&pool).await {
+                Ok(_) => {
+                    tracing::info!("PostgreSQL {} pool established successfully", label);
+                    return Ok(pool);
+                }
+                Err(e) => {
+                    tracing::error!("Error verifying {} pool connection: {}", label, e);
+                    if attempt >= MAX_ATTEMPTS {
+                        return Err(anyhow::anyhow!(
+                            "Error verifying PostgreSQL {} pool connection: {}",
+                            label,
+                            e
+                        ));
                     }
                 }
-            }
+            },
             Err(e) => {
                 tracing::error!(
                     "Error connecting to PostgreSQL {} pool (attempt {}/{}): {}",

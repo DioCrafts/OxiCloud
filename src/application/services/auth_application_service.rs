@@ -526,7 +526,10 @@ impl AuthApplicationService {
         }
 
         // Hash new password and update user
-        let new_hash = self.password_hasher.hash_password(&dto.new_password).await?;
+        let new_hash = self
+            .password_hasher
+            .hash_password(&dto.new_password)
+            .await?;
         user.update_password_hash(new_hash);
 
         // Save updated user
@@ -642,10 +645,7 @@ impl AuthApplicationService {
         let admin_quota = self.capped_quota(&admin_role);
 
         // Hash the password (same as register / admin_create_user)
-        let password_hash = self
-            .password_hasher
-            .hash_password(&dto.password)
-            .await?;
+        let password_hash = self.password_hasher.hash_password(&dto.password).await?;
 
         // Create the new admin user
         let user = User::new(
@@ -1156,10 +1156,8 @@ impl AuthApplicationService {
         let exchange_code = hex::encode(code_bytes);
 
         // Store auth response (auto-expires after 60 s via moka TTL)
-        self.pending_oidc_tokens.insert(
-            exchange_code.clone(),
-            PendingOidcToken { auth_response },
-        );
+        self.pending_oidc_tokens
+            .insert(exchange_code.clone(), PendingOidcToken { auth_response });
 
         tracing::info!("OIDC login successful, one-time exchange code generated");
 
@@ -1169,13 +1167,16 @@ impl AuthApplicationService {
     /// Exchange a one-time code for the authentication tokens.
     /// The code is single-use and expires after 60 seconds (moka TTL).
     pub fn exchange_oidc_token(&self, one_time_code: &str) -> Result<AuthResponseDto, DomainError> {
-        let pending = self.pending_oidc_tokens.remove(one_time_code).ok_or_else(|| {
-            DomainError::new(
-                ErrorKind::AccessDenied,
-                "OIDC",
-                "Invalid or expired exchange code. Please try logging in again.",
-            )
-        })?;
+        let pending = self
+            .pending_oidc_tokens
+            .remove(one_time_code)
+            .ok_or_else(|| {
+                DomainError::new(
+                    ErrorKind::AccessDenied,
+                    "OIDC",
+                    "Invalid or expired exchange code. Please try logging in again.",
+                )
+            })?;
 
         Ok(pending.auth_response)
     }

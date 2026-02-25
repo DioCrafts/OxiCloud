@@ -110,10 +110,7 @@ pub trait FolderRepository: Send + Sync + 'static {
     /// ordered by `path` so callers can iterate in directory order.
     ///
     /// Default: falls back to `list_folders` (one level only).
-    async fn list_subtree_folders(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<Folder>, DomainError> {
+    async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<Folder>, DomainError> {
         let _ = folder_id;
         Ok(Vec::new())
     }
@@ -154,17 +151,20 @@ pub trait FolderRepository: Send + Sync + 'static {
         recursive: bool,
     ) -> Result<Vec<Folder>, DomainError> {
         // Recursive with folder_id → use optimised ltree scan
-        if recursive {
-            if let Some(fid) = parent_id {
-                return self.list_descendant_folders(fid, name_contains, user_id).await;
-            }
+        if recursive && let Some(fid) = parent_id {
+            return self
+                .list_descendant_folders(fid, name_contains, user_id)
+                .await;
         }
         // Fallback: load + filter in memory (stubs / mocks)
         let all = self.list_folders(parent_id).await?;
         match name_contains {
             Some(q) if !q.is_empty() => {
                 let q = q.to_lowercase();
-                Ok(all.into_iter().filter(|f| f.name().to_lowercase().contains(&q)).collect())
+                Ok(all
+                    .into_iter()
+                    .filter(|f| f.name().to_lowercase().contains(&q))
+                    .collect())
             }
             _ => Ok(all),
         }

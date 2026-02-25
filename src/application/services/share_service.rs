@@ -132,8 +132,9 @@ impl ShareService {
     /// concurrently. This keeps RAM usage predictable (~19 MB × 2 = ~38 MB max)
     /// and avoids starving the Tokio blocking thread pool.
     async fn hash_password_async(&self, password: &str) -> Result<String, DomainError> {
-        let _permit = self.hash_semaphore.acquire().await
-            .map_err(|_| DomainError::internal_error("ShareService", "Hash semaphore closed".to_string()))?;
+        let _permit = self.hash_semaphore.acquire().await.map_err(|_| {
+            DomainError::internal_error("ShareService", "Hash semaphore closed".to_string())
+        })?;
         self.password_hasher.hash_password(password).await
     }
 }

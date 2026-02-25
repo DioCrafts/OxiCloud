@@ -39,13 +39,12 @@ impl Argon2PasswordHasher {
     ///
     /// Panics at startup if the parameters are invalid (caught immediately).
     pub fn new(memory_cost: u32, time_cost: u32, parallelism: u32) -> Self {
-        let params = Params::new(memory_cost, time_cost, parallelism, None)
-            .unwrap_or_else(|e| {
-                panic!(
-                    "Invalid Argon2 parameters (m={}, t={}, p={}): {}",
-                    memory_cost, time_cost, parallelism, e
-                )
-            });
+        let params = Params::new(memory_cost, time_cost, parallelism, None).unwrap_or_else(|e| {
+            panic!(
+                "Invalid Argon2 parameters (m={}, t={}, p={}): {}",
+                memory_cost, time_cost, parallelism, e
+            )
+        });
 
         tracing::info!(
             "Argon2PasswordHasher initialized: m_cost={} KiB, t_cost={}, p_cost={}",

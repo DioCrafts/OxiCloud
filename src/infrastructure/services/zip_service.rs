@@ -8,8 +8,8 @@ use crate::{
 use async_trait::async_trait;
 use async_zip::base::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
-use futures::io::AsyncWriteExt as FuturesWriteExt;
 use futures::StreamExt;
+use futures::io::AsyncWriteExt as FuturesWriteExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
@@ -99,17 +99,13 @@ impl ZipService {
             .folder_service
             .list_subtree_folders(folder_id)
             .await
-            .map_err(|e| {
-                ZipError::FolderContentsError(format!("subtree folders: {}", e))
-            })?;
+            .map_err(|e| ZipError::FolderContentsError(format!("subtree folders: {}", e)))?;
 
         let all_files = self
             .file_service
             .list_files_in_subtree(folder_id)
             .await
-            .map_err(|e| {
-                ZipError::FolderContentsError(format!("subtree files: {}", e))
-            })?;
+            .map_err(|e| ZipError::FolderContentsError(format!("subtree files: {}", e)))?;
 
         info!(
             "ZIP subtree: {} folders, {} files",
@@ -157,8 +153,7 @@ impl ZipService {
             let zip_dir = format!("{}/", folder_zip_path(&folder.path));
 
             // Directory entry (Stored, zero-length body)
-            let dir_entry =
-                ZipEntryBuilder::new(zip_dir.clone().into(), Compression::Stored);
+            let dir_entry = ZipEntryBuilder::new(zip_dir.clone().into(), Compression::Stored);
             match zip.write_entry_whole(dir_entry, &[]).await {
                 Ok(()) => debug!("Folder added to ZIP: {}", zip_dir),
                 Err(e) => {

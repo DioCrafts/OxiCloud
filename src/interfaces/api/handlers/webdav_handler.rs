@@ -284,13 +284,8 @@ async fn handle_propfind(
             let mut xml_writer = Writer::new(&mut buf);
             WebDavAdapter::write_multistatus_start(&mut xml_writer)
                 .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
-            WebDavAdapter::write_file_entry(
-                &mut xml_writer,
-                &file,
-                &propfind_request,
-                &base_href,
-            )
-            .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+            WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
+                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
             WebDavAdapter::write_multistatus_end(&mut xml_writer)
                 .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
         }
@@ -329,9 +324,9 @@ async fn build_streaming_propfind_response(
         {
             let mut w = Writer::new(&mut buf);
             WebDavAdapter::write_multistatus_start(&mut w)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
             WebDavAdapter::write_folder_entry(&mut w, &folder, &propfind_request, &base_href)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
         }
         yield Bytes::from(buf);
 
@@ -353,7 +348,7 @@ async fn build_streaming_propfind_response(
                 let result = folder_service
                     .list_folders_paginated(fid_ref, &pag)
                     .await
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
 
                 if result.items.is_empty() {
                     break;
@@ -365,7 +360,7 @@ async fn build_streaming_propfind_response(
                     for subfolder in &result.items {
                         let href = format!("{}{}/", base_href, subfolder.name);
                         WebDavAdapter::write_folder_entry(&mut w, subfolder, &propfind_request, &href)
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                            .map_err(|e| std::io::Error::other(e.to_string()))?;
                     }
                 }
                 let has_more = result.pagination.has_next;
@@ -383,7 +378,7 @@ async fn build_streaming_propfind_response(
                 let batch: Vec<FileDto> = file_retrieval_service
                     .list_files_batch(fid_ref, offset, PROPFIND_BATCH_SIZE)
                     .await
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                    .map_err(|e| std::io::Error::other(e.to_string()))?;
 
                 if batch.is_empty() {
                     break;
@@ -396,7 +391,7 @@ async fn build_streaming_propfind_response(
                     for file in &batch {
                         let href = format!("{}{}", base_href, file.name);
                         WebDavAdapter::write_file_entry(&mut w, file, &propfind_request, &href)
-                            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                            .map_err(|e| std::io::Error::other(e.to_string()))?;
                     }
                 }
                 yield Bytes::from(chunk);
@@ -413,13 +408,14 @@ async fn build_streaming_propfind_response(
         {
             let mut w = Writer::new(&mut buf);
             WebDavAdapter::write_multistatus_end(&mut w)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
         }
         yield Bytes::from(buf);
     };
 
     use futures::TryStreamExt;
-    let stream = stream.map_err(|e: std::io::Error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) });
+    let stream = stream
+        .map_err(|e: std::io::Error| -> Box<dyn std::error::Error + Send + Sync> { Box::new(e) });
 
     Ok(Response::builder()
         .status(StatusCode::MULTI_STATUS)
@@ -453,7 +449,9 @@ async fn handle_proppatch(
     // Read request body (XML — bounded to 1 MB)
     let body_bytes = body::to_bytes(req.into_body(), MAX_XML_BODY)
         .await
-        .map_err(|e| AppError::payload_too_large(format!("PROPPATCH body too large or unreadable: {}", e)))?;
+        .map_err(|e| {
+            AppError::payload_too_large(format!("PROPPATCH body too large or unreadable: {}", e))
+        })?;
     let (props_to_set, props_to_remove) = WebDavAdapter::parse_proppatch(body_bytes.reader())
         .map_err(|e| AppError::bad_request(format!("Failed to parse PROPPATCH request: {}", e)))?;
 
@@ -661,12 +659,13 @@ async fn handle_put(
                 )));
             }
             hasher.update(chunk);
-            file.write_all(chunk)
-                .await
-                .map_err(|e| AppError::internal_error(format!("Failed to write to temp file: {}", e)))?;
+            file.write_all(chunk).await.map_err(|e| {
+                AppError::internal_error(format!("Failed to write to temp file: {}", e))
+            })?;
         }
     }
-    file.flush().await
+    file.flush()
+        .await
         .map_err(|e| AppError::internal_error(format!("Failed to flush temp file: {}", e)))?;
     drop(file);
 
@@ -1109,10 +1108,7 @@ async fn handle_copy(
                 .create_folder(create_dto)
                 .await
                 .map_err(|e| {
-                    AppError::internal_error(format!(
-                        "Failed to create destination folder: {}",
-                        e
-                    ))
+                    AppError::internal_error(format!("Failed to create destination folder: {}", e))
                 })?;
         }
     } else {

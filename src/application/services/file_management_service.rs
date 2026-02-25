@@ -177,7 +177,10 @@ impl FileManagementUseCase for FileManagementService {
             .copy_folder_tree(source_folder_id, target_parent_id, dest_name)
             .await
             .map_err(|e| {
-                error!("Error copying folder tree (source: {}): {}", source_folder_id, e);
+                error!(
+                    "Error copying folder tree (source: {}): {}",
+                    source_folder_id, e
+                );
                 e
             })?;
 

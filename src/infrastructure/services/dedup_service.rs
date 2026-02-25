@@ -712,8 +712,7 @@ impl DedupService {
                         let blob_root = blob_root.clone();
                         async move {
                             let prefix = &hash[0..2];
-                            let blob_path =
-                                blob_root.join(prefix).join(format!("{}.blob", hash));
+                            let blob_path = blob_root.join(prefix).join(format!("{}.blob", hash));
 
                             let mut issues = Vec::new();
 

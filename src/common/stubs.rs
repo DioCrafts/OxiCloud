@@ -621,7 +621,11 @@ pub struct StubSearchUseCase;
 
 #[async_trait]
 impl SearchUseCase for StubSearchUseCase {
-    async fn search(&self, _criteria: SearchCriteriaDto, _user_id: &str) -> Result<SearchResultsDto, DomainError> {
+    async fn search(
+        &self,
+        _criteria: SearchCriteriaDto,
+        _user_id: &str,
+    ) -> Result<SearchResultsDto, DomainError> {
         Ok(SearchResultsDto::empty())
     }
 
@@ -794,7 +798,14 @@ impl ContentCachePort for StubContentCachePort {
         None
     }
 
-    async fn put(&self, _file_id: String, _content: Bytes, _etag: Arc<str>, _content_type: Arc<str>) {}
+    async fn put(
+        &self,
+        _file_id: String,
+        _content: Bytes,
+        _etag: Arc<str>,
+        _content_type: Arc<str>,
+    ) {
+    }
 
     async fn invalidate(&self, _file_id: &str) {}
 

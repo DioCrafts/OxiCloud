@@ -685,10 +685,7 @@ impl FolderRepository for FolderDbRepository {
     ///
     /// Single GiST-indexed query: `fo.lpath <@ (root's lpath)`.
     /// Ordered by `fo.path` so callers can iterate in directory order.
-    async fn list_subtree_folders(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<Folder>, DomainError> {
+    async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<Folder>, DomainError> {
         let sql = "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
                           fo.user_id::text, \
                           EXTRACT(EPOCH FROM fo.created_at)::bigint, \
@@ -698,14 +695,21 @@ impl FolderRepository for FolderDbRepository {
                       AND fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid) \
                     ORDER BY fo.path";
 
-        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
-            sqlx::query_as(sql)
-                .bind(folder_id)
-                .fetch_all(self.pool())
-                .await
-                .map_err(|e| {
-                    DomainError::internal_error("FolderDb", format!("subtree folders: {e}"))
-                })?;
+        let rows: Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+        )> = sqlx::query_as(sql)
+            .bind(folder_id)
+            .fetch_all(self.pool())
+            .await
+            .map_err(|e| {
+                DomainError::internal_error("FolderDb", format!("subtree folders: {e}"))
+            })?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -728,10 +732,10 @@ impl FolderRepository for FolderDbRepository {
         recursive: bool,
     ) -> Result<Vec<Folder>, DomainError> {
         // Recursive with folder scope → existing optimised ltree scan
-        if recursive {
-            if let Some(fid) = parent_id {
-                return self.list_descendant_folders(fid, name_contains, user_id).await;
-            }
+        if recursive && let Some(fid) = parent_id {
+            return self
+                .list_descendant_folders(fid, name_contains, user_id)
+                .await;
         }
 
         // Build optional name filter
@@ -761,22 +765,27 @@ impl FolderRepository for FolderDbRepository {
                   ORDER BY fo.name"
             );
 
-            let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
-                if let Some(ref pattern) = name_pattern {
-                    sqlx::query_as(&sql)
-                        .bind(user_id)
-                        .bind(pattern)
-                        .fetch_all(self.pool())
-                        .await
-                } else {
-                    sqlx::query_as(&sql)
-                        .bind(user_id)
-                        .fetch_all(self.pool())
-                        .await
-                }
-                .map_err(|e| {
-                    DomainError::internal_error("FolderDb", format!("search_folders: {e}"))
-                })?;
+            let rows: Vec<(
+                String,
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+                i64,
+                i64,
+            )> = if let Some(ref pattern) = name_pattern {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .bind(pattern)
+                    .fetch_all(self.pool())
+                    .await
+            } else {
+                sqlx::query_as(&sql)
+                    .bind(user_id)
+                    .fetch_all(self.pool())
+                    .await
+            }
+            .map_err(|e| DomainError::internal_error("FolderDb", format!("search_folders: {e}")))?;
 
             return rows
                 .into_iter()
@@ -820,37 +829,42 @@ impl FolderRepository for FolderDbRepository {
             )
         };
 
-        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
-            if let Some(pid) = parent_id {
-                if let Some(ref pattern) = name_pattern {
-                    sqlx::query_as(&sql)
-                        .bind(pid)
-                        .bind(user_id)
-                        .bind(pattern)
-                        .fetch_all(self.pool())
-                        .await
-                } else {
-                    sqlx::query_as(&sql)
-                        .bind(pid)
-                        .bind(user_id)
-                        .fetch_all(self.pool())
-                        .await
-                }
-            } else if let Some(ref pattern) = name_pattern {
+        let rows: Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+        )> = if let Some(pid) = parent_id {
+            if let Some(ref pattern) = name_pattern {
                 sqlx::query_as(&sql)
+                    .bind(pid)
                     .bind(user_id)
                     .bind(pattern)
                     .fetch_all(self.pool())
                     .await
             } else {
                 sqlx::query_as(&sql)
+                    .bind(pid)
                     .bind(user_id)
                     .fetch_all(self.pool())
                     .await
             }
-            .map_err(|e| {
-                DomainError::internal_error("FolderDb", format!("search_folders: {e}"))
-            })?;
+        } else if let Some(ref pattern) = name_pattern {
+            sqlx::query_as(&sql)
+                .bind(user_id)
+                .bind(pattern)
+                .fetch_all(self.pool())
+                .await
+        } else {
+            sqlx::query_as(&sql)
+                .bind(user_id)
+                .fetch_all(self.pool())
+                .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("search_folders: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -870,9 +884,10 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if !name.is_empty() => {
-                (" AND LOWER(fo.name) LIKE $3", Some(format!("%{}%", name.to_lowercase())))
-            }
+            Some(name) if !name.is_empty() => (
+                " AND LOWER(fo.name) LIKE $3",
+                Some(format!("%{}%", name.to_lowercase())),
+            ),
             _ => ("", None),
         };
 
@@ -890,24 +905,29 @@ impl FolderRepository for FolderDbRepository {
               ORDER BY fo.name"
         );
 
-        let rows: Vec<(String, String, String, Option<String>, Option<String>, i64, i64)> =
-            if let Some(ref pattern) = name_pattern {
-                sqlx::query_as(&sql)
-                    .bind(user_id)
-                    .bind(folder_id)
-                    .bind(pattern)
-                    .fetch_all(self.pool())
-                    .await
-            } else {
-                sqlx::query_as(&sql)
-                    .bind(user_id)
-                    .bind(folder_id)
-                    .fetch_all(self.pool())
-                    .await
-            }
-            .map_err(|e| {
-                DomainError::internal_error("FolderDb", format!("descendant search: {e}"))
-            })?;
+        let rows: Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            i64,
+            i64,
+        )> = if let Some(ref pattern) = name_pattern {
+            sqlx::query_as(&sql)
+                .bind(user_id)
+                .bind(folder_id)
+                .bind(pattern)
+                .fetch_all(self.pool())
+                .await
+        } else {
+            sqlx::query_as(&sql)
+                .bind(user_id)
+                .bind(folder_id)
+                .fetch_all(self.pool())
+                .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("descendant search: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {

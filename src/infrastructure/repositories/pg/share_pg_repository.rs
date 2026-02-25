@@ -25,9 +25,9 @@ impl SharePgRepository {
 
     /// Maps a [`sqlx::postgres::PgRow`] to the domain [`Share`] entity.
     fn row_to_entity(row: &sqlx::postgres::PgRow) -> Result<Share, DomainError> {
-        let id: String = row.try_get("id").map_err(|e| {
-            DomainError::internal_error("Share", format!("Failed to read id: {e}"))
-        })?;
+        let id: String = row
+            .try_get("id")
+            .map_err(|e| DomainError::internal_error("Share", format!("Failed to read id: {e}")))?;
         let item_id: String = row.try_get("item_id").map_err(|e| {
             DomainError::internal_error("Share", format!("Failed to read item_id: {e}"))
         })?;
@@ -53,7 +53,8 @@ impl SharePgRepository {
 
         let item_type =
             ShareItemType::try_from(item_type_str.as_str()).unwrap_or(ShareItemType::File);
-        let permissions = SharePermissions::new(permissions_read, permissions_write, permissions_reshare);
+        let permissions =
+            SharePermissions::new(permissions_read, permissions_write, permissions_reshare);
 
         Ok(Share::from_raw(
             id,
@@ -245,16 +246,14 @@ impl ShareStoragePort for SharePgRepository {
     }
 
     async fn delete_share(&self, id: &str) -> Result<(), DomainError> {
-        let result = sqlx::query(
-            "DELETE FROM storage.shares WHERE id = $1::UUID",
-        )
-        .bind(id)
-        .execute(&*self.db_pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Database error deleting share: {}", e);
-            DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
-        })?;
+        let result = sqlx::query("DELETE FROM storage.shares WHERE id = $1::UUID")
+            .bind(id)
+            .execute(&*self.db_pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database error deleting share: {}", e);
+                DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
+            })?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::not_found(

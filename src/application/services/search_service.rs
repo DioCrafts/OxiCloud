@@ -347,19 +347,15 @@ impl SearchUseCase for SearchService {
             let start_idx = criteria.offset.min(total_count);
             let end_idx = (criteria.offset + criteria.limit).min(total_count);
 
-            let mut paginated_folders = Vec::new();
-            let mut paginated_files = Vec::new();
+            let folder_start = start_idx.min(folder_count);
+            let folder_end = end_idx.min(folder_count);
+            let paginated_folders = enriched_folders[folder_start..folder_end].to_vec();
 
-            for i in start_idx..end_idx {
-                if i < folder_count {
-                    paginated_folders.push(enriched_folders[i].clone());
-                } else {
-                    let file_idx = i - folder_count;
-                    if file_idx < enriched_files.len() {
-                        paginated_files.push(enriched_files[file_idx].clone());
-                    }
-                }
-            }
+            let file_start = start_idx.saturating_sub(folder_count);
+            let file_end = end_idx
+                .saturating_sub(folder_count)
+                .min(enriched_files.len());
+            let paginated_files = enriched_files[file_start..file_end].to_vec();
 
             let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -413,12 +409,10 @@ impl SearchUseCase for SearchService {
         // ── Sort folders (files already sorted by SQL ORDER BY) ──
         match criteria.sort_by.as_str() {
             "name" => {
-                enriched_folders
-                    .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                enriched_folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
             }
             "name_desc" => {
-                enriched_folders
-                    .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                enriched_folders.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
             }
             "date" => {
                 enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
@@ -437,19 +431,15 @@ impl SearchUseCase for SearchService {
         let start_idx = criteria.offset.min(total_count);
         let end_idx = (criteria.offset + criteria.limit).min(total_count);
 
-        let mut paginated_folders = Vec::new();
-        let mut paginated_files = Vec::new();
+        let folder_start = start_idx.min(folder_count);
+        let folder_end = end_idx.min(folder_count);
+        let paginated_folders = enriched_folders[folder_start..folder_end].to_vec();
 
-        for i in start_idx..end_idx {
-            if i < folder_count {
-                paginated_folders.push(enriched_folders[i].clone());
-            } else {
-                let file_idx = i - folder_count;
-                if file_idx < enriched_files.len() {
-                    paginated_files.push(enriched_files[file_idx].clone());
-                }
-            }
-        }
+        let file_start = start_idx.saturating_sub(folder_count);
+        let file_end = end_idx
+            .saturating_sub(folder_count)
+            .min(enriched_files.len());
+        let paginated_files = enriched_files[file_start..file_end].to_vec();
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
@@ -496,7 +486,11 @@ impl SearchService {
 
         #[async_trait]
         impl SearchUseCase for SearchServiceStub {
-            async fn search(&self, _criteria: SearchCriteriaDto, _user_id: &str) -> Result<SearchResultsDto> {
+            async fn search(
+                &self,
+                _criteria: SearchCriteriaDto,
+                _user_id: &str,
+            ) -> Result<SearchResultsDto> {
                 Ok(SearchResultsDto::empty())
             }
 

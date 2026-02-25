@@ -1,12 +1,12 @@
-/// Shared display helpers for DTOs.
-///
-/// These functions centralise the mime→icon / mime→category / size→human-string
-/// logic so that every API response carries pre-computed display fields and the
-/// frontend does **not** need to duplicate these mappings.
-///
-/// The approach is: try MIME first (specific matches beat prefix matches),
-/// then fall back to the file extension when the MIME is generic
-/// (`application/octet-stream` or empty).
+// Shared display helpers for DTOs.
+//
+// These functions centralise the mime→icon / mime→category / size→human-string
+// logic so that every API response carries pre-computed display fields and the
+// frontend does **not** need to duplicate these mappings.
+//
+// The approach is: try MIME first (specific matches beat prefix matches),
+// then fall back to the file extension when the MIME is generic
+// (`application/octet-stream` or empty).
 
 // ─── Private: extract lowercase extension from a filename ────────────
 
@@ -100,8 +100,6 @@ pub fn icon_class_for(name: &str, mime: &str) -> &'static str {
         || mime.contains("typescript")
     {
         return "fas fa-file-code";
-    } else if mime.starts_with("text/markdown") {
-        return "fas fa-file-alt";
     } else if mime.starts_with("text/") {
         return "fas fa-file-alt";
     }

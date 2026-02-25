@@ -182,10 +182,7 @@ impl FolderUseCase for FolderService {
         Ok(FolderDto::from(folder))
     }
 
-    async fn list_subtree_folders(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<FolderDto>, DomainError> {
+    async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<FolderDto>, DomainError> {
         let folders = self.folder_storage.list_subtree_folders(folder_id).await?;
         Ok(folders.into_iter().map(FolderDto::from).collect())
     }

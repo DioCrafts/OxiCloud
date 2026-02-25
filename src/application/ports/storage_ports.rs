@@ -100,10 +100,7 @@ pub trait FileReadPort: Send + Sync + 'static {
     /// subtree is fetched in a single GiST-indexed query.
     ///
     /// Default: falls back to `list_files(Some(folder_id))` (one level).
-    async fn list_files_in_subtree(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<File>, DomainError> {
+    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<File>, DomainError> {
         self.list_files(Some(folder_id)).await
     }
 

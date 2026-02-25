@@ -713,7 +713,10 @@ impl BatchOperationService {
                             match chunk {
                                 Ok(bytes) => {
                                     if let Err(e) = zip.write_all(&bytes) {
-                                        info!("Could not write zip chunk for {}: {}", file_dto.name, e);
+                                        info!(
+                                            "Could not write zip chunk for {}: {}",
+                                            file_dto.name, e
+                                        );
                                         break;
                                     }
                                 }

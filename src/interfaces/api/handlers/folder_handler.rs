@@ -89,17 +89,16 @@ impl FolderHandler {
         match service.get_folder(&id).await {
             Ok(folder) => {
                 // Access check: folder must belong to the requesting user
-                if let Some(ref owner) = folder.owner_id {
-                    if owner != &auth_user.id {
-                        tracing::warn!(
-                            "get_folder: user '{}' attempted to access folder '{}' owned by '{}'",
-                            auth_user.id,
-                            id,
-                            owner
-                        );
-                        return (StatusCode::NOT_FOUND, "Folder not found".to_string())
-                            .into_response();
-                    }
+                if let Some(ref owner) = folder.owner_id
+                    && owner != &auth_user.id
+                {
+                    tracing::warn!(
+                        "get_folder: user '{}' attempted to access folder '{}' owned by '{}'",
+                        auth_user.id,
+                        id,
+                        owner
+                    );
+                    return (StatusCode::NOT_FOUND, "Folder not found".to_string()).into_response();
                 }
                 (StatusCode::OK, Json(folder)).into_response()
             }
@@ -198,8 +197,13 @@ impl FolderHandler {
 
     /// Compute a lightweight ETag from the maximum `modified_at` timestamp
     /// and item count. No body buffering required.
-    fn compute_listing_etag(folders: &[crate::application::dtos::folder_dto::FolderDto], files: &[crate::application::dtos::file_dto::FileDto]) -> String {
-        let max_mod = folders.iter().map(|f| f.modified_at)
+    fn compute_listing_etag(
+        folders: &[crate::application::dtos::folder_dto::FolderDto],
+        files: &[crate::application::dtos::file_dto::FileDto],
+    ) -> String {
+        let max_mod = folders
+            .iter()
+            .map(|f| f.modified_at)
             .chain(files.iter().map(|f| f.modified_at))
             .max()
             .unwrap_or(0);
@@ -249,10 +253,8 @@ impl FolderHandler {
 
                 let listing = FolderListingDto { folders, files };
                 let mut resp = (StatusCode::OK, Json(listing)).into_response();
-                resp.headers_mut().insert(
-                    header::ETAG,
-                    header::HeaderValue::from_str(&etag).unwrap(),
-                );
+                resp.headers_mut()
+                    .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
             (Err(err), _) | (_, Err(err)) => {
@@ -441,10 +443,7 @@ impl FolderHandler {
                             }
                         };
 
-                        tracing::info!(
-                            "ZIP file created successfully, size: {} bytes",
-                            file_size
-                        );
+                        tracing::info!("ZIP file created successfully, size: {} bytes", file_size);
 
                         // Split the NamedTempFile into the already-open std File
                         // and the TempPath (auto-deletes on drop).  This reuses

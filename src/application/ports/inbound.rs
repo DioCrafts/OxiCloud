@@ -76,10 +76,7 @@ pub trait FolderUseCase: Send + Sync + 'static {
     /// ordered by path.  Uses ltree `<@` — single GiST-indexed query.
     ///
     /// Default: returns an empty vec (stubs / mocks).
-    async fn list_subtree_folders(
-        &self,
-        folder_id: &str,
-    ) -> Result<Vec<FolderDto>, DomainError> {
+    async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<FolderDto>, DomainError> {
         let _ = folder_id;
         Ok(Vec::new())
     }
@@ -97,7 +94,11 @@ pub trait SearchUseCase: Send + Sync + 'static {
     ///
     /// `user_id` identifies the authenticated user so that SQL queries filter
     /// by owner and the result cache is isolated per tenant.
-    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<SearchResultsDto, DomainError>;
+    async fn search(
+        &self,
+        criteria: SearchCriteriaDto,
+        user_id: &str,
+    ) -> Result<SearchResultsDto, DomainError>;
 
     /// Returns quick suggestions for autocomplete (lightweight, fast).
     async fn suggest(

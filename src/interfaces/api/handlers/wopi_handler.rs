@@ -13,7 +13,7 @@ use axum::{
     Router,
     body::Body,
     extract::{Path, Query, State},
-    http::{HeaderMap, StatusCode, Request},
+    http::{HeaderMap, Request, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
