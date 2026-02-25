@@ -94,8 +94,6 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
     if let Some(ref ts) = trash_service {
         batch_service_builder = batch_service_builder.with_trash_service(ts.clone());
     }
-    let zip_service_ref = app_state.core.zip_service.clone();
-    batch_service_builder = batch_service_builder.with_zip_service(zip_service_ref);
     let batch_service = Arc::new(batch_service_builder);
 
     // Create state for the batch operations handler

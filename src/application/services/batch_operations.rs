@@ -1,6 +1,12 @@
+use async_zip::base::write::ZipFileWriter;
+use async_zip::{Compression, ZipEntryBuilder};
+use futures::io::AsyncWriteExt as FuturesWriteExt;
 use futures::{Future, StreamExt, future::join_all};
+use std::collections::HashMap;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
 use thiserror::Error;
+use tokio::io::BufWriter;
 use tokio::sync::Semaphore;
 use tracing::info;
 
@@ -9,7 +15,6 @@ use crate::application::dtos::folder_dto::{FolderDto, MoveFolderDto};
 use crate::application::ports::file_ports::{FileManagementUseCase, FileRetrievalUseCase};
 use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::trash_ports::TrashUseCase;
-use crate::application::ports::zip_ports::ZipPort;
 use crate::application::services::folder_service::FolderService;
 use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
@@ -65,7 +70,6 @@ pub struct BatchOperationService {
     file_management: Arc<dyn FileManagementUseCase>,
     folder_service: Arc<FolderService>,
     trash_service: Option<Arc<dyn TrashUseCase>>,
-    zip_service: Option<Arc<dyn ZipPort>>,
     config: AppConfig,
     semaphore: Arc<Semaphore>,
 }
@@ -86,7 +90,6 @@ impl BatchOperationService {
             file_management,
             folder_service,
             trash_service: None,
-            zip_service: None,
             config,
             semaphore: Arc::new(Semaphore::new(max_concurrency)),
         }
@@ -109,12 +112,6 @@ impl BatchOperationService {
     /// Set the optional trash service (enables batch trash operations)
     pub fn with_trash_service(mut self, trash_service: Arc<dyn TrashUseCase>) -> Self {
         self.trash_service = Some(trash_service);
-        self
-    }
-
-    /// Set the optional zip service (enables batch download)
-    pub fn with_zip_service(mut self, zip_service: Arc<dyn ZipPort>) -> Self {
-        self.zip_service = Some(zip_service);
         self
     }
 
@@ -675,17 +672,16 @@ impl BatchOperationService {
         Ok(result)
     }
 
-    /// Downloads multiple files/folders as a single ZIP archive
+    /// Downloads multiple files/folders as a single ZIP archive.
+    ///
+    /// Writes the archive to a temporary file so RAM usage is O(buffer_size)
+    /// regardless of total archive size.  The caller streams the resulting
+    /// `NamedTempFile` to the client; the OS deletes it on drop.
     pub async fn download_zip(
         &self,
         file_ids: Vec<String>,
         folder_ids: Vec<String>,
-    ) -> Result<Vec<u8>, BatchOperationError> {
-        use std::io::{Cursor, Write};
-        use zip::{ZipWriter, write::SimpleFileOptions};
-
-        let zip_service = self.zip_service.as_ref();
-
+    ) -> Result<NamedTempFile, BatchOperationError> {
         info!(
             "Starting batch download: {} files, {} folders",
             file_ids.len(),
@@ -693,163 +689,176 @@ impl BatchOperationService {
         );
         let start_time = std::time::Instant::now();
 
-        let buf = Cursor::new(Vec::new());
-        let mut zip = ZipWriter::new(buf);
-        let options = SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated)
-            .unix_permissions(0o644);
+        // ── Open temp file + async ZIP writer (all writes go to disk) ────
+        let temp = NamedTempFile::new()
+            .map_err(|e| BatchOperationError::Internal(format!("temp file error: {}", e)))?;
+        let tokio_file = tokio::fs::File::create(temp.path())
+            .await
+            .map_err(|e| BatchOperationError::Internal(format!("temp file open: {}", e)))?;
+        let buf_writer = BufWriter::with_capacity(256 * 1024, tokio_file);
+        let mut zip = ZipFileWriter::with_tokio(buf_writer);
 
-        // Add individual files at the root of the ZIP
+        // ── Add individual files at the root of the ZIP ──────────────────
         for file_id in &file_ids {
             match self.file_retrieval.get_file(file_id).await {
-                Ok(file_dto) => match self.file_retrieval.get_file_stream(file_id).await {
-                    Ok(stream) => {
-                        let mut stream = std::pin::Pin::from(stream);
-                        if let Err(e) = zip.start_file(&file_dto.name, options) {
-                            info!("Could not start zip entry for {}: {}", file_dto.name, e);
-                            continue;
-                        }
-                        while let Some(chunk) = stream.next().await {
-                            match chunk {
-                                Ok(bytes) => {
-                                    if let Err(e) = zip.write_all(&bytes) {
-                                        info!(
-                                            "Could not write zip chunk for {}: {}",
-                                            file_dto.name, e
-                                        );
-                                        break;
-                                    }
-                                }
-                                Err(e) => {
-                                    info!("Stream error for {}: {}", file_dto.name, e);
-                                    break;
-                                }
-                            }
-                        }
+                Ok(file_dto) => {
+                    if let Err(e) = self
+                        .add_file_entry_streamed(&mut zip, file_id, &file_dto.name)
+                        .await
+                    {
+                        info!("Could not add file {} to ZIP: {}", file_dto.name, e);
                     }
-                    Err(e) => {
-                        info!("Could not stream file content {}: {}", file_id, e);
-                    }
-                },
+                }
                 Err(e) => {
                     info!("Could not get file metadata {}: {}", file_id, e);
                 }
             }
         }
 
-        // Add folders as sub-trees using the existing ZipPort if available
-        // Otherwise fall back to manual folder traversal
-        if let Some(zip_svc) = zip_service {
-            // For each folder, create a separate zip and merge its contents
-            // Actually, we need to build the tree ourselves for a single zip
-            // Use manual approach for consistency within one archive
-            for folder_id in &folder_ids {
-                match self.folder_service.get_folder(folder_id).await {
-                    Ok(folder) => {
-                        self.add_folder_to_zip(&mut zip, folder_id, &folder.name, &options)
-                            .await;
-                    }
-                    Err(e) => {
-                        info!("Could not get folder {}: {}", folder_id, e);
+        // ── Add folders as sub-trees (bulk subtree queries, not N+1) ─────
+        for folder_id in &folder_ids {
+            match self.folder_service.get_folder(folder_id).await {
+                Ok(root_folder) => {
+                    if let Err(e) = self
+                        .add_folder_subtree_to_zip(&mut zip, folder_id, &root_folder)
+                        .await
+                    {
+                        info!("Could not add folder {} to ZIP: {}", root_folder.name, e);
                     }
                 }
-            }
-            // Suppress unused variable warning
-            let _ = zip_svc;
-        } else {
-            for folder_id in &folder_ids {
-                match self.folder_service.get_folder(folder_id).await {
-                    Ok(folder) => {
-                        self.add_folder_to_zip(&mut zip, folder_id, &folder.name, &options)
-                            .await;
-                    }
-                    Err(e) => {
-                        info!("Could not get folder {}: {}", folder_id, e);
-                    }
+                Err(e) => {
+                    info!("Could not get folder {}: {}", folder_id, e);
                 }
             }
         }
 
-        let mut zip_buf = zip
-            .finish()
-            .map_err(|e| BatchOperationError::Internal(format!("ZIP finalize error: {}", e)))?;
+        // ── Finalize ─────────────────────────────────────────────────────
+        let mut compat_writer = zip.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("ZIP finalize error: {}", e))
+        })?;
+        compat_writer.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("ZIP flush error: {}", e))
+        })?;
 
-        use std::io::Read;
-        let mut bytes = Vec::new();
-        zip_buf
-            .read_to_end(&mut bytes)
-            .map_err(|e| BatchOperationError::Internal(format!("ZIP read error: {}", e)))?;
+        let file_size = temp
+            .as_file()
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(0);
 
         info!(
             "Batch download ZIP created: {} bytes in {}ms",
-            bytes.len(),
+            file_size,
             start_time.elapsed().as_millis()
         );
 
-        Ok(bytes)
+        Ok(temp)
     }
 
-    /// Recursively add a folder and its contents to a ZipWriter
-    async fn add_folder_to_zip(
+    /// Streams a single file into an async ZIP entry (~64 KB peak RAM per file).
+    async fn add_file_entry_streamed(
         &self,
-        zip: &mut zip::ZipWriter<std::io::Cursor<Vec<u8>>>,
-        folder_id: &str,
-        path: &str,
-        options: &zip::write::SimpleFileOptions,
-    ) {
-        use std::io::Write;
+        zip: &mut ZipFileWriter<tokio_util::compat::Compat<BufWriter<tokio::fs::File>>>,
+        file_id: &str,
+        entry_name: &str,
+    ) -> Result<(), BatchOperationError> {
+        let entry = ZipEntryBuilder::new(entry_name.to_string().into(), Compression::Deflate);
+        let mut writer = zip
+            .write_entry_stream(entry)
+            .await
+            .map_err(|e| BatchOperationError::Internal(format!("zip entry start: {}", e)))?;
 
-        struct PendingFolder {
-            id: String,
-            path: String,
+        let stream = self
+            .file_retrieval
+            .get_file_stream(file_id)
+            .await
+            .map_err(|e| BatchOperationError::Domain(e))?;
+        let mut stream = std::pin::Pin::from(stream);
+
+        while let Some(chunk) = stream.next().await {
+            let bytes = chunk.map_err(|e| {
+                BatchOperationError::Internal(format!("stream read: {}", e))
+            })?;
+            writer.write_all(&bytes).await.map_err(|e| {
+                BatchOperationError::Internal(format!("zip chunk write: {}", e))
+            })?;
         }
 
-        let mut queue = vec![PendingFolder {
-            id: folder_id.to_string(),
-            path: path.to_string(),
-        }];
+        writer.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("zip entry close: {}", e))
+        })?;
+        Ok(())
+    }
 
-        let mut visited = std::collections::HashSet::new();
+    /// Adds an entire folder subtree to the ZIP using 2 bulk SQL queries
+    /// (ltree `<@`) instead of N+1 per-folder traversal.
+    async fn add_folder_subtree_to_zip(
+        &self,
+        zip: &mut ZipFileWriter<tokio_util::compat::Compat<BufWriter<tokio::fs::File>>>,
+        folder_id: &str,
+        root_folder: &FolderDto,
+    ) -> Result<(), BatchOperationError> {
+        // Bulk-fetch entire subtree (2 queries total)
+        let all_folders = self
+            .folder_service
+            .list_subtree_folders(folder_id)
+            .await
+            .map_err(BatchOperationError::Domain)?;
 
-        while let Some(current) = queue.pop() {
-            if visited.contains(&current.id) {
-                continue;
+        let all_files = self
+            .file_retrieval
+            .list_files_in_subtree(folder_id)
+            .await
+            .map_err(BatchOperationError::Domain)?;
+
+        // Group files by folder_id
+        let mut files_by_folder: HashMap<String, Vec<FileDto>> =
+            HashMap::with_capacity(all_folders.len());
+        for file in all_files {
+            let fid = file.folder_id.clone().unwrap_or_default();
+            files_by_folder.entry(fid).or_default().push(file);
+        }
+
+        // Build path mapping: folder_id → ZIP-relative path
+        let root_path = root_folder.path.trim_end_matches('/');
+        let folder_zip_path = |db_path: &str| -> String {
+            let db_path = db_path.trim_end_matches('/');
+            if db_path == root_path {
+                root_folder.name.clone()
+            } else {
+                let suffix = db_path
+                    .strip_prefix(root_path)
+                    .unwrap_or(db_path)
+                    .trim_start_matches('/');
+                format!("{}/{}", root_folder.name, suffix)
             }
-            visited.insert(current.id.clone());
+        };
 
-            let dir_path = format!("{}/", current.path);
-            let _ = zip.add_directory(&dir_path, *options);
+        // Write folder + file entries (folders are sorted by path from DB)
+        for folder in &all_folders {
+            let zip_dir = format!("{}/", folder_zip_path(&folder.path));
 
-            // Add files via streaming (constant ~64 KB memory per file)
-            if let Ok(files) = self.file_retrieval.list_files(Some(&current.id)).await {
+            // Directory entry (Stored, zero-length body)
+            let dir_entry = ZipEntryBuilder::new(zip_dir.clone().into(), Compression::Stored);
+            if let Err(e) = zip.write_entry_whole(dir_entry, &[]).await {
+                info!("Could not add folder entry {}: {}", zip_dir, e);
+            }
+
+            // Stream files belonging to this folder
+            if let Some(files) = files_by_folder.get(&folder.id) {
                 for file in files {
-                    let file_path = format!("{}{}", dir_path, file.name);
-                    if let Ok(stream) = self.file_retrieval.get_file_stream(&file.id).await {
-                        let mut stream = std::pin::Pin::from(stream);
-                        if zip.start_file(&file_path, *options).is_ok() {
-                            while let Some(chunk) = stream.next().await {
-                                match chunk {
-                                    Ok(bytes) => {
-                                        let _ = zip.write_all(&bytes);
-                                    }
-                                    Err(_) => break,
-                                }
-                            }
-                        }
+                    let file_path = format!("{}{}", zip_dir, file.name);
+                    if let Err(e) = self
+                        .add_file_entry_streamed(zip, &file.id, &file_path)
+                        .await
+                    {
+                        info!("Could not add file {} to ZIP: {}", file.name, e);
                     }
                 }
             }
-
-            // Enqueue subfolders
-            if let Ok(subfolders) = self.folder_service.list_folders(Some(&current.id)).await {
-                for sub in subfolders {
-                    queue.push(PendingFolder {
-                        id: sub.id.clone(),
-                        path: format!("{}/{}", current.path, sub.name),
-                    });
-                }
-            }
         }
+
+        Ok(())
     }
 
     /// Generic batch operation for any type of async function

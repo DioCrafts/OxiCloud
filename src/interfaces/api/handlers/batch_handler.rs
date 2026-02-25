@@ -590,7 +590,10 @@ pub async fn move_folders_batch(
     Ok((status_code, Json(response)).into_response())
 }
 
-/// Handler for downloading multiple files and folders as a single ZIP
+/// Handler for downloading multiple files and folders as a single ZIP.
+///
+/// The ZIP is written to a temporary file and streamed to the client,
+/// so RAM usage is O(buffer_size) regardless of archive size.
 pub async fn download_batch(
     State(state): State<BatchHandlerState>,
     Json(request): Json<BatchDownloadRequest>,
@@ -602,22 +605,46 @@ pub async fn download_batch(
         ));
     }
 
-    let zip_bytes = state
+    let temp_file = state
         .batch_service
         .download_zip(request.file_ids, request.folder_ids)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // Read file size for Content-Length before splitting ownership
+    let file_size = temp_file
+        .as_file()
+        .metadata()
+        .map(|m| m.len())
+        .map_err(|e| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to read temp file metadata: {}", e),
+        ))?;
+
+    // Split into the already-open fd + auto-delete path
+    let (std_file, temp_path) = temp_file.into_parts();
+    let tokio_file = tokio::fs::File::from_std(std_file);
+
+    // Stream to client — O(64 KB) RAM regardless of ZIP size
+    let stream = tokio_util::io::ReaderStream::new(tokio_file);
+    let body = axum::body::Body::from_stream(stream);
+
     let filename = format!("oxicloud-download-{}.zip", chrono::Utc::now().timestamp());
 
-    Ok(Response::builder()
+    let mut response = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "application/zip")
         .header(
             "Content-Disposition",
             format!("attachment; filename=\"{}\"", filename),
         )
-        .header("Content-Length", zip_bytes.len().to_string())
-        .body(axum::body::Body::from(zip_bytes))
-        .unwrap())
+        .header("Content-Length", file_size)
+        .body(body)
+        .unwrap();
+
+    // Keep TempPath alive in response extensions so the file is only
+    // deleted AFTER the body stream finishes sending.
+    response.extensions_mut().insert(std::sync::Arc::new(temp_path));
+
+    Ok(response)
 }
