@@ -9,9 +9,10 @@
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::Stream;
+use futures::{Stream, TryStreamExt};
 use moka::sync::Cache;
 use sqlx::PgPool;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -437,45 +438,50 @@ impl FileReadPort for FileBlobReadRepository {
         }
     }
 
-    /// Lists every file in the subtree rooted at `folder_id` (inclusive).
+    /// Streams every file in the subtree rooted at `folder_id`.
     ///
-    /// Single GiST-indexed query via ltree `<@`.
-    /// Ordered by `(fo.path, fi.name)` so callers iterate in directory order.
-    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<File>, DomainError> {
-        let rows: Vec<(
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            String,
-            i64,
-            i64,
-            Option<String>,
-        )> = sqlx::query_as(
-            r#"
-            SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
-                   fi.size, fi.mime_type,
-                   EXTRACT(EPOCH FROM fi.created_at)::bigint,
-                   EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                   fi.user_id::text
-              FROM storage.files fi
-              JOIN storage.folders fo ON fo.id = fi.folder_id
-             WHERE fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid)
-               AND NOT fi.is_trashed
-             ORDER BY fo.path, fi.name
-            "#,
-        )
-        .bind(folder_id)
-        .fetch_all(self.pool.as_ref())
-        .await
-        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("subtree files: {e}")))?;
+    /// Single GiST-indexed query via ltree `<@`.  Results are delivered
+    /// through a PostgreSQL cursor — RAM stays O(1) per row.
+    async fn stream_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError> {
+        let pool = Arc::clone(&self.pool);
+        let folder_id = folder_id.to_owned();
 
-        rows.into_iter()
-            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
-                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
-            })
-            .collect()
+        let stream = async_stream::try_stream! {
+            let mut row_stream = sqlx::query_as::<_, (
+                String, String, Option<String>, Option<String>,
+                i64, String, i64, i64, Option<String>,
+            )>(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid)
+                   AND NOT fi.is_trashed
+                 ORDER BY fo.path, fi.name
+                "#,
+            )
+            .bind(&folder_id)
+            .fetch(pool.as_ref());
+
+            while let Some(row) = row_stream.try_next().await.map_err(|e| {
+                DomainError::internal_error("FileBlobRead", format!("subtree stream: {e}"))
+            })? {
+                let (id, name, fid, fpath, size, mime, ca, ma, uid) = row;
+                let file = FileBlobReadRepository::row_to_file(
+                    id, name, fid, fpath, size, mime, ca, ma, uid,
+                )?;
+                yield file;
+            }
+        };
+
+        Ok(Box::pin(stream))
     }
 
     /// Search files with filtering and pagination at database level.

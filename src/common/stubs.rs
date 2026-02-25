@@ -121,6 +121,13 @@ impl FileReadPort for StubFileReadPort {
     ) -> Result<usize, DomainError> {
         Ok(0)
     }
+
+    async fn stream_files_in_subtree(
+        &self,
+        _folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError> {
+        Ok(Box::pin(futures::stream::empty()))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -525,6 +532,13 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
 
     async fn get_file_by_path(&self, _path: &str) -> Result<FileDto, DomainError> {
         Err(DomainError::not_found("File", "stub"))
+    }
+
+    async fn stream_files_in_subtree(
+        &self,
+        _folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<FileDto, DomainError>> + Send>>, DomainError> {
+        Ok(Box::pin(futures::stream::empty()))
     }
 }
 

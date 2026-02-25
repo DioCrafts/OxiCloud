@@ -4,6 +4,7 @@ use chrono::Utc;
 use futures::Stream;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
@@ -204,6 +205,13 @@ impl FileReadPort for MockFileRepository {
         _user_id: &str,
     ) -> std::result::Result<usize, DomainError> {
         Ok(0)
+    }
+
+    async fn stream_files_in_subtree(
+        &self,
+        _folder_id: &str,
+    ) -> std::result::Result<Pin<Box<dyn Stream<Item = std::result::Result<File, DomainError>> + Send>>, DomainError> {
+        Ok(Box::pin(futures::stream::empty()))
     }
 }
 

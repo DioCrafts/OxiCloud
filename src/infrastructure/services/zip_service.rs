@@ -94,32 +94,35 @@ impl ZipService {
             }
         };
 
-        // ── 1. Bulk-fetch the entire subtree (2 queries total) ───────────
+        // ── 1. Bulk-fetch folder tree (small — one entry per folder) ────
         let all_folders = self
             .folder_service
             .list_subtree_folders(folder_id)
             .await
             .map_err(|e| ZipError::FolderContentsError(format!("subtree folders: {}", e)))?;
 
-        let all_files = self
+        // ── 2. Stream files from DB cursor — O(1) per row ───────────────
+        let mut file_stream = self
             .file_service
-            .list_files_in_subtree(folder_id)
+            .stream_files_in_subtree(folder_id)
             .await
             .map_err(|e| ZipError::FolderContentsError(format!("subtree files: {}", e)))?;
+
+        // Group files by folder_id incrementally from the stream
+        let mut files_by_folder: HashMap<String, Vec<FileDto>> =
+            HashMap::with_capacity(all_folders.len());
+        while let Some(file) = file_stream.next().await {
+            let file =
+                file.map_err(|e| ZipError::FolderContentsError(format!("subtree file: {}", e)))?;
+            let fid = file.folder_id.clone().unwrap_or_default();
+            files_by_folder.entry(fid).or_default().push(file);
+        }
 
         info!(
             "ZIP subtree: {} folders, {} files",
             all_folders.len(),
-            all_files.len()
+            files_by_folder.values().map(|v| v.len()).sum::<usize>()
         );
-
-        // ── 2. Group files by folder_id ──────────────────────────────────
-        let mut files_by_folder: HashMap<String, Vec<FileDto>> =
-            HashMap::with_capacity(all_folders.len());
-        for file in all_files {
-            let fid = file.folder_id.clone().unwrap_or_default();
-            files_by_folder.entry(fid).or_default().push(file);
-        }
 
         // ── 3. Build a mapping: folder_id → ZIP-relative path ────────────
         //

@@ -792,29 +792,34 @@ impl BatchOperationService {
 
     /// Adds an entire folder subtree to the ZIP using 2 bulk SQL queries
     /// (ltree `<@`) instead of N+1 per-folder traversal.
+    ///
+    /// Files are streamed from the DB cursor — RAM for the file list is
+    /// proportional to the number of *folders* (HashMap keys), not files.
     async fn add_folder_subtree_to_zip(
         &self,
         zip: &mut ZipFileWriter<tokio_util::compat::Compat<BufWriter<tokio::fs::File>>>,
         folder_id: &str,
         root_folder: &FolderDto,
     ) -> Result<(), BatchOperationError> {
-        // Bulk-fetch entire subtree (2 queries total)
+        // Bulk-fetch folder tree (small — one entry per folder)
         let all_folders = self
             .folder_service
             .list_subtree_folders(folder_id)
             .await
             .map_err(BatchOperationError::Domain)?;
 
-        let all_files = self
+        // Stream files from DB cursor — O(1) per row
+        let mut file_stream = self
             .file_retrieval
-            .list_files_in_subtree(folder_id)
+            .stream_files_in_subtree(folder_id)
             .await
             .map_err(BatchOperationError::Domain)?;
 
-        // Group files by folder_id
+        // Group files by folder_id incrementally from the stream
         let mut files_by_folder: HashMap<String, Vec<FileDto>> =
             HashMap::with_capacity(all_folders.len());
-        for file in all_files {
+        while let Some(file) = file_stream.next().await {
+            let file = file.map_err(BatchOperationError::Domain)?;
             let fid = file.folder_id.clone().unwrap_or_default();
             files_by_folder.entry(fid).or_default().push(file);
         }

@@ -3,6 +3,7 @@ use bytes::Bytes;
 use futures::Stream;
 use serde_json::Value;
 use std::path::PathBuf;
+use std::pin::Pin;
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::errors::DomainError;
@@ -94,15 +95,18 @@ pub trait FileReadPort: Send + Sync + 'static {
         Ok(all.into_iter().skip(start).take(end - start).collect())
     }
 
-    /// Lists every file in the subtree rooted at `folder_id`.
+    /// Streams every file in the subtree rooted at `folder_id`.
     ///
     /// Uses an ltree `<@` join against `storage.folders` so the entire
-    /// subtree is fetched in a single GiST-indexed query.
+    /// subtree is resolved in a single GiST-indexed query, but rows are
+    /// delivered via a PostgreSQL cursor — RAM stays O(1) per row.
     ///
-    /// Default: falls back to `list_files(Some(folder_id))` (one level).
-    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<File>, DomainError> {
-        self.list_files(Some(folder_id)).await
-    }
+    /// Callers consume the stream incrementally (e.g. build a HashMap
+    /// keyed by folder_id) without ever materializing the full Vec.
+    async fn stream_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError>;
 
     /// Search files with pagination and filtering at database level.
     ///

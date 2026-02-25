@@ -154,12 +154,15 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
-    /// Lists every file in the subtree rooted at `folder_id`.
+    /// Streams every file in the subtree rooted at `folder_id`.
     ///
-    /// Default: falls back to `list_files(Some(folder_id))` (one level).
-    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<FileDto>, DomainError> {
-        self.list_files(Some(folder_id)).await
-    }
+    /// Returns a streaming cursor — RAM stays O(1) per row.  Callers
+    /// consume incrementally (e.g. group into a HashMap by folder_id)
+    /// without materializing the full result set.
+    async fn stream_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<FileDto, DomainError>> + Send>>, DomainError>;
 
     /// Lists files in a folder with LIMIT/OFFSET pagination.
     ///

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
+use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
@@ -308,9 +309,13 @@ impl FileRetrievalUseCase for FileRetrievalService {
         self.file_read.get_file_range_stream(id, start, end).await
     }
 
-    async fn list_files_in_subtree(&self, folder_id: &str) -> Result<Vec<FileDto>, DomainError> {
-        let files = self.file_read.list_files_in_subtree(folder_id).await?;
-        Ok(files.into_iter().map(FileDto::from).collect())
+    async fn stream_files_in_subtree(
+        &self,
+        folder_id: &str,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<FileDto, DomainError>> + Send>>, DomainError> {
+        let inner = self.file_read.stream_files_in_subtree(folder_id).await?;
+        let mapped = inner.map(|r| r.map(FileDto::from));
+        Ok(Box::pin(mapped))
     }
 
     async fn list_files_batch(
