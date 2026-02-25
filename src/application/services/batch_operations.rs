@@ -733,16 +733,18 @@ impl BatchOperationService {
         }
 
         // ── Finalize ─────────────────────────────────────────────────────
-        let mut compat_writer = zip
-            .close()
-            .await
-            .map_err(|e| BatchOperationError::Internal(format!("ZIP finalize error: {}", e)))?;
-        compat_writer
-            .close()
-            .await
-            .map_err(|e| BatchOperationError::Internal(format!("ZIP flush error: {}", e)))?;
+        let mut compat_writer = zip.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("ZIP finalize error: {}", e))
+        })?;
+        compat_writer.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("ZIP flush error: {}", e))
+        })?;
 
-        let file_size = temp.as_file().metadata().map(|m| m.len()).unwrap_or(0);
+        let file_size = temp
+            .as_file()
+            .metadata()
+            .map(|m| m.len())
+            .unwrap_or(0);
 
         info!(
             "Batch download ZIP created: {} bytes in {}ms",
@@ -770,22 +772,21 @@ impl BatchOperationService {
             .file_retrieval
             .get_file_stream(file_id)
             .await
-            .map_err(|e| BatchOperationError::Domain(e))?;
+            .map_err(BatchOperationError::Domain)?;
         let mut stream = std::pin::Pin::from(stream);
 
         while let Some(chunk) = stream.next().await {
-            let bytes =
-                chunk.map_err(|e| BatchOperationError::Internal(format!("stream read: {}", e)))?;
-            writer
-                .write_all(&bytes)
-                .await
-                .map_err(|e| BatchOperationError::Internal(format!("zip chunk write: {}", e)))?;
+            let bytes = chunk.map_err(|e| {
+                BatchOperationError::Internal(format!("stream read: {}", e))
+            })?;
+            writer.write_all(&bytes).await.map_err(|e| {
+                BatchOperationError::Internal(format!("zip chunk write: {}", e))
+            })?;
         }
 
-        writer
-            .close()
-            .await
-            .map_err(|e| BatchOperationError::Internal(format!("zip entry close: {}", e)))?;
+        writer.close().await.map_err(|e| {
+            BatchOperationError::Internal(format!("zip entry close: {}", e))
+        })?;
         Ok(())
     }
 
