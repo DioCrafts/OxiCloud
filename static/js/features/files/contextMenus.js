@@ -260,8 +260,22 @@ const contextMenus = {
         const moveCancelBtn = document.getElementById('move-cancel-btn');
         const moveConfirmBtn = document.getElementById('move-confirm-btn');
         const copyConfirmBtn = document.getElementById('copy-confirm-btn');
+        const moveFileDialog = document.getElementById('move-file-dialog');
 
         moveCancelBtn.addEventListener('click', this.closeMoveDialog);
+
+        // Close move dialog on Escape key
+        // Store handler reference to avoid duplicate listeners
+        // Note: We don't use stopPropagation because all Escape handlers are on document level
+        // Each handler checks its own state, so multiple dialogs can be closed with multiple Escape presses
+        if (!window._moveDialogEscapeHandler) {
+            window._moveDialogEscapeHandler = (e) => {
+                if (e.key === 'Escape' && moveFileDialog.style.display === 'flex') {
+                    this.closeMoveDialog();
+                }
+            };
+            document.addEventListener('keydown', window._moveDialogEscapeHandler);
+        }
 
         // Copy button handler
         copyConfirmBtn.addEventListener('click', async () => {
@@ -473,8 +487,14 @@ const contextMenus = {
         // Initialize dialog navigation state
         // Start at the parent of the item being moved (so user sees siblings and can navigate)
         let startFolderId = null;
+        let startFolderName = null;
         if (mode === 'file' && item.folder_id) {
             startFolderId = item.folder_id;
+            // We need the folder name for breadcrumb - try to get it from current view
+            const folderEl = document.querySelector(`[data-folder-id="${startFolderId}"]`);
+            if (folderEl) {
+                startFolderName = folderEl.querySelector('.folder-name, .item-name')?.textContent || null;
+            }
         } else if (mode === 'folder' && item.parent_id) {
             startFolderId = item.parent_id;
         } else {
@@ -488,7 +508,15 @@ const contextMenus = {
         window.app.moveDialogItemId = item.id;
         window.app.moveDialogItemMode = mode;
         window.app.moveDialogCurrentFolderId = startFolderId;
-        window.app.moveDialogBreadcrumb = [];
+
+        // Build initial breadcrumb if starting at a non-home folder
+        // This allows proper navigation back to home
+        const breadcrumb = [];
+        if (startFolderId && startFolderId !== window.app.userHomeFolderId && startFolderName) {
+            // We have the folder name, add it to breadcrumb
+            breadcrumb.push({ id: startFolderId, name: startFolderName });
+        }
+        window.app.moveDialogBreadcrumb = breadcrumb;
 
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
@@ -562,23 +590,20 @@ const contextMenus = {
 
             // Ensure we have the home folder ID before proceeding
             if (!window.app.userHomeFolderId) {
-                console.log('[Move Dialog] Home folder ID not set, resolving...');
                 await window.resolveHomeFolder();
             }
 
-            // Build URL - use /api/folders/{id}/contents to get CHILDREN of the folder
-            let url;
-            let effectiveParentId = parentFolderId || window.app.userHomeFolderId;
+            // Get the effective folder ID
+            const effectiveParentId = parentFolderId || window.app.userHomeFolderId;
 
-            if (effectiveParentId) {
-                // Use the contents endpoint to get children (not the folder itself)
-                url = `/api/folders/${effectiveParentId}/contents`;
-            } else {
-                // Last resort fallback: this returns root folders (home folder)
-                // We should NOT use this as it returns the folder itself, not its contents
-                console.error('[Move Dialog] No folder ID available, using fallback');
-                url = '/api/folders';
+            // Must have a folder ID to proceed
+            if (!effectiveParentId) {
+                console.error('[Move Dialog] Cannot load folders - no folder ID available');
+                return;
             }
+
+            // Use the contents endpoint to get children
+            const url = `/api/folders/${effectiveParentId}/contents`;
 
             console.log('[Move Dialog] Loading folders from:', url, 'effectiveParentId:', effectiveParentId);
             const response = await fetch(url, { headers });
@@ -606,13 +631,9 @@ const contextMenus = {
             const mode = window.app.moveDialogItemMode;
             const breadcrumb = window.app.moveDialogBreadcrumb || [];
 
-            // Only show breadcrumb when we've navigated into subfolders
-            if (breadcrumb.length > 0) {
-                this._renderMoveDialogBreadcrumb(breadcrumbContainer, breadcrumb, effectiveParentId);
-                breadcrumbContainer.style.display = 'flex';
-            } else {
-                breadcrumbContainer.style.display = 'none';
-            }
+            // Always show breadcrumb to allow navigation back to home
+            this._renderMoveDialogBreadcrumb(breadcrumbContainer, breadcrumb, effectiveParentId);
+            breadcrumbContainer.style.display = 'flex';
 
             // Option to select current folder as destination (only after navigating into subfolders)
             if (breadcrumb.length > 0 && effectiveParentId && effectiveParentId !== itemId) {
@@ -632,8 +653,9 @@ const contextMenus = {
                 folderSelectContainer.appendChild(currentFolderOption);
             }
 
-            // Add "Go to parent" option if we have navigated into subfolders
-            if (breadcrumb.length > 0) {
+            // Add "Go to parent" option if not at home folder
+            const isAtHomeFolder = effectiveParentId === window.app.userHomeFolderId;
+            if (!isAtHomeFolder || breadcrumb.length > 0) {
                 const parentOption = document.createElement('div');
                 parentOption.className = 'folder-select-item folder-navigate-up';
                 parentOption.innerHTML = `
@@ -654,6 +676,7 @@ const contextMenus = {
                         this.loadMoveDialogFolders(parentFolder ? parentFolder.id : null);
                     } else {
                         // Go to root (home folder)
+                        window.app.moveDialogBreadcrumb = [];
                         window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
                         this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
                     }
@@ -798,63 +821,19 @@ const contextMenus = {
     },
 
     /**
-     * Load all folders for the move dialog (legacy - kept for batch operations)
-     * @param {string} itemId - ID of the item being moved
-     * @param {string} mode - 'file' or 'folder'
+     * Load all folders for the move dialog (batch operations)
+     * Uses the same navigation pattern as loadMoveDialogFolders
+     * @param {string} itemId - ID of the item being moved (unused, kept for compatibility)
+     * @param {string} mode - 'batch' for batch operations
      */
     async loadAllFolders(itemId, mode) {
-        // For batch mode, use the old behavior but start from home folder
-        try {
-            const token = localStorage.getItem('oxicloud_token');
-            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-            const response = await fetch('/api/folders', { headers });
-            if (response.ok) {
-                const folders = await response.json();
-                const folderSelectContainer = document.getElementById('folder-select-container');
+        // For batch mode, use the same navigation as regular move dialog
+        // Initialize navigation state starting at home folder
+        window.app.moveDialogBreadcrumb = [];
+        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
 
-                // Clear container
-                folderSelectContainer.innerHTML = '';
-
-                // Add all available folders
-                if (Array.isArray(folders)) {
-                    const excludeIds = itemId ? [itemId] : [];
-                    folders.forEach(folder => {
-                        // Skip folders that would create cycles
-                        if (excludeIds.includes(folder.id)) {
-                            return;
-                        }
-
-                        const folderItem = document.createElement('div');
-                        folderItem.className = 'folder-select-item';
-                        folderItem.dataset.folderId = folder.id;
-                        folderItem.innerHTML = `<i class="fas fa-folder"></i> ${escapeHtml(folder.name)}`;
-
-                        folderItem.addEventListener('click', () => {
-                            // Deselect all
-                            document.querySelectorAll('.folder-select-item').forEach(item => {
-                                item.classList.remove('selected');
-                            });
-
-                            // Select this one
-                            folderItem.classList.add('selected');
-                            window.app.selectedTargetFolderId = folder.id;
-                        });
-
-                        folderSelectContainer.appendChild(folderItem);
-                    });
-                }
-
-                // Set default selection
-                window.app.selectedTargetFolderId = "";
-
-                // Translate new elements (scoped to container)
-                if (window.i18n && window.i18n.translateElement) {
-                    window.i18n.translateElement(folderSelectContainer);
-                }
-            }
-        } catch (error) {
-            console.error('Error loading folders:', error);
-        }
+        // Use loadMoveDialogFolders which uses /api/folders/{id}/contents
+        await this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
     },
     /**
      * Show share dialog for files or folders
