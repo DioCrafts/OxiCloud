@@ -28,9 +28,9 @@ pub struct FileBlobReadRepository {
     pool: Arc<PgPool>,
     dedup: Arc<dyn DedupPort>,
     /// Lock-free cache: file_id → blob_hash.
-    /// Populated by `get_file()`, consumed by `resolve_blob_hash()`.
-    /// Avoids an extra SQL round-trip on the hot download path.
-    /// Uses moka with TTI eviction to prevent unbounded growth.
+    /// Populated by `get_file()` and `resolve_blob_hash()` (slow path).
+    /// Entries persist until TTI expiry (30 s idle) or capacity eviction —
+    /// safe because blob_hash is content-addressed and never mutated.
     hash_cache: Cache<String, String>,
 }
 
@@ -86,22 +86,32 @@ impl FileBlobReadRepository {
     }
 
     /// Resolve the blob hash for a file (internal helper).
-    /// Checks the lock-free moka cache first (populated by `get_file`).
+    ///
+    /// Checks the lock-free moka cache first (populated by `get_file` or
+    /// a previous slow-path lookup).  The entry is **kept** in cache so
+    /// subsequent reads for the same file (e.g. Range Requests on a video,
+    /// thumbnail + download, browser re-fetch) hit the cache instead of PG.
+    ///
+    /// This is safe because `blob_hash` is content-addressed (SHA-256)
+    /// and never mutated — if the file's content changes, a new row with a
+    /// new `blob_hash` is created.
     async fn resolve_blob_hash(&self, file_id: &str) -> Result<String, DomainError> {
-        // Fast path: cached from a prior get_file call (lock-free read)
+        // Fast path: cached (lock-free read, refreshes TTI automatically)
         if let Some(hash) = self.hash_cache.get(file_id) {
-            self.hash_cache.invalidate(file_id);
             return Ok(hash);
         }
-        // Slow path: DB round-trip
-        sqlx::query_scalar::<_, String>(
+        // Slow path: DB round-trip → populate cache for future reads
+        let hash = sqlx::query_scalar::<_, String>(
             "SELECT blob_hash FROM storage.files WHERE id = $1::uuid AND NOT is_trashed",
         )
         .bind(file_id)
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("FileBlobRead", format!("hash lookup: {e}")))?
-        .ok_or_else(|| DomainError::not_found("File", file_id))
+        .ok_or_else(|| DomainError::not_found("File", file_id))?;
+
+        self.hash_cache.insert(file_id.to_owned(), hash.clone());
+        Ok(hash)
     }
 }
 
@@ -908,22 +918,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_cache_insert_and_consume() {
+    async fn test_cache_insert_and_persist() {
         let repo = make_repo();
 
-        // Insert a hash
         repo.hash_cache
             .insert("file-1".to_string(), "abc123".to_string());
 
-        // First read should return the cached value
-        let cached = repo.hash_cache.get("file-1");
-        assert_eq!(cached.as_deref(), Some("abc123"));
+        // First read
+        assert_eq!(repo.hash_cache.get("file-1").as_deref(), Some("abc123"));
 
-        // Simulate the one-shot consume pattern used in resolve_blob_hash
-        repo.hash_cache.invalidate("file-1");
-        assert!(
-            repo.hash_cache.get("file-1").is_none(),
-            "Entry must be gone after invalidation"
+        // Second read — entry must still be present (no longer one-shot)
+        assert_eq!(
+            repo.hash_cache.get("file-1").as_deref(),
+            Some("abc123"),
+            "Entry must persist across multiple reads"
         );
     }
 
@@ -946,11 +954,9 @@ mod tests {
         repo.hash_cache
             .insert("file-b".to_string(), "hash-b".to_string());
 
-        // Consuming file-a should not affect file-b
+        // Reading file-a must not affect file-b
         assert_eq!(repo.hash_cache.get("file-a").as_deref(), Some("hash-a"));
-        repo.hash_cache.invalidate("file-a");
-
-        assert!(repo.hash_cache.get("file-a").is_none());
+        assert_eq!(repo.hash_cache.get("file-a").as_deref(), Some("hash-a"));
         assert_eq!(
             repo.hash_cache.get("file-b").as_deref(),
             Some("hash-b"),
@@ -1025,7 +1031,6 @@ mod tests {
                 repo.hash_cache.insert(key.clone(), hash.clone());
                 // Read back — should be our value or already evicted, never panic
                 let _ = repo.hash_cache.get(&key);
-                repo.hash_cache.invalidate(&key);
             }));
         }
 
