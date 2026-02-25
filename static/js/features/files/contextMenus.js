@@ -395,6 +395,24 @@ const contextMenus = {
         // Reset selection
         window.app.selectedTargetFolderId = "";
 
+        // Initialize dialog navigation state
+        // Start at the parent of the item being moved (so user sees siblings and can navigate)
+        let startFolderId = null;
+        if (mode === 'file' && item.folder_id) {
+            startFolderId = item.folder_id;
+        } else if (mode === 'folder' && item.parent_id) {
+            startFolderId = item.parent_id;
+        } else {
+            // If item is at root level, start at user's home folder
+            startFolderId = window.app.userHomeFolderId || null;
+        }
+
+        // Store the item being moved and navigation state
+        window.app.moveDialogItemId = item.id;
+        window.app.moveDialogItemMode = mode;
+        window.app.moveDialogCurrentFolderId = startFolderId;
+        window.app.moveDialogBreadcrumb = [];
+
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
         const titleText = mode === 'file' ?
@@ -402,8 +420,8 @@ const contextMenus = {
             (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
 
-        // Load all available folders
-        await this.loadAllFolders(item.id, mode);
+        // Load folders for the starting location
+        await this.loadMoveDialogFolders(startFolderId);
 
         // Show dialog
         document.getElementById('move-file-dialog').style.display = 'flex';
@@ -456,11 +474,220 @@ const contextMenus = {
     },
 
     /**
-     * Load all folders for the move dialog
+     * Load folders for the move dialog with navigation support
+     * Shows subfolders of the specified parent folder and allows navigation
+     * @param {string} parentFolderId - Parent folder ID to load children from (null for root)
+     */
+    async loadMoveDialogFolders(parentFolderId) {
+        try {
+            const token = localStorage.getItem('oxicloud_token');
+            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+            // Build URL - use /api/folders/{id}/contents for subfolders, or /api/folders for root
+            let url;
+            if (parentFolderId) {
+                url = `/api/folders/${parentFolderId}/contents`;
+            } else {
+                url = '/api/folders';
+            }
+
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                console.error('Failed to load folders:', response.status);
+                return;
+            }
+
+            const data = await response.json();
+            // The contents endpoint returns { folders: [...], files: [...] }, but we only need folders
+            const folders = Array.isArray(data) ? data : (data.folders || []);
+
+            const folderSelectContainer = document.getElementById('folder-select-container');
+            const breadcrumbContainer = document.getElementById('move-dialog-breadcrumb');
+
+            // Clear container
+            folderSelectContainer.innerHTML = '';
+
+            // Get current navigation state
+            const itemId = window.app.moveDialogItemId;
+            const mode = window.app.moveDialogItemMode;
+            const breadcrumb = window.app.moveDialogBreadcrumb || [];
+
+            // Render breadcrumb navigation
+            this._renderMoveDialogBreadcrumb(breadcrumbContainer, breadcrumb, parentFolderId);
+
+            // Option to select current folder as destination (if not at root and not the item being moved)
+            if (parentFolderId && parentFolderId !== itemId) {
+                const currentFolderOption = document.createElement('div');
+                currentFolderOption.className = 'folder-select-item folder-select-current';
+                currentFolderOption.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #48bb78;"></i>
+                    <span>${window.i18n ? window.i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
+                `;
+                currentFolderOption.addEventListener('click', () => {
+                    document.querySelectorAll('.folder-select-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    currentFolderOption.classList.add('selected');
+                    window.app.selectedTargetFolderId = parentFolderId;
+                });
+                folderSelectContainer.appendChild(currentFolderOption);
+            }
+
+            // Add "Go to parent" option if not at root
+            if (parentFolderId) {
+                const parentOption = document.createElement('div');
+                parentOption.className = 'folder-select-item folder-navigate-up';
+                parentOption.innerHTML = `
+                    <i class="fas fa-level-up-alt"></i>
+                    <span>${window.i18n ? window.i18n.t('dialogs.go_to_parent') : '.. (parent folder)'}</span>
+                `;
+                parentOption.addEventListener('click', () => {
+                    // Navigate to parent folder
+                    const currentBreadcrumb = window.app.moveDialogBreadcrumb || [];
+                    if (currentBreadcrumb.length > 0) {
+                        // Remove current folder from breadcrumb
+                        currentBreadcrumb.pop();
+                        const parentFolder = currentBreadcrumb.length > 0
+                            ? currentBreadcrumb[currentBreadcrumb.length - 1]
+                            : null;
+                        window.app.moveDialogBreadcrumb = currentBreadcrumb;
+                        window.app.moveDialogCurrentFolderId = parentFolder ? parentFolder.id : null;
+                        this.loadMoveDialogFolders(parentFolder ? parentFolder.id : null);
+                    } else {
+                        // Go to root (home folder)
+                        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
+                        this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
+                    }
+                });
+                folderSelectContainer.appendChild(parentOption);
+            }
+
+            // Add subfolders (clicking navigates INTO the folder)
+            folders.forEach(folder => {
+                // Skip the item being moved (to prevent moving a folder into itself)
+                if (mode === 'folder' && folder.id === itemId) {
+                    return;
+                }
+
+                const folderItem = document.createElement('div');
+                folderItem.className = 'folder-select-item folder-navigate';
+                folderItem.dataset.folderId = folder.id;
+                folderItem.innerHTML = `
+                    <i class="fas fa-folder"></i>
+                    <span class="folder-name">${escapeHtml(folder.name)}</span>
+                    <i class="fas fa-chevron-right folder-navigate-icon"></i>
+                `;
+
+                // Click navigates INTO this folder
+                folderItem.addEventListener('click', () => {
+                    // Add to breadcrumb
+                    const breadcrumb = window.app.moveDialogBreadcrumb || [];
+                    breadcrumb.push({ id: folder.id, name: folder.name });
+                    window.app.moveDialogBreadcrumb = breadcrumb;
+                    window.app.moveDialogCurrentFolderId = folder.id;
+                    this.loadMoveDialogFolders(folder.id);
+                });
+
+                folderSelectContainer.appendChild(folderItem);
+            });
+
+            // Show "no subfolders" message if empty
+            if (folders.length === 0 && !parentFolderId) {
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'folder-select-empty';
+                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${window.i18n ? window.i18n.t('dialogs.no_subfolders') : 'No subfolders'}</span>`;
+                folderSelectContainer.appendChild(emptyMsg);
+            }
+
+            // Set default selection to current folder
+            window.app.selectedTargetFolderId = parentFolderId || '';
+
+            // Translate new elements
+            if (window.i18n && window.i18n.translateElement) {
+                window.i18n.translateElement(folderSelectContainer);
+            }
+        } catch (error) {
+            console.error('Error loading folders:', error);
+        }
+    },
+
+    /**
+     * Render breadcrumb navigation for move dialog
+     */
+    _renderMoveDialogBreadcrumb(container, breadcrumb, currentFolderId) {
+        if (!container) return;
+        container.innerHTML = '';
+
+        const homeFolderId = window.app.userHomeFolderId;
+        const homeFolderName = window.app.userHomeFolderName || 'Home';
+
+        // Home icon (click to go to home folder)
+        const homeItem = document.createElement('span');
+        homeItem.className = 'move-breadcrumb-item';
+        homeItem.innerHTML = '<i class="fas fa-home"></i>';
+        homeItem.addEventListener('click', () => {
+            window.app.moveDialogBreadcrumb = [];
+            window.app.moveDialogCurrentFolderId = homeFolderId || null;
+            this.loadMoveDialogFolders(homeFolderId || null);
+        });
+        container.appendChild(homeItem);
+
+        // Home folder name
+        if (homeFolderName) {
+            const separator = document.createElement('span');
+            separator.className = 'move-breadcrumb-separator';
+            separator.textContent = '>';
+            container.appendChild(separator);
+
+            const homeNameItem = document.createElement('span');
+            homeNameItem.className = 'move-breadcrumb-item';
+            if (breadcrumb.length === 0) {
+                homeNameItem.classList.add('current');
+            }
+            homeNameItem.textContent = homeFolderName;
+            if (breadcrumb.length > 0) {
+                homeNameItem.addEventListener('click', () => {
+                    window.app.moveDialogBreadcrumb = [];
+                    window.app.moveDialogCurrentFolderId = homeFolderId || null;
+                    this.loadMoveDialogFolders(homeFolderId || null);
+                });
+            }
+            container.appendChild(homeNameItem);
+        }
+
+        // Breadcrumb path
+        breadcrumb.forEach((segment, index) => {
+            const separator = document.createElement('span');
+            separator.className = 'move-breadcrumb-separator';
+            separator.textContent = '>';
+            container.appendChild(separator);
+
+            const item = document.createElement('span');
+            item.className = 'move-breadcrumb-item';
+            if (index === breadcrumb.length - 1) {
+                item.classList.add('current');
+            }
+            item.textContent = segment.name;
+
+            // Click to navigate back to this level
+            if (index < breadcrumb.length - 1) {
+                item.addEventListener('click', () => {
+                    window.app.moveDialogBreadcrumb = breadcrumb.slice(0, index + 1);
+                    window.app.moveDialogCurrentFolderId = segment.id;
+                    this.loadMoveDialogFolders(segment.id);
+                });
+            }
+            container.appendChild(item);
+        });
+    },
+
+    /**
+     * Load all folders for the move dialog (legacy - kept for batch operations)
      * @param {string} itemId - ID of the item being moved
      * @param {string} mode - 'file' or 'folder'
      */
     async loadAllFolders(itemId, mode) {
+        // For batch mode, use the old behavior but start from home folder
         try {
             const token = localStorage.getItem('oxicloud_token');
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -469,32 +696,15 @@ const contextMenus = {
                 const folders = await response.json();
                 const folderSelectContainer = document.getElementById('folder-select-container');
 
-                // Clear container except root option
-                folderSelectContainer.innerHTML = `
-                    <div class="folder-select-item selected" data-folder-id="">
-                        <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
-                    </div>
-                `;
-
-                // Select root by default
-                window.app.selectedTargetFolderId = "";
+                // Clear container
+                folderSelectContainer.innerHTML = '';
 
                 // Add all available folders
                 if (Array.isArray(folders)) {
+                    const excludeIds = itemId ? [itemId] : [];
                     folders.forEach(folder => {
                         // Skip folders that would create cycles
-                        if (mode === 'folder' && folder.id === itemId) {
-                            return;
-                        }
-
-                        // Skip current folder of the item
-                        if (mode === 'file' && window.app.contextMenuTargetFile && 
-                            folder.id === window.app.contextMenuTargetFile.folder_id) {
-                            return;
-                        }
-
-                        if (mode === 'folder' && window.app.contextMenuTargetFolder && 
-                            folder.id === window.app.contextMenuTargetFolder.parent_id) {
+                        if (excludeIds.includes(folder.id)) {
                             return;
                         }
 
@@ -518,15 +728,8 @@ const contextMenus = {
                     });
                 }
 
-                // Event for root option
-                const rootOption = folderSelectContainer.querySelector('.folder-select-item');
-                rootOption.addEventListener('click', () => {
-                    document.querySelectorAll('.folder-select-item').forEach(item => {
-                        item.classList.remove('selected');
-                    });
-                    rootOption.classList.add('selected');
-                    window.app.selectedTargetFolderId = "";
-                });
+                // Set default selection
+                window.app.selectedTargetFolderId = "";
 
                 // Translate new elements (scoped to container)
                 if (window.i18n && window.i18n.translateElement) {
