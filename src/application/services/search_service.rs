@@ -42,9 +42,9 @@ pub struct SearchService {
     folder_repository: Arc<dyn FolderStoragePort>,
 
     /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka).
-    /// Uses `future::Cache` so `.get()` / `.insert()` never block the Tokio
-    /// runtime (maintenance work is deferred to an internal async task).
-    search_cache: moka::future::Cache<u64, SearchResultsDto>,
+    /// Values are `Arc<SearchResultsDto>` so cache insert/hit is a single
+    /// atomic ref-count increment (~1 ns) instead of cloning thousands of Strings.
+    search_cache: moka::future::Cache<u64, Arc<SearchResultsDto>>,
 }
 
 // ─── Utility functions (pure, no self — computed on the server) ─────────
@@ -134,12 +134,12 @@ impl SearchService {
     }
 
     /// Attempts to retrieve results from the cache.
-    async fn get_from_cache(&self, key: u64) -> Option<SearchResultsDto> {
+    async fn get_from_cache(&self, key: u64) -> Option<Arc<SearchResultsDto>> {
         self.search_cache.get(&key).await
     }
 
     /// Stores results in the cache.
-    async fn store_in_cache(&self, key: u64, results: SearchResultsDto) {
+    async fn store_in_cache(&self, key: u64, results: Arc<SearchResultsDto>) {
         self.search_cache.insert(key, results).await;
     }
 
@@ -272,7 +272,7 @@ impl SearchUseCase for SearchService {
      * - Human-readable size formatting
      * - Pagination
      */
-    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<SearchResultsDto> {
+    async fn search(&self, criteria: SearchCriteriaDto, user_id: &str) -> Result<Arc<SearchResultsDto>> {
         let start = Instant::now();
 
         // Try to get from cache
@@ -359,7 +359,7 @@ impl SearchUseCase for SearchService {
 
             let elapsed_ms = start.elapsed().as_millis() as u64;
 
-            let search_results = SearchResultsDto::new(
+            let search_results = Arc::new(SearchResultsDto::new(
                 paginated_files,
                 paginated_folders,
                 criteria.limit,
@@ -367,9 +367,9 @@ impl SearchUseCase for SearchService {
                 Some(total_count),
                 elapsed_ms,
                 criteria.sort_by.clone(),
-            );
+            ));
 
-            self.store_in_cache(cache_key, search_results.clone()).await;
+            self.store_in_cache(cache_key, Arc::clone(&search_results)).await;
             return Ok(search_results);
         }
 
@@ -443,7 +443,7 @@ impl SearchUseCase for SearchService {
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
 
-        let search_results = SearchResultsDto::new(
+        let search_results = Arc::new(SearchResultsDto::new(
             paginated_files,
             paginated_folders,
             criteria.limit,
@@ -451,10 +451,10 @@ impl SearchUseCase for SearchService {
             Some(total_count),
             elapsed_ms,
             criteria.sort_by.clone(),
-        );
+        ));
 
-        // Store in cache
-        self.store_in_cache(cache_key, search_results.clone()).await;
+        // Store in cache — Arc::clone is ~1 ns (atomic increment)
+        self.store_in_cache(cache_key, Arc::clone(&search_results)).await;
 
         Ok(search_results)
     }
@@ -490,8 +490,8 @@ impl SearchService {
                 &self,
                 _criteria: SearchCriteriaDto,
                 _user_id: &str,
-            ) -> Result<SearchResultsDto> {
-                Ok(SearchResultsDto::empty())
+            ) -> Result<Arc<SearchResultsDto>> {
+                Ok(Arc::new(SearchResultsDto::empty()))
             }
 
             async fn suggest(

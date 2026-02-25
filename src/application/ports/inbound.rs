@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
@@ -92,13 +93,15 @@ pub trait FolderUseCase: Send + Sync + 'static {
 pub trait SearchUseCase: Send + Sync + 'static {
     /// Performs a full search based on the specified criteria.
     ///
+    /// Returns `Arc<SearchResultsDto>` so the cache and the caller share
+    /// the same allocation — zero-copy on both insert and hit.
     /// `user_id` identifies the authenticated user so that SQL queries filter
     /// by owner and the result cache is isolated per tenant.
     async fn search(
         &self,
         criteria: SearchCriteriaDto,
         user_id: &str,
-    ) -> Result<SearchResultsDto, DomainError>;
+    ) -> Result<Arc<SearchResultsDto>, DomainError>;
 
     /// Returns quick suggestions for autocomplete (lightweight, fast).
     async fn suggest(

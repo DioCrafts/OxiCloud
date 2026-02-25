@@ -597,8 +597,8 @@ impl SearchUseCase for StubSearchUseCase {
         &self,
         _criteria: SearchCriteriaDto,
         _user_id: &str,
-    ) -> Result<SearchResultsDto, DomainError> {
-        Ok(SearchResultsDto::empty())
+    ) -> Result<Arc<SearchResultsDto>, DomainError> {
+        Ok(Arc::new(SearchResultsDto::empty()))
     }
 
     async fn suggest(

@@ -156,7 +156,7 @@ pub struct SearchFolderResultDto {
  * both files and folders that match the search criteria, along with pagination
  * information and server-computed metadata.
  */
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SearchResultsDto {
     /// Files matching the search criteria (enriched with metadata)
     pub files: Vec<SearchFileResultDto>,

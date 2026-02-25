@@ -67,7 +67,7 @@ impl SearchHandler {
                     results.files.len(),
                     results.folders.len()
                 );
-                (StatusCode::OK, Json(results)).into_response()
+                (StatusCode::OK, Json(&*results)).into_response()
             }
             Err(err) => {
                 error!("Search error: {}", err);
@@ -108,7 +108,7 @@ impl SearchHandler {
                     results.files.len(),
                     results.folders.len()
                 );
-                (StatusCode::OK, Json(results)).into_response()
+                (StatusCode::OK, Json(&*results)).into_response()
             }
             Err(err) => {
                 error!("Search error: {}", err);
