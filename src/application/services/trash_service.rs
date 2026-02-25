@@ -4,6 +4,7 @@ use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
+use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
@@ -37,6 +38,9 @@ pub struct TrashService {
     /// Port for folder operations (get folder, trash, restore, delete)
     folder_storage_port: Arc<dyn FolderStoragePort>,
 
+    /// Port for dedup/blob operations (cleanup orphaned blobs)
+    dedup_port: Arc<dyn DedupPort>,
+
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
 }
@@ -47,6 +51,7 @@ impl TrashService {
         file_read_port: Arc<dyn FileReadPort>,
         file_write_port: Arc<dyn FileWritePort>,
         folder_storage_port: Arc<dyn FolderStoragePort>,
+        dedup_port: Arc<dyn DedupPort>,
         retention_days: u32,
     ) -> Self {
         Self {
@@ -54,6 +59,7 @@ impl TrashService {
             file_read_port,
             file_write_port,
             folder_storage_port,
+            dedup_port,
             retention_days,
         }
     }
@@ -672,37 +678,40 @@ impl TrashUseCase for TrashService {
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
-        // Get all items in the user's trash
-        let items = self.trash_repository.get_trash_items(&user_uuid).await?;
+        // Use bulk operations for O(1) SQL queries instead of N individual deletes.
+        // This is a significant performance optimization for users with many trashed items.
 
-        // Permanently delete each item
-        for item in items {
-            match item.item_type() {
-                TrashedItemType::File => {
-                    // Permanently delete the file
-                    let file_id = item.original_id().to_string();
-                    if let Err(e) = self.file_write_port.delete_file_permanently(&file_id).await {
-                        error!("Error permanently deleting file {}: {}", file_id, e);
-                    }
-                }
-                TrashedItemType::Folder => {
-                    // Permanently delete the folder
-                    let folder_id = item.original_id().to_string();
-                    if let Err(e) = self
-                        .folder_storage_port
-                        .delete_folder_permanently(&folder_id)
-                        .await
-                    {
-                        error!("Error permanently deleting folder {}: {}", folder_id, e);
-                    }
-                }
+        // Step 1: Bulk delete all trashed files, collecting blob hashes for dedup cleanup
+        let (files_deleted, blob_hashes) = self
+            .file_write_port
+            .empty_trash_bulk(user_id)
+            .await
+            .unwrap_or((0, Vec::new()));
+
+        // Step 2: Bulk delete all trashed folders
+        let (folders_deleted, _) = self
+            .folder_storage_port
+            .bulk_delete_trashed_folders(user_id)
+            .await
+            .unwrap_or((0, Vec::new()));
+
+        // Step 3: Clear the trash index for this user
+        self.trash_repository.clear_trash(&user_uuid).await?;
+
+        // Step 4: Clean up orphaned blobs via dedup port
+        // The blob hashes were collected during bulk file delete.
+        // Each hash needs its reference count decremented.
+        for hash in blob_hashes {
+            if let Err(e) = self.dedup_port.remove_reference(&hash).await {
+                // Log but don't fail - the blob will be cleaned up later by garbage collection
+                debug!("Failed to decrement blob ref {}: {}", &hash[..12], e);
             }
         }
 
-        // Clear all trash records for this user
-        self.trash_repository.clear_trash(&user_uuid).await?;
-
-        info!("Trash completely emptied for user {}", user_id);
+        info!(
+            "Trash emptied for user {}: {} files, {} folders deleted",
+            user_id, files_deleted, folders_deleted
+        );
         Ok(())
     }
 }

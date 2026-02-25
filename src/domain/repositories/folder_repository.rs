@@ -104,6 +104,16 @@ pub trait FolderRepository: Send + Sync + 'static {
     /// This is used during user registration to create the user's personal folder.
     async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError>;
 
+    /// Bulk deletes all trashed folders for a user in a single query.
+    ///
+    /// This is an optimization for the "empty trash" operation that avoids
+    /// N individual DELETE calls. Returns a tuple of (folders_deleted, folder_ids)
+    /// where folder_ids are the IDs of deleted folders.
+    async fn bulk_delete_trashed_folders(
+        &self,
+        user_id: &str,
+    ) -> Result<(u64, Vec<String>), DomainError>;
+
     /// Lists every folder in a subtree rooted at `folder_id` (inclusive).
     ///
     /// Uses ltree `<@` for a single GiST-indexed scan.  The result is

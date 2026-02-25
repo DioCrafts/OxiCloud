@@ -623,6 +623,69 @@ impl FolderRepository for FolderDbRepository {
         Ok(())
     }
 
+    async fn bulk_delete_trashed_folders(
+        &self,
+        user_id: &str,
+    ) -> Result<(u64, Vec<String>), DomainError> {
+        // Bulk delete all trashed folders for a user.
+        // First delete files in those folders, then delete the folders.
+        // Returns (count, folder_ids) for logging/cleanup.
+
+        // Step 1: Get all trashed folder IDs for this user
+        let folder_ids: Vec<String> = sqlx::query_scalar(
+            "SELECT id::text FROM storage.folders WHERE user_id = $1::uuid AND is_trashed = TRUE",
+        )
+        .bind(user_id)
+        .fetch_all(self.pool())
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("FolderDb", format!("bulk trash lookup: {e}"))
+        })?;
+
+        if folder_ids.is_empty() {
+            return Ok((0, Vec::new()));
+        }
+
+        // Step 2: Delete files in trashed folders (and their descendants)
+        let files_deleted = sqlx::query(
+            r#"
+            DELETE FROM storage.files
+             WHERE folder_id IN (
+                SELECT id FROM storage.folders
+                 WHERE user_id = $1::uuid AND is_trashed = TRUE
+             )
+            "#,
+        )
+        .bind(user_id)
+        .execute(self.pool())
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("FolderDb", format!("bulk delete files: {e}"))
+        })?
+        .rows_affected();
+
+        // Step 3: Delete the trashed folders (CASCADE handles descendants)
+        let folders_deleted = sqlx::query(
+            "DELETE FROM storage.folders WHERE user_id = $1::uuid AND is_trashed = TRUE",
+        )
+        .bind(user_id)
+        .execute(self.pool())
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("FolderDb", format!("bulk delete folders: {e}"))
+        })?
+        .rows_affected();
+
+        tracing::info!(
+            "🗑️ BULK FOLDER DELETE: {} trashed folders + {} files for user {}",
+            folders_deleted,
+            files_deleted,
+            &user_id[..8]
+        );
+
+        Ok((folders_deleted, folder_ids))
+    }
+
     async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError> {
         let row = sqlx::query_as::<_, (String, String, i64, i64)>(
             r#"

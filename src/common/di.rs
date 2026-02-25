@@ -288,6 +288,7 @@ impl AppServiceFactory {
     /// Creates the trash service
     pub async fn create_trash_service(
         &self,
+        core: &CoreServices,
         repos: &RepositoryServices,
     ) -> Option<Arc<dyn TrashUseCase>> {
         if !self.config.features.enable_trash {
@@ -303,6 +304,7 @@ impl AppServiceFactory {
             repos.file_read_repository.clone(),
             repos.file_write_repository.clone(),
             repos.folder_repository.clone(),
+            core.dedup_service.clone(),
             self.config.storage.trash_retention_days,
         ));
 
@@ -444,7 +446,7 @@ impl AppServiceFactory {
         let repos = self.create_repository_services(&core, &pool);
 
         // 3. Trash service (needed before application services)
-        let trash_service = self.create_trash_service(&repos).await;
+        let trash_service = self.create_trash_service(&core, &repos).await;
 
         // 4. Application services (with trash already wired)
         let mut apps = self.create_application_services(&core, &repos, trash_service.clone());

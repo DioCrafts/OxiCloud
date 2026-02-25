@@ -312,6 +312,14 @@ pub trait FileWritePort: Send + Sync + 'static {
 
     /// Permanently deletes a file (used by the trash)
     async fn delete_file_permanently(&self, file_id: &str) -> Result<(), DomainError>;
+
+    /// Bulk deletes all trashed files for a user in a single query.
+    ///
+    /// This is an optimization for the "empty trash" operation that avoids
+    /// N individual DELETE calls. Returns a tuple of (files_deleted, blob_hashes)
+    /// where blob_hashes are the hashes of deleted files that need their
+    /// references decremented via DedupPort.
+    async fn empty_trash_bulk(&self, user_id: &str) -> Result<(u64, Vec<String>), DomainError>;
 }
 
 // ─────────────────────────────────────────────────────

@@ -673,6 +673,37 @@ impl FileWritePort for FileBlobWriteRepository {
         self.delete_file(file_id).await
     }
 
+    async fn empty_trash_bulk(&self, user_id: &str) -> Result<(u64, Vec<String>), DomainError> {
+        // Bulk delete all trashed files for a user, returning blob hashes for dedup cleanup.
+        // The PG trigger automatically decrements blob ref_counts via trg_files_decrement_blob_ref.
+        let rows = sqlx::query_as::<_, (String,)>(
+            r#"
+            DELETE FROM storage.files
+             WHERE user_id = $1::uuid
+               AND is_trashed = TRUE
+            RETURNING blob_hash
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(self.pool.as_ref())
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("FileBlobWrite", format!("empty_trash_bulk: {e}"))
+        })?;
+
+        let count = rows.len() as u64;
+        let blob_hashes: Vec<String> = rows.into_iter().map(|r| r.0).collect();
+
+        tracing::info!(
+            "🗑️ BULK DELETE: {} trashed files for user {} ({} blobs to cleanup)",
+            count,
+            &user_id[..8],
+            blob_hashes.len()
+        );
+
+        Ok((count, blob_hashes))
+    }
+
     async fn copy_folder_tree(
         &self,
         source_folder_id: &str,

@@ -221,6 +221,10 @@ impl FileWritePort for StubFileWritePort {
     async fn delete_file_permanently(&self, _file_id: &str) -> Result<(), DomainError> {
         Ok(())
     }
+
+    async fn empty_trash_bulk(&self, _user_id: &str) -> Result<(u64, Vec<String>), DomainError> {
+        Ok((0, Vec::new()))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +330,13 @@ impl FolderRepository for StubFolderStoragePort {
         _name: String,
     ) -> Result<Folder, DomainError> {
         Ok(Folder::default())
+    }
+
+    async fn bulk_delete_trashed_folders(
+        &self,
+        _user_id: &str,
+    ) -> Result<(u64, Vec<String>), DomainError> {
+        Ok((0, Vec::new()))
     }
 }
 
