@@ -318,6 +318,14 @@ impl FileWritePort for MockFileRepository {
             ))
         }
     }
+
+    async fn empty_trash_bulk(&self, _user_id: &str) -> std::result::Result<(u64, Vec<String>), DomainError> {
+        // Mock implementation: remove all trashed files
+        let mut trashed = self.trashed_files.lock().unwrap();
+        let count = trashed.len() as u64;
+        trashed.clear();
+        Ok((count, Vec::new()))
+    }
 }
 
 struct MockFolderRepository {
@@ -489,6 +497,18 @@ impl FolderRepository for MockFolderRepository {
         _name: String,
     ) -> std::result::Result<Folder, DomainError> {
         Ok(Folder::default())
+    }
+
+    async fn bulk_delete_trashed_folders(
+        &self,
+        _user_id: &str,
+    ) -> std::result::Result<(u64, Vec<String>), DomainError> {
+        // Mock implementation: remove all trashed folders
+        let mut trashed = self.trashed_folders.lock().unwrap();
+        let count = trashed.len() as u64;
+        let ids: Vec<String> = trashed.keys().cloned().collect();
+        trashed.clear();
+        Ok((count, ids))
     }
 }
 

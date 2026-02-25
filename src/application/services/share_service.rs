@@ -638,6 +638,14 @@ mod tests {
         ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()
         }
+
+        async fn bulk_delete_trashed_folders(
+            &self,
+            _user_id: &str,
+        ) -> Result<(u64, Vec<String>), DomainError> {
+            // Mock implementation for tests
+            Ok((0, Vec::new()))
+        }
     }
 
     struct MockShareRepository {
