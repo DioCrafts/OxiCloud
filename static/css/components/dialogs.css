@@ -77,6 +77,17 @@
 	border-top: 1px solid #e2e8f0;
 }
 
+.rename-dialog-buttons .btn-outline {
+	background: transparent;
+	color: #4a5568;
+	border: 1px solid #cbd5e0;
+}
+
+.rename-dialog-buttons .btn-outline:hover {
+	background: #f7fafc;
+	border-color: #a0aec0;
+}
+
 /* Share Dialog — Modern Style */
 .share-dialog {
 	position: fixed;
@@ -341,6 +352,45 @@
 	margin-bottom: 15px;
 }
 
+/* Move dialog breadcrumb navigation */
+.move-dialog-breadcrumb {
+	display: none; /* Hidden by default, shown via JS when navigating into subfolders */
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 4px;
+	padding: 8px 12px;
+	background: #f8fafc;
+	border-radius: 8px;
+	margin-bottom: 12px;
+	font-size: 13px;
+	overflow-x: auto;
+}
+
+.move-breadcrumb-item {
+	color: #4a5568;
+	cursor: pointer;
+	padding: 2px 6px;
+	border-radius: 4px;
+	transition: all 0.15s ease;
+	white-space: nowrap;
+}
+
+.move-breadcrumb-item:hover {
+	background: #e2e8f0;
+	color: #1a202c;
+}
+
+.move-breadcrumb-item.current {
+	color: #ff5e3a;
+	font-weight: 600;
+	cursor: default;
+}
+
+.move-breadcrumb-separator {
+	color: #a0aec0;
+	margin: 0 2px;
+}
+
 /* Folder select items in move dialog */
 .folder-select-item {
 	display: flex;
@@ -371,6 +421,70 @@
 
 .folder-select-item.selected i {
 	color: #ff5e3a;
+}
+
+/* "Select this folder" option */
+.folder-select-item.folder-select-current {
+	background-color: rgba(72, 187, 120, 0.1);
+	color: #2f855a;
+	font-weight: 500;
+}
+
+.folder-select-item.folder-select-current:hover {
+	background-color: rgba(72, 187, 120, 0.15);
+}
+
+.folder-select-item.folder-select-current i {
+	color: #48bb78;
+}
+
+/* Navigate up option */
+.folder-select-item.folder-navigate-up {
+	color: #718096;
+	font-style: italic;
+}
+
+.folder-select-item.folder-navigate-up:hover {
+	color: #4a5568;
+}
+
+.folder-select-item.folder-navigate-up i {
+	color: #a0aec0;
+}
+
+/* Folder navigation item (click to enter) */
+.folder-select-item.folder-navigate {
+	justify-content: space-between;
+}
+
+.folder-select-item.folder-navigate .folder-name {
+	flex: 1;
+}
+
+.folder-select-item.folder-navigate .folder-navigate-icon {
+	color: #a0aec0;
+	font-size: 12px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.folder-select-item.folder-navigate:hover .folder-navigate-icon {
+	opacity: 1;
+}
+
+/* Empty folder message */
+.folder-select-empty {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 24px;
+	color: #a0aec0;
+	font-size: 14px;
+}
+
+.folder-select-empty i {
+	font-size: 20px;
 }
 
 /* Custom confirm dialog */
@@ -552,6 +666,17 @@
 [data-theme="dark"] .rename-dialog-buttons {
 	background: #162032;
 	border-top-color: #334155;
+}
+
+[data-theme="dark"] .rename-dialog-buttons .btn-outline {
+	background: transparent;
+	color: #94a3b8;
+	border-color: #475569;
+}
+
+[data-theme="dark"] .rename-dialog-buttons .btn-outline:hover {
+	background: #334155;
+	border-color: #64748b;
 }
 
 [data-theme="dark"] .shared-dialog-content {
@@ -746,4 +871,81 @@
 
 [data-theme="dark"] .share-item-info {
 	color: #e2e8f0;
+}
+
+/* Dark mode for move dialog breadcrumb */
+[data-theme="dark"] .move-dialog-breadcrumb {
+	background: #0f172a;
+}
+
+[data-theme="dark"] .move-breadcrumb-item {
+	color: #94a3b8;
+}
+
+[data-theme="dark"] .move-breadcrumb-item:hover {
+	background: #334155;
+	color: #e2e8f0;
+}
+
+[data-theme="dark"] .move-breadcrumb-item.current {
+	color: #ff5e3a;
+}
+
+[data-theme="dark"] .move-breadcrumb-separator {
+	color: #475569;
+}
+
+/* Dark mode for folder select items */
+[data-theme="dark"] .folder-select-item {
+	color: #cbd5e1;
+}
+
+[data-theme="dark"] .folder-select-item:hover {
+	background-color: #334155;
+}
+
+[data-theme="dark"] .folder-select-item.selected {
+	background-color: rgba(255,94,58,0.15);
+	color: #ff5e3a;
+}
+
+[data-theme="dark"] .folder-select-item i {
+	color: #fbbf24;
+}
+
+[data-theme="dark"] .folder-select-item.selected i {
+	color: #ff5e3a;
+}
+
+[data-theme="dark"] .folder-select-item.folder-select-current {
+	background-color: rgba(74, 222, 128, 0.1);
+	color: #86efac;
+}
+
+[data-theme="dark"] .folder-select-item.folder-select-current:hover {
+	background-color: rgba(74, 222, 128, 0.15);
+}
+
+[data-theme="dark"] .folder-select-item.folder-select-current i {
+	color: #4ade80;
+}
+
+[data-theme="dark"] .folder-select-item.folder-navigate-up {
+	color: #64748b;
+}
+
+[data-theme="dark"] .folder-select-item.folder-navigate-up:hover {
+	color: #94a3b8;
+}
+
+[data-theme="dark"] .folder-select-item.folder-navigate-up i {
+	color: #475569;
+}
+
+[data-theme="dark"] .folder-select-item.folder-navigate .folder-navigate-icon {
+	color: #475569;
+}
+
+[data-theme="dark"] .folder-select-empty {
+	color: #475569;
 }

@@ -102,7 +102,7 @@ const ui = {
             document.body.appendChild(renameDialog);
         }
 
-        // Move dialog — modern
+        // Move dialog — modern with navigation
         if (!document.getElementById('move-file-dialog')) {
             const moveDialog = document.createElement('div');
             moveDialog.className = 'rename-dialog';
@@ -115,14 +115,13 @@ const ui = {
                     </div>
                     <div class="rename-dialog-body">
                         <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Select destination folder:</p>
+                        <div id="move-dialog-breadcrumb" class="move-dialog-breadcrumb"></div>
                         <div id="folder-select-container" style="max-height:220px;overflow-y:auto;">
-                            <div class="folder-select-item selected" data-folder-id="">
-                                <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
-                            </div>
                         </div>
                     </div>
                     <div class="rename-dialog-buttons">
                         <button class="btn btn-secondary" id="move-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-outline" id="copy-confirm-btn" data-i18n="actions.copy">Copy</button>
                         <button class="btn btn-primary" id="move-confirm-btn" data-i18n="actions.move_to">Move</button>
                     </div>
                 </div>

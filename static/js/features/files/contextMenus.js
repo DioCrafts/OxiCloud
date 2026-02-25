@@ -63,7 +63,7 @@ const contextMenus = {
             }
             window.ui.closeContextMenu();
         });
-        
+
         document.getElementById('favorite-folder-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFolder) {
                 const folder = window.app.contextMenuTargetFolder;
@@ -91,7 +91,7 @@ const contextMenus = {
             }
             window.ui.closeContextMenu();
         });
-        
+
         document.getElementById('rename-folder-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFolder) {
                 this.showRenameDialog(window.app.contextMenuTargetFolder);
@@ -105,7 +105,7 @@ const contextMenus = {
             }
             window.ui.closeContextMenu();
         });
-        
+
         document.getElementById('share-folder-option').addEventListener('click', () => {
             const folder = window.app.contextMenuTargetFolder;
             if (folder) {
@@ -180,7 +180,7 @@ const contextMenus = {
             }
             window.ui.closeFileContextMenu();
         });
-        
+
         document.getElementById('favorite-file-option').addEventListener('click', async () => {
             if (window.app.contextMenuTargetFile) {
                 const file = window.app.contextMenuTargetFile;
@@ -208,7 +208,7 @@ const contextMenus = {
             }
             window.ui.closeFileContextMenu();
         });
-        
+
         document.getElementById('rename-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
                 this.showRenameFileDialog(window.app.contextMenuTargetFile);
@@ -259,8 +259,91 @@ const contextMenus = {
         // Move dialog events
         const moveCancelBtn = document.getElementById('move-cancel-btn');
         const moveConfirmBtn = document.getElementById('move-confirm-btn');
+        const copyConfirmBtn = document.getElementById('copy-confirm-btn');
+        const moveFileDialog = document.getElementById('move-file-dialog');
 
         moveCancelBtn.addEventListener('click', this.closeMoveDialog);
+
+        // Close move dialog on Escape key
+        // Store handler reference to avoid duplicate listeners
+        // Note: We don't use stopPropagation because all Escape handlers are on document level
+        // Each handler checks its own state, so multiple dialogs can be closed with multiple Escape presses
+        if (!window._moveDialogEscapeHandler) {
+            window._moveDialogEscapeHandler = (e) => {
+                if (e.key === 'Escape' && moveFileDialog.style.display === 'flex') {
+                    this.closeMoveDialog();
+                }
+            };
+            document.addEventListener('keydown', window._moveDialogEscapeHandler);
+        }
+
+        // Copy button handler
+        copyConfirmBtn.addEventListener('click', async () => {
+            // Batch copy mode (from multiSelect)
+            if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
+                const targetId = window.app.selectedTargetFolderId;
+                const items = window.app.batchMoveItems || [];
+
+                const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
+                const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
+
+                let success = 0, errors = 0;
+
+                try {
+                    // Batch copy files
+                    if (fileIds.length > 0) {
+                        const res = await fetch('/api/batch/files/copy', {
+                            method: 'POST',
+                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetId })
+                        });
+                        const data = await res.json();
+                        success += data.stats?.successful || 0;
+                        errors += data.stats?.failed || 0;
+                    }
+
+                    // Note: Folder copy is not yet implemented in batch API
+                    if (folderIds.length > 0) {
+                        window.ui.showNotification('Info', 'Folder copy is not yet supported in batch mode');
+                    }
+                } catch (err) {
+                    console.error('Batch copy error:', err);
+                    errors++;
+                }
+
+                this.closeMoveDialog();
+                window.multiSelect.clear();
+                window.loadFiles();
+
+                if (errors > 0) {
+                    window.ui.showNotification('Batch copy', `${success} copied, ${errors} failed`);
+                } else {
+                    window.ui.showNotification('Items copied',
+                        `${success} item${success !== 1 ? 's' : ''} copied successfully`);
+                }
+                return;
+            }
+
+            // Single item copy
+            if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
+                const success = await window.fileOps.copyFile(
+                    window.app.contextMenuTargetFile.id,
+                    window.app.selectedTargetFolderId
+                );
+                if (success) {
+                    this.closeMoveDialog();
+                }
+            } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
+                const success = await window.fileOps.copyFolder(
+                    window.app.contextMenuTargetFolder.id,
+                    window.app.selectedTargetFolderId
+                );
+                if (success) {
+                    this.closeMoveDialog();
+                }
+            }
+        });
+
         moveConfirmBtn.addEventListener('click', async () => {
             // Batch move mode (from multiSelect)
             if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
@@ -316,7 +399,7 @@ const contextMenus = {
 
             if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
                 const success = await window.fileOps.moveFile(
-                    window.app.contextMenuTargetFile.id, 
+                    window.app.contextMenuTargetFile.id,
                     window.app.selectedTargetFolderId
                 );
                 if (success) {
@@ -324,7 +407,7 @@ const contextMenus = {
                 }
             } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
                 const success = await window.fileOps.moveFolder(
-                    window.app.contextMenuTargetFolder.id, 
+                    window.app.contextMenuTargetFolder.id,
                     window.app.selectedTargetFolderId
                 );
                 if (success) {
@@ -395,6 +478,46 @@ const contextMenus = {
         // Reset selection
         window.app.selectedTargetFolderId = "";
 
+        // Ensure we have the home folder ID BEFORE calculating startFolderId
+        if (!window.app.userHomeFolderId) {
+            console.log('[Move Dialog] Home folder ID not set, resolving...');
+            await window.resolveHomeFolder();
+        }
+
+        // Initialize dialog navigation state
+        // Start at the parent of the item being moved (so user sees siblings and can navigate)
+        let startFolderId = null;
+        let startFolderName = null;
+        if (mode === 'file' && item.folder_id) {
+            startFolderId = item.folder_id;
+            // We need the folder name for breadcrumb - try to get it from current view
+            const folderEl = document.querySelector(`[data-folder-id="${startFolderId}"]`);
+            if (folderEl) {
+                startFolderName = folderEl.querySelector('.folder-name, .item-name')?.textContent || null;
+            }
+        } else if (mode === 'folder' && item.parent_id) {
+            startFolderId = item.parent_id;
+        } else {
+            // If item is at root level, start at user's home folder
+            startFolderId = window.app.userHomeFolderId || null;
+        }
+
+        console.log('[Move Dialog] showMoveDialog - item:', item, 'mode:', mode, 'startFolderId:', startFolderId, 'userHomeFolderId:', window.app.userHomeFolderId);
+
+        // Store the item being moved and navigation state
+        window.app.moveDialogItemId = item.id;
+        window.app.moveDialogItemMode = mode;
+        window.app.moveDialogCurrentFolderId = startFolderId;
+
+        // Build initial breadcrumb if starting at a non-home folder
+        // This allows proper navigation back to home
+        const breadcrumb = [];
+        if (startFolderId && startFolderId !== window.app.userHomeFolderId && startFolderName) {
+            // We have the folder name, add it to breadcrumb
+            breadcrumb.push({ id: startFolderId, name: startFolderName });
+        }
+        window.app.moveDialogBreadcrumb = breadcrumb;
+
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
         const titleText = mode === 'file' ?
@@ -402,8 +525,8 @@ const contextMenus = {
             (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
 
-        // Load all available folders
-        await this.loadAllFolders(item.id, mode);
+        // Load folders for the starting location
+        await this.loadMoveDialogFolders(startFolderId);
 
         // Show dialog
         document.getElementById('move-file-dialog').style.display = 'flex';
@@ -456,86 +579,261 @@ const contextMenus = {
     },
 
     /**
-     * Load all folders for the move dialog
-     * @param {string} itemId - ID of the item being moved
-     * @param {string} mode - 'file' or 'folder'
+     * Load folders for the move dialog with navigation support
+     * Shows subfolders of the specified parent folder and allows navigation
+     * @param {string} parentFolderId - Parent folder ID to load children from (null for root)
      */
-    async loadAllFolders(itemId, mode) {
+    async loadMoveDialogFolders(parentFolderId) {
         try {
             const token = localStorage.getItem('oxicloud_token');
             const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-            const response = await fetch('/api/folders', { headers });
-            if (response.ok) {
-                const folders = await response.json();
-                const folderSelectContainer = document.getElementById('folder-select-container');
 
-                // Clear container except root option
-                folderSelectContainer.innerHTML = `
-                    <div class="folder-select-item selected" data-folder-id="">
-                        <i class="fas fa-folder"></i> <span data-i18n="dialogs.root">Root</span>
-                    </div>
+            // Ensure we have the home folder ID before proceeding
+            if (!window.app.userHomeFolderId) {
+                await window.resolveHomeFolder();
+            }
+
+            // Get the effective folder ID
+            const effectiveParentId = parentFolderId || window.app.userHomeFolderId;
+
+            // Must have a folder ID to proceed
+            if (!effectiveParentId) {
+                console.error('[Move Dialog] Cannot load folders - no folder ID available');
+                return;
+            }
+
+            // Use the contents endpoint to get children
+            const url = `/api/folders/${effectiveParentId}/contents`;
+
+            console.log('[Move Dialog] Loading folders from:', url, 'effectiveParentId:', effectiveParentId);
+            const response = await fetch(url, { headers });
+            if (!response.ok) {
+                console.error('Failed to load folders:', response.status);
+                return;
+            }
+
+            const data = await response.json();
+            console.log('[Move Dialog] API response:', data);
+
+            // The contents endpoint returns an array of child folders
+            // The fallback /api/folders returns root folders (home folder itself)
+            const folders = Array.isArray(data) ? data : (data.folders || []);
+            console.log('[Move Dialog] Loaded folders:', folders.length, 'folders:', folders);
+
+            const folderSelectContainer = document.getElementById('folder-select-container');
+            const breadcrumbContainer = document.getElementById('move-dialog-breadcrumb');
+
+            // Clear container
+            folderSelectContainer.innerHTML = '';
+
+            // Get current navigation state
+            const itemId = window.app.moveDialogItemId;
+            const mode = window.app.moveDialogItemMode;
+            const breadcrumb = window.app.moveDialogBreadcrumb || [];
+
+            // Always show breadcrumb to allow navigation back to home
+            this._renderMoveDialogBreadcrumb(breadcrumbContainer, breadcrumb, effectiveParentId);
+            breadcrumbContainer.style.display = 'flex';
+
+            // Option to select current folder as destination (only after navigating into subfolders)
+            if (breadcrumb.length > 0 && effectiveParentId && effectiveParentId !== itemId) {
+                const currentFolderOption = document.createElement('div');
+                currentFolderOption.className = 'folder-select-item folder-select-current';
+                currentFolderOption.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #48bb78;"></i>
+                    <span>${window.i18n ? window.i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
                 `;
-
-                // Select root by default
-                window.app.selectedTargetFolderId = "";
-
-                // Add all available folders
-                if (Array.isArray(folders)) {
-                    folders.forEach(folder => {
-                        // Skip folders that would create cycles
-                        if (mode === 'folder' && folder.id === itemId) {
-                            return;
-                        }
-
-                        // Skip current folder of the item
-                        if (mode === 'file' && window.app.contextMenuTargetFile && 
-                            folder.id === window.app.contextMenuTargetFile.folder_id) {
-                            return;
-                        }
-
-                        if (mode === 'folder' && window.app.contextMenuTargetFolder && 
-                            folder.id === window.app.contextMenuTargetFolder.parent_id) {
-                            return;
-                        }
-
-                        const folderItem = document.createElement('div');
-                        folderItem.className = 'folder-select-item';
-                        folderItem.dataset.folderId = folder.id;
-                        folderItem.innerHTML = `<i class="fas fa-folder"></i> ${escapeHtml(folder.name)}`;
-
-                        folderItem.addEventListener('click', () => {
-                            // Deselect all
-                            document.querySelectorAll('.folder-select-item').forEach(item => {
-                                item.classList.remove('selected');
-                            });
-
-                            // Select this one
-                            folderItem.classList.add('selected');
-                            window.app.selectedTargetFolderId = folder.id;
-                        });
-
-                        folderSelectContainer.appendChild(folderItem);
-                    });
-                }
-
-                // Event for root option
-                const rootOption = folderSelectContainer.querySelector('.folder-select-item');
-                rootOption.addEventListener('click', () => {
+                currentFolderOption.addEventListener('click', () => {
                     document.querySelectorAll('.folder-select-item').forEach(item => {
                         item.classList.remove('selected');
                     });
-                    rootOption.classList.add('selected');
-                    window.app.selectedTargetFolderId = "";
+                    currentFolderOption.classList.add('selected');
+                    window.app.selectedTargetFolderId = effectiveParentId;
+                });
+                folderSelectContainer.appendChild(currentFolderOption);
+            }
+
+            // Add "Go to parent" option if not at home folder
+            const isAtHomeFolder = effectiveParentId === window.app.userHomeFolderId;
+            if (!isAtHomeFolder || breadcrumb.length > 0) {
+                const parentOption = document.createElement('div');
+                parentOption.className = 'folder-select-item folder-navigate-up';
+                parentOption.innerHTML = `
+                    <i class="fas fa-level-up-alt"></i>
+                    <span>${window.i18n ? window.i18n.t('dialogs.go_to_parent') : '.. (parent folder)'}</span>
+                `;
+                parentOption.addEventListener('click', () => {
+                    // Navigate to parent folder
+                    const currentBreadcrumb = window.app.moveDialogBreadcrumb || [];
+                    if (currentBreadcrumb.length > 0) {
+                        // Remove current folder from breadcrumb
+                        currentBreadcrumb.pop();
+                        const parentFolder = currentBreadcrumb.length > 0
+                            ? currentBreadcrumb[currentBreadcrumb.length - 1]
+                            : null;
+                        window.app.moveDialogBreadcrumb = currentBreadcrumb;
+                        window.app.moveDialogCurrentFolderId = parentFolder ? parentFolder.id : null;
+                        this.loadMoveDialogFolders(parentFolder ? parentFolder.id : null);
+                    } else {
+                        // Go to root (home folder)
+                        window.app.moveDialogBreadcrumb = [];
+                        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
+                        this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
+                    }
+                });
+                folderSelectContainer.appendChild(parentOption);
+            }
+
+            // Add subfolders (clicking navigates INTO the folder)
+            folders.forEach(folder => {
+                // Skip the item being moved (to prevent moving a folder into itself)
+                if (mode === 'folder' && folder.id === itemId) {
+                    return;
+                }
+
+                const folderItem = document.createElement('div');
+                folderItem.className = 'folder-select-item folder-navigate';
+                folderItem.dataset.folderId = folder.id;
+                folderItem.innerHTML = `
+                    <i class="fas fa-folder"></i>
+                    <span class="folder-name">${escapeHtml(folder.name)}</span>
+                    <i class="fas fa-chevron-right folder-navigate-icon"></i>
+                `;
+
+                // Click navigates INTO this folder
+                folderItem.addEventListener('click', () => {
+                    // Add to breadcrumb
+                    const breadcrumb = window.app.moveDialogBreadcrumb || [];
+                    breadcrumb.push({ id: folder.id, name: folder.name });
+                    window.app.moveDialogBreadcrumb = breadcrumb;
+                    window.app.moveDialogCurrentFolderId = folder.id;
+                    this.loadMoveDialogFolders(folder.id);
                 });
 
-                // Translate new elements (scoped to container)
-                if (window.i18n && window.i18n.translateElement) {
-                    window.i18n.translateElement(folderSelectContainer);
-                }
+                folderSelectContainer.appendChild(folderItem);
+            });
+
+            // Show "no subfolders" message if there are no folders to navigate
+            if (folders.length === 0 && breadcrumb.length === 0) {
+                // At home folder level with no subfolders - show option to move here
+                const homeOption = document.createElement('div');
+                homeOption.className = 'folder-select-item folder-select-current';
+                homeOption.innerHTML = `
+                    <i class="fas fa-check-circle" style="color: #48bb78;"></i>
+                    <span>${window.i18n ? window.i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
+                `;
+                homeOption.addEventListener('click', () => {
+                    document.querySelectorAll('.folder-select-item').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    homeOption.classList.add('selected');
+                    window.app.selectedTargetFolderId = '';  // Empty means root/home
+                });
+                folderSelectContainer.appendChild(homeOption);
+            } else if (folders.length === 0) {
+                // Inside a subfolder with no children - show empty message
+                const emptyMsg = document.createElement('div');
+                emptyMsg.className = 'folder-select-empty';
+                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${window.i18n ? window.i18n.t('dialogs.no_subfolders') : 'No subfolders to navigate'}</span>`;
+                folderSelectContainer.appendChild(emptyMsg);
+            }
+
+            // Set default selection to current folder
+            window.app.selectedTargetFolderId = parentFolderId || '';
+
+            // Translate new elements
+            if (window.i18n && window.i18n.translateElement) {
+                window.i18n.translateElement(folderSelectContainer);
             }
         } catch (error) {
             console.error('Error loading folders:', error);
         }
+    },
+
+    /**
+     * Render breadcrumb navigation for move dialog
+     */
+    _renderMoveDialogBreadcrumb(container, breadcrumb, currentFolderId) {
+        if (!container) return;
+        container.innerHTML = '';
+
+        const homeFolderId = window.app.userHomeFolderId;
+        const homeFolderName = window.app.userHomeFolderName || 'Home';
+
+        // Home icon (click to go to home folder)
+        const homeItem = document.createElement('span');
+        homeItem.className = 'move-breadcrumb-item';
+        homeItem.innerHTML = '<i class="fas fa-home"></i>';
+        homeItem.addEventListener('click', () => {
+            window.app.moveDialogBreadcrumb = [];
+            window.app.moveDialogCurrentFolderId = homeFolderId || null;
+            this.loadMoveDialogFolders(homeFolderId || null);
+        });
+        container.appendChild(homeItem);
+
+        // Home folder name
+        if (homeFolderName) {
+            const separator = document.createElement('span');
+            separator.className = 'move-breadcrumb-separator';
+            separator.textContent = '>';
+            container.appendChild(separator);
+
+            const homeNameItem = document.createElement('span');
+            homeNameItem.className = 'move-breadcrumb-item';
+            if (breadcrumb.length === 0) {
+                homeNameItem.classList.add('current');
+            }
+            homeNameItem.textContent = homeFolderName;
+            if (breadcrumb.length > 0) {
+                homeNameItem.addEventListener('click', () => {
+                    window.app.moveDialogBreadcrumb = [];
+                    window.app.moveDialogCurrentFolderId = homeFolderId || null;
+                    this.loadMoveDialogFolders(homeFolderId || null);
+                });
+            }
+            container.appendChild(homeNameItem);
+        }
+
+        // Breadcrumb path
+        breadcrumb.forEach((segment, index) => {
+            const separator = document.createElement('span');
+            separator.className = 'move-breadcrumb-separator';
+            separator.textContent = '>';
+            container.appendChild(separator);
+
+            const item = document.createElement('span');
+            item.className = 'move-breadcrumb-item';
+            if (index === breadcrumb.length - 1) {
+                item.classList.add('current');
+            }
+            item.textContent = segment.name;
+
+            // Click to navigate back to this level
+            if (index < breadcrumb.length - 1) {
+                item.addEventListener('click', () => {
+                    window.app.moveDialogBreadcrumb = breadcrumb.slice(0, index + 1);
+                    window.app.moveDialogCurrentFolderId = segment.id;
+                    this.loadMoveDialogFolders(segment.id);
+                });
+            }
+            container.appendChild(item);
+        });
+    },
+
+    /**
+     * Load all folders for the move dialog (batch operations)
+     * Uses the same navigation pattern as loadMoveDialogFolders
+     * @param {string} itemId - ID of the item being moved (unused, kept for compatibility)
+     * @param {string} mode - 'batch' for batch operations
+     */
+    async loadAllFolders(itemId, mode) {
+        // For batch mode, use the same navigation as regular move dialog
+        // Initialize navigation state starting at home folder
+        window.app.moveDialogBreadcrumb = [];
+        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
+
+        // Use loadMoveDialogFolders which uses /api/folders/{id}/contents
+        await this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
     },
     /**
      * Show share dialog for files or folders
@@ -567,7 +865,7 @@ const contextMenus = {
 
         const itemName = document.getElementById('shared-item-name');
         if (itemName) itemName.textContent = item.name;
-        
+
         // Reset form
         const pwField = document.getElementById('share-password');
         const expField = document.getElementById('share-expiration');
@@ -579,30 +877,30 @@ const contextMenus = {
         if (permRead) permRead.checked = true;
         if (permWrite) permWrite.checked = false;
         if (permReshare) permReshare.checked = false;
-        
+
         // Store the current item and type for use when creating the share
         window.app.shareDialogItem = item;
         window.app.shareDialogItemType = itemType;
-        
+
         // Check if item already has shares (async API call)
         const existingShares = await window.fileSharing.getSharedLinksForItem(item.id, itemType);
         const existingSharesContainer = document.getElementById('existing-shares-container');
-        
+
         // Clear existing shares container
         existingSharesContainer.innerHTML = '';
-        
+
         if (existingShares.length > 0) {
             document.getElementById('existing-shares-section').style.display = 'block';
-            
+
             // Create elements for each existing share
             existingShares.forEach(share => {
                 const shareEl = document.createElement('div');
                 shareEl.className = 'existing-share-item';
-                
-                const expiresText = share.expires_at ? 
-                    `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 
+
+                const expiresText = share.expires_at ?
+                    `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` :
                     'No expiration';
-                
+
                 // Share URL
                 const urlDiv = document.createElement('div');
                 urlDiv.className = 'share-url';
@@ -641,10 +939,10 @@ const contextMenus = {
                 actionsDiv.appendChild(deleteBtn);
 
                 shareEl.appendChild(actionsDiv);
-                
+
                 existingSharesContainer.appendChild(shareEl);
             });
-            
+
             // Add event listeners for copy and delete buttons
             document.querySelectorAll('.copy-link-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -653,12 +951,12 @@ const contextMenus = {
                     window.fileSharing.copyLinkToClipboard(url);
                 });
             });
-            
+
             document.querySelectorAll('.delete-link-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.preventDefault();
                     const shareId = btn.getAttribute('data-share-id');
-                    
+
                     showConfirmDialog({
                         title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
                         message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
@@ -677,7 +975,7 @@ const contextMenus = {
         } else {
             document.getElementById('existing-shares-section').style.display = 'none';
         }
-        
+
         // Hide new-share section from previous use
         const newShareSection = document.getElementById('new-share-section');
         if (newShareSection) newShareSection.style.display = 'none';
@@ -690,7 +988,7 @@ const contextMenus = {
             window.ui.showNotification('Error', 'Could not open share dialog');
         }
     },
-    
+
     /**
      * Create a shared link with the configured options
      */
@@ -699,14 +997,14 @@ const contextMenus = {
             window.ui.showNotification('Error', 'Could not share the item');
             return;
         }
-        
+
         // Get values from form
         const password = document.getElementById('share-password').value;
         const expirationDate = document.getElementById('share-expiration').value;
         const permissionRead = document.getElementById('share-permission-read').checked;
         const permissionWrite = document.getElementById('share-permission-write').checked;
         const permissionReshare = document.getElementById('share-permission-reshare').checked;
-        
+
         const item = window.app.shareDialogItem;
         const itemType = window.app.shareDialogItemType;
 
@@ -750,19 +1048,19 @@ const contextMenus = {
                 shareUrl.focus();
                 shareUrl.select();
             }
-            
+
             // Show success message
             window.ui.showNotification(
                 window.i18n ? window.i18n.t('notifications.link_created') : 'Link created',
                 window.i18n ? window.i18n.t('notifications.share_success') : 'Shared link created successfully'
             );
-            
+
         } catch (error) {
             console.error('Error creating shared link:', error);
             window.ui.showNotification('Error', error.message || 'Could not create shared link');
         }
     },
-    
+
     /**
      * Show email notification dialog
      * @param {string} shareUrl - URL to share
@@ -772,14 +1070,14 @@ const contextMenus = {
         document.getElementById('notification-share-url').textContent = shareUrl;
         document.getElementById('notification-email').value = '';
         document.getElementById('notification-message').value = '';
-        
+
         // Store the URL for later use
         window.app.notificationShareUrl = shareUrl;
-        
+
         // Show dialog
         document.getElementById('notification-dialog').style.display = 'flex';
     },
-    
+
     /**
      * Send share notification email
      */
@@ -787,19 +1085,19 @@ const contextMenus = {
         const email = document.getElementById('notification-email').value.trim();
         const message = document.getElementById('notification-message').value.trim();
         const shareUrl = window.app.notificationShareUrl;
-        
+
         if (!email || !shareUrl) {
             window.ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
-        
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             window.ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
-        
+
         try {
             window.fileSharing.sendShareNotification(shareUrl, email, message);
             document.getElementById('notification-dialog').style.display = 'none';
@@ -808,7 +1106,7 @@ const contextMenus = {
             window.ui.showNotification('Error', 'Could not send notification');
         }
     },
-    
+
     /**
      * Close share dialog
      */
@@ -818,7 +1116,7 @@ const contextMenus = {
         window.app.shareDialogItem = null;
         window.app.shareDialogItemType = null;
     },
-    
+
     /**
      * Close notification dialog
      */
