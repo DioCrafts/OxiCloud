@@ -738,37 +738,64 @@ impl DedupService {
 
     /// Garbage collect orphaned blobs (ref_count = 0).
     ///
-    /// Uses `DELETE … RETURNING` for an atomic "find and remove" operation.
-    /// Results are streamed so memory stays O(1) even with millions of orphans.
+    /// Deletes in small batches (BATCH_SIZE rows per TX) so that each
+    /// transaction lasts only a few milliseconds.  This avoids:
+    /// - massive row-lock accumulation in PostgreSQL,
+    /// - WAL bloat from a single giant DELETE,
+    /// - blocking concurrent uploads that touch `storage.blobs`.
+    ///
+    /// Blob files are removed **after** each batch commits, so a crash
+    /// mid-GC only leaves a few orphan files on disk (reclaimed next run).
     pub async fn garbage_collect(&self) -> Result<(u64, u64), DomainError> {
-        let mut orphan_stream = sqlx::query_as::<_, (String, i64)>(
-            "DELETE FROM storage.blobs WHERE ref_count = 0 RETURNING hash, size",
-        )
-        .fetch(self.maintenance_pool.as_ref());
+        /// Max rows deleted per mini-transaction.
+        const BATCH_SIZE: i64 = 500;
 
-        let mut deleted_count = 0u64;
-        let mut deleted_bytes = 0u64;
+        let mut total_deleted = 0u64;
+        let mut total_bytes = 0u64;
 
-        while let Some((hash, size)) = orphan_stream.try_next().await.map_err(|e| {
-            DomainError::internal_error("Dedup", format!("Failed to garbage collect: {}", e))
-        })? {
-            let blob_path = self.blob_path(&hash);
-            if let Err(e) = fs::remove_file(&blob_path).await {
-                tracing::warn!("Failed to delete orphaned blob file {}: {}", hash, e);
+        loop {
+            // Each DELETE is its own implicit TX — short and bounded.
+            // The `ctid` sub-select is the canonical way to do
+            // `DELETE … LIMIT` in PostgreSQL.
+            let batch: Vec<(String, i64)> = sqlx::query_as(
+                "DELETE FROM storage.blobs
+                  WHERE ctid = ANY(
+                      SELECT ctid FROM storage.blobs
+                       WHERE ref_count = 0
+                       LIMIT $1
+                  )
+                  RETURNING hash, size",
+            )
+            .bind(BATCH_SIZE)
+            .fetch_all(self.maintenance_pool.as_ref())
+            .await
+            .map_err(|e| {
+                DomainError::internal_error("Dedup", format!("GC batch failed: {e}"))
+            })?;
+
+            if batch.is_empty() {
+                break;
             }
-            deleted_count += 1;
-            deleted_bytes += size as u64;
+
+            // Delete blob files OUTSIDE the TX (already committed).
+            for (hash, size) in &batch {
+                let blob_path = self.blob_path(hash);
+                if let Err(e) = fs::remove_file(&blob_path).await {
+                    tracing::warn!("Failed to delete orphan blob file {hash}: {e}");
+                }
+                total_bytes += *size as u64;
+            }
+            total_deleted += batch.len() as u64;
+
+            // Yield so uploads / other tasks are not starved.
+            tokio::task::yield_now().await;
         }
 
-        if deleted_count > 0 {
-            tracing::info!(
-                "Garbage collected {} blobs ({} bytes)",
-                deleted_count,
-                deleted_bytes
-            );
+        if total_deleted > 0 {
+            tracing::info!("GC: removed {total_deleted} blobs ({total_bytes} bytes)");
         }
 
-        Ok((deleted_count, deleted_bytes))
+        Ok((total_deleted, total_bytes))
     }
 }
 
