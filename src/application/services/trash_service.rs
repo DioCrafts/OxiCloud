@@ -672,37 +672,19 @@ impl TrashUseCase for TrashService {
         let user_uuid = Uuid::parse_str(user_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
-        // Get all items in the user's trash
-        let items = self.trash_repository.get_trash_items(&user_uuid).await?;
-
-        // Permanently delete each item
-        for item in items {
-            match item.item_type() {
-                TrashedItemType::File => {
-                    // Permanently delete the file
-                    let file_id = item.original_id().to_string();
-                    if let Err(e) = self.file_write_port.delete_file_permanently(&file_id).await {
-                        error!("Error permanently deleting file {}: {}", file_id, e);
-                    }
-                }
-                TrashedItemType::Folder => {
-                    // Permanently delete the folder
-                    let folder_id = item.original_id().to_string();
-                    if let Err(e) = self
-                        .folder_storage_port
-                        .delete_folder_permanently(&folder_id)
-                        .await
-                    {
-                        error!("Error permanently deleting folder {}: {}", folder_id, e);
-                    }
-                }
-            }
-        }
-
-        // Clear all trash records for this user
+        // clear_trash() already performs bulk SQL DELETEs in 2 queries:
+        //   1. DELETE FROM storage.files  WHERE user_id = $1 AND is_trashed = TRUE
+        //   2. DELETE FROM storage.folders WHERE user_id = $1 AND is_trashed = TRUE
+        //
+        // Folder deletion cascades (FK ON DELETE CASCADE) to child folders and
+        // their files. The PG trigger `trg_files_decrement_blob_ref` automatically
+        // decrements blob ref_counts for every deleted file row — no Rust-side
+        // remove_reference() call is needed.
+        //
+        // Finally it clears the trash_items index for the user.
         self.trash_repository.clear_trash(&user_uuid).await?;
 
-        info!("Trash completely emptied for user {}", user_id);
+        info!("Trash emptied for user {}", user_id);
         Ok(())
     }
 }
