@@ -15,7 +15,7 @@ use std::pin::Pin;
 /// Metadata of a stored blob in the dedup system.
 #[derive(Debug, Clone, Serialize)]
 pub struct BlobMetadataDto {
-    /// SHA-256 hash of the content.
+    /// BLAKE3 hash of the content.
     pub hash: String,
     /// Size in bytes.
     pub size: u64,
@@ -151,7 +151,7 @@ pub trait DedupPort: Send + Sync + 'static {
     /// Returns `true` if the blob was deleted (ref_count reached 0).
     async fn remove_reference(&self, hash: &str) -> Result<bool, DomainError>;
 
-    /// Calculate SHA-256 hash of a file (streaming).
+    /// Calculate BLAKE3 hash of a file (streaming).
     async fn hash_file(&self, path: &Path) -> Result<String, DomainError>;
 
     /// Get deduplication statistics.

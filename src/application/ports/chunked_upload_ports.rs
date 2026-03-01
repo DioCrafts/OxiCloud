@@ -84,7 +84,7 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
 
     /// Assemble all chunks into the final file.
     ///
-    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, sha256_hash)`.
+    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, blake3_hash)`.
     /// The hash is computed during assembly (hash-on-write), eliminating a
     /// second sequential read of the assembled file.
     async fn complete_upload(

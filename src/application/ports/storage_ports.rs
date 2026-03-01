@@ -55,7 +55,7 @@ pub trait FileReadPort: Send + Sync + 'static {
 
     /// Gets the content-addressable blob hash for a file (O(1) DB lookup).
     ///
-    /// Returns the SHA-256 hash stored in `storage.files.blob_hash`.
+    /// Returns the BLAKE3 hash stored in `storage.files.blob_hash`.
     /// Used for dedup reference tracking without loading file content.
     async fn get_blob_hash(&self, file_id: &str) -> Result<String, DomainError>;
 

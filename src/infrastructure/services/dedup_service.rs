@@ -1,7 +1,7 @@
 //! Content-Addressable Storage with Deduplication (PostgreSQL-backed)
 //!
 //! Implements hash-based deduplication to eliminate redundant file storage.
-//! Files are stored by their SHA-256 hash, and multiple references can point
+//! Files are stored by their BLAKE3 hash, and multiple references can point
 //! to the same physical blob.
 //!
 //! Architecture:
@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::{Stream, TryStreamExt};
-use sha2::{Digest, Sha256};
+
 use sqlx::PgPool;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -49,7 +49,7 @@ use crate::application::ports::dedup_ports::{
 };
 use crate::domain::errors::{DomainError, ErrorKind};
 
-/// Block size for SHA-256 file hashing (1MB — optimal syscall/throughput ratio).
+/// Block size for BLAKE3 file hashing (1MB — optimal syscall/throughput ratio).
 const HASH_BLOCK_SIZE: usize = 1024 * 1024;
 
 /// Chunk size for streaming file reads (256 KB)
@@ -135,25 +135,23 @@ impl DedupService {
 
     // ── Hash helpers ─────────────────────────────────────────────
 
-    /// Calculate SHA-256 hash of content.
+    /// Calculate BLAKE3 hash of content (~5× faster than SHA-256).
     pub fn hash_bytes(content: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(content);
-        hex::encode(hasher.finalize())
+        blake3::hash(content).to_hex().to_string()
     }
 
-    /// Calculate SHA-256 hash of a file.
+    /// Calculate BLAKE3 hash of a file (~5× faster than SHA-256).
     ///
     /// Runs entirely on `spawn_blocking` with synchronous I/O so the Tokio
     /// worker threads are never blocked by CPU-bound hashing.  Uses 1 MB
-    /// reads for optimal syscall-to-throughput ratio (~3.8 GB/s on NVMe).
+    /// reads for optimal syscall-to-throughput ratio.
     pub async fn hash_file(path: &Path) -> std::io::Result<String> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || {
             use std::io::Read;
 
             let mut file = std::fs::File::open(&path)?;
-            let mut hasher = Sha256::new();
+            let mut hasher = blake3::Hasher::new();
             let mut buffer = vec![0u8; HASH_BLOCK_SIZE];
 
             loop {
@@ -164,7 +162,7 @@ impl DedupService {
                 hasher.update(&buffer[..n]);
             }
 
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_hex().to_string())
         })
         .await
         .expect("hash_file: spawn_blocking task panicked")
