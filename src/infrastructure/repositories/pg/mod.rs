@@ -1,4 +1,5 @@
 mod address_book_pg_repository;
+mod app_password_pg_repository;
 mod calendar_event_pg_repository;
 mod calendar_pg_repository;
 mod contact_group_pg_repository;
@@ -20,6 +21,7 @@ pub mod folder_db_repository;
 pub mod trash_db_repository;
 
 pub use address_book_pg_repository::AddressBookPgRepository;
+pub use app_password_pg_repository::AppPasswordPgRepository;
 pub use calendar_event_pg_repository::CalendarEventPgRepository;
 pub use calendar_pg_repository::CalendarPgRepository;
 pub use contact_group_pg_repository::ContactGroupPgRepository;

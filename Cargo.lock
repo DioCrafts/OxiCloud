@@ -1786,6 +1786,7 @@ dependencies = [
  "mime_guess",
  "mockall",
  "moka",
+ "percent-encoding",
  "quick-xml",
  "rand_core 0.6.4",
  "rayon",

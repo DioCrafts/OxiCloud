@@ -1,4 +1,5 @@
 pub mod admin_handler;
+pub mod app_password_handler;
 pub mod auth_handler;
 pub mod batch_handler;
 pub mod device_auth_handler;

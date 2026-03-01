@@ -1,4 +1,5 @@
 pub mod address_book_dto;
+pub mod app_password_dto;
 pub mod calendar_dto;
 pub mod contact_dto;
 pub mod device_auth_dto;

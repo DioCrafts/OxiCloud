@@ -191,6 +191,27 @@ CREATE INDEX IF NOT EXISTS idx_device_codes_user_id
 
 COMMENT ON TABLE auth.device_codes IS 'OAuth 2.0 Device Authorization Grant (RFC 8628) codes for DAV client authentication';
 
+-- App Passwords (application-specific passwords for DAV clients with HTTP Basic Auth)
+CREATE TABLE IF NOT EXISTS auth.app_passwords (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    label VARCHAR(255) NOT NULL,
+    password_hash TEXT NOT NULL,
+    prefix VARCHAR(50) NOT NULL,
+    scopes VARCHAR(512) NOT NULL DEFAULT 'webdav,caldav,carddav',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_passwords_user_id
+    ON auth.app_passwords(user_id) WHERE active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_app_passwords_active
+    ON auth.app_passwords(user_id, active) WHERE active = TRUE;
+
+COMMENT ON TABLE auth.app_passwords IS 'Application-specific passwords for DAV clients using HTTP Basic Auth';
+
 -- ============================================================
 -- 2. CALDAV SCHEMA (RFC 4791)
 -- ============================================================

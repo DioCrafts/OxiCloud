@@ -1,3 +1,4 @@
+pub mod app_password;
 pub mod calendar;
 pub mod calendar_event;
 pub mod contact;
