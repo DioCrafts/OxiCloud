@@ -119,8 +119,8 @@ impl FileHandler {
                 }
 
                 // ── Spool multipart field to temp file + hash-on-write ──
+                // .dedup_temp is created once by DedupService::initialize() at startup
                 let temp_dir = state.core.path_service.get_root_path().join(".dedup_temp");
-                let _ = tokio::fs::create_dir_all(&temp_dir).await;
                 let temp_path = temp_dir.join(format!("upload-{}", uuid::Uuid::new_v4()));
 
                 let mut total_size: u64 = 0;

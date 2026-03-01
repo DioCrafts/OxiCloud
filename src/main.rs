@@ -4,6 +4,9 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
+
+use socket2::{Domain, Protocol, Socket, TcpKeepalive, Type};
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -269,15 +272,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
 
-    // Start server
+    // Start server — tuned socket for low-latency responses
     let addr = SocketAddr::from(([0, 0, 0, 0], 8086));
     tracing::info!("Starting OxiCloud server on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    socket.set_reuse_address(true)?;
+    // Allow multiple workers on the same port (future-ready)
+    #[cfg(not(windows))]
+    socket.set_reuse_port(true)?;
+    // Disable Nagle's algorithm — send small responses (JSON, PROPFIND)
+    // immediately instead of waiting up to 40ms for coalescing.
+    socket.set_tcp_nodelay(true)?;
+    // Detect dead connections within 60s instead of hours
+    socket.set_keepalive(true)?;
+    socket.set_tcp_keepalive(
+        &TcpKeepalive::new()
+            .with_time(Duration::from_secs(60))
+            .with_interval(Duration::from_secs(10)),
+    )?;
+    socket.set_nonblocking(true)?;
+    socket.bind(&addr.into())?;
+    // High backlog for connection bursts (WebDAV clients open many parallel connections)
+    socket.listen(2048)?;
+
+    let listener = tokio::net::TcpListener::from_std(socket.into())?;
 
     // Provide the fully-built state to the router
     let app = app.with_state(app_state);
 
+    // TCP_NODELAY is inherited from the listening socket on Linux,
+    // so every accepted connection already has Nagle disabled.
     axum::serve(listener, app).await?;
     tracing::info!("Server shutdown completed");
 

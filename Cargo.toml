@@ -55,6 +55,7 @@ infer = "0.19"
 async-compression = { version = "0.4", features = ["tokio", "gzip"] }
 async_zip = { version = "0.0.18", features = ["tokio", "deflate"] }
 dashmap = "6"
+socket2 = { version = "0.6.2", features = ["all"] }
 
 [features]
 default = []

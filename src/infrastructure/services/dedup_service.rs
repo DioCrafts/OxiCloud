@@ -210,15 +210,7 @@ impl DedupService {
         // same filesystem; if it fails because the other writer won,
         // we just discard our temp file — the blob is already there.
         if !blob_path.exists() {
-            if let Some(parent) = blob_path.parent() {
-                fs::create_dir_all(parent).await.map_err(|e| {
-                    DomainError::internal_error(
-                        "Dedup",
-                        format!("Failed to create blob directory: {}", e),
-                    )
-                })?;
-            }
-
+            // Parent directory (xx/) guaranteed to exist — created by initialize()
             let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
             fs::write(&temp_path, content).await.map_err(|e| {
                 DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
@@ -308,14 +300,7 @@ impl DedupService {
             // Blob already on disk — discard the source file
             let _ = fs::remove_file(source_path).await;
         } else {
-            if let Some(parent) = blob_path.parent() {
-                fs::create_dir_all(parent).await.map_err(|e| {
-                    DomainError::internal_error(
-                        "Dedup",
-                        format!("Failed to create blob directory: {}", e),
-                    )
-                })?;
-            }
+            // Parent directory (xx/) guaranteed to exist — created by initialize()
 
             // rename is atomic on the same filesystem.  If source and blob
             // dirs live on different filesystems (rare), this falls back to
