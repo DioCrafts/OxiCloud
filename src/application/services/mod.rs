@@ -2,6 +2,7 @@ pub mod admin_settings_service;
 pub mod auth_application_service;
 pub mod batch_operations;
 pub mod calendar_service;
+pub mod device_auth_service;
 pub mod contact_service;
 pub mod favorites_service;
 pub mod file_management_service;

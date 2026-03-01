@@ -1,6 +1,7 @@
 pub mod admin_handler;
 pub mod auth_handler;
 pub mod batch_handler;
+pub mod device_auth_handler;
 pub mod caldav_handler;
 pub mod carddav_handler;
 pub mod chunked_upload_handler;

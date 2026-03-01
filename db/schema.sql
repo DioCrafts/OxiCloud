@@ -143,6 +143,54 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc ON auth.users(oidc_provider, oi
 -- NOTE: No default users are created. The first user to register through
 -- the admin setup wizard will become the administrator.
 
+-- Device Authorization Grant (RFC 8628)
+-- Used for WebDAV/CalDAV/CardDAV client authentication via the device flow.
+DO $BODY$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'device_code_status' AND n.nspname = 'auth'
+    ) THEN
+        CREATE TYPE auth.device_code_status AS ENUM (
+            'pending',      -- Waiting for user to authorize
+            'authorized',   -- User approved, tokens ready for polling client
+            'denied',       -- User denied the request
+            'expired'       -- TTL exceeded without user action
+        );
+    END IF;
+END $BODY$;
+
+CREATE TABLE IF NOT EXISTS auth.device_codes (
+    id VARCHAR(36) PRIMARY KEY,
+    device_code VARCHAR(128) UNIQUE NOT NULL,
+    user_code VARCHAR(16) UNIQUE NOT NULL,
+    client_name VARCHAR(255) NOT NULL DEFAULT 'Unknown Client',
+    scopes VARCHAR(512) NOT NULL DEFAULT 'webdav,caldav,carddav',
+    status auth.device_code_status NOT NULL DEFAULT 'pending',
+    user_id VARCHAR(36) REFERENCES auth.users(id) ON DELETE CASCADE,
+    access_token TEXT,
+    refresh_token TEXT,
+    verification_uri TEXT NOT NULL,
+    verification_uri_complete TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    poll_interval_secs INTEGER NOT NULL DEFAULT 5,
+    last_poll_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    authorized_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_codes_device_code
+    ON auth.device_codes(device_code);
+CREATE INDEX IF NOT EXISTS idx_device_codes_user_code
+    ON auth.device_codes(user_code) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_device_codes_expires_at
+    ON auth.device_codes(expires_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_device_codes_user_id
+    ON auth.device_codes(user_id) WHERE status = 'authorized';
+
+COMMENT ON TABLE auth.device_codes IS 'OAuth 2.0 Device Authorization Grant (RFC 8628) codes for DAV client authentication';
+
 -- ============================================================
 -- 2. CALDAV SCHEMA (RFC 4791)
 -- ============================================================

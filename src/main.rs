@@ -163,9 +163,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if config.features.enable_auth {
         use interfaces::api::handlers::auth_handler::auth_routes;
+        use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
 
         let auth_router = auth_routes().with_state(app_state.clone());
+
+        // Device Authorization Grant (RFC 8628)
+        // Public endpoints: /api/auth/device/authorize + /api/auth/device/token
+        let device_public = device_auth_handler::device_auth_public_routes()
+            .with_state(app_state.clone());
+        // Protected endpoints: /api/auth/device/verify, /api/auth/device/devices
+        let device_protected = device_auth_handler::device_auth_protected_routes()
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ))
+            .with_state(app_state.clone());
 
         // Protected API routes — require valid JWT token
         let protected_api = api_routes.layer(axum::middleware::from_fn_with_state(
@@ -190,6 +203,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app = Router::new()
             // Auth endpoints (login, register, refresh) are public — no middleware
             .nest("/api/auth", auth_router)
+            // Device Auth Grant public endpoints (authorize + token polling)
+            .nest("/api/auth/device", device_public)
+            // Device Auth Grant protected endpoints (verify + device management)
+            .nest("/api/auth/device", device_protected)
             // Public API routes (share access, i18n) — no auth required
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware
