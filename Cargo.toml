@@ -59,12 +59,6 @@ socket2 = { version = "0.6.2", features = ["all"] }
 [features]
 default = []
 test_utils = ["mockall"]
-migrations = ["sqlx/migrate"]
-
-[[bin]]
-name = "migrate"
-path = "src/bin/migrate.rs"
-required-features = ["migrations"]
 
 [profile.release]
 lto = "fat"
