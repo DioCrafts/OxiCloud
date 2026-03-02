@@ -27,7 +27,44 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
+use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC, AsciiSet};
 use std::sync::Arc;
+
+/// Characters that MUST NOT be percent-encoded inside a URI path segment.
+/// RFC 3986 §3.3 pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
+///   unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
+///   sub-delims = "!" / "$" / "&" / "'" / "(" / ")" / "*" / "+" / "," / ";" / "="
+const PATH_SEGMENT_ENCODE_SET: &AsciiSet = &NON_ALPHANUMERIC
+    .remove(b'-')
+    .remove(b'.')
+    .remove(b'_')
+    .remove(b'~')
+    .remove(b'!')
+    .remove(b'$')
+    .remove(b'&')
+    .remove(b'\'')
+    .remove(b'(')
+    .remove(b')')
+    .remove(b'*')
+    .remove(b'+')
+    .remove(b',')
+    .remove(b';')
+    .remove(b'=')
+    .remove(b':')
+    .remove(b'@');
+
+/// Percent-encode a single URI path segment (folder/file name).
+fn encode_path_segment(segment: &str) -> String {
+    utf8_percent_encode(segment, PATH_SEGMENT_ENCODE_SET).to_string()
+}
+
+/// Percent-encode a full slash-separated path, encoding each segment individually.
+pub(crate) fn encode_uri_path(path: &str) -> String {
+    path.split('/')
+        .map(|seg| encode_path_segment(seg))
+        .collect::<Vec<_>>()
+        .join("/")
+}
 
 // Create a custom DAV header since it's not in the standard headers
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
@@ -62,22 +99,24 @@ pub fn webdav_routes() -> Router<Arc<AppState>> {
         .route("/webdav", axum::routing::any(handle_webdav_methods_root))
 }
 
-/// Extract the resource path from the request URI, stripping the `/webdav/` prefix.
+/// Extract the resource path from the request URI, stripping the `/webdav/` prefix
+/// and percent-decoding the result so that folder/file names with spaces and
+/// special characters match the values stored in the database.
 fn extract_webdav_path(uri: &axum::http::Uri) -> String {
     let raw = uri.path();
-    if let Some(rest) = raw.strip_prefix("/webdav/") {
-        rest.trim_end_matches('/').to_string()
+    let encoded = if let Some(rest) = raw.strip_prefix("/webdav/") {
+        rest.trim_end_matches('/')
     } else if raw == "/webdav" {
-        String::new()
+        ""
     } else {
         // Fallback: split-based extraction
-        let parts: Vec<&str> = raw.split('/').collect();
-        if parts.len() > 2 {
-            parts[2..].join("/")
-        } else {
-            String::new()
-        }
-    }
+        let trimmed = raw.strip_prefix('/').unwrap_or(raw);
+        trimmed.trim_end_matches('/')
+    };
+    // Decode percent-encoded characters (e.g. %20 → space)
+    percent_decode_str(encoded)
+        .decode_utf8_lossy()
+        .into_owned()
 }
 
 async fn handle_webdav_methods_root(
@@ -230,7 +269,7 @@ async fn handle_propfind(
     let base_href = if path.is_empty() || path == "/" {
         "/webdav/".to_string()
     } else {
-        format!("/webdav/{}/", path)
+        format!("/webdav/{}/", encode_uri_path(&path))
     };
 
     // ── 5. Determine target resource ─────────────────────────────
@@ -358,7 +397,7 @@ async fn build_streaming_propfind_response(
                 {
                     let mut w = Writer::new(&mut chunk);
                     for subfolder in &result.items {
-                        let href = format!("{}{}/", base_href, subfolder.name);
+                        let href = format!("{}{}/", base_href, encode_path_segment(&subfolder.name));
                         WebDavAdapter::write_folder_entry(&mut w, subfolder, &propfind_request, &href)
                             .map_err(|e| std::io::Error::other(e.to_string()))?;
                     }
@@ -389,7 +428,7 @@ async fn build_streaming_propfind_response(
                 {
                     let mut w = Writer::new(&mut chunk);
                     for file in &batch {
-                        let href = format!("{}{}", base_href, file.name);
+                        let href = format!("{}{}", base_href, encode_path_segment(&file.name));
                         WebDavAdapter::write_file_entry(&mut w, file, &propfind_request, &href)
                             .map_err(|e| std::io::Error::other(e.to_string()))?;
                     }
@@ -472,7 +511,7 @@ async fn handle_proppatch(
     }
 
     // Generate response
-    let href = format!("/webdav/{}", path);
+    let href = format!("/webdav/{}", encode_uri_path(&path));
     let mut response_body = Vec::new();
     WebDavAdapter::generate_proppatch_response(&mut response_body, &href, &results).map_err(
         |e| AppError::internal_error(format!("Failed to generate PROPPATCH response: {}", e)),
@@ -593,7 +632,7 @@ async fn handle_head(
  * Handles PUT requests to create or update files.
  *
  * **Streaming implementation**: the request body is spooled to a temp file
- * with incremental SHA-256 hashing. Peak RAM usage is ~256 KB regardless
+ * with incremental BLAKE3 hashing. Peak RAM usage is ~256 KB regardless
  * of file size. The temp file is then atomically moved into blob storage
  * via `update_file_streaming`.
  *
@@ -608,7 +647,6 @@ async fn handle_put(
     path: String,
 ) -> Result<Response<Body>, AppError> {
     use http_body_util::BodyStream;
-    use sha2::{Digest, Sha256};
     use tokio::io::AsyncWriteExt;
     use tokio_stream::StreamExt;
 
@@ -640,7 +678,7 @@ async fn handle_put(
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to open temp file: {}", e)))?;
 
-    let mut hasher = Sha256::new();
+    let mut hasher = blake3::Hasher::new();
     let mut total_bytes: usize = 0;
     let mut stream = BodyStream::new(req.into_body());
 
@@ -669,7 +707,7 @@ async fn handle_put(
         .map_err(|e| AppError::internal_error(format!("Failed to flush temp file: {}", e)))?;
     drop(file);
 
-    let hash = hex::encode(hasher.finalize());
+    let hash = hasher.finalize().to_hex().to_string();
 
     // ── Atomic store: temp file → dedup blob + DB metadata update ──
     let result = file_upload_service
@@ -860,10 +898,11 @@ async fn handle_move(
         .unwrap_or("T")
         != "F";
 
-    // Extract destination path from URL
+    // Extract destination path from URL and percent-decode it
     let destination_path = if let Some(webdav_prefix) = destination.find("/webdav/") {
         let after_prefix = &destination[webdav_prefix + 8..];
-        after_prefix.trim_end_matches('/').to_string()
+        let trimmed = after_prefix.trim_end_matches('/');
+        percent_decode_str(trimmed).decode_utf8_lossy().into_owned()
     } else {
         return Err(AppError::bad_request("Invalid destination URL"));
     };
@@ -1021,10 +1060,11 @@ async fn handle_copy(
         .unwrap_or("T")
         != "F";
 
-    // Extract destination path from URL
+    // Extract destination path from URL and percent-decode it
     let destination_path = if let Some(webdav_prefix) = destination.find("/webdav/") {
         let after_prefix = &destination[webdav_prefix + 8..];
-        after_prefix.trim_end_matches('/').to_string()
+        let trimmed = after_prefix.trim_end_matches('/');
+        percent_decode_str(trimmed).decode_utf8_lossy().into_owned()
     } else {
         return Err(AppError::bad_request("Invalid destination URL"));
     };
@@ -1229,7 +1269,7 @@ async fn handle_lock(
         };
 
         // Generate response
-        let href = format!("/webdav/{}", path);
+        let href = format!("/webdav/{}", encode_uri_path(&path));
         let mut response_body = Vec::new();
         WebDavAdapter::generate_lock_response(&mut response_body, &lock_info, &href).map_err(
             |e| AppError::internal_error(format!("Failed to generate LOCK response: {}", e)),
@@ -1258,7 +1298,7 @@ async fn handle_lock(
         };
 
         // Generate response
-        let href = format!("/webdav/{}", path);
+        let href = format!("/webdav/{}", encode_uri_path(&path));
         let mut response_body = Vec::new();
         WebDavAdapter::generate_lock_response(&mut response_body, &lock_info, &href).map_err(
             |e| AppError::internal_error(format!("Failed to generate LOCK response: {}", e)),

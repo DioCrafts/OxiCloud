@@ -2,10 +2,19 @@
 //!
 //! This module provides JWT token generation and validation functionality,
 //! implementing the TokenServicePort trait defined in the application layer.
+//!
+//! **Performance optimisation**: a per-token validation cache (moka, lock-free)
+//! avoids repeating the HMAC-SHA256 verification on every request for the same
+//! token.  Entries are keyed by a fast BLAKE3 hash of the raw token string and
+//! auto-expire after a short TTL (30 s by default) so revoked tokens don't stay
+//! valid for long.
 
 use chrono::Utc;
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use moka::sync::Cache;
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 use uuid::Uuid;
 
 use crate::application::ports::auth_ports::{TokenClaims, TokenServicePort};
@@ -50,6 +59,24 @@ impl From<JwtClaims> for TokenClaims {
 ///
 /// This service handles JWT token generation and validation for user authentication.
 /// It uses HS256 algorithm for signing tokens.
+///
+/// ## Validation cache
+///
+/// `jsonwebtoken::decode()` performs HMAC-SHA256 verification on every call.
+/// While fast in absolute terms (~2-4 µs on modern hardware), at 10 k req/s
+/// that is 20-40 ms of pure CPU per second — and it is synchronous, blocking
+/// the Tokio worker thread.
+///
+/// The cache uses the **BLAKE3** hash of the raw token string as key (32-byte,
+/// ~0.1 µs to compute — 20× cheaper than HMAC verification) and stores the
+/// validated `TokenClaims`.  On a cache hit the HMAC step is completely
+/// skipped.
+///
+/// **Security properties**:
+/// - TTL of 30 s bounds the window in which a revoked token remains valid.
+/// - Max 50 000 entries (≈ 4 MB RSS) with LRU eviction prevents DoS via
+///   unique-token flooding.
+/// - Expired tokens are never cached (decode itself rejects them first).
 pub struct JwtTokenService {
     /// Secret key used for signing JWT tokens
     jwt_secret: String,
@@ -57,7 +84,19 @@ pub struct JwtTokenService {
     access_token_expiry: i64,
     /// Expiration time for refresh tokens in seconds
     refresh_token_expiry: i64,
+    /// Validation result cache: blake3(token) → TokenClaims
+    validation_cache: Cache<[u8; 32], TokenClaims>,
+    /// Cache hit counter (for observability / metrics)
+    cache_hits: AtomicU64,
+    /// Cache miss counter
+    cache_misses: AtomicU64,
 }
+
+/// Default TTL for cached validation results (seconds).
+const VALIDATION_CACHE_TTL_SECS: u64 = 30;
+
+/// Maximum number of cached token validations.
+const VALIDATION_CACHE_MAX_ENTRIES: u64 = 50_000;
 
 impl JwtTokenService {
     /// Create a new JwtTokenService with the specified configuration.
@@ -71,11 +110,42 @@ impl JwtTokenService {
         access_token_expiry_secs: i64,
         refresh_token_expiry_secs: i64,
     ) -> Self {
+        let validation_cache = Cache::builder()
+            .max_capacity(VALIDATION_CACHE_MAX_ENTRIES)
+            .time_to_live(Duration::from_secs(VALIDATION_CACHE_TTL_SECS))
+            .build();
+
+        tracing::info!(
+            "JWT validation cache initialised: TTL={}s, max_entries={}",
+            VALIDATION_CACHE_TTL_SECS,
+            VALIDATION_CACHE_MAX_ENTRIES,
+        );
+
         Self {
             jwt_secret,
             access_token_expiry: access_token_expiry_secs,
             refresh_token_expiry: refresh_token_expiry_secs,
+            validation_cache,
+            cache_hits: AtomicU64::new(0),
+            cache_misses: AtomicU64::new(0),
         }
+    }
+
+    /// Compute a fast BLAKE3 hash of a token string, used as cache key.
+    ///
+    /// BLAKE3 is ~20× faster than SHA-256 and ~40× faster than HMAC-SHA256
+    /// verification through `jsonwebtoken`, making it an ideal pre-filter.
+    #[inline]
+    fn token_hash(token: &str) -> [u8; 32] {
+        blake3::hash(token.as_bytes()).into()
+    }
+
+    /// Return cache hit/miss statistics for monitoring.
+    pub fn cache_stats(&self) -> (u64, u64) {
+        (
+            self.cache_hits.load(Ordering::Relaxed),
+            self.cache_misses.load(Ordering::Relaxed),
+        )
     }
 }
 
@@ -125,6 +195,25 @@ impl TokenServicePort for JwtTokenService {
     }
 
     fn validate_token(&self, token: &str) -> Result<TokenClaims, DomainError> {
+        // ── 1. Fast-path: check the validation cache ─────────────
+        let key = Self::token_hash(token);
+
+        if let Some(cached_claims) = self.validation_cache.get(&key) {
+            // Even on a cache hit we must verify the token hasn't expired
+            // since it was cached (the cached exp is an absolute timestamp).
+            let now = Utc::now().timestamp();
+            if cached_claims.exp > now {
+                self.cache_hits.fetch_add(1, Ordering::Relaxed);
+                return Ok(cached_claims);
+            }
+            // Token expired while cached — evict and fall through to full
+            // verification which will return the proper "Token expired" error.
+            self.validation_cache.invalidate(&key);
+        }
+
+        // ── 2. Slow-path: full HMAC-SHA256 verification ─────────
+        self.cache_misses.fetch_add(1, Ordering::Relaxed);
+
         let validation = Validation::new(Algorithm::HS256);
 
         let token_data = decode::<JwtClaims>(
@@ -143,7 +232,17 @@ impl TokenServicePort for JwtTokenService {
             ),
         })?;
 
-        Ok(token_data.claims.into())
+        let claims: TokenClaims = token_data.claims.into();
+
+        // ── 3. Store in cache for subsequent requests ────────────
+        // Only cache tokens that won't expire within the cache TTL window,
+        // avoiding stale positives right at the boundary.
+        let remaining_secs = claims.exp - Utc::now().timestamp();
+        if remaining_secs > VALIDATION_CACHE_TTL_SECS as i64 {
+            self.validation_cache.insert(key, claims.clone());
+        }
+
+        Ok(claims)
     }
 
     fn generate_refresh_token(&self) -> String {
@@ -217,5 +316,44 @@ mod tests {
 
         let result = service.validate_token("invalid_token");
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validation_cache_hit() {
+        let service = JwtTokenService::new(
+            "test_secret_key_at_least_32_bytes_long".to_string(),
+            3600,
+            86400,
+        );
+
+        let user = create_test_user();
+        let token = service
+            .generate_access_token(&user)
+            .expect("Should generate token");
+
+        // First call: cache miss — performs full HMAC verification
+        let claims1 = service.validate_token(&token).expect("Should validate");
+
+        // Second call: cache hit — skips HMAC, returns cloned claims
+        let claims2 = service.validate_token(&token).expect("Should validate from cache");
+
+        assert_eq!(claims1.sub, claims2.sub);
+        assert_eq!(claims1.username, claims2.username);
+
+        let (hits, misses) = service.cache_stats();
+        assert_eq!(hits, 1, "Expected 1 cache hit");
+        assert_eq!(misses, 1, "Expected 1 cache miss");
+    }
+
+    #[test]
+    fn test_invalid_token_not_cached() {
+        let service = JwtTokenService::new("secret".to_string(), 3600, 86400);
+
+        // Invalid tokens should never be cached
+        let _ = service.validate_token("bad_token");
+        let _ = service.validate_token("bad_token");
+
+        let (hits, _misses) = service.cache_stats();
+        assert_eq!(hits, 0, "Invalid tokens should never produce cache hits");
     }
 }

@@ -1,13 +1,12 @@
 use async_zip::base::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
 use futures::io::AsyncWriteExt as FuturesWriteExt;
-use futures::{Future, StreamExt, future::join_all};
+use futures::{Future, StreamExt, stream};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use thiserror::Error;
 use tokio::io::BufWriter;
-use tokio::sync::Semaphore;
 use tracing::info;
 
 use crate::application::dtos::file_dto::FileDto;
@@ -71,7 +70,6 @@ pub struct BatchOperationService {
     folder_service: Arc<FolderService>,
     trash_service: Option<Arc<dyn TrashUseCase>>,
     config: AppConfig,
-    semaphore: Arc<Semaphore>,
 }
 
 impl BatchOperationService {
@@ -82,16 +80,12 @@ impl BatchOperationService {
         folder_service: Arc<FolderService>,
         config: AppConfig,
     ) -> Self {
-        // Limit concurrency based on configuration
-        let max_concurrency = config.concurrency.max_concurrent_files;
-
         Self {
             file_retrieval,
             file_management,
             folder_service,
             trash_service: None,
             config,
-            semaphore: Arc::new(Semaphore::new(max_concurrency)),
         }
     }
 
@@ -123,6 +117,7 @@ impl BatchOperationService {
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
         info!("Starting batch copy of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
+        let max_concurrent = self.config.concurrency.max_concurrent_files;
 
         // Create result structure
         let mut result = BatchResult {
@@ -134,31 +129,23 @@ impl BatchOperationService {
             },
         };
 
-        // Define the operation to perform for each file
-        let operations = file_ids.into_iter().map(|file_id| {
+        // Arc<str> avoids N heap-clones of the same string
+        let target_folder: Option<Arc<str>> = target_folder_id.map(|s| Arc::from(s.as_str()));
+
+        // buffer_unordered materialises only max_concurrent futures at a time
+        let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
-            let target_folder = target_folder_id.clone();
-            let semaphore = self.semaphore.clone();
+            let target_folder = target_folder.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
-                let copy_result = mgmt.copy_file(&file_id, target_folder.clone()).await;
-
-                // Release the permit explicitly (also released on drop)
-                drop(permit);
-
-                // Return the result along with the ID to identify successes/failures
+                let copy_result = mgmt.copy_file(&file_id, target_folder.map(|s| s.to_string())).await;
                 (file_id, copy_result)
             }
-        });
+        }))
+        .buffer_unordered(max_concurrent);
 
-        // Execute all operations in parallel with concurrency control
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (file_id, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((file_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(file) => {
                     result.successful.push(file);
@@ -195,6 +182,7 @@ impl BatchOperationService {
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
         info!("Starting batch move of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
+        let max_concurrent = self.config.concurrency.max_concurrent_files;
 
         // Create result structure
         let mut result = BatchResult {
@@ -206,31 +194,20 @@ impl BatchOperationService {
             },
         };
 
-        // Define the operation to perform for each file
-        let operations = file_ids.into_iter().map(|file_id| {
+        let target_folder: Option<Arc<str>> = target_folder_id.map(|s| Arc::from(s.as_str()));
+
+        let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
-            let target_folder = target_folder_id.clone();
-            let semaphore = self.semaphore.clone();
+            let target_folder = target_folder.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
-                let move_result = mgmt.move_file(&file_id, target_folder.clone()).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result along with the ID to identify successes/failures
+                let move_result = mgmt.move_file(&file_id, target_folder.map(|s| s.to_string())).await;
                 (file_id, move_result)
             }
-        });
+        }))
+        .buffer_unordered(max_concurrent);
 
-        // Execute all operations in parallel with concurrency control
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (file_id, operation_result) in operation_results {
+        while let Some((file_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(file) => {
                     result.successful.push(file);
@@ -278,30 +255,19 @@ impl BatchOperationService {
         };
 
         // Define the operation to perform for each file
-        let operations = file_ids.into_iter().map(|file_id| {
+        let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
-            let semaphore = self.semaphore.clone();
-            let id_clone = file_id.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
                 let delete_result = mgmt.delete_file(&file_id).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result along with the ID
-                (id_clone.clone(), delete_result.map(|_| id_clone))
+                let id_for_result = file_id.clone();
+                (file_id, delete_result.map(|_| id_for_result))
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all operations in parallel with concurrency control
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (file_id, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((file_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(id) => {
                     result.successful.push(id);
@@ -349,29 +315,18 @@ impl BatchOperationService {
         };
 
         // Define the operation to perform for each file
-        let operations = file_ids.into_iter().map(|file_id| {
+        let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let retrieval = self.file_retrieval.clone();
-            let semaphore = self.semaphore.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
                 let get_result = retrieval.get_file(&file_id).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result along with the ID
                 (file_id, get_result)
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all operations in parallel with concurrency control
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (file_id, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((file_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(file) => {
                     result.successful.push(file);
@@ -421,31 +376,22 @@ impl BatchOperationService {
         };
 
         // Define the operation to perform for each folder
-        let operations = folder_ids.into_iter().map(|folder_id| {
+        // Arc<str> avoids N heap-clones of the caller string
+        let caller: Arc<str> = Arc::from(caller_id);
+
+        let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
-            let semaphore = self.semaphore.clone();
-            let id_clone = folder_id.clone();
-            let caller = caller_id.to_string();
+            let caller = caller.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
                 let delete_result = folder_service.delete_folder(&folder_id, &caller).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result along with the ID
-                (id_clone.clone(), delete_result.map(|_| id_clone))
+                let id_for_result = folder_id.clone();
+                (folder_id, delete_result.map(|_| id_for_result))
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all operations in parallel with concurrency control
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (folder_id, operation_result) in operation_results {
+        while let Some((folder_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(id) => {
                     result.successful.push(id);
@@ -497,23 +443,21 @@ impl BatchOperationService {
             },
         };
 
-        let operations = file_ids.into_iter().map(|file_id| {
+        let uid: Arc<str> = Arc::from(user_id);
+
+        let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let trash = trash_service.clone();
-            let semaphore = self.semaphore.clone();
-            let uid = user_id.to_string();
-            let id_clone = file_id.clone();
+            let uid = uid.clone();
 
             async move {
-                let permit = semaphore.acquire().await.unwrap();
                 let trash_result = trash.move_to_trash(&file_id, "file", &uid).await;
-                drop(permit);
-                (id_clone.clone(), trash_result.map(|_| id_clone))
+                let id_for_result = file_id.clone();
+                (file_id, trash_result.map(|_| id_for_result))
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        let operation_results = join_all(operations).await;
-
-        for (file_id, operation_result) in operation_results {
+        while let Some((file_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(id) => {
                     result.successful.push(id);
@@ -564,23 +508,21 @@ impl BatchOperationService {
             },
         };
 
-        let operations = folder_ids.into_iter().map(|folder_id| {
+        let uid: Arc<str> = Arc::from(user_id);
+
+        let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let trash = trash_service.clone();
-            let semaphore = self.semaphore.clone();
-            let uid = user_id.to_string();
-            let id_clone = folder_id.clone();
+            let uid = uid.clone();
 
             async move {
-                let permit = semaphore.acquire().await.unwrap();
                 let trash_result = trash.move_to_trash(&folder_id, "folder", &uid).await;
-                drop(permit);
-                (id_clone.clone(), trash_result.map(|_| id_clone))
+                let id_for_result = folder_id.clone();
+                (folder_id, trash_result.map(|_| id_for_result))
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        let operation_results = join_all(operations).await;
-
-        for (folder_id, operation_result) in operation_results {
+        while let Some((folder_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(id) => {
                     result.successful.push(id);
@@ -627,24 +569,23 @@ impl BatchOperationService {
             },
         };
 
-        let operations = folder_ids.into_iter().map(|folder_id| {
+        let target: Option<Arc<str>> = target_folder_id.map(|s| Arc::from(s.as_str()));
+        let caller: Arc<str> = Arc::from(caller_id);
+
+        let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
-            let target = target_folder_id.clone();
-            let semaphore = self.semaphore.clone();
-            let caller = caller_id.to_string();
+            let target = target.clone();
+            let caller = caller.clone();
 
             async move {
-                let permit = semaphore.acquire().await.unwrap();
-                let dto = MoveFolderDto { parent_id: target };
+                let dto = MoveFolderDto { parent_id: target.map(|s| s.to_string()) };
                 let move_result = folder_service.move_folder(&folder_id, dto, &caller).await;
-                drop(permit);
                 (folder_id, move_result)
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        let operation_results = join_all(operations).await;
-
-        for (folder_id, operation_result) in operation_results {
+        while let Some((folder_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(folder) => {
                     result.successful.push(folder);
@@ -873,7 +814,7 @@ impl BatchOperationService {
     ) -> Result<BatchResult<T>, BatchOperationError>
     where
         T: Clone + Send + 'static + std::fmt::Debug,
-        F: Fn(T, Arc<Semaphore>) -> Fut + Clone + Send + Sync + 'static,
+        F: Fn(T) -> Fut + Clone + Send + Sync + 'static,
         Fut: Future<Output = Result<T, DomainError>> + Send + 'static,
     {
         info!(
@@ -892,33 +833,25 @@ impl BatchOperationService {
             },
         };
 
-        // Convert each item to a task
-        let tasks = items.iter().map(|item| {
-            let item_clone = item.clone();
+        // buffer_unordered materialises only max_concurrent futures at a time
+        let mut operation_stream = stream::iter(items.into_iter().map(|item| {
             let op = operation.clone();
-            let semaphore = self.semaphore.clone();
 
             async move {
-                // The provided function must handle semaphore acquisition
-                let op_result = op(item_clone.clone(), semaphore).await;
-
-                // Return the result along with the original item for identification
-                (item_clone, op_result)
+                let op_result = op(item.clone()).await;
+                (item, op_result)
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all tasks in parallel
-        let operation_results = join_all(tasks).await;
-
-        // Process results
-        for (item, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((item, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(result_item) => {
                     result.successful.push(result_item);
                     result.stats.successful += 1;
                 }
                 Err(e) => {
-                    // Convert item to string for error reporting
                     result.failed.push((format!("{:?}", item), e.to_string()));
                     result.stats.failed += 1;
                 }
@@ -960,34 +893,23 @@ impl BatchOperationService {
         };
 
         // Define the operation for each folder
-        let operations = folders.into_iter().map(|(name, parent_id)| {
+        let mut operation_stream = stream::iter(folders.into_iter().map(|(name, parent_id)| {
             let folder_service = self.folder_service.clone();
-            let semaphore = self.semaphore.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
                 let dto = crate::application::dtos::folder_dto::CreateFolderDto {
                     name: name.clone(),
                     parent_id: parent_id.clone(),
                 };
                 let create_result = folder_service.create_folder(dto).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result with an identifier for errors
                 let id = format!("{}:{}", name, parent_id.unwrap_or_default());
                 (id, create_result)
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all operations in parallel
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (id, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(folder) => {
                     result.successful.push(folder);
@@ -1035,29 +957,18 @@ impl BatchOperationService {
         };
 
         // Define the operation for each folder
-        let operations = folder_ids.into_iter().map(|folder_id| {
+        let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
-            let semaphore = self.semaphore.clone();
 
             async move {
-                // Acquire semaphore permit
-                let permit = semaphore.acquire().await.unwrap();
-
                 let get_result = folder_service.get_folder(&folder_id).await;
-
-                // Release the permit explicitly
-                drop(permit);
-
-                // Return the result with its ID
                 (folder_id, get_result)
             }
-        });
+        }))
+        .buffer_unordered(self.config.concurrency.max_concurrent_files);
 
-        // Execute all operations in parallel
-        let operation_results = join_all(operations).await;
-
-        // Process the results
-        for (folder_id, operation_result) in operation_results {
+        // Process results as they complete
+        while let Some((folder_id, operation_result)) = operation_stream.next().await {
             match operation_result {
                 Ok(folder) => {
                     result.successful.push(folder);
@@ -1105,11 +1016,8 @@ mod tests {
             AppConfig::default(),
         );
 
-        // Define a generic test operation
-        let operation = |item: i32, semaphore: Arc<Semaphore>| async move {
-            // Acquire and release the semaphore
-            let _permit = semaphore.acquire().await.unwrap();
-
+        // Define a generic test operation (no more semaphore parameter)
+        let operation = |item: i32| async move {
             if item % 2 == 0 {
                 // Simulate success for even numbers
                 Ok(item * 2)

@@ -91,19 +91,21 @@ async fn handle_carddav_methods_inner(
     }
 }
 
-/// Extract the CardDAV path from the full URI path.
+/// Extract the CardDAV path from the full URI path, percent-decoding the result.
 fn extract_carddav_path(uri_path: &str) -> String {
-    if let Some(pos) = uri_path.find("/carddav/") {
+    let encoded = if let Some(pos) = uri_path.find("/carddav/") {
         let after = &uri_path[pos + 9..];
-        after.trim_end_matches('/').to_string()
+        after.trim_end_matches('/')
     } else if uri_path.ends_with("/carddav") {
-        String::new()
+        ""
     } else {
         uri_path
             .trim_start_matches('/')
             .trim_end_matches('/')
-            .to_string()
-    }
+    };
+    percent_encoding::percent_decode_str(encoded)
+        .decode_utf8_lossy()
+        .into_owned()
 }
 
 // ─── Helper: extract user from request ───────────────────────────────

@@ -6,7 +6,7 @@
 //!   (updated atomically on each chunk) are stored alongside the chunk files.
 //!   On boot the service scans `temp_base_dir` and recovers any active sessions.
 //! - Parallel chunk transfers (up to 6 concurrent)
-//! - Automatic reassembly with hash-on-write (SHA-256)
+//! - Automatic reassembly with hash-on-write (BLAKE3)
 //! - Expiration cleanup (24 h)
 //!
 //! Protocol:
@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -592,13 +592,13 @@ impl ChunkedUploadService {
         })
     }
 
-    /// Assemble chunks into final file and return the path + pre-computed SHA-256 hash.
+    /// Assemble chunks into final file and return the path + pre-computed BLAKE3 hash.
     ///
-    /// **Hash-on-Write**: SHA-256 is computed while copying chunks into the
+    /// **Hash-on-Write**: BLAKE3 is computed while copying chunks into the
     /// assembled file, eliminating the second sequential read that dedup_service
     /// would otherwise need.
     ///
-    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, sha256_hash)`.
+    /// Returns `(assembled_file_path, filename, folder_id, content_type, total_size, blake3_hash)`.
     async fn complete_upload_inner(
         &self,
         upload_id: &str,
@@ -625,9 +625,9 @@ impl ChunkedUploadService {
 
         // Assemble file with hash-on-write.
         //
-        // The entire loop is offloaded to spawn_blocking because SHA-256
-        // hashing is CPU-bound (~130 ms for 500 MB) and would otherwise
-        // block a Tokio worker, starving all other connections.
+        // The entire loop is offloaded to spawn_blocking because BLAKE3
+        // hashing is CPU-bound and would otherwise block a Tokio worker,
+        // starving all other connections.
         // Synchronous I/O is used inside the blocking thread — it avoids
         // the async reactor overhead and is actually faster for this
         // sequential workload.
@@ -659,7 +659,7 @@ impl ChunkedUploadService {
 
             // 512 KB I/O buffers — 8× fewer syscalls than 64 KB
             let mut output = StdBufWriter::with_capacity(524_288, raw_output);
-            let mut hasher = Sha256::new();
+            let mut hasher = blake3::Hasher::new();
 
             // Single 512 KB read buffer reused across all chunks (avoids N allocations)
             let mut buf = vec![0u8; 524_288];
@@ -689,7 +689,7 @@ impl ChunkedUploadService {
                 let _ = std::fs::remove_file(chunk_path);
             }
 
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_hex().to_string())
         })
         .await
         .map_err(|e| format!("Assembly task panicked: {e}"))??;

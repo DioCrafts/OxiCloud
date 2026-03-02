@@ -154,54 +154,119 @@ impl IntoResponse for AuthError {
 
 /// Secure authentication middleware.
 ///
-/// Validates the JWT token against the configured authentication service.
-/// Does not accept bypasses, mock tokens, or URL parameters to skip validation.
+/// Supports two authentication methods:
+/// 1. **Bearer JWT** — standard token in `Authorization: Bearer <token>`
+/// 2. **Basic Auth with App Passwords** — for DAV clients (DAVx⁵, Thunderbird, rclone)
+///    that send `Authorization: Basic base64(username:app_password)`
+///
+/// Bearer is tried first; if no Bearer header is found, Basic is attempted.
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AuthError> {
-    // Extract the Bearer token from the Authorization header
-    let token_str = headers
+    let auth_header = headers
         .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or(AuthError::TokenNotProvided)?;
+        .and_then(|value| value.to_str().ok());
 
-    // Validate that the token is not empty
-    let token_str = token_str.trim();
-    if token_str.is_empty() {
-        return Err(AuthError::TokenNotProvided);
-    }
+    // ── 1. Try Bearer JWT ────────────────────────────────────────
+    if let Some(header_value) = auth_header {
+        if let Some(token_str) = header_value.strip_prefix("Bearer ") {
+            let token_str = token_str.trim();
+            if !token_str.is_empty() {
+                tracing::debug!("Processing Bearer authentication token");
 
-    tracing::debug!("Processing authentication token");
-
-    // Validate the token using the authentication service
-    if let Some(auth_service) = state.auth_service.as_ref() {
-        let token_service = &auth_service.token_service;
-        match token_service.validate_token(token_str) {
-            Ok(claims) => {
-                tracing::debug!("Token validated successfully for user: {}", claims.username);
-                let current_user = CurrentUser {
-                    id: claims.sub,
-                    username: claims.username,
-                    email: claims.email,
-                    role: claims.role,
-                };
-                request.extensions_mut().insert(current_user);
-                return Ok(next.run(request).await);
+                if let Some(auth_service) = state.auth_service.as_ref() {
+                    let token_service = &auth_service.token_service;
+                    match token_service.validate_token(token_str) {
+                        Ok(claims) => {
+                            tracing::debug!(
+                                "Token validated successfully for user: {}",
+                                claims.username
+                            );
+                            let current_user = CurrentUser {
+                                id: claims.sub,
+                                username: claims.username,
+                                email: claims.email,
+                                role: claims.role,
+                            };
+                            request.extensions_mut().insert(current_user);
+                            return Ok(next.run(request).await);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Bearer token validation failed: {}", e);
+                            return Err(AuthError::InvalidToken(format!(
+                                "Invalid token: {}",
+                                e
+                            )));
+                        }
+                    }
+                }
             }
-            Err(e) => {
-                tracing::warn!("Token validation failed: {}", e);
-                return Err(AuthError::InvalidToken(format!("Invalid token: {}", e)));
+        }
+
+        // ── 2. Try Basic Auth with App Passwords ─────────────────
+        if let Some(basic_encoded) = header_value.strip_prefix("Basic ") {
+            let basic_encoded = basic_encoded.trim();
+            if !basic_encoded.is_empty() {
+                tracing::debug!("Processing Basic authentication (app password)");
+
+                // Decode base64(username:password)
+                use base64::Engine;
+                let decoded = base64::engine::general_purpose::STANDARD
+                    .decode(basic_encoded)
+                    .map_err(|_| {
+                        AuthError::InvalidToken("Invalid Basic auth encoding".to_string())
+                    })?;
+                let credentials = String::from_utf8(decoded).map_err(|_| {
+                    AuthError::InvalidToken("Invalid Basic auth encoding".to_string())
+                })?;
+
+                let (username, password) = credentials.split_once(':').ok_or_else(|| {
+                    AuthError::InvalidToken("Invalid Basic auth format".to_string())
+                })?;
+
+                if let Some(app_pw_service) = state.app_password_service.as_ref() {
+                    match app_pw_service.verify_basic_auth(username, password).await {
+                        Ok((user_id, uname, email, role)) => {
+                            tracing::debug!(
+                                "App password authentication successful for user: {}",
+                                uname
+                            );
+                            let current_user = CurrentUser {
+                                id: user_id,
+                                username: uname,
+                                email,
+                                role,
+                            };
+                            request.extensions_mut().insert(current_user);
+                            return Ok(next.run(request).await);
+                        }
+                        Err(e) => {
+                            tracing::warn!("App password verification failed: {}", e);
+                            return Err(AuthError::InvalidToken(
+                                "Invalid username or app password".to_string(),
+                            ));
+                        }
+                    }
+                } else {
+                    tracing::warn!("Basic auth attempted but app password service not configured");
+                    return Err(AuthError::InvalidToken(
+                        "App passwords are not enabled".to_string(),
+                    ));
+                }
             }
         }
     }
 
-    // If no authentication service is available, deny access
-    tracing::error!("Auth middleware invoked but auth service is not configured");
-    Err(AuthError::AuthServiceUnavailable)
+    // No valid Authorization header found
+    if state.auth_service.is_none() {
+        tracing::error!("Auth middleware invoked but auth service is not configured");
+        return Err(AuthError::AuthServiceUnavailable);
+    }
+
+    Err(AuthError::TokenNotProvided)
 }
 
 /// Middleware to verify that the authenticated user has an admin role.

@@ -26,16 +26,28 @@ use crate::domain::errors::{DomainError, ErrorKind};
 /// Maximum file size for transcoding (5MB - larger files stream directly)
 pub const MAX_TRANSCODE_SIZE: u64 = 5 * 1024 * 1024;
 
-/// Number of threads in the dedicated transcoding pool
-const TRANSCODE_POOL_THREADS: usize = 2;
+/// Minimum number of threads in the dedicated transcoding pool
+const MIN_TRANSCODE_THREADS: usize = 2;
+
+/// Compute the number of transcoding threads: half the available CPUs,
+/// with a floor of `MIN_TRANSCODE_THREADS`.  `available_parallelism()`
+/// respects cgroup limits (Docker/K8s) and CPU affinity masks.
+fn transcode_thread_count() -> usize {
+    let cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(MIN_TRANSCODE_THREADS);
+    (cpus / 2).max(MIN_TRANSCODE_THREADS)
+}
 
 /// Dedicated rayon thread pool for CPU-bound image transcoding.
 /// Isolated from Tokio's blocking pool to prevent starvation of other I/O.
+/// Thread count scales with available CPUs (half cores, min 2).
 fn transcode_pool() -> &'static rayon::ThreadPool {
     static POOL: OnceLock<rayon::ThreadPool> = OnceLock::new();
     POOL.get_or_init(|| {
+        let threads = transcode_thread_count();
         rayon::ThreadPoolBuilder::new()
-            .num_threads(TRANSCODE_POOL_THREADS)
+            .num_threads(threads)
             .thread_name(|idx| format!("transcode-{idx}"))
             .build()
             .expect("Failed to create transcode thread pool")
@@ -171,7 +183,7 @@ impl ImageTranscodeService {
         fs::create_dir_all(self.cache_dir.join("webp")).await?;
         tracing::info!(
             "🖼️ Image transcode service initialized (rayon pool: {} threads, cache dir: {:?})",
-            TRANSCODE_POOL_THREADS,
+            transcode_thread_count(),
             self.cache_dir
         );
         Ok(())

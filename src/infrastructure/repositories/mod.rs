@@ -3,6 +3,6 @@ pub mod pg;
 
 // Re-exportar para facilitar acceso
 pub use pg::{
-    FileBlobReadRepository, FileBlobWriteRepository, FolderDbRepository, SessionPgRepository,
-    TrashDbRepository, UserPgRepository,
+    AppPasswordPgRepository, DeviceCodePgRepository, FileBlobReadRepository, FileBlobWriteRepository,
+    FolderDbRepository, SessionPgRepository, TrashDbRepository, UserPgRepository,
 };

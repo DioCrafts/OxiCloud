@@ -1,9 +1,11 @@
 mod address_book_pg_repository;
+mod app_password_pg_repository;
 mod calendar_event_pg_repository;
 mod calendar_pg_repository;
 mod contact_group_pg_repository;
 mod contact_persistence_dto;
 mod contact_pg_repository;
+mod device_code_pg_repository;
 mod favorites_pg_repository;
 mod recent_items_pg_repository;
 mod session_pg_repository;
@@ -19,11 +21,13 @@ pub mod folder_db_repository;
 pub mod trash_db_repository;
 
 pub use address_book_pg_repository::AddressBookPgRepository;
+pub use app_password_pg_repository::AppPasswordPgRepository;
 pub use calendar_event_pg_repository::CalendarEventPgRepository;
 pub use calendar_pg_repository::CalendarPgRepository;
 pub use contact_group_pg_repository::ContactGroupPgRepository;
 pub use contact_persistence_dto::*;
 pub use contact_pg_repository::ContactPgRepository;
+pub use device_code_pg_repository::DeviceCodePgRepository;
 pub use favorites_pg_repository::FavoritesPgRepository;
 pub use file_blob_read_repository::FileBlobReadRepository;
 pub use file_blob_write_repository::FileBlobWriteRepository;

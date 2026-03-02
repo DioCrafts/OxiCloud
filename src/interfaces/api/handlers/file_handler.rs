@@ -37,7 +37,7 @@ impl FileHandler {
 
     /// Streaming file upload — constant ~64 KB RAM regardless of file size.
     ///
-    /// **Hash-on-Write**: SHA-256 is computed while spooling the multipart
+    /// **Hash-on-Write**: BLAKE3 is computed while spooling the multipart
     /// body to the temp file. This eliminates the second sequential read
     /// that dedup_service would otherwise need, cutting total I/O in half.
     pub async fn upload_file(
@@ -61,8 +61,6 @@ impl FileHandler {
         auth_user: &AuthUser,
         mut multipart: Multipart,
     ) -> Result<crate::application::dtos::file_dto::FileDto, Response<Body>> {
-        use sha2::{Digest, Sha256};
-
         let upload_service = &state.applications.file_upload_service;
         let mut folder_id: Option<String> = None;
 
@@ -121,12 +119,12 @@ impl FileHandler {
                 }
 
                 // ── Spool multipart field to temp file + hash-on-write ──
+                // .dedup_temp is created once by DedupService::initialize() at startup
                 let temp_dir = state.core.path_service.get_root_path().join(".dedup_temp");
-                let _ = tokio::fs::create_dir_all(&temp_dir).await;
                 let temp_path = temp_dir.join(format!("upload-{}", uuid::Uuid::new_v4()));
 
                 let mut total_size: u64 = 0;
-                let mut hasher = Sha256::new();
+                let mut hasher = blake3::Hasher::new();
                 let spool_result: Result<(), String> = async {
                     let file = tokio::fs::File::create(&temp_path)
                         .await
@@ -169,7 +167,7 @@ impl FileHandler {
 
                 // Empty file — use streaming path with the (empty) temp file
                 if total_size == 0 {
-                    let hash = hex::encode(hasher.finalize());
+                    let hash = hasher.finalize().to_hex().to_string();
                     return upload_service
                         .upload_file_streaming(
                             filename,
@@ -184,7 +182,7 @@ impl FileHandler {
                 }
 
                 // Finalize hash
-                let hash = hex::encode(hasher.finalize());
+                let hash = hasher.finalize().to_hex().to_string();
 
                 // ── MIME detection (magic bytes + extension fallback) ─
                 let content_type = crate::common::mime_detect::refine_content_type_from_file(

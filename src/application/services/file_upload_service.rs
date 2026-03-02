@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use sha2::{Digest, Sha256};
+
 use std::path::Path;
 use std::sync::Arc;
 
@@ -199,7 +199,7 @@ impl FileUploadUseCase for FileUploadService {
         tokio::fs::write(temp.path(), content)
             .await
             .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
-        let hash = hex::encode(Sha256::digest(content));
+        let hash = blake3::hash(content).to_hex().to_string();
 
         let file = self
             .file_write
@@ -228,7 +228,7 @@ impl FileUploadUseCase for FileUploadService {
         tokio::fs::write(temp.path(), content)
             .await
             .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
-        let hash = hex::encode(Sha256::digest(content));
+        let hash = blake3::hash(content).to_hex().to_string();
 
         self.update_file_streaming(
             path,

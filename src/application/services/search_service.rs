@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use std::cmp::Reverse;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -323,15 +324,13 @@ impl SearchUseCase for SearchService {
                 .map(|f| Self::enrich_folder(f, query))
                 .collect();
 
-            // Sort folders
+            // Sort folders (cached_key avoids O(N log N) temporary String allocations)
             match criteria.sort_by.as_str() {
                 "name" => {
-                    enriched_folders
-                        .sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                    enriched_folders.sort_by_cached_key(|f| f.name.to_lowercase());
                 }
                 "name_desc" => {
-                    enriched_folders
-                        .sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                    enriched_folders.sort_by_cached_key(|f| Reverse(f.name.to_lowercase()));
                 }
                 "date" => {
                     enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));
@@ -411,13 +410,13 @@ impl SearchUseCase for SearchService {
             .map(|f| Self::enrich_folder(f, query))
             .collect();
 
-        // ── Sort folders (files already sorted by SQL ORDER BY) ──
+        // ── Sort folders (cached_key avoids O(N log N) temporary String allocations) ──
         match criteria.sort_by.as_str() {
             "name" => {
-                enriched_folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                enriched_folders.sort_by_cached_key(|f| f.name.to_lowercase());
             }
             "name_desc" => {
-                enriched_folders.sort_by(|a, b| b.name.to_lowercase().cmp(&a.name.to_lowercase()));
+                enriched_folders.sort_by_cached_key(|f| Reverse(f.name.to_lowercase()));
             }
             "date" => {
                 enriched_folders.sort_by(|a, b| a.modified_at.cmp(&b.modified_at));

@@ -22,6 +22,7 @@ use axum::{
     response::Response,
 };
 use bytes::Buf;
+use percent_encoding::percent_decode_str;
 use std::sync::Arc;
 
 use crate::application::adapters::caldav_adapter::{CalDavAdapter, CalDavReportType};
@@ -86,19 +87,21 @@ async fn handle_caldav_methods_inner(
     }
 }
 
-/// Extract the CalDAV path from the full URI path.
+/// Extract the CalDAV path from the full URI path, percent-decoding the result.
 fn extract_caldav_path(uri_path: &str) -> String {
-    if let Some(pos) = uri_path.find("/caldav/") {
+    let encoded = if let Some(pos) = uri_path.find("/caldav/") {
         let after = &uri_path[pos + 8..];
-        after.trim_end_matches('/').to_string()
+        after.trim_end_matches('/')
     } else if uri_path.ends_with("/caldav") {
-        String::new()
+        ""
     } else {
         uri_path
             .trim_start_matches('/')
             .trim_end_matches('/')
-            .to_string()
-    }
+    };
+    percent_decode_str(encoded)
+        .decode_utf8_lossy()
+        .into_owned()
 }
 
 // ─── Helper: extract user from request ───────────────────────────────

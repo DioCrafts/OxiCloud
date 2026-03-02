@@ -1,6 +1,12 @@
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
+
+use socket2::{Domain, Protocol, Socket, TcpKeepalive, Type};
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
@@ -163,9 +169,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if config.features.enable_auth {
         use interfaces::api::handlers::auth_handler::auth_routes;
+        use oxicloud::interfaces::api::handlers::device_auth_handler;
+        use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
 
         let auth_router = auth_routes().with_state(app_state.clone());
+
+        // Device Authorization Grant (RFC 8628)
+        // Public endpoints: /api/auth/device/authorize + /api/auth/device/token
+        let device_public = device_auth_handler::device_auth_public_routes()
+            .with_state(app_state.clone());
+        // Protected endpoints: /api/auth/device/verify, /api/auth/device/devices
+        let device_protected = device_auth_handler::device_auth_protected_routes()
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ))
+            .with_state(app_state.clone());
+
+        // App Password management endpoints (protected — require JWT)
+        let app_password_protected = app_password_handler::app_password_routes()
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ))
+            .with_state(app_state.clone());
 
         // Protected API routes — require valid JWT token
         let protected_api = api_routes.layer(axum::middleware::from_fn_with_state(
@@ -190,6 +218,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app = Router::new()
             // Auth endpoints (login, register, refresh) are public — no middleware
             .nest("/api/auth", auth_router)
+            // Device Auth Grant public endpoints (authorize + token polling)
+            .nest("/api/auth/device", device_public)
+            // Device Auth Grant protected endpoints (verify + device management)
+            .nest("/api/auth/device", device_protected)
+            // App Password management endpoints (create, list, revoke)
+            .nest("/api/auth", app_password_protected)
             // Public API routes (share access, i18n) — no auth required
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware
@@ -238,15 +272,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
 
-    // Start server
+    // Start server — tuned socket for low-latency responses
     let addr = SocketAddr::from(([0, 0, 0, 0], 8086));
     tracing::info!("Starting OxiCloud server on http://{}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await?;
+    let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
+    socket.set_reuse_address(true)?;
+    // Allow multiple workers on the same port (future-ready)
+    #[cfg(not(windows))]
+    socket.set_reuse_port(true)?;
+    // Disable Nagle's algorithm — send small responses (JSON, PROPFIND)
+    // immediately instead of waiting up to 40ms for coalescing.
+    socket.set_tcp_nodelay(true)?;
+    // Detect dead connections within 60s instead of hours
+    socket.set_keepalive(true)?;
+    socket.set_tcp_keepalive(
+        &TcpKeepalive::new()
+            .with_time(Duration::from_secs(60))
+            .with_interval(Duration::from_secs(10)),
+    )?;
+    socket.set_nonblocking(true)?;
+    socket.bind(&addr.into())?;
+    // High backlog for connection bursts (WebDAV clients open many parallel connections)
+    socket.listen(2048)?;
+
+    let listener = tokio::net::TcpListener::from_std(socket.into())?;
 
     // Provide the fully-built state to the router
     let app = app.with_state(app_state);
 
+    // TCP_NODELAY is inherited from the listening socket on Linux,
+    // so every accepted connection already has Nagle disabled.
     axum::serve(listener, app).await?;
     tracing::info!("Server shutdown completed");
 

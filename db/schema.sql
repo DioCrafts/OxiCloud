@@ -143,6 +143,75 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_oidc ON auth.users(oidc_provider, oi
 -- NOTE: No default users are created. The first user to register through
 -- the admin setup wizard will become the administrator.
 
+-- Device Authorization Grant (RFC 8628)
+-- Used for WebDAV/CalDAV/CardDAV client authentication via the device flow.
+DO $BODY$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_type t
+        JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+        WHERE t.typname = 'device_code_status' AND n.nspname = 'auth'
+    ) THEN
+        CREATE TYPE auth.device_code_status AS ENUM (
+            'pending',      -- Waiting for user to authorize
+            'authorized',   -- User approved, tokens ready for polling client
+            'denied',       -- User denied the request
+            'expired'       -- TTL exceeded without user action
+        );
+    END IF;
+END $BODY$;
+
+CREATE TABLE IF NOT EXISTS auth.device_codes (
+    id VARCHAR(36) PRIMARY KEY,
+    device_code VARCHAR(128) UNIQUE NOT NULL,
+    user_code VARCHAR(16) UNIQUE NOT NULL,
+    client_name VARCHAR(255) NOT NULL DEFAULT 'Unknown Client',
+    scopes VARCHAR(512) NOT NULL DEFAULT 'webdav,caldav,carddav',
+    status auth.device_code_status NOT NULL DEFAULT 'pending',
+    user_id VARCHAR(36) REFERENCES auth.users(id) ON DELETE CASCADE,
+    access_token TEXT,
+    refresh_token TEXT,
+    verification_uri TEXT NOT NULL,
+    verification_uri_complete TEXT,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    poll_interval_secs INTEGER NOT NULL DEFAULT 5,
+    last_poll_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    authorized_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_codes_device_code
+    ON auth.device_codes(device_code);
+CREATE INDEX IF NOT EXISTS idx_device_codes_user_code
+    ON auth.device_codes(user_code) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_device_codes_expires_at
+    ON auth.device_codes(expires_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_device_codes_user_id
+    ON auth.device_codes(user_id) WHERE status = 'authorized';
+
+COMMENT ON TABLE auth.device_codes IS 'OAuth 2.0 Device Authorization Grant (RFC 8628) codes for DAV client authentication';
+
+-- App Passwords (application-specific passwords for DAV clients with HTTP Basic Auth)
+CREATE TABLE IF NOT EXISTS auth.app_passwords (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    label VARCHAR(255) NOT NULL,
+    password_hash TEXT NOT NULL,
+    prefix VARCHAR(50) NOT NULL,
+    scopes VARCHAR(512) NOT NULL DEFAULT 'webdav,caldav,carddav',
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    expires_at TIMESTAMP WITH TIME ZONE,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE INDEX IF NOT EXISTS idx_app_passwords_user_id
+    ON auth.app_passwords(user_id) WHERE active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_app_passwords_active
+    ON auth.app_passwords(user_id, active) WHERE active = TRUE;
+
+COMMENT ON TABLE auth.app_passwords IS 'Application-specific passwords for DAV clients using HTTP Basic Auth';
+
 -- ============================================================
 -- 2. CALDAV SCHEMA (RFC 4791)
 -- ============================================================
@@ -184,6 +253,9 @@ CREATE TABLE IF NOT EXISTS caldav.calendar_events (
 CREATE INDEX IF NOT EXISTS idx_calendar_events_calendar_id ON caldav.calendar_events(calendar_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_ical_uid ON caldav.calendar_events(ical_uid);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_time_range ON caldav.calendar_events(calendar_id, start_time, end_time);
+-- GIN trigram index for ILIKE substring search (find_events_by_summary)
+CREATE INDEX IF NOT EXISTS idx_calendar_events_summary_trgm
+    ON caldav.calendar_events USING gin (summary gin_trgm_ops);
 
 -- Calendar sharing
 CREATE TABLE IF NOT EXISTS caldav.calendar_shares (
@@ -213,6 +285,10 @@ COMMENT ON TABLE caldav.calendars IS 'CalDAV calendars for each user';
 COMMENT ON TABLE caldav.calendar_events IS 'Calendar events (VEVENT) stored with iCal data';
 COMMENT ON TABLE caldav.calendar_shares IS 'Calendar sharing permissions between users';
 COMMENT ON TABLE caldav.calendar_properties IS 'Custom WebDAV properties on calendars';
+
+-- ── pg_trgm extension for GIN trigram indexes (ILIKE / LIKE substring search) ──
+-- Required before creating any gin_trgm_ops indexes below.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================================
 -- 3. CARDDAV SCHEMA (RFC 6352)
@@ -261,6 +337,22 @@ CREATE TABLE IF NOT EXISTS carddav.contacts (
 CREATE INDEX IF NOT EXISTS idx_contacts_address_book_id ON carddav.contacts(address_book_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_uid ON carddav.contacts(uid);
 CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON carddav.contacts(full_name);
+
+-- GIN trigram indexes for ILIKE substring search (search_contacts, get_contacts_by_email)
+CREATE INDEX IF NOT EXISTS idx_contacts_full_name_trgm
+    ON carddav.contacts USING gin (full_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_first_name_trgm
+    ON carddav.contacts USING gin (first_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_last_name_trgm
+    ON carddav.contacts USING gin (last_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_nickname_trgm
+    ON carddav.contacts USING gin (nickname gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_organization_trgm
+    ON carddav.contacts USING gin (organization gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_email_text_trgm
+    ON carddav.contacts USING gin ((email::text) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_phone_text_trgm
+    ON carddav.contacts USING gin ((phone::text) gin_trgm_ops);
 
 -- Address book sharing
 CREATE TABLE IF NOT EXISTS carddav.address_book_shares (
@@ -372,6 +464,9 @@ CREATE INDEX IF NOT EXISTS idx_folders_trashed ON storage.folders(user_id, is_tr
 CREATE INDEX IF NOT EXISTS idx_folders_lpath ON storage.folders USING gist (lpath);
 -- B-tree index on path for exact path lookups
 CREATE INDEX IF NOT EXISTS idx_folders_path ON storage.folders (path text_pattern_ops);
+-- GIN trigram index for ILIKE substring search (search_folders, suggest_folders_by_name)
+CREATE INDEX IF NOT EXISTS idx_folders_name_trgm
+    ON storage.folders USING gin (name gin_trgm_ops);
 
 -- ── ltree trigger: compute path & lpath on INSERT or UPDATE of name/parent_id ──
 CREATE OR REPLACE FUNCTION storage.compute_folder_path()
@@ -459,6 +554,9 @@ CREATE INDEX IF NOT EXISTS idx_files_folder_id ON storage.files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_files_blob_hash ON storage.files(blob_hash);
 CREATE INDEX IF NOT EXISTS idx_files_trashed ON storage.files(user_id, is_trashed);
 CREATE INDEX IF NOT EXISTS idx_files_name_search ON storage.files(user_id, name text_pattern_ops);
+-- GIN trigram index for ILIKE substring search (search_files, suggest_files_by_name)
+CREATE INDEX IF NOT EXISTS idx_files_name_trgm
+    ON storage.files USING gin (name gin_trgm_ops);
 
 -- Trash view combining trashed files and folders for the TrashRepository.
 -- Only shows top-level trashed items: excludes files/folders whose parent

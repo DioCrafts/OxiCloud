@@ -1,4 +1,6 @@
 use crate::common::errors::DomainError;
+use crate::domain::entities::app_password::AppPassword;
+use crate::domain::entities::device_code::DeviceCode;
 use crate::domain::entities::session::Session;
 use crate::domain::entities::user::User;
 use async_trait::async_trait;
@@ -201,4 +203,62 @@ pub trait SessionStoragePort: Send + Sync + 'static {
 
     /// Revokes all sessions of a user
     async fn revoke_all_user_sessions(&self, user_id: &str) -> Result<u64, DomainError>;
+}
+
+// ============================================================================
+// Device Authorization Grant Port (RFC 8628)
+// ============================================================================
+
+#[async_trait]
+pub trait DeviceCodeStoragePort: Send + Sync + 'static {
+    /// Persist a new device code flow
+    async fn create_device_code(&self, device_code: DeviceCode) -> Result<DeviceCode, DomainError>;
+
+    /// Find a device code by its opaque device_code token (used by client polling)
+    async fn get_by_device_code(&self, device_code: &str) -> Result<DeviceCode, DomainError>;
+
+    /// Find a pending device code by the short user_code (used on verification page)
+    async fn get_pending_by_user_code(&self, user_code: &str) -> Result<DeviceCode, DomainError>;
+
+    /// Update a device code (status change, token storage, poll timestamp, etc.)
+    async fn update_device_code(&self, device_code: DeviceCode) -> Result<(), DomainError>;
+
+    /// Delete expired device codes (cleanup job)
+    async fn delete_expired(&self) -> Result<u64, DomainError>;
+
+    /// List authorized device codes for a user (for UI management)
+    async fn list_by_user(&self, user_id: &str) -> Result<Vec<DeviceCode>, DomainError>;
+
+    /// Delete a specific device code by ID (revocation)
+    async fn delete_by_id(&self, id: &str) -> Result<(), DomainError>;
+}
+
+// ============================================================================
+// App Password Storage Port
+// ============================================================================
+
+/// Storage port for application-specific passwords (HTTP Basic Auth for DAV clients).
+#[async_trait]
+pub trait AppPasswordStoragePort: Send + Sync + 'static {
+    /// Persist a new app password (hash already computed).
+    async fn create(&self, app_password: AppPassword) -> Result<AppPassword, DomainError>;
+
+    /// Get all active (non-expired) app passwords for a user.
+    async fn list_by_user(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError>;
+
+    /// Get a specific app password by ID.
+    async fn get_by_id(&self, id: &str) -> Result<AppPassword, DomainError>;
+
+    /// Get all active app passwords for a user ID (for Basic auth verification).
+    /// This includes the password hash for verification.
+    async fn get_active_by_user_id(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError>;
+
+    /// Update the `last_used_at` timestamp after a successful authentication.
+    async fn touch_last_used(&self, id: &str) -> Result<(), DomainError>;
+
+    /// Deactivate (soft-delete) an app password.
+    async fn revoke(&self, id: &str) -> Result<(), DomainError>;
+
+    /// Hard-delete expired/revoked app passwords (cleanup).
+    async fn delete_expired(&self) -> Result<u64, DomainError>;
 }

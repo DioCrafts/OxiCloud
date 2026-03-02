@@ -540,6 +540,8 @@ impl AppServiceFactory {
             wopi_token_service: None,
             wopi_lock_service: None,
             wopi_discovery_service: None,
+            device_auth_service: None,
+            app_password_service: None,
         };
 
         // 9b. Wire admin settings service when auth is available
@@ -589,6 +591,64 @@ impl AppServiceFactory {
             }
 
             app_state.admin_settings_service = Some(admin_svc);
+
+            // 9c. Wire Device Authorization Grant (RFC 8628) service
+            {
+                use crate::application::services::device_auth_service::DeviceAuthService;
+                use crate::infrastructure::repositories::DeviceCodePgRepository;
+
+                let device_code_repo = Arc::new(DeviceCodePgRepository::new(pool.clone()));
+                let user_repo: Arc<dyn crate::application::ports::auth_ports::UserStoragePort> =
+                    Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
+                        pool.clone(),
+                    ));
+                let session_repo: Arc<dyn crate::application::ports::auth_ports::SessionStoragePort> =
+                    Arc::new(crate::infrastructure::repositories::SessionPgRepository::new(
+                        pool.clone(),
+                    ));
+                let base_url = self.config.base_url();
+
+                let device_auth_svc = Arc::new(DeviceAuthService::new(
+                    device_code_repo,
+                    auth_svc.token_service.clone(),
+                    user_repo,
+                    session_repo,
+                    base_url,
+                ));
+                app_state.device_auth_service = Some(device_auth_svc);
+                tracing::info!("Device Authorization Grant (RFC 8628) service initialized");
+            }
+
+            // 9d. Wire App Password service
+            {
+                use crate::application::services::app_password_service::AppPasswordService;
+                use crate::infrastructure::repositories::AppPasswordPgRepository;
+
+                let app_pw_repo: Arc<dyn crate::application::ports::auth_ports::AppPasswordStoragePort> =
+                    Arc::new(AppPasswordPgRepository::new(pool.clone()));
+                let hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
+                    Arc::new(
+                        crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                            self.config.auth.hash_memory_cost,
+                            self.config.auth.hash_time_cost,
+                            self.config.auth.hash_parallelism,
+                        ),
+                    );
+                let user_repo: Arc<dyn crate::application::ports::auth_ports::UserStoragePort> =
+                    Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
+                        pool.clone(),
+                    ));
+                let base_url = self.config.base_url();
+
+                let app_pw_svc = Arc::new(AppPasswordService::new(
+                    app_pw_repo,
+                    hasher,
+                    user_repo,
+                    base_url,
+                ));
+                app_state.app_password_service = Some(app_pw_svc);
+                tracing::info!("App Password service initialized");
+            }
         }
 
         // 10. Wire CalDAV/CardDAV services
@@ -782,6 +842,10 @@ pub struct AppState {
         Option<Arc<crate::application::services::wopi_lock_service::WopiLockService>>,
     pub wopi_discovery_service:
         Option<Arc<crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService>>,
+    pub device_auth_service:
+        Option<Arc<crate::application::services::device_auth_service::DeviceAuthService>>,
+    pub app_password_service:
+        Option<Arc<crate::application::services::app_password_service::AppPasswordService>>,
 }
 
 // All AppState construction is done via struct literal in build_app_state().

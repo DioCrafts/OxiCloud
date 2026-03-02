@@ -1,7 +1,7 @@
 //! Content-Addressable Storage with Deduplication (PostgreSQL-backed)
 //!
 //! Implements hash-based deduplication to eliminate redundant file storage.
-//! Files are stored by their SHA-256 hash, and multiple references can point
+//! Files are stored by their BLAKE3 hash, and multiple references can point
 //! to the same physical blob.
 //!
 //! Architecture:
@@ -35,7 +35,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::{Stream, TryStreamExt};
-use sha2::{Digest, Sha256};
+
 use sqlx::PgPool;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -49,7 +49,7 @@ use crate::application::ports::dedup_ports::{
 };
 use crate::domain::errors::{DomainError, ErrorKind};
 
-/// Block size for SHA-256 file hashing (1MB — optimal syscall/throughput ratio).
+/// Block size for BLAKE3 file hashing (1MB — optimal syscall/throughput ratio).
 const HASH_BLOCK_SIZE: usize = 1024 * 1024;
 
 /// Chunk size for streaming file reads (256 KB)
@@ -68,6 +68,27 @@ pub struct DedupService {
     /// (verify_integrity, garbage_collect) that must never starve the primary.
     maintenance_pool: Arc<PgPool>,
 }
+
+/// Compile-time lookup table for the 256 two-digit lowercase hex prefixes ("00"…"ff").
+/// Avoids a `format!("{:02x}", i)` allocation on every iteration of `initialize()`.
+static HEX_PREFIXES: [&str; 256] = [
+    "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f",
+    "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "1a", "1b", "1c", "1d", "1e", "1f",
+    "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f",
+    "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "3a", "3b", "3c", "3d", "3e", "3f",
+    "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "4a", "4b", "4c", "4d", "4e", "4f",
+    "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "5a", "5b", "5c", "5d", "5e", "5f",
+    "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f",
+    "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b", "7c", "7d", "7e", "7f",
+    "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "8a", "8b", "8c", "8d", "8e", "8f",
+    "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "9a", "9b", "9c", "9d", "9e", "9f",
+    "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "aa", "ab", "ac", "ad", "ae", "af",
+    "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "ba", "bb", "bc", "bd", "be", "bf",
+    "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "ca", "cb", "cc", "cd", "ce", "cf",
+    "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "da", "db", "dc", "dd", "de", "df",
+    "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef",
+    "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff",
+];
 
 impl DedupService {
     /// Create a new dedup service backed by PostgreSQL.
@@ -97,9 +118,8 @@ impl DedupService {
             .map_err(DomainError::from)?;
 
         // Create hash prefix directories (00-ff)
-        for i in 0..=255u8 {
-            let prefix = format!("{:02x}", i);
-            fs::create_dir_all(self.blob_root.join(&prefix))
+        for prefix in &HEX_PREFIXES {
+            fs::create_dir_all(self.blob_root.join(prefix))
                 .await
                 .map_err(DomainError::from)?;
         }
@@ -135,25 +155,23 @@ impl DedupService {
 
     // ── Hash helpers ─────────────────────────────────────────────
 
-    /// Calculate SHA-256 hash of content.
+    /// Calculate BLAKE3 hash of content (~5× faster than SHA-256).
     pub fn hash_bytes(content: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(content);
-        hex::encode(hasher.finalize())
+        blake3::hash(content).to_hex().to_string()
     }
 
-    /// Calculate SHA-256 hash of a file.
+    /// Calculate BLAKE3 hash of a file (~5× faster than SHA-256).
     ///
     /// Runs entirely on `spawn_blocking` with synchronous I/O so the Tokio
     /// worker threads are never blocked by CPU-bound hashing.  Uses 1 MB
-    /// reads for optimal syscall-to-throughput ratio (~3.8 GB/s on NVMe).
+    /// reads for optimal syscall-to-throughput ratio.
     pub async fn hash_file(path: &Path) -> std::io::Result<String> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || {
             use std::io::Read;
 
             let mut file = std::fs::File::open(&path)?;
-            let mut hasher = Sha256::new();
+            let mut hasher = blake3::Hasher::new();
             let mut buffer = vec![0u8; HASH_BLOCK_SIZE];
 
             loop {
@@ -164,7 +182,7 @@ impl DedupService {
                 hasher.update(&buffer[..n]);
             }
 
-            Ok(hex::encode(hasher.finalize()))
+            Ok(hasher.finalize().to_hex().to_string())
         })
         .await
         .expect("hash_file: spawn_blocking task panicked")
@@ -212,15 +230,7 @@ impl DedupService {
         // same filesystem; if it fails because the other writer won,
         // we just discard our temp file — the blob is already there.
         if !blob_path.exists() {
-            if let Some(parent) = blob_path.parent() {
-                fs::create_dir_all(parent).await.map_err(|e| {
-                    DomainError::internal_error(
-                        "Dedup",
-                        format!("Failed to create blob directory: {}", e),
-                    )
-                })?;
-            }
-
+            // Parent directory (xx/) guaranteed to exist — created by initialize()
             let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
             fs::write(&temp_path, content).await.map_err(|e| {
                 DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
@@ -278,7 +288,7 @@ impl DedupService {
     /// never held during disk I/O.
     ///
     /// If `pre_computed_hash` is `Some`, the file will NOT be re-read for
-    /// SHA-256 — saving one full sequential read (the biggest I/O win).
+    /// BLAKE3 — saving one full sequential read (the biggest I/O win).
     pub async fn store_from_file(
         &self,
         source_path: &Path,
@@ -310,14 +320,7 @@ impl DedupService {
             // Blob already on disk — discard the source file
             let _ = fs::remove_file(source_path).await;
         } else {
-            if let Some(parent) = blob_path.parent() {
-                fs::create_dir_all(parent).await.map_err(|e| {
-                    DomainError::internal_error(
-                        "Dedup",
-                        format!("Failed to create blob directory: {}", e),
-                    )
-                })?;
-            }
+            // Parent directory (xx/) guaranteed to exist — created by initialize()
 
             // rename is atomic on the same filesystem.  If source and blob
             // dirs live on different filesystems (rare), this falls back to
@@ -632,7 +635,7 @@ impl DedupService {
     /// of `VERIFY_CONCURRENCY` using `buffer_unordered`.
     pub async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
         /// Max blobs verified concurrently.  Each spawns a blocking
-        /// thread for SHA-256 so this also caps blocking-pool pressure.
+        /// thread for BLAKE3 so this also caps blocking-pool pressure.
         const VERIFY_CONCURRENCY: usize = 16;
 
         let mut row_stream = sqlx::query_as::<_, (String, i64)>(

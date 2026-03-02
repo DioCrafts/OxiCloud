@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OxiCloud — Authorize Device</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --success: #16a34a;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 2.5rem;
+      max-width: 440px;
+      width: 100%;
+    }
+    .logo { text-align: center; margin-bottom: 1.5rem; }
+    .logo h1 { font-size: 1.5rem; font-weight: 700; }
+    .logo span { color: var(--primary); }
+    h2 { font-size: 1.15rem; margin-bottom: 0.5rem; }
+    p.subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    label { display: block; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      font-size: 1.4rem;
+      letter-spacing: 0.15em;
+      text-align: center;
+      text-transform: uppercase;
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    input[type="text"]:focus { border-color: var(--primary); }
+    .device-info {
+      background: #f1f5f9;
+      border-radius: 8px;
+      padding: 1rem;
+      margin: 1rem 0;
+      display: none;
+    }
+    .device-info .row { display: flex; justify-content: space-between; margin-bottom: 0.3rem; }
+    .device-info .label { color: var(--muted); font-size: 0.85rem; }
+    .device-info .value { font-weight: 600; font-size: 0.85rem; }
+    .actions { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
+    button {
+      flex: 1;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-approve { background: var(--primary); color: #fff; }
+    .btn-approve:hover { background: var(--primary-hover); }
+    .btn-deny { background: var(--danger); color: #fff; }
+    .btn-deny:hover { background: var(--danger-hover); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status {
+      text-align: center;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-weight: 600;
+      display: none;
+    }
+    .status.success { display: block; background: #dcfce7; color: var(--success); }
+    .status.denied  { display: block; background: #fef2f2; color: var(--danger); }
+    .status.error   { display: block; background: #fef2f2; color: var(--danger); }
+    .error-text { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <h1><span>Oxi</span>Cloud</h1>
+    </div>
+
+    <!-- Step 1: Enter code -->
+    <div id="step-code">
+      <h2>Authorize Device</h2>
+      <p class="subtitle">Enter the code displayed on your WebDAV/CalDAV client to grant access.</p>
+      <label for="user-code">Device Code</label>
+      <input type="text" id="user-code" placeholder="ABCD-1234" maxlength="9" autocomplete="off" autofocus />
+      <div id="error-text" class="error-text"></div>
+
+      <div id="device-info" class="device-info">
+        <div class="row">
+          <span class="label">Client</span>
+          <span class="value" id="info-client">—</span>
+        </div>
+        <div class="row">
+          <span class="label">Scopes</span>
+          <span class="value" id="info-scopes">—</span>
+        </div>
+      </div>
+
+      <div class="actions" id="action-buttons" style="display:none;">
+        <button class="btn-deny" id="btn-deny" onclick="handleAction('deny')">Deny</button>
+        <button class="btn-approve" id="btn-approve" onclick="handleAction('approve')">Approve</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Result -->
+    <div id="status-success" class="status success">
+      Device authorized successfully! You can close this page.
+    </div>
+    <div id="status-denied" class="status denied">
+      Authorization denied. The client will not receive access.
+    </div>
+    <div id="status-error" class="status error" id="status-error-msg"></div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    const codeInput = document.getElementById('user-code');
+    const deviceInfo = document.getElementById('device-info');
+    const actionButtons = document.getElementById('action-buttons');
+    const errorText = document.getElementById('error-text');
+    let debounceTimer = null;
+    let currentCode = '';
+
+    // Pre-fill from URL query param (?code=ABCD-1234)
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('code')) {
+      codeInput.value = params.get('code');
+      lookupCode(params.get('code'));
+    }
+
+    // Auto-insert hyphen and lookup on input
+    codeInput.addEventListener('input', (e) => {
+      let val = e.target.value.toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+      // Auto-insert hyphen after 4 chars
+      if (val.length === 4 && !val.includes('-')) {
+        val = val + '-';
+      }
+      e.target.value = val;
+      errorText.style.display = 'none';
+
+      // Debounce lookup
+      clearTimeout(debounceTimer);
+      if (val.length >= 9) {
+        debounceTimer = setTimeout(() => lookupCode(val), 300);
+      } else {
+        deviceInfo.style.display = 'none';
+        actionButtons.style.display = 'none';
+      }
+    });
+
+    async function lookupCode(code) {
+      try {
+        const token = getAuthToken();
+        if (!token) {
+          showError('You must be logged in to authorize a device. Please log in first.');
+          return;
+        }
+        const resp = await fetch(`${API_BASE}/api/auth/device/verify?code=${encodeURIComponent(code)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!resp.ok) throw new Error('Lookup failed');
+        const data = await resp.json();
+
+        if (data.valid) {
+          currentCode = code;
+          document.getElementById('info-client').textContent = data.client_name || 'Unknown';
+          document.getElementById('info-scopes').textContent = data.scopes || 'all';
+          deviceInfo.style.display = 'block';
+          actionButtons.style.display = 'flex';
+          errorText.style.display = 'none';
+        } else {
+          deviceInfo.style.display = 'none';
+          actionButtons.style.display = 'none';
+          showError('Code not found or expired. Please check and try again.');
+        }
+      } catch (err) {
+        showError('Failed to verify code. Please try again.');
+      }
+    }
+
+    async function handleAction(action) {
+      const btnApprove = document.getElementById('btn-approve');
+      const btnDeny = document.getElementById('btn-deny');
+      btnApprove.disabled = true;
+      btnDeny.disabled = true;
+
+      try {
+        const token = getAuthToken();
+        const resp = await fetch(`${API_BASE}/api/auth/device/verify`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ user_code: currentCode, action: action })
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.message || 'Action failed');
+        }
+
+        document.getElementById('step-code').style.display = 'none';
+        if (action === 'approve') {
+          document.getElementById('status-success').style.display = 'block';
+        } else {
+          document.getElementById('status-denied').style.display = 'block';
+        }
+      } catch (err) {
+        btnApprove.disabled = false;
+        btnDeny.disabled = false;
+        showError(err.message || 'Failed to process action.');
+      }
+    }
+
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorText.style.display = 'block';
+    }
+
+    function getAuthToken() {
+      // Try localStorage (OxiCloud frontend stores tokens there)
+      try {
+        const stored = localStorage.getItem('auth_token')
+          || localStorage.getItem('access_token')
+          || localStorage.getItem('oxicloud_token');
+        if (stored) return stored;
+        // Try parsing a JSON auth object
+        const authData = localStorage.getItem('auth');
+        if (authData) {
+          const parsed = JSON.parse(authData);
+          return parsed.access_token || parsed.token;
+        }
+      } catch {}
+      return null;
+    }
+  </script>
+</body>
+</html>

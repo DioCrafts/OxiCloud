@@ -1,32 +1,68 @@
-# Stage 1: Cache dependencies
-FROM rust:1.93.0-alpine3.23 AS cacher
+# syntax=docker/dockerfile:1
+# ============================================================================
+# Stage 1: PLANNER — Generate a dependency-only recipe from the full source
+# ============================================================================
+# cargo-chef inspects the real project structure (lib.rs + main.rs, features,
+# build scripts, profile settings) and produces a minimal recipe.json that
+# fingerprints ONLY dependency-relevant metadata. Source code changes that
+# don't affect dependencies will NOT invalidate this layer.
+FROM rust:1.93.0-alpine3.23 AS planner
+WORKDIR /app
+RUN cargo install cargo-chef --locked
+COPY Cargo.toml Cargo.lock ./
+COPY src src
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ============================================================================
+# Stage 2: COOK — Build all dependencies (cached until recipe.json changes)
+# ============================================================================
+# This stage compiles every dependency listed in recipe.json with the exact
+# same profile, features, and target layout as the real build. Because it
+# uses BuildKit cache mounts for the cargo registry and git checkouts,
+# even a full rebuild after `docker system prune` only re-downloads crates
+# that changed upstream — not the entire registry.
+FROM rust:1.93.0-alpine3.23 AS cook
 WORKDIR /app
 RUN apk --no-cache upgrade && \
     apk add --no-cache musl-dev pkgconfig postgresql-dev gcc perl make
-COPY Cargo.toml Cargo.lock ./
-# Create a minimal project to download and cache dependencies
-RUN mkdir -p src && \
-    echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
-    cargo build --release && \
-    rm -rf src target/release/deps/oxicloud*
-# Stage 2: Build the application
+COPY --from=planner /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
+COPY --from=planner /app/recipe.json recipe.json
+# Cook dependencies only — no application source code is present.
+# BuildKit cache mounts persist the cargo registry and target dir across
+# builds so incremental recompilation works even for dependency updates.
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
+    cargo chef cook --release --recipe-path recipe.json && \
+    # Copy built artifacts out of the cache mount so the next stage can access them
+    cp -r /app/target /app/target-out
+
+# ============================================================================
+# Stage 3: BUILD — Compile application source on top of pre-built deps
+# ============================================================================
+# Only this layer is invalidated when .rs files change. Dependencies are
+# already compiled and linked from the cook stage.
 FROM rust:1.93.0-alpine3.23 AS builder
 WORKDIR /app
 RUN apk --no-cache upgrade && \
     apk add --no-cache musl-dev pkgconfig postgresql-dev gcc perl make
-# Copy cached dependencies (only target dir and cargo registry)
-COPY --from=cacher /app/target target
-COPY --from=cacher /usr/local/cargo/registry /usr/local/cargo/registry
-# Copy source and static (login.html is embedded at compile-time via include_str!)
+# Bring in pre-compiled dependencies from cook
+COPY --from=cook /app/target-out target
+COPY --from=cook /usr/local/cargo/registry /usr/local/cargo/registry
+# Copy project metadata and full source
 COPY Cargo.toml Cargo.lock ./
 COPY src src
 COPY static static
 COPY db db
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
-RUN DATABASE_URL="${DATABASE_URL}" cargo build --release
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    DATABASE_URL="${DATABASE_URL}" cargo build --release
 
-# Stage 3: Create minimal final image
+# ============================================================================
+# Stage 4: RUNTIME — Minimal production image (~25 MB)
+# ============================================================================
 FROM alpine:3.23.3
 
 # OCI image metadata
