@@ -114,6 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     use oxicloud::interfaces::api::handlers::carddav_handler;
     use oxicloud::interfaces::api::handlers::webdav_handler;
     let caldav_router = caldav_handler::caldav_routes();
+    let well_known_router = caldav_handler::well_known_routes();
     let carddav_router = carddav_handler::carddav_routes();
     let webdav_router = webdav_handler::webdav_routes();
 
@@ -228,6 +229,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware
             .nest("/api", protected_api)
+            // RFC 6764 well-known discovery (public, no auth — just redirects)
+            .merge(well_known_router.clone())
             // CalDAV/CardDAV/WebDAV protocols merged at top-level for client compatibility
             .merge(caldav_protected)
             .merge(carddav_protected)
@@ -251,6 +254,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         app = Router::new()
             .nest("/api", public_api_routes)
             .nest("/api", api_routes)
+            // RFC 6764 well-known discovery (just redirects)
+            .merge(well_known_router)
             // CalDAV/CardDAV/WebDAV protocols merged at top-level
             .merge(caldav_router)
             .merge(carddav_router)

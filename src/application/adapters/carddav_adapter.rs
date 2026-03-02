@@ -53,10 +53,12 @@ impl CardDavAdapter {
         let mut sync_token = String::new();
         let mut in_href = false;
         let mut in_sync_token = false;
+        let mut ns_map = std::collections::HashMap::<String, String>::new();
 
         loop {
             match xml_reader.read_event_into(&mut buffer) {
                 Ok(Event::Start(ref e)) => {
+                    WebDavAdapter::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -78,9 +80,8 @@ impl CardDavAdapter {
                             in_sync_token = true
                         }
                         _ if in_prop => {
-                            let namespace = WebDavAdapter::extract_namespace(name_str);
-                            let prop_name = WebDavAdapter::extract_local_name(name_str);
-                            props.push(QualifiedName::new(namespace, prop_name));
+                            let qname = WebDavAdapter::resolve_name(name_str, &ns_map);
+                            props.push(qname);
                         }
                         _ => {}
                     }
@@ -107,11 +108,11 @@ impl CardDavAdapter {
                     }
                 }
                 Ok(Event::Empty(ref e)) if in_prop => {
+                    WebDavAdapter::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
-                    let namespace = WebDavAdapter::extract_namespace(name_str);
-                    let prop_name = WebDavAdapter::extract_local_name(name_str);
-                    props.push(QualifiedName::new(namespace, prop_name));
+                    let qname = WebDavAdapter::resolve_name(name_str, &ns_map);
+                    props.push(qname);
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(WebDavError::XmlError(e)),

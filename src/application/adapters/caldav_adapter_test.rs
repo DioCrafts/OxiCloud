@@ -336,4 +336,284 @@ mod tests {
             "Should have multistatus even for empty"
         );
     }
+
+    // ==============================================
+    // Namespace resolution tests (issue #153 fixes)
+    // ==============================================
+
+    #[test]
+    fn test_propfind_namespace_resolution_dav_and_caldav() {
+        use crate::application::adapters::webdav_adapter::WebDavAdapter;
+
+        // Simulates a real CalDAV client PROPFIND request with namespace prefixes
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop>
+    <D:current-user-principal/>
+    <C:calendar-home-set/>
+    <D:resourcetype/>
+  </D:prop>
+</D:propfind>"#;
+
+        let result = WebDavAdapter::parse_propfind(Cursor::new(xml));
+        assert!(result.is_ok(), "Failed to parse PROPFIND: {:?}", result.err());
+
+        let request = result.unwrap();
+        match request.prop_find_type {
+            PropFindType::Prop(ref props) => {
+                assert_eq!(props.len(), 3);
+
+                // Verify namespace URIs are resolved, not prefix names
+                assert_eq!(props[0].namespace, "DAV:");
+                assert_eq!(props[0].name, "current-user-principal");
+
+                assert_eq!(props[1].namespace, "urn:ietf:params:xml:ns:caldav");
+                assert_eq!(props[1].name, "calendar-home-set");
+
+                assert_eq!(props[2].namespace, "DAV:");
+                assert_eq!(props[2].name, "resourcetype");
+            }
+            other => panic!("Expected Prop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_propfind_namespace_resolution_with_custom_prefixes() {
+        use crate::application::adapters::webdav_adapter::WebDavAdapter;
+
+        // Some clients use different prefix names
+        let xml = r#"<?xml version="1.0" encoding="utf-8"?>
+<A:propfind xmlns:A="DAV:" xmlns:B="urn:ietf:params:xml:ns:caldav">
+  <A:prop>
+    <A:current-user-principal/>
+    <B:calendar-home-set/>
+  </A:prop>
+</A:propfind>"#;
+
+        let result = WebDavAdapter::parse_propfind(Cursor::new(xml));
+        assert!(result.is_ok());
+
+        let request = result.unwrap();
+        match request.prop_find_type {
+            PropFindType::Prop(ref props) => {
+                assert_eq!(props.len(), 2);
+                assert_eq!(props[0].namespace, "DAV:");
+                assert_eq!(props[0].name, "current-user-principal");
+                assert_eq!(props[1].namespace, "urn:ietf:params:xml:ns:caldav");
+                assert_eq!(props[1].name, "calendar-home-set");
+            }
+            other => panic!("Expected Prop, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_root_propfind_response_has_discovery_properties() {
+        // Depth 0: only root entry, no calendars (simulates initial discovery)
+        let calendars: Vec<CalendarDto> = vec![];
+        let request = PropFindRequest {
+            prop_find_type: PropFindType::Prop(vec![
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "current-user-principal".to_string(),
+                },
+                QualifiedName {
+                    namespace: "urn:ietf:params:xml:ns:caldav".to_string(),
+                    name: "calendar-home-set".to_string(),
+                },
+            ]),
+        };
+
+        let mut output = Vec::new();
+        let result = CalDavAdapter::generate_root_propfind_response(
+            &mut output,
+            &calendars,
+            &request,
+            "/caldav/",
+            "testuser",
+        );
+        assert!(result.is_ok(), "Failed to generate root propfind: {:?}", result.err());
+
+        let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
+
+        // Root response should contain populated current-user-principal
+        assert!(
+            xml_str.contains("/caldav/principals/testuser/"),
+            "Should contain principal href, got: {}",
+            xml_str
+        );
+
+        // Root response should contain populated calendar-home-set
+        assert!(
+            xml_str.contains("/caldav/testuser/"),
+            "Should contain calendar home href, got: {}",
+            xml_str
+        );
+
+        // Properties should NOT be empty self-closing elements
+        assert!(
+            !xml_str.contains("<D:current-user-principal/>"),
+            "current-user-principal should not be empty"
+        );
+        assert!(
+            !xml_str.contains("<C:calendar-home-set/>"),
+            "calendar-home-set should not be empty"
+        );
+    }
+
+    #[test]
+    fn test_root_propfind_response_depth1_includes_calendars() {
+        // Depth 1: root entry + calendars
+        let calendars = vec![sample_calendar()];
+        let request = PropFindRequest {
+            prop_find_type: PropFindType::AllProp,
+        };
+
+        let mut output = Vec::new();
+        let result = CalDavAdapter::generate_root_propfind_response(
+            &mut output,
+            &calendars,
+            &request,
+            "/caldav/",
+            "testuser",
+        );
+        assert!(result.is_ok());
+
+        let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
+
+        // Should contain root entry with discovery properties
+        assert!(xml_str.contains("/caldav/principals/testuser/"));
+        // Should contain calendar entry
+        assert!(xml_str.contains("cal-001"));
+        assert!(xml_str.contains("Personal"));
+    }
+
+    #[test]
+    fn test_principal_propfind_response() {
+        let request = PropFindRequest {
+            prop_find_type: PropFindType::Prop(vec![
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "resourcetype".to_string(),
+                },
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "displayname".to_string(),
+                },
+                QualifiedName {
+                    namespace: "urn:ietf:params:xml:ns:caldav".to_string(),
+                    name: "calendar-home-set".to_string(),
+                },
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "current-user-principal".to_string(),
+                },
+            ]),
+        };
+
+        let mut output = Vec::new();
+        let result = CalDavAdapter::generate_principal_propfind_response(
+            &mut output,
+            &request,
+            "testuser",
+        );
+        assert!(result.is_ok(), "Failed: {:?}", result.err());
+
+        let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
+
+        // Should contain principal href
+        assert!(xml_str.contains("/caldav/principals/testuser/"));
+        // Should contain calendar-home-set
+        assert!(xml_str.contains("/caldav/testuser/"));
+        // Should contain principal in resourcetype
+        assert!(xml_str.contains("D:principal"));
+        // Should have displayname
+        assert!(xml_str.contains("testuser"));
+    }
+
+    #[test]
+    fn test_calendar_propfind_with_resolved_namespaces() {
+        // Simulate what happens when a client asks for specific props
+        // After namespace resolution fix, these should have proper URIs
+        let calendar = sample_calendar();
+        let request = PropFindRequest {
+            prop_find_type: PropFindType::Prop(vec![
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "resourcetype".to_string(),
+                },
+                QualifiedName {
+                    namespace: "DAV:".to_string(),
+                    name: "displayname".to_string(),
+                },
+                QualifiedName {
+                    namespace: "urn:ietf:params:xml:ns:caldav".to_string(),
+                    name: "supported-calendar-component-set".to_string(),
+                },
+            ]),
+        };
+
+        let mut output = Vec::new();
+        let result = CalDavAdapter::generate_calendar_collection_propfind(
+            &mut output,
+            &calendar,
+            &[],
+            &request,
+            "/caldav/cal-001/",
+            "0",
+        );
+        assert!(result.is_ok(), "Failed: {:?}", result.err());
+
+        let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
+
+        // resourcetype should have collection + calendar children
+        assert!(
+            xml_str.contains("D:collection"),
+            "Should contain collection in resourcetype"
+        );
+        assert!(
+            xml_str.contains("C:calendar"),
+            "Should contain calendar in resourcetype"
+        );
+
+        // displayname should be populated
+        assert!(
+            xml_str.contains("Personal"),
+            "Should contain calendar name"
+        );
+
+        // supported-calendar-component-set should have VEVENT
+        assert!(
+            xml_str.contains("VEVENT"),
+            "Should contain VEVENT component"
+        );
+    }
+
+    #[test]
+    fn test_report_namespace_resolution() {
+        // Verify that REPORT parsing also resolves namespaces correctly
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+        <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+            <D:prop>
+                <D:getetag/>
+                <C:calendar-data/>
+            </D:prop>
+            <C:filter>
+                <C:comp-filter name="VCALENDAR"/>
+            </C:filter>
+        </C:calendar-query>"#;
+
+        let result = CalDavAdapter::parse_report(Cursor::new(xml));
+        assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
+
+        match result.unwrap() {
+            CalDavReportType::CalendarQuery { props, .. } => {
+                assert_eq!(props.len(), 2);
+                assert_eq!(props[0].namespace, "DAV:");
+                assert_eq!(props[0].name, "getetag");
+                assert_eq!(props[1].namespace, "urn:ietf:params:xml:ns:caldav");
+                assert_eq!(props[1].name, "calendar-data");
+            }
+            other => panic!("Expected CalendarQuery, got {:?}", other),
+        }
+    }
 }

@@ -498,6 +498,6 @@ mod tests {
     fn test_transcode_pool_initializes() {
         // Verify the pool can be created without panic
         let pool = transcode_pool();
-        assert_eq!(pool.current_num_threads(), TRANSCODE_POOL_THREADS);
+        assert_eq!(pool.current_num_threads(), transcode_thread_count());
     }
 }
