@@ -39,11 +39,12 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
                 COALESCE(f.updated_at, fld.updated_at)          AS "modified_at"
             FROM auth.user_favorites uf
             LEFT JOIN storage.files   f   ON uf.item_type = 'file'
-                                         AND uf.item_id = f.id::TEXT
+                                         AND f.id = uf.item_id::UUID
             LEFT JOIN storage.folders fld ON uf.item_type = 'folder'
-                                         AND uf.item_id = fld.id::TEXT
+                                         AND fld.id = uf.item_id::UUID
             WHERE uf.user_id = $1::TEXT
             ORDER BY uf.created_at DESC
+            LIMIT 500
             "#,
         )
         .bind(user_uuid)

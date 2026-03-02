@@ -38,9 +38,9 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
                 COALESCE(f.folder_id::TEXT, fld.parent_id::TEXT) AS "parent_id"
             FROM auth.user_recent_files ur
             LEFT JOIN storage.files   f   ON ur.item_type = 'file'
-                                         AND ur.item_id = f.id::TEXT
+                                         AND f.id = ur.item_id::UUID
             LEFT JOIN storage.folders fld ON ur.item_type = 'folder'
-                                         AND ur.item_id = fld.id::TEXT
+                                         AND fld.id = ur.item_id::UUID
             WHERE ur.user_id = $1::TEXT
             ORDER BY ur.accessed_at DESC
             LIMIT $2

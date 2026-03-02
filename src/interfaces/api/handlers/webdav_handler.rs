@@ -632,7 +632,7 @@ async fn handle_head(
  * Handles PUT requests to create or update files.
  *
  * **Streaming implementation**: the request body is spooled to a temp file
- * with incremental SHA-256 hashing. Peak RAM usage is ~256 KB regardless
+ * with incremental BLAKE3 hashing. Peak RAM usage is ~256 KB regardless
  * of file size. The temp file is then atomically moved into blob storage
  * via `update_file_streaming`.
  *
@@ -647,7 +647,6 @@ async fn handle_put(
     path: String,
 ) -> Result<Response<Body>, AppError> {
     use http_body_util::BodyStream;
-    use sha2::{Digest, Sha256};
     use tokio::io::AsyncWriteExt;
     use tokio_stream::StreamExt;
 
@@ -679,7 +678,7 @@ async fn handle_put(
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to open temp file: {}", e)))?;
 
-    let mut hasher = Sha256::new();
+    let mut hasher = blake3::Hasher::new();
     let mut total_bytes: usize = 0;
     let mut stream = BodyStream::new(req.into_body());
 
@@ -708,7 +707,7 @@ async fn handle_put(
         .map_err(|e| AppError::internal_error(format!("Failed to flush temp file: {}", e)))?;
     drop(file);
 
-    let hash = hex::encode(hasher.finalize());
+    let hash = hasher.finalize().to_hex().to_string();
 
     // ── Atomic store: temp file → dedup blob + DB metadata update ──
     let result = file_upload_service

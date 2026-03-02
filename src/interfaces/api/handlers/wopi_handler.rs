@@ -155,7 +155,7 @@ async fn get_file(
 /// POST /wopi/files/{file_id}/contents — PutFile
 ///
 /// **Streaming implementation**: the request body is spooled to a temp file
-/// with incremental SHA-256 hashing.  Peak RAM usage is ~256 KB regardless
+/// with incremental BLAKE3 hashing.  Peak RAM usage is ~256 KB regardless
 /// of file size (previously buffered the entire body as `Bytes`).
 async fn put_file(
     Path(file_id): Path<String>,
@@ -165,7 +165,6 @@ async fn put_file(
     req: Request<Body>,
 ) -> Response {
     use http_body_util::BodyStream;
-    use sha2::{Digest, Sha256};
     use tokio::io::AsyncWriteExt;
     use tokio_stream::StreamExt;
 
@@ -218,7 +217,7 @@ async fn put_file(
         Err(_) => return StatusCode::NOT_FOUND.into_response(),
     };
 
-    // ── Streaming spool: body → temp file + incremental SHA-256 ──
+    // ── Streaming spool: body → temp file + incremental BLAKE3 ──
     let temp_file = match tempfile::NamedTempFile::new() {
         Ok(f) => f,
         Err(e) => {
@@ -237,7 +236,7 @@ async fn put_file(
     };
 
     let content_type = file.mime_type.clone();
-    let mut hasher = Sha256::new();
+    let mut hasher = blake3::Hasher::new();
     let mut total_bytes: u64 = 0;
     let mut stream = BodyStream::new(req.into_body());
 
@@ -267,7 +266,7 @@ async fn put_file(
     }
     drop(file_out);
 
-    let hash = hex::encode(hasher.finalize());
+    let hash = hasher.finalize().to_hex().to_string();
 
     // ── Atomic store: temp file → dedup blob + DB metadata update ──
     let result = state

@@ -268,7 +268,7 @@ impl DedupService {
     /// never held during disk I/O.
     ///
     /// If `pre_computed_hash` is `Some`, the file will NOT be re-read for
-    /// SHA-256 — saving one full sequential read (the biggest I/O win).
+    /// BLAKE3 — saving one full sequential read (the biggest I/O win).
     pub async fn store_from_file(
         &self,
         source_path: &Path,
@@ -615,7 +615,7 @@ impl DedupService {
     /// of `VERIFY_CONCURRENCY` using `buffer_unordered`.
     pub async fn verify_integrity(&self) -> Result<Vec<String>, DomainError> {
         /// Max blobs verified concurrently.  Each spawns a blocking
-        /// thread for SHA-256 so this also caps blocking-pool pressure.
+        /// thread for BLAKE3 so this also caps blocking-pool pressure.
         const VERIFY_CONCURRENCY: usize = 16;
 
         let mut row_stream = sqlx::query_as::<_, (String, i64)>(

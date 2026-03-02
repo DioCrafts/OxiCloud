@@ -8,7 +8,7 @@ default-run = "oxicloud"
 [dependencies]
 mimalloc = { version = "0.1.48", default-features = false }
 axum = { version = "0.8.8", features = ["multipart", "http1", "tokio", "macros"] }
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "io-util", "net", "time", "sync", "fs"] }
 tokio-util = { version = "0.7.18", features = ["io", "codec", "compat"] }
 tokio-stream = { version = "0.1.18", features = ["fs"] }
 bytes = "1.11.1"
@@ -37,7 +37,6 @@ rand_core = { version = "0.6", features = ["std", "getrandom"] }
 hyper = { version = "1.8.1", features = ["full"] }
 quick-xml = "0.39.0"
 dotenvy = "0.15.7"
-lru = "0.16.3"
 moka = { version = "0.12", features = ["future", "sync"] }
 http-range-header = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
