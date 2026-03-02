@@ -269,10 +269,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Apply the redirect middleware for legacy routes
-    use oxicloud::interfaces::middleware::redirect::redirect_middleware;
-    app = app.layer(axum::middleware::from_fn(redirect_middleware));
-
     // Increase the default body limit to 10 GB to allow large file uploads.
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
