@@ -720,15 +720,16 @@ impl FolderRepository for FolderDbRepository {
                 .await;
         }
 
-        // Build optional name filter
+        // Build optional name filter — use ILIKE (case-insensitive) so the
+        // GIN trigram index idx_folders_name_trgm is used instead of a seq scan.
         let (name_clause, name_pattern) = match name_contains {
-            Some(name) if !name.is_empty() => (
+            Some(name) if name.len() >= 3 => (
                 if recursive {
-                    " AND LOWER(fo.name) LIKE $2"
+                    " AND fo.name ILIKE $2"
                 } else {
-                    " AND LOWER(fo.name) LIKE $3"
+                    " AND fo.name ILIKE $3"
                 },
-                Some(format!("%{}%", name.to_lowercase())),
+                Some(format!("%{}%", name)),
             ),
             _ => ("", None),
         };
@@ -794,7 +795,7 @@ impl FolderRepository for FolderDbRepository {
         } else {
             // Root folders: parent_id IS NULL, reindex params ($1=user_id, $2=pattern)
             let name_clause_root = match name_contains {
-                Some(name) if !name.is_empty() => " AND LOWER(fo.name) LIKE $2",
+                Some(name) if name.len() >= 3 => " AND fo.name ILIKE $2",
                 _ => "",
             };
             format!(
@@ -866,9 +867,9 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if !name.is_empty() => (
-                " AND LOWER(fo.name) LIKE $3",
-                Some(format!("%{}%", name.to_lowercase())),
+            Some(name) if name.len() >= 3 => (
+                " AND fo.name ILIKE $3",
+                Some(format!("%{}%", name)),
             ),
             _ => ("", None),
         };
@@ -924,8 +925,7 @@ impl FolderRepository for FolderDbRepository {
         query: &str,
         limit: usize,
     ) -> Result<Vec<Folder>, DomainError> {
-        let pattern = format!("%{}%", query.to_lowercase());
-        let query_lower = query.to_lowercase();
+        let pattern = format!("%{}%", query);
         let limit_i64 = limit as i64;
 
         let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
@@ -938,10 +938,10 @@ impl FolderRepository for FolderDbRepository {
                   FROM storage.folders
                  WHERE parent_id = $1::uuid
                    AND NOT is_trashed
-                   AND LOWER(name) LIKE $2
+                   AND name ILIKE $2
                  ORDER BY CASE
-                            WHEN LOWER(name) = $3 THEN 0
-                            WHEN LOWER(name) LIKE $3 || '%' THEN 1
+                            WHEN name ILIKE $3 THEN 0
+                            WHEN name ILIKE $3 || '%' THEN 1
                             ELSE 2
                           END,
                           name
@@ -950,7 +950,7 @@ impl FolderRepository for FolderDbRepository {
                 )
                 .bind(pid)
                 .bind(&pattern)
-                .bind(&query_lower)
+                .bind(query)
                 .bind(limit_i64)
                 .fetch_all(self.pool())
                 .await
@@ -963,10 +963,10 @@ impl FolderRepository for FolderDbRepository {
                   FROM storage.folders
                  WHERE parent_id IS NULL
                    AND NOT is_trashed
-                   AND LOWER(name) LIKE $1
+                   AND name ILIKE $1
                  ORDER BY CASE
-                            WHEN LOWER(name) = $2 THEN 0
-                            WHEN LOWER(name) LIKE $2 || '%' THEN 1
+                            WHEN name ILIKE $2 THEN 0
+                            WHEN name ILIKE $2 || '%' THEN 1
                             ELSE 2
                           END,
                           name
@@ -974,7 +974,7 @@ impl FolderRepository for FolderDbRepository {
                 "#,
                 )
                 .bind(&pattern)
-                .bind(&query_lower)
+                .bind(query)
                 .bind(limit_i64)
                 .fetch_all(self.pool())
                 .await

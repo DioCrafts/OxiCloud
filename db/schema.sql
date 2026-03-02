@@ -253,6 +253,9 @@ CREATE TABLE IF NOT EXISTS caldav.calendar_events (
 CREATE INDEX IF NOT EXISTS idx_calendar_events_calendar_id ON caldav.calendar_events(calendar_id);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_ical_uid ON caldav.calendar_events(ical_uid);
 CREATE INDEX IF NOT EXISTS idx_calendar_events_time_range ON caldav.calendar_events(calendar_id, start_time, end_time);
+-- GIN trigram index for ILIKE substring search (find_events_by_summary)
+CREATE INDEX IF NOT EXISTS idx_calendar_events_summary_trgm
+    ON caldav.calendar_events USING gin (summary gin_trgm_ops);
 
 -- Calendar sharing
 CREATE TABLE IF NOT EXISTS caldav.calendar_shares (
@@ -282,6 +285,10 @@ COMMENT ON TABLE caldav.calendars IS 'CalDAV calendars for each user';
 COMMENT ON TABLE caldav.calendar_events IS 'Calendar events (VEVENT) stored with iCal data';
 COMMENT ON TABLE caldav.calendar_shares IS 'Calendar sharing permissions between users';
 COMMENT ON TABLE caldav.calendar_properties IS 'Custom WebDAV properties on calendars';
+
+-- ── pg_trgm extension for GIN trigram indexes (ILIKE / LIKE substring search) ──
+-- Required before creating any gin_trgm_ops indexes below.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================================
 -- 3. CARDDAV SCHEMA (RFC 6352)
@@ -330,6 +337,22 @@ CREATE TABLE IF NOT EXISTS carddav.contacts (
 CREATE INDEX IF NOT EXISTS idx_contacts_address_book_id ON carddav.contacts(address_book_id);
 CREATE INDEX IF NOT EXISTS idx_contacts_uid ON carddav.contacts(uid);
 CREATE INDEX IF NOT EXISTS idx_contacts_full_name ON carddav.contacts(full_name);
+
+-- GIN trigram indexes for ILIKE substring search (search_contacts, get_contacts_by_email)
+CREATE INDEX IF NOT EXISTS idx_contacts_full_name_trgm
+    ON carddav.contacts USING gin (full_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_first_name_trgm
+    ON carddav.contacts USING gin (first_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_last_name_trgm
+    ON carddav.contacts USING gin (last_name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_nickname_trgm
+    ON carddav.contacts USING gin (nickname gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_organization_trgm
+    ON carddav.contacts USING gin (organization gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_email_text_trgm
+    ON carddav.contacts USING gin ((email::text) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_contacts_phone_text_trgm
+    ON carddav.contacts USING gin ((phone::text) gin_trgm_ops);
 
 -- Address book sharing
 CREATE TABLE IF NOT EXISTS carddav.address_book_shares (
@@ -441,6 +464,9 @@ CREATE INDEX IF NOT EXISTS idx_folders_trashed ON storage.folders(user_id, is_tr
 CREATE INDEX IF NOT EXISTS idx_folders_lpath ON storage.folders USING gist (lpath);
 -- B-tree index on path for exact path lookups
 CREATE INDEX IF NOT EXISTS idx_folders_path ON storage.folders (path text_pattern_ops);
+-- GIN trigram index for ILIKE substring search (search_folders, suggest_folders_by_name)
+CREATE INDEX IF NOT EXISTS idx_folders_name_trgm
+    ON storage.folders USING gin (name gin_trgm_ops);
 
 -- ── ltree trigger: compute path & lpath on INSERT or UPDATE of name/parent_id ──
 CREATE OR REPLACE FUNCTION storage.compute_folder_path()
@@ -528,6 +554,9 @@ CREATE INDEX IF NOT EXISTS idx_files_folder_id ON storage.files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_files_blob_hash ON storage.files(blob_hash);
 CREATE INDEX IF NOT EXISTS idx_files_trashed ON storage.files(user_id, is_trashed);
 CREATE INDEX IF NOT EXISTS idx_files_name_search ON storage.files(user_id, name text_pattern_ops);
+-- GIN trigram index for ILIKE substring search (search_files, suggest_files_by_name)
+CREATE INDEX IF NOT EXISTS idx_files_name_trgm
+    ON storage.files USING gin (name gin_trgm_ops);
 
 -- Trash view combining trashed files and folders for the TrashRepository.
 -- Only shows top-level trashed items: excludes files/folders whose parent
