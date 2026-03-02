@@ -124,6 +124,41 @@ pub enum LockType {
 pub struct WebDavAdapter;
 
 impl WebDavAdapter {
+    /// Collect namespace prefix → URI mappings from element attributes.
+    /// E.g. `xmlns:D="DAV:"` maps prefix `"D"` to `"DAV:"`.
+    pub fn collect_ns_decls(
+        e: &BytesStart,
+        ns_map: &mut std::collections::HashMap<String, String>,
+    ) {
+        for attr in e.attributes().flatten() {
+            let key = std::str::from_utf8(attr.key.as_ref()).unwrap_or("");
+            if let Some(prefix) = key.strip_prefix("xmlns:") {
+                let uri = attr.unescape_value().unwrap_or_default().to_string();
+                ns_map.insert(prefix.to_string(), uri);
+            }
+        }
+    }
+
+    /// Resolve a prefixed element name (e.g. `D:resourcetype`) to a
+    /// `QualifiedName` using the accumulated namespace declarations.
+    pub fn resolve_name(
+        name_str: &str,
+        ns_map: &std::collections::HashMap<String, String>,
+    ) -> QualifiedName {
+        if let Some(idx) = name_str.find(':') {
+            let prefix = &name_str[..idx];
+            let local = &name_str[idx + 1..];
+            if let Some(uri) = ns_map.get(prefix) {
+                return QualifiedName::new(uri.clone(), local.to_string());
+            }
+        }
+        // Fallback: no prefix or unknown prefix → use legacy extraction
+        QualifiedName::new(
+            Self::extract_namespace(name_str),
+            Self::extract_local_name(name_str),
+        )
+    }
+
     /// Parse a PROPFIND XML request
     pub fn parse_propfind<R: Read>(reader: R) -> Result<PropFindRequest> {
         let mut xml_reader = Reader::from_reader(BufReader::new(reader));
@@ -135,10 +170,12 @@ impl WebDavAdapter {
         let mut in_allprop = false;
         let mut in_propname = false;
         let mut props = Vec::new();
+        let mut ns_map = std::collections::HashMap::<String, String>::new();
 
         loop {
             match xml_reader.read_event_into(&mut buffer) {
                 Ok(Event::Start(ref e)) => {
+                    Self::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -155,11 +192,8 @@ impl WebDavAdapter {
                     {
                         in_propname = true;
                     } else if in_prop {
-                        // Add property to request
-                        let namespace = Self::extract_namespace(name_str);
-                        let prop_name = Self::extract_local_name(name_str);
-
-                        props.push(QualifiedName::new(namespace, prop_name));
+                        let qname = Self::resolve_name(name_str, &ns_map);
+                        props.push(qname);
                     }
                 }
                 Ok(Event::End(ref e)) => {
@@ -177,6 +211,7 @@ impl WebDavAdapter {
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
+                    Self::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -187,11 +222,8 @@ impl WebDavAdapter {
                     {
                         in_propname = true;
                     } else if in_prop {
-                        // Add property to request (empty element)
-                        let namespace = Self::extract_namespace(name_str);
-                        let prop_name = Self::extract_local_name(name_str);
-
-                        props.push(QualifiedName::new(namespace, prop_name));
+                        let qname = Self::resolve_name(name_str, &ns_map);
+                        props.push(qname);
                     }
                 }
                 Ok(Event::Eof) => break,
@@ -635,10 +667,12 @@ impl WebDavAdapter {
         let mut props_to_set = Vec::new();
         let mut props_to_remove = Vec::new();
         let mut current_text = String::new();
+        let mut ns_map = std::collections::HashMap::<String, String>::new();
 
         loop {
             match xml_reader.read_event_into(&mut buffer) {
                 Ok(Event::Start(ref e)) => {
+                    Self::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -656,11 +690,7 @@ impl WebDavAdapter {
                             in_prop = true
                         }
                         _ if in_prop => {
-                            // This is a property element
-                            let namespace = Self::extract_namespace(name_str);
-                            let prop_name = Self::extract_local_name(name_str);
-
-                            current_prop = Some(QualifiedName::new(namespace, prop_name));
+                            current_prop = Some(Self::resolve_name(name_str, &ns_map));
                             current_text.clear();
                         }
                         _ => (),
@@ -704,15 +734,12 @@ impl WebDavAdapter {
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
+                    Self::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
                     if in_prop {
-                        // Empty property element
-                        let namespace = Self::extract_namespace(name_str);
-                        let prop_name = Self::extract_local_name(name_str);
-
-                        let qname = QualifiedName::new(namespace, prop_name);
+                        let qname = Self::resolve_name(name_str, &ns_map);
 
                         if in_set {
                             props_to_set.push(PropValue {

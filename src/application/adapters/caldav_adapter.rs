@@ -57,10 +57,12 @@ impl CalDavAdapter {
         let mut props = Vec::new();
         let mut hrefs = Vec::new();
         let mut sync_token = String::new();
+        let mut ns_map = std::collections::HashMap::<String, String>::new();
 
         loop {
             match xml_reader.read_event_into(&mut buffer) {
                 Ok(Event::Start(ref e)) => {
+                    WebDavAdapter::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
@@ -102,11 +104,8 @@ impl CalDavAdapter {
                             // We'll capture the text in the Text event
                         }
                         _ if in_prop => {
-                            // Add property to request
-                            let namespace = WebDavAdapter::extract_namespace(name_str);
-                            let prop_name = WebDavAdapter::extract_local_name(name_str);
-
-                            props.push(QualifiedName::new(namespace, prop_name));
+                            let qname = WebDavAdapter::resolve_name(name_str, &ns_map);
+                            props.push(qname);
                         }
                         _ => { /* Ignore other elements */ }
                     }
@@ -138,15 +137,13 @@ impl CalDavAdapter {
                     }
                 }
                 Ok(Event::Empty(ref e)) => {
+                    WebDavAdapter::collect_ns_decls(e, &mut ns_map);
                     let name = e.name();
                     let name_str = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
                     if in_prop {
-                        // Add empty property element to request
-                        let namespace = WebDavAdapter::extract_namespace(name_str);
-                        let prop_name = WebDavAdapter::extract_local_name(name_str);
-
-                        props.push(QualifiedName::new(namespace, prop_name));
+                        let qname = WebDavAdapter::resolve_name(name_str, &ns_map);
+                        props.push(qname);
                     } else if name_str == "time-range" || name_str.ends_with(":time-range") {
                         // Parse time-range attributes
                         for attr in e.attributes().flatten() {
@@ -199,7 +196,47 @@ impl CalDavAdapter {
         Ok(report_type)
     }
 
-    /// Generate a PROPFIND response for calendars
+    /// Generate a PROPFIND response for the root CalDAV resource.
+    /// Includes a response for /caldav/ itself with discovery properties
+    /// (current-user-principal, calendar-home-set) plus each calendar.
+    pub fn generate_root_propfind_response<W: Write>(
+        writer: W,
+        calendars: &[CalendarDto],
+        request: &PropFindRequest,
+        base_href: &str,
+        username: &str,
+    ) -> Result<()> {
+        let mut xml_writer = Writer::new(writer);
+
+        // Start multistatus response
+        xml_writer.write_event(Event::Start(
+            BytesStart::new("D:multistatus").with_attributes([
+                ("xmlns:D", "DAV:"),
+                ("xmlns:C", "urn:ietf:params:xml:ns:caldav"),
+                ("xmlns:CS", "http://calendarserver.org/ns/"),
+            ]),
+        ))?;
+
+        // Write the root /caldav/ response with discovery properties
+        Self::write_root_response(&mut xml_writer, request, base_href, username)?;
+
+        // Add responses for calendars
+        for calendar in calendars {
+            Self::write_calendar_response(
+                &mut xml_writer,
+                calendar,
+                request,
+                &format!("{}{}/", base_href, calendar.id),
+            )?;
+        }
+
+        // End multistatus
+        xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
+
+        Ok(())
+    }
+
+    /// Generate a PROPFIND response for calendars (without root discovery entry)
     pub fn generate_calendars_propfind_response<W: Write>(
         writer: W,
         calendars: &[CalendarDto],
@@ -230,6 +267,301 @@ impl CalDavAdapter {
         // End multistatus
         xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
 
+        Ok(())
+    }
+
+    /// Generate a PROPFIND response for a user principal resource.
+    pub fn generate_principal_propfind_response<W: Write>(
+        writer: W,
+        request: &PropFindRequest,
+        username: &str,
+    ) -> Result<()> {
+        let mut xml_writer = Writer::new(writer);
+
+        xml_writer.write_event(Event::Start(
+            BytesStart::new("D:multistatus").with_attributes([
+                ("xmlns:D", "DAV:"),
+                ("xmlns:C", "urn:ietf:params:xml:ns:caldav"),
+                ("xmlns:CS", "http://calendarserver.org/ns/"),
+            ]),
+        ))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:response")))?;
+
+        // href
+        let href = format!("/caldav/principals/{}/", username);
+        xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+        xml_writer.write_event(Event::Text(BytesText::new(&href)))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:propstat")))?;
+        xml_writer.write_event(Event::Start(BytesStart::new("D:prop")))?;
+
+        match &request.prop_find_type {
+            PropFindType::AllProp | PropFindType::PropName => {
+                Self::write_principal_props(&mut xml_writer, username)?;
+            }
+            PropFindType::Prop(props) => {
+                Self::write_principal_requested_props(&mut xml_writer, username, props)?;
+            }
+        }
+
+        xml_writer.write_event(Event::End(BytesEnd::new("D:prop")))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:status")))?;
+        xml_writer.write_event(Event::Text(BytesText::new("HTTP/1.1 200 OK")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:status")))?;
+
+        xml_writer.write_event(Event::End(BytesEnd::new("D:propstat")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:response")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:multistatus")))?;
+
+        Ok(())
+    }
+
+    /// Write the root /caldav/ response entry with discovery properties.
+    fn write_root_response<W: Write>(
+        xml_writer: &mut Writer<W>,
+        request: &PropFindRequest,
+        href: &str,
+        username: &str,
+    ) -> Result<()> {
+        xml_writer.write_event(Event::Start(BytesStart::new("D:response")))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+        xml_writer.write_event(Event::Text(BytesText::new(href)))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:propstat")))?;
+        xml_writer.write_event(Event::Start(BytesStart::new("D:prop")))?;
+
+        match &request.prop_find_type {
+            PropFindType::AllProp => {
+                // Resource type — collection
+                xml_writer.write_event(Event::Start(BytesStart::new("D:resourcetype")))?;
+                xml_writer.write_event(Event::Empty(BytesStart::new("D:collection")))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:resourcetype")))?;
+
+                // current-user-principal
+                xml_writer
+                    .write_event(Event::Start(BytesStart::new("D:current-user-principal")))?;
+                xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                    "/caldav/principals/{}/",
+                    username
+                ))))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                xml_writer
+                    .write_event(Event::End(BytesEnd::new("D:current-user-principal")))?;
+
+                // calendar-home-set
+                xml_writer
+                    .write_event(Event::Start(BytesStart::new("C:calendar-home-set")))?;
+                xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                    "/caldav/{}/",
+                    username
+                ))))?;
+                xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                xml_writer
+                    .write_event(Event::End(BytesEnd::new("C:calendar-home-set")))?;
+            }
+            PropFindType::PropName => {
+                xml_writer.write_event(Event::Empty(BytesStart::new("D:resourcetype")))?;
+                xml_writer
+                    .write_event(Event::Empty(BytesStart::new("D:current-user-principal")))?;
+                xml_writer
+                    .write_event(Event::Empty(BytesStart::new("C:calendar-home-set")))?;
+            }
+            PropFindType::Prop(props) => {
+                Self::write_root_requested_props(xml_writer, username, props)?;
+            }
+        }
+
+        xml_writer.write_event(Event::End(BytesEnd::new("D:prop")))?;
+
+        xml_writer.write_event(Event::Start(BytesStart::new("D:status")))?;
+        xml_writer.write_event(Event::Text(BytesText::new("HTTP/1.1 200 OK")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:status")))?;
+
+        xml_writer.write_event(Event::End(BytesEnd::new("D:propstat")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:response")))?;
+
+        Ok(())
+    }
+
+    /// Write requested properties for the root /caldav/ resource.
+    fn write_root_requested_props<W: Write>(
+        xml_writer: &mut Writer<W>,
+        username: &str,
+        props: &[QualifiedName],
+    ) -> Result<()> {
+        for prop in props {
+            match (prop.namespace.as_str(), prop.name.as_str()) {
+                ("DAV:", "resourcetype") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:resourcetype")))?;
+                    xml_writer.write_event(Event::Empty(BytesStart::new("D:collection")))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:resourcetype")))?;
+                }
+                ("DAV:", "current-user-principal") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new(
+                        "D:current-user-principal",
+                    )))?;
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                        "/caldav/principals/{}/",
+                        username
+                    ))))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                    xml_writer
+                        .write_event(Event::End(BytesEnd::new("D:current-user-principal")))?;
+                }
+                ("urn:ietf:params:xml:ns:caldav", "calendar-home-set") => {
+                    xml_writer
+                        .write_event(Event::Start(BytesStart::new("C:calendar-home-set")))?;
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                        "/caldav/{}/",
+                        username
+                    ))))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                    xml_writer
+                        .write_event(Event::End(BytesEnd::new("C:calendar-home-set")))?;
+                }
+                ("DAV:", "displayname") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:displayname")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new("CalDAV Root")))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:displayname")))?;
+                }
+                _ => {
+                    // Unknown property — write empty
+                    let prop_name = if prop.namespace == "http://calendarserver.org/ns/" {
+                        format!("CS:{}", prop.name)
+                    } else if prop.namespace == "urn:ietf:params:xml:ns:caldav" {
+                        format!("C:{}", prop.name)
+                    } else if prop.namespace == "DAV:" {
+                        format!("D:{}", prop.name)
+                    } else {
+                        format!("{}:{}", prop.namespace, prop.name)
+                    };
+                    xml_writer.write_event(Event::Empty(BytesStart::new(&prop_name)))?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Write standard properties for a principal resource.
+    fn write_principal_props<W: Write>(
+        xml_writer: &mut Writer<W>,
+        username: &str,
+    ) -> Result<()> {
+        // resourcetype — principal
+        xml_writer.write_event(Event::Start(BytesStart::new("D:resourcetype")))?;
+        xml_writer.write_event(Event::Empty(BytesStart::new("D:collection")))?;
+        xml_writer.write_event(Event::Empty(BytesStart::new("D:principal")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:resourcetype")))?;
+
+        // displayname
+        xml_writer.write_event(Event::Start(BytesStart::new("D:displayname")))?;
+        xml_writer.write_event(Event::Text(BytesText::new(username)))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:displayname")))?;
+
+        // calendar-home-set
+        xml_writer.write_event(Event::Start(BytesStart::new("C:calendar-home-set")))?;
+        xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+        xml_writer.write_event(Event::Text(BytesText::new(&format!(
+            "/caldav/{}/",
+            username
+        ))))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("C:calendar-home-set")))?;
+
+        // current-user-principal (self-reference)
+        xml_writer.write_event(Event::Start(BytesStart::new("D:current-user-principal")))?;
+        xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+        xml_writer.write_event(Event::Text(BytesText::new(&format!(
+            "/caldav/principals/{}/",
+            username
+        ))))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+        xml_writer.write_event(Event::End(BytesEnd::new("D:current-user-principal")))?;
+
+        Ok(())
+    }
+
+    /// Write requested properties for a principal resource.
+    fn write_principal_requested_props<W: Write>(
+        xml_writer: &mut Writer<W>,
+        username: &str,
+        props: &[QualifiedName],
+    ) -> Result<()> {
+        for prop in props {
+            match (prop.namespace.as_str(), prop.name.as_str()) {
+                ("DAV:", "resourcetype") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:resourcetype")))?;
+                    xml_writer.write_event(Event::Empty(BytesStart::new("D:collection")))?;
+                    xml_writer.write_event(Event::Empty(BytesStart::new("D:principal")))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:resourcetype")))?;
+                }
+                ("DAV:", "displayname") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:displayname")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(username)))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:displayname")))?;
+                }
+                ("DAV:", "current-user-principal") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new(
+                        "D:current-user-principal",
+                    )))?;
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                        "/caldav/principals/{}/",
+                        username
+                    ))))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                    xml_writer
+                        .write_event(Event::End(BytesEnd::new("D:current-user-principal")))?;
+                }
+                ("urn:ietf:params:xml:ns:caldav", "calendar-home-set") => {
+                    xml_writer
+                        .write_event(Event::Start(BytesStart::new("C:calendar-home-set")))?;
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                        "/caldav/{}/",
+                        username
+                    ))))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                    xml_writer
+                        .write_event(Event::End(BytesEnd::new("C:calendar-home-set")))?;
+                }
+                ("urn:ietf:params:xml:ns:caldav", "calendar-user-address-set") => {
+                    xml_writer.write_event(Event::Start(BytesStart::new(
+                        "C:calendar-user-address-set",
+                    )))?;
+                    xml_writer.write_event(Event::Start(BytesStart::new("D:href")))?;
+                    xml_writer.write_event(Event::Text(BytesText::new(&format!(
+                        "/caldav/principals/{}/",
+                        username
+                    ))))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new("D:href")))?;
+                    xml_writer.write_event(Event::End(BytesEnd::new(
+                        "C:calendar-user-address-set",
+                    )))?;
+                }
+                _ => {
+                    let prop_name = if prop.namespace == "http://calendarserver.org/ns/" {
+                        format!("CS:{}", prop.name)
+                    } else if prop.namespace == "urn:ietf:params:xml:ns:caldav" {
+                        format!("C:{}", prop.name)
+                    } else if prop.namespace == "DAV:" {
+                        format!("D:{}", prop.name)
+                    } else {
+                        format!("{}:{}", prop.namespace, prop.name)
+                    };
+                    xml_writer.write_event(Event::Empty(BytesStart::new(&prop_name)))?;
+                }
+            }
+        }
         Ok(())
     }
 
