@@ -25,6 +25,7 @@ use crate::application::dtos::folder_dto::FolderDto;
 use crate::application::ports::file_ports::FileRetrievalUseCase;
 use crate::application::ports::inbound::FolderUseCase;
 use crate::common::di::AppState;
+use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
 use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC, AsciiSet};
@@ -301,38 +302,73 @@ async fn handle_propfind(
         .await;
     }
 
-    // Try folder first
-    if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
-        let folder_id = folder.id.clone();
-        return build_streaming_propfind_response(
-            folder,
-            Some(folder_id),
-            &depth_owned,
-            &base_href,
-            propfind_request,
-            folder_service,
-            file_retrieval_service,
-        )
-        .await;
-    }
-
-    // Try file
-    if let Ok(file) = file_retrieval_service.get_file_by_path(&path).await {
-        let mut buf = Vec::with_capacity(1024);
-        {
-            let mut xml_writer = Writer::new(&mut buf);
-            WebDavAdapter::write_multistatus_start(&mut xml_writer)
-                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
-            WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
-                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
-            WebDavAdapter::write_multistatus_end(&mut xml_writer)
-                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+    // Single-query path resolution: folder OR file in one DB round-trip
+    if let Some(resolver) = &state.path_resolver {
+        match resolver.resolve_path(&path).await {
+            Ok(ResolvedResource::Folder(folder)) => {
+                let folder_id = folder.id.clone();
+                return build_streaming_propfind_response(
+                    folder,
+                    Some(folder_id),
+                    &depth_owned,
+                    &base_href,
+                    propfind_request,
+                    folder_service,
+                    file_retrieval_service,
+                )
+                .await;
+            }
+            Ok(ResolvedResource::File(file)) => {
+                let mut buf = Vec::with_capacity(1024);
+                {
+                    let mut xml_writer = Writer::new(&mut buf);
+                    WebDavAdapter::write_multistatus_start(&mut xml_writer)
+                        .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                    WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
+                        .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                    WebDavAdapter::write_multistatus_end(&mut xml_writer)
+                        .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                }
+                return Ok(Response::builder()
+                    .status(StatusCode::MULTI_STATUS)
+                    .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+                    .body(Body::from(buf))
+                    .unwrap());
+            }
+            Err(_) => {}
         }
-        return Ok(Response::builder()
-            .status(StatusCode::MULTI_STATUS)
-            .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-            .body(Body::from(buf))
-            .unwrap());
+    } else {
+        // Fallback: legacy double-query path when PathResolver is unavailable
+        if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
+            let folder_id = folder.id.clone();
+            return build_streaming_propfind_response(
+                folder,
+                Some(folder_id),
+                &depth_owned,
+                &base_href,
+                propfind_request,
+                folder_service,
+                file_retrieval_service,
+            )
+            .await;
+        }
+        if let Ok(file) = file_retrieval_service.get_file_by_path(&path).await {
+            let mut buf = Vec::with_capacity(1024);
+            {
+                let mut xml_writer = Writer::new(&mut buf);
+                WebDavAdapter::write_multistatus_start(&mut xml_writer)
+                    .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
+                    .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                WebDavAdapter::write_multistatus_end(&mut xml_writer)
+                    .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+            }
+            return Ok(Response::builder()
+                .status(StatusCode::MULTI_STATUS)
+                .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
+                .body(Body::from(buf))
+                .unwrap());
+        }
     }
 
     Err(AppError::not_found(format!("Resource not found: {}", path)))
@@ -596,7 +632,38 @@ async fn handle_head(
             .unwrap());
     }
 
-    // Check if it's a folder first
+    // Single-query path resolution
+    if let Some(resolver) = &state.path_resolver {
+        match resolver.resolve_path(&path).await {
+            Ok(ResolvedResource::Folder(folder)) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "httpd/unix-directory")
+                    .header(header::CONTENT_LENGTH, 0)
+                    .header(header::ETAG, format!("\"{}\"", folder.id))
+                    .body(Body::empty())
+                    .unwrap());
+            }
+            Ok(ResolvedResource::File(file)) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &file.mime_type)
+                    .header(header::CONTENT_LENGTH, file.size)
+                    .header(header::ETAG, format!("\"{}\"", file.id))
+                    .header(
+                        header::LAST_MODIFIED,
+                        chrono::DateTime::<Utc>::from_timestamp(file.created_at as i64, 0)
+                            .unwrap_or_else(Utc::now)
+                            .to_rfc2822(),
+                    )
+                    .body(Body::empty())
+                    .unwrap());
+            }
+            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", path))),
+        }
+    }
+
+    // Fallback: legacy double-query path
     if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
         return Ok(Response::builder()
             .status(StatusCode::OK)
@@ -835,27 +902,45 @@ async fn handle_delete(
         return Err(AppError::forbidden("Cannot delete root folder"));
     }
 
-    // Check if path is a folder
-    let folder_result = folder_service.get_folder_by_path(&path).await;
-
-    if let Ok(folder) = folder_result {
-        // Delete folder — use the folder's own owner as caller_id
-        let caller_id = folder.owner_id.as_deref().unwrap_or("webdav");
-        folder_service
-            .delete_folder(&folder.id, caller_id)
-            .await
-            .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
+    // Single-query path resolution
+    if let Some(resolver) = &state.path_resolver {
+        match resolver.resolve_path(&path).await {
+            Ok(ResolvedResource::Folder(folder)) => {
+                let caller_id = folder.owner_id.as_deref().unwrap_or("webdav");
+                folder_service
+                    .delete_folder(&folder.id, caller_id)
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
+            }
+            Ok(ResolvedResource::File(file)) => {
+                file_management_service
+                    .delete_file(&file.id)
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to delete file: {}", e)))?;
+            }
+            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", path))),
+        }
     } else {
-        // Try to delete file
-        let file = file_retrieval_service
-            .get_file_by_path(&path)
-            .await
-            .map_err(|_e| AppError::not_found(format!("Resource not found: {}", path)))?;
+        // Fallback: legacy double-query path
+        let folder_result = folder_service.get_folder_by_path(&path).await;
 
-        file_management_service
-            .delete_file(&file.id)
-            .await
-            .map_err(|e| AppError::internal_error(format!("Failed to delete file: {}", e)))?;
+        if let Ok(folder) = folder_result {
+            let caller_id = folder.owner_id.as_deref().unwrap_or("webdav");
+            folder_service
+                .delete_folder(&folder.id, caller_id)
+                .await
+                .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
+        } else {
+            let file = file_retrieval_service
+                .get_file_by_path(&path)
+                .await
+                .map_err(|_e| AppError::not_found(format!("Resource not found: {}", path)))?;
+
+            file_management_service
+                .delete_file(&file.id)
+                .await
+                .map_err(|e| AppError::internal_error(format!("Failed to delete file: {}", e)))?;
+        }
     }
 
     Ok(Response::builder()
@@ -914,14 +999,12 @@ async fn handle_move(
 
     // Check if destination already exists (for Overwrite header compliance)
     if !overwrite {
-        let dest_exists = folder_service
-            .get_folder_by_path(&destination_path)
-            .await
-            .is_ok()
-            || file_retrieval_service
-                .get_file_by_path(&destination_path)
-                .await
-                .is_ok();
+        let dest_exists = if let Some(resolver) = &state.path_resolver {
+            resolver.exists(&destination_path).await.unwrap_or(false)
+        } else {
+            folder_service.get_folder_by_path(&destination_path).await.is_ok()
+                || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok()
+        };
         if dest_exists {
             return Err(AppError::precondition_failed(
                 "Destination already exists and Overwrite is F",
@@ -929,94 +1012,166 @@ async fn handle_move(
         }
     }
 
-    // Check if source is a folder
-    let folder_result = folder_service.get_folder_by_path(&source_path).await;
+    // Resolve source: single-query when PathResolver is available
+    if let Some(resolver) = &state.path_resolver {
+        match resolver.resolve_path(&source_path).await {
+            Ok(ResolvedResource::Folder(folder)) => {
+                let dest_folder_name = destination_path
+                    .split('/')
+                    .next_back()
+                    .unwrap_or(&destination_path);
+                let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                    &destination_path[..idx]
+                } else {
+                    ""
+                };
 
-    if let Ok(folder) = folder_result {
-        // Move folder
-        let dest_folder_name = destination_path
-            .split('/')
-            .next_back()
-            .unwrap_or(&destination_path);
-        let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
-            &destination_path[..idx]
-        } else {
-            ""
-        };
+                let move_dto = crate::application::dtos::folder_dto::MoveFolderDto {
+                    parent_id: if dest_parent_path.is_empty() {
+                        None
+                    } else {
+                        match folder_service.get_folder_by_path(dest_parent_path).await {
+                            Ok(parent) => Some(parent.id),
+                            Err(_) => None,
+                        }
+                    },
+                };
 
-        // Create DTOs for moving and renaming
-        let move_dto = crate::application::dtos::folder_dto::MoveFolderDto {
-            parent_id: if dest_parent_path.is_empty() {
-                None
-            } else {
-                match folder_service.get_folder_by_path(dest_parent_path).await {
-                    Ok(parent) => Some(parent.id),
-                    Err(_) => None, // If not found, use root
+                folder_service
+                    .move_folder(
+                        &folder.id,
+                        move_dto,
+                        folder.owner_id.as_deref().unwrap_or("webdav"),
+                    )
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
+
+                if folder.name != dest_folder_name {
+                    let rename_dto = crate::application::dtos::folder_dto::RenameFolderDto {
+                        name: dest_folder_name.to_string(),
+                    };
+                    folder_service
+                        .rename_folder(
+                            &folder.id,
+                            rename_dto,
+                            folder.owner_id.as_deref().unwrap_or("webdav"),
+                        )
+                        .await
+                        .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
                 }
-            },
-        };
+            }
+            Ok(ResolvedResource::File(file)) => {
+                let dest_filename = destination_path
+                    .split('/')
+                    .next_back()
+                    .unwrap_or(&destination_path);
+                let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                    &destination_path[..idx]
+                } else {
+                    ""
+                };
+                let source_parent_path = if let Some(idx) = source_path.rfind('/') {
+                    &source_path[..idx]
+                } else {
+                    ""
+                };
 
-        folder_service
-            .move_folder(
-                &folder.id,
-                move_dto,
-                folder.owner_id.as_deref().unwrap_or("webdav"),
-            )
-            .await
-            .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
+                if source_parent_path != dest_parent_path {
+                    file_management_service
+                        .move_file(&file.id, Some(dest_parent_path.to_string()))
+                        .await
+                        .map_err(|e| AppError::internal_error(format!("Failed to move file: {}", e)))?;
+                }
+                if file.name != dest_filename {
+                    file_management_service
+                        .rename_file(&file.id, dest_filename)
+                        .await
+                        .map_err(|e| AppError::internal_error(format!("Failed to rename file: {}", e)))?;
+                }
+            }
+            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", source_path))),
+        }
+    } else {
+        // Fallback: legacy double-query path
+        let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
-        if folder.name != dest_folder_name {
-            let rename_dto = crate::application::dtos::folder_dto::RenameFolderDto {
-                name: dest_folder_name.to_string(),
+        if let Ok(folder) = folder_result {
+            let dest_folder_name = destination_path
+                .split('/')
+                .next_back()
+                .unwrap_or(&destination_path);
+            let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                &destination_path[..idx]
+            } else {
+                ""
+            };
+
+            let move_dto = crate::application::dtos::folder_dto::MoveFolderDto {
+                parent_id: if dest_parent_path.is_empty() {
+                    None
+                } else {
+                    match folder_service.get_folder_by_path(dest_parent_path).await {
+                        Ok(parent) => Some(parent.id),
+                        Err(_) => None,
+                    }
+                },
             };
 
             folder_service
-                .rename_folder(
+                .move_folder(
                     &folder.id,
-                    rename_dto,
+                    move_dto,
                     folder.owner_id.as_deref().unwrap_or("webdav"),
                 )
                 .await
-                .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
-        }
-    } else {
-        // Try to move file
-        let file = file_retrieval_service
-            .get_file_by_path(&source_path)
-            .await
-            .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
+                .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
 
-        let dest_filename = destination_path
-            .split('/')
-            .next_back()
-            .unwrap_or(&destination_path);
-        let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
-            &destination_path[..idx]
+            if folder.name != dest_folder_name {
+                let rename_dto = crate::application::dtos::folder_dto::RenameFolderDto {
+                    name: dest_folder_name.to_string(),
+                };
+                folder_service
+                    .rename_folder(
+                        &folder.id,
+                        rename_dto,
+                        folder.owner_id.as_deref().unwrap_or("webdav"),
+                    )
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
+            }
         } else {
-            ""
-        };
-
-        // Determine source parent path for comparison
-        let source_parent_path = if let Some(idx) = source_path.rfind('/') {
-            &source_path[..idx]
-        } else {
-            ""
-        };
-
-        // Only call move_file if the parent directory actually changes
-        if source_parent_path != dest_parent_path {
-            file_management_service
-                .move_file(&file.id, Some(dest_parent_path.to_string()))
+            let file = file_retrieval_service
+                .get_file_by_path(&source_path)
                 .await
-                .map_err(|e| AppError::internal_error(format!("Failed to move file: {}", e)))?;
-        }
+                .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
 
-        // Rename the file if the name changed
-        if file.name != dest_filename {
-            file_management_service
-                .rename_file(&file.id, dest_filename)
-                .await
-                .map_err(|e| AppError::internal_error(format!("Failed to rename file: {}", e)))?;
+            let dest_filename = destination_path
+                .split('/')
+                .next_back()
+                .unwrap_or(&destination_path);
+            let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                &destination_path[..idx]
+            } else {
+                ""
+            };
+            let source_parent_path = if let Some(idx) = source_path.rfind('/') {
+                &source_path[..idx]
+            } else {
+                ""
+            };
+
+            if source_parent_path != dest_parent_path {
+                file_management_service
+                    .move_file(&file.id, Some(dest_parent_path.to_string()))
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to move file: {}", e)))?;
+            }
+            if file.name != dest_filename {
+                file_management_service
+                    .rename_file(&file.id, dest_filename)
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to rename file: {}", e)))?;
+            }
         }
     }
 
@@ -1082,14 +1237,12 @@ async fn handle_copy(
 
     // Check if destination already exists (for Overwrite header compliance)
     if !overwrite {
-        let dest_exists = folder_service
-            .get_folder_by_path(&destination_path)
-            .await
-            .is_ok()
-            || file_retrieval_service
-                .get_file_by_path(&destination_path)
-                .await
-                .is_ok();
+        let dest_exists = if let Some(resolver) = &state.path_resolver {
+            resolver.exists(&destination_path).await.unwrap_or(false)
+        } else {
+            folder_service.get_folder_by_path(&destination_path).await.is_ok()
+                || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok()
+        };
         if dest_exists {
             return Err(AppError::precondition_failed(
                 "Destination already exists and Overwrite is F",
@@ -1097,90 +1250,157 @@ async fn handle_copy(
         }
     }
 
-    // Check if source is a folder
-    let folder_result = folder_service.get_folder_by_path(&source_path).await;
+    // Resolve source: single-query when PathResolver is available
+    if let Some(resolver) = &state.path_resolver {
+        match resolver.resolve_path(&source_path).await {
+            Ok(ResolvedResource::Folder(folder)) => {
+                let recursive = depth != "0";
 
-    if let Ok(folder) = folder_result {
-        // Copy folder
-        let recursive = depth != "0";
+                let dest_folder_name = destination_path
+                    .split('/')
+                    .next_back()
+                    .unwrap_or(&destination_path);
+                let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                    &destination_path[..idx]
+                } else {
+                    ""
+                };
 
-        let dest_folder_name = destination_path
-            .split('/')
-            .next_back()
-            .unwrap_or(&destination_path);
-        let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
-            &destination_path[..idx]
-        } else {
-            ""
-        };
+                let target_parent_id = if dest_parent_path.is_empty() {
+                    None
+                } else {
+                    match folder_service.get_folder_by_path(dest_parent_path).await {
+                        Ok(parent) => Some(parent.id),
+                        Err(_) => None,
+                    }
+                };
 
-        let target_parent_id = if dest_parent_path.is_empty() {
-            None
-        } else {
-            match folder_service.get_folder_by_path(dest_parent_path).await {
-                Ok(parent) => Some(parent.id),
-                Err(_) => None,
+                if recursive {
+                    let file_management_service = &state.applications.file_management_service;
+                    file_management_service
+                        .copy_folder_tree(
+                            &folder.id,
+                            target_parent_id,
+                            Some(dest_folder_name.to_string()),
+                        )
+                        .await
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to copy folder tree: {}", e))
+                        })?;
+                } else {
+                    let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
+                        name: dest_folder_name.to_string(),
+                        parent_id: target_parent_id,
+                    };
+                    folder_service
+                        .create_folder(create_dto)
+                        .await
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to create destination folder: {}", e))
+                        })?;
+                }
             }
-        };
+            Ok(ResolvedResource::File(file)) => {
+                let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                    &destination_path[..idx]
+                } else {
+                    ""
+                };
 
-        if recursive {
-            // Atomic recursive copy: single SQL function call copies the entire
-            // folder tree (all sub-folders + all files) with zero-copy dedup.
-            // O(depth) folder INSERTs + 1 batch file INSERT + 1 batch ref_count UPDATE.
-            let file_management_service = &state.applications.file_management_service;
-            file_management_service
-                .copy_folder_tree(
-                    &folder.id,
-                    target_parent_id,
-                    Some(dest_folder_name.to_string()),
-                )
-                .await
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to copy folder tree: {}", e))
-                })?;
-        } else {
-            // Depth: 0 — create empty folder only (no sub-folder or file copy)
-            let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
-                name: dest_folder_name.to_string(),
-                parent_id: target_parent_id,
-            };
-            folder_service
-                .create_folder(create_dto)
-                .await
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to create destination folder: {}", e))
-                })?;
+                let target_folder_id = if dest_parent_path.is_empty() {
+                    None
+                } else {
+                    match folder_service.get_folder_by_path(dest_parent_path).await {
+                        Ok(parent) => Some(parent.id),
+                        Err(_) => None,
+                    }
+                };
+
+                let file_management_service = &state.applications.file_management_service;
+                file_management_service
+                    .copy_file(&file.id, target_folder_id)
+                    .await
+                    .map_err(|e| AppError::internal_error(format!("Failed to copy file: {}", e)))?;
+            }
+            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", source_path))),
         }
     } else {
-        // Copy file — use zero-copy dedup (only increments blob ref_count, no content loaded)
-        let file = file_retrieval_service
-            .get_file_by_path(&source_path)
-            .await
-            .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
+        // Fallback: legacy double-query path
+        let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
-        // Get destination parent folder ID
-        let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
-            &destination_path[..idx]
-        } else {
-            ""
-        };
+        if let Ok(folder) = folder_result {
+            let recursive = depth != "0";
 
-        let target_folder_id = if dest_parent_path.is_empty() {
-            None
-        } else {
-            match folder_service.get_folder_by_path(dest_parent_path).await {
-                Ok(parent) => Some(parent.id),
-                Err(_) => None,
+            let dest_folder_name = destination_path
+                .split('/')
+                .next_back()
+                .unwrap_or(&destination_path);
+            let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                &destination_path[..idx]
+            } else {
+                ""
+            };
+
+            let target_parent_id = if dest_parent_path.is_empty() {
+                None
+            } else {
+                match folder_service.get_folder_by_path(dest_parent_path).await {
+                    Ok(parent) => Some(parent.id),
+                    Err(_) => None,
+                }
+            };
+
+            if recursive {
+                let file_management_service = &state.applications.file_management_service;
+                file_management_service
+                    .copy_folder_tree(
+                        &folder.id,
+                        target_parent_id,
+                        Some(dest_folder_name.to_string()),
+                    )
+                    .await
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to copy folder tree: {}", e))
+                    })?;
+            } else {
+                let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
+                    name: dest_folder_name.to_string(),
+                    parent_id: target_parent_id,
+                };
+                folder_service
+                    .create_folder(create_dto)
+                    .await
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to create destination folder: {}", e))
+                    })?;
             }
-        };
+        } else {
+            let file = file_retrieval_service
+                .get_file_by_path(&source_path)
+                .await
+                .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
 
-        // Zero-copy: only creates a new metadata row + increments blob reference count.
-        // No file content is ever loaded into memory.
-        let file_management_service = &state.applications.file_management_service;
-        file_management_service
-            .copy_file(&file.id, target_folder_id)
-            .await
-            .map_err(|e| AppError::internal_error(format!("Failed to copy file: {}", e)))?;
+            let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
+                &destination_path[..idx]
+            } else {
+                ""
+            };
+
+            let target_folder_id = if dest_parent_path.is_empty() {
+                None
+            } else {
+                match folder_service.get_folder_by_path(dest_parent_path).await {
+                    Ok(parent) => Some(parent.id),
+                    Err(_) => None,
+                }
+            };
+
+            let file_management_service = &state.applications.file_management_service;
+            file_management_service
+                .copy_file(&file.id, target_folder_id)
+                .await
+                .map_err(|e| AppError::internal_error(format!("Failed to copy file: {}", e)))?;
+        }
     }
 
     Ok(Response::builder()

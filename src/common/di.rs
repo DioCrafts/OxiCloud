@@ -542,6 +542,7 @@ impl AppServiceFactory {
             wopi_discovery_service: None,
             device_auth_service: None,
             app_password_service: None,
+            path_resolver: None,
         };
 
         // 9b. Wire admin settings service when auth is available
@@ -649,6 +650,13 @@ impl AppServiceFactory {
                 app_state.app_password_service = Some(app_pw_svc);
                 tracing::info!("App Password service initialized");
             }
+        }
+
+        // 9e. Wire PathResolver for single-query WebDAV path resolution
+        {
+            use crate::infrastructure::services::path_resolver_service::PathResolverService;
+            app_state.path_resolver = Some(Arc::new(PathResolverService::new(pool.clone())));
+            tracing::info!("PathResolver service initialized");
         }
 
         // 10. Wire CalDAV/CardDAV services
@@ -846,6 +854,8 @@ pub struct AppState {
         Option<Arc<crate::application::services::device_auth_service::DeviceAuthService>>,
     pub app_password_service:
         Option<Arc<crate::application::services::app_password_service::AppPasswordService>>,
+    pub path_resolver:
+        Option<Arc<crate::infrastructure::services::path_resolver_service::PathResolverService>>,
 }
 
 // All AppState construction is done via struct literal in build_app_state().
