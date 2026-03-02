@@ -258,6 +258,9 @@ impl FolderRepository for FolderDbRepository {
             .collect()
     }
 
+    /// Paginated folder listing — single query with `COUNT(*) OVER()` window
+    /// function so the total matching count comes back alongside the data rows,
+    /// eliminating a separate COUNT round-trip.
     async fn list_folders_paginated(
         &self,
         parent_id: Option<&str>,
@@ -265,34 +268,14 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let total = if include_total {
-            let count: i64 = if let Some(pid) = parent_id {
-                sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id = $1::uuid AND NOT is_trashed",
-                )
-                .bind(pid)
-                .fetch_one(self.pool())
-                .await
-            } else {
-                sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id IS NULL AND NOT is_trashed",
-                )
-                .fetch_one(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("count: {e}")))?;
-            Some(count as usize)
-        } else {
-            None
-        };
-
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64, i64)> =
             if let Some(pid) = parent_id {
                 sqlx::query_as(
                     r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
-                       EXTRACT(EPOCH FROM updated_at)::bigint
+                       EXTRACT(EPOCH FROM updated_at)::bigint,
+                       COUNT(*) OVER() AS total_count
                   FROM storage.folders
                  WHERE parent_id = $1::uuid AND NOT is_trashed
                  ORDER BY name
@@ -309,7 +292,8 @@ impl FolderRepository for FolderDbRepository {
                     r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
-                       EXTRACT(EPOCH FROM updated_at)::bigint
+                       EXTRACT(EPOCH FROM updated_at)::bigint,
+                       COUNT(*) OVER() AS total_count
                   FROM storage.folders
                  WHERE parent_id IS NULL AND NOT is_trashed
                  ORDER BY name
@@ -323,15 +307,24 @@ impl FolderRepository for FolderDbRepository {
             }
             .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate: {e}")))?;
 
+        // total_count is identical in every row; 0 when the result set is empty.
+        let total = if include_total {
+            Some(rows.first().map_or(0, |r| r.7) as usize)
+        } else {
+            None
+        };
+
         let folders: Result<Vec<Folder>, DomainError> = rows
             .into_iter()
-            .map(|(id, name, path, pid, uid, ca, ma)| {
+            .map(|(id, name, path, pid, uid, ca, ma, _total)| {
                 Self::row_to_folder(id, name, path, pid, Some(uid), ca, ma)
             })
             .collect();
         Ok((folders?, total))
     }
 
+    /// Paginated folder listing filtered by owner — single query with
+    /// `COUNT(*) OVER()` to avoid a separate COUNT round-trip.
     async fn list_folders_by_owner_paginated(
         &self,
         parent_id: Option<&str>,
@@ -340,36 +333,14 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let total = if include_total {
-            let count: i64 = if let Some(pid) = parent_id {
-                sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed",
-                )
-                .bind(pid)
-                .bind(owner_id)
-                .fetch_one(self.pool())
-                .await
-            } else {
-                sqlx::query_scalar(
-                    "SELECT COUNT(*) FROM storage.folders WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed",
-                )
-                .bind(owner_id)
-                .fetch_one(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("count_by_owner: {e}")))?;
-            Some(count as usize)
-        } else {
-            None
-        };
-
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
+        let rows: Vec<(String, String, String, Option<String>, String, i64, i64, i64)> =
             if let Some(pid) = parent_id {
                 sqlx::query_as(
                     r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
-                       EXTRACT(EPOCH FROM updated_at)::bigint
+                       EXTRACT(EPOCH FROM updated_at)::bigint,
+                       COUNT(*) OVER() AS total_count
                   FROM storage.folders
                  WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
                  ORDER BY name
@@ -387,7 +358,8 @@ impl FolderRepository for FolderDbRepository {
                     r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
-                       EXTRACT(EPOCH FROM updated_at)::bigint
+                       EXTRACT(EPOCH FROM updated_at)::bigint,
+                       COUNT(*) OVER() AS total_count
                   FROM storage.folders
                  WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
                  ORDER BY name
@@ -404,9 +376,15 @@ impl FolderRepository for FolderDbRepository {
                 DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}"))
             })?;
 
+        let total = if include_total {
+            Some(rows.first().map_or(0, |r| r.7) as usize)
+        } else {
+            None
+        };
+
         let folders: Result<Vec<Folder>, DomainError> = rows
             .into_iter()
-            .map(|(id, name, path, pid, uid, ca, ma)| {
+            .map(|(id, name, path, pid, uid, ca, ma, _total)| {
                 Self::row_to_folder(id, name, path, pid, Some(uid), ca, ma)
             })
             .collect();
@@ -417,16 +395,19 @@ impl FolderRepository for FolderDbRepository {
         // The BEFORE UPDATE trigger recomputes path/lpath for this row;
         // the AFTER UPDATE cascade trigger then batch-updates all
         // descendants in a single UPDATE using the GiST lpath index.
-        sqlx::query(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
             r#"
             UPDATE storage.folders
                SET name = $1, updated_at = NOW()
              WHERE id = $2::uuid AND NOT is_trashed
+            RETURNING id::text, name, path, parent_id::text, user_id,
+                      EXTRACT(EPOCH FROM created_at)::bigint,
+                      EXTRACT(EPOCH FROM updated_at)::bigint
             "#,
         )
         .bind(&new_name)
         .bind(id)
-        .execute(self.pool())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| {
             if let sqlx::Error::Database(ref db_err) = e
@@ -435,9 +416,10 @@ impl FolderRepository for FolderDbRepository {
                 return DomainError::already_exists("Folder", format!("{new_name} already exists"));
             }
             DomainError::internal_error("FolderDb", format!("rename: {e}"))
-        })?;
+        })?
+        .ok_or_else(|| DomainError::not_found("Folder", id))?;
 
-        self.get_folder(id).await
+        Self::row_to_folder(row.0, row.1, row.2, row.3, Some(row.4), row.5, row.6)
     }
 
     async fn move_folder(
@@ -448,20 +430,24 @@ impl FolderRepository for FolderDbRepository {
         // The BEFORE UPDATE trigger recomputes path/lpath for this row;
         // the AFTER UPDATE cascade trigger then batch-updates all
         // descendants in a single UPDATE using the GiST lpath index.
-        sqlx::query(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
             r#"
             UPDATE storage.folders
                SET parent_id = $1::uuid, updated_at = NOW()
              WHERE id = $2::uuid AND NOT is_trashed
+            RETURNING id::text, name, path, parent_id::text, user_id,
+                      EXTRACT(EPOCH FROM created_at)::bigint,
+                      EXTRACT(EPOCH FROM updated_at)::bigint
             "#,
         )
         .bind(new_parent_id)
         .bind(id)
-        .execute(self.pool())
+        .fetch_optional(self.pool())
         .await
-        .map_err(|e| DomainError::internal_error("FolderDb", format!("move: {e}")))?;
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("move: {e}")))?
+        .ok_or_else(|| DomainError::not_found("Folder", id))?;
 
-        self.get_folder(id).await
+        Self::row_to_folder(row.0, row.1, row.2, row.3, Some(row.4), row.5, row.6)
     }
 
     async fn delete_folder(&self, id: &str) -> Result<(), DomainError> {

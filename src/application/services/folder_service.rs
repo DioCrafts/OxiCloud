@@ -3,7 +3,6 @@ use crate::application::dtos::folder_dto::{
 };
 use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::outbound::FolderStoragePort;
-use crate::application::transactions::storage_transaction::StorageTransaction;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::services::path_service::StoragePath;
 use async_trait::async_trait;
@@ -398,52 +397,11 @@ impl FolderUseCase for FolderService {
             return Err(DomainError::not_found("Folder", id));
         }
 
-        // Create transaction for renaming
-        let mut transaction = StorageTransaction::new("rename_folder");
-
-        // Main operation: rename folder
-        // Clone all values to avoid lifetime issues
-        let folder_storage = self.folder_storage.clone();
-        let id_owned = id.to_string();
-        let name_owned = dto.name.clone();
-
-        // Create future with owned values
-        let rename_op = async move {
-            folder_storage.rename_folder(&id_owned, name_owned).await?;
-            Ok(())
-        };
-        let rollback_op = {
-            let original_name = existing_folder.name().to_string();
-            let storage = self.folder_storage.clone();
-            let id_clone = id.to_string();
-
-            async move {
-                // In case of failure, restore the original name
-                storage
-                    .rename_folder(&id_clone, original_name)
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| {
-                        DomainError::new(
-                            ErrorKind::InternalError,
-                            "Folder",
-                            format!("Failed to rollback folder rename: {}", e),
-                        )
-                    })
-            }
-        };
-
-        // Add to the transaction
-        transaction.add_operation(rename_op, rollback_op);
-
-        // Execute transaction
-        transaction.commit().await?;
-
-        // Get the renamed folder
-        let folder = self.folder_storage.get_folder(id).await.map_err(|e| {
+        // Rename folder — UPDATE RETURNING gives us the updated row directly
+        let folder = self.folder_storage.rename_folder(id, dto.name).await.map_err(|e| {
             DomainError::internal_error(
                 "FolderStorage",
-                format!("Failed to get renamed folder with ID: {}: {}", id, e),
+                format!("Failed to rename folder with ID: {}: {}", id, e),
             )
         })?;
 
@@ -495,55 +453,12 @@ impl FolderUseCase for FolderService {
             // TODO: Ideally we should verify the entire hierarchy to prevent cycles
         }
 
-        // Create transaction for moving
-        let mut transaction = StorageTransaction::new("move_folder");
-
-        // Main operation: move folder
-        // Clone all values to avoid lifetime issues
-        let folder_storage = self.folder_storage.clone();
-        let id_owned = id.to_string();
-        // Get parent ID as owned string or None
-        let parent_id_owned = dto.parent_id.as_ref().map(|p| p.to_string());
-
-        // Create future with owned values
-        let move_op = async move {
-            // Convert Option<String> to Option<&str>
-            let parent_ref = parent_id_owned.as_deref();
-            folder_storage.move_folder(&id_owned, parent_ref).await?;
-            Ok(())
-        };
-        let rollback_op = {
-            let original_parent_id = source_folder.parent_id().map(String::from);
-            let storage = self.folder_storage.clone();
-            let id_clone = id.to_string();
-
-            async move {
-                // In case of failure, restore the original location
-                storage
-                    .move_folder(&id_clone, original_parent_id.as_deref())
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| {
-                        DomainError::new(
-                            ErrorKind::InternalError,
-                            "Folder",
-                            format!("Failed to rollback folder move: {}", e),
-                        )
-                    })
-            }
-        };
-
-        // Add to the transaction
-        transaction.add_operation(move_op, rollback_op);
-
-        // Execute transaction
-        transaction.commit().await?;
-
-        // Get the moved folder
-        let folder = self.folder_storage.get_folder(id).await.map_err(|e| {
+        // Move folder — UPDATE RETURNING gives us the updated row directly
+        let parent_ref = dto.parent_id.as_deref();
+        let folder = self.folder_storage.move_folder(id, parent_ref).await.map_err(|e| {
             DomainError::internal_error(
                 "FolderStorage",
-                format!("Failed to get moved folder with ID: {}: {}", id, e),
+                format!("Failed to move folder with ID: {}: {}", id, e),
             )
         })?;
 
