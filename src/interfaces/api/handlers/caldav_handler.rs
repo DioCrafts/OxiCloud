@@ -23,6 +23,7 @@ use axum::{
 };
 use bytes::Buf;
 use percent_encoding::percent_decode_str;
+use std::fmt::Write;
 use std::sync::Arc;
 
 use crate::application::adapters::caldav_adapter::{CalDavAdapter, CalDavReportType};
@@ -694,26 +695,32 @@ fn generate_full_calendar_ical(
     calendar_name: &str,
     events: &[crate::application::dtos::calendar_dto::CalendarEventDto],
 ) -> String {
-    let mut ical = format!(
+    // Pre-estimate: ~200 bytes header + ~320 bytes per event
+    let mut buf = String::with_capacity(256 + events.len() * 320);
+    let _ = write!(
+        buf,
         "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//OxiCloud//NONSGML Calendar//EN\r\nX-WR-CALNAME:{}\r\n",
         calendar_name
     );
     for event in events {
-        ical.push_str(&generate_vevent(event));
+        write_vevent(&mut buf, event);
     }
-    ical.push_str("END:VCALENDAR\r\n");
-    ical
+    buf.push_str("END:VCALENDAR\r\n");
+    buf
 }
 
 fn generate_event_ical(event: &crate::application::dtos::calendar_dto::CalendarEventDto) -> String {
-    format!(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//OxiCloud//NONSGML Calendar//EN\r\n{}END:VCALENDAR\r\n",
-        generate_vevent(event)
-    )
+    let mut buf = String::with_capacity(512);
+    buf.push_str("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//OxiCloud//NONSGML Calendar//EN\r\n");
+    write_vevent(&mut buf, event);
+    buf.push_str("END:VCALENDAR\r\n");
+    buf
 }
 
-fn generate_vevent(event: &crate::application::dtos::calendar_dto::CalendarEventDto) -> String {
-    let mut vevent = format!(
+/// Writes a VEVENT block directly into `buf` — zero intermediate allocations.
+fn write_vevent(buf: &mut String, event: &crate::application::dtos::calendar_dto::CalendarEventDto) {
+    let _ = write!(
+        buf,
         "BEGIN:VEVENT\r\nUID:{}\r\nSUMMARY:{}\r\nDTSTART:{}\r\nDTEND:{}\r\n",
         event.ical_uid,
         event.summary.replace('\n', "\\n"),
@@ -721,21 +728,21 @@ fn generate_vevent(event: &crate::application::dtos::calendar_dto::CalendarEvent
         event.end_time.format("%Y%m%dT%H%M%SZ"),
     );
     if let Some(ref desc) = event.description {
-        vevent.push_str(&format!("DESCRIPTION:{}\r\n", desc.replace('\n', "\\n")));
+        let _ = write!(buf, "DESCRIPTION:{}\r\n", desc.replace('\n', "\\n"));
     }
     if let Some(ref loc) = event.location {
-        vevent.push_str(&format!("LOCATION:{}\r\n", loc));
+        let _ = write!(buf, "LOCATION:{}\r\n", loc);
     }
     if let Some(ref rrule) = event.rrule {
-        vevent.push_str(&format!("RRULE:{}\r\n", rrule));
+        let _ = write!(buf, "RRULE:{}\r\n", rrule);
     }
-    vevent.push_str(&format!(
+    let _ = write!(
+        buf,
         "DTSTAMP:{}\r\nCREATED:{}\r\nLAST-MODIFIED:{}\r\nEND:VEVENT\r\n",
         event.updated_at.format("%Y%m%dT%H%M%SZ"),
         event.created_at.format("%Y%m%dT%H%M%SZ"),
         event.updated_at.format("%Y%m%dT%H%M%SZ"),
-    ));
-    vevent
+    );
 }
 
 // ─── DELETE ──────────────────────────────────────────────────────────
