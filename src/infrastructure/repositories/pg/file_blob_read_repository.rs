@@ -532,10 +532,10 @@ impl FileReadPort for FileBlobReadRepository {
         }
 
         if let Some(name) = &criteria.name_contains
-            && !name.is_empty()
+            && name.len() >= 3
         {
             bind_idx += 1;
-            conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
+            conditions.push(format!("fi.name ILIKE ${bind_idx}"));
         }
 
         let where_clause = conditions.join(" AND ");
@@ -578,9 +578,9 @@ impl FileReadPort for FileBlobReadRepository {
             query = query.bind(fid);
         }
         if let Some(name) = &criteria.name_contains
-            && !name.is_empty()
+            && name.len() >= 3
         {
-            query = query.bind(format!("%{}%", name.to_lowercase()));
+            query = query.bind(format!("%{}%", name));
         }
         query = query.bind(limit).bind(offset);
 
@@ -652,10 +652,10 @@ impl FileReadPort for FileBlobReadRepository {
         );
 
         if let Some(name) = &criteria.name_contains
-            && !name.is_empty()
+            && name.len() >= 3
         {
             bind_idx += 1;
-            conditions.push(format!("LOWER(fi.name) LIKE ${bind_idx}"));
+            conditions.push(format!("fi.name ILIKE ${bind_idx}"));
         }
         if let Some(types) = &criteria.file_types
             && !types.is_empty()
@@ -737,9 +737,9 @@ impl FileReadPort for FileBlobReadRepository {
         .bind(root_id);
 
         if let Some(name) = &criteria.name_contains
-            && !name.is_empty()
+            && name.len() >= 3
         {
-            query = query.bind(format!("%{}%", name.to_lowercase()));
+            query = query.bind(format!("%{}%", name));
         }
         if let Some(types) = &criteria.file_types
             && !types.is_empty()
@@ -807,9 +807,8 @@ impl FileReadPort for FileBlobReadRepository {
         query: &str,
         limit: usize,
     ) -> Result<Vec<File>, DomainError> {
-        let pattern = format!("%{}%", query.to_lowercase());
+        let pattern = format!("%{}%", query);
         let limit_i64 = limit as i64;
-        let query_lower = query.to_lowercase();
 
         let rows: Vec<(
             String,
@@ -833,10 +832,10 @@ impl FileReadPort for FileBlobReadRepository {
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid
                    AND NOT fi.is_trashed
-                   AND LOWER(fi.name) LIKE $2
+                   AND fi.name ILIKE $2
                  ORDER BY CASE
-                            WHEN LOWER(fi.name) = $3 THEN 0
-                            WHEN LOWER(fi.name) LIKE $3 || '%' THEN 1
+                            WHEN fi.name ILIKE $3 THEN 0
+                            WHEN fi.name ILIKE $3 || '%' THEN 1
                             ELSE 2
                           END,
                           fi.name
@@ -845,7 +844,7 @@ impl FileReadPort for FileBlobReadRepository {
             )
             .bind(fid)
             .bind(&pattern)
-            .bind(&query_lower)
+            .bind(query)
             .bind(limit_i64)
             .fetch_all(self.pool.as_ref())
             .await
@@ -861,10 +860,10 @@ impl FileReadPort for FileBlobReadRepository {
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL
                    AND NOT fi.is_trashed
-                   AND LOWER(fi.name) LIKE $1
+                   AND fi.name ILIKE $1
                  ORDER BY CASE
-                            WHEN LOWER(fi.name) = $2 THEN 0
-                            WHEN LOWER(fi.name) LIKE $2 || '%' THEN 1
+                            WHEN fi.name ILIKE $2 THEN 0
+                            WHEN fi.name ILIKE $2 || '%' THEN 1
                             ELSE 2
                           END,
                           fi.name
@@ -872,7 +871,7 @@ impl FileReadPort for FileBlobReadRepository {
                 "#,
             )
             .bind(&pattern)
-            .bind(&query_lower)
+            .bind(query)
             .bind(limit_i64)
             .fetch_all(self.pool.as_ref())
             .await
