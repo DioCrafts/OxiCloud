@@ -3,11 +3,9 @@ use crate::application::dtos::calendar_dto::{
     UpdateCalendarDto, UpdateEventDto,
 };
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 /// Port for external calendar storage mechanisms
-#[async_trait]
 pub trait CalendarStoragePort: Send + Sync + 'static {
     // Calendar operations
     async fn create_calendar(
@@ -111,7 +109,6 @@ pub trait CalendarStoragePort: Send + Sync + 'static {
 /// All methods require an explicit `user_id` parameter for authorization.
 /// The CalDAV protocol handler extracts the user identity from JWT claims
 /// and passes it through.
-#[async_trait]
 pub trait CalendarUseCase: Send + Sync + 'static {
     // Calendar operations
     async fn create_calendar(

@@ -1,6 +1,5 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::user::{User, UserRole};
-use async_trait::async_trait;
 
 #[derive(Debug, thiserror::Error)]
 pub enum UserRepositoryError {
@@ -41,7 +40,6 @@ impl From<UserRepositoryError> for DomainError {
     }
 }
 
-#[async_trait]
 pub trait UserRepository: Send + Sync + 'static {
     /// Creates a new user
     async fn create_user(&self, user: User) -> UserRepositoryResult<User>;

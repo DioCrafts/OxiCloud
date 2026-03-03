@@ -10,6 +10,7 @@ use tracing::{error, info};
 
 use crate::application::ports::recent_ports::RecentItemsUseCase;
 use crate::interfaces::middleware::auth::AuthUser;
+use crate::application::services::recent_service::RecentService;
 
 /// Query parameters for getting recent items
 #[derive(Deserialize)]
@@ -20,7 +21,7 @@ pub struct GetRecentParams {
 
 /// Get user's recent items
 pub async fn get_recent_items(
-    State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
     Query(params): Query<GetRecentParams>,
 ) -> impl IntoResponse {
@@ -46,7 +47,7 @@ pub async fn get_recent_items(
 
 /// Record access to an item
 pub async fn record_item_access(
-    State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -92,7 +93,7 @@ pub async fn record_item_access(
 
 /// Remove an item from recents
 pub async fn remove_from_recent(
-    State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -138,7 +139,7 @@ pub async fn remove_from_recent(
 
 /// Clear all recent items
 pub async fn clear_recent_items(
-    State(recent_service): State<Arc<dyn RecentItemsUseCase>>,
+    State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
 ) -> impl IntoResponse {
     let user_id = &auth_user.id;

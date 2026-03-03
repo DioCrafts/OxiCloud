@@ -1,6 +1,5 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::session::Session;
-use async_trait::async_trait;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionRepositoryError {
@@ -29,7 +28,6 @@ impl From<SessionRepositoryError> for DomainError {
     }
 }
 
-#[async_trait]
 pub trait SessionRepository: Send + Sync + 'static {
     /// Creates a new session
     async fn create_session(&self, session: Session) -> SessionRepositoryResult<Session>;

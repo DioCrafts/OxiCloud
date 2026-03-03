@@ -18,6 +18,8 @@ use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState as GlobalAppState;
 use crate::common::errors::ErrorKind;
 use crate::interfaces::middleware::auth::AuthUser;
+use crate::application::ports::file_ports::FileRetrievalUseCase;
+use crate::application::ports::trash_ports::TrashUseCase;
 
 type AppState = Arc<FolderService>;
 
@@ -423,7 +425,17 @@ impl FolderHandler {
                 tracing::info!("Preparing ZIP for folder: {} ({})", folder.name, id);
 
                 // Use ZIP service from DI container
-                let zip_service = &state.core.zip_service;
+                let zip_service = match &state.core.zip_service {
+                    Some(svc) => svc,
+                    None => {
+                        tracing::error!("ZipService not initialized");
+                        return (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": "ZipService not initialized" })),
+                        )
+                            .into_response();
+                    }
+                };
 
                 // Create the ZIP archive (written to a temp file, O(1) RAM)
                 match zip_service.create_folder_zip(&id, &folder.name).await {

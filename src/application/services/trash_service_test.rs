@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::Stream;
@@ -40,7 +39,6 @@ impl MockTrashRepository {
     }
 }
 
-#[async_trait]
 impl TrashRepository for MockTrashRepository {
     async fn add_to_trash(&self, item: &TrashedItem) -> Result<()> {
         let mut items = self.trash_items.lock().unwrap();
@@ -135,7 +133,6 @@ impl MockFileRepository {
     }
 }
 
-#[async_trait]
 impl FileReadPort for MockFileRepository {
     async fn get_file(&self, id: &str) -> std::result::Result<File, DomainError> {
         let files = self.files.lock().unwrap();
@@ -216,7 +213,6 @@ impl FileReadPort for MockFileRepository {
     }
 }
 
-#[async_trait]
 impl FileWritePort for MockFileRepository {
     async fn save_file_from_temp(
         &self,
@@ -350,7 +346,6 @@ impl MockFolderRepository {
     }
 }
 
-#[async_trait]
 impl FolderRepository for MockFolderRepository {
     async fn create_folder(
         &self,
@@ -514,8 +509,8 @@ mod tests {
 
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<dyn FileReadPort>,
-            file_repo.clone() as Arc<dyn FileWritePort>,
+            file_repo.clone() as Arc<FileBlobReadRepository>,
+            file_repo.clone() as Arc<FileBlobWriteRepository>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -588,8 +583,8 @@ mod tests {
 
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<dyn FileReadPort>,
-            file_repo.clone() as Arc<dyn FileWritePort>,
+            file_repo.clone() as Arc<FileBlobReadRepository>,
+            file_repo.clone() as Arc<FileBlobWriteRepository>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -653,8 +648,8 @@ mod tests {
 
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<dyn FileReadPort>,
-            file_repo.clone() as Arc<dyn FileWritePort>,
+            file_repo.clone() as Arc<FileBlobReadRepository>,
+            file_repo.clone() as Arc<FileBlobWriteRepository>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -723,8 +718,8 @@ mod tests {
 
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<dyn FileReadPort>,
-            file_repo.clone() as Arc<dyn FileWritePort>,
+            file_repo.clone() as Arc<FileBlobReadRepository>,
+            file_repo.clone() as Arc<FileBlobWriteRepository>,
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -792,8 +787,8 @@ mod tests {
 
         let service = TrashService::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<dyn FileReadPort>,
-            file_repo.clone() as Arc<dyn FileWritePort>,
+            file_repo.clone() as Arc<FileBlobReadRepository>,
+            file_repo.clone() as Arc<FileBlobWriteRepository>,
             folder_repo.clone(),
             30, // 30 days retention
         );

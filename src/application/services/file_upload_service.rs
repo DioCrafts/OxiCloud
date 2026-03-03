@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -8,6 +7,9 @@ use crate::application::ports::file_ports::FileUploadUseCase;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::common::errors::DomainError;
 use tracing::{debug, info, warn};
+use crate::infrastructure::repositories::pg::FileBlobReadRepository;
+use crate::infrastructure::repositories::pg::FileBlobWriteRepository;
+use crate::application::services::storage_usage_service::StorageUsageService;
 
 /// Helper function to extract username from folder path string.
 /// e.g. "My Folder - user1/subfolder/file.txt" → "user1"
@@ -42,17 +44,17 @@ fn extract_username_from_path(path: &str) -> Option<String> {
 /// Peak RAM usage during any upload: ~256 KB (streaming hash) regardless of file size.
 pub struct FileUploadService {
     /// Write port — handles save, streaming, deferred registration
-    file_write: Arc<dyn FileWritePort>,
+    file_write: Arc<FileBlobWriteRepository>,
     /// Read port — needed for WebDAV create_file / update_file
-    file_read: Option<Arc<dyn FileReadPort>>,
+    file_read: Option<Arc<FileBlobReadRepository>>,
     /// Optional storage usage tracking
     storage_usage_service:
-        Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>>,
+        Option<Arc<StorageUsageService>>,
 }
 
 impl FileUploadService {
     /// Constructor with write port only (minimal).
-    pub fn new(file_repository: Arc<dyn FileWritePort>) -> Self {
+    pub fn new(file_repository: Arc<FileBlobWriteRepository>) -> Self {
         Self {
             file_write: file_repository,
             file_read: None,
@@ -62,8 +64,8 @@ impl FileUploadService {
 
     /// Constructor for blob-storage model: write + read ports.
     pub fn new_with_read(
-        file_write: Arc<dyn FileWritePort>,
-        file_read: Arc<dyn FileReadPort>,
+        file_write: Arc<FileBlobWriteRepository>,
+        file_read: Arc<FileBlobReadRepository>,
     ) -> Self {
         Self {
             file_write,
@@ -75,7 +77,7 @@ impl FileUploadService {
     /// Configures the storage usage service
     pub fn with_storage_usage_service(
         mut self,
-        storage_usage_service: Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>,
+        storage_usage_service: Arc<StorageUsageService>,
     ) -> Self {
         self.storage_usage_service = Some(storage_usage_service);
         self
@@ -106,7 +108,6 @@ impl FileUploadService {
     }
 }
 
-#[async_trait]
 impl FileUploadUseCase for FileUploadService {
     /// Streaming upload from a temp file on disk.
     ///

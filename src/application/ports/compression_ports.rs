@@ -5,7 +5,6 @@
 //! compression implementations (gzip, zstd, etc.).
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 
 /// Compression level settings for file compression operations.
 ///
@@ -27,7 +26,6 @@ pub enum CompressionLevel {
 /// Implementations of this trait provide the actual compression logic
 /// (e.g., gzip, zstd) while the application layer remains agnostic
 /// of the specific algorithm used.
-#[async_trait]
 pub trait CompressionPort: Send + Sync + 'static {
     /// Compress data in memory.
     async fn compress_data(

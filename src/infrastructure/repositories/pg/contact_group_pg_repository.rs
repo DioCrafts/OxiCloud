@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value as JsonValue;
 use sqlx::{PgPool, Row, types::Uuid};
@@ -24,7 +23,6 @@ impl ContactGroupPgRepository {
     }
 }
 
-#[async_trait]
 impl ContactGroupRepository for ContactGroupPgRepository {
     async fn create_group(&self, group: ContactGroup) -> ContactRepositoryResult<ContactGroup> {
         sqlx::query(

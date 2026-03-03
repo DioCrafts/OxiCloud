@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -63,7 +62,6 @@ impl FileSystemI18nService {
     }
 }
 
-#[async_trait]
 impl I18nService for FileSystemI18nService {
     async fn translate(&self, key: &str, locale: Locale) -> I18nResult<String> {
         // Check if translations are cached

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use tracing::error;
@@ -19,7 +18,6 @@ impl FavoritesPgRepository {
     }
 }
 
-#[async_trait]
 impl FavoritesRepositoryPort for FavoritesPgRepository {
     async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>> {
         let user_uuid = Uuid::parse_str(user_id)?;

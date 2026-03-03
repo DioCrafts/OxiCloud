@@ -3,7 +3,6 @@ use crate::domain::entities::app_password::AppPassword;
 use crate::domain::entities::device_code::DeviceCode;
 use crate::domain::entities::session::Session;
 use crate::domain::entities::user::User;
-use async_trait::async_trait;
 
 // ============================================================================
 // Cryptography Ports - Extracted from Domain to maintain Clean Architecture
@@ -16,7 +15,6 @@ use async_trait::async_trait;
 ///
 /// Methods are async because implementations (e.g. Argon2) are CPU-intensive
 /// and must run on a blocking thread pool to avoid starving Tokio workers.
-#[async_trait]
 pub trait PasswordHasherPort: Send + Sync + 'static {
     /// Hash a plain text password
     async fn hash_password(&self, password: &str) -> Result<String, DomainError>;
@@ -69,7 +67,6 @@ pub trait TokenServicePort: Send + Sync + 'static {
 // Storage Ports
 // ============================================================================
 
-#[async_trait]
 pub trait UserStoragePort: Send + Sync + 'static {
     /// Creates a new user
     async fn create_user(&self, user: User) -> Result<User, DomainError>;
@@ -153,7 +150,6 @@ pub struct OidcIdClaims {
 }
 
 /// Port for OIDC operations — implemented in infrastructure layer
-#[async_trait]
 pub trait OidcServicePort: Send + Sync + 'static {
     /// Get the authorization URL for redirecting the user to the IdP.
     /// Includes PKCE code_challenge (S256) and nonce for ID token binding.
@@ -187,7 +183,6 @@ pub trait OidcServicePort: Send + Sync + 'static {
     fn provider_name(&self) -> &str;
 }
 
-#[async_trait]
 pub trait SessionStoragePort: Send + Sync + 'static {
     /// Creates a new session
     async fn create_session(&self, session: Session) -> Result<Session, DomainError>;
@@ -209,7 +204,6 @@ pub trait SessionStoragePort: Send + Sync + 'static {
 // Device Authorization Grant Port (RFC 8628)
 // ============================================================================
 
-#[async_trait]
 pub trait DeviceCodeStoragePort: Send + Sync + 'static {
     /// Persist a new device code flow
     async fn create_device_code(&self, device_code: DeviceCode) -> Result<DeviceCode, DomainError>;
@@ -238,7 +232,6 @@ pub trait DeviceCodeStoragePort: Send + Sync + 'static {
 // ============================================================================
 
 /// Storage port for application-specific passwords (HTTP Basic Auth for DAV clients).
-#[async_trait]
 pub trait AppPasswordStoragePort: Send + Sync + 'static {
     /// Persist a new app password (hash already computed).
     async fn create(&self, app_password: AppPassword) -> Result<AppPassword, DomainError>;

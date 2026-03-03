@@ -35,6 +35,7 @@ use crate::application::ports::calendar_ports::CalendarUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
+use crate::application::services::calendar_service::CalendarService;
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 
@@ -127,7 +128,7 @@ fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 
-fn get_calendar_service(state: &AppState) -> Result<&Arc<dyn CalendarUseCase>, AppError> {
+fn get_calendar_service(state: &AppState) -> Result<&Arc<CalendarService>, AppError> {
     state.calendar_use_case.as_ref().ok_or_else(|| {
         AppError::new(
             StatusCode::NOT_IMPLEMENTED,

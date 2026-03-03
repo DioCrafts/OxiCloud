@@ -2,7 +2,6 @@ use anyhow::Result;
 use sqlx::PgPool;
 use std::sync::Arc;
 
-use crate::application::ports::auth_ports::TokenServicePort;
 use crate::application::services::auth_application_service::AuthApplicationService;
 use crate::application::services::folder_service::FolderService;
 use crate::common::config::AppConfig;
@@ -18,7 +17,7 @@ pub async fn create_auth_services(
     folder_service: Option<Arc<FolderService>>,
 ) -> Result<AuthServices> {
     // Create JWT token service (TokenServicePort implementation)
-    let token_service: Arc<dyn TokenServicePort> = Arc::new(JwtTokenService::new(
+    let token_service: Arc<JwtTokenService> = Arc::new(JwtTokenService::new(
         config.auth.jwt_secret.clone(),
         config.auth.access_token_expiry_secs,
         config.auth.refresh_token_expiry_secs,

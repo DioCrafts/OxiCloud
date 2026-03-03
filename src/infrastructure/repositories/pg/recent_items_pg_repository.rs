@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
 use tracing::error;
@@ -19,7 +18,6 @@ impl RecentItemsPgRepository {
     }
 }
 
-#[async_trait]
 impl RecentItemsRepositoryPort for RecentItemsPgRepository {
     async fn get_recent_items(&self, user_id: &str, limit: i32) -> Result<Vec<RecentItemDto>> {
         let user_uuid = Uuid::parse_str(user_id)?;

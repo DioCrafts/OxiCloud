@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use futures::future::BoxFuture;
 use sqlx::{PgPool, Row};
@@ -39,7 +38,6 @@ impl SessionPgRepository {
     }
 }
 
-#[async_trait]
 impl SessionRepository for SessionPgRepository {
     /// Creates a new session using a transaction
     async fn create_session(&self, session: Session) -> SessionRepositoryResult<Session> {
@@ -291,7 +289,6 @@ impl SessionRepository for SessionPgRepository {
 }
 
 // Implementation of the storage port for the application layer
-#[async_trait]
 impl SessionStoragePort for SessionPgRepository {
     async fn create_session(&self, session: Session) -> Result<Session, DomainError> {
         SessionRepository::create_session(self, session)

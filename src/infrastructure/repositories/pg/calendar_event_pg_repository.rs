@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
@@ -19,7 +18,6 @@ impl CalendarEventPgRepository {
     }
 }
 
-#[async_trait]
 impl CalendarEventRepository for CalendarEventPgRepository {
     async fn create_event(
         &self,

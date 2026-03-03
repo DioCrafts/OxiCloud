@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::result::Result;
 use uuid::Uuid;
 
@@ -7,7 +6,6 @@ use crate::domain::entities::contact::AddressBook;
 
 pub type AddressBookRepositoryResult<T> = Result<T, DomainError>;
 
-#[async_trait]
 pub trait AddressBookRepository: Send + Sync + 'static {
     async fn create_address_book(
         &self,

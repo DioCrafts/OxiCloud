@@ -1,15 +1,18 @@
-use async_trait::async_trait;
 use std::sync::Arc;
 use tracing::{debug, error, info, instrument};
 use uuid::Uuid;
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
-use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::errors::{DomainError, ErrorKind, Result};
 use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
 use crate::domain::repositories::trash_repository::TrashRepository;
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::infrastructure::repositories::pg::trash_db_repository::TrashDbRepository;
+use crate::domain::repositories::folder_repository::FolderRepository;
 
 /**
  * Application service for trash operations.
@@ -26,16 +29,16 @@ use crate::domain::repositories::trash_repository::TrashRepository;
  */
 pub struct TrashService {
     /// Repository for trash-specific operations like listing and retrieving trashed items
-    trash_repository: Arc<dyn TrashRepository>,
+    trash_repository: Arc<TrashDbRepository>,
 
     /// Port for file read operations (get file metadata)
-    file_read_port: Arc<dyn FileReadPort>,
+    file_read_port: Arc<FileBlobReadRepository>,
 
     /// Port for file write operations (trash, restore, delete)
-    file_write_port: Arc<dyn FileWritePort>,
+    file_write_port: Arc<FileBlobWriteRepository>,
 
     /// Port for folder operations (get folder, trash, restore, delete)
-    folder_storage_port: Arc<dyn FolderStoragePort>,
+    folder_storage_port: Arc<FolderDbRepository>,
 
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
@@ -43,10 +46,10 @@ pub struct TrashService {
 
 impl TrashService {
     pub fn new(
-        trash_repository: Arc<dyn TrashRepository>,
-        file_read_port: Arc<dyn FileReadPort>,
-        file_write_port: Arc<dyn FileWritePort>,
-        folder_storage_port: Arc<dyn FolderStoragePort>,
+        trash_repository: Arc<TrashDbRepository>,
+        file_read_port: Arc<FileBlobReadRepository>,
+        file_write_port: Arc<FileBlobWriteRepository>,
+        folder_storage_port: Arc<FolderDbRepository>,
         retention_days: u32,
     ) -> Self {
         Self {
@@ -118,7 +121,6 @@ impl TrashService {
     }
 }
 
-#[async_trait]
 impl TrashUseCase for TrashService {
     #[instrument(skip(self))]
     async fn get_trash_items(&self, user_id: &str) -> Result<Vec<TrashedItemDto>> {

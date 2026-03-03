@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::result::Result;
 use uuid::Uuid;
 
@@ -7,7 +6,6 @@ use crate::domain::entities::contact::{Contact, ContactGroup};
 
 pub type ContactRepositoryResult<T> = Result<T, DomainError>;
 
-#[async_trait]
 pub trait ContactRepository: Send + Sync + 'static {
     async fn create_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact>;
     async fn update_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact>;
@@ -32,7 +30,6 @@ pub trait ContactRepository: Send + Sync + 'static {
     ) -> ContactRepositoryResult<Vec<Contact>>;
 }
 
-#[async_trait]
 pub trait ContactGroupRepository: Send + Sync + 'static {
     async fn create_group(&self, group: ContactGroup) -> ContactRepositoryResult<ContactGroup>;
     async fn update_group(&self, group: ContactGroup) -> ContactRepositoryResult<ContactGroup>;

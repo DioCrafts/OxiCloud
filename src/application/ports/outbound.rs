@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::path::PathBuf;
 
 use crate::common::errors::DomainError;
@@ -10,7 +9,6 @@ pub use crate::domain::repositories::folder_repository::FolderRepository;
 use super::storage_ports::{FileReadPort, FileWritePort};
 
 /// Secondary port for storage operations
-#[async_trait]
 pub trait StoragePort: Send + Sync + 'static {
     /// Resolves a domain path to a physical path
     fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf;

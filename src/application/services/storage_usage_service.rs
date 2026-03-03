@@ -1,11 +1,11 @@
 use crate::application::ports::auth_ports::UserStoragePort;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::task;
 use tracing::{debug, error, info};
+use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /**
  * Service for managing and updating user storage usage statistics.
@@ -18,12 +18,12 @@ use tracing::{debug, error, info};
  */
 pub struct StorageUsageService {
     pool: Arc<PgPool>,
-    user_repository: Arc<dyn UserStoragePort>,
+    user_repository: Arc<UserPgRepository>,
 }
 
 impl StorageUsageService {
     /// Creates a new storage usage service
-    pub fn new(pool: Arc<PgPool>, user_repository: Arc<dyn UserStoragePort>) -> Self {
+    pub fn new(pool: Arc<PgPool>, user_repository: Arc<UserPgRepository>) -> Self {
         Self {
             pool,
             user_repository,
@@ -111,7 +111,6 @@ impl StorageUsageService {
  * Implementation of the StorageUsagePort trait to expose storage usage services
  * to the application layer.
  */
-#[async_trait]
 impl StorageUsagePort for StorageUsageService {
     async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError> {
         StorageUsageService::update_user_storage_usage(self, user_id).await

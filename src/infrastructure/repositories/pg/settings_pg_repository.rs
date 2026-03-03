@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,7 +15,6 @@ impl SettingsPgRepository {
     }
 }
 
-#[async_trait]
 impl SettingsRepository for SettingsPgRepository {
     async fn get(&self, key: &str) -> Result<Option<String>, DomainError> {
         let row =

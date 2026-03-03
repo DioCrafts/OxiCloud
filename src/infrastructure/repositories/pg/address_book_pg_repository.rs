@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
@@ -19,7 +18,6 @@ impl AddressBookPgRepository {
     }
 }
 
-#[async_trait]
 impl AddressBookRepository for AddressBookPgRepository {
     async fn create_address_book(
         &self,

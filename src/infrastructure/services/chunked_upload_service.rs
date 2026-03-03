@@ -15,7 +15,6 @@
 //! 3. HEAD /api/uploads/:id  → Check progress
 //! 4. POST /api/uploads/:id/complete → Finalize and assemble
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
@@ -755,7 +754,6 @@ impl ChunkedUploadService {
 
 // ─── Port implementation ─────────────────────────────────────────────────────
 
-#[async_trait]
 impl ChunkedUploadPort for ChunkedUploadService {
     async fn create_session(
         &self,

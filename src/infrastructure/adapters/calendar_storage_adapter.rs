@@ -4,7 +4,6 @@
 //! the `CalendarRepository` and `CalendarEventRepository` domain repositories.
 //! It bridges the gap between the application layer and the infrastructure layer.
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,18 +19,20 @@ use crate::domain::entities::calendar::Calendar;
 use crate::domain::entities::calendar_event::CalendarEvent;
 use crate::domain::repositories::calendar_event_repository::CalendarEventRepository;
 use crate::domain::repositories::calendar_repository::CalendarRepository;
+use crate::infrastructure::repositories::pg::CalendarEventPgRepository;
+use crate::infrastructure::repositories::pg::CalendarPgRepository;
 
 /// Adapter that implements CalendarStoragePort using domain repositories
 pub struct CalendarStorageAdapter {
-    calendar_repository: Arc<dyn CalendarRepository>,
-    event_repository: Arc<dyn CalendarEventRepository>,
+    calendar_repository: Arc<CalendarPgRepository>,
+    event_repository: Arc<CalendarEventPgRepository>,
 }
 
 impl CalendarStorageAdapter {
     /// Creates a new CalendarStorageAdapter with the given repositories
     pub fn new(
-        calendar_repository: Arc<dyn CalendarRepository>,
-        event_repository: Arc<dyn CalendarEventRepository>,
+        calendar_repository: Arc<CalendarPgRepository>,
+        event_repository: Arc<CalendarEventPgRepository>,
     ) -> Self {
         Self {
             calendar_repository,
@@ -40,7 +41,6 @@ impl CalendarStorageAdapter {
     }
 }
 
-#[async_trait]
 impl CalendarStoragePort for CalendarStorageAdapter {
     // Calendar operations
 

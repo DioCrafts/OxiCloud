@@ -7,11 +7,9 @@ use crate::application::dtos::contact_dto::{
     GroupMembershipDto, UpdateContactDto, UpdateContactGroupDto,
 };
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 
 pub type CardDavRepositoryError = DomainError;
 
-#[async_trait]
 pub trait AddressBookUseCase: Send + Sync + 'static {
     // Address Book operations
     async fn create_address_book(
@@ -57,7 +55,6 @@ pub trait AddressBookUseCase: Send + Sync + 'static {
     ) -> Result<Vec<(String, bool)>, DomainError>;
 }
 
-#[async_trait]
 pub trait ContactUseCase: Send + Sync + 'static {
     // Contact operations
     async fn create_contact(&self, dto: CreateContactDto) -> Result<ContactDto, DomainError>;

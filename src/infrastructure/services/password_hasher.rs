@@ -12,7 +12,6 @@
 
 use argon2::password_hash::SaltString;
 use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
-use async_trait::async_trait;
 use rand_core::OsRng;
 
 use crate::application::ports::auth_ports::PasswordHasherPort;
@@ -57,7 +56,6 @@ impl Argon2PasswordHasher {
     }
 }
 
-#[async_trait]
 impl PasswordHasherPort for Argon2PasswordHasher {
     async fn hash_password(&self, password: &str) -> Result<String, DomainError> {
         let pwd = password.to_owned();

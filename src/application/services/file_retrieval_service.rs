@@ -1,16 +1,16 @@
-use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{Stream, StreamExt};
 use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
-use crate::application::ports::cache_ports::{ContentCachePort, WriteBehindCachePort};
 use crate::application::ports::file_ports::{FileRetrievalUseCase, OptimizedFileContent};
 use crate::application::ports::storage_ports::FileReadPort;
-use crate::application::ports::transcode_ports::{ImageTranscodePort, OutputFormat};
 use crate::common::errors::DomainError;
 use tracing::{debug, info};
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+use crate::infrastructure::services::file_content_cache::FileContentCache;
+use crate::infrastructure::services::image_transcode_service::{ImageTranscodeService, OutputFormat};
 
 /// Threshold below which files are served from RAM cache (10 MB).
 const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
@@ -23,48 +23,29 @@ const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
 /// - Tier 2: Memory-mapped I/O (10–100 MB)
 /// - Tier 3: Streaming (≥100 MB)
 pub struct FileRetrievalService {
-    file_read: Arc<dyn FileReadPort>,
-    write_behind: Option<Arc<dyn WriteBehindCachePort>>,
-    content_cache: Option<Arc<dyn ContentCachePort>>,
-    transcode: Option<Arc<dyn ImageTranscodePort>>,
+    file_read: Arc<FileBlobReadRepository>,
+    content_cache: Option<Arc<FileContentCache>>,
+    transcode: Option<Arc<ImageTranscodeService>>,
 }
 
 impl FileRetrievalService {
     /// Backward-compatible constructor (simple pass-through).
-    pub fn new(file_repository: Arc<dyn FileReadPort>) -> Self {
+    pub fn new(file_repository: Arc<FileBlobReadRepository>) -> Self {
         Self {
             file_read: file_repository,
-            write_behind: None,
             content_cache: None,
             transcode: None,
         }
     }
 
-    /// Full constructor with all infrastructure ports.
-    pub fn new_full(
-        file_read: Arc<dyn FileReadPort>,
-        write_behind: Arc<dyn WriteBehindCachePort>,
-        content_cache: Arc<dyn ContentCachePort>,
-        transcode: Arc<dyn ImageTranscodePort>,
-    ) -> Self {
-        Self {
-            file_read,
-            write_behind: Some(write_behind),
-            content_cache: Some(content_cache),
-            transcode: Some(transcode),
-        }
-    }
-
     /// Constructor for blob-storage model: read + content cache + transcode.
-    /// No write-behind needed — dedup handled at the repository layer.
     pub fn new_with_cache(
-        file_read: Arc<dyn FileReadPort>,
-        content_cache: Arc<dyn ContentCachePort>,
-        transcode: Arc<dyn ImageTranscodePort>,
+        file_read: Arc<FileBlobReadRepository>,
+        content_cache: Arc<FileContentCache>,
+        transcode: Arc<ImageTranscodeService>,
     ) -> Self {
         Self {
             file_read,
-            write_behind: None,
             content_cache: Some(content_cache),
             transcode: Some(transcode),
         }
@@ -85,7 +66,7 @@ impl FileRetrievalService {
             return None;
         }
         let transcode = self.transcode.as_ref()?;
-        if !transcode.should_transcode(mime, file_size) {
+        if !ImageTranscodeService::should_transcode(mime, file_size) {
             return None;
         }
         let format = OutputFormat::WebP;
@@ -120,37 +101,6 @@ impl FileRetrievalService {
         let file_name = dto.name.clone();
         let modified_at = dto.modified_at;
         let do_transcode = accept_webp && !prefer_original;
-
-        // ── Tier 0: Write-behind cache ───────────────────────
-        if let Some(wb) = &self.write_behind
-            && let Some(pending) = wb.get_pending(id).await
-        {
-            debug!(
-                "⚡ TIER 0 Write-Behind HIT: {} ({} bytes)",
-                file_name,
-                pending.len()
-            );
-            let (data, mime) = if do_transcode {
-                if let Some((t, m)) = self
-                    .try_transcode(id, &pending, &mime_type, file_size, true)
-                    .await
-                {
-                    (t, m)
-                } else {
-                    (pending, mime_type.clone())
-                }
-            } else {
-                (pending, mime_type.clone())
-            };
-            return Ok((
-                dto,
-                OptimizedFileContent::Bytes {
-                    data,
-                    mime_type: mime,
-                    was_transcoded: do_transcode,
-                },
-            ));
-        }
 
         // ── Tier 1: Hot cache + transcode (<10 MB) ──────────
         if file_size < CACHE_THRESHOLD {
@@ -243,7 +193,6 @@ impl FileRetrievalService {
     }
 }
 
-#[async_trait]
 impl FileRetrievalUseCase for FileRetrievalService {
     async fn get_file(&self, id: &str) -> Result<FileDto, DomainError> {
         let file = self.file_read.get_file(id).await?;

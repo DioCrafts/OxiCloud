@@ -8,7 +8,6 @@
 //! Concrete implementations (filesystem, PostgreSQL, S3, etc.) live in
 //! the infrastructure layer.
 
-use async_trait::async_trait;
 
 use crate::common::errors::DomainError;
 use crate::domain::entities::folder::Folder;
@@ -18,7 +17,6 @@ use crate::domain::services::path_service::StoragePath;
 ///
 /// Defines the CRUD and management operations required for
 /// the Folder entity in the storage system.
-#[async_trait]
 pub trait FolderRepository: Send + Sync + 'static {
     /// Creates a new folder
     async fn create_folder(

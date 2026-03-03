@@ -1,22 +1,22 @@
 use crate::application::dtos::recent_dto::RecentItemDto;
 use crate::application::ports::recent_ports::{RecentItemsRepositoryPort, RecentItemsUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
-use async_trait::async_trait;
 use std::sync::Arc;
 use tracing::info;
+use crate::infrastructure::repositories::pg::RecentItemsPgRepository;
 
 /// Implementation of the use case for managing recent items.
 ///
 /// Depends on `RecentItemsRepositoryPort` (outbound port) instead
 /// of accessing `PgPool` directly, following the hexagonal architecture.
 pub struct RecentService {
-    repo: Arc<dyn RecentItemsRepositoryPort>,
+    repo: Arc<RecentItemsPgRepository>,
     max_recent_items: i32,
 }
 
 impl RecentService {
     /// Create a new recent items service
-    pub fn new(repo: Arc<dyn RecentItemsRepositoryPort>, max_recent_items: i32) -> Self {
+    pub fn new(repo: Arc<RecentItemsPgRepository>, max_recent_items: i32) -> Self {
         Self {
             repo,
             max_recent_items: max_recent_items.clamp(1, 100),
@@ -24,7 +24,6 @@ impl RecentService {
     }
 }
 
-#[async_trait]
 impl RecentItemsUseCase for RecentService {
     /// Get recent items for a user
     async fn get_recent_items(

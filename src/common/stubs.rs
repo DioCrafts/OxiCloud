@@ -10,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 
@@ -23,7 +22,7 @@ use crate::application::dtos::search_dto::{
     SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto,
 };
 use crate::application::ports::file_ports::{
-    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
+    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase,
     OptimizedFileContent,
 };
 use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
@@ -44,7 +43,6 @@ use crate::domain::services::path_service::StoragePath;
 /// are fully initialised.
 pub struct StubZipPort;
 
-#[async_trait]
 impl ZipPort for StubZipPort {
     async fn create_folder_zip(
         &self,
@@ -64,7 +62,6 @@ impl ZipPort for StubZipPort {
 
 pub struct StubFileReadPort;
 
-#[async_trait]
 impl FileReadPort for StubFileReadPort {
     async fn get_file(&self, _id: &str) -> Result<File, DomainError> {
         Ok(File::default())
@@ -136,7 +133,6 @@ impl FileReadPort for StubFileReadPort {
 
 pub struct StubFileWritePort;
 
-#[async_trait]
 impl FileWritePort for StubFileWritePort {
     async fn save_file_from_temp(
         &self,
@@ -218,7 +214,6 @@ impl FileWritePort for StubFileWritePort {
 
 pub struct StubFolderStoragePort;
 
-#[async_trait]
 impl FolderRepository for StubFolderStoragePort {
     async fn create_folder(
         &self,
@@ -324,7 +319,6 @@ impl FolderRepository for StubFolderStoragePort {
 
 pub struct StubI18nService;
 
-#[async_trait]
 impl I18nService for StubI18nService {
     async fn translate(&self, _key: &str, _locale: Locale) -> I18nResult<String> {
         Ok(String::new())
@@ -349,7 +343,6 @@ impl I18nService for StubI18nService {
 
 pub struct StubFolderUseCase;
 
-#[async_trait]
 impl FolderUseCase for StubFolderUseCase {
     async fn create_folder(&self, _dto: CreateFolderDto) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
@@ -429,7 +422,6 @@ impl FolderUseCase for StubFolderUseCase {
 
 pub struct StubFileUploadUseCase;
 
-#[async_trait]
 impl FileUploadUseCase for StubFileUploadUseCase {
     async fn upload_file_streaming(
         &self,
@@ -486,7 +478,6 @@ impl FileUploadUseCase for StubFileUploadUseCase {
 
 pub struct StubFileRetrievalUseCase;
 
-#[async_trait]
 impl FileRetrievalUseCase for StubFileRetrievalUseCase {
     async fn get_file(&self, _id: &str) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
@@ -548,7 +539,6 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
 
 pub struct StubFileManagementUseCase;
 
-#[async_trait]
 impl FileManagementUseCase for StubFileManagementUseCase {
     async fn move_file(
         &self,
@@ -580,32 +570,11 @@ impl FileManagementUseCase for StubFileManagementUseCase {
 }
 
 // ---------------------------------------------------------------------------
-// FileUseCaseFactory
-// ---------------------------------------------------------------------------
-
-pub struct StubFileUseCaseFactory;
-
-impl FileUseCaseFactory for StubFileUseCaseFactory {
-    fn create_file_upload_use_case(&self) -> Arc<dyn FileUploadUseCase> {
-        Arc::new(StubFileUploadUseCase)
-    }
-
-    fn create_file_retrieval_use_case(&self) -> Arc<dyn FileRetrievalUseCase> {
-        Arc::new(StubFileRetrievalUseCase)
-    }
-
-    fn create_file_management_use_case(&self) -> Arc<dyn FileManagementUseCase> {
-        Arc::new(StubFileManagementUseCase)
-    }
-}
-
-// ---------------------------------------------------------------------------
 // SearchUseCase
 // ---------------------------------------------------------------------------
 
 pub struct StubSearchUseCase;
 
-#[async_trait]
 impl SearchUseCase for StubSearchUseCase {
     async fn search(
         &self,
@@ -642,7 +611,6 @@ use crate::application::ports::dedup_ports::{
 
 pub struct StubDedupPort;
 
-#[async_trait]
 impl DedupPort for StubDedupPort {
     async fn store_bytes(
         &self,
@@ -741,7 +709,6 @@ use crate::application::ports::cache_ports::{
 
 pub struct StubMetadataCachePort;
 
-#[async_trait]
 impl MetadataCachePort for StubMetadataCachePort {
     async fn get_metadata(&self, _path: &Path) -> Option<CachedMetadataDto> {
         None
@@ -774,7 +741,6 @@ impl MetadataCachePort for StubMetadataCachePort {
 
 pub struct StubContentCachePort;
 
-#[async_trait]
 impl ContentCachePort for StubContentCachePort {
     fn should_cache(&self, _size: usize) -> bool {
         false

@@ -4,7 +4,6 @@
 //! using the domain repositories. It bridges the gap between the application layer
 //! and the infrastructure layer for CardDAV functionality.
 
-use async_trait::async_trait;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -22,20 +21,23 @@ use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::contact::{Address, AddressBook, Contact, ContactGroup, Email, Phone};
 use crate::domain::repositories::address_book_repository::AddressBookRepository;
 use crate::domain::repositories::contact_repository::{ContactGroupRepository, ContactRepository};
+use crate::infrastructure::repositories::pg::AddressBookPgRepository;
+use crate::infrastructure::repositories::pg::ContactGroupPgRepository;
+use crate::infrastructure::repositories::pg::ContactPgRepository;
 
 /// Adapter that implements AddressBookUseCase and ContactUseCase using domain repositories
 pub struct ContactStorageAdapter {
-    address_book_repository: Arc<dyn AddressBookRepository>,
-    contact_repository: Arc<dyn ContactRepository>,
-    group_repository: Arc<dyn ContactGroupRepository>,
+    address_book_repository: Arc<AddressBookPgRepository>,
+    contact_repository: Arc<ContactPgRepository>,
+    group_repository: Arc<ContactGroupPgRepository>,
 }
 
 impl ContactStorageAdapter {
     /// Creates a new ContactStorageAdapter with the given repositories
     pub fn new(
-        address_book_repository: Arc<dyn AddressBookRepository>,
-        contact_repository: Arc<dyn ContactRepository>,
-        group_repository: Arc<dyn ContactGroupRepository>,
+        address_book_repository: Arc<AddressBookPgRepository>,
+        contact_repository: Arc<ContactPgRepository>,
+        group_repository: Arc<ContactGroupPgRepository>,
     ) -> Self {
         Self {
             address_book_repository,
@@ -217,7 +219,6 @@ impl ContactStorageAdapter {
     }
 }
 
-#[async_trait]
 impl AddressBookUseCase for ContactStorageAdapter {
     async fn create_address_book(
         &self,
@@ -423,7 +424,6 @@ impl AddressBookUseCase for ContactStorageAdapter {
     }
 }
 
-#[async_trait]
 impl ContactUseCase for ContactStorageAdapter {
     async fn create_contact(&self, dto: CreateContactDto) -> Result<ContactDto, DomainError> {
         let address_book_id = Self::parse_uuid(&dto.address_book_id, "AddressBook")?;

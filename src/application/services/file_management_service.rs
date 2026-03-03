@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
@@ -7,6 +6,8 @@ use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePo
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::errors::DomainError;
 use tracing::{error, info, warn};
+use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+use crate::application::services::trash_service::TrashService;
 
 /// Service for file management operations (move, delete).
 ///
@@ -15,13 +16,13 @@ use tracing::{error, info, warn};
 /// This service only orchestrates trash vs. permanent delete — it never
 /// touches ref_count directly.
 pub struct FileManagementService {
-    file_repository: Arc<dyn FileWritePort>,
-    trash_service: Option<Arc<dyn TrashUseCase>>,
+    file_repository: Arc<FileBlobWriteRepository>,
+    trash_service: Option<Arc<TrashService>>,
 }
 
 impl FileManagementService {
     /// Creates a new FileManagementService.
-    pub fn new(file_repository: Arc<dyn FileWritePort>) -> Self {
+    pub fn new(file_repository: Arc<FileBlobWriteRepository>) -> Self {
         Self {
             file_repository,
             trash_service: None,
@@ -30,8 +31,8 @@ impl FileManagementService {
 
     /// Creates a FileManagementService with a trash service.
     pub fn with_trash(
-        file_repository: Arc<dyn FileWritePort>,
-        trash_service: Option<Arc<dyn TrashUseCase>>,
+        file_repository: Arc<FileBlobWriteRepository>,
+        trash_service: Option<Arc<TrashService>>,
     ) -> Self {
         Self {
             file_repository,
@@ -40,7 +41,6 @@ impl FileManagementService {
     }
 }
 
-#[async_trait]
 impl FileManagementUseCase for FileManagementService {
     async fn move_file(
         &self,

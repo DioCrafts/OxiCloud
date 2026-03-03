@@ -5,7 +5,6 @@
 //! independent of specific image processing implementations.
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use bytes::Bytes;
 
 /// Supported output formats for image transcoding.
@@ -74,7 +73,6 @@ pub struct TranscodeStatsDto {
 /// Implementations handle the actual image conversion, caching,
 /// and format detection, while the application layer only interacts
 /// through this abstraction.
-#[async_trait]
 pub trait ImageTranscodePort: Send + Sync + 'static {
     /// Check if a MIME type can be transcoded.
     fn can_transcode(&self, mime_type: &str) -> bool;

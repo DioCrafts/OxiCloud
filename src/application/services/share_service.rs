@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use thiserror::Error;
 use tokio::sync::Semaphore;
 
@@ -12,7 +11,6 @@ use crate::{
         },
         ports::{
             auth_ports::PasswordHasherPort,
-            outbound::FolderStoragePort,
             share_ports::{ShareStoragePort, ShareUseCase},
             storage_ports::FileReadPort,
         },
@@ -20,6 +18,11 @@ use crate::{
     common::{config::AppConfig, errors::DomainError},
     domain::entities::share::{Share, ShareItemType, SharePermissions},
 };
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::infrastructure::repositories::pg::SharePgRepository;
+use crate::domain::repositories::folder_repository::FolderRepository;
 
 #[derive(Debug, Error)]
 pub enum ShareServiceError {
@@ -67,10 +70,10 @@ const MAX_CONCURRENT_HASHES: usize = 2;
 
 pub struct ShareService {
     config: Arc<AppConfig>,
-    share_repository: Arc<dyn ShareStoragePort>,
-    file_repository: Arc<dyn FileReadPort>,
-    folder_repository: Arc<dyn FolderStoragePort>,
-    password_hasher: Arc<dyn PasswordHasherPort>,
+    share_repository: Arc<SharePgRepository>,
+    file_repository: Arc<FileBlobReadRepository>,
+    folder_repository: Arc<FolderDbRepository>,
+    password_hasher: Arc<Argon2PasswordHasher>,
     /// Bounds the number of in-flight Argon2 password hashes to avoid
     /// saturating the blocking thread pool and consuming excessive RAM.
     hash_semaphore: Arc<Semaphore>,
@@ -79,10 +82,10 @@ pub struct ShareService {
 impl ShareService {
     pub fn new(
         config: Arc<AppConfig>,
-        share_repository: Arc<dyn ShareStoragePort>,
-        file_repository: Arc<dyn FileReadPort>,
-        folder_repository: Arc<dyn FolderStoragePort>,
-        password_hasher: Arc<dyn PasswordHasherPort>,
+        share_repository: Arc<SharePgRepository>,
+        file_repository: Arc<FileBlobReadRepository>,
+        folder_repository: Arc<FolderDbRepository>,
+        password_hasher: Arc<Argon2PasswordHasher>,
     ) -> Self {
         Self {
             config,
@@ -139,7 +142,6 @@ impl ShareService {
     }
 }
 
-#[async_trait]
 impl ShareUseCase for ShareService {
     async fn create_shared_link(
         &self,
@@ -400,13 +402,11 @@ mod tests {
     use crate::application::ports::share_ports::ShareStoragePort;
     use crate::common::config::AppConfig;
     use crate::domain::repositories::folder_repository::FolderRepository;
-    use async_trait::async_trait;
     use std::collections::HashMap;
     use std::sync::Mutex;
 
     struct MockPasswordHasher;
 
-    #[async_trait]
     impl PasswordHasherPort for MockPasswordHasher {
         async fn hash_password(&self, password: &str) -> Result<String, DomainError> {
             Ok(format!("hashed_{}", password))
@@ -420,7 +420,6 @@ mod tests {
     struct MockFileRepository;
     struct MockFolderRepository;
 
-    #[async_trait]
     impl FileReadPort for MockFileRepository {
         async fn get_file(
             &self,
@@ -523,7 +522,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl FolderRepository for MockFolderRepository {
         async fn create_folder(
             &self,
@@ -671,7 +669,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl ShareStoragePort for MockShareRepository {
         async fn save_share(&self, share: &Share) -> Result<Share, DomainError> {
             let mut shares = self.shares.lock().unwrap();

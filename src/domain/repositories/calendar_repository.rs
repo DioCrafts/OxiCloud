@@ -1,12 +1,10 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::calendar::Calendar;
-use async_trait::async_trait;
 use uuid::Uuid;
 
 pub type CalendarRepositoryResult<T> = Result<T, DomainError>;
 
 /// Repository interface for Calendar entity operations
-#[async_trait]
 pub trait CalendarRepository: Send + Sync + 'static {
     /// Creates a new calendar
     async fn create_calendar(&self, calendar: Calendar) -> CalendarRepositoryResult<Calendar>;

@@ -10,6 +10,7 @@ use tracing::{error, info};
 
 use crate::application::ports::favorites_ports::FavoritesUseCase;
 use crate::interfaces::middleware::auth::AuthUser;
+use crate::application::services::favorites_service::FavoritesService;
 
 /// Single item in a batch-add-favorites request.
 #[derive(Debug, Deserialize)]
@@ -26,7 +27,7 @@ pub struct BatchFavoritesRequest {
 
 /// Handler for favorite-related API endpoints
 pub async fn get_favorites(
-    State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
 ) -> impl IntoResponse {
     let user_id = &auth_user.id;
@@ -51,7 +52,7 @@ pub async fn get_favorites(
 
 /// Add an item to user's favorites
 pub async fn add_favorite(
-    State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -94,7 +95,7 @@ pub async fn add_favorite(
 
 /// Remove an item from user's favorites
 pub async fn remove_favorite(
-    State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
@@ -138,7 +139,7 @@ pub async fn remove_favorite(
 /// Add multiple items to favourites in a single transaction.
 /// POST /api/favorites/batch
 pub async fn batch_add_favorites(
-    State(favorites_service): State<Arc<dyn FavoritesUseCase>>,
+    State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
     Json(body): Json<BatchFavoritesRequest>,
 ) -> impl IntoResponse {

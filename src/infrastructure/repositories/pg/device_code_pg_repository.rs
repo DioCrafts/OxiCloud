@@ -1,6 +1,5 @@
 //! PostgreSQL repository for Device Authorization Grant (RFC 8628) codes.
 
-use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
 
@@ -49,7 +48,6 @@ impl DeviceCodePgRepository {
     }
 }
 
-#[async_trait]
 impl DeviceCodeStoragePort for DeviceCodePgRepository {
     async fn create_device_code(&self, dc: DeviceCode) -> Result<DeviceCode, DomainError> {
         sqlx::query(

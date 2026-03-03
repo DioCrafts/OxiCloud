@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 use serde_json::Value;
@@ -25,7 +24,6 @@ pub use crate::domain::repositories::folder_repository::FolderRepository;
 ///
 /// Encapsulates every operation that queries state without modifying it:
 /// get, list, content, stream, mmap, range, path resolution.
-#[async_trait]
 pub trait FileReadPort: Send + Sync + 'static {
     /// Gets a file by its ID.
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
@@ -199,7 +197,6 @@ pub struct CopyFolderTreeResult {
 ///
 /// Covers: upload (buffered + streaming), move, delete, update,
 /// and deferred registration for the write-behind cache.
-#[async_trait]
 pub trait FileWritePort: Send + Sync + 'static {
     /// Streaming upload — saves a file from a temp file already on disk.
     ///
@@ -307,7 +304,6 @@ pub trait FileWritePort: Send + Sync + 'static {
 // ─────────────────────────────────────────────────────
 
 /// Secondary port for file path resolution
-#[async_trait]
 pub trait FilePathResolutionPort: Send + Sync + 'static {
     /// Gets the storage path of a file
     async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;
@@ -317,7 +313,6 @@ pub trait FilePathResolutionPort: Send + Sync + 'static {
 }
 
 /// Secondary port for file/directory existence verification
-#[async_trait]
 pub trait StorageVerificationPort: Send + Sync + 'static {
     /// Checks whether a file exists at the given path
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
@@ -327,14 +322,12 @@ pub trait StorageVerificationPort: Send + Sync + 'static {
 }
 
 /// Secondary port for directory management
-#[async_trait]
 pub trait DirectoryManagementPort: Send + Sync + 'static {
     /// Creates directories if they do not exist
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError>;
 }
 
 /// Secondary port for storage usage management
-#[async_trait]
 pub trait StorageUsagePort: Send + Sync + 'static {
     /// Updates storage usage statistics for a user
     async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError>;
@@ -362,7 +355,6 @@ pub trait StorageUsagePort: Send + Sync + 'static {
 }
 
 /// Generic storage service interface for calendar and contact services
-#[async_trait]
 pub trait StorageUseCase: Send + Sync + 'static {
     /// Handle a request with the specified action and parameters
     async fn handle_request(&self, action: &str, params: Value) -> Result<Value, DomainError>;

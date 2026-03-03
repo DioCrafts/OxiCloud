@@ -11,6 +11,7 @@ use crate::common::di::AppState;
 
 // Re-export CurrentUser from application layer for use in handlers
 pub use crate::application::dtos::user_dto::CurrentUser;
+use crate::application::ports::auth_ports::TokenServicePort;
 
 /// Marker inserted into request extensions when the user was authenticated
 /// via the `oxicloud_access` HttpOnly cookie rather than a Bearer/Basic header.

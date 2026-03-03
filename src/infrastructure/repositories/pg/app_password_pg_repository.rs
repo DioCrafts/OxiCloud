@@ -3,7 +3,6 @@
 use crate::application::ports::auth_ports::AppPasswordStoragePort;
 use crate::common::errors::DomainError;
 use crate::domain::entities::app_password::AppPassword;
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -22,7 +21,6 @@ impl AppPasswordPgRepository {
     }
 }
 
-#[async_trait]
 impl AppPasswordStoragePort for AppPasswordPgRepository {
     async fn create(&self, ap: AppPassword) -> Result<AppPassword, DomainError> {
         sqlx::query(

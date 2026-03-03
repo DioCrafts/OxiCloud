@@ -2,20 +2,20 @@ use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
 };
 use crate::application::ports::inbound::FolderUseCase;
-use crate::application::ports::outbound::FolderStoragePort;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::services::path_service::StoragePath;
-use async_trait::async_trait;
 use std::sync::Arc;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::domain::repositories::folder_repository::FolderRepository;
 
 /// Implementation of the use case for folder operations
 pub struct FolderService {
-    folder_storage: Arc<dyn FolderStoragePort>,
+    folder_storage: Arc<FolderDbRepository>,
 }
 
 impl FolderService {
     /// Creates a new folder service
-    pub fn new(folder_storage: Arc<dyn FolderStoragePort>) -> Self {
+    pub fn new(folder_storage: Arc<FolderDbRepository>) -> Self {
         Self { folder_storage }
     }
 
@@ -23,7 +23,6 @@ impl FolderService {
     pub fn new_stub() -> impl FolderUseCase {
         struct FolderServiceStub;
 
-        #[async_trait]
         impl FolderUseCase for FolderServiceStub {
             async fn create_folder(&self, _dto: CreateFolderDto) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
@@ -124,7 +123,6 @@ impl FolderService {
     }
 }
 
-#[async_trait]
 impl FolderUseCase for FolderService {
     /// Creates a new folder
     async fn create_folder(&self, dto: CreateFolderDto) -> Result<FolderDto, DomainError> {

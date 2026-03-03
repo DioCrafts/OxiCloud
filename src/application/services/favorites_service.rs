@@ -3,26 +3,25 @@ use crate::application::dtos::favorites_dto::{
 };
 use crate::application::ports::favorites_ports::{FavoritesRepositoryPort, FavoritesUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
-use async_trait::async_trait;
 use std::sync::Arc;
 use tracing::info;
+use crate::infrastructure::repositories::pg::FavoritesPgRepository;
 
 /// Implementation of the FavoritesUseCase for managing user favorites.
 ///
 /// Depends on `FavoritesRepositoryPort` (outbound port) instead of
 /// accessing the database directly, following hexagonal architecture.
 pub struct FavoritesService {
-    repo: Arc<dyn FavoritesRepositoryPort>,
+    repo: Arc<FavoritesPgRepository>,
 }
 
 impl FavoritesService {
     /// Create a new FavoritesService with the given repository port
-    pub fn new(repo: Arc<dyn FavoritesRepositoryPort>) -> Self {
+    pub fn new(repo: Arc<FavoritesPgRepository>) -> Self {
         Self { repo }
     }
 }
 
-#[async_trait]
 impl FavoritesUseCase for FavoritesService {
     /// Get all favorites for a user
     async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>> {

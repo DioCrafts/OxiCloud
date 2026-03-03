@@ -31,7 +31,6 @@
 //! - 30-50% storage reduction typical
 //! - Faster uploads for existing content (instant dedup)
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::stream::{self, StreamExt};
 use futures::{Stream, TryStreamExt};
@@ -802,7 +801,6 @@ impl DedupService {
 
 // ─── Port implementation ─────────────────────────────────────────────────────
 
-#[async_trait]
 impl DedupPort for DedupService {
     async fn store_bytes(
         &self,

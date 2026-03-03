@@ -35,6 +35,7 @@ use crate::application::ports::carddav_ports::{AddressBookUseCase, ContactUseCas
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
+use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 
@@ -115,7 +116,7 @@ fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 
-fn get_addressbook_service(state: &AppState) -> Result<&Arc<dyn AddressBookUseCase>, AppError> {
+fn get_addressbook_service(state: &AppState) -> Result<&Arc<ContactStorageAdapter>, AppError> {
     state.addressbook_use_case.as_ref().ok_or_else(|| {
         AppError::new(
             StatusCode::NOT_IMPLEMENTED,
@@ -125,7 +126,7 @@ fn get_addressbook_service(state: &AppState) -> Result<&Arc<dyn AddressBookUseCa
     })
 }
 
-fn get_contact_service(state: &AppState) -> Result<&Arc<dyn ContactUseCase>, AppError> {
+fn get_contact_service(state: &AppState) -> Result<&Arc<ContactStorageAdapter>, AppError> {
     state.contact_use_case.as_ref().ok_or_else(|| {
         AppError::new(
             StatusCode::NOT_IMPLEMENTED,

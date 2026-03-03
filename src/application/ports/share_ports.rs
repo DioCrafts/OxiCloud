@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 
 use crate::{
     application::dtos::{
@@ -9,7 +8,6 @@ use crate::{
     domain::entities::share::ShareItemType,
 };
 
-#[async_trait]
 pub trait ShareUseCase: Send + Sync + 'static {
     /// Create a new shared link for a file or folder
     async fn create_shared_link(
@@ -60,7 +58,6 @@ pub trait ShareUseCase: Send + Sync + 'static {
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError>;
 }
 
-#[async_trait]
 pub trait ShareStoragePort: Send + Sync + 'static {
     async fn save_share(
         &self,

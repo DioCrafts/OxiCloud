@@ -5,6 +5,7 @@ use tracing::{debug, error, info, instrument};
 
 use crate::common::errors::Result;
 use crate::domain::repositories::trash_repository::TrashRepository;
+use crate::infrastructure::repositories::pg::trash_db_repository::TrashDbRepository;
 
 /// Service for automatic cleanup of expired items in the trash.
 ///
@@ -12,12 +13,12 @@ use crate::domain::repositories::trash_repository::TrashRepository;
 /// in **2 SQL statements inside a single transaction**, instead of the
 /// previous N+1 pattern that issued 3 queries per expired item.
 pub struct TrashCleanupService {
-    trash_repository: Arc<dyn TrashRepository>,
+    trash_repository: Arc<TrashDbRepository>,
     cleanup_interval_hours: u64,
 }
 
 impl TrashCleanupService {
-    pub fn new(trash_repository: Arc<dyn TrashRepository>, cleanup_interval_hours: u64) -> Self {
+    pub fn new(trash_repository: Arc<TrashDbRepository>, cleanup_interval_hours: u64) -> Self {
         Self {
             trash_repository,
             cleanup_interval_hours: cleanup_interval_hours.max(1), // Minimum 1 hour
@@ -57,7 +58,7 @@ impl TrashCleanupService {
 
     /// Bulk-delete all expired trash items in a single transaction.
     #[instrument(skip(trash_repository))]
-    async fn cleanup_expired_items(trash_repository: Arc<dyn TrashRepository>) -> Result<()> {
+    async fn cleanup_expired_items(trash_repository: Arc<TrashDbRepository>) -> Result<()> {
         debug!("Starting bulk cleanup of expired trash items");
 
         let (files, folders) = trash_repository.delete_expired_bulk().await?;

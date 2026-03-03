@@ -8,13 +8,14 @@ use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::repositories::settings_repository::SettingsRepository;
 use crate::infrastructure::services::oidc_service::OidcService;
+use crate::infrastructure::repositories::pg::SettingsPgRepository;
 
 /// Admin settings service — manages platform configuration in the database.
 ///
 /// Configuration priority: **env vars > DB settings > defaults**.
 /// Supports hot-reloading OIDC configuration without server restart.
 pub struct AdminSettingsService {
-    settings_repo: Arc<dyn SettingsRepository>,
+    settings_repo: Arc<SettingsPgRepository>,
     env_oidc_config: OidcConfig,
     auth_app_service: Arc<AuthApplicationService>,
     server_base_url: String,
@@ -22,7 +23,7 @@ pub struct AdminSettingsService {
 
 impl AdminSettingsService {
     pub fn new(
-        settings_repo: Arc<dyn SettingsRepository>,
+        settings_repo: Arc<SettingsPgRepository>,
         env_oidc_config: OidcConfig,
         auth_app_service: Arc<AuthApplicationService>,
         server_base_url: String,

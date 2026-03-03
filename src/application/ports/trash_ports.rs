@@ -1,10 +1,8 @@
-use async_trait::async_trait;
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
 use crate::common::errors::Result;
 
 /// Port for trash-related use cases
-#[async_trait]
 pub trait TrashUseCase: Send + Sync {
     /// List items in the user's trash
     async fn get_trash_items(&self, user_id: &str) -> Result<Vec<TrashedItemDto>>;
