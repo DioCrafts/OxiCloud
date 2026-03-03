@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::domain::entities::folder::Folder;
 use serde::{Deserialize, Serialize};
 
@@ -53,15 +55,15 @@ pub struct FolderDto {
     /// Whether this is a root folder
     pub is_root: bool,
 
-    // ── Pre-computed display fields ──
+    // ── Pre-computed display fields (Arc<str>: always identical values) ──
     /// FontAwesome icon CSS class (always "fas fa-folder")
-    pub icon_class: String,
+    pub icon_class: Arc<str>,
 
     /// Extra CSS class for icon styling (always "folder-icon")
-    pub icon_special_class: String,
+    pub icon_special_class: Arc<str>,
 
     /// Human-readable category (always "Folder")
-    pub category: String,
+    pub category: Arc<str>,
 }
 
 impl From<Folder> for FolderDto {
@@ -77,9 +79,9 @@ impl From<Folder> for FolderDto {
             created_at: folder.created_at(),
             modified_at: folder.modified_at(),
             is_root,
-            icon_class: "fas fa-folder".to_string(),
-            icon_special_class: "folder-icon".to_string(),
-            category: "Folder".to_string(),
+            icon_class: Arc::from("fas fa-folder"),
+            icon_special_class: Arc::from("folder-icon"),
+            category: Arc::from("Folder"),
         }
     }
 }
@@ -112,9 +114,9 @@ impl FolderDto {
             created_at: 0,
             modified_at: 0,
             is_root: true,
-            icon_class: "fas fa-folder".to_string(),
-            icon_special_class: "folder-icon".to_string(),
-            category: "Folder".to_string(),
+            icon_class: Arc::from("fas fa-folder"),
+            icon_special_class: Arc::from("folder-icon"),
+            category: Arc::from("Folder"),
         }
     }
 }

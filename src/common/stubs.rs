@@ -505,7 +505,7 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
             FileDto::default(),
             OptimizedFileContent::Bytes {
                 data: Bytes::new(),
-                mime_type: String::new(),
+                mime_type: Arc::from(""),
                 was_transcoded: false,
             },
         ))

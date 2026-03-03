@@ -286,9 +286,9 @@ async fn handle_propfind(
             created_at: Utc::now().timestamp() as u64,
             modified_at: Utc::now().timestamp() as u64,
             is_root: true,
-            icon_class: "fas fa-folder".to_string(),
-            icon_special_class: "folder-icon".to_string(),
-            category: "Folder".to_string(),
+            icon_class: Arc::from("fas fa-folder"),
+            icon_special_class: Arc::from("folder-icon"),
+            category: Arc::from("Folder"),
         };
 
         return build_streaming_propfind_response(
@@ -609,7 +609,7 @@ async fn handle_get(
     // Build streaming response using Content-Length from metadata
     Ok(Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, file.mime_type)
+        .header(header::CONTENT_TYPE, &*file.mime_type)
         .header(header::CONTENT_LENGTH, file.size)
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(
@@ -658,7 +658,7 @@ async fn handle_head(
             Ok(ResolvedResource::File(file)) => {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, &file.mime_type)
+                    .header(header::CONTENT_TYPE, &*file.mime_type)
                     .header(header::CONTENT_LENGTH, file.size)
                     .header(header::ETAG, format!("\"{}\"", file.id))
                     .header(
@@ -693,7 +693,7 @@ async fn handle_head(
 
     Ok(Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, &file.mime_type)
+        .header(header::CONTENT_TYPE, &*file.mime_type)
         .header(header::CONTENT_LENGTH, file.size)
         .header(header::ETAG, format!("\"{}\"", file.id))
         .header(
