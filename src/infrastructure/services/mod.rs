@@ -1,6 +1,7 @@
 pub mod chunked_upload_service;
 pub mod compression_service;
 pub mod dedup_service;
+pub mod login_lockout_service;
 pub mod file_content_cache;
 pub mod file_system_i18n_service;
 pub mod image_transcode_service;

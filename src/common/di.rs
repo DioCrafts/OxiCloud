@@ -818,6 +818,7 @@ pub struct ApplicationServices {
 pub struct AuthServices {
     pub token_service: Arc<dyn crate::application::ports::auth_ports::TokenServicePort>,
     pub auth_application_service: Arc<AuthApplicationService>,
+    pub login_lockout: Arc<crate::infrastructure::services::login_lockout_service::LoginLockoutService>,
 }
 
 /// Global application state for dependency injection

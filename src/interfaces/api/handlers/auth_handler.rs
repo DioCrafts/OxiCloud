@@ -19,9 +19,6 @@ use crate::interfaces::middleware::auth::CurrentUserId;
 pub fn auth_routes() -> Router<Arc<AppState>> {
     // Routes that do NOT require authentication
     let public_routes = Router::new()
-        .route("/register", post(register))
-        .route("/login", post(login))
-        .route("/refresh", post(refresh_token))
         .route("/status", get(get_system_status))
         // OIDC endpoints (all public)
         .route("/oidc/providers", get(oidc_providers))
@@ -38,6 +35,20 @@ pub fn auth_routes() -> Router<Arc<AppState>> {
 
     // Combine public and protected routes
     public_routes.merge(protected_routes)
+}
+
+/// Rate-limited auth routes — split out so main.rs can apply per-endpoint
+/// rate limiting middleware independently.
+pub fn login_route() -> Router<Arc<AppState>> {
+    Router::new().route("/login", post(login))
+}
+
+pub fn register_route() -> Router<Arc<AppState>> {
+    Router::new().route("/register", post(register))
+}
+
+pub fn refresh_route() -> Router<Arc<AppState>> {
+    Router::new().route("/refresh", post(refresh_token))
 }
 
 async fn register(
@@ -123,6 +134,25 @@ async fn login(
         }
     };
 
+    // ── Account lockout check ──────────────────────────────────────────
+    // Reject immediately if the account has too many consecutive failures.
+    // This runs BEFORE Argon2 to save CPU under brute-force attacks.
+    if let Err(lockout_secs) = auth_service.login_lockout.check(&dto.username) {
+        tracing::warn!(
+            username = %dto.username,
+            lockout_secs = lockout_secs,
+            "Login rejected — account temporarily locked"
+        );
+        return Err(AppError::new(
+            StatusCode::TOO_MANY_REQUESTS,
+            &format!(
+                "Account temporarily locked due to too many failed attempts. Try again in {} seconds.",
+                lockout_secs
+            ),
+            "AccountLocked",
+        ));
+    }
+
     // Check if password login is disabled (OIDC-only mode)
     if auth_service
         .auth_application_service
@@ -140,6 +170,9 @@ async fn login(
         .await
     {
         Ok(auth_response) => {
+            // ── Successful login — reset lockout counter ──
+            auth_service.login_lockout.record_success(&dto.username);
+
             tracing::info!("Login successful for user: {}", dto.username);
             // Log the response structure for debugging
             tracing::debug!("Auth response: {:?}", &auth_response);
@@ -171,6 +204,8 @@ async fn login(
             Ok(response)
         }
         Err(err) => {
+            // ── Record failed attempt for lockout tracking ──
+            auth_service.login_lockout.record_failure(&dto.username);
             tracing::error!("Login failed for user {}: {}", dto.username, err);
             Err(err.into())
         }

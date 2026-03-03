@@ -170,12 +170,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     if config.features.enable_auth {
-        use interfaces::api::handlers::auth_handler::auth_routes;
+        use interfaces::api::handlers::auth_handler::{auth_routes, login_route, register_route, refresh_route};
         use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
         use oxicloud::interfaces::middleware::csrf::csrf_middleware;
+        use oxicloud::interfaces::middleware::rate_limit::{
+            RateLimiter, rate_limit_login, rate_limit_register, rate_limit_refresh,
+        };
 
+        // ── Rate limiters (IP-based, in-memory via moka) ────────────────
+        let rl = &config.auth.rate_limit;
+        let login_limiter = Arc::new(RateLimiter::new(
+            rl.login_max_requests,
+            rl.login_window_secs,
+            100_000,
+        ));
+        let register_limiter = Arc::new(RateLimiter::new(
+            rl.register_max_requests,
+            rl.register_window_secs,
+            100_000,
+        ));
+        let refresh_limiter = Arc::new(RateLimiter::new(
+            rl.refresh_max_requests,
+            rl.refresh_window_secs,
+            100_000,
+        ));
+        tracing::info!(
+            "Rate limiting enabled — login: {}/{} s, register: {}/{} s, refresh: {}/{} s",
+            rl.login_max_requests, rl.login_window_secs,
+            rl.register_max_requests, rl.register_window_secs,
+            rl.refresh_max_requests, rl.refresh_window_secs,
+        );
+
+        // Auth routes split by rate-limit policy
+        let auth_login = login_route()
+            .layer(axum::middleware::from_fn_with_state(login_limiter.clone(), rate_limit_login))
+            .with_state(app_state.clone());
+        let auth_register = register_route()
+            .layer(axum::middleware::from_fn_with_state(register_limiter.clone(), rate_limit_register))
+            .with_state(app_state.clone());
+        let auth_refresh = refresh_route()
+            .layer(axum::middleware::from_fn_with_state(refresh_limiter.clone(), rate_limit_refresh))
+            .with_state(app_state.clone());
+        // Remaining auth routes (status, OIDC, protected /me, /logout, etc.)
         let auth_router = auth_routes().with_state(app_state.clone());
 
         // Device Authorization Grant (RFC 8628)
@@ -223,7 +261,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
         app = Router::new()
-            // Auth endpoints (login, register, refresh) are public — no middleware
+            // Rate-limited auth endpoints (login, register, refresh)
+            .nest("/api/auth", auth_login)
+            .nest("/api/auth", auth_register)
+            .nest("/api/auth", auth_refresh)
+            // Other auth endpoints (status, OIDC, protected /me, /logout)
             .nest("/api/auth", auth_router)
             // Device Auth Grant public endpoints (authorize + token polling)
             .nest("/api/auth/device", device_public)

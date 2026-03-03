@@ -4,6 +4,15 @@ let usersPage = 0;
 const PAGE_SIZE = 50;
 let totalUsers = 0;
 
+/** Escape a string for safe embedding inside a JS string literal within an HTML attribute.
+ *  Converts all non-alphanumeric/space/dot/hyphen/underscore chars to \xHH escapes. */
+function _escJs(s) {
+    if (typeof s !== 'string') return '';
+    return s.replace(/[^\w .\-]/g, function(c) {
+        return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0');
+    });
+}
+
 function hideElement(id) {
   const element = document.getElementById(id);
   if (!element) return;
@@ -108,21 +117,21 @@ async function loadUsers() {
       const isSelf = u.id === currentAdminId;
       const isOidc = u.auth_provider && u.auth_provider !== 'local';
       const authBadge = isOidc
-        ? '<span class="badge badge-oidc" title="Authenticated via ' + u.auth_provider + '"><i class="fas fa-key badge-admin-icon-small"></i> ' + u.auth_provider + '</span>'
+        ? '<span class="badge badge-oidc" title="Authenticated via ' + escapeHtml(u.auth_provider) + '"><i class="fas fa-key badge-admin-icon-small"></i> ' + escapeHtml(u.auth_provider) + '</span>'
         : '<span class="badge badge-local">Local</span>';
       return '<tr>' +
-        '<td><div class="user-info"><span class="user-name">' + u.username + (isSelf ? ' <span class="user-self-badge">(you)</span>' : '') + '</span><span class="user-email">' + u.email + '</span></div></td>' +
-        '<td><span class="badge badge-' + u.role + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt badge-admin-icon-small"></i> ' : '') + u.role + '</span></td>' +
+        '<td><div class="user-info"><span class="user-name">' + escapeHtml(u.username) + (isSelf ? ' <span class="user-self-badge">(you)</span>' : '') + '</span><span class="user-email">' + escapeHtml(u.email) + '</span></div></td>' +
+        '<td><span class="badge badge-' + escapeHtml(u.role) + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt badge-admin-icon-small"></i> ' : '') + escapeHtml(u.role) + '</span></td>' +
         '<td>' + authBadge + '</td>' +
         '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
         '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' + quotaColor + '" style="width:' + Math.min(quotaPct, 100) + '%"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
         '<td class="user-last-login-cell">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
-          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + u.id + '\',\'' + u.username + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
-          (isOidc ? '' : '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + u.id + '\',\'' + u.username + '\')" title="Reset password"><i class="fas fa-key"></i></button>') +
-          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + u.id + '\',\'' + u.role + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
-          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + u.id + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\',\'' + u.username + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
+          (isOidc ? '' : '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\')" title="Reset password"><i class="fas fa-key"></i></button>') +
+          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + _escJs(u.id) + '\',\'' + _escJs(u.role) + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
+          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + _escJs(u.id) + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
         '</div></td></tr>';
     }).join('');
 
@@ -130,7 +139,7 @@ async function loadUsers() {
     document.getElementById('prev-btn').disabled = usersPage === 0;
     document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Error: ' + e.message + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Error: ' + escapeHtml(e.message) + '</td></tr>';
   }
 }
 
@@ -324,12 +333,12 @@ async function testConnection() {
     const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), body: JSON.stringify({ issuer_url: url }) });
     const r = await resp.json();
     if (r.success) {
-      resultDiv.innerHTML = '<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ' + r.message + '</strong><dl><dt>Issuer</dt><dd>' + (r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + (r.authorization_endpoint||'—') + '</dd></dl></div>';
+      resultDiv.innerHTML = '<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ' + escapeHtml(r.message) + '</strong><dl><dt>Issuer</dt><dd>' + escapeHtml(r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + escapeHtml(r.authorization_endpoint||'—') + '</dd></dl></div>';
       if (!document.getElementById('provider-name').value && r.provider_name_suggestion) document.getElementById('provider-name').value = r.provider_name_suggestion;
     } else {
-      resultDiv.innerHTML = '<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ' + r.message + '</strong></div>';
+      resultDiv.innerHTML = '<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ' + escapeHtml(r.message) + '</strong></div>';
     }
-  } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ' + e.message + '</div>'; }
+  } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ' + escapeHtml(e.message) + '</div>'; }
   btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Auto-discover';
 }
 

@@ -262,6 +262,44 @@ pub struct AuthConfig {
     pub hash_time_cost: u32,
     /// Argon2id parallelism lanes (default 2)
     pub hash_parallelism: u32,
+    /// Rate limiting / account lockout configuration
+    pub rate_limit: RateLimitConfig,
+}
+
+/// Rate limiting and brute-force protection configuration.
+#[derive(Debug, Clone)]
+pub struct RateLimitConfig {
+    /// Max login attempts per IP per window (default: 10)
+    pub login_max_requests: u32,
+    /// Login rate-limit window in seconds (default: 60)
+    pub login_window_secs: u64,
+    /// Max registration attempts per IP per window (default: 5)
+    pub register_max_requests: u32,
+    /// Registration rate-limit window in seconds (default: 3600)
+    pub register_window_secs: u64,
+    /// Max token refresh attempts per IP per window (default: 20)
+    pub refresh_max_requests: u32,
+    /// Refresh rate-limit window in seconds (default: 60)
+    pub refresh_window_secs: u64,
+    /// Consecutive failed logins before account lockout (default: 5)
+    pub lockout_max_failures: u32,
+    /// Account lockout duration in seconds (default: 900 = 15 min)
+    pub lockout_duration_secs: u64,
+}
+
+impl Default for RateLimitConfig {
+    fn default() -> Self {
+        Self {
+            login_max_requests: 10,
+            login_window_secs: 60,
+            register_max_requests: 5,
+            register_window_secs: 3600,
+            refresh_max_requests: 20,
+            refresh_window_secs: 60,
+            lockout_max_failures: 5,
+            lockout_duration_secs: 900,
+        }
+    }
 }
 
 impl Default for AuthConfig {
@@ -276,6 +314,7 @@ impl Default for AuthConfig {
             hash_memory_cost: 65536,            // 64 MiB
             hash_time_cost: 3,
             hash_parallelism: 2,
+            rate_limit: RateLimitConfig::default(),
         }
     }
 }
@@ -579,6 +618,48 @@ impl AppConfig {
             && let Ok(val) = v
         {
             config.auth.hash_parallelism = val;
+        }
+
+        // Rate limiting / account lockout
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_LOGIN_MAX").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.login_max_requests = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_LOGIN_WINDOW_SECS").map(|v| v.parse::<u64>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.login_window_secs = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_REGISTER_MAX").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.register_max_requests = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_REGISTER_WINDOW_SECS").map(|v| v.parse::<u64>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.register_window_secs = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_REFRESH_MAX").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.refresh_max_requests = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_REFRESH_WINDOW_SECS").map(|v| v.parse::<u64>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.refresh_window_secs = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_LOCKOUT_MAX_FAILURES").map(|v| v.parse::<u32>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.lockout_max_failures = val;
+        }
+        if let Ok(v) = env::var("OXICLOUD_LOCKOUT_DURATION_SECS").map(|v| v.parse::<u64>())
+            && let Ok(val) = v
+        {
+            config.auth.rate_limit.lockout_duration_secs = val;
         }
 
         // Feature flags

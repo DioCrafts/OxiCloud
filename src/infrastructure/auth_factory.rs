@@ -68,8 +68,23 @@ pub async fn create_auth_services(
     // Package service in Arc
     let auth_application_service = Arc::new(auth_app_service);
 
+    // Account lockout service — in-memory brute-force protection
+    let login_lockout = Arc::new(
+        crate::infrastructure::services::login_lockout_service::LoginLockoutService::new(
+            config.auth.rate_limit.lockout_max_failures,
+            config.auth.rate_limit.lockout_duration_secs,
+            100_000, // Track up to 100k accounts concurrently
+        ),
+    );
+    tracing::info!(
+        "Login lockout service initialized: max {} failures, {}s lockout",
+        config.auth.rate_limit.lockout_max_failures,
+        config.auth.rate_limit.lockout_duration_secs,
+    );
+
     Ok(AuthServices {
         token_service,
         auth_application_service,
+        login_lockout,
     })
 }
