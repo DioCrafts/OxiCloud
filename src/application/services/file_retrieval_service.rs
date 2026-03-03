@@ -61,7 +61,7 @@ impl FileRetrievalService {
         mime: &str,
         file_size: u64,
         accept_webp: bool,
-    ) -> Option<(Bytes, String)> {
+    ) -> Option<(Bytes, Arc<str>)> {
         if !accept_webp {
             return None;
         }
@@ -81,7 +81,7 @@ impl FileRetrievalService {
                     transcoded.len(),
                     (1.0 - transcoded.len() as f64 / content.len().max(1) as f64) * 100.0
                 );
-                Some((transcoded, webp_mime))
+                Some((transcoded, Arc::from(&*webp_mime)))
             }
             _ => None,
         }
@@ -152,7 +152,7 @@ impl FileRetrievalService {
             // Store in cache
             if let Some(cache) = &self.content_cache {
                 let etag: Arc<str> = format!("\"{}-{}\"", id, modified_at).into();
-                let ct: Arc<str> = Arc::from(&*mime_type);
+                let ct: Arc<str> = mime_type.clone();
                 cache
                     .put(id.to_string(), content_bytes.clone(), etag, ct)
                     .await;

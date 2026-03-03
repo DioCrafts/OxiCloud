@@ -433,7 +433,7 @@ impl FileHandler {
                         Ok(stream) => {
                             return Response::builder()
                                 .status(StatusCode::PARTIAL_CONTENT)
-                                .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                                .header(header::CONTENT_TYPE, &*file_dto.mime_type)
                                 .header(header::CONTENT_DISPOSITION, &disposition)
                                 .header(header::CONTENT_LENGTH, range_length)
                                 .header(
@@ -488,7 +488,7 @@ impl FileHandler {
                     .into_response(),
                 OptimizedFileContent::Mmap(mmap_data) => Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                    .header(header::CONTENT_TYPE, &*file_dto.mime_type)
                     .header(header::CONTENT_DISPOSITION, &disposition)
                     .header(header::CONTENT_LENGTH, mmap_data.len())
                     .header(header::ETAG, &etag)
@@ -502,7 +502,7 @@ impl FileHandler {
                     .into_response(),
                 OptimizedFileContent::Stream(pinned_stream) => Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, &file_dto.mime_type)
+                    .header(header::CONTENT_TYPE, &*file_dto.mime_type)
                     .header(header::CONTENT_DISPOSITION, &disposition)
                     .header(header::CONTENT_LENGTH, file_dto.size)
                     .header(header::ETAG, &etag)

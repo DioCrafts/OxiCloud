@@ -158,7 +158,7 @@ impl SearchService {
             name: file.name.clone(),
             path: file.path.clone(),
             size: file.size,
-            mime_type: file.mime_type.clone(),
+            mime_type: file.mime_type.to_string(),
             folder_id: file.folder_id.clone(),
             created_at: file.created_at,
             modified_at: file.modified_at,

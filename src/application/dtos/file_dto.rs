@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::domain::entities::file::File;
 use serde::{Deserialize, Serialize};
 
@@ -20,8 +22,9 @@ pub struct FileDto {
     /// Size in bytes
     pub size: u64,
 
-    /// MIME type
-    pub mime_type: String,
+    /// MIME type — `Arc<str>` because MIME values repeat across files
+    /// and DTOs are cloned on every request (clone is O(1) atomic increment).
+    pub mime_type: Arc<str>,
 
     /// Parent folder ID
     pub folder_id: Option<String>,
@@ -32,15 +35,15 @@ pub struct FileDto {
     /// Last modification timestamp
     pub modified_at: u64,
 
-    // ── Pre-computed display fields ──
+    // ── Pre-computed display fields (Arc<str>: values come from static tables) ──
     /// FontAwesome icon CSS class (e.g. "fas fa-file-image")
-    pub icon_class: String,
+    pub icon_class: Arc<str>,
 
     /// Extra CSS class for icon styling (e.g. "image-icon", "" when default)
-    pub icon_special_class: String,
+    pub icon_special_class: Arc<str>,
 
     /// Human-readable file category (e.g. "Image", "Document")
-    pub category: String,
+    pub category: Arc<str>,
 
     /// Human-readable formatted size (e.g. "3.27 MB")
     pub size_formatted: String,
@@ -61,13 +64,13 @@ impl From<File> for FileDto {
             name: name.to_string(),
             path: file.path_string().to_string(),
             size,
-            mime_type: mime.to_string(),
+            mime_type: Arc::from(mime),
             folder_id: file.folder_id().map(String::from),
             created_at: file.created_at(),
             modified_at: file.modified_at(),
-            icon_class: icon_class_for(name, mime).to_string(),
-            icon_special_class: icon_special_class_for(name, mime).to_string(),
-            category: category_for(name, mime).to_string(),
+            icon_class: Arc::from(icon_class_for(name, mime)),
+            icon_special_class: Arc::from(icon_special_class_for(name, mime)),
+            category: Arc::from(category_for(name, mime)),
             size_formatted: format_file_size(size),
             owner_id: file.owner_id().map(String::from),
         }
@@ -84,7 +87,7 @@ impl From<FileDto> for File {
             dto.name,
             dto.path,
             dto.size,
-            dto.mime_type,
+            dto.mime_type.to_string(),
             dto.folder_id,
             dto.created_at,
             dto.modified_at,
@@ -100,13 +103,13 @@ impl FileDto {
             name: "stub-file".to_string(),
             path: "/stub/path".to_string(),
             size: 0,
-            mime_type: "application/octet-stream".to_string(),
+            mime_type: Arc::from("application/octet-stream"),
             folder_id: None,
             created_at: 0,
             modified_at: 0,
-            icon_class: "fas fa-file".to_string(),
-            icon_special_class: String::new(),
-            category: "Document".to_string(),
+            icon_class: Arc::from("fas fa-file"),
+            icon_special_class: Arc::from(""),
+            category: Arc::from("Document"),
             size_formatted: "0 Bytes".to_string(),
             owner_id: None,
         }

@@ -93,7 +93,7 @@ pub enum OptimizedFileContent {
     /// Small-file content (possibly transcoded / compressed) already in RAM.
     Bytes {
         data: Bytes,
-        mime_type: String,
+        mime_type: Arc<str>,
         was_transcoded: bool,
     },
     /// Memory-mapped file (10–100 MB).
