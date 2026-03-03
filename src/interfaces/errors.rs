@@ -78,6 +78,11 @@ impl AppError {
         Self::new(StatusCode::CONFLICT, message, "Conflict")
     }
 
+    /// Create a 423 Locked error (WebDAV).
+    pub fn locked(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::LOCKED, message, "Locked")
+    }
+
     /// Create a 415 Unsupported Media Type error.
     pub fn unsupported_media_type(message: impl Into<String>) -> Self {
         Self::new(

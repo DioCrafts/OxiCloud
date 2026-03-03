@@ -18,7 +18,7 @@ use quick_xml::Writer;
 use uuid::Uuid;
 
 use crate::application::adapters::webdav_adapter::{
-    LockInfo, LockScope, LockType, PropFindRequest, WebDavAdapter,
+    LockInfo, PropFindRequest, WebDavAdapter,
 };
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
@@ -1478,7 +1478,7 @@ async fn handle_copy(
  * @return XML response with lock information
  */
 async fn handle_lock(
-    _state: Arc<AppState>,
+    state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -1521,9 +1521,10 @@ async fn handle_lock(
             .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?
     };
 
+    let lock_store = &state.webdav_lock_store;
+
     // Check if this is a lock refresh (If header with a lock token)
     if let Some(if_header) = if_header_value {
-        // This is a lock refresh request
         // Extract lock token from If header
         let token = if_header
             .trim()
@@ -1531,30 +1532,24 @@ async fn handle_lock(
             .trim_end_matches(">)")
             .to_string();
 
-        // In a full implementation, we would look up the lock in a database
-        // and refresh its timeout. For now, just respond as if we did.
-
-        // Generate lock token and owner (for a real implementation, we'd store these)
-        let lock_info = LockInfo {
-            token,
-            owner: Some(user.id.clone()),
-            depth: depth.to_string(),
-            timeout,
-            scope: LockScope::Exclusive, // Default to exclusive
-            type_: LockType::Write,      // Default to write
-        };
+        // Refresh the lock in the store (extends TTL)
+        let entry = lock_store
+            .refresh(&token, timeout.as_deref())
+            .ok_or_else(|| {
+                AppError::precondition_failed(format!("Lock token not found or expired: {}", token))
+            })?;
 
         // Generate response
         let href = format!("/webdav/{}", encode_uri_path(&path));
         let mut response_body = Vec::new();
-        WebDavAdapter::generate_lock_response(&mut response_body, &lock_info, &href).map_err(
+        WebDavAdapter::generate_lock_response(&mut response_body, &entry.info, &href).map_err(
             |e| AppError::internal_error(format!("Failed to generate LOCK response: {}", e)),
         )?;
 
         Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-            .header(HEADER_LOCK_TOKEN, format!("<{}>", lock_info.token))
+            .header(HEADER_LOCK_TOKEN, format!("<{}>", entry.info.token))
             .body(Body::from(response_body))
             .unwrap())
     } else if !body_bytes.is_empty() {
@@ -1562,7 +1557,6 @@ async fn handle_lock(
         let (scope, type_, owner) = WebDavAdapter::parse_lockinfo(body_bytes.reader())
             .map_err(|e| AppError::bad_request(format!("Failed to parse LOCK request: {}", e)))?;
 
-        // Generate lock token and owner (for a real implementation, we'd store these)
         let token = format!("opaquelocktoken:{}", Uuid::new_v4());
         let lock_info = LockInfo {
             token,
@@ -1573,17 +1567,25 @@ async fn handle_lock(
             type_,
         };
 
+        // Try to acquire the lock (conflict detection via moka store)
+        let entry = lock_store.acquire(&path, lock_info).map_err(|existing| {
+            AppError::locked(format!(
+                "Resource already locked by token {}",
+                existing.info.token
+            ))
+        })?;
+
         // Generate response
         let href = format!("/webdav/{}", encode_uri_path(&path));
         let mut response_body = Vec::new();
-        WebDavAdapter::generate_lock_response(&mut response_body, &lock_info, &href).map_err(
+        WebDavAdapter::generate_lock_response(&mut response_body, &entry.info, &href).map_err(
             |e| AppError::internal_error(format!("Failed to generate LOCK response: {}", e)),
         )?;
 
         Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
-            .header(HEADER_LOCK_TOKEN, format!("<{}>", lock_info.token))
+            .header(HEADER_LOCK_TOKEN, format!("<{}>", entry.info.token))
             .body(Body::from(response_body))
             .unwrap())
     } else {
@@ -1604,7 +1606,7 @@ async fn handle_lock(
  * @return HTTP response indicating success
  */
 async fn handle_unlock(
-    _state: Arc<AppState>,
+    state: Arc<AppState>,
     req: Request<Body>,
     _path: String,
 ) -> Result<Response<Body>, AppError> {
@@ -1624,14 +1626,20 @@ async fn handle_unlock(
         .ok_or_else(|| AppError::bad_request("Lock-Token header required"))?;
 
     // Extract token from header value (format: <token>)
-    let _token = lock_token
+    let token = lock_token
         .trim()
         .trim_start_matches('<')
         .trim_end_matches('>')
         .to_string();
 
-    // In a full implementation, we would look up the lock in a database
-    // and remove it. For now, just respond as if we did.
+    // Remove the lock from the store
+    if !state.webdav_lock_store.release(&token) {
+        // RFC 4918 §9.11.1: If the lock does not exist, return 409 Conflict
+        return Err(AppError::conflict(format!(
+            "Lock token not found or already expired: {}",
+            token
+        )));
+    }
 
     Ok(Response::builder()
         .status(StatusCode::NO_CONTENT)

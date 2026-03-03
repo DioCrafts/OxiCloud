@@ -12,5 +12,6 @@ pub mod path_resolver_service;
 pub mod path_service;
 pub mod thumbnail_service;
 pub mod trash_cleanup_service;
+pub mod webdav_lock_service;
 pub mod wopi_discovery_service;
 pub mod zip_service;

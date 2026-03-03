@@ -543,6 +543,7 @@ impl AppServiceFactory {
             device_auth_service: None,
             app_password_service: None,
             path_resolver: None,
+            webdav_lock_store: crate::infrastructure::services::webdav_lock_service::create_webdav_lock_store(),
         };
 
         // 9b. Wire admin settings service when auth is available
@@ -860,6 +861,8 @@ pub struct AppState {
         Option<Arc<crate::application::services::app_password_service::AppPasswordService>>,
     pub path_resolver:
         Option<Arc<crate::infrastructure::services::path_resolver_service::PathResolverService>>,
+    pub webdav_lock_store:
+        Arc<crate::infrastructure::services::webdav_lock_service::WebDavLockStore>,
 }
 
 // All AppState construction is done via struct literal in build_app_state().
