@@ -73,12 +73,9 @@ impl LoginLockoutService {
     /// Record a failed login attempt.  Returns the new failure count.
     pub fn record_failure(&self, username: &str) -> u32 {
         let key = username.to_lowercase();
-        let new_count = self
-            .cache
-            .get(&key)
-            .map(|r| r.count + 1)
-            .unwrap_or(1);
-        self.cache.insert(key.clone(), FailureRecord { count: new_count });
+        let new_count = self.cache.get(&key).map(|r| r.count + 1).unwrap_or(1);
+        self.cache
+            .insert(key.clone(), FailureRecord { count: new_count });
 
         if new_count >= self.max_failures {
             tracing::warn!(

@@ -52,11 +52,10 @@ pub fn caldav_routes() -> Router<Arc<AppState>> {
 /// Creates RFC 6764 well-known discovery routes.
 /// These are public (no auth) and simply redirect to the CalDAV root.
 pub fn well_known_routes() -> Router<Arc<AppState>> {
-    Router::new()
-        .route(
-            "/.well-known/caldav",
-            axum::routing::any(handle_well_known_caldav),
-        )
+    Router::new().route(
+        "/.well-known/caldav",
+        axum::routing::any(handle_well_known_caldav),
+    )
 }
 
 async fn handle_well_known_caldav() -> Response<Body> {
@@ -114,13 +113,9 @@ fn extract_caldav_path(uri_path: &str) -> String {
     } else if uri_path.ends_with("/caldav") {
         ""
     } else {
-        uri_path
-            .trim_start_matches('/')
-            .trim_end_matches('/')
+        uri_path.trim_start_matches('/').trim_end_matches('/')
     };
-    percent_decode_str(encoded)
-        .decode_utf8_lossy()
-        .into_owned()
+    percent_decode_str(encoded).decode_utf8_lossy().into_owned()
 }
 
 // ─── Helper: extract user from request ───────────────────────────────
@@ -198,9 +193,7 @@ async fn handle_propfind(
             calendar_service
                 .list_my_calendars(&user.id)
                 .await
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to list calendars: {}", e))
-                })?
+                .map_err(|e| AppError::internal_error(format!("Failed to list calendars: {}", e)))?
         };
 
         let base_href = "/caldav/";
@@ -221,9 +214,7 @@ async fn handle_propfind(
             .unwrap())
     } else if path.starts_with("principals/") || path == "principals" {
         // Principal resource — return user principal properties
-        let username = path
-            .strip_prefix("principals/")
-            .unwrap_or(&user.username);
+        let username = path.strip_prefix("principals/").unwrap_or(&user.username);
         let username = if username.is_empty() {
             &user.username
         } else {
@@ -255,9 +246,7 @@ async fn handle_propfind(
 
         if parts.len() == 1 {
             // Single path segment: try as calendar ID first, fall back to user home
-            let calendar_result = calendar_service
-                .get_calendar(first_segment, &user.id)
-                .await;
+            let calendar_result = calendar_service.get_calendar(first_segment, &user.id).await;
 
             if let Ok(calendar) = calendar_result {
                 // Valid calendar ID — return calendar collection
@@ -281,9 +270,7 @@ async fn handle_propfind(
                     base_href,
                     &depth,
                 )
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to generate XML: {}", e))
-                })?;
+                .map_err(|e| AppError::internal_error(format!("Failed to generate XML: {}", e)))?;
 
                 Ok(Response::builder()
                     .status(StatusCode::MULTI_STATUS)
@@ -293,12 +280,13 @@ async fn handle_propfind(
             } else {
                 // Not a calendar ID — treat as user calendar home (e.g. /caldav/{username}/)
                 // List all calendars for this user
-                let calendars = calendar_service
-                    .list_my_calendars(&user.id)
-                    .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!("Failed to list calendars: {}", e))
-                    })?;
+                let calendars =
+                    calendar_service
+                        .list_my_calendars(&user.id)
+                        .await
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to list calendars: {}", e))
+                        })?;
 
                 let base_href = &format!("/caldav/{}/", first_segment);
                 let mut response_body = Vec::new();
@@ -309,9 +297,7 @@ async fn handle_propfind(
                     &propfind_request,
                     base_href,
                 )
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to generate XML: {}", e))
-                })?;
+                .map_err(|e| AppError::internal_error(format!("Failed to generate XML: {}", e)))?;
 
                 Ok(Response::builder()
                     .status(StatusCode::MULTI_STATUS)
@@ -324,9 +310,7 @@ async fn handle_propfind(
             let rest = parts[1];
 
             // Check if first_segment is a valid calendar ID
-            let calendar_result = calendar_service
-                .get_calendar(first_segment, &user.id)
-                .await;
+            let calendar_result = calendar_service.get_calendar(first_segment, &user.id).await;
 
             let (calendar_id, event_path) = if calendar_result.is_ok() {
                 // first_segment is a calendar ID, rest is event path
@@ -341,9 +325,7 @@ async fn handle_propfind(
                     let cal = calendar_service
                         .get_calendar(sub_parts[0], &user.id)
                         .await
-                        .map_err(|e| {
-                            AppError::not_found(format!("Calendar not found: {}", e))
-                        })?;
+                        .map_err(|e| AppError::not_found(format!("Calendar not found: {}", e)))?;
 
                     let events = if depth != "0" {
                         calendar_service
@@ -354,8 +336,7 @@ async fn handle_propfind(
                         vec![]
                     };
 
-                    let base_href =
-                        &format!("/caldav/{}/{}/", first_segment, sub_parts[0]);
+                    let base_href = &format!("/caldav/{}/{}/", first_segment, sub_parts[0]);
                     let mut response_body = Vec::new();
 
                     CalDavAdapter::generate_calendar_collection_propfind(
@@ -387,16 +368,12 @@ async fn handle_propfind(
             let events = calendar_service
                 .list_events(calendar_id, None, None, &user.id)
                 .await
-                .map_err(|e| {
-                    AppError::internal_error(format!("Failed to list events: {}", e))
-                })?;
+                .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
             let event = events
                 .iter()
                 .find(|e| e.ical_uid == ical_uid)
-                .ok_or_else(|| {
-                    AppError::not_found(format!("Event not found: {}", ical_uid))
-                })?;
+                .ok_or_else(|| AppError::not_found(format!("Event not found: {}", ical_uid)))?;
 
             let base_href = &format!("/caldav/{}/", calendar_id);
             let report_type = CalDavReportType::CalendarMultiget {
@@ -411,9 +388,7 @@ async fn handle_propfind(
                 &report_type,
                 base_href,
             )
-            .map_err(|e| {
-                AppError::internal_error(format!("Failed to generate XML: {}", e))
-            })?;
+            .map_err(|e| AppError::internal_error(format!("Failed to generate XML: {}", e)))?;
 
             Ok(Response::builder()
                 .status(StatusCode::MULTI_STATUS)
@@ -718,7 +693,10 @@ fn generate_event_ical(event: &crate::application::dtos::calendar_dto::CalendarE
 }
 
 /// Writes a VEVENT block directly into `buf` — zero intermediate allocations.
-fn write_vevent(buf: &mut String, event: &crate::application::dtos::calendar_dto::CalendarEventDto) {
+fn write_vevent(
+    buf: &mut String,
+    event: &crate::application::dtos::calendar_dto::CalendarEventDto,
+) {
     let _ = write!(
         buf,
         "BEGIN:VEVENT\r\nUID:{}\r\nSUMMARY:{}\r\nDTSTART:{}\r\nDTEND:{}\r\n",

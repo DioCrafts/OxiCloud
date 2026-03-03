@@ -205,10 +205,7 @@ pub async fn auth_middleware(
                         }
                         Err(e) => {
                             tracing::warn!("Bearer token validation failed: {}", e);
-                            return Err(AuthError::InvalidToken(format!(
-                                "Invalid token: {}",
-                                e
-                            )));
+                            return Err(AuthError::InvalidToken(format!("Invalid token: {}", e)));
                         }
                     }
                 }
@@ -273,7 +270,9 @@ pub async fn auth_middleware(
     {
         use crate::interfaces::api::cookie_auth;
 
-        if let Some(token_str) = cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE) {
+        if let Some(token_str) =
+            cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE)
+        {
             if !token_str.is_empty() {
                 tracing::debug!("Processing cookie-based authentication");
 
@@ -281,10 +280,7 @@ pub async fn auth_middleware(
                     let token_service = &auth_service.token_service;
                     match token_service.validate_token(&token_str) {
                         Ok(claims) => {
-                            tracing::debug!(
-                                "Cookie token validated for user: {}",
-                                claims.username
-                            );
+                            tracing::debug!("Cookie token validated for user: {}", claims.username);
                             let current_user = CurrentUser {
                                 id: claims.sub,
                                 username: claims.username,

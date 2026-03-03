@@ -356,7 +356,11 @@ mod tests {
 </D:propfind>"#;
 
         let result = WebDavAdapter::parse_propfind(Cursor::new(xml));
-        assert!(result.is_ok(), "Failed to parse PROPFIND: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse PROPFIND: {:?}",
+            result.err()
+        );
 
         let request = result.unwrap();
         match request.prop_find_type {
@@ -431,7 +435,11 @@ mod tests {
             "/caldav/",
             "testuser",
         );
-        assert!(result.is_ok(), "Failed to generate root propfind: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to generate root propfind: {:?}",
+            result.err()
+        );
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
 
@@ -511,11 +519,8 @@ mod tests {
         };
 
         let mut output = Vec::new();
-        let result = CalDavAdapter::generate_principal_propfind_response(
-            &mut output,
-            &request,
-            "testuser",
-        );
+        let result =
+            CalDavAdapter::generate_principal_propfind_response(&mut output, &request, "testuser");
         assert!(result.is_ok(), "Failed: {:?}", result.err());
 
         let xml_str = String::from_utf8(output).expect("Invalid UTF-8");
@@ -576,10 +581,7 @@ mod tests {
         );
 
         // displayname should be populated
-        assert!(
-            xml_str.contains("Personal"),
-            "Should contain calendar name"
-        );
+        assert!(xml_str.contains("Personal"), "Should contain calendar name");
 
         // supported-calendar-component-set should have VEVENT
         assert!(

@@ -138,7 +138,9 @@ impl BatchOperationService {
             let target_folder = target_folder.clone();
 
             async move {
-                let copy_result = mgmt.copy_file(&file_id, target_folder.map(|s| s.to_string())).await;
+                let copy_result = mgmt
+                    .copy_file(&file_id, target_folder.map(|s| s.to_string()))
+                    .await;
                 (file_id, copy_result)
             }
         }))
@@ -201,7 +203,9 @@ impl BatchOperationService {
             let target_folder = target_folder.clone();
 
             async move {
-                let move_result = mgmt.move_file(&file_id, target_folder.map(|s| s.to_string())).await;
+                let move_result = mgmt
+                    .move_file(&file_id, target_folder.map(|s| s.to_string()))
+                    .await;
                 (file_id, move_result)
             }
         }))
@@ -578,7 +582,9 @@ impl BatchOperationService {
             let caller = caller.clone();
 
             async move {
-                let dto = MoveFolderDto { parent_id: target.map(|s| s.to_string()) };
+                let dto = MoveFolderDto {
+                    parent_id: target.map(|s| s.to_string()),
+                };
                 let move_result = folder_service.move_folder(&folder_id, dto, &caller).await;
                 (folder_id, move_result)
             }

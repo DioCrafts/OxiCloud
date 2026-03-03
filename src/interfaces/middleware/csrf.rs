@@ -40,10 +40,8 @@ pub async fn csrf_middleware(request: Request, next: Next) -> Result<Response, R
     }
 
     // Extract the CSRF token from the cookie.
-    let cookie_token = cookie_auth::extract_cookie_value(
-        request.headers(),
-        cookie_auth::CSRF_COOKIE,
-    );
+    let cookie_token =
+        cookie_auth::extract_cookie_value(request.headers(), cookie_auth::CSRF_COOKIE);
 
     // Extract the CSRF token from the request header.
     let header_token = request

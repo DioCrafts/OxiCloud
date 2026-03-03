@@ -62,12 +62,7 @@ impl RateLimiter {
         // moka's entry API lets us atomically read-modify-write.
         // On first access the entry is inserted with count = 1 and the TTL
         // starts. Subsequent accesses within the window increment the count.
-        let count = self
-            .cache
-            .entry(key)
-            .or_insert_with(|| 0)
-            .into_value()
-            + 1;
+        let count = self.cache.entry(key).or_insert_with(|| 0).into_value() + 1;
 
         // Write back the incremented value.  Because `or_insert_with` returns
         // the *existing* value when the key was already present, we must always
@@ -75,8 +70,7 @@ impl RateLimiter {
         // insert still governs eviction because moka uses insert-time TTL.
         // However, on re-insert moka resets the TTL — for rate limiting this
         // is fine because it means the window "slides" forward on activity.
-        self.cache
-            .insert(ip.to_string(), count);
+        self.cache.insert(ip.to_string(), count);
 
         if count > self.max_requests {
             Err(())

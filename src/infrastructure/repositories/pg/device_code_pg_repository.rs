@@ -114,11 +114,9 @@ impl DeviceCodeStoragePort for DeviceCodePgRepository {
         .fetch_one(self.pool.as_ref())
         .await
         .map_err(|e| match e {
-            sqlx::Error::RowNotFound => DomainError::new(
-                ErrorKind::NotFound,
-                "DeviceCode",
-                "Device code not found",
-            ),
+            sqlx::Error::RowNotFound => {
+                DomainError::new(ErrorKind::NotFound, "DeviceCode", "Device code not found")
+            }
             _ => DomainError::new(
                 ErrorKind::DatabaseError,
                 "DeviceCode",

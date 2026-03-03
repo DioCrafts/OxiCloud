@@ -41,9 +41,7 @@ fn cookie_secure() -> bool {
 /// Build a `Set-Cookie` header value.
 fn build_cookie(name: &str, value: &str, path: &str, max_age_secs: i64) -> String {
     let secure = if cookie_secure() { "; Secure" } else { "" };
-    format!(
-        "{name}={value}; HttpOnly; SameSite=Lax; Path={path}; Max-Age={max_age_secs}{secure}",
-    )
+    format!("{name}={value}; HttpOnly; SameSite=Lax; Path={path}; Max-Age={max_age_secs}{secure}",)
 }
 
 /// Append `Set-Cookie` headers for both access and refresh tokens.
@@ -83,9 +81,7 @@ pub fn append_auth_cookies(
 pub fn append_clear_cookies(headers: &mut HeaderMap) {
     for (name, path) in [(ACCESS_COOKIE, "/"), (REFRESH_COOKIE, "/api/auth")] {
         let secure = if cookie_secure() { "; Secure" } else { "" };
-        let val = format!(
-            "{name}=; HttpOnly; SameSite=Lax; Path={path}; Max-Age=0{secure}",
-        );
+        let val = format!("{name}=; HttpOnly; SameSite=Lax; Path={path}; Max-Age=0{secure}",);
         if let Ok(hv) = HeaderValue::from_str(&val) {
             headers.append(SET_COOKIE, hv);
         }
@@ -122,9 +118,7 @@ pub fn generate_csrf_token() -> String {
 /// via `document.cookie` and echo it back in the `X-CSRF-Token` header.
 fn build_csrf_cookie(value: &str, max_age_secs: i64) -> String {
     let secure = if cookie_secure() { "; Secure" } else { "" };
-    format!(
-        "{CSRF_COOKIE}={value}; SameSite=Lax; Path=/; Max-Age={max_age_secs}{secure}",
-    )
+    format!("{CSRF_COOKIE}={value}; SameSite=Lax; Path=/; Max-Age={max_age_secs}{secure}",)
 }
 
 /// Append a CSRF double-submit cookie alongside the auth cookies.
@@ -139,9 +133,7 @@ pub fn append_csrf_cookie(headers: &mut HeaderMap, access_expiry_secs: i64) {
 /// Clear the CSRF cookie (on logout).
 pub fn append_clear_csrf_cookie(headers: &mut HeaderMap) {
     let secure = if cookie_secure() { "; Secure" } else { "" };
-    let val = format!(
-        "{CSRF_COOKIE}=; SameSite=Lax; Path=/; Max-Age=0{secure}",
-    );
+    let val = format!("{CSRF_COOKIE}=; SameSite=Lax; Path=/; Max-Age=0{secure}",);
     if let Ok(hv) = HeaderValue::from_str(&val) {
         headers.append(SET_COOKIE, hv);
     }

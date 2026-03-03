@@ -11,11 +11,13 @@
 use std::sync::Arc;
 
 use crate::application::dtos::device_auth_dto::*;
-use crate::application::ports::auth_ports::{DeviceCodeStoragePort, TokenServicePort, UserStoragePort};
+use crate::application::ports::auth_ports::SessionStoragePort;
+use crate::application::ports::auth_ports::{
+    DeviceCodeStoragePort, TokenServicePort, UserStoragePort,
+};
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::device_code::{DeviceCode, DeviceCodeStatus};
 use crate::domain::entities::session::Session;
-use crate::application::ports::auth_ports::SessionStoragePort;
 
 /// Default device code lifetime: 15 minutes (RFC 8628 recommends 5-30 min).
 const DEVICE_CODE_LIFETIME_SECS: i64 = 900;
@@ -149,11 +151,7 @@ impl DeviceAuthService {
     ///
     /// * `user_code` — the code from the verification page
     /// * `user_id` — the authenticated user's ID (from session/JWT)
-    pub async fn approve(
-        &self,
-        user_code: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    pub async fn approve(&self, user_code: &str, user_id: &str) -> Result<(), DomainError> {
         let normalized = user_code.trim().to_uppercase().replace(' ', "");
 
         let mut dc = self
@@ -180,8 +178,8 @@ impl DeviceAuthService {
         let session = Session::new(
             user_id.to_string(),
             refresh_token.clone(),
-            None,                                              // ip_address
-            Some(format!("device:{}", dc.client_name())),      // user_agent
+            None,                                         // ip_address
+            Some(format!("device:{}", dc.client_name())), // user_agent
             self.token_service.refresh_token_expiry_days(),
         );
         self.session_storage.create_session(session).await?;
@@ -226,10 +224,7 @@ impl DeviceAuthService {
     /// Client polls for tokens. Returns:
     /// - `Ok(DeviceTokenSuccessDto)` if authorized
     /// - `Err` with specific RFC 8628 error codes for pending/slow_down/expired/denied
-    pub async fn poll(
-        &self,
-        device_code: &str,
-    ) -> Result<DeviceTokenSuccessDto, DevicePollError> {
+    pub async fn poll(&self, device_code: &str) -> Result<DeviceTokenSuccessDto, DevicePollError> {
         let mut dc = self
             .device_code_storage
             .get_by_device_code(device_code)
@@ -240,7 +235,10 @@ impl DeviceAuthService {
         if dc.is_expired() && dc.status() == DeviceCodeStatus::Pending {
             let mut expired_dc = dc.clone();
             expired_dc.mark_expired();
-            let _ = self.device_code_storage.update_device_code(expired_dc).await;
+            let _ = self
+                .device_code_storage
+                .update_device_code(expired_dc)
+                .await;
             return Err(DevicePollError::ExpiredToken);
         }
 

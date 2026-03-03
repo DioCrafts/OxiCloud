@@ -603,10 +603,11 @@ impl AppServiceFactory {
                     Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
                         pool.clone(),
                     ));
-                let session_repo: Arc<dyn crate::application::ports::auth_ports::SessionStoragePort> =
-                    Arc::new(crate::infrastructure::repositories::SessionPgRepository::new(
-                        pool.clone(),
-                    ));
+                let session_repo: Arc<
+                    dyn crate::application::ports::auth_ports::SessionStoragePort,
+                > = Arc::new(
+                    crate::infrastructure::repositories::SessionPgRepository::new(pool.clone()),
+                );
                 let base_url = self.config.base_url();
 
                 let device_auth_svc = Arc::new(DeviceAuthService::new(
@@ -625,8 +626,9 @@ impl AppServiceFactory {
                 use crate::application::services::app_password_service::AppPasswordService;
                 use crate::infrastructure::repositories::AppPasswordPgRepository;
 
-                let app_pw_repo: Arc<dyn crate::application::ports::auth_ports::AppPasswordStoragePort> =
-                    Arc::new(AppPasswordPgRepository::new(pool.clone()));
+                let app_pw_repo: Arc<
+                    dyn crate::application::ports::auth_ports::AppPasswordStoragePort,
+                > = Arc::new(AppPasswordPgRepository::new(pool.clone()));
                 let hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
                     Arc::new(
                         crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
@@ -818,7 +820,8 @@ pub struct ApplicationServices {
 pub struct AuthServices {
     pub token_service: Arc<dyn crate::application::ports::auth_ports::TokenServicePort>,
     pub auth_application_service: Arc<AuthApplicationService>,
-    pub login_lockout: Arc<crate::infrastructure::services::login_lockout_service::LoginLockoutService>,
+    pub login_lockout:
+        Arc<crate::infrastructure::services::login_lockout_service::LoginLockoutService>,
 }
 
 /// Global application state for dependency injection

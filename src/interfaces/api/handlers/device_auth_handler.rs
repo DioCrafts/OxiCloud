@@ -92,8 +92,8 @@ async fn device_token(
     match device_service.poll(&body.device_code).await {
         Ok(tokens) => Ok((StatusCode::OK, Json(tokens)).into_response()),
         Err(poll_err) => {
-            let status = StatusCode::from_u16(poll_err.http_status())
-                .unwrap_or(StatusCode::BAD_REQUEST);
+            let status =
+                StatusCode::from_u16(poll_err.http_status()).unwrap_or(StatusCode::BAD_REQUEST);
             let error_body = serde_json::json!({
                 "error": poll_err.error_code(),
                 "error_description": poll_err.description()
@@ -166,9 +166,7 @@ async fn device_verify_action(
                 Json(serde_json::json!({ "status": "denied" })),
             ))
         }
-        _ => Err(AppError::bad_request(
-            "action must be 'approve' or 'deny'",
-        )),
+        _ => Err(AppError::bad_request("action must be 'approve' or 'deny'")),
     }
 }
 

@@ -268,10 +268,18 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64, i64)> =
-            if let Some(pid) = parent_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+            i64,
+            i64,
+            i64,
+        )> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
@@ -281,15 +289,15 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $2 OFFSET $3
                 "#,
-                )
-                .bind(pid)
-                .bind(limit as i64)
-                .bind(offset as i64)
-                .fetch_all(self.pool())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(pid)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
@@ -299,13 +307,13 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $1 OFFSET $2
                 "#,
-                )
-                .bind(limit as i64)
-                .bind(offset as i64)
-                .fetch_all(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate: {e}")))?;
+            )
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate: {e}")))?;
 
         // total_count is identical in every row; 0 when the result set is empty.
         let total = if include_total {
@@ -333,10 +341,18 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64, i64)> =
-            if let Some(pid) = parent_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<(
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+            i64,
+            i64,
+            i64,
+        )> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
@@ -346,16 +362,16 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $3 OFFSET $4
                 "#,
-                )
-                .bind(pid)
-                .bind(owner_id)
-                .bind(limit as i64)
-                .bind(offset as i64)
-                .fetch_all(self.pool())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(pid)
+            .bind(owner_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
@@ -365,16 +381,14 @@ impl FolderRepository for FolderDbRepository {
                  ORDER BY name
                  LIMIT $2 OFFSET $3
                 "#,
-                )
-                .bind(owner_id)
-                .bind(limit as i64)
-                .bind(offset as i64)
-                .fetch_all(self.pool())
-                .await
-            }
-            .map_err(|e| {
-                DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}"))
-            })?;
+            )
+            .bind(owner_id)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("paginate_by_owner: {e}")))?;
 
         let total = if include_total {
             Some(rows.first().map_or(0, |r| r.7) as usize)
@@ -867,10 +881,7 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if name.len() >= 3 => (
-                " AND fo.name ILIKE $3",
-                Some(format!("%{}%", name)),
-            ),
+            Some(name) if name.len() >= 3 => (" AND fo.name ILIKE $3", Some(format!("%{}%", name))),
             _ => ("", None),
         };
 

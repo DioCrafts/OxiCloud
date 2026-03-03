@@ -86,10 +86,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         Ok(row.into())
     }
 
-    async fn get_active_by_user_id(
-        &self,
-        user_id: &str,
-    ) -> Result<Vec<AppPassword>, DomainError> {
+    async fn get_active_by_user_id(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError> {
         let rows = sqlx::query_as::<_, AppPasswordRow>(
             r#"
             SELECT id, user_id, label, password_hash, prefix, scopes,
@@ -103,9 +100,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         .bind(user_id)
         .fetch_all(self.pool())
         .await
-        .map_err(|e| {
-            DomainError::internal_error("AppPasswordPg", format!("get_active: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("AppPasswordPg", format!("get_active: {e}")))?;
 
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
@@ -115,21 +110,16 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
             .bind(id)
             .execute(self.pool())
             .await
-            .map_err(|e| {
-                DomainError::internal_error("AppPasswordPg", format!("touch: {e}"))
-            })?;
+            .map_err(|e| DomainError::internal_error("AppPasswordPg", format!("touch: {e}")))?;
         Ok(())
     }
 
     async fn revoke(&self, id: &str) -> Result<(), DomainError> {
-        let result =
-            sqlx::query("UPDATE auth.app_passwords SET active = FALSE WHERE id = $1")
-                .bind(id)
-                .execute(self.pool())
-                .await
-                .map_err(|e| {
-                    DomainError::internal_error("AppPasswordPg", format!("revoke: {e}"))
-                })?;
+        let result = sqlx::query("UPDATE auth.app_passwords SET active = FALSE WHERE id = $1")
+            .bind(id)
+            .execute(self.pool())
+            .await
+            .map_err(|e| DomainError::internal_error("AppPasswordPg", format!("revoke: {e}")))?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::not_found("AppPassword", id));

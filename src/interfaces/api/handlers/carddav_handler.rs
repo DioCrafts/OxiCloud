@@ -99,9 +99,7 @@ fn extract_carddav_path(uri_path: &str) -> String {
     } else if uri_path.ends_with("/carddav") {
         ""
     } else {
-        uri_path
-            .trim_start_matches('/')
-            .trim_end_matches('/')
+        uri_path.trim_start_matches('/').trim_end_matches('/')
     };
     percent_encoding::percent_decode_str(encoded)
         .decode_utf8_lossy()

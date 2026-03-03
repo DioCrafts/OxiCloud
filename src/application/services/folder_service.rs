@@ -398,12 +398,16 @@ impl FolderUseCase for FolderService {
         }
 
         // Rename folder — UPDATE RETURNING gives us the updated row directly
-        let folder = self.folder_storage.rename_folder(id, dto.name).await.map_err(|e| {
-            DomainError::internal_error(
-                "FolderStorage",
-                format!("Failed to rename folder with ID: {}: {}", id, e),
-            )
-        })?;
+        let folder = self
+            .folder_storage
+            .rename_folder(id, dto.name)
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "FolderStorage",
+                    format!("Failed to rename folder with ID: {}: {}", id, e),
+                )
+            })?;
 
         Ok(FolderDto::from(folder))
     }
@@ -455,12 +459,16 @@ impl FolderUseCase for FolderService {
 
         // Move folder — UPDATE RETURNING gives us the updated row directly
         let parent_ref = dto.parent_id.as_deref();
-        let folder = self.folder_storage.move_folder(id, parent_ref).await.map_err(|e| {
-            DomainError::internal_error(
-                "FolderStorage",
-                format!("Failed to move folder with ID: {}: {}", id, e),
-            )
-        })?;
+        let folder = self
+            .folder_storage
+            .move_folder(id, parent_ref)
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "FolderStorage",
+                    format!("Failed to move folder with ID: {}: {}", id, e),
+                )
+            })?;
 
         Ok(FolderDto::from(folder))
     }

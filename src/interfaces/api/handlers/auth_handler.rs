@@ -197,10 +197,7 @@ async fn login(
                 auth_response.expires_in,
                 state.core.config.auth.refresh_token_expiry_secs,
             );
-            cookie_auth::append_csrf_cookie(
-                response.headers_mut(),
-                auth_response.expires_in,
-            );
+            cookie_auth::append_csrf_cookie(response.headers_mut(), auth_response.expires_in);
             Ok(response)
         }
         Err(err) => {
@@ -253,10 +250,7 @@ async fn refresh_token(
         auth_response.expires_in,
         state.core.config.auth.refresh_token_expiry_secs,
     );
-    cookie_auth::append_csrf_cookie(
-        response.headers_mut(),
-        auth_response.expires_in,
-    );
+    cookie_auth::append_csrf_cookie(response.headers_mut(), auth_response.expires_in);
     Ok(response)
 }
 
@@ -522,9 +516,6 @@ async fn oidc_exchange(
         auth_response.expires_in,
         state.core.config.auth.refresh_token_expiry_secs,
     );
-    cookie_auth::append_csrf_cookie(
-        response.headers_mut(),
-        auth_response.expires_in,
-    );
+    cookie_auth::append_csrf_cookie(response.headers_mut(), auth_response.expires_in);
     Ok(response)
 }

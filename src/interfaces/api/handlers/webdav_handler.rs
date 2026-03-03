@@ -28,7 +28,7 @@ use crate::common::di::AppState;
 use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
-use percent_encoding::{percent_decode_str, utf8_percent_encode, NON_ALPHANUMERIC, AsciiSet};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::sync::Arc;
 
 /// Characters that MUST NOT be percent-encoded inside a URI path segment.
@@ -115,9 +115,7 @@ fn extract_webdav_path(uri: &axum::http::Uri) -> String {
         trimmed.trim_end_matches('/')
     };
     // Decode percent-encoded characters (e.g. %20 → space)
-    percent_decode_str(encoded)
-        .decode_utf8_lossy()
-        .into_owned()
+    percent_decode_str(encoded).decode_utf8_lossy().into_owned()
 }
 
 async fn handle_webdav_methods_root(
@@ -324,8 +322,13 @@ async fn handle_propfind(
                     let mut xml_writer = Writer::new(&mut buf);
                     WebDavAdapter::write_multistatus_start(&mut xml_writer)
                         .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
-                    WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
-                        .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                    WebDavAdapter::write_file_entry(
+                        &mut xml_writer,
+                        &file,
+                        &propfind_request,
+                        &base_href,
+                    )
+                    .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
                     WebDavAdapter::write_multistatus_end(&mut xml_writer)
                         .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
                 }
@@ -358,8 +361,13 @@ async fn handle_propfind(
                 let mut xml_writer = Writer::new(&mut buf);
                 WebDavAdapter::write_multistatus_start(&mut xml_writer)
                     .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
-                WebDavAdapter::write_file_entry(&mut xml_writer, &file, &propfind_request, &base_href)
-                    .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
+                WebDavAdapter::write_file_entry(
+                    &mut xml_writer,
+                    &file,
+                    &propfind_request,
+                    &base_href,
+                )
+                .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
                 WebDavAdapter::write_multistatus_end(&mut xml_writer)
                     .map_err(|e| AppError::internal_error(format!("XML write error: {}", e)))?;
             }
@@ -910,13 +918,17 @@ async fn handle_delete(
                 folder_service
                     .delete_folder(&folder.id, caller_id)
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to delete folder: {}", e))
+                    })?;
             }
             Ok(ResolvedResource::File(file)) => {
                 file_management_service
                     .delete_file(&file.id)
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to delete file: {}", e)))?;
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to delete file: {}", e))
+                    })?;
             }
             Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", path))),
         }
@@ -1002,8 +1014,14 @@ async fn handle_move(
         let dest_exists = if let Some(resolver) = &state.path_resolver {
             resolver.exists(&destination_path).await.unwrap_or(false)
         } else {
-            folder_service.get_folder_by_path(&destination_path).await.is_ok()
-                || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok()
+            folder_service
+                .get_folder_by_path(&destination_path)
+                .await
+                .is_ok()
+                || file_retrieval_service
+                    .get_file_by_path(&destination_path)
+                    .await
+                    .is_ok()
         };
         if dest_exists {
             return Err(AppError::precondition_failed(
@@ -1044,7 +1062,9 @@ async fn handle_move(
                         folder.owner_id.as_deref().unwrap_or("webdav"),
                     )
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to move folder: {}", e))
+                    })?;
 
                 if folder.name != dest_folder_name {
                     let rename_dto = crate::application::dtos::folder_dto::RenameFolderDto {
@@ -1057,7 +1077,9 @@ async fn handle_move(
                             folder.owner_id.as_deref().unwrap_or("webdav"),
                         )
                         .await
-                        .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to rename folder: {}", e))
+                        })?;
                 }
             }
             Ok(ResolvedResource::File(file)) => {
@@ -1080,16 +1102,25 @@ async fn handle_move(
                     file_management_service
                         .move_file(&file.id, Some(dest_parent_path.to_string()))
                         .await
-                        .map_err(|e| AppError::internal_error(format!("Failed to move file: {}", e)))?;
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to move file: {}", e))
+                        })?;
                 }
                 if file.name != dest_filename {
                     file_management_service
                         .rename_file(&file.id, dest_filename)
                         .await
-                        .map_err(|e| AppError::internal_error(format!("Failed to rename file: {}", e)))?;
+                        .map_err(|e| {
+                            AppError::internal_error(format!("Failed to rename file: {}", e))
+                        })?;
                 }
             }
-            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", source_path))),
+            Err(_) => {
+                return Err(AppError::not_found(format!(
+                    "Resource not found: {}",
+                    source_path
+                )));
+            }
         }
     } else {
         // Fallback: legacy double-query path
@@ -1137,13 +1168,17 @@ async fn handle_move(
                         folder.owner_id.as_deref().unwrap_or("webdav"),
                     )
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to rename folder: {}", e)))?;
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to rename folder: {}", e))
+                    })?;
             }
         } else {
             let file = file_retrieval_service
                 .get_file_by_path(&source_path)
                 .await
-                .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
+                .map_err(|_e| {
+                    AppError::not_found(format!("Resource not found: {}", source_path))
+                })?;
 
             let dest_filename = destination_path
                 .split('/')
@@ -1170,7 +1205,9 @@ async fn handle_move(
                 file_management_service
                     .rename_file(&file.id, dest_filename)
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to rename file: {}", e)))?;
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to rename file: {}", e))
+                    })?;
             }
         }
     }
@@ -1240,8 +1277,14 @@ async fn handle_copy(
         let dest_exists = if let Some(resolver) = &state.path_resolver {
             resolver.exists(&destination_path).await.unwrap_or(false)
         } else {
-            folder_service.get_folder_by_path(&destination_path).await.is_ok()
-                || file_retrieval_service.get_file_by_path(&destination_path).await.is_ok()
+            folder_service
+                .get_folder_by_path(&destination_path)
+                .await
+                .is_ok()
+                || file_retrieval_service
+                    .get_file_by_path(&destination_path)
+                    .await
+                    .is_ok()
         };
         if dest_exists {
             return Err(AppError::precondition_failed(
@@ -1296,7 +1339,10 @@ async fn handle_copy(
                         .create_folder(create_dto)
                         .await
                         .map_err(|e| {
-                            AppError::internal_error(format!("Failed to create destination folder: {}", e))
+                            AppError::internal_error(format!(
+                                "Failed to create destination folder: {}",
+                                e
+                            ))
                         })?;
                 }
             }
@@ -1322,7 +1368,12 @@ async fn handle_copy(
                     .await
                     .map_err(|e| AppError::internal_error(format!("Failed to copy file: {}", e)))?;
             }
-            Err(_) => return Err(AppError::not_found(format!("Resource not found: {}", source_path))),
+            Err(_) => {
+                return Err(AppError::not_found(format!(
+                    "Resource not found: {}",
+                    source_path
+                )));
+            }
         }
     } else {
         // Fallback: legacy double-query path
@@ -1371,14 +1422,19 @@ async fn handle_copy(
                     .create_folder(create_dto)
                     .await
                     .map_err(|e| {
-                        AppError::internal_error(format!("Failed to create destination folder: {}", e))
+                        AppError::internal_error(format!(
+                            "Failed to create destination folder: {}",
+                            e
+                        ))
                     })?;
             }
         } else {
             let file = file_retrieval_service
                 .get_file_by_path(&source_path)
                 .await
-                .map_err(|_e| AppError::not_found(format!("Resource not found: {}", source_path)))?;
+                .map_err(|_e| {
+                    AppError::not_found(format!("Resource not found: {}", source_path))
+                })?;
 
             let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
                 &destination_path[..idx]

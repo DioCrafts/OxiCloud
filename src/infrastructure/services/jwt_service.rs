@@ -335,7 +335,9 @@ mod tests {
         let claims1 = service.validate_token(&token).expect("Should validate");
 
         // Second call: cache hit — skips HMAC, returns cloned claims
-        let claims2 = service.validate_token(&token).expect("Should validate from cache");
+        let claims2 = service
+            .validate_token(&token)
+            .expect("Should validate from cache");
 
         assert_eq!(claims1.sub, claims2.sub);
         assert_eq!(claims1.username, claims2.username);

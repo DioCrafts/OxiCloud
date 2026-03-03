@@ -242,12 +242,7 @@ impl DeviceCode {
     }
 
     /// Authorize this device code for a specific user, storing the tokens.
-    pub fn authorize(
-        &mut self,
-        user_id: String,
-        access_token: String,
-        refresh_token: String,
-    ) {
+    pub fn authorize(&mut self, user_id: String, access_token: String, refresh_token: String) {
         self.status = DeviceCodeStatus::Authorized;
         self.user_id = Some(user_id);
         self.access_token = Some(access_token);

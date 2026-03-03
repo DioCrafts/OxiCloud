@@ -636,7 +636,8 @@ impl AppConfig {
         {
             config.auth.rate_limit.register_max_requests = val;
         }
-        if let Ok(v) = env::var("OXICLOUD_RATE_LIMIT_REGISTER_WINDOW_SECS").map(|v| v.parse::<u64>())
+        if let Ok(v) =
+            env::var("OXICLOUD_RATE_LIMIT_REGISTER_WINDOW_SECS").map(|v| v.parse::<u64>())
             && let Ok(val) = v
         {
             config.auth.rate_limit.register_window_secs = val;

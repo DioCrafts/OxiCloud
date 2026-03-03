@@ -54,19 +54,22 @@ impl PathResolverService {
         // Single round-trip: folder branch ∪ file branch, LIMIT 1.
         // Column order: resource_type, id, name, path, parent_id, user_id,
         //               created_at, modified_at, size, mime_type, folder_id
-        let row = sqlx::query_as::<_, (
-            String,          // resource_type
-            String,          // id
-            String,          // name
-            String,          // path
-            Option<String>,  // parent_id  (folder) / NULL (file)
-            Option<String>,  // user_id
-            i64,             // created_at epoch
-            i64,             // modified_at epoch
-            Option<i64>,     // size       (NULL for folder)
-            Option<String>,  // mime_type  (NULL for folder)
-            Option<String>,  // folder_id  (NULL for folder)
-        )>(
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,         // resource_type
+                String,         // id
+                String,         // name
+                String,         // path
+                Option<String>, // parent_id  (folder) / NULL (file)
+                Option<String>, // user_id
+                i64,            // created_at epoch
+                i64,            // modified_at epoch
+                Option<i64>,    // size       (NULL for folder)
+                Option<String>, // mime_type  (NULL for folder)
+                Option<String>, // folder_id  (NULL for folder)
+            ),
+        >(
             r#"
             SELECT resource_type, id, name, path, parent_id, user_id,
                    created_at, modified_at, size, mime_type, folder_id
@@ -114,16 +117,27 @@ impl PathResolverService {
              LIMIT 1
             "#,
         )
-        .bind(path)         // $1 — full path for folder lookup
-        .bind(filename)     // $2 — filename for file lookup
+        .bind(path) // $1 — full path for folder lookup
+        .bind(filename) // $2 — filename for file lookup
         .bind(&folder_path) // $3 — parent folder path for file lookup
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("PathResolver", format!("resolve: {e}")))?
         .ok_or_else(|| DomainError::not_found("Resource", path))?;
 
-        let (resource_type, id, name, res_path, parent_id, user_id,
-             created_at, modified_at, size, mime_type, folder_id) = row;
+        let (
+            resource_type,
+            id,
+            name,
+            res_path,
+            parent_id,
+            user_id,
+            created_at,
+            modified_at,
+            size,
+            mime_type,
+            folder_id,
+        ) = row;
 
         match resource_type.as_str() {
             "folder" => Ok(ResolvedResource::Folder(FolderDto {

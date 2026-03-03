@@ -132,9 +132,9 @@ impl AppPasswordService {
         let password_hash = self.hasher.hash_password(&plain_token).await?;
 
         // Calculate expiration
-        let expires_at = request.expires_in_days.map(|days| {
-            Utc::now() + Duration::days(days as i64)
-        });
+        let expires_at = request
+            .expires_in_days
+            .map(|days| Utc::now() + Duration::days(days as i64));
 
         // Create entity
         let app_password = AppPassword::new(
@@ -148,9 +148,7 @@ impl AppPasswordService {
 
         let saved = self.repo.create(app_password).await?;
 
-        let expires_str = saved
-            .expires_at
-            .map(|dt| dt.to_rfc3339());
+        let expires_str = saved.expires_at.map(|dt| dt.to_rfc3339());
 
         let curl_example = format!(
             "curl -u '{}:{}' -X PROPFIND {}/webdav/",
@@ -225,7 +223,11 @@ impl AppPasswordService {
     /// Also invalidates **all** cached Basic Auth entries for the owning user
     /// so that the revocation takes effect immediately (instead of waiting
     /// up to `BASIC_AUTH_CACHE_TTL_SECS`).
-    pub async fn revoke(&self, user_id: &str, id: &str) -> Result<AppPasswordRevokeResponseDto, DomainError> {
+    pub async fn revoke(
+        &self,
+        user_id: &str,
+        id: &str,
+    ) -> Result<AppPasswordRevokeResponseDto, DomainError> {
         let ap = self.repo.get_by_id(id).await?;
         if ap.user_id != user_id {
             return Err(DomainError::unauthorized(
@@ -241,7 +243,11 @@ impl AppPasswordService {
             .invalidate_entries_if(move |_key, val| val.user_id == uid)
             .ok();
 
-        tracing::debug!("Revoked app password {} — auth cache entries for user {} invalidated", id, user_id);
+        tracing::debug!(
+            "Revoked app password {} — auth cache entries for user {} invalidated",
+            id,
+            user_id
+        );
 
         Ok(AppPasswordRevokeResponseDto {
             status: "revoked".to_string(),
@@ -270,19 +276,12 @@ impl AppPasswordService {
         // ── 1. Compute cache key = blake3("username:password") ────────
         //    The plain-text password is never stored; only the 32-byte
         //    cryptographic digest is used as lookup key.
-        let cache_key: [u8; 32] = blake3::hash(
-            format!("{}:{}", username, password).as_bytes(),
-        )
-        .into();
+        let cache_key: [u8; 32] =
+            blake3::hash(format!("{}:{}", username, password).as_bytes()).into();
 
         // ── 2. Cache hit → return immediately ────────────────────────
         if let Some(cached) = self.auth_cache.get(&cache_key).await {
-            return Ok((
-                cached.user_id,
-                cached.username,
-                cached.email,
-                cached.role,
-            ));
+            return Ok((cached.user_id, cached.username, cached.email, cached.role));
         }
 
         // ── 3. Cache miss → full verification ────────────────────────
@@ -294,10 +293,7 @@ impl AppPasswordService {
             .map_err(|_| DomainError::unauthorized("Invalid username or app password"))?;
 
         // Get all active app passwords for this user
-        let app_passwords = self
-            .repo
-            .get_active_by_user_id(user.id())
-            .await?;
+        let app_passwords = self.repo.get_active_by_user_id(user.id()).await?;
 
         if app_passwords.is_empty() {
             return Err(DomainError::unauthorized(
@@ -307,7 +303,11 @@ impl AppPasswordService {
 
         // Try each app password hash (Argon2id — CPU-intensive)
         for ap in &app_passwords {
-            if let Ok(true) = self.hasher.verify_password(password, &ap.password_hash).await {
+            if let Ok(true) = self
+                .hasher
+                .verify_password(password, &ap.password_hash)
+                .await
+            {
                 // Update last_used_at (fire-and-forget; don't fail auth on touch error)
                 let _ = self.repo.touch_last_used(&ap.id).await;
 
@@ -321,12 +321,7 @@ impl AppPasswordService {
                 // ── 4. Cache the successful result ────────────────────
                 self.auth_cache.insert(cache_key, result.clone()).await;
 
-                return Ok((
-                    result.user_id,
-                    result.username,
-                    result.email,
-                    result.role,
-                ));
+                return Ok((result.user_id, result.username, result.email, result.role));
             }
         }
 
