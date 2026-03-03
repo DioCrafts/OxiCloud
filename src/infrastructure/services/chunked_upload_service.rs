@@ -496,7 +496,10 @@ impl ChunkedUploadService {
         if let Some(ref expected_checksum) = checksum {
             let data_clone = data.clone(); // Bytes::clone is O(1) — just an Arc increment
             let actual_checksum =
-                tokio::task::spawn_blocking(move || format!("{:x}", md5::compute(&data_clone)))
+                tokio::task::spawn_blocking(move || {
+                    use md5::{Md5, Digest};
+                    format!("{:x}", Md5::digest(&data_clone))
+                })
                     .await
                     .map_err(|e| format!("MD5 checksum task failed: {e}"))?;
 
