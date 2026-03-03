@@ -13,6 +13,9 @@ use chrono::{Duration, Utc};
 use moka::future::Cache;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
+use crate::infrastructure::repositories::pg::AppPasswordPgRepository;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
+use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /// App password token length (32 random alphanumeric chars after prefix).
 const TOKEN_LENGTH: usize = 32;
@@ -39,9 +42,9 @@ struct CachedBasicAuthResult {
 }
 
 pub struct AppPasswordService {
-    repo: Arc<dyn AppPasswordStoragePort>,
-    hasher: Arc<dyn PasswordHasherPort>,
-    user_repo: Arc<dyn UserStoragePort>,
+    repo: Arc<AppPasswordPgRepository>,
+    hasher: Arc<Argon2PasswordHasher>,
+    user_repo: Arc<UserPgRepository>,
     base_url: String,
 
     /// In-memory cache of successful Basic Auth verifications.
@@ -59,9 +62,9 @@ pub struct AppPasswordService {
 
 impl AppPasswordService {
     pub fn new(
-        repo: Arc<dyn AppPasswordStoragePort>,
-        hasher: Arc<dyn PasswordHasherPort>,
-        user_repo: Arc<dyn UserStoragePort>,
+        repo: Arc<AppPasswordPgRepository>,
+        hasher: Arc<Argon2PasswordHasher>,
+        user_repo: Arc<UserPgRepository>,
         base_url: String,
     ) -> Self {
         let auth_cache = Cache::builder()

@@ -15,6 +15,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
+use crate::application::services::folder_service::FolderService;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::services::oidc_service::OidcService;
+use crate::infrastructure::repositories::pg::SessionPgRepository;
+use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /// Tracks a pending OIDC authorization flow (CSRF + PKCE + nonce)
 #[derive(Clone)]
@@ -31,7 +37,7 @@ struct PendingOidcToken {
 
 /// Interior state for OIDC — protected by RwLock for hot-reload.
 struct OidcState {
-    service: Option<Arc<dyn OidcServicePort>>,
+    service: Option<Arc<OidcService>>,
     config: Option<OidcConfig>,
 }
 
@@ -40,11 +46,11 @@ const DEFAULT_ADMIN_QUOTA: i64 = 107_374_182_400;
 const DEFAULT_USER_QUOTA: i64 = 1_073_741_824; // 1 GB
 
 pub struct AuthApplicationService {
-    user_storage: Arc<dyn UserStoragePort>,
-    session_storage: Arc<dyn SessionStoragePort>,
-    password_hasher: Arc<dyn PasswordHasherPort>,
-    token_service: Arc<dyn TokenServicePort>,
-    folder_service: Option<Arc<dyn FolderUseCase>>,
+    user_storage: Arc<UserPgRepository>,
+    session_storage: Arc<SessionPgRepository>,
+    password_hasher: Arc<Argon2PasswordHasher>,
+    token_service: Arc<JwtTokenService>,
+    folder_service: Option<Arc<FolderService>>,
     /// Path to the storage directory, used for disk-space–aware quota calculation
     storage_path: PathBuf,
     oidc: RwLock<OidcState>,
@@ -58,10 +64,10 @@ pub struct AuthApplicationService {
 
 impl AuthApplicationService {
     pub fn new(
-        user_storage: Arc<dyn UserStoragePort>,
-        session_storage: Arc<dyn SessionStoragePort>,
-        password_hasher: Arc<dyn PasswordHasherPort>,
-        token_service: Arc<dyn TokenServicePort>,
+        user_storage: Arc<UserPgRepository>,
+        session_storage: Arc<SessionPgRepository>,
+        password_hasher: Arc<Argon2PasswordHasher>,
+        token_service: Arc<JwtTokenService>,
         storage_path: PathBuf,
     ) -> Self {
         Self {
@@ -133,7 +139,7 @@ impl AuthApplicationService {
     }
 
     /// Configures the folder service, needed to create personal folders
-    pub fn with_folder_service(mut self, folder_service: Arc<dyn FolderUseCase>) -> Self {
+    pub fn with_folder_service(mut self, folder_service: Arc<FolderService>) -> Self {
         self.folder_service = Some(folder_service);
         self
     }
@@ -141,7 +147,7 @@ impl AuthApplicationService {
     /// Configures the OIDC service
     pub fn with_oidc(
         self,
-        oidc_service: Arc<dyn OidcServicePort>,
+        oidc_service: Arc<OidcService>,
         oidc_config: OidcConfig,
     ) -> Self {
         {
@@ -153,7 +159,7 @@ impl AuthApplicationService {
     }
 
     /// Hot-reload OIDC configuration at runtime (called from admin settings service)
-    pub fn reload_oidc(&self, oidc_service: Arc<dyn OidcServicePort>, oidc_config: OidcConfig) {
+    pub fn reload_oidc(&self, oidc_service: Arc<OidcService>, oidc_config: OidcConfig) {
         let mut state = self.oidc.write().unwrap();
         state.service = Some(oidc_service);
         state.config = Some(oidc_config);
@@ -188,7 +194,7 @@ impl AuthApplicationService {
     }
 
     /// Returns an Arc clone of the OIDC service if available
-    pub fn oidc_service(&self) -> Option<Arc<dyn OidcServicePort>> {
+    pub fn oidc_service(&self) -> Option<Arc<OidcService>> {
         let state = self.oidc.read().unwrap();
         state.service.clone()
     }

@@ -5,7 +5,6 @@
 //!
 //! StoragePath (Value Object) remains in domain/services/path_service.rs
 
-use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -116,7 +115,6 @@ impl PathService {
     }
 }
 
-#[async_trait]
 impl StoragePort for PathService {
     fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf {
         let mut path = self.root_path.clone();

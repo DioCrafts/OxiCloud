@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 use std::path::Path;
@@ -8,6 +7,9 @@ use std::sync::Arc;
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::storage_ports::CopyFolderTreeResult;
 use crate::common::errors::DomainError;
+use crate::application::services::file_management_service::FileManagementService;
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::file_upload_service::FileUploadService;
 
 // ─────────────────────────────────────────────────────
 // Upload port
@@ -24,7 +26,6 @@ use crate::common::errors::DomainError;
 /// - Chunked uploads: chunks already on disk → `upload_file_from_path`
 /// - WebDAV PUT (new): handler streams to temp file → `update_file_streaming`
 /// - WebDAV PUT (small/compat): `create_file` / `update_file` spool internally
-#[async_trait]
 pub trait FileUploadUseCase: Send + Sync + 'static {
     /// Upload from a temp file already on disk (true streaming, ~256 KB RAM).
     ///
@@ -102,7 +103,6 @@ pub enum OptimizedFileContent {
 }
 
 /// Primary port for file retrieval operations
-#[async_trait]
 pub trait FileRetrievalUseCase: Send + Sync + 'static {
     /// Gets a file by its ID
     async fn get_file(&self, id: &str) -> Result<FileDto, DomainError>;
@@ -188,7 +188,6 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
 // ─────────────────────────────────────────────────────
 
 /// Primary port for file management operations
-#[async_trait]
 pub trait FileManagementUseCase: Send + Sync + 'static {
     /// Moves a file to another folder
     async fn move_file(
@@ -241,7 +240,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
 
 /// Factory for creating file use case implementations
 pub trait FileUseCaseFactory: Send + Sync + 'static {
-    fn create_file_upload_use_case(&self) -> Arc<dyn FileUploadUseCase>;
-    fn create_file_retrieval_use_case(&self) -> Arc<dyn FileRetrievalUseCase>;
-    fn create_file_management_use_case(&self) -> Arc<dyn FileManagementUseCase>;
+    fn create_file_upload_use_case(&self) -> Arc<FileUploadService>;
+    fn create_file_retrieval_use_case(&self) -> Arc<FileRetrievalService>;
+    fn create_file_management_use_case(&self) -> Arc<FileManagementService>;
 }

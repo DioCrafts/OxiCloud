@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use futures::future::BoxFuture;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
@@ -44,7 +43,6 @@ impl UserPgRepository {
     }
 }
 
-#[async_trait]
 impl UserRepository for UserPgRepository {
     /// Creates a new user using a transaction
     async fn create_user(&self, user: User) -> UserRepositoryResult<User> {
@@ -619,7 +617,6 @@ impl UserRepository for UserPgRepository {
 }
 
 // Storage port implementation for the application layer
-#[async_trait]
 impl UserStoragePort for UserPgRepository {
     async fn create_user(&self, user: User) -> Result<User, DomainError> {
         UserRepository::create_user(self, user)

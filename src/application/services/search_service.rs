@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -13,11 +12,13 @@ use crate::application::dtos::search_dto::{
     SearchSuggestionItem, SearchSuggestionsDto,
 };
 use crate::application::ports::inbound::SearchUseCase;
-use crate::application::ports::outbound::FolderStoragePort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::Result;
 use crate::domain::entities::folder::Folder;
 use std::hash::{Hash, Hasher};
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::domain::repositories::folder_repository::FolderRepository;
 
 /**
  * High-performance search service implementation for files and folders.
@@ -37,10 +38,10 @@ use std::hash::{Hash, Hasher};
  */
 pub struct SearchService {
     /// Repository for file operations
-    file_repository: Arc<dyn FileReadPort>,
+    file_repository: Arc<FileBlobReadRepository>,
 
     /// Repository for folder operations
-    folder_repository: Arc<dyn FolderStoragePort>,
+    folder_repository: Arc<FolderDbRepository>,
 
     /// Lock-free concurrent cache with automatic TTL and LRU eviction (moka).
     /// Values are `Arc<SearchResultsDto>` so cache insert/hit is a single
@@ -109,8 +110,8 @@ impl SearchService {
      * Creates a new instance of the search service.
      */
     pub fn new(
-        file_repository: Arc<dyn FileReadPort>,
-        folder_repository: Arc<dyn FolderStoragePort>,
+        file_repository: Arc<FileBlobReadRepository>,
+        folder_repository: Arc<FolderDbRepository>,
         cache_ttl: u64,
         max_cache_size: usize,
     ) -> Self {
@@ -255,7 +256,6 @@ impl SearchService {
 
 // ─── SearchUseCase trait implementation ──────────────────────────────────
 
-#[async_trait]
 impl SearchUseCase for SearchService {
     /**
      * Performs a search based on the specified criteria.
@@ -489,7 +489,6 @@ impl SearchService {
     pub fn new_stub() -> impl SearchUseCase {
         struct SearchServiceStub;
 
-        #[async_trait]
         impl SearchUseCase for SearchServiceStub {
             async fn search(
                 &self,

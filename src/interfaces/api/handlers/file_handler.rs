@@ -14,6 +14,9 @@ use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::{AuthUser, OptionalUserId};
 use std::sync::Arc;
+use crate::application::ports::file_ports::{FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase};
+use crate::application::ports::storage_ports::StorageUsagePort;
+use crate::application::ports::thumbnail_ports::ThumbnailPort;
 
 /**
  * Type aliases for dependency injection state.
@@ -306,7 +309,7 @@ impl FileHandler {
         let file_path = storage_root.join(&file.path);
 
         match thumbnail_service
-            .get_thumbnail(&id, thumb_size, &file_path)
+            .get_thumbnail(&id, thumb_size.into(), &file_path)
             .await
         {
             Ok(data) => {

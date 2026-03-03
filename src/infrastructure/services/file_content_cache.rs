@@ -198,9 +198,7 @@ pub type SharedFileContentCache = Arc<FileContentCache>;
 // ─── ContentCachePort implementation ─────────────────────────
 
 use crate::application::ports::cache_ports::ContentCachePort;
-use async_trait::async_trait;
 
-#[async_trait]
 impl ContentCachePort for FileContentCache {
     fn should_cache(&self, size: usize) -> bool {
         FileContentCache::should_cache(self, size)

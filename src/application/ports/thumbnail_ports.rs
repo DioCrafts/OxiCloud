@@ -5,7 +5,6 @@
 //! image processing implementations.
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -63,7 +62,6 @@ pub struct ThumbnailStatsDto {
 /// Implementations handle the actual image processing, caching,
 /// and storage of thumbnails, while the application layer only
 /// interacts through this abstraction.
-#[async_trait]
 pub trait ThumbnailPort: Send + Sync + 'static {
     /// Check if a file is an image that can have thumbnails.
     fn is_supported_image(&self, mime_type: &str) -> bool;

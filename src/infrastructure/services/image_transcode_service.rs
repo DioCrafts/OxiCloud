@@ -10,7 +10,6 @@
 //! - Supports JPEG, PNG, GIF → WebP conversion
 //! - Falls back to original if conversion fails or result is larger
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use image::ImageFormat;
 use std::path::{Path, PathBuf};
@@ -392,7 +391,6 @@ impl From<PortOutputFormat> for OutputFormat {
     }
 }
 
-#[async_trait]
 impl ImageTranscodePort for ImageTranscodeService {
     fn can_transcode(&self, mime_type: &str) -> bool {
         ImageTranscodeService::can_transcode(mime_type)

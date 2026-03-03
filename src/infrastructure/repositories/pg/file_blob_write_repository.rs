@@ -7,30 +7,29 @@
 //! File paths are resolved by querying the materialized `storage.folders.path`
 //! column (O(1) per lookup), so no recursive CTEs are needed.
 
-use async_trait::async_trait;
 use sqlx::PgPool;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePort};
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
 
 use super::folder_db_repository::FolderDbRepository;
+use crate::infrastructure::services::dedup_service::DedupService;
 
 /// File write repository backed by PostgreSQL metadata + blob storage.
 pub struct FileBlobWriteRepository {
     pool: Arc<PgPool>,
-    dedup: Arc<dyn DedupPort>,
+    dedup: Arc<DedupService>,
     folder_repo: Arc<FolderDbRepository>,
 }
 
 impl FileBlobWriteRepository {
     pub fn new(
         pool: Arc<PgPool>,
-        dedup: Arc<dyn DedupPort>,
+        dedup: Arc<DedupService>,
         folder_repo: Arc<FolderDbRepository>,
     ) -> Self {
         Self {
@@ -180,7 +179,6 @@ impl FileBlobWriteRepository {
     }
 }
 
-#[async_trait]
 impl FileWritePort for FileBlobWriteRepository {
     async fn save_file_from_temp(
         &self,

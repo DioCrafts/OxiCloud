@@ -18,6 +18,10 @@ use crate::application::ports::auth_ports::{
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::device_code::{DeviceCode, DeviceCodeStatus};
 use crate::domain::entities::session::Session;
+use crate::infrastructure::repositories::pg::DeviceCodePgRepository;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::repositories::pg::SessionPgRepository;
+use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /// Default device code lifetime: 15 minutes (RFC 8628 recommends 5-30 min).
 const DEVICE_CODE_LIFETIME_SECS: i64 = 900;
@@ -34,20 +38,20 @@ const USER_CODE_LETTER_LEN: usize = 4;
 const USER_CODE_DIGIT_LEN: usize = 4;
 
 pub struct DeviceAuthService {
-    device_code_storage: Arc<dyn DeviceCodeStoragePort>,
-    token_service: Arc<dyn TokenServicePort>,
-    user_storage: Arc<dyn UserStoragePort>,
-    session_storage: Arc<dyn SessionStoragePort>,
+    device_code_storage: Arc<DeviceCodePgRepository>,
+    token_service: Arc<JwtTokenService>,
+    user_storage: Arc<UserPgRepository>,
+    session_storage: Arc<SessionPgRepository>,
     /// Base URL of the server (e.g. "https://cloud.example.com")
     base_url: String,
 }
 
 impl DeviceAuthService {
     pub fn new(
-        device_code_storage: Arc<dyn DeviceCodeStoragePort>,
-        token_service: Arc<dyn TokenServicePort>,
-        user_storage: Arc<dyn UserStoragePort>,
-        session_storage: Arc<dyn SessionStoragePort>,
+        device_code_storage: Arc<DeviceCodePgRepository>,
+        token_service: Arc<JwtTokenService>,
+        user_storage: Arc<UserPgRepository>,
+        session_storage: Arc<SessionPgRepository>,
         base_url: String,
     ) -> Self {
         Self {

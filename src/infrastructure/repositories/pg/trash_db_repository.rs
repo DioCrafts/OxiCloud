@@ -4,7 +4,6 @@
 //! and `storage.folders`.  There is no separate trash table — trashed items
 //! are files/folders with `is_trashed = TRUE`.
 
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -65,7 +64,6 @@ impl TrashDbRepository {
     }
 }
 
-#[async_trait]
 impl TrashRepository for TrashDbRepository {
     async fn add_to_trash(&self, _item: &TrashedItem) -> Result<()> {
         // No-op: the actual flagging is done by FileWritePort::move_to_trash

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use image::{ImageFormat, imageops::FilterType};
 /**
@@ -458,7 +457,6 @@ impl From<PortThumbnailSize> for ThumbnailSize {
     }
 }
 
-#[async_trait]
 impl ThumbnailPort for ThumbnailService {
     fn is_supported_image(&self, mime_type: &str) -> bool {
         ThumbnailService::is_supported_image(mime_type)

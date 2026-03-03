@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::{
@@ -20,7 +19,6 @@ pub enum ShareRepositoryError {
     AlreadyExists(String),
 }
 
-#[async_trait]
 pub trait ShareRepository: Send + Sync + 'static {
     /// Save a new share or update an existing one
     async fn save(&self, share: &Share) -> Result<Share, ShareRepositoryError>;

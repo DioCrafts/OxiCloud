@@ -17,6 +17,9 @@ use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::folder_service::FolderService;
 use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
+use crate::application::services::file_management_service::FileManagementService;
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::trash_service::TrashService;
 
 /// Specific errors for batch operations
 #[derive(Debug, Error)]
@@ -65,18 +68,18 @@ pub struct BatchStats {
 
 /// Batch operations service
 pub struct BatchOperationService {
-    file_retrieval: Arc<dyn FileRetrievalUseCase>,
-    file_management: Arc<dyn FileManagementUseCase>,
+    file_retrieval: Arc<FileRetrievalService>,
+    file_management: Arc<FileManagementService>,
     folder_service: Arc<FolderService>,
-    trash_service: Option<Arc<dyn TrashUseCase>>,
+    trash_service: Option<Arc<TrashService>>,
     config: AppConfig,
 }
 
 impl BatchOperationService {
     /// Creates a new instance of the batch operations service
     pub fn new(
-        file_retrieval: Arc<dyn FileRetrievalUseCase>,
-        file_management: Arc<dyn FileManagementUseCase>,
+        file_retrieval: Arc<FileRetrievalService>,
+        file_management: Arc<FileManagementService>,
         folder_service: Arc<FolderService>,
         config: AppConfig,
     ) -> Self {
@@ -91,8 +94,8 @@ impl BatchOperationService {
 
     /// Creates a new instance with default configuration
     pub fn default(
-        file_retrieval: Arc<dyn FileRetrievalUseCase>,
-        file_management: Arc<dyn FileManagementUseCase>,
+        file_retrieval: Arc<FileRetrievalService>,
+        file_management: Arc<FileManagementService>,
         folder_service: Arc<FolderService>,
     ) -> Self {
         Self::new(
@@ -104,7 +107,7 @@ impl BatchOperationService {
     }
 
     /// Set the optional trash service (enables batch trash operations)
-    pub fn with_trash_service(mut self, trash_service: Arc<dyn TrashUseCase>) -> Self {
+    pub fn with_trash_service(mut self, trash_service: Arc<TrashService>) -> Self {
         self.trash_service = Some(trash_service);
         self
     }

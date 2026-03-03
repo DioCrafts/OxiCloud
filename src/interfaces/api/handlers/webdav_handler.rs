@@ -28,8 +28,11 @@ use crate::common::di::AppState;
 use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::folder_service::FolderService;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::sync::Arc;
+use crate::application::ports::file_ports::{FileManagementUseCase, FileUploadUseCase};
 
 /// Characters that MUST NOT be percent-encoded inside a URI path segment.
 /// RFC 3986 §3.3 pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
@@ -394,8 +397,8 @@ async fn build_streaming_propfind_response(
     depth: &str,
     base_href: &str,
     propfind_request: PropFindRequest,
-    folder_service: std::sync::Arc<dyn FolderUseCase>,
-    file_retrieval_service: std::sync::Arc<dyn FileRetrievalUseCase>,
+    folder_service: std::sync::Arc<FolderService>,
+    file_retrieval_service: std::sync::Arc<FileRetrievalService>,
 ) -> Result<Response<Body>, AppError> {
     let depth = depth.to_string();
     let base_href = base_href.to_string();

@@ -1,9 +1,7 @@
 use crate::application::dtos::favorites_dto::{BatchFavoritesResult, FavoriteItemDto};
 use crate::common::errors::Result;
-use async_trait::async_trait;
 
 /// Defines operations for managing user favorites
-#[async_trait]
 pub trait FavoritesUseCase: Send + Sync {
     /// Get all favorites for a user
     async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>>;
@@ -40,7 +38,6 @@ pub trait FavoritesUseCase: Send + Sync {
 /// Application services depend on this trait instead of
 /// accessing `PgPool` directly. The concrete implementation
 /// lives in `infrastructure::repositories::pg`.
-#[async_trait]
 pub trait FavoritesRepositoryPort: Send + Sync + 'static {
     /// Gets all favorites for a user.
     async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>>;

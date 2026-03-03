@@ -5,7 +5,6 @@
 //! Supports both RSA (RS256, RS384, RS512) and EC (ES256, ES384) algorithms.
 //! Compatible with Authentik, Keycloak, and any standard OIDC provider.
 
-use async_trait::async_trait;
 use serde::Deserialize;
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -293,7 +292,6 @@ impl OidcService {
     }
 }
 
-#[async_trait]
 impl OidcServicePort for OidcService {
     async fn get_authorize_url(
         &self,

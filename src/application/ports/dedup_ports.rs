@@ -5,7 +5,6 @@
 //! content-addressable storage implementation.
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 use serde::Serialize;
@@ -92,7 +91,6 @@ pub struct DedupStatsDto {
 /// Implementations store files by their content hash, eliminating
 /// duplicate storage automatically. Multiple file references can
 /// point to the same physical blob.
-#[async_trait]
 pub trait DedupPort: Send + Sync + 'static {
     /// Store content with deduplication (from bytes).
     ///

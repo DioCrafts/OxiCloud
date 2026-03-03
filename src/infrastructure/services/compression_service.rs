@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use bytes::Bytes;
 use flate2::Compression;
 use flate2::bufread::GzDecoder;
@@ -43,7 +42,6 @@ impl From<CompressionLevel> for Compression {
 const COMPRESSION_SIZE_THRESHOLD: u64 = 1024 * 50; // 50KB
 
 /// Interface for compression services
-#[async_trait]
 pub trait CompressionService: Send + Sync {
     /// Compresses data in memory
     async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> io::Result<Vec<u8>>;
@@ -88,7 +86,6 @@ impl GzipCompressionService {
     }
 }
 
-#[async_trait]
 impl CompressionService for GzipCompressionService {
     /// Compresses data in memory using Gzip
     async fn compress_data(&self, data: &[u8], level: CompressionLevel) -> io::Result<Vec<u8>> {
@@ -258,7 +255,6 @@ impl From<PortCompressionLevel> for CompressionLevel {
     }
 }
 
-#[async_trait]
 impl CompressionPort for GzipCompressionService {
     async fn compress_data(
         &self,

@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use std::sync::Arc;
 
 use crate::application::dtos::folder_dto::{
@@ -10,7 +9,6 @@ use crate::application::dtos::search_dto::{
 use crate::common::errors::DomainError;
 
 /// Primary port for folder operations
-#[async_trait]
 pub trait FolderUseCase: Send + Sync + 'static {
     /// Creates a new folder
     async fn create_folder(&self, dto: CreateFolderDto) -> Result<FolderDto, DomainError>;
@@ -89,7 +87,6 @@ pub trait FolderUseCase: Send + Sync + 'static {
  * All search processing (filtering, scoring, sorting, categorization)
  * is handled server-side in Rust for maximum efficiency.
  */
-#[async_trait]
 pub trait SearchUseCase: Send + Sync + 'static {
     /// Performs a full search based on the specified criteria.
     ///

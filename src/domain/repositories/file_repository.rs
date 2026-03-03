@@ -10,7 +10,6 @@
 
 use std::path::PathBuf;
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::Stream;
 
@@ -26,7 +25,6 @@ use crate::domain::services::path_service::StoragePath;
 ///
 /// Encapsulates every operation that queries state without modifying it:
 /// get, list, content, stream, mmap, range, path resolution.
-#[async_trait]
 pub trait FileReadRepository: Send + Sync + 'static {
     /// Gets a file by its ID.
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
@@ -63,7 +61,6 @@ pub trait FileReadRepository: Send + Sync + 'static {
 ///
 /// Covers: upload (buffered + streaming), move, delete, update,
 /// and deferred registration for write-behind cache.
-#[async_trait]
 pub trait FileWriteRepository: Send + Sync + 'static {
     /// Saves a new file from bytes.
     async fn save_file(

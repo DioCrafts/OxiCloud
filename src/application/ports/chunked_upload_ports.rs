@@ -5,7 +5,6 @@
 //! the specific upload implementation (TUS-like protocol, S3 multipart, etc.).
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use bytes::Bytes;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -53,7 +52,6 @@ pub struct UploadStatusResponseDto {
 /// Implementations manage upload sessions, chunk storage, reassembly,
 /// and cleanup, while the application layer only interacts through
 /// this abstraction.
-#[async_trait]
 pub trait ChunkedUploadPort: Send + Sync + 'static {
     /// Create a new upload session.
     ///

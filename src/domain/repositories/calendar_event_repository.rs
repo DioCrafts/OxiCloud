@@ -1,13 +1,11 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::calendar_event::CalendarEvent;
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 pub type CalendarEventRepositoryResult<T> = Result<T, DomainError>;
 
 /// Repository interface for CalendarEvent entity operations
-#[async_trait]
 pub trait CalendarEventRepository: Send + Sync + 'static {
     /// Creates a new calendar event
     async fn create_event(

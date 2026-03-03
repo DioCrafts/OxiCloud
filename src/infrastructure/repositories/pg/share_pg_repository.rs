@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
 
@@ -72,7 +71,6 @@ impl SharePgRepository {
     }
 }
 
-#[async_trait]
 impl ShareStoragePort for SharePgRepository {
     async fn save_share(&self, share: &Share) -> Result<Share, DomainError> {
         let row = sqlx::query(

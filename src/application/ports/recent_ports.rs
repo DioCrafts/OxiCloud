@@ -1,9 +1,7 @@
 use crate::application::dtos::recent_dto::RecentItemDto;
 use crate::common::errors::Result;
-use async_trait::async_trait;
 
 /// Defines operations for managing user recent items
-#[async_trait]
 pub trait RecentItemsUseCase: Send + Sync {
     /// Get all recent items for a user
     async fn get_recent_items(
@@ -36,7 +34,6 @@ pub trait RecentItemsUseCase: Send + Sync {
 ///
 /// Abstracts access to the `auth.user_recent_files` table so that
 /// `RecentService` does not depend directly on `PgPool`.
-#[async_trait]
 pub trait RecentItemsRepositoryPort: Send + Sync + 'static {
     /// Gets the latest recent items for a user (ordered by date desc).
     async fn get_recent_items(&self, user_id: &str, limit: i32) -> Result<Vec<RecentItemDto>>;

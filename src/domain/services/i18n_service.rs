@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use thiserror::Error;
 
 /// Error types for i18n service operations
@@ -54,7 +53,6 @@ impl Locale {
 }
 
 /// Interface for i18n service (primary port)
-#[async_trait]
 pub trait I18nService: Send + Sync + 'static {
     /// Get a translation for a key and locale
     async fn translate(&self, key: &str, locale: Locale) -> I18nResult<String>;

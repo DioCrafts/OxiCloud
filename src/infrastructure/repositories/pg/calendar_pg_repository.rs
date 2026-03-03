@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::{PgPool, Row, types::Uuid};
 use std::sync::Arc;
@@ -19,7 +18,6 @@ impl CalendarPgRepository {
     }
 }
 
-#[async_trait]
 impl CalendarRepository for CalendarPgRepository {
     async fn create_calendar(&self, calendar: Calendar) -> CalendarRepositoryResult<Calendar> {
         let row = sqlx::query(

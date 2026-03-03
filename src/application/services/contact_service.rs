@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use sqlx::types::Uuid;
 use std::sync::Arc;
@@ -17,18 +16,21 @@ use crate::common::errors::DomainError;
 use crate::domain::entities::contact::{Address, AddressBook, Contact, ContactGroup, Email, Phone};
 use crate::domain::repositories::address_book_repository::AddressBookRepository;
 use crate::domain::repositories::contact_repository::{ContactGroupRepository, ContactRepository};
+use crate::infrastructure::repositories::pg::AddressBookPgRepository;
+use crate::infrastructure::repositories::pg::ContactGroupPgRepository;
+use crate::infrastructure::repositories::pg::ContactPgRepository;
 
 pub struct ContactService {
-    address_book_repository: Arc<dyn AddressBookRepository>,
-    contact_repository: Arc<dyn ContactRepository>,
-    contact_group_repository: Arc<dyn ContactGroupRepository>,
+    address_book_repository: Arc<AddressBookPgRepository>,
+    contact_repository: Arc<ContactPgRepository>,
+    contact_group_repository: Arc<ContactGroupPgRepository>,
 }
 
 impl ContactService {
     pub fn new(
-        address_book_repository: Arc<dyn AddressBookRepository>,
-        contact_repository: Arc<dyn ContactRepository>,
-        contact_group_repository: Arc<dyn ContactGroupRepository>,
+        address_book_repository: Arc<AddressBookPgRepository>,
+        contact_repository: Arc<ContactPgRepository>,
+        contact_group_repository: Arc<ContactGroupPgRepository>,
     ) -> Self {
         Self {
             address_book_repository,
@@ -264,7 +266,6 @@ impl ContactService {
     }
 }
 
-#[async_trait]
 impl AddressBookUseCase for ContactService {
     async fn create_address_book(
         &self,
@@ -514,7 +515,6 @@ impl AddressBookUseCase for ContactService {
     }
 }
 
-#[async_trait]
 impl ContactUseCase for ContactService {
     async fn create_contact(&self, dto: CreateContactDto) -> Result<ContactDto, DomainError> {
         let address_book_id = Uuid::parse_str(&dto.address_book_id)
@@ -1092,7 +1092,6 @@ impl ContactUseCase for ContactService {
     }
 }
 
-#[async_trait]
 impl StorageUseCase for ContactService {
     async fn handle_request(
         &self,

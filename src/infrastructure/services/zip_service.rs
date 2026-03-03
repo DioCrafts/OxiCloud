@@ -5,7 +5,6 @@ use crate::{
     application::ports::zip_ports::ZipPort,
     common::errors::{DomainError, ErrorKind, Result},
 };
-use async_trait::async_trait;
 use async_zip::base::write::ZipFileWriter;
 use async_zip::{Compression, ZipEntryBuilder};
 use futures::StreamExt;
@@ -17,6 +16,8 @@ use thiserror::Error;
 use tokio::io::BufWriter;
 use tokio_util::compat::Compat;
 use tracing::*;
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::folder_service::FolderService;
 
 /// Error related to ZIP file creation
 #[derive(Debug, Error)]
@@ -53,15 +54,15 @@ type AsyncZipWriter = ZipFileWriter<Compat<BufWriter<tokio::fs::File>>>;
 /// `tokio::io::BufWriter` → `tokio::fs::File`, so **no Tokio worker is ever
 /// blocked** by disk I/O or compression.
 pub struct ZipService {
-    file_service: Arc<dyn FileRetrievalUseCase>,
-    folder_service: Arc<dyn FolderUseCase>,
+    file_service: Arc<FileRetrievalService>,
+    folder_service: Arc<FolderService>,
 }
 
 impl ZipService {
     /// Creates a new instance of the ZIP service
     pub fn new(
-        file_service: Arc<dyn FileRetrievalUseCase>,
-        folder_service: Arc<dyn FolderUseCase>,
+        file_service: Arc<FileRetrievalService>,
+        folder_service: Arc<FolderService>,
     ) -> Self {
         Self {
             file_service,
@@ -239,7 +240,6 @@ impl ZipService {
 
 // ─── Port implementation ─────────────────────────────────────────────────────
 
-#[async_trait]
 impl ZipPort for ZipService {
     async fn create_folder_zip(
         &self,

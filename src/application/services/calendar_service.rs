@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
 
@@ -8,18 +7,18 @@ use crate::application::dtos::calendar_dto::{
 };
 use crate::application::ports::calendar_ports::{CalendarStoragePort, CalendarUseCase};
 use crate::common::errors::{DomainError, ErrorKind};
+use crate::infrastructure::adapters::calendar_storage_adapter::CalendarStorageAdapter;
 
 pub struct CalendarService {
-    calendar_storage: Arc<dyn CalendarStoragePort>,
+    calendar_storage: Arc<CalendarStorageAdapter>,
 }
 
 impl CalendarService {
-    pub fn new(calendar_storage: Arc<dyn CalendarStoragePort>) -> Self {
+    pub fn new(calendar_storage: Arc<CalendarStorageAdapter>) -> Self {
         Self { calendar_storage }
     }
 }
 
-#[async_trait]
 impl CalendarUseCase for CalendarService {
     async fn create_calendar(
         &self,

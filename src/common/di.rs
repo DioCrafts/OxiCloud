@@ -7,22 +7,7 @@ use crate::infrastructure::db::DbPools;
 use crate::application::services::admin_settings_service::AdminSettingsService;
 use crate::application::services::auth_application_service::AuthApplicationService;
 
-use crate::application::ports::cache_ports::ContentCachePort;
-use crate::application::ports::chunked_upload_ports::ChunkedUploadPort;
-
-use crate::application::ports::dedup_ports::DedupPort;
-use crate::application::ports::favorites_ports::FavoritesUseCase;
-use crate::application::ports::file_ports::{
-    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, FileUseCaseFactory,
-};
-use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
-use crate::application::ports::outbound::FolderStoragePort;
-use crate::application::ports::recent_ports::RecentItemsUseCase;
-use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
-use crate::application::ports::thumbnail_ports::ThumbnailPort;
-use crate::application::ports::transcode_ports::ImageTranscodePort;
-use crate::application::ports::trash_ports::TrashUseCase;
-use crate::application::ports::zip_ports::ZipPort;
+use crate::application::ports::file_ports::FileUseCaseFactory;
 use crate::application::services::favorites_service::FavoritesService;
 use crate::application::services::folder_service::FolderService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
@@ -35,7 +20,6 @@ use crate::application::services::{
 };
 use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
-use crate::domain::services::i18n_service::I18nService;
 use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::repositories::pg::{
     FileBlobReadRepository, FileBlobWriteRepository, FolderDbRepository, TrashDbRepository,
@@ -47,7 +31,29 @@ use crate::infrastructure::services::file_system_i18n_service::FileSystemI18nSer
 use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 
-use crate::common::stubs::StubZipPort;
+
+use crate::application::services::device_auth_service::DeviceAuthService;
+use crate::application::services::app_password_service::AppPasswordService;
+use crate::application::services::calendar_service::CalendarService;
+use crate::application::services::storage_usage_service::StorageUsageService;
+use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
+use crate::infrastructure::repositories::DeviceCodePgRepository;
+use crate::infrastructure::repositories::AppPasswordPgRepository;
+use crate::infrastructure::repositories::pg::{
+    AddressBookPgRepository, CalendarEventPgRepository, CalendarPgRepository,
+    ContactGroupPgRepository, ContactPgRepository, SessionPgRepository, UserPgRepository,
+};
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::services::path_resolver_service::PathResolverService;
+use crate::application::services::wopi_lock_service::WopiLockService;
+use crate::application::services::wopi_token_service::WopiTokenService;
+use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
+use crate::infrastructure::services::chunked_upload_service::ChunkedUploadService;
+use crate::infrastructure::services::dedup_service::DedupService;
+use crate::infrastructure::services::image_transcode_service::ImageTranscodeService;
+use crate::infrastructure::services::thumbnail_service::ThumbnailService;
+use crate::infrastructure::services::zip_service::ZipService;
 
 /// Factory for the different application components
 ///
@@ -161,7 +167,7 @@ impl AppServiceFactory {
             chunked_upload_service,
             image_transcode_service,
             dedup_service,
-            zip_service: Arc::new(StubZipPort), // Placeholder - replaced after app services init
+            zip_service: None, // Placeholder - replaced after app services init
             config: self.config.clone(),
         })
     }
@@ -176,16 +182,16 @@ impl AppServiceFactory {
     ) -> RepositoryServices {
         // Folder repository — PostgreSQL-backed virtual folders
         let folder_repo_concrete = Arc::new(FolderDbRepository::new(db_pool.clone()));
-        let folder_repository: Arc<dyn FolderStoragePort> = folder_repo_concrete.clone();
+        let folder_repository: Arc<FolderDbRepository> = folder_repo_concrete.clone();
 
         // File repositories — PostgreSQL metadata + blob content via DedupService
-        let file_read_repository: Arc<dyn FileReadPort> = Arc::new(FileBlobReadRepository::new(
+        let file_read_repository: Arc<FileBlobReadRepository> = Arc::new(FileBlobReadRepository::new(
             db_pool.clone(),
             core.dedup_service.clone(),
             folder_repo_concrete.clone(),
         ));
 
-        let file_write_repository: Arc<dyn FileWritePort> = Arc::new(FileBlobWriteRepository::new(
+        let file_write_repository: Arc<FileBlobWriteRepository> = Arc::new(FileBlobWriteRepository::new(
             db_pool.clone(),
             core.dedup_service.clone(),
             folder_repo_concrete.clone(),
@@ -201,7 +207,7 @@ impl AppServiceFactory {
                 core.config.storage.trash_retention_days,
             ))
                 as Arc<
-                    dyn crate::domain::repositories::trash_repository::TrashRepository,
+                    TrashDbRepository,
                 >)
         } else {
             None
@@ -226,7 +232,7 @@ impl AppServiceFactory {
         &self,
         core: &CoreServices,
         repos: &RepositoryServices,
-        trash_service: Option<Arc<dyn TrashUseCase>>,
+        trash_service: Option<Arc<TrashService>>,
     ) -> ApplicationServices {
         // Main services
         let folder_service = Arc::new(FolderService::new(repos.folder_repository.clone()));
@@ -258,7 +264,7 @@ impl AppServiceFactory {
         let i18n_service = Arc::new(I18nApplicationService::new(repos.i18n_repository.clone()));
 
         // Search service with cache
-        let search_service: Option<Arc<dyn SearchUseCase>> = Some(Arc::new(SearchService::new(
+        let search_service: Option<Arc<SearchService>> = Some(Arc::new(SearchService::new(
             repos.file_read_repository.clone(),
             repos.folder_repository.clone(),
             300,  // Cache TTL in seconds (5 minutes)
@@ -289,7 +295,7 @@ impl AppServiceFactory {
     pub async fn create_trash_service(
         &self,
         repos: &RepositoryServices,
-    ) -> Option<Arc<dyn TrashUseCase>> {
+    ) -> Option<Arc<TrashService>> {
         if !self.config.features.enable_trash {
             tracing::info!("Trash service is disabled in configuration");
             return None;
@@ -315,7 +321,7 @@ impl AppServiceFactory {
         cleanup_service.start_cleanup_job().await;
         tracing::info!("Trash service initialized with daily cleanup schedule");
 
-        Some(service as Arc<dyn TrashUseCase>)
+        Some(service as Arc<TrashService>)
     }
 
     /// Creates the sharing service
@@ -323,7 +329,7 @@ impl AppServiceFactory {
         &self,
         repos: &RepositoryServices,
         db_pool: &Arc<PgPool>,
-    ) -> Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>> {
+    ) -> Option<Arc<ShareService>> {
         if !self.config.features.enable_file_sharing {
             tracing::info!("File sharing service is disabled in configuration");
             return None;
@@ -332,7 +338,7 @@ impl AppServiceFactory {
         let share_repository = Arc::new(SharePgRepository::new(db_pool.clone()));
 
         // Build a password hasher for share password verification
-        let password_hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
+        let password_hasher: Arc<Argon2PasswordHasher> =
             Arc::new(
                 crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
                     self.config.auth.hash_memory_cost,
@@ -354,7 +360,7 @@ impl AppServiceFactory {
     }
 
     /// Creates the favorites service (requires database)
-    pub fn create_favorites_service(&self, db_pool: &Arc<PgPool>) -> Arc<dyn FavoritesUseCase> {
+    pub fn create_favorites_service(&self, db_pool: &Arc<PgPool>) -> Arc<FavoritesService> {
         let repo = Arc::new(
             crate::infrastructure::repositories::pg::FavoritesPgRepository::new(db_pool.clone()),
         );
@@ -364,7 +370,7 @@ impl AppServiceFactory {
     }
 
     /// Creates the recent items service (requires database)
-    pub fn create_recent_service(&self, db_pool: &Arc<PgPool>) -> Arc<dyn RecentItemsUseCase> {
+    pub fn create_recent_service(&self, db_pool: &Arc<PgPool>) -> Arc<RecentService> {
         let repo = Arc::new(
             crate::infrastructure::repositories::pg::RecentItemsPgRepository::new(db_pool.clone()),
         );
@@ -406,7 +412,7 @@ impl AppServiceFactory {
         _repos: &RepositoryServices,
         db_pool: &Arc<PgPool>,
         maintenance_pool: &Arc<PgPool>,
-    ) -> Arc<dyn crate::application::ports::storage_ports::StorageUsagePort> {
+    ) -> Arc<StorageUsageService> {
         let user_repository = Arc::new(
             crate::infrastructure::repositories::pg::UserPgRepository::new(db_pool.clone()),
         );
@@ -455,10 +461,10 @@ impl AppServiceFactory {
         apps.share_service = share_service.clone();
 
         // 6. Database-dependent services (PgPool always available in blob model)
-        let favorites_service: Option<Arc<dyn FavoritesUseCase>>;
-        let recent_service: Option<Arc<dyn RecentItemsUseCase>>;
+        let favorites_service: Option<Arc<FavoritesService>>;
+        let recent_service: Option<Arc<RecentService>>;
         let storage_usage_service: Option<
-            Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>,
+            Arc<StorageUsageService>,
         >;
         let mut auth_services: Option<crate::common::di::AuthServices> = None;
 
@@ -509,14 +515,14 @@ impl AppServiceFactory {
         self.preload_translations(&apps.i18n_service).await;
 
         // 8. Build the ZipService with real application services
-        let zip_service: Arc<dyn crate::application::ports::zip_ports::ZipPort> = Arc::new(
+        let zip_service: Arc<ZipService> = Arc::new(
             crate::infrastructure::services::zip_service::ZipService::new(
                 apps.file_retrieval_service.clone(),
                 apps.folder_service.clone(),
             ),
         );
         let mut core = core;
-        core.zip_service = zip_service;
+        core.zip_service = Some(zip_service);
 
         // 9. Assemble final AppState
         let mut app_state = AppState {
@@ -596,16 +602,14 @@ impl AppServiceFactory {
 
             // 9c. Wire Device Authorization Grant (RFC 8628) service
             {
-                use crate::application::services::device_auth_service::DeviceAuthService;
-                use crate::infrastructure::repositories::DeviceCodePgRepository;
 
                 let device_code_repo = Arc::new(DeviceCodePgRepository::new(pool.clone()));
-                let user_repo: Arc<dyn crate::application::ports::auth_ports::UserStoragePort> =
+                let user_repo: Arc<UserPgRepository> =
                     Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
                         pool.clone(),
                     ));
                 let session_repo: Arc<
-                    dyn crate::application::ports::auth_ports::SessionStoragePort,
+                    SessionPgRepository,
                 > = Arc::new(
                     crate::infrastructure::repositories::SessionPgRepository::new(pool.clone()),
                 );
@@ -624,13 +628,11 @@ impl AppServiceFactory {
 
             // 9d. Wire App Password service
             {
-                use crate::application::services::app_password_service::AppPasswordService;
-                use crate::infrastructure::repositories::AppPasswordPgRepository;
 
                 let app_pw_repo: Arc<
-                    dyn crate::application::ports::auth_ports::AppPasswordStoragePort,
+                    AppPasswordPgRepository,
                 > = Arc::new(AppPasswordPgRepository::new(pool.clone()));
-                let hasher: Arc<dyn crate::application::ports::auth_ports::PasswordHasherPort> =
+                let hasher: Arc<Argon2PasswordHasher> =
                     Arc::new(
                         crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
                             self.config.auth.hash_memory_cost,
@@ -638,7 +640,7 @@ impl AppServiceFactory {
                             self.config.auth.hash_parallelism,
                         ),
                     );
-                let user_repo: Arc<dyn crate::application::ports::auth_ports::UserStoragePort> =
+                let user_repo: Arc<UserPgRepository> =
                     Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
                         pool.clone(),
                     ));
@@ -657,7 +659,6 @@ impl AppServiceFactory {
 
         // 9e. Wire PathResolver for single-query WebDAV path resolution
         {
-            use crate::infrastructure::services::path_resolver_service::PathResolverService;
             app_state.path_resolver = Some(Arc::new(PathResolverService::new(pool.clone())));
             tracing::info!("PathResolver service initialized");
         }
@@ -666,12 +667,12 @@ impl AppServiceFactory {
         {
             // CalDAV
             let calendar_repo: Arc<
-                dyn crate::domain::repositories::calendar_repository::CalendarRepository,
+                CalendarPgRepository,
             > = Arc::new(
                 crate::infrastructure::repositories::pg::CalendarPgRepository::new(pool.clone()),
             );
             let event_repo: Arc<
-                dyn crate::domain::repositories::calendar_event_repository::CalendarEventRepository,
+                CalendarEventPgRepository,
             > = Arc::new(
                 crate::infrastructure::repositories::pg::CalendarEventPgRepository::new(
                     pool.clone(),
@@ -690,22 +691,22 @@ impl AppServiceFactory {
             );
             app_state.calendar_use_case = Some(
                 calendar_service
-                    as Arc<dyn crate::application::ports::calendar_ports::CalendarUseCase>,
+                    as Arc<CalendarService>,
             );
 
             // CardDAV
             let address_book_repo: Arc<
-                dyn crate::domain::repositories::address_book_repository::AddressBookRepository,
+                AddressBookPgRepository,
             > = Arc::new(
                 crate::infrastructure::repositories::pg::AddressBookPgRepository::new(pool.clone()),
             );
             let contact_repo: Arc<
-                dyn crate::domain::repositories::contact_repository::ContactRepository,
+                ContactPgRepository,
             > = Arc::new(
                 crate::infrastructure::repositories::pg::ContactPgRepository::new(pool.clone()),
             );
             let group_repo: Arc<
-                dyn crate::domain::repositories::contact_repository::ContactGroupRepository,
+                ContactGroupPgRepository,
             > = Arc::new(
                 crate::infrastructure::repositories::pg::ContactGroupPgRepository::new(
                     pool.clone(),
@@ -718,12 +719,8 @@ impl AppServiceFactory {
                     group_repo,
                 )
             );
-            app_state.addressbook_use_case = Some(contact_storage.clone()
-                as Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>);
-            app_state.contact_use_case = Some(
-                contact_storage
-                    as Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>,
-            );
+            app_state.addressbook_use_case = Some(contact_storage.clone());
+            app_state.contact_use_case = Some(contact_storage);
 
             tracing::info!("CalDAV and CardDAV services initialized with PostgreSQL repositories");
         }
@@ -736,9 +733,6 @@ impl AppServiceFactory {
                     "WOPI is enabled but WOPI_DISCOVERY_URL is empty — WOPI services will NOT be available"
                 );
             } else {
-                use crate::application::services::wopi_lock_service::WopiLockService;
-                use crate::application::services::wopi_token_service::WopiTokenService;
-                use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
 
                 let wopi_secret = if self.config.wopi.secret.is_empty() {
                     self.config.auth.jwt_secret.clone()
@@ -776,25 +770,25 @@ impl AppServiceFactory {
 #[derive(Clone)]
 pub struct CoreServices {
     pub path_service: Arc<PathService>,
-    pub file_content_cache: Arc<dyn ContentCachePort>,
-    pub thumbnail_service: Arc<dyn ThumbnailPort>,
-    pub chunked_upload_service: Arc<dyn ChunkedUploadPort>,
-    pub image_transcode_service: Arc<dyn ImageTranscodePort>,
-    pub dedup_service: Arc<dyn DedupPort>,
-    pub zip_service: Arc<dyn ZipPort>,
+    pub file_content_cache: Arc<FileContentCache>,
+    pub thumbnail_service: Arc<ThumbnailService>,
+    pub chunked_upload_service: Arc<ChunkedUploadService>,
+    pub image_transcode_service: Arc<ImageTranscodeService>,
+    pub dedup_service: Arc<DedupService>,
+    pub zip_service: Option<Arc<ZipService>>,
     pub config: AppConfig,
 }
 
 /// Container for repository services
 #[derive(Clone)]
 pub struct RepositoryServices {
-    pub folder_repository: Arc<dyn FolderStoragePort>,
+    pub folder_repository: Arc<FolderDbRepository>,
     pub folder_repo_concrete: Arc<FolderDbRepository>,
-    pub file_read_repository: Arc<dyn FileReadPort>,
-    pub file_write_repository: Arc<dyn FileWritePort>,
-    pub i18n_repository: Arc<dyn I18nService>,
+    pub file_read_repository: Arc<FileBlobReadRepository>,
+    pub file_write_repository: Arc<FileBlobWriteRepository>,
+    pub i18n_repository: Arc<FileSystemI18nService>,
     pub trash_repository:
-        Option<Arc<dyn crate::domain::repositories::trash_repository::TrashRepository>>,
+        Option<Arc<TrashDbRepository>>,
 }
 
 /// Container for application services
@@ -803,23 +797,23 @@ pub struct ApplicationServices {
     // Concrete types for compatibility with existing handlers
     pub folder_service_concrete: Arc<FolderService>,
     // Traits for abstraction
-    pub folder_service: Arc<dyn FolderUseCase>,
-    pub file_upload_service: Arc<dyn FileUploadUseCase>,
-    pub file_retrieval_service: Arc<dyn FileRetrievalUseCase>,
-    pub file_management_service: Arc<dyn FileManagementUseCase>,
+    pub folder_service: Arc<FolderService>,
+    pub file_upload_service: Arc<FileUploadService>,
+    pub file_retrieval_service: Arc<FileRetrievalService>,
+    pub file_management_service: Arc<FileManagementService>,
     pub file_use_case_factory: Arc<dyn FileUseCaseFactory>,
     pub i18n_service: Arc<I18nApplicationService>,
-    pub trash_service: Option<Arc<dyn TrashUseCase>>,
-    pub search_service: Option<Arc<dyn SearchUseCase>>,
-    pub share_service: Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>>,
-    pub favorites_service: Option<Arc<dyn FavoritesUseCase>>,
-    pub recent_service: Option<Arc<dyn RecentItemsUseCase>>,
+    pub trash_service: Option<Arc<TrashService>>,
+    pub search_service: Option<Arc<SearchService>>,
+    pub share_service: Option<Arc<ShareService>>,
+    pub favorites_service: Option<Arc<FavoritesService>>,
+    pub recent_service: Option<Arc<RecentService>>,
 }
 
 /// Container for authentication services
 #[derive(Clone)]
 pub struct AuthServices {
-    pub token_service: Arc<dyn crate::application::ports::auth_ports::TokenServicePort>,
+    pub token_service: Arc<JwtTokenService>,
     pub auth_application_service: Arc<AuthApplicationService>,
     pub login_lockout:
         Arc<crate::infrastructure::services::login_lockout_service::LoginLockoutService>,
@@ -836,19 +830,19 @@ pub struct AppState {
     pub maintenance_pool: Option<Arc<PgPool>>,
     pub auth_service: Option<AuthServices>,
     pub admin_settings_service: Option<Arc<AdminSettingsService>>,
-    pub trash_service: Option<Arc<dyn TrashUseCase>>,
-    pub share_service: Option<Arc<dyn crate::application::ports::share_ports::ShareUseCase>>,
-    pub favorites_service: Option<Arc<dyn FavoritesUseCase>>,
-    pub recent_service: Option<Arc<dyn RecentItemsUseCase>>,
+    pub trash_service: Option<Arc<TrashService>>,
+    pub share_service: Option<Arc<ShareService>>,
+    pub favorites_service: Option<Arc<FavoritesService>>,
+    pub recent_service: Option<Arc<RecentService>>,
     pub storage_usage_service:
-        Option<Arc<dyn crate::application::ports::storage_ports::StorageUsagePort>>,
-    pub calendar_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUseCase>>,
-    pub contact_service: Option<Arc<dyn crate::application::ports::storage_ports::StorageUseCase>>,
+        Option<Arc<StorageUsageService>>,
+    pub calendar_service: Option<Arc<CalendarService>>,
+    pub contact_service: Option<Arc<ContactStorageAdapter>>,
     pub calendar_use_case:
-        Option<Arc<dyn crate::application::ports::calendar_ports::CalendarUseCase>>,
+        Option<Arc<CalendarService>>,
     pub addressbook_use_case:
-        Option<Arc<dyn crate::application::ports::carddav_ports::AddressBookUseCase>>,
-    pub contact_use_case: Option<Arc<dyn crate::application::ports::carddav_ports::ContactUseCase>>,
+        Option<Arc<ContactStorageAdapter>>,
+    pub contact_use_case: Option<Arc<ContactStorageAdapter>>,
     pub wopi_token_service:
         Option<Arc<crate::application::services::wopi_token_service::WopiTokenService>>,
     pub wopi_lock_service:

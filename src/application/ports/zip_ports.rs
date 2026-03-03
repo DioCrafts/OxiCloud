@@ -5,14 +5,12 @@
 //! implementation details.
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use tempfile::NamedTempFile;
 
 /// Port for ZIP archive operations.
 ///
 /// Implementations handle the actual ZIP file creation, compression,
 /// and recursive folder traversal.
-#[async_trait]
 pub trait ZipPort: Send + Sync + 'static {
     /// Create a ZIP archive containing the contents of a folder (recursively).
     ///

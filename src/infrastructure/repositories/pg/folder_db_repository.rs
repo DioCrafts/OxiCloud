@@ -8,7 +8,6 @@
 //! database triggers, so reading a folder's full path is always O(1) — no
 //! recursive CTEs or N+1 queries.
 
-use async_trait::async_trait;
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -72,7 +71,6 @@ impl FolderDbRepository {
     }
 }
 
-#[async_trait]
 impl FolderRepository for FolderDbRepository {
     async fn create_folder(
         &self,

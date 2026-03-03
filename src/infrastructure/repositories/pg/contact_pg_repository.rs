@@ -1,4 +1,3 @@
-use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value as JsonValue;
 use sqlx::{PgPool, Row, types::Uuid};
@@ -63,7 +62,6 @@ impl ContactPgRepository {
     }
 }
 
-#[async_trait]
 impl ContactRepository for ContactPgRepository {
     async fn create_contact(&self, contact: Contact) -> ContactRepositoryResult<Contact> {
         // Convert domain entities to persistence DTOs for JSONB serialization

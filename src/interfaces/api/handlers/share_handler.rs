@@ -18,6 +18,7 @@ use crate::{
     domain::entities::share::ShareItemType,
     interfaces::middleware::auth::OptionalAuthUser,
 };
+use crate::application::services::share_service::ShareService;
 
 #[derive(Debug, Deserialize)]
 pub struct GetSharesQuery {
@@ -34,7 +35,7 @@ pub struct VerifyPasswordRequest {
 
 /// Create a new shared link
 pub async fn create_shared_link(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     auth_user: OptionalAuthUser,
     Json(dto): Json<CreateShareDto>,
 ) -> impl IntoResponse {
@@ -57,7 +58,7 @@ pub async fn create_shared_link(
 
 /// Get information about a specific shared link by ID
 pub async fn get_shared_link(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match share_use_case.get_shared_link(&id).await {
@@ -75,7 +76,7 @@ pub async fn get_shared_link(
 /// Get all shared links created by the current user.
 /// Supports optional filtering by item_id + item_type query params.
 pub async fn get_user_shares(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     auth_user: OptionalAuthUser,
     Query(query): Query<GetSharesQuery>,
 ) -> impl IntoResponse {
@@ -128,7 +129,7 @@ pub async fn get_user_shares(
 
 /// Update a shared link's properties
 pub async fn update_shared_link(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateShareDto>,
 ) -> impl IntoResponse {
@@ -148,7 +149,7 @@ pub async fn update_shared_link(
 
 /// Delete a shared link
 pub async fn delete_shared_link(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match share_use_case.delete_shared_link(&id).await {
@@ -166,7 +167,7 @@ pub async fn delete_shared_link(
 
 /// Access a shared item via its token
 pub async fn access_shared_item(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     Path(token): Path<String>,
 ) -> impl IntoResponse {
     // Register the access
@@ -204,7 +205,7 @@ pub async fn access_shared_item(
 
 /// Verify password for a password-protected shared item
 pub async fn verify_shared_item_password(
-    State(share_use_case): State<Arc<dyn ShareUseCase>>,
+    State(share_use_case): State<Arc<ShareService>>,
     Path(token): Path<String>,
     Json(req): Json<VerifyPasswordRequest>,
 ) -> impl IntoResponse {

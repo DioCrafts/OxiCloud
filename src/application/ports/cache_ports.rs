@@ -9,7 +9,6 @@
 //! implementation details.
 
 use crate::common::errors::DomainError;
-use async_trait::async_trait;
 use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -30,7 +29,6 @@ pub struct WriteBehindStatsDto {
 /// Provides deferred write semantics: small files are held in memory
 /// and the response is returned immediately, while actual disk writes
 /// happen asynchronously in the background.
-#[async_trait]
 pub trait WriteBehindCachePort: Send + Sync + 'static {
     /// Check if a file size is eligible for write-behind caching.
     fn is_eligible_size(&self, size: usize) -> bool;
@@ -82,7 +80,6 @@ pub struct CachedMetadataDto {
 ///
 /// Provides fast lookups for existence, size, timestamps and MIME types
 /// without hitting the filesystem on every request.
-#[async_trait]
 pub trait MetadataCachePort: Send + Sync + 'static {
     /// Get cached metadata for a path, or `None` on miss / expired.
     async fn get_metadata(&self, path: &Path) -> Option<CachedMetadataDto>;
@@ -106,7 +103,6 @@ pub trait MetadataCachePort: Send + Sync + 'static {
 ///
 /// Implementations should use LRU eviction and respect size limits so that
 /// the application layer never needs to know the concrete cache type.
-#[async_trait]
 pub trait ContentCachePort: Send + Sync + 'static {
     /// Check whether a file of the given size should be cached.
     fn should_cache(&self, size: usize) -> bool;

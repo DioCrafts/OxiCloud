@@ -7,7 +7,6 @@
 //! File paths are resolved by JOINing with `storage.folders.path` (the
 //! materialized path column), so no recursive CTEs or N+1 queries are needed.
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use futures::{Stream, TryStreamExt};
 use moka::sync::Cache;
@@ -17,16 +16,16 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
-use crate::application::ports::dedup_ports::DedupPort;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
+use crate::infrastructure::services::dedup_service::DedupService;
 
 /// File read repository backed by PostgreSQL metadata + blob storage.
 pub struct FileBlobReadRepository {
     pool: Arc<PgPool>,
-    dedup: Arc<dyn DedupPort>,
+    dedup: Arc<DedupService>,
     /// Lock-free cache: file_id → blob_hash.
     /// Populated by `get_file()` and `resolve_blob_hash()` (slow path).
     /// Entries persist until TTI expiry (30 s idle) or capacity eviction —
@@ -37,7 +36,7 @@ pub struct FileBlobReadRepository {
 impl FileBlobReadRepository {
     pub fn new(
         pool: Arc<PgPool>,
-        dedup: Arc<dyn DedupPort>,
+        dedup: Arc<DedupService>,
         _folder_repo: Arc<super::folder_db_repository::FolderDbRepository>,
     ) -> Self {
         Self {
@@ -115,7 +114,6 @@ impl FileBlobReadRepository {
     }
 }
 
-#[async_trait]
 impl FileReadPort for FileBlobReadRepository {
     async fn get_file(&self, id: &str) -> Result<File, DomainError> {
         let row = sqlx::query_as::<
@@ -890,14 +888,13 @@ impl FileReadPort for FileBlobReadRepository {
 mod tests {
     use super::*;
     use crate::common::stubs::StubDedupPort;
-    use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 
     /// Helper: build a `FileBlobReadRepository` without a real PgPool.
     /// Only the moka `hash_cache` is exercised — no SQL is executed.
     fn make_repo() -> FileBlobReadRepository {
         let _folder_repo = Arc::new(FolderDbRepository::new_stub());
         // StubDedupPort satisfies the trait but is never called in cache-only tests
-        let dedup: Arc<dyn DedupPort> = Arc::new(StubDedupPort);
+        let dedup: Arc<DedupService> = Arc::new(StubDedupPort);
         // PgPool is required by the struct but we won't hit any SQL in these tests.
         // We create a repo with a stub pool placeholder — only hash_cache is tested.
         FileBlobReadRepository {
