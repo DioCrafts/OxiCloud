@@ -661,6 +661,10 @@ impl ChunkedUploadService {
             let mut output = StdBufWriter::with_capacity(524_288, raw_output);
             let mut hasher = blake3::Hasher::new();
 
+            // For files >10 MB, use multithreaded BLAKE3 hashing (all cores)
+            const RAYON_THRESHOLD: u64 = 10 * 1024 * 1024;
+            let use_rayon = total_size > RAYON_THRESHOLD;
+
             // Single 512 KB read buffer reused across all chunks (avoids N allocations)
             let mut buf = vec![0u8; 524_288];
             for (index, chunk_path) in &chunks_meta {
@@ -673,7 +677,11 @@ impl ChunkedUploadService {
                     if n == 0 {
                         break;
                     }
-                    hasher.update(&buf[..n]);
+                    if use_rayon {
+                        hasher.update_rayon(&buf[..n]);
+                    } else {
+                        hasher.update(&buf[..n]);
+                    }
                     output.write_all(&buf[..n]).map_err(|e| {
                         format!("Failed to write chunk {index} to assembled file: {e}")
                     })?;

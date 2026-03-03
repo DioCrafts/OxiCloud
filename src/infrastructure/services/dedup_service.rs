@@ -52,6 +52,10 @@ use crate::domain::errors::{DomainError, ErrorKind};
 /// Block size for BLAKE3 file hashing (1MB — optimal syscall/throughput ratio).
 const HASH_BLOCK_SIZE: usize = 1024 * 1024;
 
+/// Files larger than this threshold use multithreaded BLAKE3 hashing via
+/// `update_rayon()`, which splits the work across all available cores.
+const RAYON_HASH_THRESHOLD: u64 = 10 * 1024 * 1024; // 10 MB
+
 /// Chunk size for streaming file reads (256 KB)
 const STREAM_CHUNK_SIZE: usize = 256 * 1024;
 
@@ -156,30 +160,49 @@ impl DedupService {
     // ── Hash helpers ─────────────────────────────────────────────
 
     /// Calculate BLAKE3 hash of content (~5× faster than SHA-256).
+    ///
+    /// For buffers larger than 10 MB the computation is parallelised across
+    /// all available cores via `update_rayon()`.
     pub fn hash_bytes(content: &[u8]) -> String {
-        blake3::hash(content).to_hex().to_string()
+        if content.len() as u64 > RAYON_HASH_THRESHOLD {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update_rayon(content);
+            hasher.finalize().to_hex().to_string()
+        } else {
+            blake3::hash(content).to_hex().to_string()
+        }
     }
 
     /// Calculate BLAKE3 hash of a file (~5× faster than SHA-256).
     ///
     /// Runs entirely on `spawn_blocking` with synchronous I/O so the Tokio
-    /// worker threads are never blocked by CPU-bound hashing.  Uses 1 MB
-    /// reads for optimal syscall-to-throughput ratio.
+    /// worker threads are never blocked by CPU-bound hashing.
+    ///
+    /// For files larger than 10 MB the hash is computed with `update_rayon()`,
+    /// which splits the work across all available cores.  Smaller files use
+    /// sequential 1 MB reads for optimal syscall-to-throughput ratio.
     pub async fn hash_file(path: &Path) -> std::io::Result<String> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || {
-            use std::io::Read;
-
-            let mut file = std::fs::File::open(&path)?;
+            let file_size = std::fs::metadata(&path)?.len();
             let mut hasher = blake3::Hasher::new();
-            let mut buffer = vec![0u8; HASH_BLOCK_SIZE];
 
-            loop {
-                let n = file.read(&mut buffer)?;
-                if n == 0 {
-                    break;
+            if file_size > RAYON_HASH_THRESHOLD {
+                // Large file: read into memory and hash with all cores
+                let content = std::fs::read(&path)?;
+                hasher.update_rayon(&content);
+            } else {
+                // Small file: sequential streaming with 1 MB reads
+                use std::io::Read;
+                let mut file = std::fs::File::open(&path)?;
+                let mut buffer = vec![0u8; HASH_BLOCK_SIZE];
+                loop {
+                    let n = file.read(&mut buffer)?;
+                    if n == 0 {
+                        break;
+                    }
+                    hasher.update(&buffer[..n]);
                 }
-                hasher.update(&buffer[..n]);
             }
 
             Ok(hasher.finalize().to_hex().to_string())
