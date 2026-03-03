@@ -1,3 +1,4 @@
+pub mod cookie_auth;
 pub mod handlers;
 pub mod routes;
 

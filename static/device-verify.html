@@ -137,6 +137,7 @@
     <div id="status-error" class="status error" id="status-error-msg"></div>
   </div>
 
+  <script src="/js/core/csrf.js"></script>
   <script>
     const API_BASE = window.location.origin;
     const codeInput = document.getElementById('user-code');
@@ -175,14 +176,13 @@
 
     async function lookupCode(code) {
       try {
-        const token = getAuthToken();
-        if (!token) {
+        const resp = await fetch(`${API_BASE}/api/auth/device/verify?code=${encodeURIComponent(code)}`, {
+          credentials: 'same-origin'
+        });
+        if (resp.status === 401) {
           showError('You must be logged in to authorize a device. Please log in first.');
           return;
         }
-        const resp = await fetch(`${API_BASE}/api/auth/device/verify?code=${encodeURIComponent(code)}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
         if (!resp.ok) throw new Error('Lookup failed');
         const data = await resp.json();
 
@@ -210,13 +210,10 @@
       btnDeny.disabled = true;
 
       try {
-        const token = getAuthToken();
         const resp = await fetch(`${API_BASE}/api/auth/device/verify`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
           body: JSON.stringify({ user_code: currentCode, action: action })
         });
 
@@ -241,23 +238,6 @@
     function showError(msg) {
       errorText.textContent = msg;
       errorText.style.display = 'block';
-    }
-
-    function getAuthToken() {
-      // Try localStorage (OxiCloud frontend stores tokens there)
-      try {
-        const stored = localStorage.getItem('auth_token')
-          || localStorage.getItem('access_token')
-          || localStorage.getItem('oxicloud_token');
-        if (stored) return stored;
-        // Try parsing a JSON auth object
-        const authData = localStorage.getItem('auth');
-        if (authData) {
-          const parsed = JSON.parse(authData);
-          return parsed.access_token || parsed.token;
-        }
-      } catch {}
-      return null;
     }
   </script>
 </body>

@@ -60,12 +60,9 @@ class WopiEditor {
      * Fetch editor URL and WOPI token from the backend.
      */
     async _getEditorUrl(fileId, action) {
-        var token = localStorage.getItem('oxicloud_token') || '';
         var response = await fetch(
             '/api/wopi/editor-url?file_id=' + encodeURIComponent(fileId) + '&action=' + encodeURIComponent(action),
-            {
-                headers: { 'Authorization': 'Bearer ' + token }
-            }
+            { credentials: 'same-origin' }
         );
         if (!response.ok) {
             var text = await response.text();

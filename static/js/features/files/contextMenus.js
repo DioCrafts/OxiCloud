@@ -127,9 +127,7 @@ const contextMenus = {
             if (window.app.contextMenuTargetFile) {
                 // Capture reference before context menu cleanup nullifies it
                 const file = window.app.contextMenuTargetFile;
-                const token = localStorage.getItem('oxicloud_token');
-                const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-                fetch(`/api/files/${file.id}?metadata=true`, { headers })
+                fetch(`/api/files/${file.id}?metadata=true`, { credentials: 'same-origin' })
                     .then(response => response.json())
                     .then(fileDetails => {
                         // Check if viewable file type (images, PDFs, text files)
@@ -585,8 +583,6 @@ const contextMenus = {
      */
     async loadMoveDialogFolders(parentFolderId) {
         try {
-            const token = localStorage.getItem('oxicloud_token');
-            const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
             // Ensure we have the home folder ID before proceeding
             if (!window.app.userHomeFolderId) {
@@ -606,7 +602,7 @@ const contextMenus = {
             const url = `/api/folders/${effectiveParentId}/contents`;
 
             console.log('[Move Dialog] Loading folders from:', url, 'effectiveParentId:', effectiveParentId);
-            const response = await fetch(url, { headers });
+            const response = await fetch(url, { credentials: 'same-origin' });
             if (!response.ok) {
                 console.error('Failed to load folders:', response.status);
                 return;
@@ -1023,9 +1019,7 @@ const contextMenus = {
         };
 
         try {
-            const token = localStorage.getItem('oxicloud_token');
-            const headers = { 'Content-Type': 'application/json' };
-            if (token) headers['Authorization'] = `Bearer ${token}`;
+            const headers = { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 
             const response = await fetch('/api/shares', {
                 method: 'POST',

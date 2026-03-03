@@ -13,10 +13,7 @@ const recent = {
     // ───────────────────── helpers ─────────────────────
 
     _authHeaders() {
-        const token = localStorage.getItem('oxicloud_token');
-        const h = {};
-        if (token) h['Authorization'] = `Bearer ${token}`;
-        return h;
+        return { ...getCsrfHeaders() };
     },
 
     // ───────────────────── lifecycle ─────────────────────

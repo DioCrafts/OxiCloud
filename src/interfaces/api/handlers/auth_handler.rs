@@ -2,7 +2,7 @@ use axum::{
     Router,
     extract::{Json, Query, State},
     http::{HeaderMap, StatusCode, header},
-    response::{IntoResponse, Redirect},
+    response::{IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
 use std::sync::Arc;
@@ -12,7 +12,9 @@ use crate::application::dtos::user_dto::{
     RefreshTokenDto, RegisterDto,
 };
 use crate::common::di::AppState;
+use crate::interfaces::api::cookie_auth;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::middleware::auth::CurrentUserId;
 
 pub fn auth_routes() -> Router<Arc<AppState>> {
     // Routes that do NOT require authentication
@@ -103,7 +105,7 @@ async fn register(
 async fn login(
     State(state): State<Arc<AppState>>,
     Json(dto): Json<LoginDto>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<Response, AppError> {
     // Add detailed logging for debugging
     tracing::info!("Login attempt for user: {}", dto.username);
 
@@ -153,7 +155,20 @@ async fn login(
                 ));
             }
 
-            Ok((StatusCode::OK, Json(auth_response)))
+            // ── Set HttpOnly cookies so the browser never stores tokens in JS ──
+            let mut response = (StatusCode::OK, Json(&auth_response)).into_response();
+            cookie_auth::append_auth_cookies(
+                response.headers_mut(),
+                &auth_response.access_token,
+                &auth_response.refresh_token,
+                auth_response.expires_in,
+                state.core.config.auth.refresh_token_expiry_secs,
+            );
+            cookie_auth::append_csrf_cookie(
+                response.headers_mut(),
+                auth_response.expires_in,
+            );
+            Ok(response)
         }
         Err(err) => {
             tracing::error!("Login failed for user {}: {}", dto.username, err);
@@ -162,57 +177,62 @@ async fn login(
     }
 }
 
+/// Token refresh — accepts the refresh token from **either**:
+/// 1. JSON body `{ "refresh_token": "..." }` (API clients, backward compat)
+/// 2. HttpOnly cookie `oxicloud_refresh` (browsers)
 async fn refresh_token(
     State(state): State<Arc<AppState>>,
-    Json(dto): Json<RefreshTokenDto>,
-) -> Result<impl IntoResponse, AppError> {
-    // Add rate limiting for token refresh to prevent refresh loops
-    // Check if this refresh token is being used too frequently
-
-    // Log the refresh attempt for debugging
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<Response, AppError> {
     tracing::info!("Token refresh requested");
 
-    // Normal process for real tokens
     let auth_service = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
+
+    // Try JSON body first (backward compat), then fall back to HttpOnly cookie
+    let refresh_tok = serde_json::from_slice::<RefreshTokenDto>(&body)
+        .ok()
+        .map(|dto| dto.refresh_token)
+        .or_else(|| cookie_auth::extract_cookie_value(&headers, cookie_auth::REFRESH_COOKIE))
+        .ok_or_else(|| AppError::unauthorized("Refresh token required (JSON body or cookie)"))?;
+
+    let dto = RefreshTokenDto {
+        refresh_token: refresh_tok,
+    };
 
     let auth_response = auth_service
         .auth_application_service
         .refresh_token(dto)
         .await?;
 
-    // Log successful token refresh
     tracing::info!("Token refresh successful, new token issued");
 
-    Ok((StatusCode::OK, Json(auth_response)))
+    let mut response = (StatusCode::OK, Json(&auth_response)).into_response();
+    cookie_auth::append_auth_cookies(
+        response.headers_mut(),
+        &auth_response.access_token,
+        &auth_response.refresh_token,
+        auth_response.expires_in,
+        state.core.config.auth.refresh_token_expiry_secs,
+    );
+    cookie_auth::append_csrf_cookie(
+        response.headers_mut(),
+        auth_response.expires_in,
+    );
+    Ok(response)
 }
 
 async fn get_current_user(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    CurrentUserId(user_id): CurrentUserId,
 ) -> Result<impl IntoResponse, AppError> {
-    // Normal process for all users
     let auth_service = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
-
-    // Extract and validate the token directly
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
-
-    // Validate the token and get claims
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
-    let user_id = claims.sub;
 
     // First, update the storage usage statistics
     // IMPORTANT: We await the calculation to return updated data
@@ -247,7 +267,7 @@ async fn get_current_user(
 
 async fn change_password(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
+    CurrentUserId(user_id): CurrentUserId,
     Json(dto): Json<ChangePasswordDto>,
 ) -> Result<impl IntoResponse, AppError> {
     let auth_service = state
@@ -255,22 +275,9 @@ async fn change_password(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
 
-    // Extract and validate the token directly
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
-
-    // Validate the token and get claims
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
     auth_service
         .auth_application_service
-        .change_password(&claims.sub, dto)
+        .change_password(&user_id, dto)
         .await?;
 
     Ok(StatusCode::OK)
@@ -279,32 +286,32 @@ async fn change_password(
 async fn logout(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
-) -> Result<impl IntoResponse, AppError> {
+    CurrentUserId(user_id): CurrentUserId,
+) -> Result<Response, AppError> {
     let auth_service = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
 
-    // Extract and validate the token directly
+    // Obtain the raw access token from Bearer header OR cookie
     let token = headers
         .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .map(String::from)
+        .or_else(|| cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE))
         .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
 
-    // Validate the token and get claims
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
-    // Use access token for logout (we don't have refresh token in headers)
     auth_service
         .auth_application_service
-        .logout(&claims.sub, token)
+        .logout(&user_id, &token)
         .await?;
 
-    Ok(StatusCode::OK)
+    // Clear HttpOnly + CSRF cookies so the browser forgets the session
+    let mut response = StatusCode::OK.into_response();
+    cookie_auth::append_clear_cookies(response.headers_mut());
+    cookie_auth::append_clear_csrf_cookie(response.headers_mut());
+    Ok(response)
 }
 
 /// Get system status - returns whether admin is configured
@@ -452,7 +459,7 @@ async fn oidc_callback(
 async fn oidc_exchange(
     State(state): State<Arc<AppState>>,
     Json(body): Json<OidcExchangeDto>,
-) -> Result<impl IntoResponse, AppError> {
+) -> Result<Response, AppError> {
     let auth_service = state
         .auth_service
         .as_ref()
@@ -471,5 +478,18 @@ async fn oidc_exchange(
         auth_response.user.username
     );
 
-    Ok((StatusCode::OK, Json(auth_response)))
+    // Set HttpOnly cookies for the browser
+    let mut response = (StatusCode::OK, Json(&auth_response)).into_response();
+    cookie_auth::append_auth_cookies(
+        response.headers_mut(),
+        &auth_response.access_token,
+        &auth_response.refresh_token,
+        auth_response.expires_in,
+        state.core.config.auth.refresh_token_expiry_secs,
+    );
+    cookie_auth::append_csrf_cookie(
+        response.headers_mut(),
+        auth_response.expires_in,
+    );
+    Ok(response)
 }

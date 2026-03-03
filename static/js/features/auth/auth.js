@@ -10,10 +10,8 @@ const REGISTER_ENDPOINT = `${API_URL}/register`;
 const ME_ENDPOINT = `${API_URL}/me`;
 const REFRESH_ENDPOINT = `${API_URL}/refresh`;
 
-// Storage keys
-const TOKEN_KEY = 'oxicloud_token';
-const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
-const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
+// Storage keys — tokens are now in HttpOnly cookies (set by server).
+// Only non-sensitive display data is kept in localStorage.
 const USER_DATA_KEY = 'oxicloud_user';
 const LOCALE_KEY = 'oxicloud-locale';
 const FIRST_RUN_KEY = 'oxicloud_first_run_completed';
@@ -491,24 +489,18 @@ let authInitialized = false;
     // Case 1: High refresh attempts
     if (refreshAttempts > 3) {
         console.error('EMERGENCY: Detected severe token refresh loop. Cleaning all auth data.');
-        localStorage.clear(); // Full localStorage clear to ensure we break the loop
+        localStorage.removeItem(USER_DATA_KEY);
         sessionStorage.clear();
         localStorage.setItem('emergency_clean', 'true');
         
         // Store timestamp of the cleanup for stability
         localStorage.setItem('last_emergency_clean', Date.now().toString());
-        
-        // No alert to avoid overwhelming the user if this happens multiple times
     }
     
     // Case 2: We were redirected from app due to auth issues
     if (redirectSource === 'app') {
         console.log('Detected redirect from app, ensuring clean auth state');
-        // Clear only auth-related data to ensure a clean login
-        localStorage.removeItem('oxicloud_token');
-        localStorage.removeItem('oxicloud_refresh_token');
-        localStorage.removeItem('oxicloud_token_expiry');
-        
+        localStorage.removeItem(USER_DATA_KEY);
         // Reset counters
         sessionStorage.removeItem('redirect_count');
         localStorage.setItem('refresh_attempts', '0');
@@ -520,9 +512,7 @@ let authInitialized = false;
     
     if (lastCleanup > 0 && timeSinceCleanup < 10000) { // Less than 10 seconds
         console.warn('Multiple auth problems in short time, clearing auth data');
-        localStorage.removeItem('oxicloud_token');
-        localStorage.removeItem('oxicloud_refresh_token');
-        localStorage.removeItem('oxicloud_token_expiry');
+        localStorage.removeItem(USER_DATA_KEY);
     }
 })();
 
@@ -549,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const resp = await fetch('/api/auth/oidc/exchange', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
                     body: JSON.stringify({ code: oidcCode })
                 });
                 
@@ -559,35 +549,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 const data = await resp.json();
-                const token = data.access_token || data.token;
-                const refreshToken = data.refresh_token || data.refreshToken;
-                
-                if (token) {
-                    localStorage.setItem(TOKEN_KEY, token);
-                    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-                    
-                    // Parse JWT expiry
-                    const tokenParts = token.split('.');
-                    if (tokenParts.length === 3) {
-                        try {
-                            const payload = JSON.parse(atob(tokenParts[1]));
-                            if (payload.exp) {
-                                const expiryDate = new Date(payload.exp * 1000);
-                                if (!isNaN(expiryDate.getTime())) {
-                                    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
-                                }
-                            }
-                        } catch (e) { /* ignore parse errors */ }
-                    }
-                    
-                    if (data.user) {
-                        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-                    }
-                    
-                    // Redirect to main app
-                    window.location.href = '/';
-                    return;
+                // Tokens are now set as HttpOnly cookies by the server.
+                // Just store user display data and redirect.
+                if (data.user) {
+                    localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
                 }
+                
+                // Redirect to main app
+                window.location.href = '/';
+                return;
             } catch (err) {
                 console.error('OIDC exchange error:', err);
             }
@@ -617,55 +587,30 @@ document.addEventListener('DOMContentLoaded', () => {
     
     (async () => {
     try {
-        // First check if the token is valid
-        const token = localStorage.getItem(TOKEN_KEY);
-        const tokenExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-        
-        if (!token) {
-            console.log('No token found, user needs to login');
-            // Clear any stale data
-            localStorage.removeItem(REFRESH_TOKEN_KEY);
-            localStorage.removeItem(TOKEN_EXPIRY_KEY);
-            localStorage.removeItem(USER_DATA_KEY);
-            return; // Stay on login page
-        }
-        
-        // Check if token expiry is valid and not expired
+        // Check if we already have a valid session (cookie-based).
+        // The HttpOnly cookie is sent automatically — just probe /api/auth/me.
         try {
-            const expiryDate = new Date(tokenExpiry);
-            if (!isNaN(expiryDate.getTime()) && expiryDate > new Date()) {
-                console.log(`Token valid until ${expiryDate.toLocaleString()}`);
-                // Token still valid, redirect to main app
+            const meResp = await fetch(ME_ENDPOINT, { method: 'GET', credentials: 'same-origin' });
+            if (meResp.ok) {
+                console.log('Session still valid, redirecting to app');
+                const userData = await meResp.json();
+                localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
                 redirectToMainApp();
                 return;
-            } else {
-                console.log('Token expired or invalid date, attempting refresh');
             }
-        } catch (dateError) {
-            console.error('Error parsing token expiry date:', dateError);
-            // Continue to refresh attempt
-        }
-        
-        // Token expired, try to refresh
-        const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
-        if (refreshToken) {
-            try {
-                console.log('Attempting to refresh expired token');
-                await refreshAuthToken(refreshToken);
+            // 401 / other → try a silent refresh
+            console.log('Session check returned', meResp.status, '— trying refresh');
+            const refreshOk = await refreshAuthToken();
+            if (refreshOk) {
                 console.log('Token refresh successful, redirecting to app');
                 redirectToMainApp();
-            } catch (error) {
-                // Refresh failed, continue with login page
-                console.log('Token refresh failed, user needs to login again:', error.message);
-                // Clear any stale auth data
-                localStorage.removeItem(TOKEN_KEY);
-                localStorage.removeItem(REFRESH_TOKEN_KEY);
-                localStorage.removeItem(TOKEN_EXPIRY_KEY);
-                localStorage.removeItem(USER_DATA_KEY);
+                return;
             }
-        } else {
-            console.log('No refresh token found, user needs to login');
+        } catch (err) {
+            console.log('Session probe failed, showing login page:', err.message);
         }
+        // No valid session — stay on login page
+        localStorage.removeItem(USER_DATA_KEY);
 
         // Check if admin account exists (customize this as needed)
         const isFirstRun = await checkFirstRun();
@@ -694,61 +639,16 @@ if (isLoginPage && loginForm) {
     try {
         const data = await login(username, password);
         
-        // Store auth data
-        console.log("Login response:", data);  // Log the response for debugging
-        
-        // Use the correct field names from our API response
-        const token = data.access_token || data.token;
-        const refreshToken = data.refresh_token || data.refreshToken;
-        
-        if (!token) {
-            throw new Error('Server did not return an access token');
-        }
-        
-        localStorage.setItem(TOKEN_KEY, token);
-        localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-        
-        // Extract expiration date from the JWT token
-        let parsedExpiry = false;
-        const tokenParts = token.split('.');
-        if (tokenParts.length === 3) {
-            try {
-                const payload = JSON.parse(atob(tokenParts[1]));
-                if (payload.exp) {
-                    // payload.exp is in seconds since epoch
-                    const expiryDate = new Date(payload.exp * 1000);
-                    
-                    // Verify the date is valid
-                    if (!isNaN(expiryDate.getTime())) {
-                        localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
-                        parsedExpiry = true;
-                        console.log(`Token expires on: ${expiryDate.toLocaleString()}`);
-                    } else {
-                        console.warn('Invalid expiry date in token:', payload.exp);
-                    }
-                }
-            } catch (e) {
-                console.error('Error parsing JWT token:', e);
-            }
-        }
-        
-        // If we couldn't parse the expiry, set a default (30 days)
-        if (!parsedExpiry) {
-            console.log('Setting default token expiry (30 days)');
-            const expiryTime = new Date();
-            expiryTime.setDate(expiryTime.getDate() + 30); // 30 days instead of 1 hour
-            localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
-        }
+        // Tokens are now set as HttpOnly cookies by the server.
+        // Just store non-sensitive user data for display.
+        console.log('Login succeeded');
         
         // Reset redirect counter on successful login
         sessionStorage.removeItem('redirect_count');
+        localStorage.setItem('refresh_attempts', '0');
         
-        // Fetch and store user data from the response
         if (data.user) {
-            console.log("Storing user data from server");
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-        } else {
-            console.warn("Server did not return user data — will fetch from /me endpoint after redirect");
         }
         
         // Redirect to main app
@@ -871,7 +771,8 @@ async function login(username, password) {
         const response = await fetch(LOGIN_ENDPOINT, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders()
             },
             body: JSON.stringify({ username, password }),
             signal: controller.signal
@@ -917,7 +818,8 @@ async function register(username, email, password, role = 'user') {
         const response = await fetch(REGISTER_ENDPOINT, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders()
             },
             body: JSON.stringify({ username, email, password, role })
         });
@@ -951,15 +853,13 @@ async function register(username, email, password, role = 'user') {
 }
 
 /**
- * Fetch current user data
+ * Fetch current user data — relies on HttpOnly cookie (auto-sent).
  */
-async function fetchUserData(token) {
+async function fetchUserData() {
     try {
         const response = await fetch(ME_ENDPOINT, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
+            credentials: 'same-origin'
         });
         
         if (!response.ok) {
@@ -974,64 +874,47 @@ async function fetchUserData(token) {
 }
 
 /**
- * Refresh authentication token - MAJOR CHANGE: Reduced functionality to break token loop
+ * Refresh authentication token via the server's refresh endpoint.
+ * The refresh-token cookie is sent automatically (HttpOnly, Path=/api/auth).
+ * Returns true on success, false on failure.
  */
-async function refreshAuthToken(refreshToken) {
+async function refreshAuthToken() {
     try {
-        // Check if we're in a refresh loop
+        // Loop-breaker
         const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0');
         localStorage.setItem('refresh_attempts', (refreshAttempts + 1).toString());
         
         if (refreshAttempts > 3) {
-            console.error('Refresh token loop detected, clearing all auth data');
-            localStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REFRESH_TOKEN_KEY);
-            localStorage.removeItem(TOKEN_EXPIRY_KEY);
+            console.error('Refresh token loop detected, giving up');
             localStorage.removeItem(USER_DATA_KEY);
             localStorage.removeItem('refresh_attempts');
             sessionStorage.removeItem('redirect_count');
-            throw new Error('Too many refresh attempts, forcing login');
+            return false;
         }
         
-        if (!refreshToken) {
-            throw new Error('No refresh token available');
-        }
+        console.log('Attempting to refresh token (cookie-based)');
         
-        console.log("Attempting to refresh token");
-        
-        // Timeout for safety
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
         
         const response = await fetch(REFRESH_ENDPOINT, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ refresh_token: refreshToken }),
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+            body: '{}',
             signal: controller.signal
         });
         
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-            console.warn(`Refresh token failed with status: ${response.status}`);
-            throw new Error(`Token refresh failed: ${response.status}`);
+            console.warn('Refresh failed with status:', response.status);
+            return false;
         }
         
         const data = await response.json();
-        console.log("Refresh token response:", data);
         
-        // Default expiry if we can't extract from token (30 days)
-        const expiryTime = new Date();
-        expiryTime.setDate(expiryTime.getDate() + 30);
-        
-        // Update stored tokens minimally to avoid parsing issues
-        localStorage.setItem(TOKEN_KEY, data.access_token || data.token);
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token || data.refreshToken || refreshToken);
-        localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
-        
-        // Store user data if provided
+        // Store user display data if provided
         if (data.user) {
             localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
         }
@@ -1040,17 +923,13 @@ async function refreshAuthToken(refreshToken) {
         localStorage.setItem('refresh_attempts', '0');
         sessionStorage.removeItem('redirect_count');
         
-        return data;
+        return true;
     } catch (error) {
         console.error('Token refresh error:', error);
-        // Clear stored auth data on refresh failure
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        localStorage.removeItem(TOKEN_EXPIRY_KEY);
         localStorage.removeItem(USER_DATA_KEY);
         localStorage.removeItem('refresh_attempts');
         sessionStorage.removeItem('redirect_count');
-        throw error;
+        return false;
     }
 }
 
@@ -1075,32 +954,13 @@ async function checkFirstRun() {
 }
 
 /**
- * Redirect to main application
+ * Redirect to main application — no token check needed (cookies are opaque).
  */
 function redirectToMainApp() {
     console.log('Redirecting to main application');
-    
     try {
-        // Reset refresh attempts counter on redirection
         localStorage.setItem('refresh_attempts', '0');
         sessionStorage.removeItem('redirect_count');
-        
-        // Set a token expiry if none exists
-        const tokenExpiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
-        if (!tokenExpiry) {
-            const expiryTime = new Date();
-            expiryTime.setDate(expiryTime.getDate() + 30);
-            localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toISOString());
-        }
-        
-        // Verify we have a valid token before redirecting
-        const hasToken = localStorage.getItem(TOKEN_KEY);
-        if (!hasToken) {
-            console.error('No token found, cannot redirect to app');
-            return;
-        }
-        
-        // Navigate to the main app
         window.location.replace('/');
     } catch (error) {
         console.error('Error during redirect:', error);
@@ -1109,12 +969,15 @@ function redirectToMainApp() {
 }
 
 /**
- * Logout - clear tokens and redirect to login
+ * Logout — tell the server to clear HttpOnly cookies, then redirect.
  */
-function logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
+async function logout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: getCsrfHeaders() });
+    } catch (e) {
+        console.warn('Logout request failed:', e);
+    }
     localStorage.removeItem(USER_DATA_KEY);
+    localStorage.removeItem('refresh_attempts');
     window.location.href = '/login';
 }

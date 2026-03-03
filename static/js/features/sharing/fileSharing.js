@@ -5,11 +5,9 @@
  */
 
 const fileSharing = {
-    /** Auth header helper */
+    /** Auth header helper — tokens are in HttpOnly cookies now */
     _headers(json = true) {
-        const h = {};
-        const token = localStorage.getItem('oxicloud_token');
-        if (token) h['Authorization'] = `Bearer ${token}`;
+        const h = { ...getCsrfHeaders() };
         if (json) h['Content-Type'] = 'application/json';
         return h;
     },

@@ -1,8 +1,7 @@
 const API = '/api';
-const token = localStorage.getItem('oxicloud_token') || localStorage.getItem('token') || localStorage.getItem('access_token');
 
 function headers() {
-  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 }
 
 function formatBytes(bytes) {
@@ -25,7 +24,6 @@ function timeAgo(dateStr) {
 }
 
 async function init() {
-  if (!token) { showError(); return; }
   try {
     const resp = await fetch(API + '/auth/me', { headers: headers() });
     if (!resp.ok) { showError(); return; }

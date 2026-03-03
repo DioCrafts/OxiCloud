@@ -11,6 +11,7 @@ use socket2::{Domain, Protocol, Socket, TcpKeepalive, Type};
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
 use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -173,6 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
+        use oxicloud::interfaces::middleware::csrf::csrf_middleware;
 
         let auth_router = auth_routes().with_state(app_state.clone());
 
@@ -182,6 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_state(app_state.clone());
         // Protected endpoints: /api/auth/device/verify, /api/auth/device/devices
         let device_protected = device_auth_handler::device_auth_protected_routes()
+            .layer(axum::middleware::from_fn(csrf_middleware))
             .layer(axum::middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
@@ -190,6 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // App Password management endpoints (protected — require JWT)
         let app_password_protected = app_password_handler::app_password_routes()
+            .layer(axum::middleware::from_fn(csrf_middleware))
             .layer(axum::middleware::from_fn_with_state(
                 app_state.clone(),
                 auth_middleware,
@@ -197,10 +201,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .with_state(app_state.clone());
 
         // Protected API routes — require valid JWT token
-        let protected_api = api_routes.layer(axum::middleware::from_fn_with_state(
-            app_state.clone(),
-            auth_middleware,
-        ));
+        let protected_api = api_routes
+            .layer(axum::middleware::from_fn(csrf_middleware))
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ));
 
         // CalDAV/CardDAV/WebDAV with auth middleware (merged, not nested)
         let caldav_protected = caldav_router.layer(axum::middleware::from_fn_with_state(
@@ -240,10 +246,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // Mount WOPI routes (protocol routes use own token auth, API routes behind auth middleware)
         if let Some((wopi_protocol, wopi_api)) = wopi_routes {
-            let wopi_api_protected = wopi_api.layer(axum::middleware::from_fn_with_state(
-                app_state.clone(),
-                auth_middleware,
-            ));
+            let wopi_api_protected = wopi_api
+                .layer(axum::middleware::from_fn(csrf_middleware))
+                .layer(axum::middleware::from_fn_with_state(
+                    app_state.clone(),
+                    auth_middleware,
+                ));
             app = app
                 .nest("/wopi", wopi_protocol)
                 .nest("/api/wopi", wopi_api_protected);
@@ -272,6 +280,50 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Increase the default body limit to 10 GB to allow large file uploads.
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
+
+    // ── Security headers ─────────────────────────────────────────────────
+    // Applied globally so every response (API, static, DAV) carries them.
+    use axum::http::header::HeaderName;
+    use axum::http::HeaderValue;
+
+    app = app
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("content-security-policy"),
+            // NOTE: script-src includes 'unsafe-inline' because several HTML
+            // pages still use inline event handlers (onclick, onsubmit) and
+            // <script> blocks. TODO: migrate these to external .js files so
+            // 'unsafe-inline' can be removed.
+            // frame-src is permissive (*) to allow WOPI editor iframes whose
+            // origin is configured at runtime (Collabora, OnlyOffice, etc.).
+            HeaderValue::from_static(
+                "default-src 'self'; \
+                 script-src 'self' 'unsafe-inline'; \
+                 style-src 'self' 'unsafe-inline'; \
+                 img-src 'self' data: blob:; \
+                 connect-src 'self'; \
+                 font-src 'self' data:; \
+                 frame-src *; \
+                 frame-ancestors 'none'; \
+                 base-uri 'self'; \
+                 form-action 'self'"
+            ),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-frame-options"),
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+        ));
 
     // Start server — tuned socket for low-latency responses
     let addr = SocketAddr::from(([0, 0, 0, 0], 8086));

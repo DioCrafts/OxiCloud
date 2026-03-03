@@ -12,6 +12,12 @@ use crate::common::di::AppState;
 // Re-export CurrentUser from application layer for use in handlers
 pub use crate::application::dtos::user_dto::CurrentUser;
 
+/// Marker inserted into request extensions when the user was authenticated
+/// via the `oxicloud_access` HttpOnly cookie rather than a Bearer/Basic header.
+/// The CSRF middleware uses this to decide whether CSRF validation is required.
+#[derive(Clone, Copy, Debug)]
+pub struct CookieAuthenticated;
+
 // Structure for use in Axum extractors
 #[derive(Clone, Debug)]
 pub struct AuthUser {
@@ -154,12 +160,15 @@ impl IntoResponse for AuthError {
 
 /// Secure authentication middleware.
 ///
-/// Supports two authentication methods:
+/// Supports three authentication methods (tried in order):
 /// 1. **Bearer JWT** — standard token in `Authorization: Bearer <token>`
 /// 2. **Basic Auth with App Passwords** — for DAV clients (DAVx⁵, Thunderbird, rclone)
 ///    that send `Authorization: Basic base64(username:app_password)`
+/// 3. **HttpOnly Cookie** — `oxicloud_access` cookie set by the login endpoint;
+///    used by browser-based sessions so tokens are never exposed to JS.
 ///
-/// Bearer is tried first; if no Bearer header is found, Basic is attempted.
+/// Bearer is tried first; if no Bearer header is found, Basic is attempted,
+/// then the cookie fallback.
 pub async fn auth_middleware(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -260,7 +269,44 @@ pub async fn auth_middleware(
         }
     }
 
-    // No valid Authorization header found
+    // ── 3. Try HttpOnly cookie (browser sessions) ────────────────
+    {
+        use crate::interfaces::api::cookie_auth;
+
+        if let Some(token_str) = cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE) {
+            if !token_str.is_empty() {
+                tracing::debug!("Processing cookie-based authentication");
+
+                if let Some(auth_service) = state.auth_service.as_ref() {
+                    let token_service = &auth_service.token_service;
+                    match token_service.validate_token(&token_str) {
+                        Ok(claims) => {
+                            tracing::debug!(
+                                "Cookie token validated for user: {}",
+                                claims.username
+                            );
+                            let current_user = CurrentUser {
+                                id: claims.sub,
+                                username: claims.username,
+                                email: claims.email,
+                                role: claims.role,
+                            };
+                            request.extensions_mut().insert(current_user);
+                            request.extensions_mut().insert(CookieAuthenticated);
+                            return Ok(next.run(request).await);
+                        }
+                        Err(e) => {
+                            tracing::debug!("Cookie token validation failed: {}", e);
+                            // Don't return error — fall through to "no token" so
+                            // the browser gets a 401 and can redirect to /login.
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // No valid credentials found via any method
     if state.auth_service.is_none() {
         tracing::error!("Auth middleware invoked but auth service is not configured");
         return Err(AuthError::AuthServiceUnavailable);

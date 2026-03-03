@@ -1,5 +1,4 @@
 const API = '/api';
-const token = localStorage.getItem('oxicloud_token') || localStorage.getItem('token') || localStorage.getItem('access_token');
 let currentAdminId = '';
 let usersPage = 0;
 const PAGE_SIZE = 50;
@@ -24,7 +23,7 @@ function showElement(id, mode = 'block') {
 }
 
 function headers() {
-  return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+  return { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 }
 
 function formatBytes(bytes) {
@@ -357,7 +356,6 @@ async function saveOidcSettings() {
 }
 
 async function init() {
-  if (!token) { showAccessDenied(); return; }
   try {
     const me = await fetch(API + '/auth/me', { headers: headers() });
     if (!me.ok) { showAccessDenied(); return; }

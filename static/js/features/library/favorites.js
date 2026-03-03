@@ -16,10 +16,7 @@ const favorites = {
     // ───────────────────── helpers ─────────────────────
 
     _authHeaders() {
-        const token = localStorage.getItem('oxicloud_token');
-        const h = {};
-        if (token) h['Authorization'] = `Bearer ${token}`;
-        return h;
+        return { ...getCsrfHeaders() };
     },
 
     _cacheKey(id, type) {

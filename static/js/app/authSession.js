@@ -3,25 +3,13 @@
  */
 
 async function refreshUserData() {
-    const TOKEN_KEY = 'oxicloud_token';
     const USER_DATA_KEY = 'oxicloud_user';
 
-    const token = localStorage.getItem(TOKEN_KEY);
-    console.log('refreshUserData called, token:', token ? token.substring(0, 20) + '...' : 'null');
-
-    if (!token) {
-        console.log('No valid token, skipping user data refresh');
-        return null;
-    }
-
     try {
-        console.log('Fetching /api/auth/me...');
+        console.log('Fetching /api/auth/me (cookie-based)...');
         const response = await fetch('/api/auth/me', {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
+            credentials: 'same-origin'
         });
 
         console.log('/api/auth/me response status:', response.status);
@@ -47,9 +35,6 @@ async function refreshUserData() {
 
 async function checkAuthentication() {
     try {
-        const TOKEN_KEY = 'oxicloud_token';
-        const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
-        const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
         const USER_DATA_KEY = 'oxicloud_user';
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -60,8 +45,9 @@ async function checkAuthentication() {
             try {
                 const exchangeResponse = await fetch('/api/auth/oidc/exchange', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: oidcCode })
+                    headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+                    body: JSON.stringify({ code: oidcCode }),
+                    credentials: 'same-origin'
                 });
 
                 if (!exchangeResponse.ok) {
@@ -74,43 +60,14 @@ async function checkAuthentication() {
                 const data = await exchangeResponse.json();
                 console.log('OIDC token exchange successful');
 
-                const token = data.access_token || data.token;
-                const refreshToken = data.refresh_token || data.refreshToken;
-
-                if (token) {
-                    localStorage.setItem(TOKEN_KEY, token);
-                    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-
-                    let parsedExpiry = false;
-                    const tokenParts = token.split('.');
-                    if (tokenParts.length === 3) {
-                        try {
-                            const payload = JSON.parse(atob(tokenParts[1]));
-                            if (payload.exp) {
-                                const expiryDate = new Date(payload.exp * 1000);
-                                if (!isNaN(expiryDate.getTime())) {
-                                    localStorage.setItem(TOKEN_EXPIRY_KEY, expiryDate.toISOString());
-                                    parsedExpiry = true;
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Error parsing JWT:', e);
-                        }
-                    }
-                    if (!parsedExpiry) {
-                        const expiry = new Date();
-                        expiry.setDate(expiry.getDate() + 30);
-                        localStorage.setItem(TOKEN_EXPIRY_KEY, expiry.toISOString());
-                    }
-
-                    if (data.user) {
-                        localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
-                    }
-
-                    window.history.replaceState({}, document.title, '/');
-                    window.location.reload();
-                    return;
+                // Tokens are now in HttpOnly cookies set by the server.
+                if (data.user) {
+                    localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
                 }
+
+                window.history.replaceState({}, document.title, '/');
+                window.location.reload();
+                return;
             } catch (err) {
                 console.error('OIDC exchange error:', err);
                 window.location.href = '/login?source=oidc_error';
@@ -118,18 +75,12 @@ async function checkAuthentication() {
             }
         }
 
-        const token = localStorage.getItem(TOKEN_KEY);
-
-        if (!token) {
-            console.log('No token found, redirecting to login');
-            window.location.href = '/login?source=app';
-            return;
-        }
-
-        console.log('Token found, proceeding with app initialization');
+        // Check session validity by calling /api/auth/me (cookie auto-sent)
+        console.log('Checking session via /api/auth/me...');
 
         const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
         if (userData.username) {
+            // We have cached user data — render immediately, refresh in background
             const userInitials = userData.username.substring(0, 2).toUpperCase();
             document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => {
                 el.textContent = userInitials;
@@ -144,6 +95,15 @@ async function checkAuthentication() {
             refreshUserData().then(freshData => {
                 if (freshData) {
                     console.log('Storage usage updated from server');
+                } else {
+                    // Session expired — try silent refresh first
+                    console.warn('Session may have expired, trying refresh...');
+                    fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() }, body: '{}' })
+                        .then(r => r.ok ? refreshUserData() : Promise.reject(new Error('refresh failed')))
+                        .catch(() => {
+                            localStorage.removeItem(USER_DATA_KEY);
+                            window.location.href = '/login?source=session_expired';
+                        });
                 }
             }).catch(err => {
                 console.warn('Could not refresh user data:', err);
@@ -151,7 +111,8 @@ async function checkAuthentication() {
 
             resolveHomeFolder().then(() => window.loadFiles());
         } else {
-            console.log('No user data, attempting to fetch from server');
+            // No cached user data — must verify session from server
+            console.log('No cached user data, fetching from server');
             try {
                 const freshData = await refreshUserData();
                 if (freshData && freshData.username) {
@@ -161,26 +122,17 @@ async function checkAuthentication() {
                     resolveHomeFolder().then(() => window.loadFiles());
                 } else {
                     console.warn('Could not retrieve user data, redirecting to login');
-                    localStorage.removeItem(TOKEN_KEY);
-                    localStorage.removeItem(REFRESH_TOKEN_KEY);
-                    localStorage.removeItem(TOKEN_EXPIRY_KEY);
                     localStorage.removeItem(USER_DATA_KEY);
                     window.location.href = '/login?source=invalid_session';
                 }
             } catch (err) {
                 console.error('Failed to fetch user data:', err);
-                localStorage.removeItem(TOKEN_KEY);
-                localStorage.removeItem(REFRESH_TOKEN_KEY);
-                localStorage.removeItem(TOKEN_EXPIRY_KEY);
                 localStorage.removeItem(USER_DATA_KEY);
                 window.location.href = '/login?source=session_error';
             }
         }
     } catch (error) {
         console.error('Error during authentication check:', error);
-        localStorage.removeItem('oxicloud_token');
-        localStorage.removeItem('oxicloud_refresh_token');
-        localStorage.removeItem('oxicloud_token_expiry');
         localStorage.removeItem('oxicloud_user');
         window.location.href = '/login?source=auth_error';
     }
@@ -191,9 +143,7 @@ async function resolveHomeFolder() {
 
     if (app.userHomeFolderId) return;
     try {
-        const token = localStorage.getItem('oxicloud_token');
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-        const response = await fetch('/api/folders', { headers });
+        const response = await fetch('/api/folders', { credentials: 'same-origin' });
         if (!response.ok) {
             console.warn(`Could not fetch home folder: ${response.status}`);
             return;

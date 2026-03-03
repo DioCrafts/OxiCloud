@@ -4,16 +4,12 @@
  */
 
 /**
- * Get authorization headers for API requests
- * @returns {Object} Headers object with Authorization bearer token
+ * Get authorization headers for API requests.
+ * Tokens are now in HttpOnly cookies — no explicit Authorization header needed.
+ * @returns {Object} Headers object
  */
 function getAuthHeaders() {
-    const token = localStorage.getItem('oxicloud_token');
-    const headers = {};
-    if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-    }
-    return headers;
+    return { ...getCsrfHeaders() };
 }
 
 // File Operations Module
@@ -177,10 +173,11 @@ const fileOps = {
 
             xhr.open('POST', '/api/files/upload');
 
-            // Set auth header
-            const token = localStorage.getItem('oxicloud_token');
-            if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            // Auth is handled by HttpOnly cookies — no explicit header needed
             xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            // CSRF double-submit: echo the CSRF cookie as a request header
+            const _csrfTok = getCsrfToken();
+            if (_csrfTok) xhr.setRequestHeader('X-CSRF-Token', _csrfTok);
 
             try {
                 xhr.send(formData);

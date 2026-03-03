@@ -48,16 +48,13 @@ async function loadFiles(options = {}) {
             console.log(`Loading subfolder content: ${app.currentPath}`);
         }
 
-        const token = localStorage.getItem('oxicloud_token');
         const headers = {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
         };
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
         const requestOptions = {
             headers,
+            credentials: 'same-origin',
             cache: 'no-store'
         };
 

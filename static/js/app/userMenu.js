@@ -224,18 +224,16 @@ function showUserProfileModal() {
 }
 
 function logout() {
-    const TOKEN_KEY = 'oxicloud_token';
-    const REFRESH_TOKEN_KEY = 'oxicloud_refresh_token';
-    const TOKEN_EXPIRY_KEY = 'oxicloud_token_expiry';
     const USER_DATA_KEY = 'oxicloud_user';
 
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(TOKEN_EXPIRY_KEY);
-    localStorage.removeItem(USER_DATA_KEY);
-
-    sessionStorage.removeItem('redirect_count');
-    window.location.href = '/login';
+    // Tell the server to clear HttpOnly cookies
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: getCsrfHeaders() })
+        .catch(() => {}) // Best-effort
+        .finally(() => {
+            localStorage.removeItem(USER_DATA_KEY);
+            sessionStorage.removeItem('redirect_count');
+            window.location.href = '/login';
+        });
 }
 
 window.setupUserMenu = setupUserMenu;

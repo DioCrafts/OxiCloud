@@ -210,10 +210,7 @@ class InlineViewer {
     try {
       console.log('Creating text viewer for:', file.name);
       
-      const token = localStorage.getItem('oxicloud_token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      
-      const response = await fetch(`/api/files/${file.id}?inline=true`, { headers });
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { credentials: 'same-origin' });
       
       if (!response.ok) {
         throw new Error(`Error fetching file: ${response.status} ${response.statusText}`);
@@ -254,12 +251,7 @@ class InlineViewer {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', `/api/files/${file.id}?inline=true`, true);
       xhr.responseType = 'blob';
-      
-      // Add auth header
-      const token = localStorage.getItem('oxicloud_token');
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
+      xhr.withCredentials = true;
       
       // Create a promise to handle the XHR
       const response = await new Promise((resolve, reject) => {
@@ -357,10 +349,8 @@ class InlineViewer {
     try {
       console.log(`Creating ${mediaType} player for:`, file.name);
 
-      // Fetch file with auth header (same pattern as images/PDFs)
-      const token = localStorage.getItem('oxicloud_token');
-      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-      const response = await fetch(`/api/files/${file.id}?inline=true`, { headers });
+      // Fetch file (cookie auto-sent)
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { credentials: 'same-origin' });
 
       if (!response.ok) {
         throw new Error(`Error fetching file: ${response.status} ${response.statusText}`);
@@ -488,10 +478,7 @@ class InlineViewer {
   }
   
   downloadFile(file) {
-    const token = localStorage.getItem('oxicloud_token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-    
-    fetch(`/api/files/${file.id}`, { headers })
+    fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.blob();
