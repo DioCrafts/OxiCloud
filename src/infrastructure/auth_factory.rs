@@ -1,6 +1,7 @@
-use anyhow::Result;
 use sqlx::PgPool;
 use std::sync::Arc;
+
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
 use crate::application::services::auth_application_service::AuthApplicationService;
 use crate::application::services::folder_service::FolderService;

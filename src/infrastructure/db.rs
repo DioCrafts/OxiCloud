@@ -1,7 +1,13 @@
 use crate::common::config::AppConfig;
-use anyhow::Result;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use std::time::Duration;
+
+/// Database initialization error.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct DbError(String);
+
+type Result<T> = std::result::Result<T, DbError>;
 
 /// Segmented database pools.
 ///
@@ -45,11 +51,11 @@ pub async fn create_database_pools(config: &AppConfig) -> Result<DbPools> {
     // Apply schema through the primary pool (idempotent)
     tracing::info!("Applying database schema...");
     if let Err(e) = apply_schema(&primary).await {
-        return Err(anyhow::anyhow!(
+        return Err(DbError(format!(
             "Database schema could not be applied: {}. \
              Run manually: psql -f db/schema.sql",
             e
-        ));
+        )));
     }
     tracing::info!("Database schema applied successfully");
 
@@ -118,11 +124,11 @@ async fn create_pool_with_retries(
                 Err(e) => {
                     tracing::error!("Error verifying {} pool connection: {}", label, e);
                     if attempt >= MAX_ATTEMPTS {
-                        return Err(anyhow::anyhow!(
+                        return Err(DbError(format!(
                             "Error verifying PostgreSQL {} pool connection: {}",
                             label,
                             e
-                        ));
+                        )));
                     }
                 }
             },
@@ -135,22 +141,22 @@ async fn create_pool_with_retries(
                     e
                 );
                 if attempt >= MAX_ATTEMPTS {
-                    return Err(anyhow::anyhow!(
+                    return Err(DbError(format!(
                         "Error in PostgreSQL {} pool connection: {}",
                         label,
                         e
-                    ));
+                    )));
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
         }
     }
 
-    Err(anyhow::anyhow!(
+    Err(DbError(format!(
         "Could not establish PostgreSQL {} pool connection after {} attempts",
         label,
         MAX_ATTEMPTS
-    ))
+    )))
 }
 
 /// Apply the embedded schema.sql to the database.
@@ -189,7 +195,7 @@ async fn apply_schema(pool: &PgPool) -> Result<()> {
                 e,
                 preview
             );
-            return Err(anyhow::anyhow!("Schema statement {} failed: {}", i + 1, e));
+            return Err(DbError(format!("Schema statement {} failed: {}", i + 1, e)));
         }
     }
 
