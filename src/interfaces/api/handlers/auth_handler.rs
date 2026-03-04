@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::application::dtos::user_dto::{
     ChangePasswordDto, LoginDto, OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto,
-    RefreshTokenDto, RegisterDto,
+    RefreshTokenDto, RegisterDto, SetupAdminDto,
 };
 use crate::common::di::AppState;
 use crate::interfaces::api::cookie_auth;
@@ -49,6 +49,11 @@ pub fn register_route() -> Router<Arc<AppState>> {
 
 pub fn refresh_route() -> Router<Arc<AppState>> {
     Router::new().route("/refresh", post(refresh_token))
+}
+
+/// Public setup route — only active before the first admin is created.
+pub fn setup_route() -> Router<Arc<AppState>> {
+    Router::new().route("/setup", post(setup_admin))
 }
 
 async fn register(
@@ -343,6 +348,103 @@ async fn logout(
     Ok(response)
 }
 
+/// POST /api/setup — One-time endpoint to create the first admin user.
+///
+/// Requires the setup token that was printed to the server log on first boot.
+/// Once the admin is created, the system is marked as initialized and this
+/// endpoint returns 403 for all subsequent requests.
+async fn setup_admin(
+    State(state): State<Arc<AppState>>,
+    Json(dto): Json<SetupAdminDto>,
+) -> Result<impl IntoResponse, AppError> {
+    tracing::info!("Setup admin request received for user: {}", dto.username);
+
+    // 1. Verify auth service exists
+    let auth_service = state
+        .auth_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
+
+    // 2. Check if system is already initialized (fail-closed: DB error → deny)
+    let admin_svc = state
+        .admin_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Admin settings service not configured"))?;
+
+    if admin_svc.is_system_initialized().await {
+        tracing::warn!(
+            "Setup admin rejected: system already initialized (user: {})",
+            dto.username
+        );
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "System is already initialized. Use the admin panel to manage users.",
+            "SystemAlreadyInitialized",
+        ));
+    }
+
+    // 3. Verify the one-time setup token
+    let expected_token = state.setup_token.as_deref().ok_or_else(|| {
+        AppError::new(
+            StatusCode::FORBIDDEN,
+            "No setup token available. The system may already be initialized or the server needs to be restarted.",
+            "NoSetupToken",
+        )
+    })?;
+
+    if !constant_time_eq(dto.setup_token.as_bytes(), expected_token.as_bytes()) {
+        tracing::warn!(
+            "Setup admin rejected: invalid setup token (user: {})",
+            dto.username
+        );
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "Invalid setup token. Check the server log for the correct token.",
+            "InvalidSetupToken",
+        ));
+    }
+
+    // 4. Create the first admin user
+    let user = auth_service
+        .auth_application_service
+        .setup_create_admin(dto.username.clone(), dto.email, dto.password)
+        .await
+        .map_err(|e| {
+            tracing::error!("Setup admin creation failed: {}", e);
+            AppError::from(e)
+        })?;
+
+    // 5. Mark system as initialized
+    if let Err(e) = admin_svc.mark_system_initialized(&user.id).await {
+        // Admin was created but we couldn't mark as initialized.
+        // This is not fatal — the setup token check prevents re-use, and
+        // on next restart the system will detect the admin in DB.
+        tracing::error!(
+            "Created admin but failed to mark system as initialized: {}",
+            e
+        );
+    }
+
+    tracing::info!(
+        "System initialized: first admin '{}' created successfully",
+        dto.username
+    );
+
+    Ok((StatusCode::CREATED, Json(user)))
+}
+
+/// Constant-time byte comparison to prevent timing attacks on the setup token.
+fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
 /// Get system status - returns whether admin is configured
 /// This is a public endpoint used to determine if setup is needed
 #[derive(serde::Serialize)]
@@ -363,7 +465,14 @@ async fn get_system_status(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
 
-    // Count admin users to determine if system is initialized
+    // Use the DB flag as the authoritative source for initialization status
+    let db_initialized = if let Some(admin_svc) = state.admin_settings_service.as_ref() {
+        admin_svc.is_system_initialized().await
+    } else {
+        false
+    };
+
+    // Count admin users for additional info
     let admin_count = auth_service
         .auth_application_service
         .count_admin_users()
@@ -371,9 +480,9 @@ async fn get_system_status(
         .unwrap_or(0);
 
     let status = SystemStatus {
-        initialized: admin_count > 0,
+        initialized: db_initialized || admin_count > 0,
         admin_count,
-        registration_allowed: admin_count > 0, // Only allow registration if admin exists
+        registration_allowed: db_initialized || admin_count > 0,
     };
 
     tracing::info!(

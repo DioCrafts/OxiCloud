@@ -303,30 +303,6 @@ pub trait FileWritePort: Send + Sync + 'static {
 // Auxiliary ports (unchanged)
 // ─────────────────────────────────────────────────────
 
-/// Secondary port for file path resolution
-pub trait FilePathResolutionPort: Send + Sync + 'static {
-    /// Gets the storage path of a file
-    async fn get_file_path(&self, id: &str) -> Result<StoragePath, DomainError>;
-
-    /// Resolves a domain path to a physical path
-    fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf;
-}
-
-/// Secondary port for file/directory existence verification
-pub trait StorageVerificationPort: Send + Sync + 'static {
-    /// Checks whether a file exists at the given path
-    async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
-
-    /// Checks whether a directory exists at the given path
-    async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError>;
-}
-
-/// Secondary port for directory management
-pub trait DirectoryManagementPort: Send + Sync + 'static {
-    /// Creates directories if they do not exist
-    async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError>;
-}
-
 /// Secondary port for storage usage management
 pub trait StorageUsagePort: Send + Sync + 'static {
     /// Updates storage usage statistics for a user

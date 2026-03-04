@@ -10,8 +10,10 @@ use super::storage_ports::{FileReadPort, FileWritePort};
 
 /// Secondary port for storage operations
 pub trait StoragePort: Send + Sync + 'static {
-    /// Resolves a domain path to a physical path
-    fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf;
+    /// Resolves a domain path to a physical path.
+    ///
+    /// Returns an error if the path contains unsafe segments (defense-in-depth).
+    fn resolve_path(&self, storage_path: &StoragePath) -> Result<PathBuf, DomainError>;
 
     /// Creates directories if they don't exist
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError>;

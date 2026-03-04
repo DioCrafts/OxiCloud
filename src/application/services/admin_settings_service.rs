@@ -353,6 +353,32 @@ impl AdminSettingsService {
     }
 
     // ========================================================================
+    // System Initialization
+    // ========================================================================
+
+    /// Check if the system has been initialized (first admin created).
+    /// Returns `true` if the `system_initialized` flag is set to `"true"` in the DB.
+    pub async fn is_system_initialized(&self) -> bool {
+        match self.settings_repo.get("system_initialized").await {
+            Ok(Some(val)) => val == "true",
+            _ => false, // fail-closed: if DB error or key absent, system is NOT initialized
+        }
+    }
+
+    /// Mark the system as initialized after the first admin is created.
+    pub async fn mark_system_initialized(&self, admin_user_id: &str) -> Result<(), DomainError> {
+        self.settings_repo
+            .set(
+                "system_initialized",
+                "true",
+                "system",
+                false,
+                Some(admin_user_id),
+            )
+            .await
+    }
+
+    // ========================================================================
     // Registration Control
     // ========================================================================
 

@@ -550,6 +550,7 @@ impl AppServiceFactory {
             app_password_service: None,
             path_resolver: None,
             webdav_lock_store: crate::infrastructure::services::webdav_lock_service::create_webdav_lock_store(),
+            setup_token: None,
         };
 
         // 9b. Wire admin settings service when auth is available
@@ -598,7 +599,29 @@ impl AppServiceFactory {
                 }
             }
 
-            app_state.admin_settings_service = Some(admin_svc);
+            app_state.admin_settings_service = Some(admin_svc.clone());
+
+            // 9b-2. Generate one-time setup token if system is NOT yet initialized
+            if !admin_svc.is_system_initialized().await {
+                use rand_core::{OsRng, RngCore};
+                let mut token_bytes = [0u8; 32];
+                OsRng.fill_bytes(&mut token_bytes);
+                let token = hex::encode(token_bytes);
+
+                tracing::warn!("╔══════════════════════════════════════════════════════════╗");
+                tracing::warn!("║  SYSTEM NOT INITIALIZED — first admin setup required     ║");
+                tracing::warn!("║                                                          ║");
+                tracing::warn!("║  POST /api/setup with this one-time token:               ║");
+                tracing::warn!("║  {}  ║", token);
+                tracing::warn!("║                                                          ║");
+                tracing::warn!("║  This token is valid until the server restarts or the     ║");
+                tracing::warn!("║  first admin is created. Keep it secret!                  ║");
+                tracing::warn!("╚══════════════════════════════════════════════════════════╝");
+
+                app_state.setup_token = Some(token);
+            } else {
+                tracing::info!("System already initialized — setup endpoint disabled");
+            }
 
             // 9c. Wire Device Authorization Grant (RFC 8628) service
             {
@@ -857,6 +880,10 @@ pub struct AppState {
         Option<Arc<crate::infrastructure::services::path_resolver_service::PathResolverService>>,
     pub webdav_lock_store:
         Arc<crate::infrastructure::services::webdav_lock_service::WebDavLockStore>,
+    /// One-time setup token generated on startup when the system is not yet
+    /// initialized. Printed to the server log so the operator can create the
+    /// first admin user via `POST /api/setup`.
+    pub setup_token: Option<String>,
 }
 
 // All AppState construction is done via struct literal in build_app_state().

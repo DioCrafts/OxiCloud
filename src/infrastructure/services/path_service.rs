@@ -23,13 +23,24 @@ impl PathService {
         Self { root_path }
     }
 
-    /// Converts a domain path to an absolute physical path
-    pub fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf {
+    /// Converts a domain path to an absolute physical path.
+    ///
+    /// Returns an error if validation fails (defense-in-depth against traversal).
+    pub fn resolve_path(&self, storage_path: &StoragePath) -> Result<PathBuf, DomainError> {
+        self.validate_path(storage_path)?;
         let mut path = self.root_path.clone();
         for segment in storage_path.segments() {
             path.push(segment);
         }
-        path
+        // Final safety check: the resolved path must remain under root
+        if !path.starts_with(&self.root_path) {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "Path",
+                format!("Resolved path escapes storage root: {}", path.display()),
+            ));
+        }
+        Ok(path)
     }
 
     /// Converts a physical path to a domain path
@@ -116,20 +127,14 @@ impl PathService {
 }
 
 impl StoragePort for PathService {
-    fn resolve_path(&self, storage_path: &StoragePath) -> PathBuf {
-        let mut path = self.root_path.clone();
-        for segment in storage_path.segments() {
-            path.push(segment);
-        }
-        path
+    fn resolve_path(&self, storage_path: &StoragePath) -> Result<PathBuf, DomainError> {
+        // Delegate to inherent method which validates + bounds-checks
+        self.resolve_path(storage_path)
     }
 
     async fn ensure_directory(&self, storage_path: &StoragePath) -> Result<(), DomainError> {
-        // First validate the path
-        self.validate_path(storage_path)?;
-
-        // Resolve to physical path
-        let physical_path = self.resolve_path(storage_path);
+        // resolve_path already calls validate_path internally
+        let physical_path = self.resolve_path(storage_path)?;
 
         // Check current state with a single async stat() — no worker blocking.
         match fs::metadata(&physical_path).await {
@@ -169,7 +174,7 @@ impl StoragePort for PathService {
     }
 
     async fn file_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
-        let physical_path = self.resolve_path(storage_path);
+        let physical_path = self.resolve_path(storage_path)?;
 
         // Single async stat() — no worker blocking, one syscall instead of two.
         match fs::metadata(&physical_path).await {
@@ -184,7 +189,7 @@ impl StoragePort for PathService {
     }
 
     async fn directory_exists(&self, storage_path: &StoragePath) -> Result<bool, DomainError> {
-        let physical_path = self.resolve_path(storage_path);
+        let physical_path = self.resolve_path(storage_path)?;
 
         // Single async stat() — no worker blocking, one syscall instead of two.
         match fs::metadata(&physical_path).await {
@@ -208,7 +213,7 @@ mod tests {
         let service = PathService::new(PathBuf::from("/storage"));
 
         let storage_path = StoragePath::from_string("test/file.txt");
-        let absolute = service.resolve_path(&storage_path);
+        let absolute = service.resolve_path(&storage_path).unwrap();
 
         assert_eq!(absolute, PathBuf::from("/storage/test/file.txt"));
     }
@@ -254,5 +259,66 @@ mod tests {
         let file_path = service.create_file_path(&folder_path, "file.txt");
 
         assert_eq!(file_path.to_string(), "/folder/file.txt");
+    }
+
+    // ── Path-traversal hardening tests (VULN-02) ──────────────
+
+    #[test]
+    fn test_resolve_path_traversal_stripped_by_domain() {
+        // StoragePath::from_string already strips ".." segments (Solution A+E),
+        // so resolve_path receives a clean path.
+        let service = PathService::new(PathBuf::from("/storage"));
+        let path = StoragePath::from_string("../../etc/passwd");
+        let resolved = service.resolve_path(&path).unwrap();
+        assert_eq!(resolved, PathBuf::from("/storage/etc/passwd"));
+        assert!(resolved.starts_with("/storage"));
+    }
+
+    #[test]
+    fn test_resolve_path_normal_path_ok() {
+        let service = PathService::new(PathBuf::from("/storage"));
+        let path = StoragePath::from_string("users/alice/documents/report.pdf");
+        let resolved = service.resolve_path(&path).unwrap();
+        assert_eq!(
+            resolved,
+            PathBuf::from("/storage/users/alice/documents/report.pdf")
+        );
+    }
+
+    #[test]
+    fn test_resolve_path_root_ok() {
+        let service = PathService::new(PathBuf::from("/storage"));
+        let path = StoragePath::root();
+        let resolved = service.resolve_path(&path).unwrap();
+        assert_eq!(resolved, PathBuf::from("/storage"));
+    }
+
+    #[test]
+    fn test_validate_path_rejects_dot_prefix() {
+        let service = PathService::new(PathBuf::from("/storage"));
+        // Manually construct a path with a dot-prefixed segment
+        // (from_string strips ".." but allows ".hidden")
+        let path = StoragePath::from_string("folder/.hidden/file.txt");
+        assert!(service.validate_path(&path).is_err());
+    }
+
+    #[test]
+    fn test_validate_path_allows_well_known() {
+        let service = PathService::new(PathBuf::from("/storage"));
+        let path = StoragePath::from_string("folder/.well-known/caldav");
+        assert!(service.validate_path(&path).is_ok());
+    }
+
+    #[test]
+    fn test_validate_path_rejects_dangerous_chars() {
+        let service = PathService::new(PathBuf::from("/storage"));
+        for dangerous in &["file:name", "file*name", "file?name", "file<name", "file>name", "file|name", "file\"name"] {
+            let path = StoragePath::new(vec![dangerous.to_string()]);
+            assert!(
+                service.validate_path(&path).is_err(),
+                "validate_path should reject segment: {}",
+                dangerous
+            );
+        }
     }
 }

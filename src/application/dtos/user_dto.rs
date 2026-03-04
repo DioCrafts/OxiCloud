@@ -46,7 +46,16 @@ pub struct RegisterDto {
     pub username: String,
     pub email: String,
     pub password: String,
-    pub role: Option<String>,
+}
+
+/// DTO for the one-time initial admin setup endpoint (`/api/setup`).
+/// Requires the setup token printed to the server log on first boot.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SetupAdminDto {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub setup_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

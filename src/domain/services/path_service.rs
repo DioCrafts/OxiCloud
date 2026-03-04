@@ -13,9 +13,16 @@ pub struct StoragePath {
 }
 
 impl StoragePath {
-    /// Creates a new storage path
+    /// Checks whether a single segment is safe (no traversal, no slashes)
+    fn is_safe_segment(s: &str) -> bool {
+        !s.is_empty() && s != "." && s != ".." && !s.contains('/')
+    }
+
+    /// Creates a new storage path, silently dropping any traversal segments
     pub fn new(segments: Vec<String>) -> Self {
-        Self { segments }
+        Self {
+            segments: segments.into_iter().filter(|s| Self::is_safe_segment(s)).collect(),
+        }
     }
 
     /// Creates an empty path (root)
@@ -26,10 +33,13 @@ impl StoragePath {
     }
 
     /// Creates a path from a string with segments separated by /
+    ///
+    /// Traversal segments (`.`, `..`) are silently stripped to prevent
+    /// path-traversal attacks.
     pub fn from_string(path: &str) -> Self {
         let segments = path
             .split('/')
-            .filter(|s| !s.is_empty())
+            .filter(|s| Self::is_safe_segment(s))
             .map(|s| s.to_string())
             .collect();
         Self { segments }
@@ -47,10 +57,15 @@ impl StoragePath {
         Self { segments }
     }
 
-    /// Appends a segment to the path
+    /// Appends a segment to the path.
+    ///
+    /// Traversal segments (`.`, `..`) and segments containing `/` are
+    /// silently ignored to prevent path-traversal attacks.
     pub fn join(&self, segment: &str) -> Self {
         let mut new_segments = self.segments.clone();
-        new_segments.push(segment.to_string());
+        if Self::is_safe_segment(segment) {
+            new_segments.push(segment.to_string());
+        }
         Self {
             segments: new_segments,
         }
@@ -140,5 +155,82 @@ mod tests {
     fn test_storage_path_file_name() {
         let path = StoragePath::from_string("folder/file.txt");
         assert_eq!(path.file_name(), Some("file.txt".to_string()));
+    }
+
+    // ── Path-traversal hardening tests (VULN-02) ──────────────
+
+    #[test]
+    fn test_from_string_strips_dot_dot() {
+        let path = StoragePath::from_string("../../etc/passwd");
+        assert_eq!(path.segments(), &["etc", "passwd"]);
+    }
+
+    #[test]
+    fn test_from_string_strips_single_dot() {
+        let path = StoragePath::from_string("folder/./file.txt");
+        assert_eq!(path.segments(), &["folder", "file.txt"]);
+    }
+
+    #[test]
+    fn test_from_string_strips_mixed_traversal() {
+        let path = StoragePath::from_string("a/../b/./c/../../d");
+        assert_eq!(path.segments(), &["a", "b", "c", "d"]);
+    }
+
+    #[test]
+    fn test_from_string_all_traversal_yields_root() {
+        let path = StoragePath::from_string("../../..");
+        assert!(path.is_empty());
+        assert_eq!(path.to_string(), "/");
+    }
+
+    #[test]
+    fn test_new_strips_traversal_segments() {
+        let path = StoragePath::new(vec![
+            "..".into(),
+            "etc".into(),
+            ".".into(),
+            "passwd".into(),
+        ]);
+        assert_eq!(path.segments(), &["etc", "passwd"]);
+    }
+
+    #[test]
+    fn test_new_strips_empty_segments() {
+        let path = StoragePath::new(vec!["a".into(), "".into(), "b".into()]);
+        assert_eq!(path.segments(), &["a", "b"]);
+    }
+
+    #[test]
+    fn test_join_rejects_dot_dot() {
+        let base = StoragePath::from_string("folder");
+        let joined = base.join("..");
+        // ".." is silently ignored — path stays unchanged
+        assert_eq!(joined.segments(), &["folder"]);
+    }
+
+    #[test]
+    fn test_join_rejects_single_dot() {
+        let base = StoragePath::from_string("folder");
+        let joined = base.join(".");
+        assert_eq!(joined.segments(), &["folder"]);
+    }
+
+    #[test]
+    fn test_join_rejects_slash_in_segment() {
+        let base = StoragePath::from_string("folder");
+        let joined = base.join("sub/../../etc/passwd");
+        // Segment contains '/' → silently ignored
+        assert_eq!(joined.segments(), &["folder"]);
+    }
+
+    #[test]
+    fn test_from_pathbuf_strips_traversal() {
+        let path = StoragePath::from(PathBuf::from("a/../b/./c"));
+        // PathBuf Component::Normal only yields the normal parts
+        // On most platforms this strips . and ..
+        // but regardless, our from() only accepts Component::Normal
+        assert!(!path.segments().contains(&"..".to_string()));
+        assert!(!path.segments().contains(&".".to_string()));
     }
 }

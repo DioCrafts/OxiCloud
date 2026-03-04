@@ -227,73 +227,11 @@ impl AuthApplicationService {
             ));
         }
 
-        // Check if the user wants to create an admin
-        let is_admin_request = dto.username.to_lowercase() == "admin"
-            || (dto.role.is_some() && dto.role.as_ref().unwrap().to_lowercase() == "admin");
-
-        // If trying to create an admin, check if admins already exist in the system
-        if is_admin_request {
-            match self.count_admin_users().await {
-                Ok(admin_count) => {
-                    // If there are already admins in the system and this is not a clean install,
-                    // we do not allow creating another admin from registration
-                    if admin_count > 0 {
-                        // Check if this is a clean install (only the default admin)
-                        match self.count_all_users().await {
-                            Ok(user_count) => {
-                                // If there are more than 2 users (admin + test), it is not a clean install
-                                if user_count > 2 {
-                                    tracing::warn!(
-                                        "Attempt to create additional admin rejected: at least one admin already exists"
-                                    );
-                                    return Err(DomainError::new(
-                                        ErrorKind::AccessDenied,
-                                        "User",
-                                        "Creating additional admin users from the registration page is not allowed",
-                                    ));
-                                }
-                                // Otherwise, it is a clean install and the first admin is allowed
-                                tracing::info!("Allowing admin creation on clean install");
-                            }
-                            Err(e) => {
-                                // Cannot verify user count — treat as bootstrap scenario
-                                tracing::warn!(
-                                    "Could not count users ({}). Allowing admin creation for bootstrap.",
-                                    e
-                                );
-                            }
-                        }
-                    }
-                }
-                Err(e) => {
-                    // Any DB error (table missing, connection issue, etc.) means we
-                    // cannot verify admin state. Allow admin creation so the user can
-                    // bootstrap the system. If the DB is truly broken the INSERT will
-                    // fail anyway with a clear error.
-                    tracing::warn!(
-                        "Could not count admin users ({}). Allowing admin creation for bootstrap.",
-                        e
-                    );
-                }
-            }
-        }
-
-        // Determine role and quota based on user type
-        // If an explicit "admin" role is provided, use the administrator role
-        let role = if let Some(role_str) = &dto.role {
-            if role_str.to_lowercase() == "admin" {
-                UserRole::Admin
-            } else {
-                UserRole::User
-            }
-        } else {
-            // Special case: if the username is "admin", assign admin role even if not specified
-            if dto.username.to_lowercase() == "admin" {
-                UserRole::Admin
-            } else {
-                UserRole::User
-            }
-        };
+        // SECURITY: Public registration ALWAYS creates regular users.
+        // Admin users can only be created via:
+        //   1. The one-time /api/setup endpoint (first boot)
+        //   2. The admin panel (admin_create_user)
+        let role = UserRole::User;
 
         // Quota based on role, capped to available disk space
         let quota = self.capped_quota(&role);
@@ -329,6 +267,92 @@ impl AuthApplicationService {
             .await;
 
         tracing::info!("User registered: {}", created_user.id());
+        Ok(UserDto::from(created_user))
+    }
+
+    /// Create the first admin user during initial system setup.
+    ///
+    /// This is called by the `/api/setup` endpoint after verifying the setup
+    /// token. It unconditionally creates an admin user. The caller (handler)
+    /// is responsible for:
+    ///   1. Verifying the setup token
+    ///   2. Checking that the system is not already initialized
+    ///   3. Marking the system as initialized after this call succeeds
+    pub async fn setup_create_admin(
+        &self,
+        username: String,
+        email: String,
+        password: String,
+    ) -> Result<UserDto, DomainError> {
+        // Validate username
+        if username.len() < 3 || username.len() > 32 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                "Username must be between 3 and 32 characters".to_string(),
+            ));
+        }
+
+        // Check for duplicate username
+        if self
+            .user_storage
+            .get_user_by_username(&username)
+            .await
+            .is_ok()
+        {
+            return Err(DomainError::new(
+                ErrorKind::AlreadyExists,
+                "User",
+                format!("User '{}' already exists", username),
+            ));
+        }
+
+        // Check email uniqueness
+        if self
+            .user_storage
+            .get_user_by_email(&email)
+            .await
+            .is_ok()
+        {
+            return Err(DomainError::new(
+                ErrorKind::AlreadyExists,
+                "User",
+                format!("Email '{}' is already registered", email),
+            ));
+        }
+
+        // Validate password
+        if password.len() < 8 {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                "Password must be at least 8 characters long".to_string(),
+            ));
+        }
+
+        let role = UserRole::Admin;
+        let quota = self.capped_quota(&role);
+        let password_hash = self.password_hasher.hash_password(&password).await?;
+
+        let user = User::new(username.clone(), email, password_hash, role, quota).map_err(|e| {
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "User",
+                format!("Error creating admin user: {}", e),
+            )
+        })?;
+
+        let created_user = self.user_storage.create_user(user).await?;
+
+        // Create personal folder for the admin
+        self.create_personal_folder(&username, created_user.id())
+            .await;
+
+        tracing::info!(
+            "Initial admin created via setup: {} ({})",
+            username,
+            created_user.id()
+        );
         Ok(UserDto::from(created_user))
     }
 
@@ -585,105 +609,11 @@ impl AuthApplicationService {
         Ok(admin_users.len() as i64)
     }
 
-    // Method to count all users in the system
-    // Used to determine if this is a fresh install
-    pub async fn count_all_users(&self) -> Result<i64, DomainError> {
-        // Get all users with large limit and 0 offset
-        let all_users = self.user_storage.list_users(1000, 0).await.map_err(|e| {
-            DomainError::new(
-                ErrorKind::InternalError,
-                "User",
-                format!("Error counting users: {}", e),
-            )
-        })?;
-
-        Ok(all_users.len() as i64)
-    }
-
-    // Method to delete the default admin user created by migrations
-    // Used in fresh installations before creating a custom admin
-    pub async fn delete_default_admin(&self) -> Result<(), DomainError> {
-        // Find the default admin user (created by migrations)
-        match self.get_user_by_username("admin").await {
-            Ok(default_admin) => {
-                // Delete the default admin user
-                self.user_storage
-                    .delete_user(&default_admin.id)
-                    .await
-                    .map_err(|e| {
-                        DomainError::new(
-                            ErrorKind::InternalError,
-                            "User",
-                            format!("Error deleting default admin user: {}", e),
-                        )
-                    })
-            }
-            Err(_) => {
-                // Admin user doesn't exist, nothing to do
-                tracing::info!("Default admin user not found, nothing to delete");
-                Ok(())
-            }
-        }
-    }
-
-    // Method to replace the default admin user with a custom one
-    // Used in fresh installations to allow users to set their own admin credentials
-    pub async fn replace_default_admin(&self, dto: &RegisterDto) -> Result<UserDto, DomainError> {
-        // 1. Get the default admin user
-        let default_admin = self.get_user_by_username("admin").await?;
-
-        // 2. Delete the default admin user
-        self.user_storage
-            .delete_user(&default_admin.id)
-            .await
-            .map_err(|e| {
-                DomainError::new(
-                    ErrorKind::InternalError,
-                    "User",
-                    format!("Error deleting default admin user: {}", e),
-                )
-            })?;
-
-        // 3. Create new admin user with the provided credentials but admin role
-        let admin_role = UserRole::Admin;
-
-        // Admin quota, capped to available disk space
-        let admin_quota = self.capped_quota(&admin_role);
-
-        // Hash the password (same as register / admin_create_user)
-        let password_hash = self.password_hasher.hash_password(&dto.password).await?;
-
-        // Create the new admin user
-        let user = User::new(
-            dto.username.clone(),
-            dto.email.clone(),
-            password_hash,
-            admin_role,
-            admin_quota,
-        )
-        .map_err(|e| {
-            DomainError::new(
-                ErrorKind::InvalidInput,
-                "User",
-                format!("Error creating admin user: {}", e),
-            )
-        })?;
-
-        // 4. Save the new admin user
-        let created_user = self.user_storage.create_user(user).await?;
-
-        // 5. Create personal folder for the new admin
-        self.create_personal_folder(&dto.username, created_user.id())
-            .await;
-
-        tracing::info!("Custom admin created: {}", created_user.id());
-        Ok(UserDto::from(created_user))
-    }
-
     pub async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<UserDto>, DomainError> {
         let users = self.user_storage.list_users(limit, offset).await?;
         Ok(users.into_iter().map(UserDto::from).collect())
     }
+
 
     // ========================================================================
     // Admin User Management Methods
