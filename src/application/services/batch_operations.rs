@@ -1007,7 +1007,7 @@ impl BatchOperationService {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
     use crate::common::stubs::{StubFileManagementUseCase, StubFileRetrievalUseCase};

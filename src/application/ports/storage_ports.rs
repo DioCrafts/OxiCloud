@@ -28,6 +28,21 @@ pub trait FileReadPort: Send + Sync + 'static {
     /// Gets a file by its ID.
     async fn get_file(&self, id: &str) -> Result<File, DomainError>;
 
+    /// Gets a file by its ID, scoped to a specific owner.
+    ///
+    /// Returns `NotFound` if the file does not exist **or** belongs to a
+    /// different user.  This is the primary IDOR-safe accessor — handlers
+    /// serving end-user requests should always prefer this over `get_file`.
+    async fn get_file_for_owner(&self, id: &str, owner_id: &str) -> Result<File, DomainError>;
+
+    /// Verifies that the file identified by `id` belongs to `owner_id`.
+    ///
+    /// Returns `Ok(())` on success or `NotFound` when the file does not
+    /// exist or belongs to another user.
+    async fn verify_file_owner(&self, id: &str, owner_id: &str) -> Result<(), DomainError> {
+        self.get_file_for_owner(id, owner_id).await.map(|_| ())
+    }
+
     /// Lists files in a folder.
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
 

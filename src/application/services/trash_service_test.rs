@@ -211,6 +211,15 @@ impl FileReadPort for MockFileRepository {
     > {
         Ok(Box::pin(futures::stream::empty()))
     }
+
+    async fn get_file_for_owner(
+        &self,
+        id: &str,
+        _owner_id: &str,
+    ) -> std::result::Result<File, DomainError> {
+        // In this mock, ignore ownership — trash tests don't focus on ownership
+        self.get_file(id).await
+    }
 }
 
 impl FileWritePort for MockFileRepository {
@@ -490,10 +499,12 @@ impl FolderRepository for MockFolderRepository {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
     use crate::application::ports::trash_ports::TrashUseCase;
+    use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 
     #[tokio::test]
     async fn test_move_file_to_trash() {

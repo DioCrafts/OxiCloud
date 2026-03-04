@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::{AuthUser, OptionalUserId};
+use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 use crate::application::ports::file_ports::{FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase};
 use crate::application::ports::storage_ports::StorageUsagePort;
@@ -260,6 +260,7 @@ impl FileHandler {
     /// because it is tightly coupled to HTTP response headers.
     pub async fn get_thumbnail(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path((id, size)): Path<(String, String)>,
     ) -> impl IntoResponse {
         use crate::application::ports::thumbnail_ports::ThumbnailSize;
@@ -282,7 +283,7 @@ impl FileHandler {
             }
         };
 
-        let file = match file_retrieval_service.get_file(&id).await {
+        let file = match file_retrieval_service.get_file_owned(&id, &auth_user.id).await {
             Ok(f) => f,
             Err(err) => {
                 return (
@@ -349,14 +350,15 @@ impl FileHandler {
     /// and optional compression.
     pub async fn download_file(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Query(params): Query<HashMap<String, String>>,
         headers: HeaderMap,
     ) -> impl IntoResponse {
         let retrieval = &state.applications.file_retrieval_service;
 
-        // ── Get file metadata ────────────────────────────────────────
-        let file_dto = match retrieval.get_file(&id).await {
+        // ── Get file metadata (ownership-scoped) ────────────────────────
+        let file_dto = match retrieval.get_file_owned(&id, &auth_user.id).await {
             Ok(f) => f,
             Err(err) => {
                 let status = if err.to_string().contains("not found")
@@ -427,7 +429,7 @@ impl FileHandler {
                         Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
 
                     match retrieval
-                        .get_file_range_stream(&id, start, Some(end + 1))
+                        .get_file_range_stream_owned(&id, &auth_user.id, start, Some(end + 1))
                         .await
                     {
                         Ok(stream) => {
@@ -477,6 +479,9 @@ impl FileHandler {
             .get("original")
             .is_some_and(|v| v == "true" || v == "1");
 
+        // Use the ownership-scoped optimized download.
+        // Ownership was already verified by get_file_owned above,
+        // so we can safely use the preloaded variant.
         match retrieval
             .get_file_optimized_preloaded(&id, file_dto.clone(), accept_webp, prefer_original)
             .await
@@ -667,29 +672,21 @@ impl FileHandler {
     /// to permanent delete so the endpoint works with or without auth.
     pub async fn delete_file(
         State(state): State<GlobalState>,
-        OptionalUserId(user_id): OptionalUserId,
+        auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
         let mgmt = &state.applications.file_management_service;
 
-        let result = if let Some(uid) = user_id {
-            // Auth available: trash-first with dedup cleanup
-            mgmt.delete_with_cleanup(&id, &uid)
-                .await
-                .map(|was_trashed| {
-                    if was_trashed {
-                        tracing::info!("File moved to trash: {}", id);
-                    } else {
-                        tracing::info!("File permanently deleted: {}", id);
-                    }
-                })
-        } else {
-            // No auth: permanent delete
-            tracing::warn!("No auth context – permanently deleting file: {}", id);
-            mgmt.delete_file(&id).await.map(|_| {
-                tracing::info!("File permanently deleted (no auth): {}", id);
-            })
-        };
+        // Auth required: trash-first with dedup cleanup + ownership verification
+        let result = mgmt.delete_with_cleanup(&id, &auth_user.id)
+            .await
+            .map(|was_trashed| {
+                if was_trashed {
+                    tracing::info!("File moved to trash: {}", id);
+                } else {
+                    tracing::info!("File permanently deleted: {}", id);
+                }
+            });
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
@@ -717,9 +714,10 @@ impl FileHandler {
     //  MOVE
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Renames a file
+    /// Renames a file (ownership-verified)
     pub async fn rename_file(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Json(payload): Json<serde_json::Value>,
     ) -> impl IntoResponse {
@@ -738,7 +736,7 @@ impl FileHandler {
 
         tracing::info!("Renaming file {} to \"{}\"", id, new_name);
         let mgmt = &state.applications.file_management_service;
-        match mgmt.rename_file(&id, &new_name).await {
+        match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => {
                 tracing::error!("Error renaming file: {}", err);
@@ -762,37 +760,32 @@ impl FileHandler {
         }
     }
 
-    /// Moves a file to a different folder
+    /// Moves a file to a different folder (ownership-verified)
     pub async fn move_file(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Json(payload): Json<MoveFilePayload>,
     ) -> impl IntoResponse {
         tracing::info!("Moving file {} to folder {:?}", id, payload.folder_id);
 
-        let retrieval = &state.applications.file_retrieval_service;
         let mgmt = &state.applications.file_management_service;
 
-        match retrieval.get_file(&id).await {
-            Ok(_) => match mgmt.move_file(&id, payload.folder_id).await {
-                Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-                Err(err) => {
-                    tracing::error!("Error moving file: {}", err);
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(serde_json::json!({
-                            "error": format!("Error moving file: {}", err)
-                        })),
-                    )
-                        .into_response()
-                }
-            },
+        match mgmt.move_file_owned(&id, &auth_user.id, payload.folder_id).await {
+            Ok(file) => (StatusCode::OK, Json(file)).into_response(),
             Err(err) => {
-                tracing::error!("File not found for move: {}", err);
+                tracing::error!("Error moving file: {}", err);
+                let status = if err.to_string().contains("not found")
+                    || err.to_string().contains("NotFound")
+                {
+                    StatusCode::NOT_FOUND
+                } else {
+                    StatusCode::INTERNAL_SERVER_ERROR
+                };
                 (
-                    StatusCode::NOT_FOUND,
+                    status,
                     Json(serde_json::json!({
-                        "error": format!("File with ID {} does not exist", id)
+                        "error": format!("Error moving file: {}", err)
                     })),
                 )
                     .into_response()
@@ -800,9 +793,10 @@ impl FileHandler {
         }
     }
 
-    /// Moves a file to a different folder (simplified payload accepting generic JSON)
+    /// Moves a file to a different folder (simplified payload, ownership-verified)
     pub async fn move_file_simple(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(id): Path<String>,
         Json(payload): Json<serde_json::Value>,
     ) -> impl IntoResponse {
@@ -812,7 +806,7 @@ impl FileHandler {
             .map(|s| s.to_string());
 
         let mgmt = &state.applications.file_management_service;
-        match mgmt.move_file(&id, folder_id).await {
+        match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => {
                 tracing::error!("Error moving file: {}", err);

@@ -104,8 +104,14 @@ pub enum OptimizedFileContent {
 
 /// Primary port for file retrieval operations
 pub trait FileRetrievalUseCase: Send + Sync + 'static {
-    /// Gets a file by its ID
+    /// Gets a file by its ID (system/internal — no ownership check).
     async fn get_file(&self, id: &str) -> Result<FileDto, DomainError>;
+
+    /// Gets a file by its ID, enforcing that `caller_id` is the owner.
+    ///
+    /// Returns `NotFound` if the file does not exist **or** belongs to
+    /// another user.  All user-facing handlers should use this method.
+    async fn get_file_owned(&self, id: &str, caller_id: &str) -> Result<FileDto, DomainError>;
 
     /// Gets a file by its path (for WebDAV)
     async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError>;
@@ -131,6 +137,18 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError>;
 
+    /// Ownership-scoped optimized download.
+    ///
+    /// Verifies `caller_id` owns the file before returning content.
+    /// All user-facing download handlers should use this.
+    async fn get_file_optimized_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
+        accept_webp: bool,
+        prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError>;
+
     /// Like `get_file_optimized` but accepts an already-fetched `FileDto`,
     /// avoiding a redundant metadata query when the handler already has it.
     async fn get_file_optimized_preloaded(
@@ -150,6 +168,15 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn get_file_range_stream(
         &self,
         id: &str,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
+
+    /// Ownership-scoped range stream — verifies caller owns the file first.
+    async fn get_file_range_stream_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
@@ -189,10 +216,18 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
 
 /// Primary port for file management operations
 pub trait FileManagementUseCase: Send + Sync + 'static {
-    /// Moves a file to another folder
+    /// Moves a file to another folder (system/internal — no ownership check).
     async fn move_file(
         &self,
         file_id: &str,
+        folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError>;
+
+    /// Moves a file, enforcing that `caller_id` is the owner.
+    async fn move_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
@@ -203,10 +238,18 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
         target_folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
-    /// Renames a file
+    /// Renames a file (system/internal — no ownership check).
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
 
-    /// Deletes a file
+    /// Renames a file, enforcing that `caller_id` is the owner.
+    async fn rename_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
+        new_name: &str,
+    ) -> Result<FileDto, DomainError>;
+
+    /// Deletes a file (system/internal — no ownership check).
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
     /// Smart delete: trash-first with dedup reference cleanup.

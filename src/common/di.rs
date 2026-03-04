@@ -254,6 +254,7 @@ impl AppServiceFactory {
         let file_management_service = Arc::new(FileManagementService::with_trash(
             repos.file_write_repository.clone(),
             trash_service.clone(),
+            Some(repos.file_read_repository.clone()),
         ));
 
         let file_use_case_factory = Arc::new(AppFileUseCaseFactory::new(

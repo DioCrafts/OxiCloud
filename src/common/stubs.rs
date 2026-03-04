@@ -125,6 +125,10 @@ impl FileReadPort for StubFileReadPort {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError> {
         Ok(Box::pin(futures::stream::empty()))
     }
+
+    async fn get_file_for_owner(&self, _id: &str, _owner_id: &str) -> Result<File, DomainError> {
+        Ok(File::default())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -531,6 +535,38 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
     ) -> Result<Pin<Box<dyn Stream<Item = Result<FileDto, DomainError>> + Send>>, DomainError> {
         Ok(Box::pin(futures::stream::empty()))
     }
+
+    async fn get_file_owned(&self, _id: &str, _caller_id: &str) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn get_file_optimized_owned(
+        &self,
+        _id: &str,
+        _caller_id: &str,
+        _accept_webp: bool,
+        _prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        Ok((
+            FileDto::default(),
+            OptimizedFileContent::Bytes {
+                data: Bytes::new(),
+                mime_type: Arc::from(""),
+                was_transcoded: false,
+            },
+        ))
+    }
+
+    async fn get_file_range_stream_owned(
+        &self,
+        _id: &str,
+        _caller_id: &str,
+        _start: u64,
+        _end: Option<u64>,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -566,6 +602,24 @@ impl FileManagementUseCase for StubFileManagementUseCase {
 
     async fn delete_with_cleanup(&self, _id: &str, _user_id: &str) -> Result<bool, DomainError> {
         Ok(false)
+    }
+
+    async fn move_file_owned(
+        &self,
+        _file_id: &str,
+        _caller_id: &str,
+        _folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
+    async fn rename_file_owned(
+        &self,
+        _file_id: &str,
+        _caller_id: &str,
+        _new_name: &str,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
     }
 }
 

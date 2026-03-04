@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::file_ports::FileManagementUseCase;
-use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePort};
+use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::errors::DomainError;
 use tracing::{error, info, warn};
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 use crate::application::services::trash_service::TrashService;
 
@@ -17,6 +18,7 @@ use crate::application::services::trash_service::TrashService;
 /// touches ref_count directly.
 pub struct FileManagementService {
     file_repository: Arc<FileBlobWriteRepository>,
+    file_read: Option<Arc<FileBlobReadRepository>>,
     trash_service: Option<Arc<TrashService>>,
 }
 
@@ -25,18 +27,34 @@ impl FileManagementService {
     pub fn new(file_repository: Arc<FileBlobWriteRepository>) -> Self {
         Self {
             file_repository,
+            file_read: None,
             trash_service: None,
         }
     }
 
-    /// Creates a FileManagementService with a trash service.
+    /// Creates a FileManagementService with a trash service and read repo for ownership checks.
     pub fn with_trash(
         file_repository: Arc<FileBlobWriteRepository>,
         trash_service: Option<Arc<TrashService>>,
+        file_read: Option<Arc<FileBlobReadRepository>>,
     ) -> Self {
         Self {
             file_repository,
+            file_read,
             trash_service,
+        }
+    }
+
+    /// Verifies ownership via the read repository.
+    async fn verify_owner(&self, file_id: &str, caller_id: &str) -> Result<(), DomainError> {
+        if let Some(read) = &self.file_read {
+            read.verify_file_owner(file_id, caller_id).await
+        } else {
+            // Fallback: no read repo injected — deny by default (fail-closed)
+            Err(DomainError::internal_error(
+                "FileManagement",
+                "Ownership verification unavailable",
+            ))
         }
     }
 }
@@ -69,6 +87,16 @@ impl FileManagementUseCase for FileManagementService {
         );
 
         Ok(FileDto::from(moved_file))
+    }
+
+    async fn move_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
+        folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        self.verify_owner(file_id, caller_id).await?;
+        self.move_file(file_id, folder_id).await
     }
 
     async fn copy_file(
@@ -119,6 +147,16 @@ impl FileManagementUseCase for FileManagementService {
         );
 
         Ok(FileDto::from(renamed_file))
+    }
+
+    async fn rename_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
+        new_name: &str,
+    ) -> Result<FileDto, DomainError> {
+        self.verify_owner(file_id, caller_id).await?;
+        self.rename_file(file_id, new_name).await
     }
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {

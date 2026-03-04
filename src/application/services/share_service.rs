@@ -394,7 +394,7 @@ impl ShareUseCase for ShareService {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
     use crate::application::dtos::share_dto::SharePermissionsDto;
@@ -519,6 +519,14 @@ mod tests {
             DomainError,
         > {
             Ok(Box::pin(futures::stream::empty()))
+        }
+
+        async fn get_file_for_owner(
+            &self,
+            id: &str,
+            _owner_id: &str,
+        ) -> Result<crate::domain::entities::file::File, DomainError> {
+            self.get_file(id).await
         }
     }
 

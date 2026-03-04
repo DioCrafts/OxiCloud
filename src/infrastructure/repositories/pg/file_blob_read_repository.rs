@@ -158,6 +158,51 @@ impl FileReadPort for FileBlobReadRepository {
         )
     }
 
+    async fn get_file_for_owner(&self, id: &str, owner_id: &str) -> Result<File, DomainError> {
+        let row = sqlx::query_as::<
+            _,
+            (
+                String,         // id
+                String,         // name
+                Option<String>, // folder_id
+                Option<String>, // folder path
+                i64,            // size
+                String,         // mime_type
+                i64,            // created_at
+                i64,            // updated_at
+                String,         // blob_hash
+                Option<String>, // user_id (owner)
+            ),
+        >(
+            r#"
+            SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                   fi.size, fi.mime_type,
+                   EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                   EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                   fi.blob_hash,
+                   fi.user_id::text
+              FROM storage.files fi
+              LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+             WHERE fi.id = $1::uuid
+               AND fi.user_id = $2
+               AND NOT fi.is_trashed
+            "#,
+        )
+        .bind(id)
+        .bind(owner_id)
+        .fetch_optional(self.pool.as_ref())
+        .await
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("get_for_owner: {e}")))?
+        // Return NotFound (not Forbidden) to avoid leaking file existence
+        .ok_or_else(|| DomainError::not_found("File", id))?;
+
+        self.hash_cache.insert(id.to_string(), row.8.clone());
+
+        Self::row_to_file(
+            row.0, row.1, row.2, row.3, row.4, row.5, row.6, row.7, row.9,
+        )
+    }
+
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
         let rows: Vec<(
             String,
@@ -884,10 +929,11 @@ impl FileReadPort for FileBlobReadRepository {
     }
 }
 
-#[cfg(test)]
+#[cfg(feature = "integration_tests")]
 mod tests {
     use super::*;
     use crate::common::stubs::StubDedupPort;
+    use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 
     /// Helper: build a `FileBlobReadRepository` without a real PgPool.
     /// Only the moka `hash_cache` is exercised — no SQL is executed.

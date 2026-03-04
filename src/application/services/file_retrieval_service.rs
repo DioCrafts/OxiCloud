@@ -199,6 +199,11 @@ impl FileRetrievalUseCase for FileRetrievalService {
         Ok(FileDto::from(file))
     }
 
+    async fn get_file_owned(&self, id: &str, caller_id: &str) -> Result<FileDto, DomainError> {
+        let file = self.file_read.get_file_for_owner(id, caller_id).await?;
+        Ok(FileDto::from(file))
+    }
+
     async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError> {
         // Direct SQL lookup — O(folder_depth) queries instead of O(total_files)
         if let Some(file) = self.file_read.find_file_by_path(path).await? {
@@ -236,6 +241,19 @@ impl FileRetrievalUseCase for FileRetrievalService {
             .await
     }
 
+    async fn get_file_optimized_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
+        accept_webp: bool,
+        prefer_original: bool,
+    ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
+        let file = self.file_read.get_file_for_owner(id, caller_id).await?;
+        let dto = FileDto::from(file);
+        self.optimized_inner(id, dto, accept_webp, prefer_original)
+            .await
+    }
+
     /// Like `get_file_optimized` but skips the metadata re-fetch.
     async fn get_file_optimized_preloaded(
         &self,
@@ -255,6 +273,18 @@ impl FileRetrievalUseCase for FileRetrievalService {
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        self.file_read.get_file_range_stream(id, start, end).await
+    }
+
+    async fn get_file_range_stream_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
+        start: u64,
+        end: Option<u64>,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        // Verify ownership first, then delegate to the unscoped stream
+        self.file_read.verify_file_owner(id, caller_id).await?;
         self.file_read.get_file_range_stream(id, start, end).await
     }
 

@@ -22,6 +22,8 @@ pub mod wopi_token_service;
 
 #[cfg(test)]
 mod trash_service_test;
+#[cfg(test)]
+mod idor_protection_test;
 
 // Re-exportar para facilitar acceso
 pub use file_management_service::FileManagementService;
