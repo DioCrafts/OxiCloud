@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::application::dtos::favorites_dto::{BatchFavoritesResult, FavoriteItemDto};
 use crate::common::errors::Result;
 
@@ -27,6 +29,14 @@ pub trait FavoritesUseCase: Send + Sync {
         user_id: &str,
         items: &[(String, String)],
     ) -> Result<BatchFavoritesResult>;
+
+    /// Check which of the given item IDs are favorites for this user.
+    /// Returns the set of item_ids that are favorites.
+    async fn batch_check_favorites(
+        &self,
+        user_id: &str,
+        item_ids: &[(&str, &str)], // (item_id, item_type) pairs
+    ) -> Result<HashSet<String>>;
 }
 
 // ─────────────────────────────────────────────────────
@@ -54,4 +64,12 @@ pub trait FavoritesRepositoryPort: Send + Sync + 'static {
     /// Insert multiple items in a single transaction.
     /// Returns the number of rows actually inserted (ignoring duplicates).
     async fn add_favorites_batch(&self, user_id: &str, items: &[(String, String)]) -> Result<u64>;
+
+    /// Check which of the given item IDs are favorites for this user.
+    /// Returns the set of item_ids that are favorites.
+    async fn batch_check_favorites(
+        &self,
+        user_id: &str,
+        item_ids: &[(&str, &str)], // (item_id, item_type) pairs
+    ) -> Result<HashSet<String>>;
 }

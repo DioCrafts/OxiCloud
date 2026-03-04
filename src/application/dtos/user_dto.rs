@@ -88,6 +88,30 @@ pub struct CurrentUser {
 }
 
 // ============================================================================
+// App Password DTOs
+// ============================================================================
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateAppPasswordDto {
+    pub label: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppPasswordCreatedDto {
+    pub id: String,
+    pub label: String,
+    pub password: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppPasswordDto {
+    pub id: String,
+    pub label: String,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+// ============================================================================
 // OIDC DTOs
 // ============================================================================
 

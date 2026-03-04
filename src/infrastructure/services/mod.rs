@@ -6,6 +6,7 @@ pub mod file_system_i18n_service;
 pub mod image_transcode_service;
 pub mod jwt_service;
 pub mod login_lockout_service;
+pub mod nextcloud_chunked_upload_service;
 pub mod oidc_service;
 pub mod password_hasher;
 pub mod path_resolver_service;

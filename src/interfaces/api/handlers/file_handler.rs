@@ -335,10 +335,10 @@ impl FileHandler {
                     .into_response();
             }
         };
-        let file_path = state.core.dedup_service.blob_path(&blob_hash);
+        let blob_path = state.core.dedup_service.blob_path(&blob_hash);
 
         match thumbnail_service
-            .get_thumbnail(&id, thumb_size.into(), &file_path)
+            .get_thumbnail(&id, thumb_size.into(), &blob_path)
             .await
         {
             Ok(data) => {

@@ -93,6 +93,9 @@ pub trait UserStoragePort: Send + Sync + 'static {
     /// Lists users with pagination
     async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<User>, DomainError>;
 
+    /// Searches users by username or email (SQL ILIKE) with a limit.
+    async fn search_users(&self, query: &str, limit: i64) -> Result<Vec<User>, DomainError>;
+
     /// Lists users by role (e.g., "admin" or "user")
     async fn list_users_by_role(&self, role: &str) -> Result<Vec<User>, DomainError>;
 
@@ -249,8 +252,19 @@ pub trait AppPasswordStoragePort: Send + Sync + 'static {
     /// Update the `last_used_at` timestamp after a successful authentication.
     async fn touch_last_used(&self, id: &str) -> Result<(), DomainError>;
 
-    /// Deactivate (soft-delete) an app password.
-    async fn revoke(&self, id: &str) -> Result<(), DomainError>;
+    /// Get active app passwords for a user filtered by token prefix (first 8 chars).
+    /// More efficient than `get_active_by_user_id` when the password prefix is known.
+    async fn get_active_by_user_prefix(
+        &self,
+        user_id: &str,
+        prefix: &str,
+    ) -> Result<Vec<AppPassword>, DomainError>;
+
+    /// Deactivate (soft-delete) an app password, scoped to the owning user.
+    async fn revoke(&self, id: &str, user_id: &str) -> Result<(), DomainError>;
+
+    /// Delete an app password owned by a specific user. Returns true if found and deleted.
+    async fn delete_by_user_and_id(&self, id: &str, user_id: &str) -> Result<bool, DomainError>;
 
     /// Hard-delete expired/revoked app passwords (cleanup).
     async fn delete_expired(&self) -> Result<u64, DomainError>;

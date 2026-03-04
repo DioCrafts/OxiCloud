@@ -182,9 +182,11 @@ impl FileUploadUseCase for FileUploadService {
         content: &[u8],
         content_type: &str,
     ) -> Result<FileDto, DomainError> {
+        // Look up the folder ID by folder path
         let parent_id = if !parent_path.is_empty() {
             if let Some(file_read) = &self.file_read {
-                file_read.get_parent_folder_id(parent_path).await.ok()
+                // Use get_folder_id_by_path to look up the folder directly
+                file_read.get_folder_id_by_path(parent_path).await.ok()
             } else {
                 None
             }

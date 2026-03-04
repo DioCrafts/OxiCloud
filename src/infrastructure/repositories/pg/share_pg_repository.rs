@@ -22,6 +22,19 @@ impl SharePgRepository {
         Self { db_pool }
     }
 
+    /// Creates a stub instance for testing — never hits PG.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        Self {
+            db_pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+        }
+    }
+
     /// Maps a [`sqlx::postgres::PgRow`] to the domain [`Share`] entity.
     fn row_to_entity(row: &sqlx::postgres::PgRow) -> Result<Share, DomainError> {
         let id: String = row

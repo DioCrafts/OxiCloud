@@ -1,4 +1,5 @@
 use sqlx::{PgPool, Row};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::error;
 use uuid::Uuid;
@@ -246,5 +247,38 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         })?;
 
         Ok(total_inserted)
+    }
+
+    async fn batch_check_favorites(
+        &self,
+        user_id: &str,
+        item_ids: &[(&str, &str)],
+    ) -> Result<HashSet<String>> {
+        if item_ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+
+        let user_uuid = Uuid::parse_str(user_id)?;
+
+        // Collect just the IDs for the IN clause
+        let ids: Vec<String> = item_ids.iter().map(|(id, _)| id.to_string()).collect();
+
+        let rows = sqlx::query(
+            "SELECT item_id FROM auth.user_favorites WHERE user_id = $1::TEXT AND item_id = ANY($2)",
+        )
+        .bind(user_uuid)
+        .bind(&ids)
+        .fetch_all(&*self.db_pool)
+        .await
+        .map_err(|e| {
+            error!("Database error batch-checking favorites: {}", e);
+            DomainError::new(
+                ErrorKind::InternalError,
+                "Favorites",
+                format!("Failed to batch-check favorites: {}", e),
+            )
+        })?;
+
+        Ok(rows.iter().map(|r| r.get::<String, _>("item_id")).collect())
     }
 }

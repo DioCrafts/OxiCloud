@@ -62,6 +62,25 @@ impl FileBlobReadRepository {
         }
     }
 
+    /// Creates a stub instance for testing — never hits PG.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        use crate::infrastructure::services::dedup_service::DedupService;
+        Self {
+            pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+            dedup: Arc::new(DedupService::new_stub()),
+            hash_cache: Cache::builder()
+                .max_capacity(10_000)
+                .time_to_idle(Duration::from_secs(30))
+                .build(),
+        }
+    }
+
     /// Build a `StoragePath` from the materialized folder path + file name.
     fn make_file_path(folder_path: Option<&str>, file_name: &str) -> StoragePath {
         match folder_path {
@@ -508,14 +527,24 @@ impl FileReadPort for FileBlobReadRepository {
             ));
         }
 
+        self.get_folder_id_by_path(&folder_path).await
+    }
+
+    async fn get_folder_id_by_path(&self, folder_path: &str) -> Result<String, DomainError> {
+        let folder_path = folder_path.trim_start_matches('/').trim_end_matches('/');
+
+        if folder_path.is_empty() {
+            return Err(DomainError::not_found("Folder", "empty path"));
+        }
+
         sqlx::query_scalar::<_, String>(
             "SELECT id::text FROM storage.folders WHERE path = $1 AND NOT is_trashed",
         )
-        .bind(&folder_path)
+        .bind(folder_path)
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("parent lookup: {e}")))?
-        .ok_or_else(|| DomainError::not_found("Folder", format!("parent for path: {path}")))
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("folder lookup: {e}")))?
+        .ok_or_else(|| DomainError::not_found("Folder", format!("path: {folder_path}")))
     }
 
     /// Direct SQL lookup using materialized folder paths.
@@ -1042,13 +1071,9 @@ mod tests {
     /// Only the moka `hash_cache` is exercised — no SQL is executed.
     fn make_repo() -> FileBlobReadRepository {
         let _folder_repo = Arc::new(FolderDbRepository::new_stub());
-        // StubDedupPort satisfies the trait but is never called in cache-only tests
-        let dedup: Arc<DedupService> = Arc::new(StubDedupPort);
-        // PgPool is required by the struct but we won't hit any SQL in these tests.
-        // We create a repo with a stub pool placeholder — only hash_cache is tested.
+        let dedup: Arc<DedupService> = Arc::new(DedupService::new_stub());
         FileBlobReadRepository {
             pool: Arc::new(
-                // Use an intentionally invalid URL; tests never reach PG.
                 sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
                     .max_connections(1)
                     .connect_lazy("postgres://invalid:5432/none")
@@ -1135,7 +1160,7 @@ mod tests {
                     .connect_lazy("postgres://invalid:5432/none")
                     .unwrap(),
             ),
-            dedup: Arc::new(StubDedupPort),
+            dedup: Arc::new(DedupService::new_stub()),
             hash_cache: Cache::builder()
                 .max_capacity(2) // only 2 entries
                 .build(),

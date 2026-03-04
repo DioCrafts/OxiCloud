@@ -1,11 +1,14 @@
+use std::collections::HashSet;
+use std::sync::Arc;
+
+use tracing::info;
+
 use crate::application::dtos::favorites_dto::{
     BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto,
 };
 use crate::application::ports::favorites_ports::{FavoritesRepositoryPort, FavoritesUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
 use crate::infrastructure::repositories::pg::FavoritesPgRepository;
-use std::sync::Arc;
-use tracing::info;
 
 /// Implementation of the FavoritesUseCase for managing user favorites.
 ///
@@ -141,5 +144,13 @@ impl FavoritesUseCase for FavoritesService {
             },
             favorites,
         })
+    }
+
+    async fn batch_check_favorites(
+        &self,
+        user_id: &str,
+        item_ids: &[(&str, &str)],
+    ) -> Result<HashSet<String>> {
+        self.repo.batch_check_favorites(user_id, item_ids).await
     }
 }

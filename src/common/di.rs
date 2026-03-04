@@ -11,6 +11,8 @@ use crate::application::ports::file_ports::FileUseCaseFactory;
 use crate::application::services::favorites_service::FavoritesService;
 use crate::application::services::folder_service::FolderService;
 use crate::application::services::i18n_application_service::I18nApplicationService;
+use crate::application::services::nextcloud_file_id_service::NextcloudFileIdService;
+use crate::application::services::nextcloud_login_flow_service::NextcloudLoginFlowService;
 use crate::application::services::recent_service::RecentService;
 use crate::application::services::search_service::SearchService;
 use crate::application::services::share_service::ShareService;
@@ -28,6 +30,7 @@ use crate::infrastructure::services::file_content_cache::{
     FileContentCache, FileContentCacheConfig,
 };
 use crate::infrastructure::services::file_system_i18n_service::FileSystemI18nService;
+use crate::infrastructure::services::nextcloud_chunked_upload_service::NextcloudChunkedUploadService;
 use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 
@@ -463,6 +466,7 @@ impl AppServiceFactory {
         let recent_service: Option<Arc<RecentService>>;
         let storage_usage_service: Option<Arc<StorageUsageService>>;
         let mut auth_services: Option<crate::common::di::AuthServices> = None;
+        let mut nextcloud_services: Option<NextcloudServices> = None;
 
         {
             let favs = self.create_favorites_service(&pool);
@@ -507,6 +511,66 @@ impl AppServiceFactory {
             }
         }
 
+        // Shared App Password service — created once, used by both NC routes and native API
+        let shared_app_pw_svc: Option<Arc<AppPasswordService>> =
+            if self.config.nextcloud.enabled || self.config.features.enable_auth {
+                let app_pw_repo: Arc<AppPasswordPgRepository> =
+                    Arc::new(AppPasswordPgRepository::new(pool.clone()));
+                let hasher: Arc<Argon2PasswordHasher> = Arc::new(
+                    crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                        self.config.auth.hash_memory_cost,
+                        self.config.auth.hash_time_cost,
+                        self.config.auth.hash_parallelism,
+                    ),
+                );
+                let user_repo: Arc<UserPgRepository> = Arc::new(
+                    crate::infrastructure::repositories::pg::UserPgRepository::new(pool.clone()),
+                );
+                let svc = Arc::new(AppPasswordService::new(
+                    app_pw_repo,
+                    hasher,
+                    user_repo,
+                    self.config.base_url(),
+                ));
+                tracing::info!("App Password service initialized (shared)");
+                Some(svc)
+            } else {
+                None
+            };
+
+        // Nextcloud compatibility services
+        if self.config.nextcloud.enabled {
+            if !self.config.features.enable_auth {
+                tracing::warn!(
+                    "Nextcloud compatibility enabled but auth is disabled; Nextcloud routes will be unusable"
+                );
+            }
+
+            let chunk_base = self.storage_path.join(".uploads/nextcloud");
+            let chunked_uploads = Arc::new(NextcloudChunkedUploadService::new(chunk_base));
+
+            let file_id_repo = Arc::new(
+                crate::infrastructure::repositories::pg::NextcloudObjectIdRepository::new(
+                    pool.clone(),
+                ),
+            );
+            let file_ids = Arc::new(NextcloudFileIdService::new(
+                file_id_repo,
+                self.config.nextcloud.instance_id.clone(),
+            ));
+
+            nextcloud_services = Some(NextcloudServices {
+                login_flow: Arc::new(NextcloudLoginFlowService::new(
+                    std::time::Duration::from_secs(self.config.nextcloud.login_flow_ttl_secs),
+                )),
+                app_passwords: shared_app_pw_svc
+                    .clone()
+                    .expect("AppPasswordService must be available when NC is enabled"),
+                file_ids,
+                chunked_uploads,
+            });
+        }
+
         // 7. Preload translations
         self.preload_translations(&apps.i18n_service).await;
 
@@ -528,6 +592,7 @@ impl AppServiceFactory {
             db_pool: Some(pool.clone()),
             maintenance_pool: Some(maintenance_pool),
             auth_service: auth_services,
+            nextcloud: nextcloud_services,
             admin_settings_service: None,
             trash_service,
             share_service,
@@ -642,31 +707,8 @@ impl AppServiceFactory {
                 tracing::info!("Device Authorization Grant (RFC 8628) service initialized");
             }
 
-            // 9d. Wire App Password service
-            {
-                let app_pw_repo: Arc<AppPasswordPgRepository> =
-                    Arc::new(AppPasswordPgRepository::new(pool.clone()));
-                let hasher: Arc<Argon2PasswordHasher> = Arc::new(
-                    crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
-                        self.config.auth.hash_memory_cost,
-                        self.config.auth.hash_time_cost,
-                        self.config.auth.hash_parallelism,
-                    ),
-                );
-                let user_repo: Arc<UserPgRepository> = Arc::new(
-                    crate::infrastructure::repositories::UserPgRepository::new(pool.clone()),
-                );
-                let base_url = self.config.base_url();
-
-                let app_pw_svc = Arc::new(AppPasswordService::new(
-                    app_pw_repo,
-                    hasher,
-                    user_repo,
-                    base_url,
-                ));
-                app_state.app_password_service = Some(app_pw_svc);
-                tracing::info!("App Password service initialized");
-            }
+            // 9d. Wire App Password service (reuse shared instance)
+            app_state.app_password_service = shared_app_pw_svc.clone();
         }
 
         // 9e. Wire PathResolver for single-query WebDAV path resolution
@@ -816,6 +858,15 @@ pub struct AuthServices {
         Arc<crate::infrastructure::services::login_lockout_service::LoginLockoutService>,
 }
 
+/// Container for Nextcloud compatibility services
+#[derive(Clone)]
+pub struct NextcloudServices {
+    pub login_flow: Arc<NextcloudLoginFlowService>,
+    pub app_passwords: Arc<AppPasswordService>,
+    pub file_ids: Arc<NextcloudFileIdService>,
+    pub chunked_uploads: Arc<NextcloudChunkedUploadService>,
+}
+
 /// Global application state for dependency injection
 #[derive(Clone)]
 pub struct AppState {
@@ -826,6 +877,7 @@ pub struct AppState {
     /// Isolated pool for background / batch operations.
     pub maintenance_pool: Option<Arc<PgPool>>,
     pub auth_service: Option<AuthServices>,
+    pub nextcloud: Option<NextcloudServices>,
     pub admin_settings_service: Option<Arc<AdminSettingsService>>,
     pub trash_service: Option<Arc<TrashService>>,
     pub share_service: Option<Arc<ShareService>>,

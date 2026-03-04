@@ -1042,18 +1042,22 @@ impl BatchOperationService {
 #[cfg(integration_tests)]
 mod tests {
     use super::*;
-    use crate::common::stubs::{StubFileManagementUseCase, StubFileRetrievalUseCase};
+    use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+    use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_generic_batch_operation() {
-        // Create the batch service with stubs
+        // Create the batch service with stub repositories (lazy pool — no SQL is executed
+        // in this test; generic_batch_operation never touches file/folder services).
+        let folder_repo = Arc::new(FolderDbRepository::new_stub());
+        let file_read_repo = Arc::new(FileBlobReadRepository::new_stub());
+        let file_write_repo = Arc::new(FileBlobWriteRepository::new_stub());
         let batch_service = BatchOperationService::new(
-            Arc::new(StubFileRetrievalUseCase),
-            Arc::new(StubFileManagementUseCase),
-            Arc::new(FolderService::new(Arc::new(
-                crate::common::stubs::StubFolderStoragePort,
-            ))),
+            Arc::new(FileRetrievalService::new(file_read_repo)),
+            Arc::new(FileManagementService::new(file_write_repo)),
+            Arc::new(FolderService::new(folder_repo)),
             AppConfig::default(),
         );
 

@@ -55,6 +55,7 @@ npm-debug.log
 # Log files
 *.log
 logs/
+logs.txt
 
 # Storage data (user files, blobs — never commit)
 storage/
@@ -73,3 +74,17 @@ storage/
 *.swp
 *.swo
 nohup.out
+
+# Agent planning docs (live on 'planning' branch)
+docs/plans/
+.planning/
+
+# Local dev compose (not in upstream)
+docker-compose.dev.yml
+
+# Test scripts with hardcoded credentials
+test-nextcloud-*.sh
+
+# Claude Code artifacts
+.claude/
+CLAUDE.md

@@ -96,6 +96,10 @@ impl FileReadPort for StubFileReadPort {
         Ok("root".to_string())
     }
 
+    async fn get_folder_id_by_path(&self, _folder_path: &str) -> Result<String, DomainError> {
+        Ok("stub-folder-id".to_string())
+    }
+
     async fn get_blob_hash(&self, _file_id: &str) -> Result<String, DomainError> {
         Ok(String::new())
     }
@@ -771,6 +775,10 @@ impl DedupPort for StubDedupPort {
 
     async fn hash_file(&self, _path: &Path) -> Result<String, DomainError> {
         Ok(String::new())
+    }
+
+    fn blob_path(&self, hash: &str) -> PathBuf {
+        PathBuf::from(format!("stub_blob_{}.blob", hash))
     }
 
     async fn get_stats(&self) -> DedupStatsDto {

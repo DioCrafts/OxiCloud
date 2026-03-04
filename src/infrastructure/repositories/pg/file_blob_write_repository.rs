@@ -39,6 +39,22 @@ impl FileBlobWriteRepository {
         }
     }
 
+    /// Creates a stub instance for testing — never hits PG.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        use crate::infrastructure::services::dedup_service::DedupService;
+        Self {
+            pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+            dedup: Arc::new(DedupService::new_stub()),
+            folder_repo: Arc::new(super::folder_db_repository::FolderDbRepository::new_stub()),
+        }
+    }
+
     /// Build a `StoragePath` from the materialized folder path + file name.
     fn make_file_path(folder_path: Option<&str>, file_name: &str) -> StoragePath {
         match folder_path {

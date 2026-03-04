@@ -435,6 +435,39 @@ impl Default for WopiConfig {
     }
 }
 
+/// Nextcloud compatibility configuration
+#[derive(Debug, Clone)]
+pub struct NextcloudConfig {
+    /// Whether the Nextcloud compatibility layer is enabled
+    pub enabled: bool,
+    /// Instance ID suffix for oc:id formatting (e.g., "ocnca")
+    pub instance_id: String,
+    /// Emulated Nextcloud version (major.minor.patch).
+    /// Clients use this to decide which features to enable.
+    pub emulated_version: (u32, u32, u32),
+    /// Login Flow v2 token TTL in seconds (default: 600 = 10 minutes)
+    pub login_flow_ttl_secs: u64,
+}
+
+impl Default for NextcloudConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            instance_id: "ocnca".to_string(),
+            emulated_version: (28, 0, 4),
+            login_flow_ttl_secs: 600,
+        }
+    }
+}
+
+impl NextcloudConfig {
+    /// Version string, e.g. "28.0.4".
+    pub fn version_string(&self) -> String {
+        let (maj, min, pat) = self.emulated_version;
+        format!("{}.{}.{}", maj, min, pat)
+    }
+}
+
 /// Feature configuration (feature flags)
 #[derive(Debug, Clone)]
 pub struct FeaturesConfig {
@@ -488,6 +521,8 @@ pub struct AppConfig {
     pub oidc: OidcConfig,
     /// WOPI configuration
     pub wopi: WopiConfig,
+    /// Nextcloud compatibility configuration
+    pub nextcloud: NextcloudConfig,
 }
 
 impl Default for AppConfig {
@@ -507,6 +542,7 @@ impl Default for AppConfig {
             features: FeaturesConfig::default(),
             oidc: OidcConfig::default(),
             wopi: WopiConfig::default(),
+            nextcloud: NextcloudConfig::default(),
         }
     }
 }
@@ -795,6 +831,30 @@ impl AppConfig {
         if config.wopi.enabled && config.wopi.secret.is_empty() {
             config.wopi.secret = config.auth.jwt_secret.clone();
             tracing::info!("WOPI secret not set, falling back to JWT secret");
+        }
+
+        // Nextcloud compatibility configuration
+        if let Ok(v) = env::var("OXICLOUD_NEXTCLOUD_ENABLED") {
+            config.nextcloud.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_NEXTCLOUD_INSTANCE_ID") {
+            let trimmed = v.trim();
+            if !trimmed.is_empty() {
+                config.nextcloud.instance_id = trimmed.to_string();
+            }
+        }
+        if let Ok(v) = env::var("OXICLOUD_NEXTCLOUD_VERSION") {
+            // Expected format: "28.0.4"
+            let parts: Vec<&str> = v.trim().splitn(3, '.').collect();
+            if parts.len() == 3
+                && let (Ok(maj), Ok(min), Ok(pat)) = (
+                    parts[0].parse::<u32>(),
+                    parts[1].parse::<u32>(),
+                    parts[2].parse::<u32>(),
+                )
+            {
+                config.nextcloud.emulated_version = (maj, min, pat);
+            }
         }
 
         config

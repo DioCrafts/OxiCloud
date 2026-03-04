@@ -24,7 +24,10 @@ const contextMenus = {
         if (!wopiEdit || !wopiEditTab) return;
 
         const targetFile = window.app && window.app.contextMenuTargetFile;
+        // Don't show WOPI editor for image files - they should use inline preview
+        const isImage = targetFile && targetFile.mime_type && targetFile.mime_type.startsWith('image/');
         const show = targetFile &&
+            !isImage &&
             window.wopiEditor &&
             await window.wopiEditor.canEdit(targetFile.name);
 

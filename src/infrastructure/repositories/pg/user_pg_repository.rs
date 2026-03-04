@@ -369,6 +369,57 @@ impl UserRepository for UserPgRepository {
         Ok(users)
     }
 
+    async fn search_users(&self, query: &str, limit: i64) -> UserRepositoryResult<Vec<User>> {
+        let pattern = format!("%{}%", query);
+        let rows = sqlx::query(
+            r#"
+            SELECT
+                id, username, email, password_hash, role::text as role_text,
+                storage_quota_bytes, storage_used_bytes,
+                created_at, updated_at, last_login_at, active,
+                oidc_provider, oidc_subject
+            FROM auth.users
+            WHERE username ILIKE $1 OR email ILIKE $1
+            ORDER BY username
+            LIMIT $2
+            "#,
+        )
+        .bind(&pattern)
+        .bind(limit)
+        .fetch_all(&*self.pool)
+        .await
+        .map_err(Self::map_sqlx_error)?;
+
+        let users = rows
+            .into_iter()
+            .map(|row| {
+                let role_str: Option<String> = row.try_get("role_text").unwrap_or(None);
+                let role = match role_str.as_deref() {
+                    Some("admin") => UserRole::Admin,
+                    _ => UserRole::User,
+                };
+
+                User::from_data_full(
+                    row.get("id"),
+                    row.get("username"),
+                    row.get("email"),
+                    row.get("password_hash"),
+                    role,
+                    row.get("storage_quota_bytes"),
+                    row.get("storage_used_bytes"),
+                    row.get("created_at"),
+                    row.get("updated_at"),
+                    row.get("last_login_at"),
+                    row.get("active"),
+                    row.get("oidc_provider"),
+                    row.get("oidc_subject"),
+                )
+            })
+            .collect();
+
+        Ok(users)
+    }
+
     /// Activates or deactivates a user
     async fn set_user_active_status(
         &self,
@@ -660,6 +711,12 @@ impl UserStoragePort for UserPgRepository {
 
     async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<User>, DomainError> {
         UserRepository::list_users(self, limit, offset)
+            .await
+            .map_err(DomainError::from)
+    }
+
+    async fn search_users(&self, query: &str, limit: i64) -> Result<Vec<User>, DomainError> {
+        UserRepository::search_users(self, query, limit)
             .await
             .map_err(DomainError::from)
     }

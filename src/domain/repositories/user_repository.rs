@@ -69,6 +69,9 @@ pub trait UserRepository: Send + Sync + 'static {
     /// Lists users with pagination
     async fn list_users(&self, limit: i64, offset: i64) -> UserRepositoryResult<Vec<User>>;
 
+    /// Searches users by username or email (SQL ILIKE) with a limit.
+    async fn search_users(&self, query: &str, limit: i64) -> UserRepositoryResult<Vec<User>>;
+
     /// Activates or deactivates a user
     async fn set_user_active_status(&self, user_id: &str, active: bool)
     -> UserRepositoryResult<()>;

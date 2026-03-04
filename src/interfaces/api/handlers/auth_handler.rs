@@ -1,16 +1,19 @@
 use axum::{
     Router,
-    extract::{Json, Query, State},
-    http::{HeaderMap, StatusCode},
+    extract::{Json, Path, Query, State},
+    http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
-    routing::{get, post, put},
+    routing::{delete, get, post, put},
 };
 use std::sync::Arc;
 
 use crate::application::dtos::user_dto::{
-    ChangePasswordDto, LoginDto, OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto,
-    RefreshTokenDto, RegisterDto, SetupAdminDto,
+    AppPasswordCreatedDto, AppPasswordDto, ChangePasswordDto, CreateAppPasswordDto, LoginDto,
+    OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto, RefreshTokenDto, RegisterDto,
+    SetupAdminDto,
 };
+use crate::application::ports::auth_ports::TokenServicePort;
+use crate::application::services::auth_application_service::OidcCallbackResult;
 use crate::common::di::AppState;
 use crate::interfaces::api::cookie_auth;
 use crate::interfaces::errors::AppError;
@@ -34,6 +37,11 @@ pub fn auth_protected_routes() -> Router<Arc<AppState>> {
         .route("/me", get(get_current_user))
         .route("/change-password", put(change_password))
         .route("/logout", post(logout))
+        .route(
+            "/app-passwords",
+            get(list_app_passwords).post(create_app_password),
+        )
+        .route("/app-passwords/{id}", delete(delete_app_password))
 }
 
 /// Rate-limited auth routes — split out so main.rs can apply per-endpoint
@@ -523,6 +531,140 @@ async fn get_system_status(
 }
 
 // ============================================================================
+// App Password Handlers
+// ============================================================================
+
+async fn create_app_password(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(dto): Json<CreateAppPasswordDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state
+        .auth_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
+
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
+
+    let claims = auth_service
+        .token_service
+        .validate_token(token)
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
+
+    let nextcloud = state
+        .nextcloud
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
+
+    let label = dto.label.trim();
+    if label.is_empty() || label.len() > 128 {
+        return Err(AppError::new(
+            StatusCode::BAD_REQUEST,
+            "Label must be between 1 and 128 characters",
+            "InvalidInput",
+        ));
+    }
+
+    let (id, password) = nextcloud
+        .app_passwords
+        .create_nc(&claims.sub, label)
+        .await
+        .map_err(AppError::from)?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(AppPasswordCreatedDto {
+            id,
+            label: label.to_string(),
+            password,
+        }),
+    ))
+}
+
+async fn list_app_passwords(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state
+        .auth_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
+
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
+
+    let claims = auth_service
+        .token_service
+        .validate_token(token)
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
+
+    let nextcloud = state
+        .nextcloud
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
+
+    let records = nextcloud
+        .app_passwords
+        .list_nc(&claims.sub)
+        .await
+        .map_err(AppError::from)?;
+
+    let passwords: Vec<AppPasswordDto> = records
+        .into_iter()
+        .map(|r| AppPasswordDto {
+            id: r.id,
+            label: r.label,
+            created_at: r.created_at,
+            last_used_at: r.last_used_at,
+        })
+        .collect();
+
+    Ok((StatusCode::OK, Json(passwords)))
+}
+
+async fn delete_app_password(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<impl IntoResponse, AppError> {
+    let auth_service = state
+        .auth_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
+
+    let token = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
+
+    let claims = auth_service
+        .token_service
+        .validate_token(token)
+        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
+
+    let nextcloud = state
+        .nextcloud
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
+
+    nextcloud
+        .app_passwords
+        .delete_by_user(&id, &claims.sub)
+        .await
+        .map_err(AppError::from)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ============================================================================
 // OIDC Handlers
 // ============================================================================
 
@@ -602,7 +744,7 @@ async fn oidc_callback(
     tracing::info!("OIDC callback received with code");
 
     // Exchange code, validate state/nonce/PKCE, authenticate user
-    let exchange_code = auth_app
+    let result = auth_app
         .oidc_callback(&query.code, &query.state)
         .await
         .map_err(|e| {
@@ -610,14 +752,58 @@ async fn oidc_callback(
             AppError::from(e)
         })?;
 
-    // Redirect to frontend with one-time exchange code (NOT raw tokens)
-    let config = auth_app.oidc_config().unwrap();
-    let frontend_url = config.frontend_url.trim_end_matches('/');
-    let redirect_url = format!("{}/?oidc_code={}", frontend_url, exchange_code,);
+    match result {
+        OidcCallbackResult::WebLogin { exchange_code } => {
+            // Regular web login — redirect to frontend with exchange code
+            let config = auth_app.oidc_config().unwrap();
+            let frontend_url = config.frontend_url.trim_end_matches('/');
+            let redirect_url = format!("{}/?oidc_code={}", frontend_url, exchange_code);
+            tracing::info!("OIDC login successful, redirecting with exchange code");
+            Ok(Redirect::temporary(&redirect_url))
+        }
+        OidcCallbackResult::NextcloudLogin {
+            nc_flow_token,
+            user_id,
+            username,
+        } => {
+            // Nextcloud Login Flow v2 — create app password and complete flow
+            let nextcloud = state
+                .nextcloud
+                .as_ref()
+                .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
 
-    tracing::info!("OIDC login successful, redirecting with exchange code");
+            let (_id, app_password) = nextcloud
+                .app_passwords
+                .create_nc(&user_id, "Nextcloud (OIDC)")
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, user = %username, "OIDC+NC: failed to create app password");
+                    AppError::from(e)
+                })?;
 
-    Ok(Redirect::temporary(&redirect_url))
+            let base_url = state.core.config.base_url();
+            let completed =
+                nextcloud
+                    .login_flow
+                    .complete(&nc_flow_token, &username, &base_url, &app_password);
+
+            if completed {
+                tracing::info!(
+                    user = %username,
+                    "OIDC login completed Nextcloud Login Flow v2 successfully"
+                );
+                Ok(Redirect::temporary("/nextcloud-success.html"))
+            } else {
+                tracing::error!(
+                    user = %username,
+                    "OIDC+NC: login flow token expired or not found"
+                );
+                Ok(Redirect::temporary(
+                    "/nextcloud-error.html?type=session-expired",
+                ))
+            }
+        }
+    }
 }
 
 /// POST /api/auth/oidc/exchange — Exchange one-time code for auth tokens

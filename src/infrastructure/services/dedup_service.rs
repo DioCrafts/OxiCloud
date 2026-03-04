@@ -110,6 +110,23 @@ impl DedupService {
         }
     }
 
+    /// Creates a stub instance for testing — never hits PG or the filesystem.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        let stub_pool = Arc::new(
+            sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                .max_connections(1)
+                .connect_lazy("postgres://invalid:5432/none")
+                .unwrap(),
+        );
+        Self {
+            blob_root: std::path::PathBuf::from("/tmp/oxicloud_stub_blobs"),
+            temp_root: std::path::PathBuf::from("/tmp/oxicloud_stub_temp"),
+            pool: stub_pool.clone(),
+            maintenance_pool: stub_pool,
+        }
+    }
+
     /// Initialize the service (create blob directories on the filesystem).
     pub async fn initialize(&self) -> Result<(), DomainError> {
         // Create directories
@@ -901,6 +918,10 @@ impl DedupPort for DedupService {
         DedupService::hash_file(path)
             .await
             .map_err(DomainError::from)
+    }
+
+    fn blob_path(&self, hash: &str) -> PathBuf {
+        self.blob_path(hash)
     }
 
     async fn get_stats(&self) -> DedupStatsDto {

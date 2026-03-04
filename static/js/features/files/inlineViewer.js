@@ -92,7 +92,9 @@ class InlineViewer {
     console.log('Opening file:', file);
 
     // WOPI editor intercept: open Office documents in the WOPI editor
-    if (window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+    // But NOT image files - those should be previewed in the inline viewer
+    const isImage = file.mime_type && file.mime_type.startsWith('image/');
+    if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }

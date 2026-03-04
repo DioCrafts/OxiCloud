@@ -262,6 +262,10 @@ impl DeviceAuthService {
                 let refresh_token = dc.refresh_token().unwrap_or_default().to_string();
                 let scope = dc.scopes().to_string();
 
+                // Delete the device code row now that tokens have been retrieved.
+                // This prevents plain-text tokens from lingering in the database.
+                let _ = self.device_code_storage.delete_by_id(dc.id()).await;
+
                 Ok(DeviceTokenSuccessDto {
                     access_token,
                     token_type: "Bearer".to_string(),
