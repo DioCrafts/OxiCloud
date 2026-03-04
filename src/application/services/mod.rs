@@ -24,7 +24,7 @@ pub mod wopi_token_service;
 
 #[cfg(test)]
 mod idor_protection_test;
-#[cfg(all(test, integration_tests))]
+#[cfg(test)]
 mod trash_service_test;
 
 // Re-exportar para facilitar acceso

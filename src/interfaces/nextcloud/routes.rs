@@ -155,6 +155,7 @@ pub fn nextcloud_routes_with_state(state: Arc<AppState>) -> Router<Arc<AppState>
 // ──────────────── Handler glue ────────────────
 
 /// Reject requests where the URL `{user}` doesn't match the authenticated user.
+#[allow(clippy::result_large_err)]
 fn verify_url_user(url_user: &str, auth_user: &CurrentUser) -> Result<(), Response> {
     if url_user != auth_user.username {
         Err(StatusCode::FORBIDDEN.into_response())

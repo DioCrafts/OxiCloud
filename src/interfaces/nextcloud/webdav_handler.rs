@@ -480,7 +480,7 @@ async fn handle_put(
         .unwrap_or("application/octet-stream")
         .to_string();
 
-    let oc_mtime = req
+    let _oc_mtime = req
         .headers()
         .get("x-oc-mtime")
         .and_then(|v| v.to_str().ok())
@@ -507,7 +507,7 @@ async fn handle_put(
 
         // Re-fetch for etag.
         if let Ok(updated) = file_service.get_file_by_path(&internal_path).await {
-            let mut builder = Response::builder()
+            let builder = Response::builder()
                 .status(StatusCode::NO_CONTENT)
                 .header(header::ETAG, format!("\"{}\"", updated.id))
                 .header("oc-etag", format!("\"{}\"", updated.id));
@@ -534,7 +534,7 @@ async fn handle_put(
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to create file: {}", e)))?;
 
-    let mut builder = Response::builder()
+    let builder = Response::builder()
         .status(StatusCode::CREATED)
         .header(header::ETAG, format!("\"{}\"", file_dto.id))
         .header("oc-etag", format!("\"{}\"", file_dto.id));
