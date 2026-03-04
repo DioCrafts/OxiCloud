@@ -6,6 +6,9 @@
 -- All tables use IF NOT EXISTS for idempotent re-runs.
 -- ============================================================
 
+-- ── Extensions required by indexes below ──
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- ============================================================
 -- 1. AUTH SCHEMA
 -- ============================================================
@@ -286,10 +289,6 @@ COMMENT ON TABLE caldav.calendars IS 'CalDAV calendars for each user';
 COMMENT ON TABLE caldav.calendar_events IS 'Calendar events (VEVENT) stored with iCal data';
 COMMENT ON TABLE caldav.calendar_shares IS 'Calendar sharing permissions between users';
 COMMENT ON TABLE caldav.calendar_properties IS 'Custom WebDAV properties on calendars';
-
--- ── pg_trgm extension for GIN trigram indexes (ILIKE / LIKE substring search) ──
--- Required before creating any gin_trgm_ops indexes below.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================================
 -- 3. CARDDAV SCHEMA (RFC 6352)

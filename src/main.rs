@@ -185,7 +185,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             auth_protected_routes, auth_public_routes, login_route, refresh_route, register_route,
             setup_route,
         };
-        use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
         use oxicloud::interfaces::middleware::csrf::csrf_middleware;
@@ -270,15 +269,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ))
             .with_state(app_state.clone());
 
-        // App Password management endpoints (protected — require JWT)
-        let app_password_protected = app_password_handler::app_password_routes()
-            .layer(axum::middleware::from_fn(csrf_middleware))
-            .layer(axum::middleware::from_fn_with_state(
-                app_state.clone(),
-                auth_middleware,
-            ))
-            .with_state(app_state.clone());
-
         // Protected API routes — require valid JWT token
         let protected_api = api_routes
             .layer(axum::middleware::from_fn(csrf_middleware))
@@ -316,8 +306,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api/auth/device", device_public)
             // Device Auth Grant protected endpoints (verify + device management)
             .nest("/api/auth/device", device_protected)
-            // App Password management endpoints (create, list, revoke)
-            .nest("/api/auth", app_password_protected)
             // Public API routes (share access, i18n) — no auth required
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware

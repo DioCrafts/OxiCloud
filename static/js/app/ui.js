@@ -754,12 +754,14 @@ const ui = {
             }
             // WOPI editor intercept: open Office documents in the WOPI editor
             // But NOT image files - those should be previewed in the inline viewer
-            const isImage = file.mime_type && file.mime_type.startsWith('image/');
+            const ext = (file.name || '').split('.').pop().toLowerCase();
+            const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
+            const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
             if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
                 window.wopiEditor.openInModal(file.id, file.name, 'edit');
                 return;
             }
-            if (self.isViewableFile(file)) {
+            if (self.isViewableFile(file) || isImage) {
                 if (window.inlineViewer) window.inlineViewer.openFile(file);
                 else window.fileOps.downloadFile(file.id, file.name);
             } else {
