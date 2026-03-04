@@ -57,6 +57,7 @@ socket2 = { version = "0.6.2", features = ["all"] }
 [features]
 default = []
 test_utils = ["mockall"]
+integration_tests = []
 
 [profile.release]
 lto = "fat"

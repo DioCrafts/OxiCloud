@@ -20,7 +20,7 @@ pub mod trash_service;
 pub mod wopi_lock_service;
 pub mod wopi_token_service;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "integration_tests"))]
 mod trash_service_test;
 #[cfg(test)]
 mod idor_protection_test;
