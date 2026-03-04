@@ -467,7 +467,12 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         Ok(FileDto::default())
     }
 
-    async fn update_file(&self, _path: &str, _content: &[u8]) -> Result<(), DomainError> {
+    async fn update_file(
+        &self,
+        _path: &str,
+        _content: &[u8],
+        _content_type: &str,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 

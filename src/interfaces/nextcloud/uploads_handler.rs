@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::application::ports::file_ports::{FileRetrievalUseCase, FileUploadUseCase};
 use crate::common::di::AppState;
+use crate::common::mime_detect::{filename_from_path, refine_content_type_from_file};
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
 
@@ -135,10 +136,10 @@ async fn handle_assemble(
         dest_subpath.trim_matches('/')
     );
 
-    // Detect content type from file extension.
-    let content_type = mime_guess::from_path(&dest_subpath)
-        .first_or_octet_stream()
-        .to_string();
+    // Detect content type via magic bytes + extension fallback.
+    let filename = filename_from_path(&dest_subpath);
+    let content_type =
+        refine_content_type_from_file(&temp_path, filename, "application/octet-stream").await;
 
     // Check if file exists (update vs create).
     let existing = file_service.get_file_by_path(&internal_path).await;

@@ -20,6 +20,7 @@ use crate::application::ports::file_ports::{
 use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
+use crate::common::mime_detect::{filename_from_path, refine_content_type};
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
 
@@ -472,7 +473,7 @@ async fn handle_put(
     let file_service = &state.applications.file_retrieval_service;
     let upload_service = &state.applications.file_upload_service;
 
-    let content_type = req
+    let claimed_type = req
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
@@ -490,13 +491,17 @@ async fn handle_put(
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read body: {}", e)))?;
 
+    // Detect real MIME type via magic bytes + extension, falling back to client header.
+    let filename = filename_from_path(subpath);
+    let content_type = refine_content_type(&body_bytes, filename, &claimed_type);
+
     // Check if the file already exists (update vs create).
     let existing = file_service.get_file_by_path(&internal_path).await;
 
     if existing.is_ok() {
         // Update existing file.
         upload_service
-            .update_file(&internal_path, &body_bytes)
+            .update_file(&internal_path, &body_bytes, &content_type)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update file: {}", e)))?;
 
