@@ -235,6 +235,7 @@ impl FileReadPort for FileBlobReadRepository {
         )
     }
 
+    #[allow(clippy::type_complexity)]
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
@@ -343,6 +344,7 @@ impl FileReadPort for FileBlobReadRepository {
     ///
     /// Uses a single SQL query with `LIMIT/OFFSET` to avoid loading the full
     /// folder contents into memory.  Ideal for streaming WebDAV PROPFIND.
+    #[allow(clippy::type_complexity)]
     async fn list_files_batch(
         &self,
         folder_id: Option<&str>,
@@ -986,6 +988,7 @@ impl FileReadPort for FileBlobReadRepository {
         Ok(count)
     }
 
+    #[allow(clippy::type_complexity)]
     async fn suggest_files_by_name(
         &self,
         folder_id: Option<&str>,
@@ -1061,9 +1064,11 @@ impl FileReadPort for FileBlobReadRepository {
     }
 }
 
-#[cfg(integration_tests)]
+#[cfg(feature = "integration_tests")]
+#[allow(dead_code)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::common::stubs::StubDedupPort;
     use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 

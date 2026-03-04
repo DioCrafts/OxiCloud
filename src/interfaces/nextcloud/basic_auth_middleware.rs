@@ -63,15 +63,15 @@ pub async fn basic_auth_middleware(
         parse_basic_auth(auth_header).ok_or(NextcloudAuthError::Unauthorized)?;
 
     // Check account lockout before attempting password verification (saves CPU)
-    if let Some(auth_svc) = state.auth_service.as_ref() {
-        if let Err(secs) = auth_svc.login_lockout.check(&username) {
-            tracing::warn!(
-                username = %username,
-                lockout_remaining_secs = secs,
-                "[NC] Account locked — too many failed attempts"
-            );
-            return Err(NextcloudAuthError::Unauthorized);
-        }
+    if let Some(auth_svc) = state.auth_service.as_ref()
+        && let Err(secs) = auth_svc.login_lockout.check(&username)
+    {
+        tracing::warn!(
+            username = %username,
+            lockout_remaining_secs = secs,
+            "[NC] Account locked — too many failed attempts"
+        );
+        return Err(NextcloudAuthError::Unauthorized);
     }
 
     let nextcloud = state

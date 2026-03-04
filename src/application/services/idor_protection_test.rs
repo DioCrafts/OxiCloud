@@ -131,17 +131,20 @@ impl FileReadPort for MockFileReadPort {
 }
 
 /// Minimal mock write port — only `move_file` and `rename_file` need real logic.
+#[allow(dead_code)]
 struct MockFileWritePort {
     files: Mutex<HashMap<String, File>>,
 }
 
 impl MockFileWritePort {
+    #[allow(dead_code)]
     fn new() -> Self {
         Self {
             files: Mutex::new(HashMap::new()),
         }
     }
 
+    #[allow(dead_code)]
     fn insert(&self, id: &str, name: &str) {
         let file = File::new(
             id.to_string(),

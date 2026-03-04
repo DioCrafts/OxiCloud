@@ -430,9 +430,11 @@ impl ShareUseCase for ShareService {
     }
 }
 
-#[cfg(integration_tests)]
+#[cfg(feature = "integration_tests")]
+#[allow(dead_code)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::application::dtos::share_dto::SharePermissionsDto;
     use crate::application::ports::auth_ports::PasswordHasherPort;
     use crate::application::ports::share_ports::ShareStoragePort;

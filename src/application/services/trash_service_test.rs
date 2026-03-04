@@ -197,14 +197,14 @@ where
                             .file_write_port
                             .restore_from_trash(&file_id, &original_path)
                             .await;
-                        if let Err(e) = result {
-                            if !format!("{}", e).contains("not found") {
-                                return Err(DomainError::new(
-                                    ErrorKind::InternalError,
-                                    "File",
-                                    format!("Error restoring file {} from trash: {}", file_id, e),
-                                ));
-                            }
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "File",
+                                format!("Error restoring file {} from trash: {}", file_id, e),
+                            ));
                         }
                     }
                     TrashedItemType::Folder => {
@@ -214,17 +214,14 @@ where
                             .folder_storage_port
                             .restore_from_trash(&folder_id, &original_path)
                             .await;
-                        if let Err(e) = result {
-                            if !format!("{}", e).contains("not found") {
-                                return Err(DomainError::new(
-                                    ErrorKind::InternalError,
-                                    "Folder",
-                                    format!(
-                                        "Error restoring folder {} from trash: {}",
-                                        folder_id, e
-                                    ),
-                                ));
-                            }
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "Folder",
+                                format!("Error restoring folder {} from trash: {}", folder_id, e),
+                            ));
                         }
                     }
                 }
@@ -260,14 +257,14 @@ where
                     TrashedItemType::File => {
                         let file_id = item.original_id().to_string();
                         let result = self.file_write_port.delete_file_permanently(&file_id).await;
-                        if let Err(e) = result {
-                            if !format!("{}", e).contains("not found") {
-                                return Err(DomainError::new(
-                                    ErrorKind::InternalError,
-                                    "File",
-                                    format!("Error deleting file {} permanently: {}", file_id, e),
-                                ));
-                            }
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "File",
+                                format!("Error deleting file {} permanently: {}", file_id, e),
+                            ));
                         }
                     }
                     TrashedItemType::Folder => {
@@ -276,17 +273,14 @@ where
                             .folder_storage_port
                             .delete_folder_permanently(&folder_id)
                             .await;
-                        if let Err(e) = result {
-                            if !format!("{}", e).contains("not found") {
-                                return Err(DomainError::new(
-                                    ErrorKind::InternalError,
-                                    "Folder",
-                                    format!(
-                                        "Error deleting folder {} permanently: {}",
-                                        folder_id, e
-                                    ),
-                                ));
-                            }
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "Folder",
+                                format!("Error deleting folder {} permanently: {}", folder_id, e),
+                            ));
                         }
                     }
                 }
@@ -804,9 +798,13 @@ impl FolderRepository for MockFolderRepository {
 
 #[cfg(integration_tests)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
+    #[allow(unused_imports)]
     use crate::application::ports::trash_ports::TrashUseCase;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 
     #[tokio::test]

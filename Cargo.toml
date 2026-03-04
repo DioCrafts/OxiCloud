@@ -57,6 +57,7 @@ urlencoding = "2.1.3"
 [features]
 default = []
 test_utils = ["mockall"]
+integration_tests = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(integration_tests)'] }

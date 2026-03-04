@@ -111,7 +111,7 @@ impl DedupService {
     }
 
     /// Creates a stub instance for testing — never hits PG or the filesystem.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "integration_tests"))]
     pub fn new_stub() -> Self {
         let stub_pool = Arc::new(
             sqlx::pool::PoolOptions::<sqlx::Postgres>::new()

@@ -1041,10 +1041,15 @@ impl BatchOperationService {
 
 #[cfg(integration_tests)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+    #[allow(unused_imports)]
     use std::sync::Arc;
 
     #[tokio::test]
