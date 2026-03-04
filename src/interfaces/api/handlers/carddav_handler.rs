@@ -33,9 +33,9 @@ use crate::application::dtos::address_book_dto::{CreateAddressBookDto, UpdateAdd
 use crate::application::dtos::contact_dto::CreateContactVCardDto;
 use crate::application::ports::carddav_ports::{AddressBookUseCase, ContactUseCase};
 use crate::common::di::AppState;
+use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
-use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 

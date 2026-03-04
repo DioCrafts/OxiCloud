@@ -6,21 +6,21 @@ use crate::application::ports::auth_ports::{
     UserStoragePort,
 };
 use crate::application::ports::inbound::FolderUseCase;
+use crate::application::services::folder_service::FolderService;
 use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::session::Session;
 use crate::domain::entities::user::{User, UserRole};
+use crate::infrastructure::repositories::pg::SessionPgRepository;
+use crate::infrastructure::repositories::pg::UserPgRepository;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::services::oidc_service::OidcService;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use moka::sync::Cache;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
-use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
-use crate::application::services::folder_service::FolderService;
-use crate::infrastructure::services::jwt_service::JwtTokenService;
-use crate::infrastructure::services::oidc_service::OidcService;
-use crate::infrastructure::repositories::pg::SessionPgRepository;
-use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /// Tracks a pending OIDC authorization flow (CSRF + PKCE + nonce)
 #[derive(Clone)]
@@ -145,11 +145,7 @@ impl AuthApplicationService {
     }
 
     /// Configures the OIDC service
-    pub fn with_oidc(
-        self,
-        oidc_service: Arc<OidcService>,
-        oidc_config: OidcConfig,
-    ) -> Self {
+    pub fn with_oidc(self, oidc_service: Arc<OidcService>, oidc_config: OidcConfig) -> Self {
         {
             let mut state = self.oidc.write().unwrap();
             state.service = Some(oidc_service);
@@ -308,12 +304,7 @@ impl AuthApplicationService {
         }
 
         // Check email uniqueness
-        if self
-            .user_storage
-            .get_user_by_email(&email)
-            .await
-            .is_ok()
-        {
+        if self.user_storage.get_user_by_email(&email).await.is_ok() {
             return Err(DomainError::new(
                 ErrorKind::AlreadyExists,
                 "User",
@@ -613,7 +604,6 @@ impl AuthApplicationService {
         let users = self.user_storage.list_users(limit, offset).await?;
         Ok(users.into_iter().map(UserDto::from).collect())
     }
-
 
     // ========================================================================
     // Admin User Management Methods

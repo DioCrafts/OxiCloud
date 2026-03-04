@@ -19,9 +19,9 @@ use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::device_code::{DeviceCode, DeviceCodeStatus};
 use crate::domain::entities::session::Session;
 use crate::infrastructure::repositories::pg::DeviceCodePgRepository;
-use crate::infrastructure::services::jwt_service::JwtTokenService;
 use crate::infrastructure::repositories::pg::SessionPgRepository;
 use crate::infrastructure::repositories::pg::UserPgRepository;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
 
 /// Default device code lifetime: 15 minutes (RFC 8628 recommends 5-30 min).
 const DEVICE_CODE_LIFETIME_SECS: i64 = 900;

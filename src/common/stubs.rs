@@ -22,8 +22,7 @@ use crate::application::dtos::search_dto::{
     SearchCriteriaDto, SearchResultsDto, SearchSuggestionsDto,
 };
 use crate::application::ports::file_ports::{
-    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase,
-    OptimizedFileContent,
+    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase, OptimizedFileContent,
 };
 use crate::application::ports::inbound::{FolderUseCase, SearchUseCase};
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};

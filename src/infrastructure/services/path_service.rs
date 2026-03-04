@@ -312,7 +312,15 @@ mod tests {
     #[test]
     fn test_validate_path_rejects_dangerous_chars() {
         let service = PathService::new(PathBuf::from("/storage"));
-        for dangerous in &["file:name", "file*name", "file?name", "file<name", "file>name", "file|name", "file\"name"] {
+        for dangerous in &[
+            "file:name",
+            "file*name",
+            "file?name",
+            "file<name",
+            "file>name",
+            "file|name",
+            "file\"name",
+        ] {
             let path = StoragePath::new(vec![dangerous.to_string()]);
             assert!(
                 service.validate_path(&path).is_err(),

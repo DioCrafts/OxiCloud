@@ -11,10 +11,10 @@ use crate::application::dtos::settings_dto::{
     SaveOidcSettingsDto, TestOidcConnectionDto, UpdateUserActiveDto, UpdateUserQuotaDto,
     UpdateUserRoleDto,
 };
+use crate::application::ports::auth_ports::TokenServicePort;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use std::sync::Arc;
-use crate::application::ports::auth_ports::TokenServicePort;
 
 /// Admin API routes — all require admin role.
 pub fn admin_routes() -> Router<Arc<AppState>> {

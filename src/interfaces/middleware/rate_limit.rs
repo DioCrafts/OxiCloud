@@ -57,6 +57,7 @@ impl RateLimiter {
 
     /// Check whether the IP is allowed. Returns `Ok(current_count)` or
     /// `Err(StatusCode::TOO_MANY_REQUESTS)`.
+    #[allow(clippy::result_unit_err)]
     pub fn check_and_increment(&self, ip: &str) -> Result<u32, ()> {
         let key = ip.to_string();
         // moka's entry API lets us atomically read-modify-write.
@@ -92,12 +93,12 @@ pub fn extract_client_ip<B>(req: &Request<B>) -> String {
     let headers = req.headers();
 
     // 1. X-Forwarded-For (first entry — closest to the client)
-    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()) {
-        if let Some(first) = xff.split(',').next() {
-            let ip = first.trim();
-            if !ip.is_empty() {
-                return ip.to_string();
-            }
+    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
+        && let Some(first) = xff.split(',').next()
+    {
+        let ip = first.trim();
+        if !ip.is_empty() {
+            return ip.to_string();
         }
     }
 

@@ -17,22 +17,20 @@ use chrono::Utc;
 use quick_xml::Writer;
 use uuid::Uuid;
 
-use crate::application::adapters::webdav_adapter::{
-    LockInfo, PropFindRequest, WebDavAdapter,
-};
+use crate::application::adapters::webdav_adapter::{LockInfo, PropFindRequest, WebDavAdapter};
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::FolderDto;
 use crate::application::ports::file_ports::FileRetrievalUseCase;
+use crate::application::ports::file_ports::{FileManagementUseCase, FileUploadUseCase};
 use crate::application::ports::inbound::FolderUseCase;
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState;
 use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
-use crate::application::services::file_retrieval_service::FileRetrievalService;
-use crate::application::services::folder_service::FolderService;
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::sync::Arc;
-use crate::application::ports::file_ports::{FileManagementUseCase, FileUploadUseCase};
 
 /// Characters that MUST NOT be percent-encoded inside a URI path segment.
 /// RFC 3986 §3.3 pchar = unreserved / pct-encoded / sub-delims / ":" / "@"
@@ -65,7 +63,7 @@ fn encode_path_segment(segment: &str) -> String {
 /// Percent-encode a full slash-separated path, encoding each segment individually.
 pub(crate) fn encode_uri_path(path: &str) -> String {
     path.split('/')
-        .map(|seg| encode_path_segment(seg))
+        .map(encode_path_segment)
         .collect::<Vec<_>>()
         .join("/")
 }

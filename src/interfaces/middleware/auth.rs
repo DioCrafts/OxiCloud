@@ -273,30 +273,29 @@ pub async fn auth_middleware(
 
         if let Some(token_str) =
             cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE)
+            && !token_str.is_empty()
         {
-            if !token_str.is_empty() {
-                tracing::debug!("Processing cookie-based authentication");
+            tracing::debug!("Processing cookie-based authentication");
 
-                if let Some(auth_service) = state.auth_service.as_ref() {
-                    let token_service = &auth_service.token_service;
-                    match token_service.validate_token(&token_str) {
-                        Ok(claims) => {
-                            tracing::debug!("Cookie token validated for user: {}", claims.username);
-                            let current_user = CurrentUser {
-                                id: claims.sub,
-                                username: claims.username,
-                                email: claims.email,
-                                role: claims.role,
-                            };
-                            request.extensions_mut().insert(current_user);
-                            request.extensions_mut().insert(CookieAuthenticated);
-                            return Ok(next.run(request).await);
-                        }
-                        Err(e) => {
-                            tracing::debug!("Cookie token validation failed: {}", e);
-                            // Don't return error — fall through to "no token" so
-                            // the browser gets a 401 and can redirect to /login.
-                        }
+            if let Some(auth_service) = state.auth_service.as_ref() {
+                let token_service = &auth_service.token_service;
+                match token_service.validate_token(&token_str) {
+                    Ok(claims) => {
+                        tracing::debug!("Cookie token validated for user: {}", claims.username);
+                        let current_user = CurrentUser {
+                            id: claims.sub,
+                            username: claims.username,
+                            email: claims.email,
+                            role: claims.role,
+                        };
+                        request.extensions_mut().insert(current_user);
+                        request.extensions_mut().insert(CookieAuthenticated);
+                        return Ok(next.run(request).await);
+                    }
+                    Err(e) => {
+                        tracing::debug!("Cookie token validation failed: {}", e);
+                        // Don't return error — fall through to "no token" so
+                        // the browser gets a 401 and can redirect to /login.
                     }
                 }
             }

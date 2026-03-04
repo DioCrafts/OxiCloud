@@ -13,13 +13,13 @@ use tokio_util::io::ReaderStream;
 use crate::application::dtos::folder_dto::{CreateFolderDto, MoveFolderDto, RenameFolderDto};
 use crate::application::dtos::folder_listing_dto::FolderListingDto;
 use crate::application::dtos::pagination::PaginationRequestDto;
+use crate::application::ports::file_ports::FileRetrievalUseCase;
 use crate::application::ports::inbound::FolderUseCase;
+use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState as GlobalAppState;
 use crate::common::errors::ErrorKind;
 use crate::interfaces::middleware::auth::AuthUser;
-use crate::application::ports::file_ports::FileRetrievalUseCase;
-use crate::application::ports::trash_ports::TrashUseCase;
 
 type AppState = Arc<FolderService>;
 

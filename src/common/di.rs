@@ -31,28 +31,27 @@ use crate::infrastructure::services::file_system_i18n_service::FileSystemI18nSer
 use crate::infrastructure::services::path_service::PathService;
 use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 
-
-use crate::application::services::device_auth_service::DeviceAuthService;
 use crate::application::services::app_password_service::AppPasswordService;
 use crate::application::services::calendar_service::CalendarService;
+use crate::application::services::device_auth_service::DeviceAuthService;
 use crate::application::services::storage_usage_service::StorageUsageService;
+use crate::application::services::wopi_lock_service::WopiLockService;
+use crate::application::services::wopi_token_service::WopiTokenService;
 use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
-use crate::infrastructure::repositories::DeviceCodePgRepository;
 use crate::infrastructure::repositories::AppPasswordPgRepository;
+use crate::infrastructure::repositories::DeviceCodePgRepository;
 use crate::infrastructure::repositories::pg::{
     AddressBookPgRepository, CalendarEventPgRepository, CalendarPgRepository,
     ContactGroupPgRepository, ContactPgRepository, SessionPgRepository, UserPgRepository,
 };
-use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
-use crate::infrastructure::services::jwt_service::JwtTokenService;
-use crate::infrastructure::services::path_resolver_service::PathResolverService;
-use crate::application::services::wopi_lock_service::WopiLockService;
-use crate::application::services::wopi_token_service::WopiTokenService;
-use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
 use crate::infrastructure::services::chunked_upload_service::ChunkedUploadService;
 use crate::infrastructure::services::dedup_service::DedupService;
 use crate::infrastructure::services::image_transcode_service::ImageTranscodeService;
+use crate::infrastructure::services::jwt_service::JwtTokenService;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
+use crate::infrastructure::services::path_resolver_service::PathResolverService;
 use crate::infrastructure::services::thumbnail_service::ThumbnailService;
+use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
 use crate::infrastructure::services::zip_service::ZipService;
 
 /// Factory for the different application components
@@ -185,17 +184,19 @@ impl AppServiceFactory {
         let folder_repository: Arc<FolderDbRepository> = folder_repo_concrete.clone();
 
         // File repositories — PostgreSQL metadata + blob content via DedupService
-        let file_read_repository: Arc<FileBlobReadRepository> = Arc::new(FileBlobReadRepository::new(
-            db_pool.clone(),
-            core.dedup_service.clone(),
-            folder_repo_concrete.clone(),
-        ));
+        let file_read_repository: Arc<FileBlobReadRepository> =
+            Arc::new(FileBlobReadRepository::new(
+                db_pool.clone(),
+                core.dedup_service.clone(),
+                folder_repo_concrete.clone(),
+            ));
 
-        let file_write_repository: Arc<FileBlobWriteRepository> = Arc::new(FileBlobWriteRepository::new(
-            db_pool.clone(),
-            core.dedup_service.clone(),
-            folder_repo_concrete.clone(),
-        ));
+        let file_write_repository: Arc<FileBlobWriteRepository> =
+            Arc::new(FileBlobWriteRepository::new(
+                db_pool.clone(),
+                core.dedup_service.clone(),
+                folder_repo_concrete.clone(),
+            ));
 
         // I18n repository
         let i18n_repository = Arc::new(FileSystemI18nService::new(self.locales_path.clone()));
@@ -205,10 +206,7 @@ impl AppServiceFactory {
             Some(Arc::new(TrashDbRepository::new(
                 db_pool.clone(),
                 core.config.storage.trash_retention_days,
-            ))
-                as Arc<
-                    TrashDbRepository,
-                >)
+            )) as Arc<TrashDbRepository>)
         } else {
             None
         };
@@ -339,14 +337,13 @@ impl AppServiceFactory {
         let share_repository = Arc::new(SharePgRepository::new(db_pool.clone()));
 
         // Build a password hasher for share password verification
-        let password_hasher: Arc<Argon2PasswordHasher> =
-            Arc::new(
-                crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
-                    self.config.auth.hash_memory_cost,
-                    self.config.auth.hash_time_cost,
-                    self.config.auth.hash_parallelism,
-                ),
-            );
+        let password_hasher: Arc<Argon2PasswordHasher> = Arc::new(
+            crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                self.config.auth.hash_memory_cost,
+                self.config.auth.hash_time_cost,
+                self.config.auth.hash_parallelism,
+            ),
+        );
 
         let service = Arc::new(ShareService::new(
             Arc::new(self.config.clone()),
@@ -464,9 +461,7 @@ impl AppServiceFactory {
         // 6. Database-dependent services (PgPool always available in blob model)
         let favorites_service: Option<Arc<FavoritesService>>;
         let recent_service: Option<Arc<RecentService>>;
-        let storage_usage_service: Option<
-            Arc<StorageUsageService>,
-        >;
+        let storage_usage_service: Option<Arc<StorageUsageService>>;
         let mut auth_services: Option<crate::common::di::AuthServices> = None;
 
         {
@@ -550,7 +545,8 @@ impl AppServiceFactory {
             device_auth_service: None,
             app_password_service: None,
             path_resolver: None,
-            webdav_lock_store: crate::infrastructure::services::webdav_lock_service::create_webdav_lock_store(),
+            webdav_lock_store:
+                crate::infrastructure::services::webdav_lock_service::create_webdav_lock_store(),
             setup_token: None,
         };
 
@@ -626,15 +622,11 @@ impl AppServiceFactory {
 
             // 9c. Wire Device Authorization Grant (RFC 8628) service
             {
-
                 let device_code_repo = Arc::new(DeviceCodePgRepository::new(pool.clone()));
-                let user_repo: Arc<UserPgRepository> =
-                    Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
-                        pool.clone(),
-                    ));
-                let session_repo: Arc<
-                    SessionPgRepository,
-                > = Arc::new(
+                let user_repo: Arc<UserPgRepository> = Arc::new(
+                    crate::infrastructure::repositories::UserPgRepository::new(pool.clone()),
+                );
+                let session_repo: Arc<SessionPgRepository> = Arc::new(
                     crate::infrastructure::repositories::SessionPgRepository::new(pool.clone()),
                 );
                 let base_url = self.config.base_url();
@@ -652,22 +644,18 @@ impl AppServiceFactory {
 
             // 9d. Wire App Password service
             {
-
-                let app_pw_repo: Arc<
-                    AppPasswordPgRepository,
-                > = Arc::new(AppPasswordPgRepository::new(pool.clone()));
-                let hasher: Arc<Argon2PasswordHasher> =
-                    Arc::new(
-                        crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
-                            self.config.auth.hash_memory_cost,
-                            self.config.auth.hash_time_cost,
-                            self.config.auth.hash_parallelism,
-                        ),
-                    );
-                let user_repo: Arc<UserPgRepository> =
-                    Arc::new(crate::infrastructure::repositories::UserPgRepository::new(
-                        pool.clone(),
-                    ));
+                let app_pw_repo: Arc<AppPasswordPgRepository> =
+                    Arc::new(AppPasswordPgRepository::new(pool.clone()));
+                let hasher: Arc<Argon2PasswordHasher> = Arc::new(
+                    crate::infrastructure::services::password_hasher::Argon2PasswordHasher::new(
+                        self.config.auth.hash_memory_cost,
+                        self.config.auth.hash_time_cost,
+                        self.config.auth.hash_parallelism,
+                    ),
+                );
+                let user_repo: Arc<UserPgRepository> = Arc::new(
+                    crate::infrastructure::repositories::UserPgRepository::new(pool.clone()),
+                );
                 let base_url = self.config.base_url();
 
                 let app_pw_svc = Arc::new(AppPasswordService::new(
@@ -690,14 +678,10 @@ impl AppServiceFactory {
         // 10. Wire CalDAV/CardDAV services
         {
             // CalDAV
-            let calendar_repo: Arc<
-                CalendarPgRepository,
-            > = Arc::new(
+            let calendar_repo: Arc<CalendarPgRepository> = Arc::new(
                 crate::infrastructure::repositories::pg::CalendarPgRepository::new(pool.clone()),
             );
-            let event_repo: Arc<
-                CalendarEventPgRepository,
-            > = Arc::new(
+            let event_repo: Arc<CalendarEventPgRepository> = Arc::new(
                 crate::infrastructure::repositories::pg::CalendarEventPgRepository::new(
                     pool.clone(),
                 ),
@@ -713,25 +697,16 @@ impl AppServiceFactory {
                     calendar_storage,
                 ),
             );
-            app_state.calendar_use_case = Some(
-                calendar_service
-                    as Arc<CalendarService>,
-            );
+            app_state.calendar_use_case = Some(calendar_service as Arc<CalendarService>);
 
             // CardDAV
-            let address_book_repo: Arc<
-                AddressBookPgRepository,
-            > = Arc::new(
+            let address_book_repo: Arc<AddressBookPgRepository> = Arc::new(
                 crate::infrastructure::repositories::pg::AddressBookPgRepository::new(pool.clone()),
             );
-            let contact_repo: Arc<
-                ContactPgRepository,
-            > = Arc::new(
+            let contact_repo: Arc<ContactPgRepository> = Arc::new(
                 crate::infrastructure::repositories::pg::ContactPgRepository::new(pool.clone()),
             );
-            let group_repo: Arc<
-                ContactGroupPgRepository,
-            > = Arc::new(
+            let group_repo: Arc<ContactGroupPgRepository> = Arc::new(
                 crate::infrastructure::repositories::pg::ContactGroupPgRepository::new(
                     pool.clone(),
                 ),
@@ -757,7 +732,6 @@ impl AppServiceFactory {
                     "WOPI is enabled but WOPI_DISCOVERY_URL is empty — WOPI services will NOT be available"
                 );
             } else {
-
                 let wopi_secret = if self.config.wopi.secret.is_empty() {
                     self.config.auth.jwt_secret.clone()
                 } else {
@@ -811,8 +785,7 @@ pub struct RepositoryServices {
     pub file_read_repository: Arc<FileBlobReadRepository>,
     pub file_write_repository: Arc<FileBlobWriteRepository>,
     pub i18n_repository: Arc<FileSystemI18nService>,
-    pub trash_repository:
-        Option<Arc<TrashDbRepository>>,
+    pub trash_repository: Option<Arc<TrashDbRepository>>,
 }
 
 /// Container for application services
@@ -858,14 +831,11 @@ pub struct AppState {
     pub share_service: Option<Arc<ShareService>>,
     pub favorites_service: Option<Arc<FavoritesService>>,
     pub recent_service: Option<Arc<RecentService>>,
-    pub storage_usage_service:
-        Option<Arc<StorageUsageService>>,
+    pub storage_usage_service: Option<Arc<StorageUsageService>>,
     pub calendar_service: Option<Arc<CalendarService>>,
     pub contact_service: Option<Arc<ContactStorageAdapter>>,
-    pub calendar_use_case:
-        Option<Arc<CalendarService>>,
-    pub addressbook_use_case:
-        Option<Arc<ContactStorageAdapter>>,
+    pub calendar_use_case: Option<Arc<CalendarService>>,
+    pub addressbook_use_case: Option<Arc<ContactStorageAdapter>>,
     pub contact_use_case: Option<Arc<ContactStorageAdapter>>,
     pub wopi_token_service:
         Option<Arc<crate::application::services::wopi_token_service::WopiTokenService>>,

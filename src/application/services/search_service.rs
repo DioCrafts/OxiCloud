@@ -15,10 +15,10 @@ use crate::application::ports::inbound::SearchUseCase;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::Result;
 use crate::domain::entities::folder::Folder;
-use std::hash::{Hash, Hasher};
+use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
-use crate::domain::repositories::folder_repository::FolderRepository;
+use std::hash::{Hash, Hasher};
 
 /**
  * High-performance search service implementation for files and folders.

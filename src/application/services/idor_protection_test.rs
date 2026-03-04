@@ -9,9 +9,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::Mutex;
 
-use crate::application::ports::storage_ports::{
-    FileReadPort,
-};
+use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
@@ -122,10 +120,7 @@ impl FileReadPort for MockFileReadPort {
     async fn stream_files_in_subtree(
         &self,
         _folder_id: &str,
-    ) -> Result<
-        Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>,
-        DomainError,
-    > {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError> {
         Ok(Box::pin(futures::stream::empty()))
     }
 }
@@ -245,8 +240,13 @@ async fn stub_move_file_owned_returns_ok() {
 #[tokio::test]
 async fn stub_rename_file_owned_returns_ok() {
     let stub = StubFileManagementUseCase;
-    let result = stub.rename_file_owned("file-1", "user-1", "new-name.txt").await;
-    assert!(result.is_ok(), "stub should return Ok for rename_file_owned");
+    let result = stub
+        .rename_file_owned("file-1", "user-1", "new-name.txt")
+        .await;
+    assert!(
+        result.is_ok(),
+        "stub should return Ok for rename_file_owned"
+    );
 }
 
 use crate::application::ports::file_ports::FileRetrievalUseCase;

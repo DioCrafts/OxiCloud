@@ -7,10 +7,12 @@ use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::file_ports::{FileRetrievalUseCase, OptimizedFileContent};
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::common::errors::DomainError;
-use tracing::{debug, info};
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::services::file_content_cache::FileContentCache;
-use crate::infrastructure::services::image_transcode_service::{ImageTranscodeService, OutputFormat};
+use crate::infrastructure::services::image_transcode_service::{
+    ImageTranscodeService, OutputFormat,
+};
+use tracing::{debug, info};
 
 /// Threshold below which files are served from RAM cache (10 MB).
 const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;

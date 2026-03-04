@@ -1,9 +1,9 @@
 use crate::application::dtos::recent_dto::RecentItemDto;
 use crate::application::ports::recent_ports::{RecentItemsRepositoryPort, RecentItemsUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
+use crate::infrastructure::repositories::pg::RecentItemsPgRepository;
 use std::sync::Arc;
 use tracing::info;
-use crate::infrastructure::repositories::pg::RecentItemsPgRepository;
 
 /// Implementation of the use case for managing recent items.
 ///

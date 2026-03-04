@@ -1,3 +1,5 @@
+use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::folder_service::FolderService;
 use crate::{
     application::dtos::file_dto::FileDto,
     application::ports::file_ports::FileRetrievalUseCase,
@@ -16,8 +18,6 @@ use thiserror::Error;
 use tokio::io::BufWriter;
 use tokio_util::compat::Compat;
 use tracing::*;
-use crate::application::services::file_retrieval_service::FileRetrievalService;
-use crate::application::services::folder_service::FolderService;
 
 /// Error related to ZIP file creation
 #[derive(Debug, Error)]

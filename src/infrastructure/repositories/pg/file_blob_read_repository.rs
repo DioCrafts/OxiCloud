@@ -22,6 +22,19 @@ use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
 use crate::infrastructure::services::dedup_service::DedupService;
 
+/// Type alias for file metadata rows from SQL queries.
+type FileRow = (
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    String,
+    i64,
+    i64,
+    Option<String>,
+);
+
 /// File read repository backed by PostgreSQL metadata + blob storage.
 pub struct FileBlobReadRepository {
     pool: Arc<PgPool>,
@@ -204,17 +217,7 @@ impl FileReadPort for FileBlobReadRepository {
     }
 
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError> {
-        let rows: Vec<(
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            String,
-            i64,
-            i64,
-            Option<String>,
-        )> = if let Some(fid) = folder_id {
+        let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
@@ -271,17 +274,7 @@ impl FileReadPort for FileBlobReadRepository {
         offset: i64,
         limit: i64,
     ) -> Result<Vec<File>, DomainError> {
-        let rows: Vec<(
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            String,
-            i64,
-            i64,
-            Option<String>,
-        )> = if let Some(fid) = folder_id {
+        let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
@@ -853,17 +846,7 @@ impl FileReadPort for FileBlobReadRepository {
         let pattern = format!("%{}%", query);
         let limit_i64 = limit as i64;
 
-        let rows: Vec<(
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            String,
-            i64,
-            i64,
-            Option<String>,
-        )> = if let Some(fid) = folder_id {
+        let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
@@ -929,7 +912,7 @@ impl FileReadPort for FileBlobReadRepository {
     }
 }
 
-#[cfg(feature = "integration_tests")]
+#[cfg(integration_tests)]
 mod tests {
     use super::*;
     use crate::common::stubs::StubDedupPort;

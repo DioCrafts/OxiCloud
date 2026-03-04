@@ -3,6 +3,11 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::Semaphore;
 
+use crate::domain::repositories::folder_repository::FolderRepository;
+use crate::infrastructure::repositories::pg::SharePgRepository;
+use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use crate::{
     application::{
         dtos::{
@@ -18,11 +23,6 @@ use crate::{
     common::{config::AppConfig, errors::DomainError},
     domain::entities::share::{Share, ShareItemType, SharePermissions},
 };
-use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
-use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
-use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
-use crate::infrastructure::repositories::pg::SharePgRepository;
-use crate::domain::repositories::folder_repository::FolderRepository;
 
 #[derive(Debug, Error)]
 pub enum ShareServiceError {
@@ -394,7 +394,7 @@ impl ShareUseCase for ShareService {
     }
 }
 
-#[cfg(feature = "integration_tests")]
+#[cfg(integration_tests)]
 mod tests {
     use super::*;
     use crate::application::dtos::share_dto::SharePermissionsDto;

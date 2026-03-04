@@ -9,8 +9,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use crate::application::ports::recent_ports::RecentItemsUseCase;
-use crate::interfaces::middleware::auth::AuthUser;
 use crate::application::services::recent_service::RecentService;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Query parameters for getting recent items
 #[derive(Deserialize)]

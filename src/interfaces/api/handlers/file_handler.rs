@@ -11,12 +11,14 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::application::ports::file_ports::OptimizedFileContent;
+use crate::application::ports::file_ports::{
+    FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase,
+};
+use crate::application::ports::storage_ports::StorageUsagePort;
+use crate::application::ports::thumbnail_ports::ThumbnailPort;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
-use crate::application::ports::file_ports::{FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase};
-use crate::application::ports::storage_ports::StorageUsagePort;
-use crate::application::ports::thumbnail_ports::ThumbnailPort;
 
 /**
  * Type aliases for dependency injection state.
@@ -283,7 +285,10 @@ impl FileHandler {
             }
         };
 
-        let file = match file_retrieval_service.get_file_owned(&id, &auth_user.id).await {
+        let file = match file_retrieval_service
+            .get_file_owned(&id, &auth_user.id)
+            .await
+        {
             Ok(f) => f,
             Err(err) => {
                 return (
@@ -678,7 +683,8 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
 
         // Auth required: trash-first with dedup cleanup + ownership verification
-        let result = mgmt.delete_with_cleanup(&id, &auth_user.id)
+        let result = mgmt
+            .delete_with_cleanup(&id, &auth_user.id)
             .await
             .map(|was_trashed| {
                 if was_trashed {
@@ -771,7 +777,10 @@ impl FileHandler {
 
         let mgmt = &state.applications.file_management_service;
 
-        match mgmt.move_file_owned(&id, &auth_user.id, payload.folder_id).await {
+        match mgmt
+            .move_file_owned(&id, &auth_user.id, payload.folder_id)
+            .await
+        {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
             Err(err) => {
                 tracing::error!("Error moving file: {}", err);

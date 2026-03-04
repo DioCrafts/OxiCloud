@@ -14,12 +14,12 @@ use crate::application::dtos::folder_dto::{FolderDto, MoveFolderDto};
 use crate::application::ports::file_ports::{FileManagementUseCase, FileRetrievalUseCase};
 use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::trash_ports::TrashUseCase;
-use crate::application::services::folder_service::FolderService;
-use crate::common::config::AppConfig;
-use crate::common::errors::DomainError;
 use crate::application::services::file_management_service::FileManagementService;
 use crate::application::services::file_retrieval_service::FileRetrievalService;
+use crate::application::services::folder_service::FolderService;
 use crate::application::services::trash_service::TrashService;
+use crate::common::config::AppConfig;
+use crate::common::errors::DomainError;
 
 /// Specific errors for batch operations
 #[derive(Debug, Error)]
@@ -1007,7 +1007,7 @@ impl BatchOperationService {
     }
 }
 
-#[cfg(feature = "integration_tests")]
+#[cfg(integration_tests)]
 mod tests {
     use super::*;
     use crate::common::stubs::{StubFileManagementUseCase, StubFileRetrievalUseCase};

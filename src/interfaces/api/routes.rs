@@ -1,3 +1,4 @@
+use crate::application::services::batch_operations::BatchOperationService;
 use crate::common::di::AppState;
 use axum::{
     Router,
@@ -8,7 +9,6 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
-use crate::application::services::batch_operations::BatchOperationService;
 
 /// Returns the application version from Cargo.toml (compile-time constant)
 async fn get_version() -> AxumJson<serde_json::Value> {
@@ -17,7 +17,6 @@ async fn get_version() -> AxumJson<serde_json::Value> {
         "version": env!("CARGO_PKG_VERSION")
     }))
 }
-
 
 use crate::interfaces::api::handlers::admin_handler;
 use crate::interfaces::api::handlers::batch_handler::{self, BatchHandlerState};

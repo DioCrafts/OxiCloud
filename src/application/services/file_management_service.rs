@@ -4,11 +4,11 @@ use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::file_ports::FileManagementUseCase;
 use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
+use crate::application::services::trash_service::TrashService;
 use crate::common::errors::DomainError;
-use tracing::{error, info, warn};
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
-use crate::application::services::trash_service::TrashService;
+use tracing::{error, info, warn};
 
 /// Service for file management operations (move, delete).
 ///

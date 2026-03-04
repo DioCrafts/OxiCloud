@@ -1,15 +1,14 @@
-
 use std::path::Path;
 use std::sync::Arc;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::file_ports::FileUploadUseCase;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
+use crate::application::services::storage_usage_service::StorageUsageService;
 use crate::common::errors::DomainError;
-use tracing::{debug, info, warn};
 use crate::infrastructure::repositories::pg::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::FileBlobWriteRepository;
-use crate::application::services::storage_usage_service::StorageUsageService;
+use tracing::{debug, info, warn};
 
 /// Helper function to extract username from folder path string.
 /// e.g. "My Folder - user1/subfolder/file.txt" → "user1"
@@ -48,8 +47,7 @@ pub struct FileUploadService {
     /// Read port — needed for WebDAV create_file / update_file
     file_read: Option<Arc<FileBlobReadRepository>>,
     /// Optional storage usage tracking
-    storage_usage_service:
-        Option<Arc<StorageUsageService>>,
+    storage_usage_service: Option<Arc<StorageUsageService>>,
 }
 
 impl FileUploadService {

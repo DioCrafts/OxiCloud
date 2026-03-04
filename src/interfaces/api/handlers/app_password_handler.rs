@@ -37,7 +37,7 @@ async fn create_app_password(
     let response = service
         .create(&user.id, request)
         .await
-        .map_err(|e| AppError::from(e))?;
+        .map_err(AppError::from)?;
 
     Ok(Json(response))
 }
@@ -55,10 +55,7 @@ async fn list_app_passwords(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("App password service not configured"))?;
 
-    let response = service
-        .list(&user.id)
-        .await
-        .map_err(|e| AppError::from(e))?;
+    let response = service.list(&user.id).await.map_err(AppError::from)?;
 
     Ok(Json(response))
 }
@@ -78,7 +75,7 @@ async fn revoke_app_password(
     let response = service
         .revoke(&user.id, &id)
         .await
-        .map_err(|e| AppError::from(e))?;
+        .map_err(AppError::from)?;
 
     Ok(Json(response))
 }

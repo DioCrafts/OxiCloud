@@ -16,6 +16,32 @@ use crate::domain::entities::folder::Folder;
 use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::services::path_service::StoragePath;
 
+/// Type alias for folder metadata rows from SQL queries.
+type FolderRow = (String, String, String, Option<String>, String, i64, i64);
+
+/// Type alias for paginated folder rows (includes total_count).
+type FolderRowPaginated = (
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+    i64,
+    i64,
+    i64,
+);
+
+/// Type alias for folder rows with optional user_id.
+type FolderRowOptUser = (
+    String,
+    String,
+    String,
+    Option<String>,
+    Option<String>,
+    i64,
+    i64,
+);
+
 /// PostgreSQL-backed folder repository.
 ///
 /// All folder metadata lives in the `storage.folders` table.  The physical
@@ -173,10 +199,9 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
-            if let Some(pid) = parent_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -184,13 +209,13 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id = $1::uuid AND NOT is_trashed
                  ORDER BY name
                 "#,
-                )
-                .bind(pid)
-                .fetch_all(self.pool())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(pid)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -198,11 +223,11 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id IS NULL AND NOT is_trashed
                  ORDER BY name
                 "#,
-                )
-                .fetch_all(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("list: {e}")))?;
+            )
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("list: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -216,10 +241,9 @@ impl FolderRepository for FolderDbRepository {
         parent_id: Option<&str>,
         owner_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
-            if let Some(pid) = parent_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -227,14 +251,14 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
                  ORDER BY name
                 "#,
-                )
-                .bind(pid)
-                .bind(owner_id)
-                .fetch_all(self.pool())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(pid)
+            .bind(owner_id)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -242,12 +266,12 @@ impl FolderRepository for FolderDbRepository {
                  WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
                  ORDER BY name
                 "#,
-                )
-                .bind(owner_id)
-                .fetch_all(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("list_by_owner: {e}")))?;
+            )
+            .bind(owner_id)
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("list_by_owner: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {
@@ -266,16 +290,7 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            i64,
-            i64,
-            i64,
-        )> = if let Some(pid) = parent_id {
+        let rows: Vec<FolderRowPaginated> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
@@ -339,16 +354,7 @@ impl FolderRepository for FolderDbRepository {
         limit: usize,
         include_total: bool,
     ) -> Result<(Vec<Folder>, Option<usize>), DomainError> {
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            Option<String>,
-            String,
-            i64,
-            i64,
-            i64,
-        )> = if let Some(pid) = parent_id {
+        let rows: Vec<FolderRowPaginated> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
@@ -689,15 +695,7 @@ impl FolderRepository for FolderDbRepository {
                       AND fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid) \
                     ORDER BY fo.path";
 
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            i64,
-        )> = sqlx::query_as(sql)
+        let rows: Vec<FolderRowOptUser> = sqlx::query_as(sql)
             .bind(folder_id)
             .fetch_all(self.pool())
             .await
@@ -760,15 +758,7 @@ impl FolderRepository for FolderDbRepository {
                   ORDER BY fo.name"
             );
 
-            let rows: Vec<(
-                String,
-                String,
-                String,
-                Option<String>,
-                Option<String>,
-                i64,
-                i64,
-            )> = if let Some(ref pattern) = name_pattern {
+            let rows: Vec<FolderRowOptUser> = if let Some(ref pattern) = name_pattern {
                 sqlx::query_as(&sql)
                     .bind(user_id)
                     .bind(pattern)
@@ -824,15 +814,7 @@ impl FolderRepository for FolderDbRepository {
             )
         };
 
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            i64,
-        )> = if let Some(pid) = parent_id {
+        let rows: Vec<FolderRowOptUser> = if let Some(pid) = parent_id {
             if let Some(ref pattern) = name_pattern {
                 sqlx::query_as(&sql)
                     .bind(pid)
@@ -897,15 +879,7 @@ impl FolderRepository for FolderDbRepository {
               ORDER BY fo.name"
         );
 
-        let rows: Vec<(
-            String,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            i64,
-            i64,
-        )> = if let Some(ref pattern) = name_pattern {
+        let rows: Vec<FolderRowOptUser> = if let Some(ref pattern) = name_pattern {
             sqlx::query_as(&sql)
                 .bind(user_id)
                 .bind(folder_id)
@@ -937,10 +911,9 @@ impl FolderRepository for FolderDbRepository {
         let pattern = format!("%{}%", query);
         let limit_i64 = limit as i64;
 
-        let rows: Vec<(String, String, String, Option<String>, String, i64, i64)> =
-            if let Some(pid) = parent_id {
-                sqlx::query_as(
-                    r#"
+        let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -956,16 +929,16 @@ impl FolderRepository for FolderDbRepository {
                           name
                  LIMIT $4
                 "#,
-                )
-                .bind(pid)
-                .bind(&pattern)
-                .bind(query)
-                .bind(limit_i64)
-                .fetch_all(self.pool())
-                .await
-            } else {
-                sqlx::query_as(
-                    r#"
+            )
+            .bind(pid)
+            .bind(&pattern)
+            .bind(query)
+            .bind(limit_i64)
+            .fetch_all(self.pool())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
                 SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
@@ -981,14 +954,14 @@ impl FolderRepository for FolderDbRepository {
                           name
                  LIMIT $3
                 "#,
-                )
-                .bind(&pattern)
-                .bind(query)
-                .bind(limit_i64)
-                .fetch_all(self.pool())
-                .await
-            }
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("suggest: {e}")))?;
+            )
+            .bind(&pattern)
+            .bind(query)
+            .bind(limit_i64)
+            .fetch_all(self.pool())
+            .await
+        }
+        .map_err(|e| DomainError::internal_error("FolderDb", format!("suggest: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, path, pid, uid, ca, ma)| {

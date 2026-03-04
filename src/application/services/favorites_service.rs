@@ -3,9 +3,9 @@ use crate::application::dtos::favorites_dto::{
 };
 use crate::application::ports::favorites_ports::{FavoritesRepositoryPort, FavoritesUseCase};
 use crate::common::errors::{DomainError, ErrorKind, Result};
+use crate::infrastructure::repositories::pg::FavoritesPgRepository;
 use std::sync::Arc;
 use tracing::info;
-use crate::infrastructure::repositories::pg::FavoritesPgRepository;
 
 /// Implementation of the FavoritesUseCase for managing user favorites.
 ///

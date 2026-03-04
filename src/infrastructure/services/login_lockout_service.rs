@@ -60,12 +60,12 @@ impl LoginLockoutService {
     /// Returns `Ok(())` if the user may attempt login, or
     /// `Err(remaining_secs)` with the *approximate* remaining lockout time.
     pub fn check(&self, username: &str) -> Result<(), u64> {
-        if let Some(rec) = self.cache.get(&username.to_lowercase()) {
-            if rec.count >= self.max_failures {
-                // The entry exists and is over the threshold.  Because moka
-                // evicts at TTL we know the lockout window has not yet elapsed.
-                return Err(self.lockout_secs);
-            }
+        if let Some(rec) = self.cache.get(&username.to_lowercase())
+            && rec.count >= self.max_failures
+        {
+            // The entry exists and is over the threshold.  Because moka
+            // evicts at TTL we know the lockout window has not yet elapsed.
+            return Err(self.lockout_secs);
         }
         Ok(())
     }

@@ -126,8 +126,7 @@ async fn create_pool_with_retries(
                     if attempt >= MAX_ATTEMPTS {
                         return Err(DbError(format!(
                             "Error verifying PostgreSQL {} pool connection: {}",
-                            label,
-                            e
+                            label, e
                         )));
                     }
                 }
@@ -143,8 +142,7 @@ async fn create_pool_with_retries(
                 if attempt >= MAX_ATTEMPTS {
                     return Err(DbError(format!(
                         "Error in PostgreSQL {} pool connection: {}",
-                        label,
-                        e
+                        label, e
                     )));
                 }
                 tokio::time::sleep(Duration::from_secs(2)).await;
@@ -154,8 +152,7 @@ async fn create_pool_with_retries(
 
     Err(DbError(format!(
         "Could not establish PostgreSQL {} pool connection after {} attempts",
-        label,
-        MAX_ATTEMPTS
+        label, MAX_ATTEMPTS
     )))
 }
 

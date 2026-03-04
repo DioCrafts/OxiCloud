@@ -7,8 +7,8 @@ use crate::application::services::auth_application_service::AuthApplicationServi
 use crate::common::config::OidcConfig;
 use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::repositories::settings_repository::SettingsRepository;
-use crate::infrastructure::services::oidc_service::OidcService;
 use crate::infrastructure::repositories::pg::SettingsPgRepository;
+use crate::infrastructure::services::oidc_service::OidcService;
 
 /// Admin settings service — manages platform configuration in the database.
 ///

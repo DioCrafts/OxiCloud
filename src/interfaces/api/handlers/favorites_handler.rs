@@ -9,8 +9,8 @@ use std::sync::Arc;
 use tracing::{error, info};
 
 use crate::application::ports::favorites_ports::FavoritesUseCase;
-use crate::interfaces::middleware::auth::AuthUser;
 use crate::application::services::favorites_service::FavoritesService;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Single item in a batch-add-favorites request.
 #[derive(Debug, Deserialize)]

@@ -499,7 +499,7 @@ impl FolderRepository for MockFolderRepository {
     }
 }
 
-#[cfg(feature = "integration_tests")]
+#[cfg(integration_tests)]
 mod tests {
     use super::*;
     use crate::application::ports::trash_ports::TrashUseCase;

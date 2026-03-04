@@ -1,4 +1,3 @@
-
 use crate::application::dtos::trash_dto::TrashedItemDto;
 use crate::common::errors::Result;
 

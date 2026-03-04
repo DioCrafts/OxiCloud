@@ -9,13 +9,13 @@ use crate::application::ports::auth_ports::{
 };
 use crate::common::errors::DomainError;
 use crate::domain::entities::app_password::AppPassword;
+use crate::infrastructure::repositories::pg::AppPasswordPgRepository;
+use crate::infrastructure::repositories::pg::UserPgRepository;
+use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use chrono::{Duration, Utc};
 use moka::future::Cache;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use crate::infrastructure::repositories::pg::AppPasswordPgRepository;
-use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
-use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /// App password token length (32 random alphanumeric chars after prefix).
 const TOKEN_LENGTH: usize = 32;

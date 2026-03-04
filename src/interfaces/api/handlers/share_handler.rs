@@ -9,6 +9,7 @@ use axum::{
 use serde::Deserialize;
 use serde_json::json;
 
+use crate::application::services::share_service::ShareService;
 use crate::{
     application::{
         dtos::share_dto::{CreateShareDto, UpdateShareDto},
@@ -18,7 +19,6 @@ use crate::{
     domain::entities::share::ShareItemType,
     interfaces::middleware::auth::OptionalAuthUser,
 };
-use crate::application::services::share_service::ShareService;
 
 #[derive(Debug, Deserialize)]
 pub struct GetSharesQuery {

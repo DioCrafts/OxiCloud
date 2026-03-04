@@ -150,7 +150,7 @@ async fn login(
         );
         return Err(AppError::new(
             StatusCode::TOO_MANY_REQUESTS,
-            &format!(
+            format!(
                 "Account temporarily locked due to too many failed attempts. Try again in {} seconds.",
                 lockout_secs
             ),

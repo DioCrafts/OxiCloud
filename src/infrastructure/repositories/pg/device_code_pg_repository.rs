@@ -25,7 +25,7 @@ impl DeviceCodePgRepository {
             )
         })?;
 
-        let status = DeviceCodeStatus::from_str(&status_str).unwrap_or(DeviceCodeStatus::Expired);
+        let status = DeviceCodeStatus::parse(&status_str).unwrap_or(DeviceCodeStatus::Expired);
 
         Ok(DeviceCode::from_raw(
             row.try_get("id").unwrap_or_default(),

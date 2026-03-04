@@ -20,10 +20,10 @@ pub mod trash_service;
 pub mod wopi_lock_service;
 pub mod wopi_token_service;
 
-#[cfg(all(test, feature = "integration_tests"))]
-mod trash_service_test;
 #[cfg(test)]
 mod idor_protection_test;
+#[cfg(all(test, integration_tests))]
+mod trash_service_test;
 
 // Re-exportar para facilitar acceso
 pub use file_management_service::FileManagementService;

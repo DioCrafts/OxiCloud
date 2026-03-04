@@ -1,11 +1,11 @@
 use crate::application::ports::auth_ports::UserStoragePort;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::common::errors::DomainError;
+use crate::infrastructure::repositories::pg::UserPgRepository;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::task;
 use tracing::{debug, error, info};
-use crate::infrastructure::repositories::pg::UserPgRepository;
 
 /**
  * Service for managing and updating user storage usage statistics.

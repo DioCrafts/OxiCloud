@@ -21,7 +21,10 @@ impl StoragePath {
     /// Creates a new storage path, silently dropping any traversal segments
     pub fn new(segments: Vec<String>) -> Self {
         Self {
-            segments: segments.into_iter().filter(|s| Self::is_safe_segment(s)).collect(),
+            segments: segments
+                .into_iter()
+                .filter(|s| Self::is_safe_segment(s))
+                .collect(),
         }
     }
 
@@ -186,12 +189,7 @@ mod tests {
 
     #[test]
     fn test_new_strips_traversal_segments() {
-        let path = StoragePath::new(vec![
-            "..".into(),
-            "etc".into(),
-            ".".into(),
-            "passwd".into(),
-        ]);
+        let path = StoragePath::new(vec!["..".into(), "etc".into(), ".".into(), "passwd".into()]);
         assert_eq!(path.segments(), &["etc", "passwd"]);
     }
 

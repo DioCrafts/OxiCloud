@@ -8,7 +8,6 @@
 //! Concrete implementations (filesystem, PostgreSQL, S3, etc.) live in
 //! the infrastructure layer.
 
-
 use crate::common::errors::DomainError;
 use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;

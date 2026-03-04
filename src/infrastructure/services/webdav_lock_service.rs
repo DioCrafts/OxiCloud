@@ -63,16 +63,12 @@ impl WebDavLockStore {
     ///
     /// Returns `Ok(LockEntry)` on success, or `Err(existing)` if the resource
     /// is already exclusively locked by a different token.
-    pub fn acquire(
-        &self,
-        path: &str,
-        info: LockInfo,
-    ) -> Result<LockEntry, LockEntry> {
+    pub fn acquire(&self, path: &str, info: LockInfo) -> Result<LockEntry, Box<LockEntry>> {
         // Check for existing conflicting lock
-        if let Some(existing) = self.by_path.get(path) {
-            if existing.info.scope == LockScope::Exclusive {
-                return Err(existing);
-            }
+        if let Some(existing) = self.by_path.get(path)
+            && existing.info.scope == LockScope::Exclusive
+        {
+            return Err(Box::new(existing));
         }
 
         let ttl = Self::parse_timeout(info.timeout.as_deref());
@@ -81,8 +77,7 @@ impl WebDavLockStore {
             path: path.to_owned(),
         };
 
-        self.by_path
-            .insert(path.to_owned(), entry.clone());
+        self.by_path.insert(path.to_owned(), entry.clone());
         self.by_token
             .insert(entry.info.token.clone(), path.to_owned());
 
@@ -99,11 +94,11 @@ impl WebDavLockStore {
             tokio::spawn(async move {
                 tokio::time::sleep(ttl).await;
                 // Only remove if the entry still matches (wasn't refreshed/replaced)
-                if let Some(e) = by_path.get(&path_owned) {
-                    if e.info.token == token {
-                        by_path.invalidate(&path_owned);
-                        by_token.invalidate(&token);
-                    }
+                if let Some(e) = by_path.get(&path_owned)
+                    && e.info.token == token
+                {
+                    by_path.invalidate(&path_owned);
+                    by_token.invalidate(&token);
                 }
             });
         }
@@ -138,11 +133,11 @@ impl WebDavLockStore {
             let path_owned = path.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(ttl).await;
-                if let Some(e) = by_path.get(&path_owned) {
-                    if e.info.token == token_owned {
-                        by_path.invalidate(&path_owned);
-                        by_token.invalidate(&token_owned);
-                    }
+                if let Some(e) = by_path.get(&path_owned)
+                    && e.info.token == token_owned
+                {
+                    by_path.invalidate(&path_owned);
+                    by_token.invalidate(&token_owned);
                 }
             });
         }
@@ -156,10 +151,10 @@ impl WebDavLockStore {
     pub fn release(&self, token: &str) -> bool {
         if let Some(path) = self.by_token.get(token) {
             // Only remove from by_path if the token still matches
-            if let Some(entry) = self.by_path.get(&path) {
-                if entry.info.token == token {
-                    self.by_path.invalidate(&path);
-                }
+            if let Some(entry) = self.by_path.get(&path)
+                && entry.info.token == token
+            {
+                self.by_path.invalidate(&path);
             }
             self.by_token.invalidate(token);
             true
@@ -200,10 +195,10 @@ impl WebDavLockStore {
             return Duration::from_secs(MAX_LOCK_TIMEOUT_SECS);
         }
 
-        if let Some(secs_str) = first.strip_prefix("Second-") {
-            if let Ok(secs) = secs_str.trim().parse::<u64>() {
-                return Duration::from_secs(secs.min(MAX_LOCK_TIMEOUT_SECS));
-            }
+        if let Some(secs_str) = first.strip_prefix("Second-")
+            && let Ok(secs) = secs_str.trim().parse::<u64>()
+        {
+            return Duration::from_secs(secs.min(MAX_LOCK_TIMEOUT_SECS));
         }
 
         Duration::from_secs(DEFAULT_LOCK_TIMEOUT_SECS)

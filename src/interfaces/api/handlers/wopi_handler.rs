@@ -20,10 +20,10 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::application::ports::file_ports::{FileRetrievalUseCase, FileUploadUseCase};
 use crate::application::services::wopi_lock_service::WopiLockService;
 use crate::application::services::wopi_token_service::WopiTokenService;
 use crate::infrastructure::services::wopi_discovery_service::WopiDiscoveryService;
-use crate::application::ports::file_ports::{FileRetrievalUseCase, FileUploadUseCase};
 
 /// Shared state for WOPI handlers.
 #[derive(Clone)]

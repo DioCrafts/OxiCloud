@@ -7,10 +7,10 @@ use serde_json::json;
 use tracing::{error, info};
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
+use crate::application::ports::inbound::SearchUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
-use crate::application::ports::inbound::SearchUseCase;
 
 /**
  * Handler for search operations through the API.

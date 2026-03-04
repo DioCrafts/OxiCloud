@@ -32,10 +32,10 @@ use crate::application::dtos::calendar_dto::{
     CreateCalendarDto, CreateEventICalDto, UpdateCalendarDto,
 };
 use crate::application::ports::calendar_ports::CalendarUseCase;
+use crate::application::services::calendar_service::CalendarService;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUser;
-use crate::application::services::calendar_service::CalendarService;
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 

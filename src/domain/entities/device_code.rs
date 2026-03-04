@@ -28,7 +28,7 @@ impl DeviceCodeStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s {
             "pending" => Some(Self::Pending),
             "authorized" => Some(Self::Authorized),
@@ -76,6 +76,7 @@ impl DeviceCode {
     /// * `verification_uri` — URL the user must visit
     /// * `expires_in_secs` — TTL for the device code
     /// * `poll_interval_secs` — minimum polling interval
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         device_code: String,
         user_code: String,
