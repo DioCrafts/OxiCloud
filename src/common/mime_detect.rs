@@ -134,8 +134,7 @@ mod tests {
 
     #[test]
     fn falls_back_to_claimed_when_nothing_matches() {
-        let result =
-            refine_content_type(b"unknown stuff", "noext", "application/octet-stream");
+        let result = refine_content_type(b"unknown stuff", "noext", "application/octet-stream");
         assert_eq!(result, "application/octet-stream");
     }
 
@@ -173,12 +172,8 @@ mod tests {
 
     #[tokio::test]
     async fn from_file_trusts_specific_claimed() {
-        let result = refine_content_type_from_file(
-            Path::new("/nonexistent"),
-            "file",
-            "image/webp",
-        )
-        .await;
+        let result =
+            refine_content_type_from_file(Path::new("/nonexistent"), "file", "image/webp").await;
         assert_eq!(result, "image/webp");
     }
 
