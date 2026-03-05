@@ -144,9 +144,8 @@ impl TrashUseCase for TrashService {
         );
         debug!("User UUID validation: {}", user_id);
 
-        // Note: We do NOT call validate_user_ownership here because the item
-        // is not yet in the trash. Ownership validation is only for operations
-        // on already-trashed items (restore, delete_permanently).
+        // Note: We now verify file/folder ownership BEFORE moving to trash.
+        // This prevents users from trashing items they do not own (IDOR).
 
         // Parse UUIDs with detailed error handling
         debug!("Validating item UUID: {}", item_id);
@@ -183,9 +182,11 @@ impl TrashUseCase for TrashService {
             "file" => {
                 info!("Processing file to move to trash: {}", item_id);
 
-                // Get the file to verify it exists and capture its data
-                debug!("Getting file data: {}", item_id);
-                let file = match self.file_read_port.get_file(item_id).await {
+                // Get the file — ownership-verified at SQL level.
+                // Returns NotFound if the file does not exist OR belongs to
+                // another user, preventing cross-user trash operations.
+                debug!("Getting file data (owner-scoped): {}", item_id);
+                let file = match self.file_read_port.get_file_for_owner(item_id, user_id).await {
                     Ok(file) => {
                         debug!("File found: {} ({})", file.name(), item_id);
                         file
@@ -254,7 +255,9 @@ impl TrashUseCase for TrashService {
                 Ok(())
             }
             "folder" => {
-                // Get the folder to verify it exists and capture its data
+                // Get the folder and verify ownership.
+                // Returns NotFound if the folder does not exist or belongs
+                // to another user — prevents cross-user trash operations.
                 let folder = self
                     .folder_storage_port
                     .get_folder(item_id)
@@ -266,6 +269,15 @@ impl TrashUseCase for TrashService {
                             format!("Error retrieving folder {}: {}", item_id, e),
                         )
                     })?;
+
+                // Ownership check — return NotFound (not Forbidden) to
+                // prevent leaking whether the folder exists.
+                if folder.owner_id().map_or(true, |o| o != user_id) {
+                    return Err(DomainError::not_found(
+                        "Folder",
+                        format!("Folder not found: {}", item_id),
+                    ));
+                }
 
                 let original_path = folder.storage_path().to_string();
 

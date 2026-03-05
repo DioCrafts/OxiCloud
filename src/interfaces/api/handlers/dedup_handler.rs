@@ -9,6 +9,7 @@ use serde::Serialize;
 
 use crate::application::ports::dedup_ports::DedupResultDto;
 use crate::common::di::AppState;
+use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
 /// Global application state for dependency injection
@@ -72,14 +73,15 @@ pub struct StatsResponse {
 pub struct DedupHandler;
 
 impl DedupHandler {
-    /// Check if a blob with the given hash already exists
+    /// Check if the authenticated user already has a file with the given hash.
     ///
-    /// This endpoint allows clients to check if uploading a file is necessary
-    /// by pre-computing the hash client-side and checking against the server.
+    /// User-scoped: only reveals whether **this user** owns a file that
+    /// references the blob — never exposes global existence or ref_count.
     ///
     /// GET /api/dedup/check/{hash}
     pub async fn check_hash(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(hash): Path<String>,
     ) -> impl IntoResponse {
         let dedup = &state.core.dedup_service;
@@ -96,35 +98,37 @@ impl DedupHandler {
                 .into_response();
         }
 
-        match dedup.get_blob_metadata(&hash).await {
-            Some(metadata) => {
-                let response = HashCheckResponse {
-                    exists: true,
-                    hash,
-                    existing_size: Some(metadata.size),
-                    ref_count: Some(metadata.ref_count),
-                };
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(serde_json::to_string(&response).unwrap()))
-                    .unwrap()
-                    .into_response()
-            }
-            None => {
-                let response = HashCheckResponse {
-                    exists: false,
-                    hash,
-                    existing_size: None,
-                    ref_count: None,
-                };
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(serde_json::to_string(&response).unwrap()))
-                    .unwrap()
-                    .into_response()
-            }
+        // Only reveal whether THIS user has the blob — no global oracle
+        let user_has_it = dedup.user_owns_blob_reference(&hash, &auth_user.id).await;
+
+        if user_has_it {
+            // Fetch size from metadata (safe — user owns a reference)
+            let size = dedup.get_blob_metadata(&hash).await.map(|m| m.size);
+            let response = HashCheckResponse {
+                exists: true,
+                hash,
+                existing_size: size,
+                ref_count: None, // Never expose global ref_count
+            };
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_string(&response).unwrap()))
+                .unwrap()
+                .into_response()
+        } else {
+            let response = HashCheckResponse {
+                exists: false,
+                hash,
+                existing_size: None,
+                ref_count: None,
+            };
+            Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_string(&response).unwrap()))
+                .unwrap()
+                .into_response()
         }
     }
 
@@ -139,6 +143,7 @@ impl DedupHandler {
     /// Returns information about whether the content was new or deduplicated.
     pub async fn upload_with_dedup(
         State(state): State<GlobalState>,
+        _auth_user: AuthUser,
         mut multipart: Multipart,
     ) -> impl IntoResponse {
         let dedup = &state.core.dedup_service;
@@ -222,14 +227,13 @@ impl DedupHandler {
                             .into_response();
                     }
                     Err(e) => {
-                        tracing::error!("❌ Dedup upload failed: {}", e);
+                        tracing::error!("Dedup upload failed: {}", e);
                         return Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Body::from(format!(
-                                r#"{{"error": "Upload failed: {}"}}"#,
-                                e
-                            )))
+                            .body(Body::from(
+                                r#"{"error": "Upload failed"}"#,
+                            ))
                             .unwrap()
                             .into_response();
                     }
@@ -256,7 +260,20 @@ impl DedupHandler {
     /// - Total references
     /// - Bytes saved
     /// - Deduplication ratio
-    pub async fn get_stats(State(state): State<GlobalState>) -> impl IntoResponse {
+    pub async fn get_stats(
+        State(state): State<GlobalState>,
+        auth_user: AuthUser,
+    ) -> impl IntoResponse {
+        // Admin-only — global dedup statistics are sensitive infrastructure data
+        if auth_user.role != "admin" {
+            return Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"error": "Admin role required"}"#))
+                .unwrap()
+                .into_response();
+        }
+
         let dedup = &state.core.dedup_service;
         let stats = dedup.get_stats().await;
 
@@ -285,14 +302,16 @@ impl DedupHandler {
             .into_response()
     }
 
-    /// Retrieve content by hash
+    /// Retrieve content by hash (user-scoped).
     ///
     /// GET /api/dedup/blob/{hash}
     ///
-    /// Returns the raw content of a blob identified by its SHA-256 hash.
-    /// Useful for retrieving deduplicated content.
+    /// Returns the raw content of a blob **only if** the authenticated user
+    /// owns at least one file that references it. Returns 404 otherwise
+    /// (does not reveal whether the blob exists globally).
     pub async fn get_blob(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         Path(hash): Path<String>,
     ) -> impl IntoResponse {
         let dedup = &state.core.dedup_service;
@@ -303,6 +322,16 @@ impl DedupHandler {
                 .status(StatusCode::BAD_REQUEST)
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(r#"{"error": "Invalid hash format"}"#))
+                .unwrap()
+                .into_response();
+        }
+
+        // Verify the user owns at least one file referencing this blob
+        if !dedup.user_owns_blob_reference(&hash, &auth_user.id).await {
+            return Response::builder()
+                .status(StatusCode::NOT_FOUND)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"error": "Blob not found"}"#))
                 .unwrap()
                 .into_response();
         }
@@ -345,65 +374,26 @@ impl DedupHandler {
         }
     }
 
-    /// Remove a reference to a blob
-    ///
-    /// DELETE /api/dedup/blob/{hash}
-    ///
-    /// Decrements the reference count for a blob. If the reference count
-    /// reaches zero, the blob is deleted from storage.
-    pub async fn remove_reference(
-        State(state): State<GlobalState>,
-        Path(hash): Path<String>,
-    ) -> impl IntoResponse {
-        let dedup = &state.core.dedup_service;
-
-        // Validate hash format
-        if hash.len() != 64 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
-            return Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(r#"{"error": "Invalid hash format"}"#))
-                .unwrap()
-                .into_response();
-        }
-
-        match dedup.remove_reference(&hash).await {
-            Ok(deleted) => {
-                let message = if deleted {
-                    format!(
-                        r#"{{"success": true, "deleted": true, "message": "Blob {} was deleted (ref_count reached 0)"}}"#,
-                        hash
-                    )
-                } else {
-                    format!(
-                        r#"{{"success": true, "deleted": false, "message": "Reference removed from blob {}"}}"#,
-                        hash
-                    )
-                };
-
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(message))
-                    .unwrap()
-                    .into_response()
-            }
-            Err(e) => Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!(r#"{{"error": "{}"}}"#, e)))
-                .unwrap()
-                .into_response(),
-        }
-    }
-
     /// Force recalculation of statistics from disk
     ///
     /// POST /api/dedup/recalculate
     ///
     /// Verifies integrity and returns current statistics.
     /// Useful for health checks and auditing.
-    pub async fn recalculate_stats(State(state): State<GlobalState>) -> impl IntoResponse {
+    pub async fn recalculate_stats(
+        State(state): State<GlobalState>,
+        auth_user: AuthUser,
+    ) -> impl IntoResponse {
+        // Admin-only — integrity verification is a privileged operation
+        if auth_user.role != "admin" {
+            return Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"error": "Admin role required"}"#))
+                .unwrap()
+                .into_response();
+        }
+
         let dedup = &state.core.dedup_service;
 
         // Verify integrity first
@@ -414,13 +404,13 @@ impl DedupHandler {
                 }
             }
             Err(e) => {
+                tracing::error!("Dedup integrity verification failed: {}", e);
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!(
-                        r#"{{"error": "Verification failed: {}"}}"#,
-                        e
-                    )))
+                    .body(Body::from(
+                        r#"{"error": "Verification failed"}"#,
+                    ))
                     .unwrap()
                     .into_response();
             }

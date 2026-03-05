@@ -73,6 +73,7 @@ pub struct ChunkInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UploadSession {
     pub id: String,
+    pub user_id: String,
     pub filename: String,
     pub folder_id: Option<String>,
     pub content_type: String,
@@ -368,9 +369,27 @@ impl ChunkedUploadService {
 
     // ── Core operations ──────────────────────────────────────────────────
 
+    /// Verify that the given session belongs to the given user.
+    /// Returns 404 (not 403) to avoid revealing the existence of other users' sessions.
+    fn verify_session_owner(
+        &self,
+        upload_id: &str,
+        user_id: &str,
+    ) -> Result<(), String> {
+        let session = self
+            .sessions
+            .get(upload_id)
+            .ok_or_else(|| format!("Upload session not found: {}", upload_id))?;
+        if session.user_id != user_id {
+            return Err(format!("Upload session not found: {}", upload_id));
+        }
+        Ok(())
+    }
+
     /// Create a new upload session (persists `session.json` + empty `progress.bin`)
     async fn create_session_inner(
         &self,
+        user_id: String,
         filename: String,
         folder_id: Option<String>,
         content_type: String,
@@ -412,6 +431,7 @@ impl ChunkedUploadService {
         let now = Utc::now();
         let session = UploadSession {
             id: upload_id.clone(),
+            user_id,
             filename,
             folder_id,
             content_type,
@@ -451,11 +471,15 @@ impl ChunkedUploadService {
     async fn upload_chunk_inner(
         &self,
         upload_id: &str,
+        user_id: &str,
         chunk_index: usize,
         data: bytes::Bytes,
         checksum: Option<String>,
     ) -> Result<ChunkUploadResponseDto, String> {
-        // Validate session exists and chunk index is valid
+        // Verify session exists AND belongs to the requesting user
+        self.verify_session_owner(upload_id, user_id)?;
+
+        // Validate chunk index is valid
         let (chunk_path, expected_size) = {
             let session = self
                 .sessions
@@ -568,7 +592,9 @@ impl ChunkedUploadService {
     }
 
     /// Get upload status
-    async fn get_status_inner(&self, upload_id: &str) -> Result<UploadStatusResponseDto, String> {
+    async fn get_status_inner(&self, upload_id: &str, user_id: &str) -> Result<UploadStatusResponseDto, String> {
+        self.verify_session_owner(upload_id, user_id)?;
+
         let session = self
             .sessions
             .get(upload_id)
@@ -603,7 +629,11 @@ impl ChunkedUploadService {
     async fn complete_upload_inner(
         &self,
         upload_id: &str,
+        user_id: &str,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), String> {
+        // Verify ownership before assembly
+        self.verify_session_owner(upload_id, user_id)?;
+
         // Get session and validate completion.
         // Clone the session data and drop the DashMap ref immediately
         // so the shard is not held during the expensive assembly step.
@@ -723,7 +753,9 @@ impl ChunkedUploadService {
     }
 
     /// Finalize upload: remove session from RAM, then clean disk OUTSIDE lock.
-    async fn finalize_upload_inner(&self, upload_id: &str) -> Result<(), String> {
+    async fn finalize_upload_inner(&self, upload_id: &str, user_id: &str) -> Result<(), String> {
+        self.verify_session_owner(upload_id, user_id)?;
+
         // Remove from map (~µs) — releases shard immediately
         let removed = self.sessions.remove(upload_id).map(|(_, s)| s);
 
@@ -737,7 +769,9 @@ impl ChunkedUploadService {
     }
 
     /// Cancel an upload and cleanup — disk I/O outside lock.
-    async fn cancel_upload_inner(&self, upload_id: &str) -> Result<(), String> {
+    async fn cancel_upload_inner(&self, upload_id: &str, user_id: &str) -> Result<(), String> {
+        self.verify_session_owner(upload_id, user_id)?;
+
         // Remove from map (~µs)
         let removed = self.sessions.remove(upload_id).map(|(_, s)| s);
 
@@ -767,13 +801,14 @@ impl ChunkedUploadService {
 impl ChunkedUploadPort for ChunkedUploadService {
     async fn create_session(
         &self,
+        user_id: &str,
         filename: String,
         folder_id: Option<String>,
         content_type: String,
         total_size: u64,
         chunk_size: Option<usize>,
     ) -> Result<CreateUploadResponseDto, DomainError> {
-        self.create_session_inner(filename, folder_id, content_type, total_size, chunk_size)
+        self.create_session_inner(user_id.to_owned(), filename, folder_id, content_type, total_size, chunk_size)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
@@ -781,17 +816,18 @@ impl ChunkedUploadPort for ChunkedUploadService {
     async fn upload_chunk(
         &self,
         upload_id: &str,
+        user_id: &str,
         chunk_index: usize,
         data: bytes::Bytes,
         checksum: Option<String>,
     ) -> Result<ChunkUploadResponseDto, DomainError> {
-        self.upload_chunk_inner(upload_id, chunk_index, data, checksum)
+        self.upload_chunk_inner(upload_id, user_id, chunk_index, data, checksum)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn get_status(&self, upload_id: &str) -> Result<UploadStatusResponseDto, DomainError> {
-        self.get_status_inner(upload_id)
+    async fn get_status(&self, upload_id: &str, user_id: &str) -> Result<UploadStatusResponseDto, DomainError> {
+        self.get_status_inner(upload_id, user_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))
     }
@@ -799,20 +835,21 @@ impl ChunkedUploadPort for ChunkedUploadService {
     async fn complete_upload(
         &self,
         upload_id: &str,
+        user_id: &str,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), DomainError> {
-        self.complete_upload_inner(upload_id)
+        self.complete_upload_inner(upload_id, user_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn finalize_upload(&self, upload_id: &str) -> Result<(), DomainError> {
-        self.finalize_upload_inner(upload_id)
+    async fn finalize_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError> {
+        self.finalize_upload_inner(upload_id, user_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn cancel_upload(&self, upload_id: &str) -> Result<(), DomainError> {
-        self.cancel_upload_inner(upload_id)
+    async fn cancel_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError> {
+        self.cancel_upload_inner(upload_id, user_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
@@ -854,6 +891,7 @@ mod tests {
         let now = Utc::now();
         let mut session = UploadSession {
             id: "test-id".into(),
+            user_id: "user-1".into(),
             filename: "file.bin".into(),
             folder_id: None,
             content_type: "application/octet-stream".into(),
@@ -900,6 +938,7 @@ mod tests {
         let now = Utc::now();
         let session = UploadSession {
             id: "abc-123".into(),
+            user_id: "user-1".into(),
             filename: "photo.jpg".into(),
             folder_id: Some("folder-1".into()),
             content_type: "image/jpeg".into(),
@@ -931,6 +970,7 @@ mod tests {
         let restored: UploadSession = serde_json::from_slice(&json).expect("deserialise");
 
         assert_eq!(restored.id, session.id);
+        assert_eq!(restored.user_id, session.user_id);
         assert_eq!(restored.filename, session.filename);
         assert_eq!(restored.folder_id, session.folder_id);
         assert_eq!(restored.total_size, session.total_size);
@@ -944,6 +984,7 @@ mod tests {
     fn test_session_expiry_check() {
         let mut session = UploadSession {
             id: "exp-test".into(),
+            user_id: "user-1".into(),
             filename: "f".into(),
             folder_id: None,
             content_type: "x".into(),
@@ -974,6 +1015,7 @@ mod tests {
         // Create a session
         let resp = service
             .create_session_inner(
+                "test-user".into(),
                 "bigfile.bin".into(),
                 Some("folder-x".into()),
                 "application/octet-stream".into(),
@@ -988,7 +1030,7 @@ mod tests {
         // Upload first chunk (5 MB of zeros)
         let chunk_data = bytes::Bytes::from(vec![0u8; 5 * 1024 * 1024]);
         service
-            .upload_chunk_inner(&upload_id, 0, chunk_data, None)
+            .upload_chunk_inner(&upload_id, "test-user", 0, chunk_data, None)
             .await
             .expect("upload_chunk 0");
 
@@ -1024,6 +1066,7 @@ mod tests {
         // 1. Create session (1024 bytes, 512 byte chunks → 2 chunks)
         let resp = service
             .create_session_inner(
+                "test-user".into(),
                 "test.txt".into(),
                 None,
                 "text/plain".into(),
@@ -1040,28 +1083,28 @@ mod tests {
         // 2. Upload chunks
         let chunk0 = bytes::Bytes::from(vec![b'A'; 512]);
         let r0 = service
-            .upload_chunk_inner(&id, 0, chunk0, None)
+            .upload_chunk_inner(&id, "test-user", 0, chunk0, None)
             .await
             .expect("chunk 0");
         assert!(!r0.is_complete);
 
         let chunk1 = bytes::Bytes::from(vec![b'B'; 512]);
         let r1 = service
-            .upload_chunk_inner(&id, 1, chunk1, None)
+            .upload_chunk_inner(&id, "test-user", 1, chunk1, None)
             .await
             .expect("chunk 1");
         assert!(r1.is_complete);
         assert_eq!(r1.bytes_received, 1024);
 
         // 3. Status check
-        let status = service.get_status_inner(&id).await.expect("status");
+        let status = service.get_status_inner(&id, "test-user").await.expect("status");
         assert!(status.is_complete);
         assert_eq!(status.completed_chunks, 2);
         assert!(status.pending_chunks.is_empty());
 
         // 4. Complete (assemble)
         let (path, filename, _folder, _ct, size, hash) =
-            service.complete_upload_inner(&id).await.expect("complete");
+            service.complete_upload_inner(&id, "test-user").await.expect("complete");
         assert_eq!(filename, "test.txt");
         assert_eq!(size, 1024);
         assert!(!hash.is_empty());
@@ -1073,7 +1116,7 @@ mod tests {
         assert_eq!(&content[512..], &[b'B'; 512]);
 
         // 6. Finalize
-        service.finalize_upload_inner(&id).await.expect("finalize");
+        service.finalize_upload_inner(&id, "test-user").await.expect("finalize");
         assert_eq!(service.active_sessions().await, 0);
 
         let _ = fs::remove_dir_all(&base).await;
@@ -1086,6 +1129,7 @@ mod tests {
 
         let resp = service
             .create_session_inner(
+                "test-user".into(),
                 "x.bin".into(),
                 None,
                 "application/octet-stream".into(),
@@ -1099,7 +1143,7 @@ mod tests {
         assert!(session_dir.exists());
 
         service
-            .cancel_upload_inner(&resp.upload_id)
+            .cancel_upload_inner(&resp.upload_id, "test-user")
             .await
             .expect("cancel");
 
@@ -1120,6 +1164,7 @@ mod tests {
 
         let expired_session = UploadSession {
             id: "expired-session".into(),
+            user_id: "user-1".into(),
             filename: "old.bin".into(),
             folder_id: None,
             content_type: "application/octet-stream".into(),
@@ -1162,6 +1207,7 @@ mod tests {
 
         let session = UploadSession {
             id: "partial-session".into(),
+            user_id: "user-1".into(),
             filename: "file.bin".into(),
             folder_id: None,
             content_type: "application/octet-stream".into(),

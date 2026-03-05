@@ -40,6 +40,11 @@
 	display: none;
 }
 
+.dropzone-icon {
+	font-size: 32px;
+	margin-bottom: 10px;
+}
+
 .dropzone.active {
 	border-color: #ff5e3a;
 	background-color: rgba(255, 94, 58, 0.05);

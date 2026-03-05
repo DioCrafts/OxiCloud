@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — My Profile</title>
-<script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
+<script src="/js/core/theme-init.js"></script>
 <script src="/js/core/icons.js" defer></script>
 <script src="/js/core/csrf.js" defer></script>
 <link rel="stylesheet" href="/css/main.css">
@@ -96,7 +96,7 @@
 
     <div class="profile-card" id="password-section">
       <h2><i class="fas fa-key"></i> Change Password</h2>
-      <form id="password-form" onsubmit="return changePassword(event)">
+      <form id="password-form">
         <div class="form-group">
           <label for="current-password">Current Password</label>
           <input type="password" id="current-password" required autocomplete="current-password">

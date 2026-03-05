@@ -24,6 +24,7 @@ pub struct CookieAuthenticated;
 pub struct AuthUser {
     pub id: String,
     pub username: String,
+    pub role: String,
 }
 
 /// Reusable extractor that gets the user_id of the authenticated user.
@@ -50,6 +51,7 @@ where
             .map(|cu| AuthUser {
                 id: cu.id.clone(),
                 username: cu.username.clone(),
+                role: cu.role.clone(),
             })
             .ok_or(AuthError::UserNotFound)
     }
@@ -108,6 +110,7 @@ where
             |cu| AuthUser {
                 id: cu.id.clone(),
                 username: cu.username.clone(),
+                role: cu.role.clone(),
             },
         )))
     }

@@ -407,3 +407,28 @@ function showAccessDenied() {
 }
 
 init();
+
+/* ── Event-listener wiring (replaces inline onclick/onchange) ── */
+document.getElementById('tab-btn-dashboard').addEventListener('click', function(){ switchTab('dashboard', this); });
+document.getElementById('tab-btn-users').addEventListener('click', function(){ switchTab('users', this); });
+document.getElementById('tab-btn-oidc').addEventListener('click', function(){ switchTab('oidc', this); });
+
+document.getElementById('ds-registration').addEventListener('change', function(){ toggleRegistration(this.checked); });
+
+document.getElementById('btn-create-user').addEventListener('click', openCreateUserModal);
+document.getElementById('prev-btn').addEventListener('click', prevPage);
+document.getElementById('next-btn').addEventListener('click', nextPage);
+
+document.getElementById('discover-btn').addEventListener('click', testConnection);
+document.getElementById('btn-copy-callback').addEventListener('click', copyCallback);
+document.getElementById('btn-test-oidc').addEventListener('click', testConnection);
+document.getElementById('save-btn').addEventListener('click', saveOidcSettings);
+
+document.getElementById('btn-close-quota').addEventListener('click', closeQuotaModal);
+document.getElementById('btn-save-quota').addEventListener('click', saveQuota);
+
+document.getElementById('btn-close-create-user').addEventListener('click', closeCreateUserModal);
+document.getElementById('cu-submit').addEventListener('click', submitCreateUser);
+
+document.getElementById('btn-close-reset-pw').addEventListener('click', closeResetPasswordModal);
+document.getElementById('rp-submit').addEventListener('click', submitResetPassword);

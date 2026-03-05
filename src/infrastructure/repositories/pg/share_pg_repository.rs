@@ -120,33 +120,6 @@ impl ShareStoragePort for SharePgRepository {
         Self::row_to_entity(&row)
     }
 
-    async fn find_share_by_id(&self, id: &str) -> Result<Share, DomainError> {
-        let row = sqlx::query(
-            r#"
-            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
-                   expires_at, permissions_read, permissions_write, permissions_reshare,
-                   created_at, created_by, access_count
-            FROM storage.shares
-            WHERE id = $1::UUID
-            "#,
-        )
-        .bind(id)
-        .fetch_optional(&*self.db_pool)
-        .await
-        .map_err(|e| {
-            tracing::error!("Database error finding share by id: {}", e);
-            DomainError::internal_error("Share", format!("Failed to find share: {e}"))
-        })?;
-
-        match row {
-            Some(r) => Self::row_to_entity(&r),
-            None => Err(DomainError::not_found(
-                "Share",
-                format!("Share with ID {id} not found"),
-            )),
-        }
-    }
-
     async fn find_share_by_token(&self, token: &str) -> Result<Share, DomainError> {
         let row = sqlx::query(
             r#"
@@ -174,10 +147,70 @@ impl ShareStoragePort for SharePgRepository {
         }
     }
 
-    async fn find_shares_by_item(
+    async fn find_share_by_id_for_user(
+        &self,
+        id: &str,
+        user_id: &str,
+    ) -> Result<Share, DomainError> {
+        let row = sqlx::query(
+            r#"
+            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
+                   expires_at, permissions_read, permissions_write, permissions_reshare,
+                   created_at, created_by, access_count
+            FROM storage.shares
+            WHERE id = $1::UUID AND created_by = $2
+            "#,
+        )
+        .bind(id)
+        .bind(user_id)
+        .fetch_optional(&*self.db_pool)
+        .await
+        .map_err(|e| {
+            tracing::error!("Database error finding share by id for user: {}", e);
+            DomainError::internal_error("Share", format!("Failed to find share: {e}"))
+        })?;
+
+        match row {
+            Some(r) => Self::row_to_entity(&r),
+            // SECURITY: return NotFound (not Forbidden) to prevent share-ID enumeration
+            None => Err(DomainError::not_found(
+                "Share",
+                format!("Share with ID {id} not found"),
+            )),
+        }
+    }
+
+    async fn delete_share_for_user(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+        let result =
+            sqlx::query("DELETE FROM storage.shares WHERE id = $1::UUID AND created_by = $2")
+                .bind(id)
+                .bind(user_id)
+                .execute(&*self.db_pool)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Database error deleting share for user: {}", e);
+                    DomainError::internal_error(
+                        "Share",
+                        format!("Failed to delete share: {e}"),
+                    )
+                })?;
+
+        if result.rows_affected() == 0 {
+            // SECURITY: could be non-existent or owned by another user — same 404
+            return Err(DomainError::not_found(
+                "Share",
+                format!("Share with ID {id} not found"),
+            ));
+        }
+
+        Ok(())
+    }
+
+    async fn find_shares_by_item_for_user(
         &self,
         item_id: &str,
         item_type: &ShareItemType,
+        user_id: &str,
     ) -> Result<Vec<Share>, DomainError> {
         let rows = sqlx::query(
             r#"
@@ -185,17 +218,21 @@ impl ShareStoragePort for SharePgRepository {
                    expires_at, permissions_read, permissions_write, permissions_reshare,
                    created_at, created_by, access_count
             FROM storage.shares
-            WHERE item_id = $1 AND item_type = $2
+            WHERE item_id = $1 AND item_type = $2 AND created_by = $3
             ORDER BY created_at DESC
             "#,
         )
         .bind(item_id)
         .bind(item_type.to_string())
+        .bind(user_id)
         .fetch_all(&*self.db_pool)
         .await
         .map_err(|e| {
-            tracing::error!("Database error finding shares by item: {}", e);
-            DomainError::internal_error("Share", format!("Failed to find shares by item: {e}"))
+            tracing::error!("Database error finding shares by item for user: {}", e);
+            DomainError::internal_error(
+                "Share",
+                format!("Failed to find shares by item: {e}"),
+            )
         })?;
 
         rows.iter().map(Self::row_to_entity).collect()
@@ -241,26 +278,6 @@ impl ShareStoragePort for SharePgRepository {
                 format!("Share with ID {} not found for update", share.id()),
             )),
         }
-    }
-
-    async fn delete_share(&self, id: &str) -> Result<(), DomainError> {
-        let result = sqlx::query("DELETE FROM storage.shares WHERE id = $1::UUID")
-            .bind(id)
-            .execute(&*self.db_pool)
-            .await
-            .map_err(|e| {
-                tracing::error!("Database error deleting share: {}", e);
-                DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
-            })?;
-
-        if result.rows_affected() == 0 {
-            return Err(DomainError::not_found(
-                "Share",
-                format!("Share with ID {id} not found for deletion"),
-            ));
-        }
-
-        Ok(())
     }
 
     async fn find_shares_by_user(

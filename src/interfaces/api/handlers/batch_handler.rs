@@ -149,7 +149,10 @@ pub async fn move_files_batch(
         .batch_service
         .move_files(request.file_ids, request.target_folder_id, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch move_files failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
@@ -190,7 +193,10 @@ pub async fn copy_files_batch(
         .batch_service
         .copy_files(request.file_ids, request.target_folder_id, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch copy_files failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
@@ -231,7 +237,10 @@ pub async fn delete_files_batch(
         .batch_service
         .delete_files(request.file_ids, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch delete_files failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Create custom response for string IDs
     let response = BatchOperationResponse {
@@ -280,7 +289,10 @@ pub async fn delete_folders_batch(
         .batch_service
         .delete_folders(request.folder_ids, request.recursive, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch delete_folders failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Create custom response for string IDs
     let response = BatchOperationResponse {
@@ -336,7 +348,10 @@ pub async fn create_folders_batch(
         .batch_service
         .create_folders(folders, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch create_folders failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Convert result to DTO
     let response: BatchOperationResponse<FolderDto> = result.into();
@@ -377,7 +392,10 @@ pub async fn get_files_batch(
         .batch_service
         .get_multiple_files(request.file_ids, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch get_files failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Convert result to DTO
     let response: BatchOperationResponse<FileDto> = result.into();
@@ -418,7 +436,10 @@ pub async fn get_folders_batch(
         .batch_service
         .get_multiple_folders(request.folder_ids, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch get_folders failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     // Convert result to DTO
     let response: BatchOperationResponse<FolderDto> = result.into();
@@ -497,9 +518,10 @@ pub async fn trash_batch(
                 );
             }
             Err(e) => {
+                tracing::error!("Batch trash_files failed: {}", e);
                 return Ok((
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
+                    Json(serde_json::json!({ "error": "Batch trash operation failed" })),
                 )
                     .into_response());
             }
@@ -523,9 +545,10 @@ pub async fn trash_batch(
                 );
             }
             Err(e) => {
+                tracing::error!("Batch trash_folders failed: {}", e);
                 return Ok((
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
+                    Json(serde_json::json!({ "error": "Batch trash operation failed" })),
                 )
                     .into_response());
             }
@@ -579,7 +602,10 @@ pub async fn move_folders_batch(
         .batch_service
         .move_folders(request.folder_ids, request.target_folder_id, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch move_folders failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+        })?;
 
     let response: BatchOperationResponse<FolderDto> = result.into();
 
@@ -616,7 +642,10 @@ pub async fn download_batch(
         .batch_service
         .download_zip(request.file_ids, request.folder_ids, &auth_user.id)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .map_err(|e| {
+            tracing::error!("Batch download ZIP failed: {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, "Batch download failed".to_string())
+        })?;
 
     // Read file size for Content-Length before splitting ownership
     let file_size = temp_file
@@ -624,9 +653,10 @@ pub async fn download_batch(
         .metadata()
         .map(|m| m.len())
         .map_err(|e| {
+            tracing::error!("Failed to read temp file metadata: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Failed to read temp file metadata: {}", e),
+                "Failed to prepare download".to_string(),
             )
         })?;
 

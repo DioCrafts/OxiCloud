@@ -394,6 +394,7 @@ pub async fn get_editor_url(
     AuthUser {
         id: user_id,
         username,
+        ..
     }: AuthUser,
     Query(params): Query<EditorUrlParams>,
     State(state): State<WopiState>,

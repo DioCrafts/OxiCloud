@@ -56,16 +56,22 @@ impl I18nHandler {
                 (StatusCode::OK, Json(response)).into_response()
             }
             Err(err) => {
-                let status = match &err {
-                    I18nError::KeyNotFound(_) => StatusCode::NOT_FOUND,
-                    I18nError::InvalidLocale(_) => StatusCode::BAD_REQUEST,
-                    I18nError::LoadError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                let (status, error_msg) = match &err {
+                    I18nError::KeyNotFound(_) => (StatusCode::NOT_FOUND, err.to_string()),
+                    I18nError::InvalidLocale(_) => (StatusCode::BAD_REQUEST, err.to_string()),
+                    I18nError::LoadError(_) => {
+                        tracing::error!("I18n load error: {}", err);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Translation loading error".to_string(),
+                        )
+                    }
                 };
 
                 let error = TranslationErrorDto {
                     key: query.key,
                     locale: locale.unwrap_or(Locale::default()).as_str().to_string(),
-                    error: err.to_string(),
+                    error: error_msg,
                 };
 
                 (status, Json(error)).into_response()

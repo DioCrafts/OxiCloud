@@ -354,16 +354,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app = app
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("content-security-policy"),
-            // NOTE: script-src includes 'unsafe-inline' because several HTML
-            // pages still use inline event handlers (onclick, onsubmit) and
-            // <script> blocks. TODO: migrate these to external .js files so
-            // 'unsafe-inline' can be removed.
+            // All inline scripts and styles have been migrated to external
+            // files, so 'unsafe-inline' is no longer needed.
             // frame-src is permissive (*) to allow WOPI editor iframes whose
             // origin is configured at runtime (Collabora, OnlyOffice, etc.).
             HeaderValue::from_static(
                 "default-src 'self'; \
-                 script-src 'self' 'unsafe-inline'; \
-                 style-src 'self' 'unsafe-inline'; \
+                 script-src 'self'; \
+                 style-src 'self'; \
                  img-src 'self' data: blob:; \
                  connect-src 'self'; \
                  font-src 'self' data:; \

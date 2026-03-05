@@ -37,7 +37,7 @@ pub async fn get_recent_items(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to retrieve recent items: {}", err)
+                    "error": "Failed to retrieve recent items"
                 })),
             )
                 .into_response()
@@ -83,7 +83,7 @@ pub async fn record_item_access(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to record access: {}", err)
+                    "error": "Failed to record access"
                 })),
             )
                 .into_response()
@@ -129,7 +129,7 @@ pub async fn remove_from_recent(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to remove from recents: {}", err)
+                    "error": "Failed to remove from recents"
                 })),
             )
                 .into_response()
@@ -160,7 +160,7 @@ pub async fn clear_recent_items(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to clear recent items: {}", err)
+                    "error": "Failed to clear recent items"
                 })),
             )
                 .into_response()

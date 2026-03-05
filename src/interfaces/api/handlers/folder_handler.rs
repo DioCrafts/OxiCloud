@@ -18,7 +18,7 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState as GlobalAppState;
-use crate::common::errors::ErrorKind;
+use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::AuthUser;
 
 type AppState = Arc<FolderService>;
@@ -69,15 +69,7 @@ impl FolderHandler {
 
         match service.create_folder(dto).await {
             Ok(folder) => (StatusCode::CREATED, Json(folder)).into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::AlreadyExists => StatusCode::CONFLICT,
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (status, err.to_string()).into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -100,18 +92,11 @@ impl FolderHandler {
                         id,
                         owner
                     );
-                    return (StatusCode::NOT_FOUND, "Folder not found".to_string()).into_response();
+                    return AppError::not_found("Folder not found").into_response();
                 }
                 (StatusCode::OK, Json(folder)).into_response()
             }
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (status, err.to_string()).into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -156,17 +141,7 @@ impl FolderHandler {
             .await
         {
             Ok(paginated_result) => (StatusCode::OK, Json(paginated_result)).into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-                (
-                    status,
-                    Json(serde_json::json!({ "error": err.to_string() })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -183,17 +158,7 @@ impl FolderHandler {
             .await
         {
             Ok(folders) => (StatusCode::OK, Json(folders)).into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-                (
-                    status,
-                    Json(serde_json::json!({ "error": err.to_string() })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -233,7 +198,7 @@ impl FolderHandler {
         // Run both queries concurrently — no sequential wait.
         let (folders_result, files_result) = tokio::join!(
             folder_service.list_folders_for_owner(Some(&id), &auth_user.id),
-            file_service.list_files(Some(&id))
+            file_service.list_files_owned(Some(&id), &auth_user.id)
         );
 
         match (folders_result, files_result) {
@@ -259,17 +224,7 @@ impl FolderHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            (Err(err), _) | (_, Err(err)) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-                (
-                    status,
-                    Json(serde_json::json!({ "error": err.to_string() })),
-                )
-                    .into_response()
-            }
+            (Err(err), _) | (_, Err(err)) => AppError::from(err).into_response()
         }
     }
 
@@ -282,22 +237,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.rename_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    ErrorKind::AlreadyExists => StatusCode::CONFLICT,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                // Return a proper JSON error response
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": err.to_string()
-                    })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -310,15 +250,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.move_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    ErrorKind::AlreadyExists => StatusCode::CONFLICT,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (status, err.to_string()).into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -330,14 +262,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.delete_folder(&id, &auth_user.id).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => {
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (status, err.to_string()).into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -376,20 +301,7 @@ impl FolderHandler {
                 StatusCode::NO_CONTENT.into_response()
             }
             Err(err) => {
-                tracing::error!("Error deleting folder: {}", err);
-
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": format!("Error deleting folder: {}", err)
-                    })),
-                )
-                    .into_response()
+                AppError::from(err).into_response()
             }
         }
     }
@@ -487,30 +399,14 @@ impl FolderHandler {
                     }
                     Err(err) => {
                         tracing::error!("Error creating ZIP file: {}", err);
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(serde_json::json!({
-                                "error": format!("Error creating ZIP file: {}", err)
-                            })),
-                        )
+                        AppError::internal_error(format!("Error creating ZIP file: {}", err))
                             .into_response()
                     }
                 }
             }
             Err(err) => {
                 tracing::error!("Folder not found: {}", err);
-                let status = match err.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": format!("Error finding folder: {}", err)
-                    })),
-                )
-                    .into_response()
+                AppError::from(err).into_response()
             }
         }
     }

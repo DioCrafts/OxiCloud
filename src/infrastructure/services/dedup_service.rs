@@ -410,6 +410,22 @@ impl DedupService {
             .unwrap_or(false)
     }
 
+    /// Returns `true` if `user_id` owns at least one (non-trashed) file that
+    /// references the blob identified by `hash`.
+    ///
+    /// Used by the dedup API handlers to enforce per-user access control on
+    /// the content-addressed blob store.
+    pub async fn user_owns_blob_reference(&self, hash: &str, user_id: &str) -> bool {
+        sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM storage.files WHERE blob_hash = $1 AND user_id = $2 AND NOT is_trashed)",
+        )
+        .bind(hash)
+        .bind(user_id)
+        .fetch_one(self.pool.as_ref())
+        .await
+        .unwrap_or(false)
+    }
+
     /// Get metadata for a blob from PostgreSQL.
     pub async fn get_blob_metadata(&self, hash: &str) -> Option<BlobMetadataDto> {
         let row = sqlx::query_as::<_, (String, i64, i32, Option<String>)>(

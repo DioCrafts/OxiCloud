@@ -288,10 +288,9 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
             "/blob/{hash}",
             get(super::handlers::dedup_handler::DedupHandler::get_blob),
         )
-        .route(
-            "/blob/{hash}",
-            delete(super::handlers::dedup_handler::DedupHandler::remove_reference),
-        )
+        // NOTE: remove_reference is intentionally NOT exposed as a public
+        // endpoint — ref_count management is an internal concern handled
+        // automatically when files are deleted via the file API.
         .route(
             "/recalculate",
             post(super::handlers::dedup_handler::DedupHandler::recalculate_stats),

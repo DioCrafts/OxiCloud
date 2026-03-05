@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="app.title">OxiCloud</title>
     <!-- Apply saved theme immediately to prevent flash of light mode -->
-    <script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
+    <script src="/js/core/theme-init.js"></script>
     
     <!-- Styles -->
     <link rel="stylesheet" href="/css/main.css">
@@ -47,22 +47,14 @@
     <script defer src="/js/app/bootstrap.js"></script>
 
     <!-- Service Worker Registration -->
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service Worker registered successfully'))
-                    .catch(err => console.log('Service Worker registration failed:', err));
-            });
-        }
-    </script>
+    <script defer src="/js/core/sw-register.js"></script>
 </head>
 <body>
     <!-- Mobile sidebar overlay -->
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <a href="/" class="logo-container" style="text-decoration:none;color:inherit;">
+        <a href="/" class="logo-container">
 
             <div class="logo">
                 <svg viewBox="0 0 500 500">
@@ -127,7 +119,7 @@
                 <div class="notif-wrapper" id="notif-wrapper">
                     <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications">
                         <i class="fas fa-bell"></i>
-                        <span class="notif-badge" id="notif-badge" style="display:none">0</span>
+                        <span class="notif-badge hidden" id="notif-badge">0</span>
                     </button>
                     <div class="notif-panel" id="notif-panel">
                         <div class="notif-panel-header">
@@ -157,7 +149,7 @@
                                 <div class="user-menu-email" id="user-menu-email">user@oxicloud.app</div>
                             </div>
                         </div>
-                        <div class="user-menu-role-badge" id="user-menu-role-badge" style="display:none">
+                        <div class="user-menu-role-badge hidden" id="user-menu-role-badge">
                             <span class="role-badge role-badge-admin"><i class="fas fa-shield-alt"></i> Admin</span>
                         </div>
                         <div class="user-menu-storage">
@@ -171,7 +163,7 @@
                             <div class="user-menu-storage-text" id="user-menu-storage-text">0% used</div>
                         </div>
                         <div class="user-menu-divider"></div>
-                        <button class="user-menu-item user-menu-admin" id="user-menu-admin" style="display:none">
+                        <button class="user-menu-item user-menu-admin hidden" id="user-menu-admin">
                             <i class="fas fa-cogs"></i>
                             <span data-i18n="user_menu.admin_panel">Admin panel</span>
                         </button>
@@ -179,7 +171,7 @@
                             <i class="fas fa-user-circle"></i>
                             <span data-i18n="user_menu.profile">My profile</span>
                         </button>
-                        <div class="user-menu-divider" id="user-menu-admin-divider" style="display:none"></div>
+                        <div class="user-menu-divider hidden" id="user-menu-admin-divider"></div>
                         <button class="user-menu-item" id="user-menu-theme">
                             <i class="fas fa-moon"></i>
                             <span data-i18n="user_menu.appearance">Appearance</span>
@@ -210,7 +202,7 @@
                         <button class="btn btn-primary" id="upload-btn">
                             <i class="fas fa-cloud-upload-alt"></i>
                             <span data-i18n="actions.upload">Upload</span>
-                            <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                            <i class="fas fa-caret-down upload-caret"></i>
                         </button>
                         <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                             <button class="upload-dropdown-item" id="upload-files-btn">
@@ -240,10 +232,10 @@
             </div>
 
             <div class="dropzone" id="dropzone">
-                <i class="fas fa-cloud-upload-alt" style="font-size: 32px; margin-bottom: 10px;"></i>
+                <i class="fas fa-cloud-upload-alt dropzone-icon"></i>
                 <p data-i18n="dropzone.drag_files">Drag files here or click to select</p>
-                <input type="file" id="file-input" style="display: none;" multiple>
-                <input type="file" id="folder-input" style="display: none;" webkitdirectory directory multiple>
+                <input type="file" id="file-input" class="hidden" multiple>
+                <input type="file" id="folder-input" class="hidden" webkitdirectory directory multiple>
                 <div class="upload-progress">
                     <div class="progress-bar">
                         <div class="progress-fill"></div>
@@ -263,7 +255,7 @@
                 </div>
 
                 <!-- List View (hidden by default) -->
-                <div class="files-list-view" id="files-list-view" style="display: none;">
+                <div class="files-list-view hidden" id="files-list-view">
                     <div class="list-header">
                         <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                         <div data-i18n="files.name">Name</div>
@@ -330,6 +322,6 @@
     </div>
 
     <!-- Upload Progress Toast (hidden – driven by notification bell) -->
-    <div class="upload-toast" id="upload-toast" style="display:none"></div>
+    <div class="upload-toast hidden" id="upload-toast"></div>
 </body>
 </html>

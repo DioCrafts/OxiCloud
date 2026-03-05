@@ -6,7 +6,7 @@ use tracing::{debug, error, instrument, warn};
 
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::{AuthUser, OptionalAuthUser};
+use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
 /// Gets all items in the trash for the current user
@@ -46,61 +46,7 @@ pub async fn get_trash_items(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error retrieving trash items: {}", e)
-                })),
-            )
-        }
-    }
-}
-
-/// Moves an item (file or folder) to the trash (generic function, not used directly in routes)
-#[instrument(skip_all)]
-pub async fn move_to_trash(
-    State(state): State<Arc<AppState>>,
-    OptionalAuthUser(auth_user): OptionalAuthUser,
-    Path((item_type, item_id)): Path<(String, String)>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    let user_id = auth_user
-        .as_ref()
-        .map(|u| u.id.as_str())
-        .unwrap_or("anonymous");
-    debug!(
-        "Request to move to trash: type={}, id={}, user={}",
-        item_type, item_id, user_id
-    );
-
-    let trash_service = match state.trash_service.as_ref() {
-        Some(service) => service,
-        None => {
-            return (
-                StatusCode::NOT_IMPLEMENTED,
-                Json(json!({
-                    "error": "Trash feature is not enabled"
-                })),
-            );
-        }
-    };
-    let result = trash_service
-        .move_to_trash(&item_id, &item_type, user_id)
-        .await;
-
-    match result {
-        Ok(_) => {
-            debug!("Item moved to trash successfully");
-            (
-                StatusCode::OK,
-                Json(json!({
-                    "success": true,
-                    "message": "Item moved to trash successfully"
-                })),
-            )
-        }
-        Err(e) => {
-            error!("Error moving item to trash: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({
-                    "error": format!("Error moving item to trash: {}", e)
+                    "error": "Error retrieving trash items"
                 })),
             )
         }
@@ -111,13 +57,10 @@ pub async fn move_to_trash(
 #[instrument(skip_all)]
 pub async fn move_file_to_trash(
     State(state): State<Arc<AppState>>,
-    OptionalAuthUser(auth_user): OptionalAuthUser,
+    auth_user: AuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let user_id = auth_user
-        .as_ref()
-        .map(|u| u.id.as_str())
-        .unwrap_or("anonymous");
+    let user_id = &auth_user.id;
     debug!(
         "Request to move file to trash: id={}, user={}",
         item_id, user_id
@@ -154,7 +97,7 @@ pub async fn move_file_to_trash(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error moving file to trash: {}", e)
+                    "error": "Error moving file to trash"
                 })),
             )
         }
@@ -165,13 +108,10 @@ pub async fn move_file_to_trash(
 #[instrument(skip_all)]
 pub async fn move_folder_to_trash(
     State(state): State<Arc<AppState>>,
-    OptionalAuthUser(auth_user): OptionalAuthUser,
+    auth_user: AuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let user_id = auth_user
-        .as_ref()
-        .map(|u| u.id.as_str())
-        .unwrap_or("anonymous");
+    let user_id = &auth_user.id;
     debug!(
         "Request to move folder to trash: id={}, user={}",
         item_id, user_id
@@ -210,7 +150,7 @@ pub async fn move_folder_to_trash(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error moving folder to trash: {}", e)
+                    "error": "Error moving folder to trash"
                 })),
             )
         }
@@ -271,7 +211,7 @@ pub async fn restore_from_trash(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error restoring item from trash: {}", e)
+                    "error": "Error restoring item from trash"
                 })),
             )
         }
@@ -334,7 +274,7 @@ pub async fn delete_permanently(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error deleting item permanently: {}", e)
+                    "error": "Error deleting item permanently"
                 })),
             )
         }
@@ -378,7 +318,7 @@ pub async fn empty_trash(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({
-                    "error": format!("Error emptying trash: {}", e)
+                    "error": "Error emptying trash"
                 })),
             )
         }

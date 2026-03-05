@@ -22,7 +22,7 @@ use crate::application::ports::chunked_upload_ports::DEFAULT_CHUNK_SIZE;
 use crate::application::ports::file_ports::FileUploadUseCase;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::common::di::AppState;
-use crate::domain::errors::ErrorKind;
+use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::AuthUser;
 
 /// Request body for creating an upload session
@@ -146,6 +146,7 @@ impl ChunkedUploadHandler {
 
         match chunked_service
             .create_session(
+                &auth_user.id,
                 request.filename,
                 request.folder_id,
                 content_type,
@@ -157,12 +158,7 @@ impl ChunkedUploadHandler {
             Ok(response) => (StatusCode::CREATED, Json(response)).into_response(),
             Err(e) => {
                 tracing::error!("Failed to create upload session: {}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": e.to_string()
-                    })),
-                )
+                AppError::internal_error(format!("Failed to create upload session: {}", e))
                     .into_response()
             }
         }
@@ -177,6 +173,7 @@ impl ChunkedUploadHandler {
     /// Body: Raw bytes of the chunk
     pub async fn upload_chunk(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Path(upload_id): Path<String>,
         Query(params): Query<ChunkUploadParams>,
         headers: HeaderMap,
@@ -193,7 +190,7 @@ impl ChunkedUploadHandler {
         });
 
         match chunked_service
-            .upload_chunk(&upload_id, params.chunk_index, body, checksum)
+            .upload_chunk(&upload_id, &auth_user.id, params.chunk_index, body, checksum)
             .await
         {
             Ok(response) => {
@@ -216,22 +213,7 @@ impl ChunkedUploadHandler {
                 .unwrap()
                 .into_response()
             }
-            Err(e) => {
-                let status = match e.kind {
-                    ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                    ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
-                    ErrorKind::AlreadyExists => StatusCode::CONFLICT,
-                    _ => StatusCode::INTERNAL_SERVER_ERROR,
-                };
-
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": e.to_string()
-                    })),
-                )
-                    .into_response()
-            }
+            Err(e) => AppError::from(e).into_response()
         }
     }
 
@@ -240,11 +222,12 @@ impl ChunkedUploadHandler {
     /// Returns upload progress and pending chunks
     pub async fn get_upload_status(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Path(upload_id): Path<String>,
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
 
-        match chunked_service.get_status(&upload_id).await {
+        match chunked_service.get_status(&upload_id, &auth_user.id).await {
             Ok(status) => Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -261,13 +244,7 @@ impl ChunkedUploadHandler {
                 ))
                 .unwrap()
                 .into_response(),
-            Err(e) => (
-                StatusCode::NOT_FOUND,
-                Json(serde_json::json!({
-                    "error": e.to_string()
-                })),
-            )
-                .into_response(),
+            Err(e) => AppError::from(e).into_response(),
         }
     }
 
@@ -276,6 +253,7 @@ impl ChunkedUploadHandler {
     /// Assembles all chunks into the final file and creates the file record
     pub async fn complete_upload(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Path(upload_id): Path<String>,
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
@@ -283,22 +261,10 @@ impl ChunkedUploadHandler {
 
         // Assemble chunks (hash-on-write: SHA-256 computed during assembly)
         let (assembled_path, filename, folder_id, content_type, total_size, hash) =
-            match chunked_service.complete_upload(&upload_id).await {
+            match chunked_service.complete_upload(&upload_id, &auth_user.id).await {
                 Ok(result) => result,
                 Err(e) => {
-                    let status = match e.kind {
-                        ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                        ErrorKind::InvalidInput | ErrorKind::AlreadyExists => StatusCode::CONFLICT,
-                        _ => StatusCode::INTERNAL_SERVER_ERROR,
-                    };
-
-                    return (
-                        status,
-                        Json(serde_json::json!({
-                            "error": e.to_string()
-                        })),
-                    )
-                        .into_response();
+                    return AppError::from(e).into_response();
                 }
             };
 
@@ -323,7 +289,7 @@ impl ChunkedUploadHandler {
         {
             Ok(file) => {
                 // Cleanup session
-                let _ = chunked_service.finalize_upload(&upload_id).await;
+                let _ = chunked_service.finalize_upload(&upload_id, &auth_user.id).await;
 
                 tracing::info!(
                     "✅ CHUNKED UPLOAD COMPLETE: {} (ID: {}, {} bytes)",
@@ -345,12 +311,7 @@ impl ChunkedUploadHandler {
             }
             Err(e) => {
                 tracing::error!("Failed to create file from assembled upload: {:?}", e);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to create file: {:?}", e)
-                    })),
-                )
+                AppError::internal_error(format!("Failed to create file: {}", e))
                     .into_response()
             }
         }
@@ -361,18 +322,14 @@ impl ChunkedUploadHandler {
     /// Cancels an in-progress upload and cleans up temp files
     pub async fn cancel_upload(
         State(state): State<Arc<AppState>>,
+        auth_user: AuthUser,
         Path(upload_id): Path<String>,
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
 
-        match chunked_service.cancel_upload(&upload_id).await {
+        match chunked_service.cancel_upload(&upload_id, &auth_user.id).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(e) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({
-                    "error": e.to_string()
-                })),
-            )
+            Err(e) => AppError::internal_error(format!("Failed to cancel upload: {}", e))
                 .into_response(),
         }
     }

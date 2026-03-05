@@ -17,6 +17,7 @@ use crate::application::ports::file_ports::{
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::application::ports::thumbnail_ports::ThumbnailPort;
 use crate::common::di::AppState;
+use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
@@ -291,13 +292,7 @@ impl FileHandler {
         {
             Ok(f) => f,
             Err(err) => {
-                return (
-                    StatusCode::NOT_FOUND,
-                    Json(serde_json::json!({
-                        "error": format!("File not found: {}", err)
-                    })),
-                )
-                    .into_response();
+                return AppError::from(err).into_response();
             }
         };
 
@@ -331,13 +326,7 @@ impl FileHandler {
                     .into_response()
             }
             Err(err) => {
-                tracing::error!("Thumbnail generation failed: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Failed to generate thumbnail: {}", err)
-                    })),
-                )
+                AppError::internal_error(format!("Thumbnail generation failed: {}", err))
                     .into_response()
             }
         }
@@ -366,20 +355,7 @@ impl FileHandler {
         let file_dto = match retrieval.get_file_owned(&id, &auth_user.id).await {
             Ok(f) => f,
             Err(err) => {
-                let status = if err.to_string().contains("not found")
-                    || err.to_string().contains("NotFound")
-                {
-                    StatusCode::NOT_FOUND
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
-                };
-                return (
-                    status,
-                    Json(serde_json::json!({
-                        "error": err.to_string()
-                    })),
-                )
-                    .into_response();
+                return AppError::from(err).into_response();
             }
         };
 
@@ -526,14 +502,7 @@ impl FileHandler {
                     .into_response(),
             },
             Err(err) => {
-                tracing::error!("Error downloading file: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Error reading file: {}", err)
-                    })),
-                )
-                    .into_response()
+                AppError::from(err).into_response()
             }
         }
     }
@@ -547,6 +516,7 @@ impl FileHandler {
     /// Axum-compatible handler wrapper around [`Self::list_files`].
     pub async fn list_files_query(
         State(state): State<GlobalState>,
+        auth_user: AuthUser,
         headers: HeaderMap,
         Query(params): Query<HashMap<String, String>>,
     ) -> impl IntoResponse {
@@ -554,7 +524,7 @@ impl FileHandler {
         tracing::info!("API: Listing files with folder_id: {:?}", folder_id);
 
         let retrieval = &state.applications.file_retrieval_service;
-        match retrieval.list_files(folder_id).await {
+        match retrieval.list_files_owned(folder_id, &auth_user.id).await {
             Ok(files) => {
                 // Compute lightweight ETag from max modified_at + count
                 let max_mod = files.iter().map(|f| f.modified_at).max().unwrap_or(0);
@@ -584,14 +554,7 @@ impl FileHandler {
                 resp
             }
             Err(err) => {
-                tracing::error!("Error listing files: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Error listing files: {}", err)
-                    })),
-                )
-                    .into_response()
+                AppError::from(err).into_response()
             }
         }
     }
@@ -664,23 +627,7 @@ impl FileHandler {
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => {
-                tracing::error!("Error deleting file: {}", err);
-                let status = if err.to_string().contains("not found")
-                    || err.to_string().contains("NotFound")
-                {
-                    StatusCode::NOT_FOUND
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
-                };
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": format!("Error deleting file: {}", err)
-                    })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -712,25 +659,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => {
-                tracing::error!("Error renaming file: {}", err);
-                let status = if err.to_string().contains("not found")
-                    || err.to_string().contains("NotFound")
-                {
-                    StatusCode::NOT_FOUND
-                } else if err.to_string().contains("already exists") {
-                    StatusCode::CONFLICT
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
-                };
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": format!("Error renaming file: {}", err)
-                    })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -750,23 +679,7 @@ impl FileHandler {
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-            Err(err) => {
-                tracing::error!("Error moving file: {}", err);
-                let status = if err.to_string().contains("not found")
-                    || err.to_string().contains("NotFound")
-                {
-                    StatusCode::NOT_FOUND
-                } else {
-                    StatusCode::INTERNAL_SERVER_ERROR
-                };
-                (
-                    status,
-                    Json(serde_json::json!({
-                        "error": format!("Error moving file: {}", err)
-                    })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -785,16 +698,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => {
-                tracing::error!("Error moving file: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": format!("Error moving file: {}", err)
-                    })),
-                )
-                    .into_response()
-            }
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -831,33 +735,12 @@ impl FileHandler {
 
     /// Build error response for DomainError.
     fn domain_error_response(err: crate::common::errors::DomainError) -> Response<Body> {
-        let status = match err.kind {
-            crate::common::errors::ErrorKind::NotFound => StatusCode::NOT_FOUND,
-            crate::common::errors::ErrorKind::QuotaExceeded => StatusCode::INSUFFICIENT_STORAGE,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
-        };
-        Response::builder()
-            .status(status)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                serde_json::json!({ "error": format!("Error: {}", err) }).to_string(),
-            ))
-            .unwrap()
+        AppError::from(err).into_response()
     }
 
     /// Build a quota-specific error response with 507 status and structured body.
     fn quota_error_response(err: crate::common::errors::DomainError) -> Response<Body> {
-        Response::builder()
-            .status(StatusCode::INSUFFICIENT_STORAGE)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                serde_json::json!({
-                    "error": err.message,
-                    "error_type": "QuotaExceeded"
-                })
-                .to_string(),
-            ))
-            .unwrap()
+        AppError::from(err).into_response()
     }
 
     /// Build response for cached/small files.

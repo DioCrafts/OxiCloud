@@ -22,9 +22,14 @@ pub struct AppError {
 }
 
 /// JSON response structure for errors.
+///
+/// Both `error` and `message` carry the same content for backwards compatibility:
+/// - Legacy ad-hoc handlers returned `{"error": "..."}` (frontend reads `.error`)
+/// - AppError returned `{"message": "..."}` (admin panel reads `.message`)
 #[derive(Serialize)]
 pub struct ErrorResponse {
     pub status: String,
+    pub error: String,
     pub message: String,
     pub error_type: String,
 }
@@ -133,9 +138,26 @@ impl From<DomainError> for AppError {
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let status = self.status_code;
+
+        // Sanitize 500 Internal Server Error to prevent information leakage.
+        // Log the full error server-side for debugging, return a generic
+        // message to the client. Other status codes (including 5xx like
+        // 501, 503, 507) keep their intentionally user-facing messages.
+        let client_message = if status == StatusCode::INTERNAL_SERVER_ERROR {
+            tracing::error!(
+                error_type = %self.error_type,
+                "Internal server error: {}",
+                self.message
+            );
+            "An internal error occurred. Please try again later.".to_string()
+        } else {
+            self.message
+        };
+
         let error_response = ErrorResponse {
             status: status.to_string(),
-            message: self.message,
+            error: client_message.clone(),
+            message: client_message,
             error_type: self.error_type,
         };
 

@@ -42,7 +42,7 @@ pub async fn get_favorites(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to retrieve favorites: {}", err)
+                    "error": "Failed to retrieve favorites"
                 })),
             )
                 .into_response()
@@ -86,7 +86,7 @@ pub async fn add_favorite(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to add to favorites: {}", err)
+                    "error": "Failed to add to favorites"
                 })),
             )
         }
@@ -129,7 +129,7 @@ pub async fn remove_favorite(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to remove from favorites: {}", err)
+                    "error": "Failed to remove from favorites"
                 })),
             )
         }
@@ -188,7 +188,7 @@ pub async fn batch_add_favorites(
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
-                    "error": format!("Failed to batch add favorites: {}", err)
+                    "error": "Failed to batch add favorites"
                 })),
             )
                 .into_response()

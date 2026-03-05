@@ -74,7 +74,7 @@ impl SearchHandler {
                 error!("Search error: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Search error: {}", err) })),
+                    Json(json!({ "error": "Search error" })),
                 )
                     .into_response()
             }
@@ -115,7 +115,7 @@ impl SearchHandler {
                 error!("Search error: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Search error: {}", err) })),
+                    Json(json!({ "error": "Search error" })),
                 )
                     .into_response()
             }
@@ -159,7 +159,7 @@ impl SearchHandler {
                 error!("Suggestions error: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Suggestions error: {}", err) })),
+                    Json(json!({ "error": "Suggestions error" })),
                 )
                     .into_response()
             }
@@ -195,7 +195,7 @@ impl SearchHandler {
                 error!("Error clearing search cache: {}", err);
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(json!({ "error": format!("Error clearing search cache: {}", err) })),
+                    Json(json!({ "error": "Error clearing search cache" })),
                 )
                     .into_response()
             }

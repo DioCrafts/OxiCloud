@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — Admin Panel</title>
-<script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
+<script src="/js/core/theme-init.js"></script>
 <script src="/js/core/icons.js" defer></script>
 <script src="/js/core/formatters.js" defer></script>
 <script src="/js/core/csrf.js" defer></script>
@@ -41,9 +41,9 @@
 
   <div id="main-content">
     <div class="admin-tabs">
-      <button class="admin-tab active" onclick="switchTab('dashboard',this)"><i class="fas fa-chart-pie"></i> Dashboard</button>
-      <button class="admin-tab" onclick="switchTab('users',this)"><i class="fas fa-users"></i> Users</button>
-      <button class="admin-tab" onclick="switchTab('oidc',this)"><i class="fas fa-key"></i> SSO / OIDC</button>
+      <button class="admin-tab active" id="tab-btn-dashboard"><i class="fas fa-chart-pie"></i> Dashboard</button>
+      <button class="admin-tab" id="tab-btn-users"><i class="fas fa-users"></i> Users</button>
+      <button class="admin-tab" id="tab-btn-oidc"><i class="fas fa-key"></i> SSO / OIDC</button>
     </div>
 
     <div id="tab-dashboard" class="tab-content active">
@@ -79,7 +79,7 @@
         </div>
         <div class="toggle-row toggle-row-strong">
           <label><i class="fas fa-user-plus icon-muted-right"></i> Allow public self-registration</label>
-          <label class="switch"><input type="checkbox" id="ds-registration" checked onchange="toggleRegistration(this.checked)"><span class="slider"></span></label>
+          <label class="switch"><input type="checkbox" id="ds-registration" checked><span class="slider"></span></label>
         </div>
         <div class="warning" id="registration-warning"><i class="fas fa-exclamation-triangle"></i> Public registration is disabled. Only admins can create new users.</div>
       </div>
@@ -87,7 +87,7 @@
 
     <div id="tab-users" class="tab-content">
       <div class="admin-card">
-        <h2 class="h2-space-between"><span><i class="fas fa-users-cog"></i> User Management</span><button class="btn btn-primary" onclick="openCreateUserModal()"><i class="fas fa-user-plus"></i> Create User</button></h2>
+        <h2 class="h2-space-between"><span><i class="fas fa-users-cog"></i> User Management</span><button class="btn btn-primary" id="btn-create-user"><i class="fas fa-user-plus"></i> Create User</button></h2>
         <div class="table-wrap">
           <table>
             <thead>
@@ -107,8 +107,8 @@
         <div class="pagination">
           <span id="users-info">—</span>
           <div class="flex-gap-6">
-            <button class="btn btn-sm btn-secondary" id="prev-btn" onclick="prevPage()" disabled><i class="fas fa-chevron-left"></i> Prev</button>
-            <button class="btn btn-sm btn-secondary" id="next-btn" onclick="nextPage()">Next <i class="fas fa-chevron-right"></i></button>
+            <button class="btn btn-sm btn-secondary" id="prev-btn" disabled><i class="fas fa-chevron-left"></i> Prev</button>
+            <button class="btn btn-sm btn-secondary" id="next-btn">Next <i class="fas fa-chevron-right"></i></button>
           </div>
         </div>
       </div>
@@ -132,7 +132,7 @@
             <small>OpenID Connect issuer URL of your identity provider</small>
           </div>
           <div class="oidc-discover-wrap">
-            <button class="btn btn-secondary btn-sm" id="discover-btn" onclick="testConnection()"><i class="fas fa-search"></i> Auto-discover</button>
+            <button class="btn btn-secondary btn-sm" id="discover-btn"><i class="fas fa-search"></i> Auto-discover</button>
           </div>
           <div id="discovery-result"></div>
           <div class="form-group">
@@ -146,7 +146,7 @@
           </div>
           <div class="form-group">
             <label>Callback URL <small class="small-muted">(register in your IdP)</small></label>
-            <div class="readonly-field"><span id="callback-url">—</span><button onclick="copyCallback()" title="Copy"><i class="fas fa-copy"></i></button></div>
+            <div class="readonly-field"><span id="callback-url">—</span><button id="btn-copy-callback" title="Copy"><i class="fas fa-copy"></i></button></div>
           </div>
           <details>
             <summary><i class="fas fa-sliders-h summary-icon-right"></i> Advanced Settings</summary>
@@ -170,8 +170,8 @@
             <div class="warning" id="password-warning"><i class="fas fa-exclamation-triangle"></i> This will prevent ALL password-based logins!</div>
           </details>
           <div class="oidc-actions">
-            <button class="btn btn-secondary" onclick="testConnection()"><i class="fas fa-vial"></i> Test</button>
-            <button class="btn btn-primary" id="save-btn" onclick="saveOidcSettings()"><i class="fas fa-save"></i> Save</button>
+            <button class="btn btn-secondary" id="btn-test-oidc"><i class="fas fa-vial"></i> Test</button>
+            <button class="btn btn-primary" id="save-btn"><i class="fas fa-save"></i> Save</button>
           </div>
           <div id="oidc-status" class="alert"></div>
         </div>
@@ -195,8 +195,8 @@
       <small>Set to 0 for unlimited</small>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeQuotaModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveQuota()"><i class="fas fa-save"></i> Save</button>
+      <button class="btn btn-secondary" id="btn-close-quota">Cancel</button>
+      <button class="btn btn-primary" id="btn-save-quota"><i class="fas fa-save"></i> Save</button>
     </div>
   </div>
 </div>
@@ -235,8 +235,8 @@
     </div>
     <div id="cu-error" class="alert alert-no-margin"></div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeCreateUserModal()">Cancel</button>
-      <button class="btn btn-primary" id="cu-submit" onclick="submitCreateUser()"><i class="fas fa-user-plus"></i> Create</button>
+      <button class="btn btn-secondary" id="btn-close-create-user">Cancel</button>
+      <button class="btn btn-primary" id="cu-submit"><i class="fas fa-user-plus"></i> Create</button>
     </div>
   </div>
 </div>
@@ -253,8 +253,8 @@
     </div>
     <div id="rp-error" class="alert alert-no-margin"></div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeResetPasswordModal()">Cancel</button>
-      <button class="btn btn-primary" id="rp-submit" onclick="submitResetPassword()"><i class="fas fa-save"></i> Reset</button>
+      <button class="btn btn-secondary" id="btn-close-reset-pw">Cancel</button>
+      <button class="btn btn-primary" id="rp-submit"><i class="fas fa-save"></i> Reset</button>
     </div>
   </div>
 </div>

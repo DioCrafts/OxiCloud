@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="app.title">OxiCloud - Login</title>
     <!-- Apply saved theme immediately to prevent flash of light mode -->
-    <script>if(localStorage.getItem('oxicloud_theme')==='dark')document.documentElement.setAttribute('data-theme','dark');</script>
+    <script src="/js/core/theme-init.js"></script>
     
     <!-- Styles -->
     <link rel="stylesheet" href="/css/main.css">
@@ -20,7 +20,7 @@
 <body>
     <div class="auth-container">
         <!-- Language Selector Panel - Shown first on fresh install -->
-        <div class="auth-panel language-selector-panel" id="language-panel" style="display: none;">
+        <div class="auth-panel language-selector-panel hidden" id="language-panel">
             <div class="auth-logo">
                 <div class="auth-logo-icon">
                     <svg viewBox="0 0 500 500">
@@ -54,7 +54,7 @@
             <button type="button" class="auth-button" id="language-continue">Continue</button>
         </div>
 
-        <div class="auth-panel" id="login-panel" style="display: none;">
+        <div class="auth-panel hidden" id="login-panel">
             <div class="auth-logo">
                 <div class="auth-logo-icon">
                     <svg viewBox="0 0 500 500">
@@ -97,7 +97,7 @@
             </form>
             
             <!-- SSO / OIDC login section (hidden by default, shown dynamically) -->
-            <div id="oidc-login-section" style="display: none;">
+            <div id="oidc-login-section" class="hidden">
                 <div class="auth-divider" id="auth-divider">
                     <span data-i18n="auth.or">or</span>
                 </div>
@@ -118,7 +118,7 @@
             </div>
         </div>
         
-        <div class="auth-panel" id="register-panel" style="display: none;">
+        <div class="auth-panel hidden" id="register-panel">
             <div class="auth-logo">
                 <div class="auth-logo-icon">
                     <svg viewBox="0 0 500 500">

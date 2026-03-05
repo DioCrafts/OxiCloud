@@ -20,3 +20,5 @@ html[dir='rtl'] .fa-sign-out-alt {
 	-webkit-transform: rotate(180deg);
 	transform: rotate(180deg);
 }
+/* Utility: hide elements without inline style="" (CSP-safe) */
+.hidden { display: none; }

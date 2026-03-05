@@ -134,3 +134,6 @@ async function changePassword(e) {
 }
 
 init();
+
+/* Wire up form handler (replaces inline onsubmit) */
+document.getElementById('password-form').addEventListener('submit', changePassword);

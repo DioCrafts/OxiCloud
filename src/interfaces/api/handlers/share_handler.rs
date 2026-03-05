@@ -17,7 +17,8 @@ use crate::{
     },
     common::errors::ErrorKind,
     domain::entities::share::ShareItemType,
-    interfaces::middleware::auth::OptionalAuthUser,
+    interfaces::errors::AppError,
+    interfaces::middleware::auth::AuthUser,
 };
 
 #[derive(Debug, Deserialize)]
@@ -36,40 +37,27 @@ pub struct VerifyPasswordRequest {
 /// Create a new shared link
 pub async fn create_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
-    auth_user: OptionalAuthUser,
+    auth_user: AuthUser,
     Json(dto): Json<CreateShareDto>,
 ) -> impl IntoResponse {
-    let user_id = auth_user
-        .0
-        .map(|u| u.id)
-        .unwrap_or_else(|| "anonymous".to_string());
-    match share_use_case.create_shared_link(&user_id, dto).await {
+    match share_use_case
+        .create_shared_link(&auth_user.id, dto)
+        .await
+    {
         Ok(share) => (StatusCode::CREATED, Json(share)).into_response(),
-        Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
-        }
+        Err(err) => AppError::from(err).into_response()
     }
 }
 
 /// Get information about a specific shared link by ID
 pub async fn get_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match share_use_case.get_shared_link(&id).await {
+    match share_use_case.get_shared_link(&id, &auth_user.id).await {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
-        Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
-        }
+        Err(err) => AppError::from(err).into_response()
     }
 }
 
@@ -77,13 +65,10 @@ pub async fn get_shared_link(
 /// Supports optional filtering by item_id + item_type query params.
 pub async fn get_user_shares(
     State(share_use_case): State<Arc<ShareService>>,
-    auth_user: OptionalAuthUser,
+    auth_user: AuthUser,
     Query(query): Query<GetSharesQuery>,
 ) -> impl IntoResponse {
-    let _user_id = auth_user
-        .0
-        .map(|u| u.id)
-        .unwrap_or_else(|| "anonymous".to_string());
+    let user_id = &auth_user.id;
 
     // If both item_id and item_type are provided, return shares for that specific item
     if let (Some(item_id), Some(item_type_str)) = (&query.item_id, &query.item_type) {
@@ -98,15 +83,11 @@ pub async fn get_user_shares(
             }
         };
         return match share_use_case
-            .get_shared_links_for_item(item_id, &item_type)
+            .get_shared_links_for_item(item_id, &item_type, user_id)
             .await
         {
             Ok(shares) => (StatusCode::OK, Json(shares)).into_response(),
-            Err(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": err.to_string() })),
-            )
-                .into_response(),
+            Err(err) => AppError::from(err).into_response(),
         };
     }
 
@@ -115,53 +96,42 @@ pub async fn get_user_shares(
     let per_page = query.per_page.unwrap_or(20);
 
     match share_use_case
-        .get_user_shared_links(&_user_id, page, per_page)
+        .get_user_shared_links(user_id, page, per_page)
         .await
     {
         Ok(shares) => (StatusCode::OK, Json(shares)).into_response(),
-        Err(err) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": err.to_string() })),
-        )
-            .into_response(),
+        Err(err) => AppError::from(err).into_response(),
     }
 }
 
 /// Update a shared link's properties
 pub async fn update_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
     Json(dto): Json<UpdateShareDto>,
 ) -> impl IntoResponse {
-    match share_use_case.update_shared_link(&id, dto).await {
+    match share_use_case
+        .update_shared_link(&id, &auth_user.id, dto)
+        .await
+    {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
-        Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                ErrorKind::AccessDenied => StatusCode::FORBIDDEN,
-                ErrorKind::InvalidInput => StatusCode::BAD_REQUEST,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
-        }
+        Err(err) => AppError::from(err).into_response()
     }
 }
 
 /// Delete a shared link
 pub async fn delete_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
+    auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match share_use_case.delete_shared_link(&id).await {
+    match share_use_case
+        .delete_shared_link(&id, &auth_user.id)
+        .await
+    {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                ErrorKind::AccessDenied => StatusCode::FORBIDDEN,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
-        }
+        Err(err) => AppError::from(err).into_response()
     }
 }
 
@@ -177,28 +147,24 @@ pub async fn access_shared_item(
     match share_use_case.get_shared_link_by_token(&token).await {
         Ok(item) => (StatusCode::OK, Json(item)).into_response(),
         Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                ErrorKind::AccessDenied => {
-                    if err.message.contains("expired") {
-                        StatusCode::GONE // HTTP 410 Gone for expired links
-                    } else if err.message.contains("password") {
-                        return (
-                            StatusCode::UNAUTHORIZED,
-                            Json(json!({
-                                "error": "Password required",
-                                "requiresPassword": true
-                            })),
-                        )
-                            .into_response();
-                    } else {
-                        StatusCode::FORBIDDEN
-                    }
+            // Special handling for share access errors
+            if err.kind == ErrorKind::AccessDenied {
+                if err.message.contains("password") {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({
+                            "error": "Password required",
+                            "requiresPassword": true
+                        })),
+                    )
+                        .into_response();
                 }
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
+                if err.message.contains("expired") {
+                    return AppError::new(StatusCode::GONE, err.message, "Expired")
+                        .into_response();
+                }
+            }
+            AppError::from(err).into_response()
         }
     }
 }
@@ -215,20 +181,16 @@ pub async fn verify_shared_item_password(
     {
         Ok(item) => (StatusCode::OK, Json(item)).into_response(),
         Err(err) => {
-            let status = match err.kind {
-                ErrorKind::NotFound => StatusCode::NOT_FOUND,
-                ErrorKind::AccessDenied => {
-                    if err.message.contains("expired") {
-                        StatusCode::GONE
-                    } else if err.message.contains("password") {
-                        StatusCode::UNAUTHORIZED
-                    } else {
-                        StatusCode::FORBIDDEN
-                    }
+            if err.kind == ErrorKind::AccessDenied {
+                if err.message.contains("expired") {
+                    return AppError::new(StatusCode::GONE, err.message, "Expired")
+                        .into_response();
                 }
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
-            };
-            (status, Json(json!({ "error": err.to_string() }))).into_response()
+                if err.message.contains("password") {
+                    return AppError::unauthorized("Invalid password").into_response();
+                }
+            }
+            AppError::from(err).into_response()
         }
     }
 }
