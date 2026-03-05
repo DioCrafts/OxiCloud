@@ -378,6 +378,21 @@ impl AdminSettingsService {
             .await
     }
 
+    /// Atomically try to claim system initialization.
+    ///
+    /// Returns `Ok(true)` if this call was the one that marked the system as
+    /// initialized (the caller "won" the race), or `Ok(false)` if another
+    /// request already did it.  This eliminates the race-condition window
+    /// between `is_system_initialized()` and `mark_system_initialized()`.
+    pub async fn try_claim_initialization(
+        &self,
+        admin_user_id: &str,
+    ) -> Result<bool, DomainError> {
+        self.settings_repo
+            .try_claim_initialization(admin_user_id)
+            .await
+    }
+
     // ========================================================================
     // Registration Control
     // ========================================================================

@@ -66,6 +66,7 @@ async fn handle_carddav_methods(
 ) -> Result<Response<Body>, AppError> {
     let uri = req.uri().clone();
     let path = extract_carddav_path(uri.path());
+    reject_path_traversal(&path)?;
     handle_carddav_methods_inner(state, req, path).await
 }
 
@@ -105,6 +106,18 @@ fn extract_carddav_path(uri_path: &str) -> String {
     percent_encoding::percent_decode_str(encoded)
         .decode_utf8_lossy()
         .into_owned()
+}
+
+/// Reject paths that contain path-traversal segments (`.` or `..`).
+fn reject_path_traversal(path: &str) -> Result<(), AppError> {
+    for segment in path.split('/') {
+        if segment == ".." || segment == "." {
+            return Err(AppError::bad_request(
+                "Path must not contain '.' or '..' segments",
+            ));
+        }
+    }
+    Ok(())
 }
 
 // ─── Helper: extract user from request ───────────────────────────────

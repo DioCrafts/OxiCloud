@@ -52,12 +52,14 @@ pub trait ShareUseCase: Send + Sync + 'static {
         per_page: usize,
     ) -> Result<PaginatedResponseDto<ShareDto>, DomainError>;
 
-    /// Verify a password for a password-protected shared link
+    /// Verify a password for a password-protected shared link.
+    /// On success, returns the full share metadata (`ShareDto`).
+    /// On failure (wrong password), returns `AccessDenied`.
     async fn verify_shared_link_password(
         &self,
         token: &str,
         password: &str,
-    ) -> Result<bool, DomainError>;
+    ) -> Result<ShareDto, DomainError>;
 
     /// Register an access to a shared link
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError>;

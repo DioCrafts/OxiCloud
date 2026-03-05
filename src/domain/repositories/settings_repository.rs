@@ -23,4 +23,35 @@ pub trait SettingsRepository: Send + Sync + 'static {
 
     /// Delete a setting by key
     async fn delete(&self, key: &str) -> Result<(), DomainError>;
+
+    /// Atomically claim system initialization.
+    ///
+    /// Inserts `system_initialized = "true"` **only if the key does not
+    /// already exist**.  Returns `true` when this call was the one that
+    /// performed the insert (i.e. the caller "won" the race), `false` if
+    /// the system was already initialized.
+    ///
+    /// The default implementation falls back to the non-atomic
+    /// get-then-set pattern for repositories that don't support a native
+    /// atomic upsert.
+    async fn try_claim_initialization(
+        &self,
+        admin_user_id: &str,
+    ) -> Result<bool, DomainError> {
+        // Default: non-atomic fallback (overridden by PG implementation)
+        match self.get("system_initialized").await? {
+            Some(v) if v == "true" => Ok(false),
+            _ => {
+                self.set(
+                    "system_initialized",
+                    "true",
+                    "system",
+                    false,
+                    Some(admin_user_id),
+                )
+                .await?;
+                Ok(true)
+            }
+        }
+    }
 }

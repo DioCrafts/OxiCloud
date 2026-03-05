@@ -97,4 +97,28 @@ impl SettingsRepository for SettingsPgRepository {
 
         Ok(())
     }
+
+    /// Atomically claim system initialization using INSERT … ON CONFLICT DO NOTHING.
+    ///
+    /// Only the first caller that inserts the row gets `rows_affected == 1`;
+    /// concurrent callers see 0 rows affected and receive `false`.
+    async fn try_claim_initialization(
+        &self,
+        admin_user_id: &str,
+    ) -> Result<bool, DomainError> {
+        let result = sqlx::query(
+            "INSERT INTO auth.admin_settings (key, value, category, is_secret, updated_by, updated_at)
+             VALUES ('system_initialized', 'true', 'system', false, $1, NOW())
+             ON CONFLICT (key) DO NOTHING"
+        )
+        .bind(admin_user_id)
+        .execute(self.pool.as_ref())
+        .await
+        .map_err(|e| DomainError::new(
+            ErrorKind::InternalError, "Settings", format!("DB error: {}", e),
+        ))?;
+
+        // rows_affected == 1 means we inserted; 0 means another caller already did
+        Ok(result.rows_affected() == 1)
+    }
 }

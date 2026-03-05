@@ -354,6 +354,10 @@ async fn logout(
 /// Requires the setup token that was printed to the server log on first boot.
 /// Once the admin is created, the system is marked as initialized and this
 /// endpoint returns 403 for all subsequent requests.
+///
+/// Uses an atomic "claim" operation to prevent race conditions: even if two
+/// requests arrive simultaneously with the correct token, only one will
+/// succeed in marking the system as initialized and creating the admin.
 async fn setup_admin(
     State(state): State<Arc<AppState>>,
     Json(dto): Json<SetupAdminDto>,
@@ -366,12 +370,14 @@ async fn setup_admin(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
 
-    // 2. Check if system is already initialized (fail-closed: DB error → deny)
+    // 2. Verify admin settings service exists
     let admin_svc = state
         .admin_settings_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not configured"))?;
 
+    // 3. Quick pre-check: if the system is already initialized, reject early
+    //    (avoids token validation and Argon2 work on obviously-late requests)
     if admin_svc.is_system_initialized().await {
         tracing::warn!(
             "Setup admin rejected: system already initialized (user: {})",
@@ -384,7 +390,7 @@ async fn setup_admin(
         ));
     }
 
-    // 3. Verify the one-time setup token
+    // 4. Verify the one-time setup token
     let expected_token = state.setup_token.as_deref().ok_or_else(|| {
         AppError::new(
             StatusCode::FORBIDDEN,
@@ -405,7 +411,30 @@ async fn setup_admin(
         ));
     }
 
-    // 4. Create the first admin user
+    // 5. ATOMIC: claim initialization — only one concurrent request can win.
+    //    We use a placeholder user_id ("pending") because the admin user
+    //    doesn't exist yet.  It will be updated to the real id below.
+    let claimed = admin_svc
+        .try_claim_initialization("pending")
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to claim system initialization: {}", e);
+            AppError::internal_error("Failed to claim system initialization")
+        })?;
+
+    if !claimed {
+        tracing::warn!(
+            "Setup admin rejected: another request already claimed initialization (user: {})",
+            dto.username
+        );
+        return Err(AppError::new(
+            StatusCode::FORBIDDEN,
+            "System is already initialized. Use the admin panel to manage users.",
+            "SystemAlreadyInitialized",
+        ));
+    }
+
+    // 6. Create the first admin user (we hold the exclusive claim)
     let user = auth_service
         .auth_application_service
         .setup_create_admin(dto.username.clone(), dto.email, dto.password)
@@ -415,13 +444,12 @@ async fn setup_admin(
             AppError::from(e)
         })?;
 
-    // 5. Mark system as initialized
+    // 7. Update the initialization record with the real admin user_id
     if let Err(e) = admin_svc.mark_system_initialized(&user.id).await {
-        // Admin was created but we couldn't mark as initialized.
-        // This is not fatal — the setup token check prevents re-use, and
-        // on next restart the system will detect the admin in DB.
+        // Not fatal — the claim already prevents concurrent re-initialization,
+        // and the "pending" marker is still "true" so the system stays locked.
         tracing::error!(
-            "Created admin but failed to mark system as initialized: {}",
+            "Created admin but failed to update initialized_by with real user id: {}",
             e
         );
     }

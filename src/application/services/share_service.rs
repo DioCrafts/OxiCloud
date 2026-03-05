@@ -20,7 +20,7 @@ use crate::{
             storage_ports::FileReadPort,
         },
     },
-    common::{config::AppConfig, errors::DomainError},
+    common::{config::AppConfig, errors::{DomainError, ErrorKind}},
     domain::entities::share::{Share, ShareItemType, SharePermissions},
 };
 
@@ -239,6 +239,17 @@ impl ShareUseCase for ShareService {
             return Err(ShareServiceError::Expired.into());
         }
 
+        // SECURITY: If the share is password-protected, do NOT return
+        // the full metadata.  Force the caller to verify the password
+        // first via `verify_shared_link_password`.
+        if share.has_password() {
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "Share",
+                "This share is password protected",
+            ));
+        }
+
         // Convert the entity to DTO for the response
         Ok(ShareDto::from_entity(&share, &self.config.base_url()))
     }
@@ -357,7 +368,7 @@ impl ShareUseCase for ShareService {
         &self,
         token: &str,
         password: &str,
-    ) -> Result<bool, DomainError> {
+    ) -> Result<ShareDto, DomainError> {
         // Find the shared link by its token
         let share = self
             .share_repository
@@ -374,9 +385,21 @@ impl ShareUseCase for ShareService {
 
         // Verify the password using the infrastructure port
         match share.password_hash() {
-            Some(hash) => self.password_hasher.verify_password(password, hash).await,
-            None => Ok(true), // No password required
+            Some(hash) => {
+                let is_valid = self.password_hasher.verify_password(password, hash).await?;
+                if !is_valid {
+                    return Err(DomainError::new(
+                        ErrorKind::AccessDenied,
+                        "Share",
+                        "Invalid share password",
+                    ));
+                }
+            }
+            None => { /* No password required — allow access */ }
         }
+
+        // Password verified (or not required) — return full share metadata
+        Ok(ShareDto::from_entity(&share, &self.config.base_url()))
     }
 
     async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError> {
