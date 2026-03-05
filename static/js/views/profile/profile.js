@@ -165,12 +165,13 @@ function renderPwRow(pw) {
 
 async function loadAppPasswords() {
   try {
-    const resp = await fetch(API + '/auth/app-passwords', { headers: headers() });
+    const resp = await fetch(API + '/auth/app-passwords', { headers: headers(), credentials: 'same-origin' });
     if (!resp.ok) {
       document.getElementById('app-passwords-section').classList.add('hidden');
       return;
     }
-    const passwords = await resp.json();
+    const data = await resp.json();
+    const passwords = data.app_passwords || data;
     const userPws = passwords.filter(function (pw) { return !isAutoPassword(pw); });
     const autoPws = passwords.filter(isAutoPassword);
 
@@ -231,6 +232,7 @@ async function createAppPassword() {
     const resp = await fetch(API + '/auth/app-passwords', {
       method: 'POST',
       headers: headers(),
+      credentials: 'same-origin',
       body: JSON.stringify({ label: label })
     });
     if (!resp.ok) {
@@ -266,7 +268,8 @@ async function revokeAppPassword(id, label) {
   try {
     const resp = await fetch(API + '/auth/app-passwords/' + encodeURIComponent(id), {
       method: 'DELETE',
-      headers: headers()
+      headers: headers(),
+      credentials: 'same-origin'
     });
     if (resp.ok || resp.status === 204) {
       document.getElementById('app-pw-created').classList.add('hidden');

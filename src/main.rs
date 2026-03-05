@@ -187,6 +187,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             auth_protected_routes, auth_public_routes, login_route, refresh_route, register_route,
             setup_route,
         };
+        use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
         use oxicloud::interfaces::middleware::csrf::csrf_middleware;
@@ -250,6 +251,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 auth_middleware,
             ))
             .with_state(app_state.clone());
+        // App password management routes — require auth + CSRF
+        let app_pw_protected = app_password_handler::app_password_routes()
+            .layer(axum::middleware::from_fn(csrf_middleware))
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ))
+            .with_state(app_state.clone());
         // One-time setup route — public, rate-limited like register
         let setup_router = setup_route()
             .layer(axum::middleware::from_fn_with_state(
@@ -302,6 +311,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api/auth", auth_public)
             // Protected auth endpoints (/me, /change-password, /logout)
             .nest("/api/auth", auth_protected)
+            // App password management (create, list, revoke)
+            .nest("/api/auth", app_pw_protected)
             // One-time setup endpoint — public, rate-limited
             .nest("/api", setup_router)
             // Device Auth Grant public endpoints (authorize + token polling)
