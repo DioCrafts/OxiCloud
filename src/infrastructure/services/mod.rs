@@ -11,6 +11,8 @@ pub mod password_hasher;
 pub mod path_resolver_service;
 pub mod path_service;
 pub mod thumbnail_service;
+#[cfg(test)]
+mod thumbnail_service_test;
 pub mod trash_cleanup_service;
 pub mod webdav_lock_service;
 pub mod wopi_discovery_service;

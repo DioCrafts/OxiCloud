@@ -223,17 +223,24 @@ function showUserProfileModal() {
     });
 }
 
-function logout() {
+async function logout() {
     const USER_DATA_KEY = 'oxicloud_user';
 
-    // Tell the server to clear HttpOnly cookies
-    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: getCsrfHeaders() })
-        .catch(() => {}) // Best-effort
-        .finally(() => {
-            localStorage.removeItem(USER_DATA_KEY);
-            sessionStorage.removeItem('redirect_count');
-            window.location.href = '/login';
-        });
+    // Clear local state first to prevent login page from auto-refreshing
+    localStorage.removeItem(USER_DATA_KEY);
+    localStorage.removeItem('refresh_attempts');
+    sessionStorage.removeItem('redirect_count');
+
+    // Tell the server to clear HttpOnly cookies (await to ensure cookies are
+    // cleared before redirecting, otherwise the login page's session probe
+    // will refresh the token and redirect back to the app).
+    try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: getCsrfHeaders() });
+    } catch (_) {
+        // Best-effort
+    }
+
+    window.location.href = '/login';
 }
 
 window.setupUserMenu = setupUserMenu;

@@ -50,12 +50,18 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, S
     let token = headers
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
+        .and_then(|v| v.strip_prefix("Bearer ").map(|s| s.to_string()))
+        .or_else(|| {
+            crate::interfaces::api::cookie_auth::extract_cookie_value(
+                headers,
+                crate::interfaces::api::cookie_auth::ACCESS_COOKIE,
+            )
+        })
         .ok_or_else(|| AppError::unauthorized("Authorization token required"))?;
 
     let claims = auth
         .token_service
-        .validate_token(token)
+        .validate_token(&token)
         .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
 
     if claims.role != "admin" {

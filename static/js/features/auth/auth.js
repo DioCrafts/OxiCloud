@@ -729,9 +729,25 @@ if (isLoginPage && adminSetupForm) {
     }
     
     try {
-        // Register admin account
-        const data = await register('admin', email, password, 'admin');
-        
+        // Use the /api/setup endpoint which creates an admin and marks the system as initialized
+        const setupToken = document.getElementById('admin-setup-token').value;
+        const response = await fetch('/api/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                username: 'admin',
+                email,
+                password,
+                setup_token: setupToken
+            })
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || 'Setup failed');
+        }
+        const data = await response.json();
+
         // Show success message in the GUI instead of alert
         const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
         

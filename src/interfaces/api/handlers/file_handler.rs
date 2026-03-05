@@ -14,7 +14,7 @@ use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::application::ports::file_ports::{
     FileManagementUseCase, FileRetrievalUseCase, FileUploadUseCase,
 };
-use crate::application::ports::storage_ports::StorageUsagePort;
+use crate::application::ports::storage_ports::{FileReadPort, StorageUsagePort};
 use crate::application::ports::thumbnail_ports::ThumbnailPort;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
@@ -322,8 +322,20 @@ impl FileHandler {
                 .into_response();
         }
 
-        let storage_root = state.core.path_service.get_root_path();
-        let file_path = storage_root.join(&file.path);
+        // Resolve the actual blob path on disk (not the logical file path).
+        let blob_hash = match state.repositories.file_read_repository.get_blob_hash(&id).await {
+            Ok(h) => h,
+            Err(err) => {
+                return (
+                    StatusCode::NOT_FOUND,
+                    Json(serde_json::json!({
+                        "error": format!("File content not found: {}", err)
+                    })),
+                )
+                    .into_response();
+            }
+        };
+        let file_path = state.core.dedup_service.blob_path(&blob_hash);
 
         match thumbnail_service
             .get_thumbnail(&id, thumb_size.into(), &file_path)
@@ -597,12 +609,21 @@ impl FileHandler {
             .is_supported_image(&file.mime_type)
         {
             let file_id = file.id.clone();
-            let file_path_rel = file.path.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();
-            let path_service = state.core.path_service.clone();
+            let dedup_service = state.core.dedup_service.clone();
+            let file_read = state.repositories.file_read_repository.clone();
 
             tokio::spawn(async move {
-                let file_path = path_service.get_root_path().join(&file_path_rel);
+                // Resolve the actual blob path on disk (not the logical file path,
+                // which doesn't exist when using blob storage).
+                let blob_hash = match file_read.get_blob_hash(&file_id).await {
+                    Ok(h) => h,
+                    Err(e) => {
+                        tracing::warn!("Skipping thumbnails for {}: {}", file_id, e);
+                        return;
+                    }
+                };
+                let file_path = dedup_service.blob_path(&blob_hash);
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
                 thumbnail_service.generate_all_sizes_background(file_id, file_path);
             });

@@ -322,6 +322,17 @@ button.favorite-star {
 	overflow: hidden;
 }
 
+/* Thumbnail image inside file-icon (grid and list views) */
+.file-icon .file-thumb {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	z-index: 1;
+}
+
 .file-icon.image-icon::before {
 	content: "";
 	position: absolute;

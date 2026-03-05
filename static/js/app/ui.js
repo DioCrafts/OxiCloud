@@ -747,13 +747,13 @@ const ui = {
             return null;
         };
 
-        const openFile = (file) => {
+        const openFile = async (file) => {
             if (!file) return;
             if (window.recent) {
                 document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file } }));
             }
             // WOPI editor intercept: open Office documents in the WOPI editor
-            if (window.wopiEditor && window.wopiEditor.canEdit(file.name)) {
+            if (window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
                 window.wopiEditor.openInModal(file.id, file.name, 'edit');
                 return;
             }
@@ -1139,6 +1139,7 @@ const ui = {
                 <i class="${isFileFav ? 'fas' : 'far'} fa-star"></i>
             </button>
             <div class="file-icon ${iconSpecialClass}">
+                ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>
@@ -1176,6 +1177,7 @@ const ui = {
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
+                    ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${escapeHtml(file.name)}</span>

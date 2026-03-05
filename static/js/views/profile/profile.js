@@ -25,7 +25,7 @@ function timeAgo(dateStr) {
 
 async function init() {
   try {
-    const resp = await fetch(API + '/auth/me', { headers: headers() });
+    const resp = await fetch(API + '/auth/me', { headers: headers(), credentials: 'same-origin' });
     if (!resp.ok) { showError(); return; }
     const user = await resp.json();
 
@@ -66,7 +66,7 @@ async function init() {
     }
 
     try {
-      const oidcResp = await fetch(API + '/auth/oidc/providers');
+      const oidcResp = await fetch(API + '/auth/oidc/providers', { credentials: 'same-origin' });
       if (oidcResp.ok) {
         const oidcInfo = await oidcResp.json();
         if (!oidcInfo.password_login_enabled) {
@@ -114,6 +114,7 @@ async function changePassword(e) {
     const resp = await fetch(API + '/auth/change-password', {
       method: 'PUT',
       headers: headers(),
+      credentials: 'same-origin',
       body: JSON.stringify({ current_password: currentPw, new_password: newPw })
     });
 
