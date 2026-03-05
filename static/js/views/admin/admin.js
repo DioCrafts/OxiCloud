@@ -65,7 +65,7 @@ function switchTab(name, el) {
 
 async function loadDashboard() {
   try {
-    const resp = await fetch(API + '/admin/dashboard', { headers: headers() });
+    const resp = await fetch(API + '/admin/dashboard', { headers: headers(), credentials: 'same-origin' });
     if (!resp.ok) return;
     const d = await resp.json();
     document.getElementById('ds-total-users').textContent = d.total_users;
@@ -103,7 +103,7 @@ async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
   tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
   try {
-    const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers() });
+    const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers(), credentials: 'same-origin' });
     if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Failed to load users</td></tr>'; return; }
     const data = await resp.json();
     totalUsers = data.total;
@@ -151,7 +151,7 @@ async function toggleRole(userId, currentRole) {
   if (!confirm('Change role to ' + newRole + '?')) return;
   try {
     const resp = await fetch(API + '/admin/users/' + userId + '/role', {
-      method: 'PUT', headers: headers(), body: JSON.stringify({ role: newRole })
+      method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ role: newRole })
     });
     if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
   } catch (e) { alert('Error: ' + e.message); }
@@ -162,7 +162,7 @@ async function toggleActive(userId, currentActive) {
   if (!confirm('Are you sure you want to ' + action + ' this user?')) return;
   try {
     const resp = await fetch(API + '/admin/users/' + userId + '/active', {
-      method: 'PUT', headers: headers(), body: JSON.stringify({ active: !currentActive })
+      method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ active: !currentActive })
     });
     if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
   } catch (e) { alert('Error: ' + e.message); }
@@ -171,7 +171,7 @@ async function toggleActive(userId, currentActive) {
 async function deleteUser(userId, username) {
   if (!confirm('DELETE user "' + username + '"? This cannot be undone!')) return;
   try {
-    const resp = await fetch(API + '/admin/users/' + userId, { method: 'DELETE', headers: headers() });
+    const resp = await fetch(API + '/admin/users/' + userId, { method: 'DELETE', headers: headers(), credentials: 'same-origin' });
     if (resp.ok) { loadUsers(); loadDashboard(); } else { const e = await resp.json(); alert(e.message || 'Failed'); }
   } catch (e) { alert('Error: ' + e.message); }
 }
@@ -193,7 +193,7 @@ async function saveQuota() {
   const bytes = Math.round(val * unit);
   try {
     const resp = await fetch(API + '/admin/users/' + quotaUserId + '/quota', {
-      method: 'PUT', headers: headers(), body: JSON.stringify({ quota_bytes: bytes })
+      method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ quota_bytes: bytes })
     });
     if (resp.ok) { closeQuotaModal(); loadUsers(); loadDashboard(); }
     else { const e = await resp.json(); alert(e.message || 'Failed'); }
@@ -231,7 +231,7 @@ async function submitCreateUser() {
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating…';
   try {
     const resp = await fetch(API + '/admin/users', {
-      method: 'POST', headers: headers(),
+      method: 'POST', headers: headers(), credentials: 'same-origin',
       body: JSON.stringify({ username, password, email, role, quota_bytes: quotaBytes })
     });
     if (resp.ok) {
@@ -271,7 +271,7 @@ async function submitResetPassword() {
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting…';
   try {
     const resp = await fetch(API + '/admin/users/' + resetPwUserId + '/password', {
-      method: 'PUT', headers: headers(),
+      method: 'PUT', headers: headers(), credentials: 'same-origin',
       body: JSON.stringify({ new_password: password })
     });
     if (resp.ok) { closeResetPasswordModal(); }
@@ -285,7 +285,7 @@ async function toggleRegistration(enabled) {
   else showElement('registration-warning', 'flex');
   try {
     const resp = await fetch(API + '/admin/settings/registration', {
-      method: 'PUT', headers: headers(),
+      method: 'PUT', headers: headers(), credentials: 'same-origin',
       body: JSON.stringify({ registration_enabled: enabled })
     });
     if (!resp.ok) {
@@ -330,7 +330,7 @@ async function testConnection() {
   btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering…';
   const resultDiv = document.getElementById('discovery-result');
   try {
-    const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), body: JSON.stringify({ issuer_url: url }) });
+    const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ issuer_url: url }) });
     const r = await resp.json();
     if (r.success) {
       resultDiv.innerHTML = '<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ' + escapeHtml(r.message) + '</strong><dl><dt>Issuer</dt><dd>' + escapeHtml(r.issuer||'—') + '</dd><dt>Auth Endpoint</dt><dd>' + escapeHtml(r.authorization_endpoint||'—') + '</dd></dl></div>';
@@ -357,7 +357,7 @@ async function saveOidcSettings() {
     provider_name: document.getElementById('provider-name').value.trim() || null,
   };
   try {
-    const resp = await fetch(API + '/admin/settings/oidc', { method: 'PUT', headers: headers(), body: JSON.stringify(body) });
+    const resp = await fetch(API + '/admin/settings/oidc', { method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify(body) });
     if (resp.ok) { showOidcStatus('Settings saved — OIDC is now ' + (body.enabled ? 'active' : 'disabled'), 'success'); loadDashboard(); }
     else { const e = await resp.json().catch(()=>({})); showOidcStatus('Error: ' + (e.message || resp.statusText), 'error'); }
   } catch (e) { showOidcStatus('Network error: ' + e.message, 'error'); }
@@ -366,13 +366,13 @@ async function saveOidcSettings() {
 
 async function init() {
   try {
-    const me = await fetch(API + '/auth/me', { headers: headers() });
+    const me = await fetch(API + '/auth/me', { headers: headers(), credentials: 'same-origin' });
     if (!me.ok) { showAccessDenied(); return; }
     const user = await me.json();
     if (user.role !== 'admin') { showAccessDenied(); return; }
     currentAdminId = user.id;
 
-    const oidcResp = await fetch(API + '/admin/settings/oidc', { headers: headers() });
+    const oidcResp = await fetch(API + '/admin/settings/oidc', { headers: headers(), credentials: 'same-origin' });
     if (oidcResp.ok) {
       const s = await oidcResp.json();
       document.getElementById('oidc-enabled').checked = s.enabled;

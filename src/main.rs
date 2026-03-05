@@ -2,7 +2,6 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -67,10 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !storage_path.exists() {
         std::fs::create_dir_all(&storage_path).expect("Failed to create storage directory");
     }
-    let locales_path = PathBuf::from("./static/locales");
-    if !locales_path.exists() {
-        std::fs::create_dir_all(&locales_path).expect("Failed to create locales directory");
-    }
+    // Locales are embedded in the binary via rust-embed — no filesystem path needed.
 
     // Initialize database pools if auth is enabled
     let db_pools = if config.features.enable_auth {
@@ -94,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Build all services via the factory
-    let factory = AppServiceFactory::with_config(storage_path, locales_path, config.clone());
+    let factory = AppServiceFactory::with_config(storage_path, None, config.clone());
 
     let app_state = factory.build_app_state(db_pools).await
         .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
@@ -171,7 +167,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     if config.features.enable_auth {
         use interfaces::api::handlers::auth_handler::{
-            auth_routes, login_route, refresh_route, register_route, setup_route,
+            auth_protected_routes, auth_public_routes, login_route, refresh_route, register_route,
+            setup_route,
         };
         use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::api::handlers::device_auth_handler;
@@ -227,8 +224,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 rate_limit_refresh,
             ))
             .with_state(app_state.clone());
-        // Remaining auth routes (status, OIDC, protected /me, /logout, etc.)
-        let auth_router = auth_routes().with_state(app_state.clone());
+        // Public auth routes (status, OIDC)
+        let auth_public = auth_public_routes().with_state(app_state.clone());
+        // Protected auth routes (/me, /change-password, /logout) — require auth + CSRF
+        let auth_protected = auth_protected_routes()
+            .layer(axum::middleware::from_fn(csrf_middleware))
+            .layer(axum::middleware::from_fn_with_state(
+                app_state.clone(),
+                auth_middleware,
+            ))
+            .with_state(app_state.clone());
         // One-time setup route — public, rate-limited like register
         let setup_router = setup_route()
             .layer(axum::middleware::from_fn_with_state(
@@ -286,8 +291,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api/auth", auth_login)
             .nest("/api/auth", auth_register)
             .nest("/api/auth", auth_refresh)
-            // Other auth endpoints (status, OIDC, protected /me, /logout)
-            .nest("/api/auth", auth_router)
+            // Public auth endpoints (status, OIDC)
+            .nest("/api/auth", auth_public)
+            // Protected auth endpoints (/me, /change-password, /logout)
+            .nest("/api/auth", auth_protected)
             // One-time setup endpoint — public, rate-limited
             .nest("/api", setup_router)
             // Device Auth Grant public endpoints (authorize + token polling)

@@ -16,25 +16,24 @@ use crate::interfaces::api::cookie_auth;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUserId;
 
-pub fn auth_routes() -> Router<Arc<AppState>> {
-    // Routes that do NOT require authentication
-    let public_routes = Router::new()
+/// Public auth routes — no authentication required.
+pub fn auth_public_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/status", get(get_system_status))
         // OIDC endpoints (all public)
         .route("/oidc/providers", get(oidc_providers))
         .route("/oidc/authorize", get(oidc_authorize))
         .route("/oidc/callback", get(oidc_callback))
-        .route("/oidc/exchange", post(oidc_exchange));
+        .route("/oidc/exchange", post(oidc_exchange))
+}
 
-    // Routes that DO require authentication - we use route_layer to apply middleware
-    // The middleware will use the state passed with .with_state() from main.rs
-    let protected_routes = Router::new()
+/// Protected auth routes — require authentication (auth + CSRF middleware
+/// must be applied by the caller in main.rs).
+pub fn auth_protected_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/me", get(get_current_user))
         .route("/change-password", put(change_password))
-        .route("/logout", post(logout));
-
-    // Combine public and protected routes
-    public_routes.merge(protected_routes)
+        .route("/logout", post(logout))
 }
 
 /// Rate-limited auth routes — split out so main.rs can apply per-endpoint
