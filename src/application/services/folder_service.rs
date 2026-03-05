@@ -32,6 +32,10 @@ impl FolderService {
                 Ok(FolderDto::empty())
             }
 
+            async fn get_folder_owned(&self, _id: &str, _caller_id: &str) -> Result<FolderDto, DomainError> {
+                Ok(FolderDto::empty())
+            }
+
             async fn get_folder_by_path(&self, _path: &str) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
             }
@@ -194,6 +198,21 @@ impl FolderUseCase for FolderService {
         })?;
 
         Ok(FolderDto::from(folder))
+    }
+
+    /// Gets a folder by its ID, enforcing that `caller_id` is the owner.
+    async fn get_folder_owned(&self, id: &str, caller_id: &str) -> Result<FolderDto, DomainError> {
+        let folder_dto = self.get_folder(id).await?;
+        if folder_dto.owner_id.as_deref() != Some(caller_id) {
+            tracing::warn!(
+                "get_folder_owned: user '{}' attempted to access folder '{}' owned by '{:?}'",
+                caller_id,
+                id,
+                folder_dto.owner_id
+            );
+            return Err(DomainError::not_found("Folder", id));
+        }
+        Ok(folder_dto)
     }
 
     /// Gets a folder by its path

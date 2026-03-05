@@ -117,6 +117,7 @@ impl BatchOperationService {
         &self,
         file_ids: Vec<String>,
         target_folder_id: Option<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
         info!("Starting batch copy of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
@@ -134,15 +135,17 @@ impl BatchOperationService {
 
         // Arc<str> avoids N heap-clones of the same string
         let target_folder: Option<Arc<str>> = target_folder_id.map(|s| Arc::from(s.as_str()));
+        let caller: Arc<str> = Arc::from(caller_id);
 
         // buffer_unordered materialises only max_concurrent futures at a time
         let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
             let target_folder = target_folder.clone();
+            let caller = caller.clone();
 
             async move {
                 let copy_result = mgmt
-                    .copy_file(&file_id, target_folder.map(|s| s.to_string()))
+                    .copy_file_owned(&file_id, &caller, target_folder.map(|s| s.to_string()))
                     .await;
                 (file_id, copy_result)
             }
@@ -184,6 +187,7 @@ impl BatchOperationService {
         &self,
         file_ids: Vec<String>,
         target_folder_id: Option<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
         info!("Starting batch move of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
@@ -200,14 +204,16 @@ impl BatchOperationService {
         };
 
         let target_folder: Option<Arc<str>> = target_folder_id.map(|s| Arc::from(s.as_str()));
+        let caller: Arc<str> = Arc::from(caller_id);
 
         let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
             let target_folder = target_folder.clone();
+            let caller = caller.clone();
 
             async move {
                 let move_result = mgmt
-                    .move_file(&file_id, target_folder.map(|s| s.to_string()))
+                    .move_file_owned(&file_id, &caller, target_folder.map(|s| s.to_string()))
                     .await;
                 (file_id, move_result)
             }
@@ -247,6 +253,7 @@ impl BatchOperationService {
     pub async fn delete_files(
         &self,
         file_ids: Vec<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<String>, BatchOperationError> {
         info!("Starting batch deletion of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
@@ -262,11 +269,14 @@ impl BatchOperationService {
         };
 
         // Define the operation to perform for each file
+        let caller: Arc<str> = Arc::from(caller_id);
+
         let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let mgmt = self.file_management.clone();
+            let caller = caller.clone();
 
             async move {
-                let delete_result = mgmt.delete_file(&file_id).await;
+                let delete_result = mgmt.delete_file_owned(&file_id, &caller).await;
                 let id_for_result = file_id.clone();
                 (file_id, delete_result.map(|_| id_for_result))
             }
@@ -307,6 +317,7 @@ impl BatchOperationService {
     pub async fn get_multiple_files(
         &self,
         file_ids: Vec<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<FileDto>, BatchOperationError> {
         info!("Starting batch load of {} files", file_ids.len());
         let start_time = std::time::Instant::now();
@@ -322,11 +333,14 @@ impl BatchOperationService {
         };
 
         // Define the operation to perform for each file
+        let caller: Arc<str> = Arc::from(caller_id);
+
         let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let retrieval = self.file_retrieval.clone();
+            let caller = caller.clone();
 
             async move {
-                let get_result = retrieval.get_file(&file_id).await;
+                let get_result = retrieval.get_file_owned(&file_id, &caller).await;
                 (file_id, get_result)
             }
         }))
@@ -631,6 +645,7 @@ impl BatchOperationService {
         &self,
         file_ids: Vec<String>,
         folder_ids: Vec<String>,
+        caller_id: &str,
     ) -> Result<NamedTempFile, BatchOperationError> {
         info!(
             "Starting batch download: {} files, {} folders",
@@ -650,10 +665,10 @@ impl BatchOperationService {
 
         // ── Add individual files at the root of the ZIP ──────────────────
         for file_id in &file_ids {
-            match self.file_retrieval.get_file(file_id).await {
+            match self.file_retrieval.get_file_owned(file_id, caller_id).await {
                 Ok(file_dto) => {
                     if let Err(e) = self
-                        .add_file_entry_streamed(&mut zip, file_id, &file_dto.name)
+                        .add_file_entry_streamed(&mut zip, file_id, &file_dto.name, caller_id)
                         .await
                     {
                         info!("Could not add file {} to ZIP: {}", file_dto.name, e);
@@ -667,10 +682,10 @@ impl BatchOperationService {
 
         // ── Add folders as sub-trees (bulk subtree queries, not N+1) ─────
         for folder_id in &folder_ids {
-            match self.folder_service.get_folder(folder_id).await {
+            match self.folder_service.get_folder_owned(folder_id, caller_id).await {
                 Ok(root_folder) => {
                     if let Err(e) = self
-                        .add_folder_subtree_to_zip(&mut zip, folder_id, &root_folder)
+                        .add_folder_subtree_to_zip(&mut zip, folder_id, &root_folder, caller_id)
                         .await
                     {
                         info!("Could not add folder {} to ZIP: {}", root_folder.name, e);
@@ -709,6 +724,7 @@ impl BatchOperationService {
         zip: &mut ZipFileWriter<tokio_util::compat::Compat<BufWriter<tokio::fs::File>>>,
         file_id: &str,
         entry_name: &str,
+        caller_id: &str,
     ) -> Result<(), BatchOperationError> {
         let entry = ZipEntryBuilder::new(entry_name.to_string().into(), Compression::Deflate);
         let mut writer = zip
@@ -718,7 +734,7 @@ impl BatchOperationService {
 
         let stream = self
             .file_retrieval
-            .get_file_stream(file_id)
+            .get_file_stream_owned(file_id, caller_id)
             .await
             .map_err(BatchOperationError::Domain)?;
         let mut stream = std::pin::Pin::from(stream);
@@ -749,6 +765,7 @@ impl BatchOperationService {
         zip: &mut ZipFileWriter<tokio_util::compat::Compat<BufWriter<tokio::fs::File>>>,
         folder_id: &str,
         root_folder: &FolderDto,
+        caller_id: &str,
     ) -> Result<(), BatchOperationError> {
         // Bulk-fetch folder tree (small — one entry per folder)
         let all_folders = self
@@ -803,7 +820,7 @@ impl BatchOperationService {
                 for file in files {
                     let file_path = format!("{}{}", zip_dir, file.name);
                     if let Err(e) = self
-                        .add_file_entry_streamed(zip, &file.id, &file_path)
+                        .add_file_entry_streamed(zip, &file.id, &file_path, caller_id)
                         .await
                     {
                         info!("Could not add file {} to ZIP: {}", file.name, e);
@@ -887,6 +904,7 @@ impl BatchOperationService {
     pub async fn create_folders(
         &self,
         folders: Vec<(String, Option<String>)>, // (name, parent_id)
+        caller_id: &str,
     ) -> Result<BatchResult<FolderDto>, BatchOperationError> {
         info!("Starting batch creation of {} folders", folders.len());
         let start_time = std::time::Instant::now();
@@ -902,10 +920,20 @@ impl BatchOperationService {
         };
 
         // Define the operation for each folder
+        let caller: Arc<str> = Arc::from(caller_id);
+
         let mut operation_stream = stream::iter(folders.into_iter().map(|(name, parent_id)| {
             let folder_service = self.folder_service.clone();
+            let caller = caller.clone();
 
             async move {
+                // If a parent is specified, verify the caller owns it
+                if let Some(ref pid) = parent_id {
+                    if let Err(e) = folder_service.get_folder_owned(pid, &caller).await {
+                        let id = format!("{}:{}", name, pid);
+                        return (id, Err(e.into()));
+                    }
+                }
                 let dto = crate::application::dtos::folder_dto::CreateFolderDto {
                     name: name.clone(),
                     parent_id: parent_id.clone(),
@@ -951,6 +979,7 @@ impl BatchOperationService {
     pub async fn get_multiple_folders(
         &self,
         folder_ids: Vec<String>,
+        caller_id: &str,
     ) -> Result<BatchResult<FolderDto>, BatchOperationError> {
         info!("Starting batch load of {} folders", folder_ids.len());
         let start_time = std::time::Instant::now();
@@ -966,11 +995,14 @@ impl BatchOperationService {
         };
 
         // Define the operation for each folder
+        let caller: Arc<str> = Arc::from(caller_id);
+
         let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let folder_service = self.folder_service.clone();
+            let caller = caller.clone();
 
             async move {
-                let get_result = folder_service.get_folder(&folder_id).await;
+                let get_result = folder_service.get_folder_owned(&folder_id, &caller).await;
                 (folder_id, get_result)
             }
         }))

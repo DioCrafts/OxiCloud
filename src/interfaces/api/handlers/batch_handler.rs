@@ -130,6 +130,7 @@ where
 /// Handler for moving multiple files in batch
 pub async fn move_files_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are files to process
@@ -146,7 +147,7 @@ pub async fn move_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .move_files(request.file_ids, request.target_folder_id)
+        .move_files(request.file_ids, request.target_folder_id, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -170,6 +171,7 @@ pub async fn move_files_batch(
 /// Handler for copying multiple files in batch
 pub async fn copy_files_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are files to process
@@ -186,7 +188,7 @@ pub async fn copy_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .copy_files(request.file_ids, request.target_folder_id)
+        .copy_files(request.file_ids, request.target_folder_id, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -210,6 +212,7 @@ pub async fn copy_files_batch(
 /// Handler for deleting multiple files in batch
 pub async fn delete_files_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are files to process
@@ -226,7 +229,7 @@ pub async fn delete_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .delete_files(request.file_ids)
+        .delete_files(request.file_ids, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -307,6 +310,7 @@ pub async fn delete_folders_batch(
 /// Handler for creating multiple folders in batch
 pub async fn create_folders_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchCreateFoldersRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are folders to process
@@ -330,7 +334,7 @@ pub async fn create_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .create_folders(folders)
+        .create_folders(folders, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -354,6 +358,7 @@ pub async fn create_folders_batch(
 /// Handler for getting multiple files in batch
 pub async fn get_files_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFileOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are files to process
@@ -370,7 +375,7 @@ pub async fn get_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .get_multiple_files(request.file_ids)
+        .get_multiple_files(request.file_ids, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -394,6 +399,7 @@ pub async fn get_files_batch(
 /// Handler for getting multiple folders in batch
 pub async fn get_folders_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchFolderOperationRequest>,
 ) -> ApiResult<impl IntoResponse> {
     // Verify there are folders to process
@@ -410,7 +416,7 @@ pub async fn get_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .get_multiple_folders(request.folder_ids)
+        .get_multiple_folders(request.folder_ids, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -596,6 +602,7 @@ pub async fn move_folders_batch(
 /// so RAM usage is O(buffer_size) regardless of archive size.
 pub async fn download_batch(
     State(state): State<BatchHandlerState>,
+    auth_user: AuthUser,
     Json(request): Json<BatchDownloadRequest>,
 ) -> Result<Response, (StatusCode, String)> {
     if request.file_ids.is_empty() && request.folder_ids.is_empty() {
@@ -607,7 +614,7 @@ pub async fn download_batch(
 
     let temp_file = state
         .batch_service
-        .download_zip(request.file_ids, request.folder_ids)
+        .download_zip(request.file_ids, request.folder_ids, &auth_user.id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

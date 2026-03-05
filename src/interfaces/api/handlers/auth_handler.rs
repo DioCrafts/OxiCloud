@@ -1,7 +1,7 @@
 use axum::{
     Router,
     extract::{Json, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post, put},
 };
@@ -319,26 +319,27 @@ async fn change_password(
 
 async fn logout(
     State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
     CurrentUserId(user_id): CurrentUserId,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
 ) -> Result<Response, AppError> {
     let auth_service = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
 
-    // Obtain the raw access token from Bearer header OR cookie
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "))
-        .map(String::from)
-        .or_else(|| cookie_auth::extract_cookie_value(&headers, cookie_auth::ACCESS_COOKIE))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
+    // Extract the REFRESH token (not the access token) so the service can
+    // look up and revoke the correct session.
+    // Strategy: try JSON body first (API clients), then HttpOnly cookie (browsers).
+    let refresh_token = serde_json::from_slice::<RefreshTokenDto>(&body)
+        .ok()
+        .map(|dto| dto.refresh_token)
+        .or_else(|| cookie_auth::extract_cookie_value(&headers, cookie_auth::REFRESH_COOKIE))
+        .ok_or_else(|| AppError::unauthorized("Refresh token required for logout (JSON body or cookie)"))?;
 
     auth_service
         .auth_application_service
-        .logout(&user_id, &token)
+        .logout(&user_id, &refresh_token)
         .await?;
 
     // Clear HttpOnly + CSRF cookies so the browser forgets the session

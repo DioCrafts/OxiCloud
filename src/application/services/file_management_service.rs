@@ -128,6 +128,16 @@ impl FileManagementUseCase for FileManagementService {
         Ok(FileDto::from(copied_file))
     }
 
+    async fn copy_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
+        target_folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        self.verify_owner(file_id, caller_id).await?;
+        self.copy_file(file_id, target_folder_id).await
+    }
+
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError> {
         info!("Renaming file with ID: {} to \"{}\"", file_id, new_name);
 
@@ -161,6 +171,11 @@ impl FileManagementUseCase for FileManagementService {
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         self.file_repository.delete_file(id).await
+    }
+
+    async fn delete_file_owned(&self, id: &str, caller_id: &str) -> Result<(), DomainError> {
+        self.verify_owner(id, caller_id).await?;
+        self.delete_file(id).await
     }
 
     /// Smart delete: trash-first with dedup reference cleanup.

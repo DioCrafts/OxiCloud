@@ -355,6 +355,10 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
+    async fn get_folder_owned(&self, _id: &str, _caller_id: &str) -> Result<FolderDto, DomainError> {
+        Ok(FolderDto::default())
+    }
+
     async fn get_folder_by_path(&self, _path: &str) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
@@ -490,9 +494,26 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
         Ok(Vec::new())
     }
 
+    async fn list_files_owned(
+        &self,
+        _folder_id: Option<&str>,
+        _owner_id: &str,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        Ok(Vec::new())
+    }
+
     async fn get_file_stream(
         &self,
         _id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
+        Ok(Box::new(empty_stream))
+    }
+
+    async fn get_file_stream_owned(
+        &self,
+        _id: &str,
+        _caller_id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
         Ok(Box::new(empty_stream))
@@ -591,11 +612,24 @@ impl FileManagementUseCase for StubFileManagementUseCase {
         Ok(FileDto::default())
     }
 
+    async fn copy_file_owned(
+        &self,
+        _file_id: &str,
+        _caller_id: &str,
+        _folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
+    }
+
     async fn rename_file(&self, _file_id: &str, _new_name: &str) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }
 
     async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn delete_file_owned(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
         Ok(())
     }
 

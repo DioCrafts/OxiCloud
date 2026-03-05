@@ -223,10 +223,28 @@ impl FileRetrievalUseCase for FileRetrievalService {
         Ok(files.into_iter().map(FileDto::from).collect())
     }
 
+    async fn list_files_owned(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let files = self.file_read.list_files_for_owner(folder_id, owner_id).await?;
+        Ok(files.into_iter().map(FileDto::from).collect())
+    }
+
     async fn get_file_stream(
         &self,
         id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        self.file_read.get_file_stream(id).await
+    }
+
+    async fn get_file_stream_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
+        self.file_read.verify_file_owner(id, caller_id).await?;
         self.file_read.get_file_stream(id).await
     }
 
@@ -308,6 +326,20 @@ impl FileRetrievalUseCase for FileRetrievalService {
         let files = self
             .file_read
             .list_files_batch(folder_id, offset, limit)
+            .await?;
+        Ok(files.into_iter().map(FileDto::from).collect())
+    }
+
+    async fn list_files_batch_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let files = self
+            .file_read
+            .list_files_batch_for_owner(folder_id, owner_id, offset, limit)
             .await?;
         Ok(files.into_iter().map(FileDto::from).collect())
     }

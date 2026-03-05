@@ -119,10 +119,27 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     /// Lists files in a folder
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<FileDto>, DomainError>;
 
+    /// Lists files in a folder, scoped to the authenticated user.
+    ///
+    /// Uses SQL-level `AND user_id` filtering — no in-memory post-filter.
+    /// All user-facing list handlers should use this method.
+    async fn list_files_owned(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<FileDto>, DomainError>;
+
     /// Gets file content as a stream (for large files)
     async fn get_file_stream(
         &self,
         id: &str,
+    ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
+
+    /// Gets file content as a stream, enforcing that `caller_id` is the owner.
+    async fn get_file_stream_owned(
+        &self,
+        id: &str,
+        caller_id: &str,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
     /// Optimized multi-tier download.
@@ -208,6 +225,24 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
             .take(limit as usize)
             .collect())
     }
+
+    /// Like [`list_files_batch`], but scoped to a specific owner.
+    ///
+    /// Used by streaming WebDAV PROPFIND so that each user only sees their
+    /// own files, even in shared folder_id namespaces.
+    async fn list_files_batch_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<FileDto>, DomainError> {
+        let all = self.list_files_batch(folder_id, offset, limit).await?;
+        Ok(all
+            .into_iter()
+            .filter(|f| f.owner_id.as_deref().map_or(false, |o| o == owner_id))
+            .collect())
+    }
 }
 
 // ─────────────────────────────────────────────────────
@@ -238,6 +273,14 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
         target_folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
+    /// Copies a file, enforcing that `caller_id` is the owner.
+    async fn copy_file_owned(
+        &self,
+        file_id: &str,
+        caller_id: &str,
+        target_folder_id: Option<String>,
+    ) -> Result<FileDto, DomainError>;
+
     /// Renames a file (system/internal — no ownership check).
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError>;
 
@@ -251,6 +294,9 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
 
     /// Deletes a file (system/internal — no ownership check).
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
+
+    /// Deletes a file, enforcing that `caller_id` is the owner.
+    async fn delete_file_owned(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
 
     /// Smart delete: trash-first with dedup reference cleanup.
     ///

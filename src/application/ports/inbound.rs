@@ -16,6 +16,12 @@ pub trait FolderUseCase: Send + Sync + 'static {
     /// Gets a folder by its ID
     async fn get_folder(&self, id: &str) -> Result<FolderDto, DomainError>;
 
+    /// Gets a folder by its ID, enforcing that `caller_id` is the owner.
+    ///
+    /// Returns `NotFound` if the folder does not exist **or** belongs to
+    /// another user.  All user-facing handlers should use this method.
+    async fn get_folder_owned(&self, id: &str, caller_id: &str) -> Result<FolderDto, DomainError>;
+
     /// Gets a folder by its path
     async fn get_folder_by_path(&self, path: &str) -> Result<FolderDto, DomainError>;
 

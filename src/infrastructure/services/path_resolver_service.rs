@@ -32,17 +32,20 @@ impl PathResolverService {
         Self { pool }
     }
 
-    /// Resolve `path` (without leading `/`) to either a folder or a file.
+    /// Resolve `path` to a folder or file **owned by `user_id`**.
     ///
-    /// The query uses `UNION ALL … LIMIT 1`: the folder branch is evaluated
-    /// first, and PG short-circuits if it produces a row.
-    pub async fn resolve_path(&self, path: &str) -> Result<ResolvedResource, DomainError> {
+    /// Adds `AND fo.user_id = $4` / `AND fi.user_id = $4` so that one
+    /// user can never resolve another user's resources.
+    pub async fn resolve_path_for_user(
+        &self,
+        path: &str,
+        user_id: &str,
+    ) -> Result<ResolvedResource, DomainError> {
         let path = path.trim_start_matches('/').trim_end_matches('/');
         if path.is_empty() {
             return Err(DomainError::not_found("Resource", "empty path"));
         }
 
-        // Split into folder_path + filename for the file branch
         let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
         let filename = segments[segments.len() - 1];
         let folder_path = if segments.len() > 1 {
@@ -51,9 +54,6 @@ impl PathResolverService {
             String::new()
         };
 
-        // Single round-trip: folder branch ∪ file branch, LIMIT 1.
-        // Column order: resource_type, id, name, path, parent_id, user_id,
-        //               created_at, modified_at, size, mime_type, folder_id
         let row = sqlx::query_as::<
             _,
             (
@@ -61,13 +61,13 @@ impl PathResolverService {
                 String,         // id
                 String,         // name
                 String,         // path
-                Option<String>, // parent_id  (folder) / NULL (file)
+                Option<String>, // parent_id
                 Option<String>, // user_id
-                i64,            // created_at epoch
-                i64,            // modified_at epoch
-                Option<i64>,    // size       (NULL for folder)
-                Option<String>, // mime_type  (NULL for folder)
-                Option<String>, // folder_id  (NULL for folder)
+                i64,            // created_at
+                i64,            // modified_at
+                Option<i64>,    // size
+                Option<String>, // mime_type
+                Option<String>, // folder_id
             ),
         >(
             r#"
@@ -87,6 +87,7 @@ impl PathResolverService {
                        NULL::text           AS folder_id
                   FROM storage.folders fo
                  WHERE fo.path = $1 AND NOT fo.is_trashed
+                   AND fo.user_id = $4
 
                 UNION ALL
 
@@ -113,16 +114,18 @@ impl PathResolverService {
                          OR fo.path = $3
                        )
                    AND NOT fi.is_trashed
+                   AND fi.user_id = $4
               ) sub
              LIMIT 1
             "#,
         )
-        .bind(path) // $1 — full path for folder lookup
-        .bind(filename) // $2 — filename for file lookup
-        .bind(&folder_path) // $3 — parent folder path for file lookup
+        .bind(path)          // $1
+        .bind(filename)      // $2
+        .bind(&folder_path)  // $3
+        .bind(user_id)       // $4
         .fetch_optional(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::internal_error("PathResolver", format!("resolve: {e}")))?
+        .map_err(|e| DomainError::internal_error("PathResolver", format!("resolve_for_user: {e}")))?
         .ok_or_else(|| DomainError::not_found("Resource", path))?;
 
         let (
@@ -131,7 +134,7 @@ impl PathResolverService {
             name,
             res_path,
             parent_id,
-            user_id,
+            uid,
             created_at,
             modified_at,
             size,
@@ -145,7 +148,7 @@ impl PathResolverService {
                 name: name.clone(),
                 path: res_path,
                 parent_id,
-                owner_id: user_id,
+                owner_id: uid,
                 created_at: created_at as u64,
                 modified_at: modified_at as u64,
                 is_root: false,
@@ -169,16 +172,14 @@ impl PathResolverService {
                     icon_special_class: Arc::from(icon_special_class_for(&name, &mime)),
                     category: Arc::from(category_for(&name, &mime)),
                     size_formatted: format_file_size(sz),
-                    owner_id: user_id,
+                    owner_id: uid,
                 }))
             }
         }
     }
 
-    /// Check whether *any* resource (folder or file) exists at the given path.
-    ///
-    /// Equivalent to `resolve_path(…).is_ok()` but avoids constructing the DTO.
-    pub async fn exists(&self, path: &str) -> Result<bool, DomainError> {
+    /// Returns `true` if the resource at `path` belongs to `user_id`.
+    pub async fn exists_for_user(&self, path: &str, user_id: &str) -> Result<bool, DomainError> {
         let path = path.trim_start_matches('/').trim_end_matches('/');
         if path.is_empty() {
             return Ok(false);
@@ -196,7 +197,7 @@ impl PathResolverService {
             r#"
             SELECT EXISTS(
               SELECT 1 FROM storage.folders
-               WHERE path = $1 AND NOT is_trashed
+               WHERE path = $1 AND NOT is_trashed AND user_id = $4
             ) OR EXISTS(
               SELECT 1
                 FROM storage.files fi
@@ -204,15 +205,17 @@ impl PathResolverService {
                WHERE fi.name = $2
                  AND (($3 = '' AND fi.folder_id IS NULL) OR fo.path = $3)
                  AND NOT fi.is_trashed
+                 AND fi.user_id = $4
             )
             "#,
         )
         .bind(path)
         .bind(filename)
         .bind(&folder_path)
+        .bind(user_id)
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::internal_error("PathResolver", format!("exists: {e}")))?;
+        .map_err(|e| DomainError::internal_error("PathResolver", format!("exists_for_user: {e}")))?;
 
         Ok(exists)
     }

@@ -260,6 +260,62 @@ impl FileReadPort for FileBlobReadRepository {
             .collect()
     }
 
+    /// User-scoped file listing — adds `AND fi.user_id = $2` to prevent
+    /// cross-user data leakage in the REST API (`list_files_query`).
+    async fn list_files_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<File>, DomainError> {
+        let rows: Vec<FileRow> = if let Some(fid) = folder_id {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
+                   AND fi.user_id = $2
+                 ORDER BY fi.name
+                "#,
+            )
+            .bind(fid)
+            .bind(owner_id)
+            .fetch_all(self.pool.as_ref())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
+                   AND fi.user_id = $1
+                 ORDER BY fi.name
+                "#,
+            )
+            .bind(owner_id)
+            .fetch_all(self.pool.as_ref())
+            .await
+        }
+        .map_err(|e| {
+            DomainError::internal_error("FileBlobRead", format!("list_for_owner: {e}"))
+        })?;
+
+        rows.into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect()
+    }
+
     async fn get_blob_hash(&self, file_id: &str) -> Result<String, DomainError> {
         self.resolve_blob_hash(file_id).await
     }
@@ -315,6 +371,70 @@ impl FileReadPort for FileBlobReadRepository {
             .await
         }
         .map_err(|e| DomainError::internal_error("FileBlobRead", format!("list_batch: {e}")))?;
+
+        rows.into_iter()
+            .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {
+                Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)
+            })
+            .collect()
+    }
+
+    /// User-scoped paginated file listing — adds `AND fi.user_id = $4` to
+    /// prevent cross-user data leakage in WebDAV PROPFIND.
+    async fn list_files_batch_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<File>, DomainError> {
+        let rows: Vec<FileRow> = if let Some(fid) = folder_id {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
+                   AND fi.user_id = $4
+                 ORDER BY fi.name
+                 LIMIT $2 OFFSET $3
+                "#,
+            )
+            .bind(fid)
+            .bind(limit)
+            .bind(offset)
+            .bind(owner_id)
+            .fetch_all(self.pool.as_ref())
+            .await
+        } else {
+            sqlx::query_as(
+                r#"
+                SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                       fi.size, fi.mime_type,
+                       EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                       EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                       fi.user_id::text
+                  FROM storage.files fi
+                  LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+                 WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
+                   AND fi.user_id = $3
+                 ORDER BY fi.name
+                 LIMIT $1 OFFSET $2
+                "#,
+            )
+            .bind(limit)
+            .bind(offset)
+            .bind(owner_id)
+            .fetch_all(self.pool.as_ref())
+            .await
+        }
+        .map_err(|e| {
+            DomainError::internal_error("FileBlobRead", format!("list_batch_for_owner: {e}"))
+        })?;
 
         rows.into_iter()
             .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {

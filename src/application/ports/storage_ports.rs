@@ -46,6 +46,22 @@ pub trait FileReadPort: Send + Sync + 'static {
     /// Lists files in a folder.
     async fn list_files(&self, folder_id: Option<&str>) -> Result<Vec<File>, DomainError>;
 
+    /// Lists files in a folder scoped to a specific owner (SQL-level).
+    ///
+    /// Default falls back to `list_files` + in-memory filter.
+    /// Repositories should override with a direct `AND user_id = $N` query.
+    async fn list_files_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+    ) -> Result<Vec<File>, DomainError> {
+        let all = self.list_files(folder_id).await?;
+        Ok(all
+            .into_iter()
+            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .collect())
+    }
+
     /// Gets content as a stream (ideal for large files).
     async fn get_file_stream(
         &self,
@@ -106,6 +122,25 @@ pub trait FileReadPort: Send + Sync + 'static {
         let start = (offset as usize).min(all.len());
         let end = (start + limit as usize).min(all.len());
         Ok(all.into_iter().skip(start).take(end - start).collect())
+    }
+
+    /// Like [`list_files_batch`], but only returns files owned by `owner_id`.
+    ///
+    /// Used by streaming WebDAV PROPFIND to list files scoped to the
+    /// authenticated user, preventing cross-user data leakage.
+    async fn list_files_batch_for_owner(
+        &self,
+        folder_id: Option<&str>,
+        owner_id: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<File>, DomainError> {
+        // Default: filter in-memory (repos should override with SQL)
+        let all = self.list_files_batch(folder_id, offset, limit).await?;
+        Ok(all
+            .into_iter()
+            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .collect())
     }
 
     /// Streams every file in the subtree rooted at `folder_id`.

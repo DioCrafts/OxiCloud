@@ -632,38 +632,6 @@ impl FileHandler {
         Self::created_json_response(&file).into_response()
     }
 
-    /// Lists files, optionally filtered by folder ID
-    pub async fn list_files(
-        State(state): State<GlobalState>,
-        folder_id: Option<&str>,
-    ) -> impl IntoResponse {
-        tracing::info!("Listing files with folder_id: {:?}", folder_id);
-
-        let retrieval = &state.applications.file_retrieval_service;
-        match retrieval.list_files(folder_id).await {
-            Ok(files) => {
-                tracing::info!("Found {} files through the service", files.len());
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header("Cache-Control", "no-cache, no-store, must-revalidate")
-                    .header("Pragma", "no-cache")
-                    .header("Expires", "0")
-                    .body(Body::from(serde_json::to_string(&files).unwrap()))
-                    .unwrap()
-            }
-            Err(err) => {
-                tracing::error!("Error listing files: {}", err);
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({
-                        "error": err.to_string()
-                    })),
-                )
-                    .into_response()
-            }
-        }
-    }
-
     // ═══════════════════════════════════════════════════════════════════════
     //  DELETE
     // ═══════════════════════════════════════════════════════════════════════
