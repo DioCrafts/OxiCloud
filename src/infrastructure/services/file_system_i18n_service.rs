@@ -1,7 +1,7 @@
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::RwLock;
+use tokio::sync::RwLock;
 use tokio::fs;
 
 use crate::domain::services::i18n_service::{I18nError, I18nResult, I18nService, Locale};
@@ -66,7 +66,7 @@ impl I18nService for FileSystemI18nService {
     async fn translate(&self, key: &str, locale: Locale) -> I18nResult<String> {
         // Check if translations are cached
         {
-            let cache = self.cache.read().unwrap();
+            let cache = self.cache.read().await;
             if let Some(translations) = cache.get(&locale) {
                 if let Some(value) = self.get_nested_value(translations, key) {
                     return Ok(value);
@@ -88,7 +88,7 @@ impl I18nService for FileSystemI18nService {
         self.load_translations(locale).await?;
 
         {
-            let cache = self.cache.read().unwrap();
+            let cache = self.cache.read().await;
             if let Some(translations) = cache.get(&locale) {
                 if let Some(value) = self.get_nested_value(translations, key) {
                     return Ok(value);
@@ -131,7 +131,7 @@ impl I18nService for FileSystemI18nService {
 
         // Update cache
         {
-            let mut cache = self.cache.write().unwrap();
+            let mut cache = self.cache.write().await;
             cache.insert(locale, translations);
         }
 

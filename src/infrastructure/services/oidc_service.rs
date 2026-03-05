@@ -6,7 +6,7 @@
 //! Compatible with Authentik, Keycloak, and any standard OIDC provider.
 
 use serde::Deserialize;
-use std::sync::RwLock;
+use tokio::sync::RwLock;
 use std::time::{Duration, Instant};
 
 use crate::application::ports::auth_ports::{OidcIdClaims, OidcServicePort, OidcTokenSet};
@@ -144,10 +144,7 @@ impl OidcService {
     async fn get_discovery(&self) -> Result<OidcDiscovery, DomainError> {
         // Check cache first (return cached value only if not expired)
         {
-            let cache = self
-                .discovery
-                .read()
-                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
+            let cache = self.discovery.read().await;
             if let Some(ref cached) = *cache {
                 if !cached.is_expired() {
                     return Ok(cached.value.clone());
@@ -193,10 +190,7 @@ impl OidcService {
 
         // Cache it with timestamp
         {
-            let mut cache = self
-                .discovery
-                .write()
-                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
+            let mut cache = self.discovery.write().await;
             *cache = Some(Cached::new(discovery.clone()));
         }
 
@@ -207,10 +201,7 @@ impl OidcService {
     async fn get_jwks(&self) -> Result<JwksDocument, DomainError> {
         // Check cache first (return cached value only if not expired)
         {
-            let cache = self
-                .jwks
-                .read()
-                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
+            let cache = self.jwks.read().await;
             if let Some(ref cached) = *cache {
                 if !cached.is_expired() {
                     return Ok(cached.value.clone());
@@ -246,10 +237,7 @@ impl OidcService {
 
         // Cache it with timestamp
         {
-            let mut cache = self
-                .jwks
-                .write()
-                .map_err(|_| DomainError::new(ErrorKind::InternalError, "OIDC", "Lock poisoned"))?;
+            let mut cache = self.jwks.write().await;
             *cache = Some(Cached::new(jwks.clone()));
         }
 

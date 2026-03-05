@@ -7,7 +7,7 @@ default-run = "oxicloud"
 
 [dependencies]
 mimalloc = { version = "0.1.48", default-features = false }
-axum = { version = "0.8.8", features = ["multipart", "http1", "tokio", "macros"] }
+axum = { version = "0.8.8", features = ["multipart", "http1", "http2", "tokio", "macros"] }
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "io-util", "net", "time", "sync", "fs"] }
 tokio-util = { version = "0.7.18", features = ["io", "codec", "compat"] }
 tokio-stream = { version = "0.1.18", features = ["fs"] }
@@ -32,7 +32,6 @@ sqlx = { version = "0.8.6", features = ["postgres", "runtime-tokio", "tls-rustls
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 argon2 = "0.5.3"
 rand_core = { version = "0.6", features = ["std", "getrandom"] }
-hyper = { version = "1.8.1", features = ["full"] }
 quick-xml = "0.39.2"
 dotenvy = "0.15.7"
 moka = { version = "0.12", features = ["future", "sync"] }
