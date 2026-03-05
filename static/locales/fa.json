@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "هنوز عکسی نیست",
     "empty_hint": "تصاویر یا ویدیوها را آپلود کنید تا اینجا نمایش داده شوند",
-    "items_selected": "انتخاب شده"
+    "items_selected": "انتخاب شده",
+    "view_daily": "روز",
+    "view_monthly": "ماه",
+    "view_yearly": "سال"
   },
   "actions": {
     "search": "جست‌و‌جوی پرونده‌ها..",

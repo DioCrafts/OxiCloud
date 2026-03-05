@@ -24,7 +24,8 @@ use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::repositories::pg::{
-    FileBlobReadRepository, FileBlobWriteRepository, FileMetadataRepository, FolderDbRepository, TrashDbRepository,
+    FileBlobReadRepository, FileBlobWriteRepository, FileMetadataRepository, FolderDbRepository,
+    TrashDbRepository,
 };
 use crate::infrastructure::services::file_content_cache::{
     FileContentCache, FileContentCacheConfig,

@@ -61,13 +61,23 @@ impl ExifService {
 
         // ── Camera info ──
         if let Some(field) = exif.get_field(Tag::Make, In::PRIMARY) {
-            let val = field.display_value().to_string().trim_matches('"').trim().to_string();
+            let val = field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .trim()
+                .to_string();
             if !val.is_empty() {
                 meta.camera_make = Some(val);
             }
         }
         if let Some(field) = exif.get_field(Tag::Model, In::PRIMARY) {
-            let val = field.display_value().to_string().trim_matches('"').trim().to_string();
+            let val = field
+                .display_value()
+                .to_string()
+                .trim_matches('"')
+                .trim()
+                .to_string();
             if !val.is_empty() {
                 meta.camera_model = Some(val);
             }
@@ -159,7 +169,7 @@ fn parse_u32_value(value: &exif::Value) -> Option<u32> {
 /// to match the intended orientation.
 pub fn apply_orientation(img: image::DynamicImage, orientation: u16) -> image::DynamicImage {
     match orientation {
-        1 => img,                                                        // Normal
+        1 => img,                                                               // Normal
         2 => image::DynamicImage::from(image::imageops::flip_horizontal(&img)), // Mirror horizontal
         3 => image::DynamicImage::from(image::imageops::rotate180(&img)),       // Rotate 180°
         4 => image::DynamicImage::from(image::imageops::flip_vertical(&img)),   // Mirror vertical
@@ -168,13 +178,13 @@ pub fn apply_orientation(img: image::DynamicImage, orientation: u16) -> image::D
             let flipped = image::imageops::flip_horizontal(&img);
             image::DynamicImage::from(image::imageops::rotate270(&flipped))
         }
-        6 => image::DynamicImage::from(image::imageops::rotate90(&img)),        // Rotate 90° CW
+        6 => image::DynamicImage::from(image::imageops::rotate90(&img)), // Rotate 90° CW
         7 => {
             // Transverse: flip horizontal then rotate 90°
             let flipped = image::imageops::flip_horizontal(&img);
             image::DynamicImage::from(image::imageops::rotate90(&flipped))
         }
-        8 => image::DynamicImage::from(image::imageops::rotate270(&img)),       // Rotate 270° CW
+        8 => image::DynamicImage::from(image::imageops::rotate270(&img)), // Rotate 270° CW
         _ => img,
     }
 }

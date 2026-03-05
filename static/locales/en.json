@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "No photos yet",
     "empty_hint": "Upload images or videos to see them here",
-    "items_selected": "selected"
+    "items_selected": "selected",
+    "view_daily": "Day",
+    "view_monthly": "Month",
+    "view_yearly": "Year"
   },
   "actions": {
     "search": "Search files...",

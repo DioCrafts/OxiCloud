@@ -178,7 +178,7 @@ impl FileBlobReadRepository {
               FROM storage.files fi
               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
               LEFT JOIN storage.file_metadata fm ON fm.file_id = fi.id
-             WHERE fi.user_id = $1::uuid
+             WHERE fi.user_id = $1
                AND NOT fi.is_trashed
                AND (fi.mime_type LIKE 'image/%' OR fi.mime_type LIKE 'video/%')
                AND ($2::bigint IS NULL
@@ -198,7 +198,9 @@ impl FileBlobReadRepository {
         let mut sort_dates = Vec::with_capacity(rows.len());
 
         for (id, name, fid, fpath, size, mime, ca, ma, uid, sd) in rows {
-            files.push(Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)?);
+            files.push(Self::row_to_file(
+                id, name, fid, fpath, size, mime, ca, ma, uid,
+            )?);
             sort_dates.push(sd);
         }
 

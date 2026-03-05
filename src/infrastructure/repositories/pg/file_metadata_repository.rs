@@ -100,7 +100,17 @@ impl FileMetadataRepository {
         })?;
 
         Ok(row.map(
-            |(file_id, captured_at, latitude, longitude, camera_make, camera_model, orientation, width, height)| {
+            |(
+                file_id,
+                captured_at,
+                latitude,
+                longitude,
+                camera_make,
+                camera_model,
+                orientation,
+                width,
+                height,
+            )| {
                 StoredMetadata {
                     file_id,
                     captured_at,
@@ -152,7 +162,18 @@ impl FileMetadataRepository {
         })?;
 
         let mut map = HashMap::with_capacity(rows.len());
-        for (file_id, captured_at, latitude, longitude, camera_make, camera_model, orientation, width, height) in rows {
+        for (
+            file_id,
+            captured_at,
+            latitude,
+            longitude,
+            camera_make,
+            camera_model,
+            orientation,
+            width,
+            height,
+        ) in rows
+        {
             map.insert(
                 file_id.clone(),
                 StoredMetadata {

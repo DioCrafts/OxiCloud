@@ -642,7 +642,11 @@ impl FileHandler {
                             }
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to read file for EXIF extraction {}: {}", file_id, e);
+                            tracing::warn!(
+                                "Failed to read file for EXIF extraction {}: {}",
+                                file_id,
+                                e
+                            );
                         }
                     }
                 }

@@ -1,6 +1,6 @@
 /**
  * OxiCloud - Photos Timeline View
- * Dense photo grid grouped by day, with infinite scroll and multi-select.
+ * Photo grid grouped by day/month/year, with infinite scroll and multi-select.
  */
 
 const photosView = {
@@ -20,6 +20,8 @@ const photosView = {
     _container: null,
     /** @type {boolean} */
     _initialized: false,
+    /** @type {'daily'|'monthly'|'yearly'} */
+    groupMode: 'monthly',
 
     PAGE_SIZE: 200,
 
@@ -42,6 +44,7 @@ const photosView = {
             this._container = el;
         }
         if (!this._initialized) {
+            this.groupMode = localStorage.getItem('oxicloud-photos-group') || 'monthly';
             this._initialized = true;
         }
     },
@@ -66,6 +69,14 @@ const photosView = {
         }
         this._destroyObserver();
         this._hideSelectionBar();
+    },
+
+    /** Switch grouping mode */
+    setGroupMode(mode) {
+        if (this.groupMode === mode) return;
+        this.groupMode = mode;
+        localStorage.setItem('oxicloud-photos-group', mode);
+        this._render();
     },
 
     /** Fetch a page of photos from the API */
@@ -93,7 +104,6 @@ const photosView = {
                 this.exhausted = true;
             } else {
                 this.items.push(...data);
-                // Read cursor from header
                 const cursor = res.headers.get('X-Next-Cursor');
                 if (cursor && data.length >= this.PAGE_SIZE) {
                     this.nextCursor = cursor;
@@ -116,6 +126,10 @@ const photosView = {
         if (!this._container) return;
         this._destroyObserver();
 
+        // Set group mode class on container
+        this._container.classList.remove('photos-group-daily', 'photos-group-monthly', 'photos-group-yearly');
+        this._container.classList.add(`photos-group-${this.groupMode}`);
+
         if (this.items.length === 0 && this.exhausted) {
             this._renderEmpty();
             return;
@@ -123,12 +137,12 @@ const photosView = {
 
         if (this.items.length === 0) return;
 
-        // Group by day
-        const groups = this._groupByDay(this.items);
-        let html = '';
+        // Group by selected mode
+        const groups = this._groupItems(this.items);
+        let html = this._renderToolbar();
 
-        for (const [dayLabel, files] of groups) {
-            html += `<div class="photos-day-header">${this._escHtml(dayLabel)}<span class="photos-day-count">${files.length}</span></div>`;
+        for (const [label, files] of groups) {
+            html += `<div class="photos-day-header">${this._escHtml(label)}<span class="photos-day-count">${files.length}</span></div>`;
             html += '<div class="photos-grid">';
             for (const file of files) {
                 const isVideo = file.mime_type && file.mime_type.startsWith('video/');
@@ -165,6 +179,23 @@ const photosView = {
         }
     },
 
+    /** Render the group mode toolbar */
+    _renderToolbar() {
+        const t = (k, d) => window.i18n ? window.i18n.t(k) : d;
+        const modes = [
+            ['daily', t('photos.view_daily', 'Day')],
+            ['monthly', t('photos.view_monthly', 'Month')],
+            ['yearly', t('photos.view_yearly', 'Year')]
+        ];
+        let html = '<div class="photos-toolbar"><div class="view-toggle">';
+        for (const [mode, label] of modes) {
+            const active = this.groupMode === mode ? ' active' : '';
+            html += `<button class="toggle-btn${active}" data-group-mode="${mode}">${this._escHtml(label)}</button>`;
+        }
+        html += '</div></div>';
+        return html;
+    },
+
     /** Render empty state */
     _renderEmpty() {
         const t = (k, d) => window.i18n ? window.i18n.t(k) : d;
@@ -176,23 +207,37 @@ const photosView = {
             </div>`;
     },
 
-    /** Group items by day using sort_date */
-    _groupByDay(items) {
+    /** Group items by the current groupMode */
+    _groupItems(items) {
         const map = new Map();
         for (const item of items) {
             const ts = (item.sort_date || item.created_at) * 1000;
             const d = new Date(ts);
-            const key = d.toLocaleDateString(undefined, {
-                weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-            });
+            let key;
+            if (this.groupMode === 'yearly') {
+                key = String(d.getFullYear());
+            } else if (this.groupMode === 'monthly') {
+                key = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+            } else {
+                key = d.toLocaleDateString(undefined, {
+                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                });
+            }
             if (!map.has(key)) map.set(key, []);
             map.get(key).push(item);
         }
         return map;
     },
 
-    /** Handle click on photo tile */
+    /** Handle click on photo tile or toolbar */
     _handleClick(e) {
+        // Handle group mode toggle
+        const modeBtn = e.target.closest('[data-group-mode]');
+        if (modeBtn) {
+            this.setGroupMode(modeBtn.dataset.groupMode);
+            return;
+        }
+
         const tile = e.target.closest('.photo-tile');
         if (!tile) return;
 
@@ -268,7 +313,6 @@ const photosView = {
                     console.error('Delete failed:', fid, err);
                 }
             }
-            // Remove from items and re-render
             this.items = this.items.filter(f => !this.selected.has(f.id));
             this.selected.clear();
             this._hideSelectionBar();

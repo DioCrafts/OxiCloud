@@ -8,18 +8,28 @@
     display: block;
 }
 
-/* Day group header */
+/* Toolbar with group mode toggle */
+.photos-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 8px 4px;
+}
+
+/* Toggle buttons — wider for text labels */
+.photos-toolbar .toggle-btn {
+    width: auto;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Group header */
 .photos-day-header {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    padding: 12px 4px 8px;
+    padding: 16px 8px 10px;
     font-size: 15px;
     font-weight: 600;
     color: #2d3748;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }
 
 .photos-day-header .photos-day-count {
@@ -29,12 +39,35 @@
     margin-left: 8px;
 }
 
-/* Photo grid */
+/* Photo grid — base (daily mode) */
 .photos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 4px;
-    padding: 0 4px 4px;
+    padding: 0 8px;
+    margin-bottom: 16px;
+}
+
+/* Monthly mode — larger tiles, more breathing room */
+.photos-group-monthly .photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px;
+}
+
+.photos-group-monthly .photos-day-header {
+    font-size: 17px;
+    padding: 20px 8px 12px;
+}
+
+/* Yearly mode — smaller tiles, more items visible */
+.photos-group-yearly .photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px;
+}
+
+.photos-group-yearly .photos-day-header {
+    font-size: 20px;
+    padding: 24px 8px 14px;
 }
 
 /* Individual photo tile */
@@ -222,7 +255,16 @@
     .photos-grid {
         grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
         gap: 2px;
-        padding: 0 2px 2px;
+        padding: 0 2px;
+        margin-bottom: 8px;
+    }
+
+    .photos-group-monthly .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    }
+
+    .photos-group-yearly .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     }
 
     .photo-tile .photo-check {
@@ -231,14 +273,17 @@
 
     .photos-day-header {
         font-size: 14px;
-        padding: 10px 2px 6px;
+        padding: 10px 4px 6px;
+    }
+
+    .photos-toolbar {
+        padding: 6px 4px 2px;
     }
 }
 
 /* Dark theme */
 [data-theme="dark"] .photos-day-header {
     color: #e2e8f0;
-    background: rgba(15, 23, 42, 0.92);
 }
 
 [data-theme="dark"] .photo-tile {

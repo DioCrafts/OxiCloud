@@ -36,7 +36,10 @@ pub async fn list_photos(
 
     let file_read = &state.repositories.file_read_repository;
 
-    match file_read.list_media_files(user_id, params.before, limit).await {
+    match file_read
+        .list_media_files(user_id, params.before, limit)
+        .await
+    {
         Ok((files, sort_dates)) => {
             info!("Photos: returned {} media files for user", files.len());
 
@@ -54,10 +57,9 @@ pub async fn list_photos(
             // Set cursor header for next page
             let mut response = Json(&dtos).into_response();
             if let Some(&last_sd) = sort_dates.last() {
-                response.headers_mut().insert(
-                    "X-Next-Cursor",
-                    last_sd.to_string().parse().unwrap(),
-                );
+                response
+                    .headers_mut()
+                    .insert("X-Next-Cursor", last_sd.to_string().parse().unwrap());
             }
 
             response

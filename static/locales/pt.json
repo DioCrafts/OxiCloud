@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "Nenhuma foto ainda",
     "empty_hint": "Envie imagens ou vídeos para vê-los aqui",
-    "items_selected": "selecionados"
+    "items_selected": "selecionados",
+    "view_daily": "Dia",
+    "view_monthly": "Mês",
+    "view_yearly": "Ano"
   },
   "actions": {
     "search": "Pesquisar arquivos...",

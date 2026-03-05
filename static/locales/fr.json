@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "Pas encore de photos",
     "empty_hint": "Téléchargez des images ou des vidéos pour les voir ici",
-    "items_selected": "sélectionnés"
+    "items_selected": "sélectionnés",
+    "view_daily": "Jour",
+    "view_monthly": "Mois",
+    "view_yearly": "Année"
   },
   "actions": {
     "search": "Rechercher des fichiers...",

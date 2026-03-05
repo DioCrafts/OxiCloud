@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "Nog geen foto's",
     "empty_hint": "Upload afbeeldingen of video's om ze hier te zien",
-    "items_selected": "geselecteerd"
+    "items_selected": "geselecteerd",
+    "view_daily": "Dag",
+    "view_monthly": "Maand",
+    "view_yearly": "Jaar"
   },
   "actions": {
     "search": "Zoek bestanden...",

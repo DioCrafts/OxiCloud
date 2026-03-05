@@ -14,7 +14,10 @@
   "photos": {
     "empty_state": "还没有照片",
     "empty_hint": "上传图片或视频即可在此查看",
-    "items_selected": "已选择"
+    "items_selected": "已选择",
+    "view_daily": "日",
+    "view_monthly": "月",
+    "view_yearly": "年"
   },
   "actions": {
     "search": "搜索文件...",

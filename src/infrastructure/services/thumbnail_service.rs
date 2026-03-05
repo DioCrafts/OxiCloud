@@ -271,7 +271,9 @@ impl ThumbnailService {
 
             // Apply EXIF orientation so thumbnails display correctly
             let img = {
-                use crate::infrastructure::services::exif_service::{ExifService, apply_orientation};
+                use crate::infrastructure::services::exif_service::{
+                    ExifService, apply_orientation,
+                };
                 let orientation = ExifService::extract(&data)
                     .and_then(|m| m.orientation)
                     .unwrap_or(1);
@@ -360,7 +362,9 @@ impl ThumbnailService {
 
                 // Apply EXIF orientation so thumbnails display correctly
                 let img = {
-                    use crate::infrastructure::services::exif_service::{ExifService, apply_orientation};
+                    use crate::infrastructure::services::exif_service::{
+                        ExifService, apply_orientation,
+                    };
                     let orientation = ExifService::extract(&data)
                         .and_then(|m| m.orientation)
                         .unwrap_or(1);

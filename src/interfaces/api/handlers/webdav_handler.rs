@@ -183,11 +183,7 @@ async fn handle_webdav_methods(
 /// If `path` doesn't already start with the user's home folder name, prepend
 /// the home folder path so downstream services can find the resource in the DB.
 /// Returns `None` when the path already includes the prefix or resolution fails.
-async fn resolve_webdav_path(
-    state: &Arc<AppState>,
-    user_id: &str,
-    path: &str,
-) -> Option<String> {
+async fn resolve_webdav_path(state: &Arc<AppState>, user_id: &str, path: &str) -> Option<String> {
     let folder_service = &state.applications.folder_service;
     let home_folders = folder_service
         .list_folders_for_owner(None, user_id)
@@ -213,10 +209,7 @@ async fn handle_webdav_dispatch(
     // prefix when the path doesn't already include it.
     // Extract user_id before any async call to keep the future Send.
     let path = if !path.is_empty() && method.as_str() != "OPTIONS" {
-        let user_id = req
-            .extensions()
-            .get::<CurrentUser>()
-            .map(|u| u.id.clone());
+        let user_id = req.extensions().get::<CurrentUser>().map(|u| u.id.clone());
         if let Some(uid) = user_id {
             resolve_webdav_path(&state, &uid, &path)
                 .await
