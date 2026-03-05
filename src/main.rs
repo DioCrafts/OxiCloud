@@ -2,6 +2,7 @@
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -89,8 +90,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    // Ensure locales directory exists for i18n
+    let locales_path = PathBuf::from("./static/locales");
+    if !locales_path.exists() {
+        std::fs::create_dir_all(&locales_path).expect("Failed to create locales directory");
+    }
+
     // Build all services via the factory
-    let factory = AppServiceFactory::with_config(storage_path, None, config.clone());
+    let factory = AppServiceFactory::with_config(storage_path, locales_path, config.clone());
 
     let app_state = factory.build_app_state(db_pools).await
         .expect("Failed to build application state. If running in Docker, ensure the storage volume is writable by the oxicloud user (UID 1001)");
