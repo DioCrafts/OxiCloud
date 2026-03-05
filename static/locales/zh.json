@@ -8,7 +8,13 @@
     "shared": "共享",
     "recent": "最近",
     "favorites": "收藏",
+    "photos": "照片",
     "trash": "回收站"
+  },
+  "photos": {
+    "empty_state": "还没有照片",
+    "empty_hint": "上传图片或视频即可在此查看",
+    "items_selected": "已选择"
   },
   "actions": {
     "search": "搜索文件...",

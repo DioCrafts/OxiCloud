@@ -8,7 +8,13 @@
     "shared": "Shared",
     "recent": "Recent",
     "favorites": "Favorites",
+    "photos": "Photos",
     "trash": "Trash"
+  },
+  "photos": {
+    "empty_state": "No photos yet",
+    "empty_hint": "Upload images or videos to see them here",
+    "items_selected": "selected"
   },
   "actions": {
     "search": "Search files...",

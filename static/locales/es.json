@@ -8,7 +8,13 @@
     "shared": "Compartidos",
     "recent": "Recientes",
     "favorites": "Favoritos",
+    "photos": "Fotos",
     "trash": "Papelera"
+  },
+  "photos": {
+    "empty_state": "Aún no hay fotos",
+    "empty_hint": "Sube imágenes o videos para verlos aquí",
+    "items_selected": "seleccionados"
   },
   "share": {
     "dialogTitle": "Compartir Enlace",

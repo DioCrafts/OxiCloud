@@ -144,6 +144,66 @@ impl FileBlobReadRepository {
         self.hash_cache.insert(file_id.to_owned(), hash.clone());
         Ok(hash)
     }
+
+    /// Lists all image/video files for a user, sorted by capture date (EXIF) or
+    /// creation date, with cursor-based pagination for the Photos timeline.
+    ///
+    /// Returns `(Vec<File>, Vec<i64>)` where the second vec contains the
+    /// `sort_date` epoch for each file (used as pagination cursor).
+    pub async fn list_media_files(
+        &self,
+        owner_id: &str,
+        before: Option<i64>,
+        limit: i64,
+    ) -> Result<(Vec<File>, Vec<i64>), DomainError> {
+        let rows: Vec<(
+            String,         // id
+            String,         // name
+            Option<String>, // folder_id
+            Option<String>, // folder path
+            i64,            // size
+            String,         // mime_type
+            i64,            // created_at
+            i64,            // updated_at
+            Option<String>, // user_id
+            i64,            // sort_date
+        )> = sqlx::query_as(
+            r#"
+            SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
+                   fi.size, fi.mime_type,
+                   EXTRACT(EPOCH FROM fi.created_at)::bigint,
+                   EXTRACT(EPOCH FROM fi.updated_at)::bigint,
+                   fi.user_id::text,
+                   EXTRACT(EPOCH FROM COALESCE(fm.captured_at, fi.created_at))::bigint AS sort_date
+              FROM storage.files fi
+              LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
+              LEFT JOIN storage.file_metadata fm ON fm.file_id = fi.id
+             WHERE fi.user_id = $1::uuid
+               AND NOT fi.is_trashed
+               AND (fi.mime_type LIKE 'image/%' OR fi.mime_type LIKE 'video/%')
+               AND ($2::bigint IS NULL
+                    OR EXTRACT(EPOCH FROM COALESCE(fm.captured_at, fi.created_at))::bigint < $2::bigint)
+             ORDER BY COALESCE(fm.captured_at, fi.created_at) DESC
+             LIMIT $3
+            "#,
+        )
+        .bind(owner_id)
+        .bind(before)
+        .bind(limit)
+        .fetch_all(self.pool.as_ref())
+        .await
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("list_media: {e}")))?;
+
+        let mut files = Vec::with_capacity(rows.len());
+        let mut sort_dates = Vec::with_capacity(rows.len());
+
+        for (id, name, fid, fpath, size, mime, ca, ma, uid, sd) in rows {
+            files.push(Self::row_to_file(id, name, fid, fpath, size, mime, ca, ma, uid)?);
+            sort_dates.push(sd);
+        }
+
+        Ok((files, sort_dates))
+    }
 }
 
 impl FileReadPort for FileBlobReadRepository {

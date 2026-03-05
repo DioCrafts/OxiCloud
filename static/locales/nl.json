@@ -8,7 +8,13 @@
     "shared": "Gedeeld",
     "recent": "Recente",
     "favorites": "Favorieten",
+    "photos": "Foto's",
     "trash": "Prullenbak"
+  },
+  "photos": {
+    "empty_state": "Nog geen foto's",
+    "empty_hint": "Upload afbeeldingen of video's om ze hier te zien",
+    "items_selected": "geselecteerd"
   },
   "actions": {
     "search": "Zoek bestanden...",

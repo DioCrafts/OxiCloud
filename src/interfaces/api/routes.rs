@@ -309,6 +309,17 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
         .nest("/favorites", favorites_router)
         .nest("/recent", recent_router);
 
+    // Photos timeline endpoint — lists all image/video files sorted by capture date
+    {
+        use crate::interfaces::api::handlers::photos_handler;
+
+        let photos_router = Router::new()
+            .route("/", get(photos_handler::list_photos))
+            .with_state(app_state.clone());
+
+        router = router.nest("/photos", photos_router);
+    }
+
     // Re-enable trash routes to make the trash view work
     if let Some(_trash_service_ref) = trash_service.clone() {
         tracing::info!("Setting up trash routes for trash view");

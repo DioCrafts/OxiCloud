@@ -11,6 +11,7 @@ pub mod favorites_handler;
 pub mod file_handler;
 pub mod folder_handler;
 pub mod i18n_handler;
+pub mod photos_handler;
 pub mod recent_handler;
 pub mod search_handler;
 pub mod share_handler;

@@ -16,6 +16,7 @@ window.app = {
     isSharedView: false,
     isFavoritesView: false,
     isRecentView: false,
+    isPhotosView: false,
     currentSection: 'files',
     isSearchMode: false,
     shareDialogItem: null,

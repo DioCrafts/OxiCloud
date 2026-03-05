@@ -8,7 +8,13 @@
     "shared": "Partagés",
     "recent": "Récents",
     "favorites": "Favoris",
+    "photos": "Photos",
     "trash": "Corbeille"
+  },
+  "photos": {
+    "empty_state": "Pas encore de photos",
+    "empty_hint": "Téléchargez des images ou des vidéos pour les voir ici",
+    "items_selected": "sélectionnés"
   },
   "actions": {
     "search": "Rechercher des fichiers...",

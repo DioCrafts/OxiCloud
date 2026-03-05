@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="/css/views/recent.css">
     <link rel="stylesheet" href="/css/views/shared.css">
     <link rel="stylesheet" href="/css/views/trash.css">
+    <link rel="stylesheet" href="/css/views/photos.css">
+    <link rel="stylesheet" href="/css/views/photosLightbox.css">
 
     <!-- Scripts (defer: download in parallel, execute in order, after HTML parsed) -->
     <script defer src="/js/core/i18n.js"></script>
@@ -32,6 +34,8 @@
     <script defer src="/js/features/files/search.js"></script>
     <script defer src="/js/features/library/favorites.js"></script>
     <script defer src="/js/features/library/recent.js"></script>
+    <script defer src="/js/features/library/photos.js"></script>
+    <script defer src="/js/features/library/photosLightbox.js"></script>
     <script defer src="/js/features/sharing/fileSharing.js"></script>
     <script defer src="/js/views/shared/sharedView.js"></script>
     <script defer src="/js/features/files/inlineViewer.js"></script>
@@ -80,6 +84,10 @@
             <div class="nav-item">
                 <i class="fas fa-star"></i>
                 <span data-i18n="nav.favorites">Favorites</span>
+            </div>
+            <div class="nav-item" id="nav-photos">
+                <i class="fas fa-images"></i>
+                <span data-i18n="nav.photos">Photos</span>
             </div>
             <div class="nav-item">
                 <i class="fas fa-trash"></i>
