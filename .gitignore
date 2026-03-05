@@ -59,6 +59,14 @@ logs/
 # Storage data (user files, blobs — never commit)
 storage/
 
+# TLS certificates and private keys — NEVER commit
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+
 # Temporary files
 *.tmp
 *.bak

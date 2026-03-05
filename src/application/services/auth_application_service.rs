@@ -731,7 +731,16 @@ impl AuthApplicationService {
             ));
         }
         let hash = self.password_hasher.hash_password(new_password).await?;
-        self.user_storage.change_password(user_id, &hash).await
+        self.user_storage.change_password(user_id, &hash).await?;
+
+        // Invalidate all existing sessions so the user must re-login
+        // with the new password.  Mirrors the behaviour of change_password().
+        self.session_storage
+            .revoke_all_user_sessions(user_id)
+            .await?;
+
+        tracing::info!(user_id = %user_id, "Admin reset password — all sessions revoked");
+        Ok(())
     }
 
     /// Get a single user by ID (for admin panel)

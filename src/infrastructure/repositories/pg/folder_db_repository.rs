@@ -739,7 +739,7 @@ impl FolderRepository for FolderDbRepository {
                 } else {
                     " AND fo.name ILIKE $3"
                 },
-                Some(format!("%{}%", name)),
+                Some(super::like_escape(name)),
             ),
             _ => ("", None),
         };
@@ -861,7 +861,7 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if name.len() >= 3 => (" AND fo.name ILIKE $3", Some(format!("%{}%", name))),
+            Some(name) if name.len() >= 3 => (" AND fo.name ILIKE $3", Some(super::like_escape(name))),
             _ => ("", None),
         };
 
@@ -908,7 +908,7 @@ impl FolderRepository for FolderDbRepository {
         query: &str,
         limit: usize,
     ) -> Result<Vec<Folder>, DomainError> {
-        let pattern = format!("%{}%", query);
+        let pattern = super::like_escape(query);
         let limit_i64 = limit as i64;
 
         let rows: Vec<FolderRow> = if let Some(pid) = parent_id {

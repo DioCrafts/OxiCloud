@@ -1160,7 +1160,11 @@ async fn handle_move(
                         None
                     } else {
                         match folder_service.get_folder_by_path(dest_parent_path).await {
-                            Ok(parent) => Some(parent.id),
+                            Ok(parent) => {
+                                // SECURITY: verify destination parent belongs to caller (V-08)
+                                assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                                Some(parent.id)
+                            }
                             Err(_) => None,
                         }
                     },
@@ -1246,7 +1250,11 @@ async fn handle_move(
                     None
                 } else {
                     match folder_service.get_folder_by_path(dest_parent_path).await {
-                        Ok(parent) => Some(parent.id),
+                        Ok(parent) => {
+                            // SECURITY: verify destination parent belongs to caller (V-08)
+                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            Some(parent.id)
+                        }
                         Err(_) => None,
                     }
                 },
@@ -1417,7 +1425,11 @@ async fn handle_copy(
                     None
                 } else {
                     match folder_service.get_folder_by_path(dest_parent_path).await {
-                        Ok(parent) => Some(parent.id),
+                        Ok(parent) => {
+                            // SECURITY: verify destination parent belongs to caller (V-08)
+                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            Some(parent.id)
+                        }
                         Err(_) => None,
                     }
                 };
@@ -1461,7 +1473,11 @@ async fn handle_copy(
                     None
                 } else {
                     match folder_service.get_folder_by_path(dest_parent_path).await {
-                        Ok(parent) => Some(parent.id),
+                        Ok(parent) => {
+                            // SECURITY: verify destination parent belongs to caller (V-08)
+                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            Some(parent.id)
+                        }
                         Err(_) => None,
                     }
                 };
@@ -1501,7 +1517,11 @@ async fn handle_copy(
                 None
             } else {
                 match folder_service.get_folder_by_path(dest_parent_path).await {
-                    Ok(parent) => Some(parent.id),
+                    Ok(parent) => {
+                        // SECURITY: verify destination parent belongs to caller (V-08)
+                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                        Some(parent.id)
+                    }
                     Err(_) => None,
                 }
             };
@@ -1552,7 +1572,11 @@ async fn handle_copy(
                 None
             } else {
                 match folder_service.get_folder_by_path(dest_parent_path).await {
-                    Ok(parent) => Some(parent.id),
+                    Ok(parent) => {
+                        // SECURITY: verify destination parent belongs to caller (V-08)
+                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                        Some(parent.id)
+                    }
                     Err(_) => None,
                 }
             };

@@ -58,15 +58,8 @@ impl User {
         storage_quota_bytes: i64,
     ) -> UserResult<Self> {
         // Validations
-        if username.is_empty() || username.len() < 3 || username.len() > 32 {
-            return Err(UserError::InvalidUsername(
-                "Username must be between 3 and 32 characters".to_string(),
-            ));
-        }
-
-        if !email.contains('@') || email.len() < 5 {
-            return Err(UserError::ValidationError("Invalid email".to_string()));
-        }
+        Self::validate_username(&username)?;
+        Self::validate_email(&email)?;
 
         if password_hash.is_empty() {
             return Err(UserError::InvalidPassword(
@@ -102,14 +95,8 @@ impl User {
         oidc_provider: String,
         oidc_subject: String,
     ) -> UserResult<Self> {
-        if username.is_empty() || username.len() < 3 || username.len() > 32 {
-            return Err(UserError::InvalidUsername(
-                "Username must be between 3 and 32 characters".to_string(),
-            ));
-        }
-        if !email.contains('@') || email.len() < 5 {
-            return Err(UserError::ValidationError("Invalid email".to_string()));
-        }
+        Self::validate_username(&username)?;
+        Self::validate_email(&email)?;
         let now = Utc::now();
         Ok(Self {
             id: Uuid::new_v4().to_string(),
@@ -282,5 +269,72 @@ impl User {
     pub fn activate(&mut self) {
         self.active = true;
         self.updated_at = Utc::now();
+    }
+
+    // ── Shared validation helpers ──────────────────────────────────────
+
+    /// Usernames must be 3-32 chars and contain only ASCII alphanumerics,
+    /// hyphens, underscores, and dots.  This prevents XSS payloads like
+    /// `<img/src=x>` from being stored as usernames.
+    fn validate_username(username: &str) -> UserResult<()> {
+        if username.len() < 3 || username.len() > 32 {
+            return Err(UserError::InvalidUsername(
+                "Username must be between 3 and 32 characters".to_string(),
+            ));
+        }
+        if !username
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')
+        {
+            return Err(UserError::InvalidUsername(
+                "Username may only contain letters, digits, hyphens, underscores, and dots"
+                    .to_string(),
+            ));
+        }
+        // Disallow leading/trailing dots or hyphens
+        if username.starts_with('.') || username.starts_with('-')
+            || username.ends_with('.') || username.ends_with('-')
+        {
+            return Err(UserError::InvalidUsername(
+                "Username must not start or end with a dot or hyphen".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Basic but meaningful email validation:
+    /// - Must contain exactly one `@`
+    /// - Local part and domain must be non-empty
+    /// - Domain must contain at least one dot
+    /// - No angle brackets, spaces, or other characters used in XSS payloads
+    fn validate_email(email: &str) -> UserResult<()> {
+        let parts: Vec<&str> = email.splitn(2, '@').collect();
+        if parts.len() != 2 {
+            return Err(UserError::ValidationError("Invalid email: missing @".to_string()));
+        }
+        let (local, domain) = (parts[0], parts[1]);
+        if local.is_empty() || domain.is_empty() {
+            return Err(UserError::ValidationError(
+                "Invalid email: empty local part or domain".to_string(),
+            ));
+        }
+        if !domain.contains('.') {
+            return Err(UserError::ValidationError(
+                "Invalid email: domain must contain a dot".to_string(),
+            ));
+        }
+        // Reject characters commonly used in XSS / header injection
+        let forbidden = ['<', '>', '"', '\'', '\\', ' ', '\t', '\n', '\r', '(', ')', ',', ';'];
+        if email.chars().any(|c| forbidden.contains(&c)) {
+            return Err(UserError::ValidationError(
+                "Invalid email: contains forbidden characters".to_string(),
+            ));
+        }
+        if email.len() > 254 {
+            return Err(UserError::ValidationError(
+                "Invalid email: too long (max 254 characters)".to_string(),
+            ));
+        }
+        Ok(())
     }
 }

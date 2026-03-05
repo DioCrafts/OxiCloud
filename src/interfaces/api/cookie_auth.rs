@@ -26,16 +26,36 @@ pub const CSRF_COOKIE: &str = "oxicloud_csrf";
 pub const CSRF_HEADER: &str = "x-csrf-token";
 
 /// Whether the `Secure` flag should be set on cookies.
-/// Auto-detected from `OXICLOUD_BASE_URL` (if it starts with `https`)
-/// or overridden with `OXICLOUD_COOKIE_SECURE=true|false`.
+///
+/// Resolution order:
+/// 1. `OXICLOUD_COOKIE_SECURE=true|false` — explicit override.
+/// 2. `OXICLOUD_BASE_URL` starts with `https` → `true`.
+/// 3. **Default: `true`** (safe-by-default).  Set `OXICLOUD_COOKIE_SECURE=false`
+///    explicitly for plain-HTTP development environments.
 fn cookie_secure() -> bool {
     if let Ok(v) = std::env::var("OXICLOUD_COOKIE_SECURE") {
-        return v == "true" || v == "1";
+        let secure = v == "true" || v == "1";
+        if !secure {
+            tracing::warn!(
+                "OXICLOUD_COOKIE_SECURE is explicitly disabled — \
+                 cookies will be sent over plain HTTP. \
+                 Do NOT use this in production."
+            );
+        }
+        return secure;
     }
-    // Auto-detect from base URL
-    std::env::var("OXICLOUD_BASE_URL")
+    // Auto-detect from base URL, defaulting to secure when unset
+    let secure = std::env::var("OXICLOUD_BASE_URL")
         .map(|u| u.starts_with("https"))
-        .unwrap_or(false)
+        .unwrap_or(true);
+    if !secure {
+        tracing::warn!(
+            "OXICLOUD_BASE_URL does not start with https — \
+             cookie Secure flag is OFF. Set OXICLOUD_COOKIE_SECURE=true \
+             to override if your proxy terminates TLS."
+        );
+    }
+    secure
 }
 
 /// Build a `Set-Cookie` header value.

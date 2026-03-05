@@ -736,7 +736,7 @@ impl FileReadPort for FileBlobReadRepository {
         if let Some(name) = &criteria.name_contains
             && name.len() >= 3
         {
-            query = query.bind(format!("%{}%", name));
+            query = query.bind(super::like_escape(name));
         }
         query = query.bind(limit).bind(offset);
 
@@ -895,7 +895,7 @@ impl FileReadPort for FileBlobReadRepository {
         if let Some(name) = &criteria.name_contains
             && name.len() >= 3
         {
-            query = query.bind(format!("%{}%", name));
+            query = query.bind(super::like_escape(name));
         }
         if let Some(types) = &criteria.file_types
             && !types.is_empty()
@@ -963,7 +963,7 @@ impl FileReadPort for FileBlobReadRepository {
         query: &str,
         limit: usize,
     ) -> Result<Vec<File>, DomainError> {
-        let pattern = format!("%{}%", query);
+        let pattern = super::like_escape(query);
         let limit_i64 = limit as i64;
 
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {

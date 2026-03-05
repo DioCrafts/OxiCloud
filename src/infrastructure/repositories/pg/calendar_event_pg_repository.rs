@@ -274,7 +274,7 @@ impl CalendarEventRepository for CalendarEventPgRepository {
         calendar_id: &Uuid,
         summary: &str,
     ) -> CalendarEventRepositoryResult<Vec<CalendarEvent>> {
-        let search_pattern = format!("%{}%", summary);
+        let search_pattern = super::like_escape(summary);
 
         let rows = sqlx::query(
             r#"

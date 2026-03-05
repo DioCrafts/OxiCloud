@@ -38,3 +38,16 @@ pub use settings_pg_repository::SettingsPgRepository;
 pub use share_pg_repository::SharePgRepository;
 pub use trash_db_repository::TrashDbRepository;
 pub use user_pg_repository::UserPgRepository;
+
+// ── SQL helpers ─────────────────────────────────────────────────────────────
+
+/// Escape SQL `LIKE` / `ILIKE` wildcard characters (`%` and `_`) in user
+/// input and wrap the result in `%…%` for a contains-match.
+///
+/// Without this, a user searching for `100%` would match *every* row because
+/// `%` is a wildcard in LIKE patterns.
+#[inline]
+pub fn like_escape(raw: &str) -> String {
+    let escaped = raw.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    format!("%{escaped}%")
+}

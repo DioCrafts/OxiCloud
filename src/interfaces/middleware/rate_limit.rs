@@ -89,24 +89,35 @@ impl RateLimiter {
 // ─── Axum middleware factories ──────────────────────────────────────────────
 
 /// Extract the most-likely real client IP from headers / connection info.
+///
+/// Proxy headers (`X-Forwarded-For`, `X-Real-Ip`) are only trusted when
+/// `OXICLOUD_TRUST_PROXY_HEADERS=true` is set.  Without a trusted reverse
+/// proxy in front of the app, an attacker can spoof these headers to bypass
+/// rate limiting.
 pub fn extract_client_ip<B>(req: &Request<B>) -> String {
+    let trust_proxy = std::env::var("OXICLOUD_TRUST_PROXY_HEADERS")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(false);
+
     let headers = req.headers();
 
-    // 1. X-Forwarded-For (first entry — closest to the client)
-    if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
-        && let Some(first) = xff.split(',').next()
-    {
-        let ip = first.trim();
-        if !ip.is_empty() {
-            return ip.to_string();
+    if trust_proxy {
+        // 1. X-Forwarded-For (first entry — closest to the client)
+        if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
+            && let Some(first) = xff.split(',').next()
+        {
+            let ip = first.trim();
+            if !ip.is_empty() {
+                return ip.to_string();
+            }
         }
-    }
 
-    // 2. X-Real-Ip
-    if let Some(xri) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
-        let ip = xri.trim();
-        if !ip.is_empty() {
-            return ip.to_string();
+        // 2. X-Real-Ip
+        if let Some(xri) = headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+            let ip = xri.trim();
+            if !ip.is_empty() {
+                return ip.to_string();
+            }
         }
     }
 

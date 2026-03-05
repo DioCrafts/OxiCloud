@@ -277,7 +277,7 @@ impl ContactRepository for ContactPgRepository {
     }
 
     async fn get_contacts_by_email(&self, email: &str) -> ContactRepositoryResult<Vec<Contact>> {
-        let search_pattern = format!("%{}%", email);
+        let search_pattern = super::like_escape(email);
 
         let rows = sqlx::query(
             r#"
@@ -339,7 +339,7 @@ impl ContactRepository for ContactPgRepository {
         address_book_id: &Uuid,
         query: &str,
     ) -> ContactRepositoryResult<Vec<Contact>> {
-        let search_pattern = format!("%{}%", query);
+        let search_pattern = super::like_escape(query);
 
         let rows = sqlx::query(
             r#"

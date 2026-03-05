@@ -122,10 +122,10 @@ async function changePassword(e) {
       document.getElementById('password-form').reset();
     } else {
       const err = await resp.json().catch(() => ({}));
-      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + (err.message || 'Failed to change password') + '</div>';
+      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(err.message || 'Failed to change password') + '</div>';
     }
   } catch (err) {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Network error: ' + err.message + '</div>';
+    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Network error: ' + escapeHtml(err.message) + '</div>';
   }
 
   btn.disabled = false;

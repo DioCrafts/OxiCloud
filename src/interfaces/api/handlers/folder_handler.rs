@@ -67,6 +67,19 @@ impl FolderHandler {
             }
         }
 
+        // ── SECURITY: Verify parent folder ownership (IDOR V-04 fix) ──
+        if let Some(ref parent_id) = dto.parent_id {
+            use crate::application::ports::inbound::FolderUseCase;
+            if service.get_folder_owned(parent_id, &auth_user.id).await.is_err() {
+                tracing::warn!(
+                    "create_folder: user '{}' attempted to create folder in parent '{}' owned by another user",
+                    auth_user.username,
+                    parent_id,
+                );
+                return AppError::not_found(format!("Parent folder not found: {}", parent_id)).into_response();
+            }
+        }
+
         match service.create_folder(dto).await {
             Ok(folder) => (StatusCode::CREATED, Json(folder)).into_response(),
             Err(err) => AppError::from(err).into_response()

@@ -102,6 +102,22 @@ impl FileHandler {
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
+                // ── SECURITY: Verify folder ownership before upload (IDOR V-03 fix) ──
+                if let Some(ref fid) = folder_id {
+                    use crate::application::ports::inbound::FolderUseCase;
+                    let folder_service = &state.applications.folder_service;
+                    if folder_service.get_folder_owned(fid, &auth_user.id).await.is_err() {
+                        tracing::warn!(
+                            "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
+                            auth_user.username,
+                            fid,
+                        );
+                        return Err(Self::domain_error_response(
+                            crate::common::errors::DomainError::not_found("Folder", fid),
+                        ));
+                    }
+                }
+
                 // ── Early quota check (before spooling to disk) ──────
                 if let Some(storage_svc) = state.storage_usage_service.as_ref() {
                     let estimated_size = field
@@ -707,20 +723,59 @@ impl FileHandler {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Build a Content-Disposition header value.
+    ///
+    /// Uses RFC 5987 `filename*=UTF-8''<percent-encoded>` to safely handle
+    /// filenames with quotes, non-ASCII characters, or other special chars.
+    /// A sanitised ASCII `filename=` fallback is included for legacy clients.
     fn content_disposition(name: &str, mime: &str, params: &HashMap<String, String>) -> String {
         let force_inline = params
             .get("inline")
             .is_some_and(|v| v == "true" || v == "1");
-        if force_inline
+        let disposition = if force_inline
             || mime.starts_with("image/")
             || mime == "application/pdf"
             || mime.starts_with("video/")
             || mime.starts_with("audio/")
         {
-            format!("inline; filename=\"{}\"", name)
+            "inline"
         } else {
-            format!("attachment; filename=\"{}\"", name)
-        }
+            "attachment"
+        };
+
+        // RFC 5987 percent-encode for filename* (attr-char safe set)
+        use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, utf8_percent_encode};
+        // Characters that DON'T need encoding per RFC 5987 attr-char:
+        //   ALPHA / DIGIT / "!" / "#" / "$" / "&" / "+" / "-" / "." /
+        //   "^" / "_" / "`" / "|" / "~"
+        const RFC5987_SET: &AsciiSet = &NON_ALPHANUMERIC
+            .remove(b'!')
+            .remove(b'#')
+            .remove(b'$')
+            .remove(b'&')
+            .remove(b'+')
+            .remove(b'-')
+            .remove(b'.')
+            .remove(b'^')
+            .remove(b'_')
+            .remove(b'`')
+            .remove(b'|')
+            .remove(b'~');
+        let encoded = utf8_percent_encode(name, RFC5987_SET).to_string();
+
+        // ASCII fallback: strip anything outside printable ASCII and
+        // replace '"' and '\\' to prevent header injection.
+        let ascii_safe: String = name
+            .chars()
+            .filter(|c| c.is_ascii_graphic() || *c == ' ')
+            .map(|c| match c {
+                '"' | '\\' => '_',
+                _ => c,
+            })
+            .collect();
+
+        format!(
+            "{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}"
+        )
     }
 
     /// Build a 201 Created JSON response.
