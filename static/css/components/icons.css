@@ -1,0 +1,19 @@
+/* SVG icon base styles (replaces inline <style> from icons.js) */
+.oxi-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.125em;
+  fill: currentColor;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.oxi-icon-spin {
+  animation: oxi-spin 1s linear infinite;
+}
+
+@keyframes oxi-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

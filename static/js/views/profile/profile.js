@@ -62,7 +62,7 @@ async function init() {
     document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : 'Unlimited');
 
     if (user.auth_provider && user.auth_provider !== 'local') {
-      document.getElementById('password-section').style.display = 'none';
+      document.getElementById('password-section').classList.add('hidden');
     }
 
     loadAppPasswords();
@@ -72,7 +72,7 @@ async function init() {
       if (oidcResp.ok) {
         const oidcInfo = await oidcResp.json();
         if (!oidcInfo.password_login_enabled) {
-          document.getElementById('password-section').style.display = 'none';
+          document.getElementById('password-section').classList.add('hidden');
         }
       }
     } catch (oidcErr) {
@@ -157,7 +157,7 @@ function renderPwRow(pw) {
   btn.className = 'btn btn-danger-sm';
   btn.innerHTML = '<i class="fas fa-trash"></i>';
   btn.title = 'Revoke';
-  btn.onclick = function () { revokeAppPassword(pw.id, pw.label); };
+  btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
   actions.appendChild(btn);
   tr.append(label, created, lastUsed, actions);
   return tr;
@@ -167,7 +167,7 @@ async function loadAppPasswords() {
   try {
     const resp = await fetch(API + '/auth/app-passwords', { headers: headers() });
     if (!resp.ok) {
-      document.getElementById('app-passwords-section').style.display = 'none';
+      document.getElementById('app-passwords-section').classList.add('hidden');
       return;
     }
     const passwords = await resp.json();
@@ -180,20 +180,20 @@ async function loadAppPasswords() {
     const empty = document.getElementById('app-pw-empty');
     tbody.innerHTML = '';
     if (userPws.length === 0) {
-      table.style.display = 'none';
-      empty.style.display = 'block';
+      table.classList.add('hidden');
+      empty.classList.remove('hidden');
     } else {
-      table.style.display = '';
-      empty.style.display = 'none';
+      table.classList.remove('hidden');
+      empty.classList.add('hidden');
       for (const pw of userPws) tbody.appendChild(renderPwRow(pw));
     }
 
     // Auto-generated (client session) passwords
     const autoSection = document.getElementById('app-pw-auto-section');
     if (autoPws.length === 0) {
-      autoSection.style.display = 'none';
+      autoSection.classList.add('hidden');
     } else {
-      autoSection.style.display = '';
+      autoSection.classList.remove('hidden');
       document.getElementById('app-pw-auto-count').textContent = autoPws.length;
       const autoTbody = document.getElementById('app-pw-auto-tbody');
       autoTbody.innerHTML = '';
@@ -207,9 +207,9 @@ async function loadAppPasswords() {
 function toggleAutoPasswords() {
   const body = document.getElementById('app-pw-auto-body');
   const chevron = document.getElementById('app-pw-auto-chevron');
-  const open = body.style.display === 'none';
-  body.style.display = open ? '' : 'none';
-  chevron.className = open ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
+  const isHidden = body.classList.contains('hidden');
+  body.classList.toggle('hidden', !isHidden);
+  chevron.className = isHidden ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
 }
 
 async function createAppPassword() {
@@ -241,7 +241,7 @@ async function createAppPassword() {
     const result = await resp.json();
     document.getElementById('app-pw-created-label').textContent = result.label;
     document.getElementById('app-pw-created-password').textContent = result.password;
-    document.getElementById('app-pw-created').style.display = 'block';
+    document.getElementById('app-pw-created').classList.remove('hidden');
     labelInput.value = '';
     loadAppPasswords();
   } catch (err) {
@@ -255,7 +255,7 @@ async function createAppPassword() {
 function copyAppPassword() {
   const pw = document.getElementById('app-pw-created-password').textContent;
   navigator.clipboard.writeText(pw).then(function () {
-    const btn = document.querySelector('.btn-copy');
+    const btn = document.getElementById('app-pw-copy-btn');
     btn.innerHTML = '<i class="fas fa-check"></i>';
     setTimeout(function () { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1500);
   });
@@ -269,7 +269,7 @@ async function revokeAppPassword(id, label) {
       headers: headers()
     });
     if (resp.ok || resp.status === 204) {
-      document.getElementById('app-pw-created').style.display = 'none';
+      document.getElementById('app-pw-created').classList.add('hidden');
       loadAppPasswords();
     } else {
       const err = await resp.json().catch(() => ({}));
@@ -280,7 +280,16 @@ async function revokeAppPassword(id, label) {
   }
 }
 
+function escapeHtml(str) {
+  var div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
 init();
 
-/* Wire up form handler (replaces inline onsubmit) */
+/* Wire up event handlers (replaces inline onclick/onsubmit) */
 document.getElementById('password-form').addEventListener('submit', changePassword);
+document.getElementById('app-pw-generate').addEventListener('click', createAppPassword);
+document.getElementById('app-pw-copy-btn').addEventListener('click', copyAppPassword);
+document.getElementById('app-pw-auto-toggle').addEventListener('click', toggleAutoPasswords);

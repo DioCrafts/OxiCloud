@@ -93,7 +93,7 @@ impl<T> PaginatedResponseDto<T> {
             page_size,
             total_items,
             total_pages,
-            has_next: page < total_pages - 1,
+            has_next: total_pages > 0 && page < total_pages - 1,
             has_prev: page > 0,
         };
 

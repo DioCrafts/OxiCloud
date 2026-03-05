@@ -25,46 +25,12 @@
                 <span id="error-message">An error occurred. Please try again.</span>
             </div>
             
-            <div style="margin-top: 20px;">
+            <div class="auth-action-wrap">
                 <button type="button" class="auth-button" id="error-action">Try Again</button>
             </div>
         </div>
     </div>
-    
-    <script>
-        // Read error type from URL query parameter
-        const params = new URLSearchParams(window.location.search);
-        const errorType = params.get('type') || 'generic';
-        
-        const errorTitle = document.getElementById('error-title');
-        const errorMessage = document.getElementById('error-message');
-        const errorAction = document.getElementById('error-action');
-        
-        switch(errorType) {
-            case 'invalid-credentials':
-                errorTitle.textContent = 'Login Failed';
-                errorMessage.textContent = 'Invalid username or password. Please check your credentials and try again.';
-                errorAction.textContent = 'Try Again';
-                errorAction.onclick = () => history.back();
-                break;
-            case 'session-expired':
-                errorTitle.textContent = 'Session Expired';
-                errorMessage.textContent = 'Your session has expired. Please try again.';
-                errorAction.textContent = 'Close Window';
-                errorAction.onclick = () => window.close();
-                break;
-            case 'not-found':
-                errorTitle.textContent = 'Not Found';
-                errorMessage.textContent = 'The requested page was not found.';
-                errorAction.textContent = 'Close Window';
-                errorAction.onclick = () => window.close();
-                break;
-            default:
-                errorTitle.textContent = 'Error';
-                errorMessage.textContent = 'An unexpected error occurred. Please try again.';
-                errorAction.textContent = 'Close Window';
-                errorAction.onclick = () => window.close();
-        }
-    </script>
+
+    <script src="/js/views/nextcloud/error.js"></script>
 </body>
 </html>

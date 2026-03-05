@@ -24,6 +24,8 @@
 @import url("./components/multiSelect.css");
 @import url("./components/spinner.css");
 @import url("./components/search.css");
+@import url("./components/icons.css");
+@import url("./components/csp-utilities.css");
 
 /* Theme */
 @import url("./themes/dark.css");

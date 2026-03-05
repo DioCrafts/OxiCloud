@@ -126,6 +126,9 @@
     cursor: not-allowed;
 }
 
+.auth-subtitle { margin: 20px 0; color: #6b7280; font-size: 14px; }
+.auth-action-wrap { margin-top: 20px; }
+
 /* SSO / OIDC button */
 .auth-button-oidc {
     background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
@@ -138,6 +141,14 @@
 
 .auth-button-oidc:hover {
     box-shadow: 0 6px 20px rgba(45, 55, 72, 0.4);
+}
+
+.auth-button-sso {
+    background: #4f46e5;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+.auth-button-sso:hover {
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
 }
 
 .auth-button-oidc i {

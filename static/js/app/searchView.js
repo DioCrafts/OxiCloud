@@ -15,7 +15,7 @@ async function performSearch(query, sortBy) {
         if (filesGrid) {
             filesGrid.innerHTML = `
                 <div class="search-results-header">
-                    <h3><i class="fas fa-spinner fa-spin" style="margin-right:8px;"></i> Searching for "${query}"...</h3>
+                    <h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>
                 </div>
             `;
         }

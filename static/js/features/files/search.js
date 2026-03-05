@@ -175,8 +175,8 @@ const search = {
             const emptyState = document.createElement('div');
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
-                <i class="fas fa-search" style="font-size: 48px; color: var(--empty-icon, #ccc); margin-bottom: 16px;"></i>
-                <p style="color: var(--text-secondary, #64748b);">No results found for this search</p>
+                <i class="fas fa-search empty-state-icon"></i>
+                <p class="search-empty-text">No results found for this search</p>
             `;
             filesGrid.appendChild(emptyState);
             return;

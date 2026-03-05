@@ -100,14 +100,14 @@
 
       <div class="app-pw-create">
         <input type="text" id="app-pw-label" placeholder="Label (e.g. Thunderbird, macOS)" maxlength="128">
-        <button class="btn btn-primary" id="app-pw-generate" onclick="createAppPassword()"><i class="fas fa-plus"></i> Generate</button>
+        <button class="btn btn-primary" id="app-pw-generate"><i class="fas fa-plus"></i> Generate</button>
       </div>
 
-      <div id="app-pw-created" class="app-pw-created" style="display:none">
+      <div id="app-pw-created" class="app-pw-created hidden">
         <div class="app-pw-created-label">New password for <strong id="app-pw-created-label"></strong>:</div>
         <div class="app-pw-created-value">
           <code id="app-pw-created-password"></code>
-          <button class="btn btn-copy" onclick="copyAppPassword()" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+          <button class="btn btn-copy" id="app-pw-copy-btn" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
         </div>
         <small>Copy this password now. You won't be able to see it again.</small>
       </div>
@@ -120,15 +120,15 @@
         </thead>
         <tbody id="app-pw-tbody"></tbody>
       </table>
-      <div id="app-pw-empty" class="app-pw-empty" style="display:none">No app passwords yet.</div>
+      <div id="app-pw-empty" class="app-pw-empty hidden">No app passwords yet.</div>
 
-      <div id="app-pw-auto-section" class="app-pw-auto-section" style="display:none">
-        <button class="app-pw-auto-toggle" id="app-pw-auto-toggle" onclick="toggleAutoPasswords()">
+      <div id="app-pw-auto-section" class="app-pw-auto-section hidden">
+        <button class="app-pw-auto-toggle" id="app-pw-auto-toggle">
           <i class="fas fa-chevron-right" id="app-pw-auto-chevron"></i>
           <span>Client sessions</span>
           <span class="app-pw-auto-count" id="app-pw-auto-count">0</span>
         </button>
-        <div id="app-pw-auto-body" style="display:none">
+        <div id="app-pw-auto-body" class="hidden">
           <p class="app-pw-auto-desc">Auto-generated when you connect a Nextcloud-compatible client.</p>
           <table class="app-pw-table" id="app-pw-auto-table">
             <thead>

@@ -604,30 +604,31 @@ impl AppConfig {
         }
 
         // Auth configuration
-        if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
-            if !jwt_secret.is_empty() {
-                // SECURITY: Validate JWT secret minimum entropy (RFC 7518 §3.2
-                // recommends ≥256 bits for HS256). Panic on dangerously short
-                // secrets, warn on sub-optimal ones.
-                let len = jwt_secret.len();
-                if config.features.enable_auth && len < 16 {
-                    panic!(
-                        "FATAL: OXICLOUD_JWT_SECRET is dangerously short ({} bytes). \
-                         Minimum: 32 bytes (256 bits) for HS256. \
-                         Generate a secure secret with: openssl rand -hex 32",
-                        len
-                    );
-                } else if config.features.enable_auth && len < 32 {
-                    tracing::warn!("==========================================================");
-                    tracing::warn!(
-                        "OXICLOUD_JWT_SECRET is only {} bytes — recommended minimum is 32 (256 bits).",
-                        len
-                    );
-                    tracing::warn!("Generate a stronger secret with: openssl rand -hex 32");
-                    tracing::warn!("==========================================================");
-                }
-                config.auth.jwt_secret = jwt_secret;
+        if let Some(jwt_secret) = env::var("OXICLOUD_JWT_SECRET")
+            .ok()
+            .filter(|s| !s.is_empty())
+        {
+            // SECURITY: Validate JWT secret minimum entropy (RFC 7518 §3.2
+            // recommends ≥256 bits for HS256). Panic on dangerously short
+            // secrets, warn on sub-optimal ones.
+            let len = jwt_secret.len();
+            if config.features.enable_auth && len < 16 {
+                panic!(
+                    "FATAL: OXICLOUD_JWT_SECRET is dangerously short ({} bytes). \
+                     Minimum: 32 bytes (256 bits) for HS256. \
+                     Generate a secure secret with: openssl rand -hex 32",
+                    len
+                );
+            } else if config.features.enable_auth && len < 32 {
+                tracing::warn!("==========================================================");
+                tracing::warn!(
+                    "OXICLOUD_JWT_SECRET is only {} bytes — recommended minimum is 32 (256 bits).",
+                    len
+                );
+                tracing::warn!("Generate a stronger secret with: openssl rand -hex 32");
+                tracing::warn!("==========================================================");
             }
+            config.auth.jwt_secret = jwt_secret;
         }
 
         // SECURITY: Auto-persist JWT secret to storage so it survives restarts.
@@ -642,10 +643,7 @@ impl AppConfig {
                         let persisted = persisted.trim().to_string();
                         if persisted.len() >= 32 {
                             config.auth.jwt_secret = persisted;
-                            tracing::info!(
-                                "JWT secret loaded from {}",
-                                secret_file.display()
-                            );
+                            tracing::info!("JWT secret loaded from {}", secret_file.display());
                         } else {
                             tracing::warn!(
                                 "Persisted JWT secret too short ({}B), regenerating",
@@ -664,8 +662,7 @@ impl AppConfig {
                 use rand_core::{OsRng, RngCore};
                 let mut key = [0u8; 32];
                 OsRng.fill_bytes(&mut key);
-                let generated_secret: String =
-                    key.iter().map(|b| format!("{:02x}", b)).collect();
+                let generated_secret: String = key.iter().map(|b| format!("{:02x}", b)).collect();
 
                 // Persist to storage volume so it survives container restarts
                 if let Err(e) = std::fs::write(&secret_file, &generated_secret) {
