@@ -7,6 +7,12 @@
 -- ============================================================
 
 -- ============================================================
+-- 0. REQUIRED EXTENSIONS (must come before any table/index)
+-- ============================================================
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE EXTENSION IF NOT EXISTS ltree;
+
+-- ============================================================
 -- 1. AUTH SCHEMA
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS auth;
@@ -286,10 +292,6 @@ COMMENT ON TABLE caldav.calendar_events IS 'Calendar events (VEVENT) stored with
 COMMENT ON TABLE caldav.calendar_shares IS 'Calendar sharing permissions between users';
 COMMENT ON TABLE caldav.calendar_properties IS 'Custom WebDAV properties on calendars';
 
--- ── pg_trgm extension for GIN trigram indexes (ILIKE / LIKE substring search) ──
--- Required before creating any gin_trgm_ops indexes below.
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-
 -- ============================================================
 -- 3. CARDDAV SCHEMA (RFC 6352)
 -- ============================================================
@@ -411,9 +413,6 @@ COMMENT ON TABLE carddav.group_memberships IS 'Many-to-many relationship between
 -- expensive recursive CTEs.
 -- ============================================================
 CREATE SCHEMA IF NOT EXISTS storage;
-
--- Enable ltree extension for hierarchical path operations
-CREATE EXTENSION IF NOT EXISTS ltree;
 
 -- Content-addressable blob index (dedup)
 -- One row per unique content hash; multiple storage.files rows may
