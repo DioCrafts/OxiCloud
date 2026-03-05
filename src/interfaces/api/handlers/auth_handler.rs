@@ -1,18 +1,16 @@
 use axum::{
     Router,
-    extract::{Json, Path, Query, State},
-    http::{HeaderMap, StatusCode, header},
+    extract::{Json, Query, State},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
-    routing::{delete, get, post, put},
+    routing::{get, post, put},
 };
 use std::sync::Arc;
 
 use crate::application::dtos::user_dto::{
-    AppPasswordCreatedDto, AppPasswordDto, ChangePasswordDto, CreateAppPasswordDto, LoginDto,
-    OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto, RefreshTokenDto, RegisterDto,
-    SetupAdminDto,
+    ChangePasswordDto, LoginDto, OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto,
+    RefreshTokenDto, RegisterDto, SetupAdminDto,
 };
-use crate::application::ports::auth_ports::TokenServicePort;
 use crate::application::services::auth_application_service::OidcCallbackResult;
 use crate::common::di::AppState;
 use crate::interfaces::api::cookie_auth;
@@ -37,11 +35,6 @@ pub fn auth_protected_routes() -> Router<Arc<AppState>> {
         .route("/me", get(get_current_user))
         .route("/change-password", put(change_password))
         .route("/logout", post(logout))
-        .route(
-            "/app-passwords",
-            get(list_app_passwords).post(create_app_password),
-        )
-        .route("/app-passwords/{id}", delete(delete_app_password))
 }
 
 /// Rate-limited auth routes — split out so main.rs can apply per-endpoint
@@ -500,139 +493,6 @@ async fn get_system_status(
 }
 
 // ============================================================================
-// App Password Handlers
-// ============================================================================
-
-async fn create_app_password(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Json(dto): Json<CreateAppPasswordDto>,
-) -> Result<impl IntoResponse, AppError> {
-    let auth_service = state
-        .auth_service
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
-
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
-
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
-    let nextcloud = state
-        .nextcloud
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
-
-    let label = dto.label.trim();
-    if label.is_empty() || label.len() > 128 {
-        return Err(AppError::new(
-            StatusCode::BAD_REQUEST,
-            "Label must be between 1 and 128 characters",
-            "InvalidInput",
-        ));
-    }
-
-    let (id, password) = nextcloud
-        .app_passwords
-        .create_nc(&claims.sub, label)
-        .await
-        .map_err(AppError::from)?;
-
-    Ok((
-        StatusCode::CREATED,
-        Json(AppPasswordCreatedDto {
-            id,
-            label: label.to_string(),
-            password,
-        }),
-    ))
-}
-
-async fn list_app_passwords(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Result<impl IntoResponse, AppError> {
-    let auth_service = state
-        .auth_service
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
-
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
-
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
-    let nextcloud = state
-        .nextcloud
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
-
-    let records = nextcloud
-        .app_passwords
-        .list_nc(&claims.sub)
-        .await
-        .map_err(AppError::from)?;
-
-    let passwords: Vec<AppPasswordDto> = records
-        .into_iter()
-        .map(|r| AppPasswordDto {
-            id: r.id,
-            label: r.label,
-            created_at: r.created_at,
-            last_used_at: r.last_used_at,
-        })
-        .collect();
-
-    Ok((StatusCode::OK, Json(passwords)))
-}
-
-async fn delete_app_password(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-    Path(id): Path<String>,
-) -> Result<impl IntoResponse, AppError> {
-    let auth_service = state
-        .auth_service
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Authentication service not configured"))?;
-
-    let token = headers
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .ok_or_else(|| AppError::unauthorized("Authorization token not found"))?;
-
-    let claims = auth_service
-        .token_service
-        .validate_token(token)
-        .map_err(|e| AppError::unauthorized(format!("Invalid token: {}", e)))?;
-
-    let nextcloud = state
-        .nextcloud
-        .as_ref()
-        .ok_or_else(|| AppError::internal_error("Nextcloud services not configured"))?;
-
-    nextcloud
-        .app_passwords
-        .delete_by_user(&id, &claims.sub)
-        .await
-        .map_err(AppError::from)?;
-
-    Ok(StatusCode::NO_CONTENT)
-}
-
 // ============================================================================
 // OIDC Handlers
 // ============================================================================

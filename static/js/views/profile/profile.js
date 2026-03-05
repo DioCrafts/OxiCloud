@@ -152,25 +152,38 @@ function renderPwRow(pw) {
   created.textContent = new Date(pw.created_at).toLocaleDateString();
   const lastUsed = document.createElement('td');
   lastUsed.textContent = pw.last_used_at ? timeAgo(pw.last_used_at) : 'Never';
+  const status = document.createElement('td');
+  const badge = document.createElement('span');
+  if (pw.active !== false) {
+    badge.className = 'badge badge-active';
+    badge.textContent = 'Active';
+  } else {
+    badge.className = 'badge badge-expired';
+    badge.textContent = 'Revoked';
+  }
+  status.appendChild(badge);
   const actions = document.createElement('td');
-  const btn = document.createElement('button');
-  btn.className = 'btn btn-danger-sm';
-  btn.innerHTML = '<i class="fas fa-trash"></i>';
-  btn.title = 'Revoke';
-  btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
-  actions.appendChild(btn);
-  tr.append(label, created, lastUsed, actions);
+  if (pw.active !== false) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-danger-sm';
+    btn.innerHTML = '<i class="fas fa-trash"></i>';
+    btn.title = 'Revoke';
+    btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
+    actions.appendChild(btn);
+  }
+  tr.append(label, created, lastUsed, status, actions);
   return tr;
 }
 
 async function loadAppPasswords() {
   try {
-    const resp = await fetch(API + '/auth/app-passwords', { headers: headers() });
+    const resp = await fetch(API + '/auth/app-passwords', { headers: headers(), credentials: 'same-origin' });
     if (!resp.ok) {
       document.getElementById('app-passwords-section').classList.add('hidden');
       return;
     }
-    const passwords = await resp.json();
+    const data = await resp.json();
+    const passwords = data.app_passwords || data;
     const userPws = passwords.filter(function (pw) { return !isAutoPassword(pw); });
     const autoPws = passwords.filter(isAutoPassword);
 
@@ -231,6 +244,7 @@ async function createAppPassword() {
     const resp = await fetch(API + '/auth/app-passwords', {
       method: 'POST',
       headers: headers(),
+      credentials: 'same-origin',
       body: JSON.stringify({ label: label })
     });
     if (!resp.ok) {
@@ -266,7 +280,8 @@ async function revokeAppPassword(id, label) {
   try {
     const resp = await fetch(API + '/auth/app-passwords/' + encodeURIComponent(id), {
       method: 'DELETE',
-      headers: headers()
+      headers: headers(),
+      credentials: 'same-origin'
     });
     if (resp.ok || resp.status === 204) {
       document.getElementById('app-pw-created').classList.add('hidden');
