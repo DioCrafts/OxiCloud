@@ -323,6 +323,7 @@ This document contains the task list for the development of OxiCloud, a minimali
   - [ ] Add scene and object detection in photos (beach, mountain, animals, etc.)
   - [ ] Implement similar or duplicate photo detection
   - [ ] Add non-destructive basic editing features (crop, filters, adjustments)
+  - [ ] Video support
 
 ### Enterprise Collaboration
 - [ ] Create shared workspaces
