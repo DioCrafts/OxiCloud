@@ -730,7 +730,6 @@ if (isLoginPage && adminSetupForm) {
     
     try {
         // Use the /api/setup endpoint which creates an admin and marks the system as initialized
-        const setupToken = document.getElementById('admin-setup-token').value;
         const response = await fetch('/api/setup', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
@@ -738,8 +737,7 @@ if (isLoginPage && adminSetupForm) {
             body: JSON.stringify({
                 username: 'admin',
                 email,
-                password,
-                setup_token: setupToken
+                password
             })
         });
         if (!response.ok) {

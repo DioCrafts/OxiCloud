@@ -360,13 +360,13 @@ async fn logout(
 
 /// POST /api/setup — One-time endpoint to create the first admin user.
 ///
-/// Requires the setup token that was printed to the server log on first boot.
+/// Available only when the system is not yet initialized (no admin exists).
 /// Once the admin is created, the system is marked as initialized and this
 /// endpoint returns 403 for all subsequent requests.
 ///
 /// Uses an atomic "claim" operation to prevent race conditions: even if two
-/// requests arrive simultaneously with the correct token, only one will
-/// succeed in marking the system as initialized and creating the admin.
+/// requests arrive simultaneously, only one will succeed in marking the
+/// system as initialized and creating the admin.
 async fn setup_admin(
     State(state): State<Arc<AppState>>,
     Json(dto): Json<SetupAdminDto>,
@@ -386,7 +386,7 @@ async fn setup_admin(
         .ok_or_else(|| AppError::internal_error("Admin settings service not configured"))?;
 
     // 3. Quick pre-check: if the system is already initialized, reject early
-    //    (avoids token validation and Argon2 work on obviously-late requests)
+    //    (avoids Argon2 work on obviously-late requests)
     if admin_svc.is_system_initialized().await {
         tracing::warn!(
             "Setup admin rejected: system already initialized (user: {})",
@@ -399,30 +399,9 @@ async fn setup_admin(
         ));
     }
 
-    // 4. Verify the one-time setup token
-    let expected_token = state.setup_token.as_deref().ok_or_else(|| {
-        AppError::new(
-            StatusCode::FORBIDDEN,
-            "No setup token available. The system may already be initialized or the server needs to be restarted.",
-            "NoSetupToken",
-        )
-    })?;
-
-    if !constant_time_eq(dto.setup_token.as_bytes(), expected_token.as_bytes()) {
-        tracing::warn!(
-            "Setup admin rejected: invalid setup token (user: {})",
-            dto.username
-        );
-        return Err(AppError::new(
-            StatusCode::FORBIDDEN,
-            "Invalid setup token. Check the server log for the correct token.",
-            "InvalidSetupToken",
-        ));
-    }
-
-    // 5. ATOMIC: claim initialization — only one concurrent request can win.
+    // 4. ATOMIC: claim initialization — only one concurrent request can win.
     //    We use a placeholder user_id ("pending") because the admin user
-    //    doesn't exist yet.  It will be updated to the real id below.
+    //    doesn't exist yet. It will be updated to the real id below.
     let claimed = admin_svc
         .try_claim_initialization("pending")
         .await
@@ -443,7 +422,7 @@ async fn setup_admin(
         ));
     }
 
-    // 6. Create the first admin user (we hold the exclusive claim)
+    // 5. Create the first admin user (we hold the exclusive claim)
     let user = auth_service
         .auth_application_service
         .setup_create_admin(dto.username.clone(), dto.email, dto.password)
@@ -453,7 +432,7 @@ async fn setup_admin(
             AppError::from(e)
         })?;
 
-    // 7. Update the initialization record with the real admin user_id
+    // 5. Update the initialization record with the real admin user_id
     if let Err(e) = admin_svc.mark_system_initialized(&user.id).await {
         // Not fatal — the claim already prevents concurrent re-initialization,
         // and the "pending" marker is still "true" so the system stays locked.
@@ -469,18 +448,6 @@ async fn setup_admin(
     );
 
     Ok((StatusCode::CREATED, Json(user)))
-}
-
-/// Constant-time byte comparison to prevent timing attacks on the setup token.
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff = 0u8;
-    for (x, y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
-    }
-    diff == 0
 }
 
 /// Get system status - returns whether admin is configured

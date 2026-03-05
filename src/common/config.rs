@@ -605,44 +605,94 @@ impl AppConfig {
 
         // Auth configuration
         if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
-            // SECURITY: Validate JWT secret minimum entropy (RFC 7518 §3.2
-            // recommends ≥256 bits for HS256). Panic on dangerously short
-            // secrets, warn on sub-optimal ones.
-            let len = jwt_secret.len();
-            if config.features.enable_auth && len < 16 {
-                panic!(
-                    "FATAL: OXICLOUD_JWT_SECRET is dangerously short ({} bytes). \
-                     Minimum: 32 bytes (256 bits) for HS256. \
-                     Generate a secure secret with: openssl rand -hex 32",
-                    len
-                );
-            } else if config.features.enable_auth && len < 32 {
-                tracing::warn!("==========================================================");
-                tracing::warn!(
-                    "OXICLOUD_JWT_SECRET is only {} bytes — recommended minimum is 32 (256 bits).",
-                    len
-                );
-                tracing::warn!("Generate a stronger secret with: openssl rand -hex 32");
-                tracing::warn!("==========================================================");
+            if !jwt_secret.is_empty() {
+                // SECURITY: Validate JWT secret minimum entropy (RFC 7518 §3.2
+                // recommends ≥256 bits for HS256). Panic on dangerously short
+                // secrets, warn on sub-optimal ones.
+                let len = jwt_secret.len();
+                if config.features.enable_auth && len < 16 {
+                    panic!(
+                        "FATAL: OXICLOUD_JWT_SECRET is dangerously short ({} bytes). \
+                         Minimum: 32 bytes (256 bits) for HS256. \
+                         Generate a secure secret with: openssl rand -hex 32",
+                        len
+                    );
+                } else if config.features.enable_auth && len < 32 {
+                    tracing::warn!("==========================================================");
+                    tracing::warn!(
+                        "OXICLOUD_JWT_SECRET is only {} bytes — recommended minimum is 32 (256 bits).",
+                        len
+                    );
+                    tracing::warn!("Generate a stronger secret with: openssl rand -hex 32");
+                    tracing::warn!("==========================================================");
+                }
+                config.auth.jwt_secret = jwt_secret;
             }
-            config.auth.jwt_secret = jwt_secret;
         }
 
-        // SECURITY: Generate ephemeral secret when none is provided
+        // SECURITY: Auto-persist JWT secret to storage so it survives restarts.
+        // Priority: env var > persisted file > generate new.
         if config.features.enable_auth && config.auth.jwt_secret.is_empty() {
-            // Generate a random secret for this session and warn loudly
-            use rand_core::{OsRng, RngCore};
-            let mut key = [0u8; 32];
-            OsRng.fill_bytes(&mut key);
-            let generated_secret: String = key.iter().map(|b| format!("{:02x}", b)).collect();
-            config.auth.jwt_secret = generated_secret;
+            let secret_file = config.storage_path.join(".jwt_secret");
 
-            tracing::warn!("==========================================================");
-            tracing::warn!("OXICLOUD_JWT_SECRET is not set.");
-            tracing::warn!("A random secret has been generated for this session.");
-            tracing::warn!("All tokens will be INVALIDATED on restart.");
-            tracing::warn!("Set OXICLOUD_JWT_SECRET env var for production use.");
-            tracing::warn!("==========================================================");
+            if secret_file.exists() {
+                // Read persisted secret from previous run
+                match std::fs::read_to_string(&secret_file) {
+                    Ok(persisted) => {
+                        let persisted = persisted.trim().to_string();
+                        if persisted.len() >= 32 {
+                            config.auth.jwt_secret = persisted;
+                            tracing::info!(
+                                "JWT secret loaded from {}",
+                                secret_file.display()
+                            );
+                        } else {
+                            tracing::warn!(
+                                "Persisted JWT secret too short ({}B), regenerating",
+                                persisted.len()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to read {}: {}", secret_file.display(), e);
+                    }
+                }
+            }
+
+            // Still empty → generate and persist
+            if config.auth.jwt_secret.is_empty() {
+                use rand_core::{OsRng, RngCore};
+                let mut key = [0u8; 32];
+                OsRng.fill_bytes(&mut key);
+                let generated_secret: String =
+                    key.iter().map(|b| format!("{:02x}", b)).collect();
+
+                // Persist to storage volume so it survives container restarts
+                if let Err(e) = std::fs::write(&secret_file, &generated_secret) {
+                    tracing::error!(
+                        "Failed to persist JWT secret to {}: {}. \
+                         Tokens will be invalidated on restart!",
+                        secret_file.display(),
+                        e
+                    );
+                } else {
+                    // Restrict file permissions (owner-only read/write)
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let _ = std::fs::set_permissions(
+                            &secret_file,
+                            std::fs::Permissions::from_mode(0o600),
+                        );
+                    }
+                    tracing::info!(
+                        "JWT secret auto-generated and persisted to {}",
+                        secret_file.display()
+                    );
+                }
+
+                config.auth.jwt_secret = generated_secret;
+            }
         }
 
         if let Ok(access_token_expiry) =
