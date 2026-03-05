@@ -184,7 +184,7 @@ function switchToFavoritesView() {
         if (filesGridError) {
             filesGridError.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
+                    <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                     <p>Error loading the favorites module</p>
                 </div>
             `;
@@ -215,7 +215,7 @@ function switchToRecentFilesView() {
         if (filesGridError) {
             filesGridError.innerHTML = `
                 <div class="empty-state">
-                    <i class="fas fa-exclamation-circle" style="font-size: 48px; color: #f44336; margin-bottom: 16px;"></i>
+                    <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                     <p>Error loading the recent files module</p>
                 </div>
             `;

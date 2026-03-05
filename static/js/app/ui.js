@@ -48,10 +48,10 @@ const ui = {
                 <div class="context-menu-item" id="view-file-option">
                     <i class="fas fa-eye"></i> <span data-i18n="actions.view">View</span>
                 </div>
-                <div class="context-menu-item" id="wopi-edit-file-option" style="display:none">
+                <div class="context-menu-item hidden" id="wopi-edit-file-option">
                     <i class="fas fa-file-word"></i> <span>Edit in Office</span>
                 </div>
-                <div class="context-menu-item" id="wopi-edit-file-tab-option" style="display:none">
+                <div class="context-menu-item hidden" id="wopi-edit-file-tab-option">
                     <i class="fas fa-external-link-alt"></i> <span>Edit in Office (new tab)</span>
                 </div>
                 <div class="context-menu-item" id="download-file-option">
@@ -87,7 +87,7 @@ const ui = {
             renameDialog.innerHTML = `
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
-                        <i class="fas fa-pen" style="color:#ff5e3a"></i>
+                        <i class="fas fa-pen dialog-header-icon"></i>
                         <span data-i18n="dialogs.rename_folder">Rename</span>
                     </div>
                     <div class="rename-dialog-body">
@@ -110,13 +110,13 @@ const ui = {
             moveDialog.innerHTML = `
                 <div class="rename-dialog-content">
                     <div class="rename-dialog-header">
-                        <i class="fas fa-arrows-alt" style="color:#ff5e3a"></i>
+                        <i class="fas fa-arrows-alt dialog-header-icon"></i>
                         <span data-i18n="dialogs.move_file">Move</span>
                     </div>
                     <div class="rename-dialog-body">
-                        <p style="margin:0 0 12px;color:#718096;font-size:14px" data-i18n="dialogs.select_destination">Select destination folder:</p>
+                        <p class="move-dialog-hint" data-i18n="dialogs.select_destination">Select destination folder:</p>
                         <div id="move-dialog-breadcrumb" class="move-dialog-breadcrumb"></div>
-                        <div id="folder-select-container" style="max-height:220px;overflow-y:auto;">
+                        <div id="folder-select-container" class="folder-select-container">
                         </div>
                     </div>
                     <div class="rename-dialog-buttons">
@@ -137,14 +137,14 @@ const ui = {
             shareDialog.innerHTML = `
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
-                        <i class="fas fa-share-alt" style="color:#ff5e3a"></i>
+                        <i class="fas fa-share-alt dialog-header-icon"></i>
                         <span data-i18n="dialogs.share_file">Share file</span>
                     </div>
                     <div class="shared-item-info">
                         <strong>Item:</strong> <span id="shared-item-name"></span>
                     </div>
 
-                    <div id="existing-shares-section" style="display:none; margin: 15px 0;">
+                    <div id="existing-shares-section" class="share-section hidden">
                         <h3 data-i18n="dialogs.existing_shares">Existing shared links</h3>
                         <div id="existing-shares-container"></div>
                     </div>
@@ -181,7 +181,7 @@ const ui = {
                         </div>
                     </div>
 
-                    <div id="new-share-section" style="display:none; margin: 15px 0;">
+                    <div id="new-share-section" class="share-section hidden">
                         <h3 data-i18n="dialogs.generated_link">Generated link</h3>
                         <div class="form-group">
                             <input type="text" id="generated-share-url" readonly>
@@ -232,7 +232,7 @@ const ui = {
             notificationDialog.innerHTML = `
                 <div class="share-dialog-content">
                     <div class="share-dialog-header">
-                        <i class="fas fa-envelope" style="color:#ff5e3a"></i>
+                        <i class="fas fa-envelope dialog-header-icon"></i>
                         <span data-i18n="dialogs.notify">Notify shared link</span>
                     </div>
 
@@ -1143,12 +1143,14 @@ const ui = {
                 <i class="${isFileFav ? 'fas' : 'far'} fa-star"></i>
             </button>
             <div class="file-icon ${iconSpecialClass}">
-                ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
+                ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="">` : ''}
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>
             <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
+        var thumb = el.querySelector('.file-thumb');
+        if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });
         this._bindStarClick(el);
         return el;
     },
@@ -1181,7 +1183,7 @@ const ui = {
             <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
-                    ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="" onerror="this.style.display='none'">` : ''}
+                    ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="">` : ''}
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${escapeHtml(file.name)}</span>
@@ -1191,6 +1193,8 @@ const ui = {
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
         `;
+        var thumb = el.querySelector('.file-thumb');
+        if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });
         return el;
     },
 

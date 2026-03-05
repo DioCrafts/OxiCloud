@@ -25,21 +25,16 @@
                 <span>You have successfully granted access to your account.</span>
             </div>
             
-            <p style="margin-top: 20px; color: #6b7280; font-size: 14px;">
+            <p class="auth-subtitle">
                 You can now close this window and return to your Nextcloud app.
             </p>
-            
-            <div style="margin-top: 20px;">
-                <button type="button" class="auth-button" onclick="window.close()">Close Window</button>
+
+            <div class="auth-action-wrap">
+                <button type="button" class="auth-button" id="close-window-btn">Close Window</button>
             </div>
         </div>
     </div>
-    
-    <script>
-        // Auto-close after 3 seconds
-        setTimeout(() => {
-            window.close();
-        }, 3000);
-    </script>
+
+    <script src="/js/views/nextcloud/success.js"></script>
 </body>
 </html>

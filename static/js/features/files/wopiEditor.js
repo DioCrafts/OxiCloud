@@ -120,7 +120,7 @@ class WopiEditor {
         var spinner = document.createElement('div');
         spinner.id = 'wopi-loading-spinner';
         spinner.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;z-index:1;';
-        spinner.innerHTML = '<i class="fas fa-spinner fa-spin" style="font-size:48px;color:#666;"></i>';
+        spinner.innerHTML = '<i class="fas fa-spinner fa-spin empty-state-icon spinner"></i>';
         frameHolder.appendChild(spinner);
 
         var iframe = document.createElement('iframe');

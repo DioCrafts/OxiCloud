@@ -106,7 +106,7 @@ const recent = {
                 const emptyState = document.createElement('div');
                 emptyState.className = 'empty-state';
                 emptyState.innerHTML = `
-                    <i class="fas fa-clock" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+                    <i class="fas fa-clock empty-state-icon"></i>
                     <p>${window.i18n ? window.i18n.t('recent.empty_state') : 'No recent files'}</p>
                     <p>${window.i18n ? window.i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
                 `;

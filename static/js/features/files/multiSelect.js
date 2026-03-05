@@ -401,7 +401,7 @@ const multiSelect = {
         const n = items.length;
         const titleText = this._t('batch.move_title', { count: n })
             || `Move ${n} item${n !== 1 ? 's' : ''}`;
-        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
+        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
         const excludeIds = items.filter(i => i.type === 'folder').map(i => i.id);
         await contextMenus.loadAllFolders(excludeIds[0] || null, 'batch');

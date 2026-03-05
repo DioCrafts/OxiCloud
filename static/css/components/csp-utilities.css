@@ -1,0 +1,150 @@
+/* CSP-compliant utility classes — replaces inline style="" attributes */
+
+/* ── Empty state icons (large, muted) ── */
+.empty-state-icon {
+  font-size: 48px;
+  color: #ddd;
+  margin-bottom: 16px;
+}
+.empty-state-icon.error {
+  color: #f44336;
+}
+.empty-state-icon.spinner {
+  color: #666;
+}
+
+/* ── Dialog header icons (accent color) ── */
+.dialog-header-icon {
+  color: #ff5e3a;
+}
+
+/* ── Icon spacing ── */
+.icon-mr { margin-right: 5px; }
+.icon-ml { margin-left: 4px; font-size: 12px; }
+
+/* ── Success check icon ── */
+.check-icon { color: #48bb78; }
+
+/* ── Move dialog ── */
+.move-dialog-hint {
+  margin: 0 0 12px;
+  color: #718096;
+  font-size: 14px;
+}
+.folder-select-container {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* ── Share dialog sections ── */
+.share-section {
+  margin: 15px 0;
+}
+
+/* ── Search spinner ── */
+.search-spinner {
+  margin-right: 8px;
+}
+
+/* ── Search empty state text ── */
+.search-empty-text {
+  color: var(--text-secondary, #64748b);
+}
+
+/* ── Notification upload current file ── */
+.notif-upload-current {
+  font-size: 11px;
+  color: #64748b;
+  margin: 3px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Login auth hint ── */
+.auth-hint {
+  color: var(--text-secondary, #666);
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── About modal (userMenu.js profile popup) ── */
+.about-modal-body { max-width: 380px; }
+.about-modal-header { text-align: center; padding: 20px 20px 0; }
+.about-modal-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.about-modal-username { margin: 0; font-size: 18px; color: #1a1a2e; }
+.about-modal-email { margin: 4px 0 0; font-size: 13px; color: #64748b; }
+.about-modal-role {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.about-modal-role-admin { background: #dbeafe; color: #1d4ed8; }
+.about-modal-role-user { background: #f1f5f9; color: #64748b; }
+.about-modal-storage { padding: 16px 20px; }
+.about-modal-storage-label {
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 6px;
+}
+.about-modal-storage-label i { margin-right: 4px; }
+.about-modal-bar-bg {
+  background: #f1f5f9;
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.about-modal-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width .3s;
+}
+.about-modal-bar-text { font-size: 12px; color: #64748b; text-align: right; }
+.about-modal-footer { padding: 0 20px 16px; display: flex; justify-content: center; }
+.about-modal-close-btn {
+  padding: 8px 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+/* ── Dark theme overrides ── */
+[data-theme="dark"] .empty-state-icon { color: #475569; }
+[data-theme="dark"] .empty-state-icon.error { color: #ef4444; }
+[data-theme="dark"] .about-modal-username { color: #f1f5f9; }
+[data-theme="dark"] .about-modal-email { color: #94a3b8; }
+[data-theme="dark"] .about-modal-role-admin { background: #1e3a5f; color: #60a5fa; }
+[data-theme="dark"] .about-modal-role-user { background: #334155; color: #94a3b8; }
+[data-theme="dark"] .about-modal-storage-label { color: #94a3b8; }
+[data-theme="dark"] .about-modal-bar-bg { background: #334155; }
+[data-theme="dark"] .about-modal-bar-text { color: #94a3b8; }
+[data-theme="dark"] .about-modal-close-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+[data-theme="dark"] .move-dialog-hint { color: #94a3b8; }
+[data-theme="dark"] .search-empty-text { color: #94a3b8; }

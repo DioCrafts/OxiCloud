@@ -124,16 +124,34 @@ async function loadUsers() {
         '<td><span class="badge badge-' + escapeHtml(u.role) + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt badge-admin-icon-small"></i> ' : '') + escapeHtml(u.role) + '</span></td>' +
         '<td>' + authBadge + '</td>' +
         '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
-        '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' + quotaColor + '" style="width:' + Math.min(quotaPct, 100) + '%"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
+        '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' + quotaColor + '" data-width="' + Math.min(quotaPct, 100) + '"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
         '<td class="user-last-login-cell">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
-          '<button class="btn btn-sm btn-secondary" onclick="openQuotaModal(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\',' + u.storage_quota_bytes + ')" title="Edit quota"><i class="fas fa-box"></i></button>' +
-          (isOidc ? '' : '<button class="btn btn-sm btn-secondary" onclick="openResetPasswordModal(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\')" title="Reset password"><i class="fas fa-key"></i></button>') +
-          '<button class="btn btn-sm btn-secondary" onclick="toggleRole(\'' + _escJs(u.id) + '\',\'' + _escJs(u.role) + '\')" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
-          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + '" onclick="toggleActive(\'' + _escJs(u.id) + '\',' + u.active + ')" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + _escJs(u.id) + '\',\'' + _escJs(u.username) + '\')" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
+          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="quota" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" data-quota="' + u.storage_quota_bytes + '" title="Edit quota"><i class="fas fa-box"></i></button>' +
+          (isOidc ? '' : '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="reset-pw" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="Reset password"><i class="fas fa-key"></i></button>') +
+          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="toggle-role" data-uid="' + _escJs(u.id) + '" data-role="' + _escJs(u.role) + '" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
+          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + ' admin-action-btn" data-action="toggle-active" data-uid="' + _escJs(u.id) + '" data-active="' + u.active + '" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+          '<button class="btn btn-sm btn-danger admin-action-btn" data-action="delete" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
         '</div></td></tr>';
     }).join('');
+
+    // Set dynamic progress bar widths (CSP-safe via JS property)
+    document.querySelectorAll('.progress-fill[data-width]').forEach(function(el) {
+      el.style.width = el.dataset.width + '%';
+      el.removeAttribute('data-width');
+    });
+
+    // Wire up admin action buttons (replaces inline onclick handlers)
+    document.querySelectorAll('.admin-action-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var action = btn.dataset.action;
+        if (action === 'quota') openQuotaModal(btn.dataset.uid, btn.dataset.uname, Number(btn.dataset.quota));
+        else if (action === 'reset-pw') openResetPasswordModal(btn.dataset.uid, btn.dataset.uname);
+        else if (action === 'toggle-role') toggleRole(btn.dataset.uid, btn.dataset.role);
+        else if (action === 'toggle-active') toggleActive(btn.dataset.uid, btn.dataset.active === 'true');
+        else if (action === 'delete') deleteUser(btn.dataset.uid, btn.dataset.uname);
+      });
+    });
 
     document.getElementById('users-info').textContent = 'Showing ' + (usersPage * PAGE_SIZE + 1) + '-' + Math.min((usersPage + 1) * PAGE_SIZE, totalUsers) + ' of ' + totalUsers;
     document.getElementById('prev-btn').disabled = usersPage === 0;

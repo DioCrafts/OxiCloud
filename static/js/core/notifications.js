@@ -153,7 +153,7 @@ const notifications = (() => {
             <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
             <div class="notif-item-body">
                 <div class="notif-item-title">${uploadingText}</div>
-                <div class="notif-upload-current" id="${batchId}-current" style="font-size:11px;color:#64748b;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+                <div class="notif-upload-current" id="${batchId}-current"></div>
                 <div class="notif-upload-progress">
                     <div class="notif-upload-bar"><div class="notif-upload-fill" id="${batchId}-fill"></div></div>
                     <div class="notif-upload-detail">

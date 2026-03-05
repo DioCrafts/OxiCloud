@@ -182,31 +182,34 @@ function showUserProfileModal() {
     overlay.id = 'profile-modal-overlay';
     overlay.className = 'about-modal-overlay';
     overlay.innerHTML = `
-        <div class="about-modal" style="max-width:380px">
-            <div style="text-align:center;padding:20px 20px 0">
-                <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin-bottom:12px">${initials}</div>
-                <h3 style="margin:0;font-size:18px;color:#1a1a2e">${username}</h3>
-                <p style="margin:4px 0 0;font-size:13px;color:#64748b">${email}</p>
-                <span style="display:inline-block;margin-top:8px;padding:2px 10px;border-radius:10px;font-size:11px;font-weight:600;${
-                    role === 'admin'
-                        ? 'background:#dbeafe;color:#1d4ed8'
-                        : 'background:#f1f5f9;color:#64748b'
-                }">${role === 'admin' ? '🛡️ Admin' : '👤 ' + t('user_menu.role_user', 'User')}</span>
+        <div class="about-modal about-modal-body">
+            <div class="about-modal-header">
+                <div class="about-modal-avatar">${initials}</div>
+                <h3 class="about-modal-username">${username}</h3>
+                <p class="about-modal-email">${email}</p>
+                <span class="about-modal-role ${role === 'admin' ? 'about-modal-role-admin' : 'about-modal-role-user'}">${role === 'admin' ? '🛡️ Admin' : '👤 ' + t('user_menu.role_user', 'User')}</span>
             </div>
-            <div style="padding:16px 20px">
-                <div style="font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-                    <i class="fas fa-database" style="margin-right:4px"></i>${t('storage.title', 'Storage')}
+            <div class="about-modal-storage">
+                <div class="about-modal-storage-label">
+                    <i class="fas fa-database"></i>${t('storage.title', 'Storage')}
                 </div>
-                <div style="background:#f1f5f9;border-radius:6px;height:8px;overflow:hidden;margin-bottom:4px">
-                    <div style="height:100%;width:${percentage}%;background:${barColor};border-radius:6px;transition:width .3s"></div>
+                <div class="about-modal-bar-bg">
+                    <div class="about-modal-bar-fill" id="about-bar-fill"></div>
                 </div>
-                <div style="font-size:12px;color:#64748b;text-align:right">${percentage}% · ${window.formatFileSize(usedBytes)} / ${window.formatQuotaSize(quotaBytes)}</div>
+                <div class="about-modal-bar-text">${percentage}% · ${window.formatFileSize(usedBytes)} / ${window.formatQuotaSize(quotaBytes)}</div>
             </div>
-            <div style="padding:0 20px 16px;display:flex;justify-content:center">
-                <button id="profile-modal-close" style="padding:8px 24px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s">${t('actions.close', 'Close')}</button>
+            <div class="about-modal-footer">
+                <button id="profile-modal-close" class="about-modal-close-btn">${t('actions.close', 'Close')}</button>
             </div>
         </div>
     `;
+
+    // Set dynamic bar width and color via JS property (CSP-safe)
+    const barFill = overlay.querySelector('#about-bar-fill');
+    if (barFill) {
+        barFill.style.width = percentage + '%';
+        barFill.style.background = barColor;
+    }
 
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('show'));

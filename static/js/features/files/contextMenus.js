@@ -31,8 +31,8 @@ const contextMenus = {
             window.wopiEditor &&
             await window.wopiEditor.canEdit(targetFile.name);
 
-        wopiEdit.style.display = show ? '' : 'none';
-        wopiEditTab.style.display = show ? '' : 'none';
+        wopiEdit.classList.toggle('hidden', !show);
+        wopiEditTab.classList.toggle('hidden', !show);
     },
 
     syncFavoriteOptionLabels() {
@@ -524,7 +524,7 @@ const contextMenus = {
         const titleText = mode === 'file' ?
             (window.i18n ? window.i18n.t('dialogs.move_file') : 'Move file') :
             (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
-        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt" style="color:#ff5e3a"></i> <span>${titleText}</span>`;
+        dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
         // Load folders for the starting location
         await this.loadMoveDialogFolders(startFolderId);
@@ -639,7 +639,7 @@ const contextMenus = {
                 const currentFolderOption = document.createElement('div');
                 currentFolderOption.className = 'folder-select-item folder-select-current';
                 currentFolderOption.innerHTML = `
-                    <i class="fas fa-check-circle" style="color: #48bb78;"></i>
+                    <i class="fas fa-check-circle check-icon"></i>
                     <span>${window.i18n ? window.i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
                 `;
                 currentFolderOption.addEventListener('click', () => {
@@ -718,7 +718,7 @@ const contextMenus = {
                 const homeOption = document.createElement('div');
                 homeOption.className = 'folder-select-item folder-select-current';
                 homeOption.innerHTML = `
-                    <i class="fas fa-check-circle" style="color: #48bb78;"></i>
+                    <i class="fas fa-check-circle check-icon"></i>
                     <span>${window.i18n ? window.i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
                 `;
                 homeOption.addEventListener('click', () => {
@@ -889,7 +889,7 @@ const contextMenus = {
         existingSharesContainer.innerHTML = '';
 
         if (existingShares.length > 0) {
-            document.getElementById('existing-shares-section').style.display = 'block';
+            document.getElementById('existing-shares-section').classList.remove('hidden');
 
             // Create elements for each existing share
             existingShares.forEach(share => {
@@ -965,19 +965,19 @@ const contextMenus = {
                             await window.fileSharing.removeSharedLink(shareId);
                             btn.closest('.existing-share-item').remove();
                             if (existingSharesContainer.children.length === 0) {
-                                document.getElementById('existing-shares-section').style.display = 'none';
+                                document.getElementById('existing-shares-section').classList.add('hidden');
                             }
                         }
                     });
                 });
             });
         } else {
-            document.getElementById('existing-shares-section').style.display = 'none';
+            document.getElementById('existing-shares-section').classList.add('hidden');
         }
 
         // Hide new-share section from previous use
         const newShareSection = document.getElementById('new-share-section');
-        if (newShareSection) newShareSection.style.display = 'none';
+        if (newShareSection) newShareSection.classList.add('hidden');
 
         // Show dialog
         shareDialog.style.display = 'flex';
@@ -1041,7 +1041,7 @@ const contextMenus = {
             const shareUrl = document.getElementById('generated-share-url');
             if (shareUrl) {
                 shareUrl.value = shareInfo.url;
-                document.getElementById('new-share-section').style.display = 'block';
+                document.getElementById('new-share-section').classList.remove('hidden');
                 shareUrl.focus();
                 shareUrl.select();
             }

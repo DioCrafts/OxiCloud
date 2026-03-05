@@ -16,9 +16,9 @@ const ACTIONS_BAR_TEMPLATES = {
         <div class="action-buttons">
             <div class="upload-dropdown" id="upload-dropdown">
                 <button class="btn btn-primary" id="upload-btn">
-                    <i class="fas fa-cloud-upload-alt" style="margin-right: 5px;"></i>
+                    <i class="fas fa-cloud-upload-alt icon-mr"></i>
                     <span data-i18n="actions.upload">Upload</span>
-                    <i class="fas fa-caret-down" style="margin-left: 4px; font-size: 12px;"></i>
+                    <i class="fas fa-caret-down icon-ml"></i>
                 </button>
                 <div class="upload-dropdown-menu" id="upload-dropdown-menu">
                     <button class="upload-dropdown-item" id="upload-files-btn">
@@ -32,7 +32,7 @@ const ACTIONS_BAR_TEMPLATES = {
                 </div>
             </div>
             <button class="btn btn-secondary" id="new-folder-btn">
-                <i class="fas fa-folder-plus" style="margin-right: 5px;"></i>
+                <i class="fas fa-folder-plus icon-mr"></i>
                 <span data-i18n="actions.new_folder">New folder</span>
             </button>
         </div>
@@ -75,7 +75,7 @@ const ACTIONS_BAR_TEMPLATES = {
     recent: `
         <div class="action-buttons">
             <button class="btn btn-secondary" id="clear-recent-btn">
-                <i class="fas fa-broom" style="margin-right: 5px;"></i>
+                <i class="fas fa-broom icon-mr"></i>
                 <span data-i18n="actions.clear_recent">Clear recent</span>
             </button>
         </div>

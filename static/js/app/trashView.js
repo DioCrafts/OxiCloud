@@ -27,7 +27,7 @@ async function loadTrashItems() {
             const emptyState = document.createElement('div');
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
-                <i class="fas fa-trash" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+                <i class="fas fa-trash empty-state-icon"></i>
                 <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'The trash is empty'}</p>
             `;
             elements.filesGrid.appendChild(emptyState);

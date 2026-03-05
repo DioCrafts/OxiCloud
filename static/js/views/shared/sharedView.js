@@ -92,14 +92,14 @@ const sharedView = {
                 </div>
             </div>
 
-            <div id="empty-shared-state" class="empty-state" style="display:none;">
-                <i class="fas fa-share-alt" style="font-size: 48px; color: #ddd; margin-bottom: 16px;"></i>
+            <div id="empty-shared-state" class="empty-state hidden">
+                <i class="fas fa-share-alt empty-state-icon"></i>
                 <p data-i18n="shared_emptyStateTitle">No shared items</p>
                 <p data-i18n="shared_emptyStateDesc">Items you share will appear here</p>
                 <button id="go-to-files-btn" class="button primary" data-i18n="shared.goToFiles">Go to Files</button>
             </div>
 
-            <div class="shared-list-container" style="display:none;">
+            <div class="shared-list-container hidden">
                 <table class="shared-table">
                     <thead>
                         <tr>
