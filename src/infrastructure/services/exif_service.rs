@@ -49,10 +49,10 @@ impl ExifService {
             meta.captured_at = parse_exif_datetime(&field.display_value().to_string());
         }
         // Fallback to DateTimeDigitized if DateTimeOriginal is missing
-        if meta.captured_at.is_none() {
-            if let Some(field) = exif.get_field(Tag::DateTimeDigitized, In::PRIMARY) {
-                meta.captured_at = parse_exif_datetime(&field.display_value().to_string());
-            }
+        if meta.captured_at.is_none()
+            && let Some(field) = exif.get_field(Tag::DateTimeDigitized, In::PRIMARY)
+        {
+            meta.captured_at = parse_exif_datetime(&field.display_value().to_string());
         }
 
         // ── GPS coordinates ──
@@ -84,14 +84,12 @@ impl ExifService {
         }
 
         // ── Orientation ──
-        if let Some(field) = exif.get_field(Tag::Orientation, In::PRIMARY) {
-            if let exif::Value::Short(ref v) = field.value {
-                if let Some(&o) = v.first() {
-                    if (1..=8).contains(&o) {
-                        meta.orientation = Some(o);
-                    }
-                }
-            }
+        if let Some(field) = exif.get_field(Tag::Orientation, In::PRIMARY)
+            && let exif::Value::Short(ref v) = field.value
+            && let Some(&o) = v.first()
+            && (1..=8).contains(&o)
+        {
+            meta.orientation = Some(o);
         }
 
         // ── Dimensions ──
@@ -102,15 +100,15 @@ impl ExifService {
             meta.height = parse_u32_value(&field.value);
         }
         // Fallback to ImageWidth/ImageLength if PixelXDimension is missing
-        if meta.width.is_none() {
-            if let Some(field) = exif.get_field(Tag::ImageWidth, In::PRIMARY) {
-                meta.width = parse_u32_value(&field.value);
-            }
+        if meta.width.is_none()
+            && let Some(field) = exif.get_field(Tag::ImageWidth, In::PRIMARY)
+        {
+            meta.width = parse_u32_value(&field.value);
         }
-        if meta.height.is_none() {
-            if let Some(field) = exif.get_field(Tag::ImageLength, In::PRIMARY) {
-                meta.height = parse_u32_value(&field.value);
-            }
+        if meta.height.is_none()
+            && let Some(field) = exif.get_field(Tag::ImageLength, In::PRIMARY)
+        {
+            meta.height = parse_u32_value(&field.value);
         }
 
         Some(meta)

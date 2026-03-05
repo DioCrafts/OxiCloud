@@ -32,7 +32,7 @@ pub async fn list_photos(
     Query(params): Query<PhotosQueryParams>,
 ) -> impl IntoResponse {
     let user_id = &auth_user.id;
-    let limit = params.limit.unwrap_or(200).min(500).max(1);
+    let limit = params.limit.unwrap_or(200).clamp(1, 500);
 
     let file_read = &state.repositories.file_read_repository;
 

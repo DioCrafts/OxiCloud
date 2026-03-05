@@ -635,10 +635,10 @@ impl FileHandler {
                     use crate::infrastructure::services::exif_service::ExifService;
                     match tokio::fs::read(&file_path).await {
                         Ok(data) => {
-                            if let Some(meta) = ExifService::extract(&data) {
-                                if let Err(e) = metadata_repo.upsert(&file_id, &meta).await {
-                                    tracing::warn!("Failed to store EXIF for {}: {}", file_id, e);
-                                }
+                            if let Some(meta) = ExifService::extract(&data)
+                                && let Err(e) = metadata_repo.upsert(&file_id, &meta).await
+                            {
+                                tracing::warn!("Failed to store EXIF for {}: {}", file_id, e);
                             }
                         }
                         Err(e) => {
