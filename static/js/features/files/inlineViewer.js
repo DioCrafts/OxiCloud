@@ -88,11 +88,11 @@ class InlineViewer {
     console.log('Inline viewer initialized');
   }
   
-  openFile(file) {
+  async openFile(file) {
     console.log('Opening file:', file);
 
     // WOPI editor intercept: open Office documents in the WOPI editor
-    if (window.wopiEditor && window.wopiEditor.canEdit(file.name)) {
+    if (window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }
