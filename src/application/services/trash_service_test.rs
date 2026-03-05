@@ -20,6 +20,7 @@ use crate::domain::services::path_service::StoragePath;
 
 /// Test-only service that mirrors `TrashService` logic but accepts generic repos,
 /// allowing mock repositories to be injected in unit tests.
+#[allow(dead_code)]
 struct TrashServiceForTest<TR, FR, FW, FoR> {
     trash_repository: Arc<TR>,
     file_read_port: Arc<FR>,
@@ -35,6 +36,7 @@ where
     FW: FileWritePort,
     FoR: FolderRepository,
 {
+    #[allow(dead_code)]
     fn new(
         trash_repository: Arc<TR>,
         file_read_port: Arc<FR>,
@@ -308,6 +310,7 @@ where
 }
 
 // Mock repositories for testing
+#[allow(dead_code)]
 struct MockTrashRepository {
     trash_items: Mutex<HashMap<Uuid, TrashedItem>>,
     /// Shared refs to the file/folder trashed maps so `clear_trash` can
@@ -317,6 +320,7 @@ struct MockTrashRepository {
 }
 
 impl MockTrashRepository {
+    #[allow(dead_code)]
     fn new(
         trashed_files: Arc<Mutex<HashMap<String, File>>>,
         trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
@@ -394,12 +398,14 @@ impl TrashRepository for MockTrashRepository {
     }
 }
 
+#[allow(dead_code)]
 struct MockFileRepository {
     files: Mutex<HashMap<String, File>>,
     trashed_files: Arc<Mutex<HashMap<String, File>>>,
 }
 
 impl MockFileRepository {
+    #[allow(dead_code)]
     fn new(trashed_files: Arc<Mutex<HashMap<String, File>>>) -> Self {
         Self {
             files: Mutex::new(HashMap::new()),
@@ -407,6 +413,7 @@ impl MockFileRepository {
         }
     }
 
+    #[allow(dead_code)]
     fn add_test_file(&self, id: &str, name: &str, path: &str) {
         let file = File::new(
             id.to_string(),
@@ -625,12 +632,14 @@ impl FileWritePort for MockFileRepository {
     }
 }
 
+#[allow(dead_code)]
 struct MockFolderRepository {
     folders: Mutex<HashMap<String, Folder>>,
     trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
 }
 
 impl MockFolderRepository {
+    #[allow(dead_code)]
     fn new(trashed_folders: Arc<Mutex<HashMap<String, Folder>>>) -> Self {
         Self {
             folders: Mutex::new(HashMap::new()),
@@ -638,6 +647,7 @@ impl MockFolderRepository {
         }
     }
 
+    #[allow(dead_code)]
     fn add_test_folder(&self, id: &str, name: &str, path: &str) {
         let folder = Folder::new(
             id.to_string(),

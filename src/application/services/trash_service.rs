@@ -272,7 +272,7 @@ impl TrashUseCase for TrashService {
 
                 // Ownership check — return NotFound (not Forbidden) to
                 // prevent leaking whether the folder exists.
-                if folder.owner_id().map_or(true, |o| o != user_id) {
+                if folder.owner_id().is_none_or(|o| o != user_id) {
                     return Err(DomainError::not_found(
                         "Folder",
                         format!("Folder not found: {}", item_id),

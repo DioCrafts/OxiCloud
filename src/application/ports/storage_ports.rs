@@ -58,7 +58,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         let all = self.list_files(folder_id).await?;
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
             .collect())
     }
 
@@ -142,7 +142,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         let all = self.list_files_batch(folder_id, offset, limit).await?;
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
             .collect())
     }
 

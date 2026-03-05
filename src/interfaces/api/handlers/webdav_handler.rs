@@ -434,6 +434,7 @@ async fn handle_propfind(
 /// (sub-folders and files) are fetched in batches of `PROPFIND_BATCH_SIZE`.
 /// Each batch is serialised to XML and sent as a chunk, so memory stays
 /// constant at O(batch_size) regardless of the total number of children.
+#[allow(clippy::too_many_arguments)]
 async fn build_streaming_propfind_response(
     folder: FolderDto,
     folder_id: Option<String>,
@@ -1227,10 +1228,8 @@ async fn handle_move(
 
                 if source_parent_path != dest_parent_path {
                     // SECURITY: verify destination parent belongs to caller (V-08)
-                    if !dest_parent_path.is_empty() {
-                        if let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
-                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
-                        }
+                    if !dest_parent_path.is_empty() && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
+                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
                     }
                     file_management_service
                         .move_file(&file.id, Some(dest_parent_path.to_string()))
@@ -1328,10 +1327,8 @@ async fn handle_move(
 
             if source_parent_path != dest_parent_path {
                 // SECURITY: verify destination parent belongs to caller (V-08)
-                if !dest_parent_path.is_empty() {
-                    if let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
-                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
-                    }
+                if !dest_parent_path.is_empty() && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
+                    assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
                 }
                 file_management_service
                     .move_file(&file.id, Some(dest_parent_path.to_string()))

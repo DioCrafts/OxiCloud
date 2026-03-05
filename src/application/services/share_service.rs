@@ -553,10 +553,10 @@ mod tests {
             Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
         }
 
-        async fn get_shared_link(&self, id: &str) -> Result<ShareDto, DomainError> {
+        async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError> {
             let share = self
                 .share_repository
-                .find_share_by_id(id)
+                .find_share_by_id_for_user(id, requester_id)
                 .await
                 .map_err(|e| {
                     ShareServiceError::NotFound(format!("Share {} not found: {}", id, e))
@@ -585,10 +585,11 @@ mod tests {
             &self,
             item_id: &str,
             item_type: &ShareItemType,
+            requester_id: &str,
         ) -> Result<Vec<ShareDto>, DomainError> {
             let shares = self
                 .share_repository
-                .find_shares_by_item(item_id, item_type)
+                .find_shares_by_item_for_user(item_id, item_type, requester_id)
                 .await
                 .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
             Ok(shares
@@ -601,11 +602,12 @@ mod tests {
         async fn update_shared_link(
             &self,
             id: &str,
+            requester_id: &str,
             dto: UpdateShareDto,
         ) -> Result<ShareDto, DomainError> {
             let mut share = self
                 .share_repository
-                .find_share_by_id(id)
+                .find_share_by_id_for_user(id, requester_id)
                 .await
                 .map_err(|e| {
                     ShareServiceError::NotFound(format!("Share {} not found: {}", id, e))
@@ -632,9 +634,9 @@ mod tests {
             Ok(ShareDto::from_entity(&updated, &self.config.base_url()))
         }
 
-        async fn delete_shared_link(&self, id: &str) -> Result<(), DomainError> {
+        async fn delete_shared_link(&self, id: &str, requester_id: &str) -> Result<(), DomainError> {
             self.share_repository
-                .delete_share(id)
+                .delete_share_for_user(id, requester_id)
                 .await
                 .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
             Ok(())
@@ -663,7 +665,7 @@ mod tests {
             &self,
             token: &str,
             password: &str,
-        ) -> Result<bool, DomainError> {
+        ) -> Result<ShareDto, DomainError> {
             let share = self
                 .share_repository
                 .find_share_by_token(token)
@@ -675,8 +677,18 @@ mod tests {
                 return Err(ShareServiceError::Expired.into());
             }
             match share.password_hash() {
-                Some(hash) => self.password_hasher.verify_password(password, hash).await,
-                None => Ok(true),
+                Some(hash) => {
+                    let valid = self.password_hasher.verify_password(password, hash).await?;
+                    if !valid {
+                        return Err(DomainError::new(
+                            crate::common::errors::ErrorKind::AccessDenied,
+                            "Share",
+                            "Invalid share password",
+                        ));
+                    }
+                    Ok(ShareDto::from_entity(&share, &self.config.base_url()))
+                }
+                None => Ok(ShareDto::from_entity(&share, &self.config.base_url())),
             }
         }
 
