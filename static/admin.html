@@ -1,264 +1,609 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OxiCloud — Admin Panel</title>
-<script src="/js/core/theme-init.js"></script>
-<script src="/js/core/icons.js" defer></script>
-<script src="/js/core/formatters.js" defer></script>
-<script src="/js/core/csrf.js" defer></script>
-<link rel="stylesheet" href="/css/main.css">
-<link rel="stylesheet" href="/css/views/admin.css">
-</head>
-<body>
-
-<div class="admin-header">
-  <div class="admin-header-left">
-    <a href="/" class="admin-logo-link link-reset-flex">
-      <div class="admin-logo">
-        <svg viewBox="0 0 500 500">
-          <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"/>
-        </svg>
-      </div>
-      <span class="admin-title-text">OxiCloud</span>
-    </a>
-    <span class="admin-title-separator">· Admin</span>
-  </div>
-  <div class="admin-header-right">
-    <a href="/"><i class="fas fa-arrow-left"></i> Back to OxiCloud</a>
-  </div>
-</div>
-
-<div class="admin-container">
-  <div id="loading"><i class="fas fa-circle-notch"></i> Loading…</div>
-  <div id="access-denied">
-    <div class="access-icon"><i class="fas fa-lock"></i></div>
-    <h2>Access Denied</h2>
-    <p>Administrator privileges required to access this panel.</p>
-    <a href="/login"><i class="fas fa-sign-in-alt"></i> Sign in</a>
-  </div>
-
-  <div id="main-content">
-    <div class="admin-tabs">
-      <button class="admin-tab active" id="tab-btn-dashboard"><i class="fas fa-chart-pie"></i> Dashboard</button>
-      <button class="admin-tab" id="tab-btn-users"><i class="fas fa-users"></i> Users</button>
-      <button class="admin-tab" id="tab-btn-oidc"><i class="fas fa-key"></i> SSO / OIDC</button>
-    </div>
-
-    <div id="tab-dashboard" class="tab-content active">
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value text-blue" id="ds-total-users">—</div><div class="stat-label">Total Users</div></div>
-        <div class="stat-card"><div class="stat-value text-green" id="ds-active-users">—</div><div class="stat-label">Active Users</div></div>
-        <div class="stat-card"><div class="stat-value text-blue" id="ds-admin-users">—</div><div class="stat-label">Admins</div></div>
-        <div class="stat-card"><div class="stat-value" id="ds-version">—</div><div class="stat-label">Version</div></div>
-      </div>
-
-      <div class="admin-card">
-        <h2><i class="fas fa-hdd"></i> Storage Overview</h2>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value" id="ds-used">—</div><div class="stat-label">Used</div></div>
-          <div class="stat-card"><div class="stat-value" id="ds-quota">—</div><div class="stat-label">Total Quota</div></div>
-          <div class="stat-card"><div class="stat-value" id="ds-usage-pct">—</div><div class="stat-label">Usage %</div></div>
-        </div>
-        <div class="progress-bar"><div class="progress-fill green width-zero" id="ds-bar"></div></div>
-        <div class="mt-14">
-          <div class="stats-grid">
-            <div class="stat-card warn" id="ds-warn-card"><div class="stat-value text-orange" id="ds-over80">0</div><div class="stat-label">Users &gt;80% quota</div></div>
-            <div class="stat-card danger" id="ds-danger-card"><div class="stat-value text-red" id="ds-overquota">0</div><div class="stat-label">Users over quota</div></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-card">
-        <h2><i class="fas fa-server"></i> System</h2>
-        <div class="stats-grid">
-          <div class="stat-card"><div class="stat-value" id="ds-auth">—</div><div class="stat-label">Auth</div></div>
-          <div class="stat-card"><div class="stat-value" id="ds-oidc">—</div><div class="stat-label">OIDC</div></div>
-          <div class="stat-card"><div class="stat-value" id="ds-quotas-flag">—</div><div class="stat-label">Quotas</div></div>
-        </div>
-        <div class="toggle-row toggle-row-strong">
-          <label><i class="fas fa-user-plus icon-muted-right"></i> Allow public self-registration</label>
-          <label class="switch"><input type="checkbox" id="ds-registration" checked><span class="slider"></span></label>
-        </div>
-        <div class="warning" id="registration-warning"><i class="fas fa-exclamation-triangle"></i> Public registration is disabled. Only admins can create new users.</div>
-      </div>
-    </div>
-
-    <div id="tab-users" class="tab-content">
-      <div class="admin-card">
-        <h2 class="h2-space-between"><span><i class="fas fa-users-cog"></i> User Management</span><button class="btn btn-primary" id="btn-create-user"><i class="fas fa-user-plus"></i> Create User</button></h2>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th>Auth</th>
-                <th>Status</th>
-                <th>Storage</th>
-                <th>Last Login</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="users-tbody"><tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading users…</td></tr></tbody>
-          </table>
-        </div>
-        <div class="pagination">
-          <span id="users-info">—</span>
-          <div class="flex-gap-6">
-            <button class="btn btn-sm btn-secondary" id="prev-btn" disabled><i class="fas fa-chevron-left"></i> Prev</button>
-            <button class="btn btn-sm btn-secondary" id="next-btn">Next <i class="fas fa-chevron-right"></i></button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="tab-oidc" class="tab-content">
-      <div class="admin-card">
-        <h2><i class="fas fa-shield-alt"></i> Single Sign-On (OIDC / SSO)</h2>
-        <div class="toggle-row">
-          <label>Enable SSO Authentication</label>
-          <label class="switch"><input type="checkbox" id="oidc-enabled"><span class="slider"></span></label>
-        </div>
-        <div id="oidc-form">
-          <div class="form-group">
-            <label>Provider Name <span id="badge-provider_name"></span></label>
-            <input type="text" id="provider-name" placeholder="e.g., Authentik, Keycloak">
-          </div>
-          <div class="form-group">
-            <label>Issuer URL <span id="badge-issuer_url"></span></label>
-            <input type="url" id="issuer-url" placeholder="https://auth.example.com/application/o/oxicloud/">
-            <small>OpenID Connect issuer URL of your identity provider</small>
-          </div>
-          <div class="oidc-discover-wrap">
-            <button class="btn btn-secondary btn-sm" id="discover-btn"><i class="fas fa-search"></i> Auto-discover</button>
-          </div>
-          <div id="discovery-result"></div>
-          <div class="form-group">
-            <label>Client ID <span id="badge-client_id"></span></label>
-            <input type="text" id="client-id" placeholder="oxicloud">
-          </div>
-          <div class="form-group">
-            <label>Client Secret <span id="badge-client_secret"></span></label>
-            <input type="password" id="client-secret" placeholder="Leave empty to keep current value">
-            <small id="secret-hint"><i class="fas fa-check-circle secret-icon"></i> A client secret is already configured</small>
-          </div>
-          <div class="form-group">
-            <label>Callback URL <small class="small-muted">(register in your IdP)</small></label>
-            <div class="readonly-field"><span id="callback-url">—</span><button id="btn-copy-callback" title="Copy"><i class="fas fa-copy"></i></button></div>
-          </div>
-          <details>
-            <summary><i class="fas fa-sliders-h summary-icon-right"></i> Advanced Settings</summary>
-            <div class="form-group">
-              <label>Scopes <span id="badge-scopes"></span></label>
-              <input type="text" id="scopes" placeholder="openid profile email">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>OxiCloud — Admin Panel</title>
+        <script>
+            if (localStorage.getItem("oxicloud_theme") === "dark")
+                document.documentElement.setAttribute("data-theme", "dark");
+        </script>
+        <script src="/js/core/icons.js" defer></script>
+        <script src="/js/core/formatters.js" defer></script>
+        <script src="/js/core/csrf.js" defer></script>
+        <link rel="stylesheet" href="/css/main.css" />
+        <link rel="stylesheet" href="/css/views/admin.css" />
+    </head>
+    <body>
+        <div class="admin-header">
+            <div class="admin-header-left">
+                <a href="/" class="admin-logo-link link-reset-flex">
+                    <div class="admin-logo">
+                        <svg viewBox="0 0 500 500">
+                            <path
+                                d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z"
+                            />
+                        </svg>
+                    </div>
+                    <span class="admin-title-text">OxiCloud</span>
+                </a>
+                <span class="admin-title-separator">· Admin</span>
             </div>
-            <div class="toggle-row">
-              <label>Auto-provision users on first login</label>
-              <label class="switch"><input type="checkbox" id="auto-provision" checked><span class="slider"></span></label>
+            <div class="admin-header-right">
+                <a href="/"
+                    ><i class="fas fa-arrow-left"></i> Back to OxiCloud</a
+                >
             </div>
-            <div class="form-group">
-              <label>Admin Groups <span id="badge-admin_groups"></span></label>
-              <input type="text" id="admin-groups" placeholder="e.g., oxicloud-admins">
-              <small>Comma-separated OIDC group names that map to admin role</small>
-            </div>
-            <div class="toggle-row">
-              <label>Disable password login (OIDC only)</label>
-              <label class="switch"><input type="checkbox" id="disable-password"><span class="slider"></span></label>
-            </div>
-            <div class="warning" id="password-warning"><i class="fas fa-exclamation-triangle"></i> This will prevent ALL password-based logins!</div>
-          </details>
-          <div class="oidc-actions">
-            <button class="btn btn-secondary" id="btn-test-oidc"><i class="fas fa-vial"></i> Test</button>
-            <button class="btn btn-primary" id="save-btn"><i class="fas fa-save"></i> Save</button>
-          </div>
-          <div id="oidc-status" class="alert"></div>
         </div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div id="quota-modal" class="modal-overlay">
-  <div class="modal">
-    <h3><i class="fas fa-box modal-title-icon"></i> Update Storage Quota</h3>
-    <div class="form-group">
-      <label>User: <strong id="qm-username"></strong></label>
-    </div>
-    <div class="form-group">
-      <label>New Quota</label>
-      <div class="quota-input-row">
-        <input type="number" id="qm-value" min="0" step="1" class="flex-1">
-        <select id="qm-unit" class="select-qm-unit"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
-      </div>
-      <small>Set to 0 for unlimited</small>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="btn-close-quota">Cancel</button>
-      <button class="btn btn-primary" id="btn-save-quota"><i class="fas fa-save"></i> Save</button>
-    </div>
-  </div>
-</div>
+        <div class="admin-container">
+            <div id="loading"><i class="fas fa-circle-notch"></i> Loading…</div>
+            <div id="access-denied">
+                <div class="access-icon"><i class="fas fa-lock"></i></div>
+                <h2>Access Denied</h2>
+                <p>Administrator privileges required to access this panel.</p>
+                <a href="/login"><i class="fas fa-sign-in-alt"></i> Sign in</a>
+            </div>
 
-<div id="create-user-modal" class="modal-overlay">
-  <div class="modal">
-    <h3><i class="fas fa-user-plus modal-title-icon"></i> Create New User</h3>
-    <div class="form-group">
-      <label>Username *</label>
-      <input type="text" id="cu-username" placeholder="johndoe" minlength="3" maxlength="32">
-      <small>3–32 characters</small>
-    </div>
-    <div class="form-group">
-      <label>Password *</label>
-      <input type="password" id="cu-password" placeholder="Min 8 characters" minlength="8">
-    </div>
-    <div class="form-group">
-      <label>Email <small class="small-muted">(optional)</small></label>
-      <input type="text" id="cu-email" placeholder="user@example.com (auto-generated if empty)">
-    </div>
-    <div class="form-row">
-      <div class="form-group flex-1">
-        <label>Role</label>
-        <select id="cu-role" class="select-cu-role">
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
-      </div>
-      <div class="form-group flex-1">
-        <label>Quota</label>
-        <div class="quota-row">
-          <input type="number" id="cu-quota-value" min="0" step="1" value="1" class="flex-1">
-          <select id="cu-quota-unit" class="select-cu-quota-unit"><option value="1073741824">GB</option><option value="1048576">MB</option><option value="1099511627776">TB</option></select>
+            <div id="main-content">
+                <div class="admin-tabs">
+                    <button
+                        class="admin-tab active"
+                        onclick="switchTab('dashboard',this)"
+                    >
+                        <i class="fas fa-chart-pie"></i> Dashboard
+                    </button>
+                    <button class="admin-tab" onclick="switchTab('users',this)">
+                        <i class="fas fa-users"></i> Users
+                    </button>
+                    <button class="admin-tab" onclick="switchTab('oidc',this)">
+                        <i class="fas fa-key"></i> SSO / OIDC
+                    </button>
+                </div>
+
+                <div id="tab-dashboard" class="tab-content active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div
+                                class="stat-value text-blue"
+                                id="ds-total-users"
+                            >
+                                —
+                            </div>
+                            <div class="stat-label">Total Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div
+                                class="stat-value text-green"
+                                id="ds-active-users"
+                            >
+                                —
+                            </div>
+                            <div class="stat-label">Active Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div
+                                class="stat-value text-blue"
+                                id="ds-admin-users"
+                            >
+                                —
+                            </div>
+                            <div class="stat-label">Admins</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="ds-version">—</div>
+                            <div class="stat-label">Version</div>
+                        </div>
+                    </div>
+
+                    <div class="admin-card">
+                        <h2><i class="fas fa-hdd"></i> Storage Overview</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-used">—</div>
+                                <div class="stat-label">Used</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-quota">—</div>
+                                <div class="stat-label">Total Quota</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-usage-pct">
+                                    —
+                                </div>
+                                <div class="stat-label">Usage %</div>
+                            </div>
+                        </div>
+                        <div class="progress-bar">
+                            <div
+                                class="progress-fill green width-zero"
+                                id="ds-bar"
+                            ></div>
+                        </div>
+                        <div class="mt-14">
+                            <div class="stats-grid">
+                                <div class="stat-card warn" id="ds-warn-card">
+                                    <div
+                                        class="stat-value text-orange"
+                                        id="ds-over80"
+                                    >
+                                        0
+                                    </div>
+                                    <div class="stat-label">
+                                        Users &gt;80% quota
+                                    </div>
+                                </div>
+                                <div
+                                    class="stat-card danger"
+                                    id="ds-danger-card"
+                                >
+                                    <div
+                                        class="stat-value text-red"
+                                        id="ds-overquota"
+                                    >
+                                        0
+                                    </div>
+                                    <div class="stat-label">
+                                        Users over quota
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="admin-card">
+                        <h2><i class="fas fa-server"></i> System</h2>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-auth">—</div>
+                                <div class="stat-label">Auth</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-oidc">—</div>
+                                <div class="stat-label">OIDC</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value" id="ds-quotas-flag">
+                                    —
+                                </div>
+                                <div class="stat-label">Quotas</div>
+                            </div>
+                        </div>
+                        <div class="toggle-row toggle-row-strong">
+                            <label
+                                ><i
+                                    class="fas fa-user-plus icon-muted-right"
+                                ></i>
+                                Allow public self-registration</label
+                            >
+                            <label class="switch"
+                                ><input
+                                    type="checkbox"
+                                    id="ds-registration"
+                                    checked
+                                    onchange="toggleRegistration(this.checked)" /><span
+                                    class="slider"
+                                ></span
+                            ></label>
+                        </div>
+                        <div class="warning" id="registration-warning">
+                            <i class="fas fa-exclamation-triangle"></i> Public
+                            registration is disabled. Only admins can create new
+                            users.
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-users" class="tab-content">
+                    <div class="admin-card">
+                        <h2 class="h2-space-between">
+                            <span
+                                ><i class="fas fa-users-cog"></i> User
+                                Management</span
+                            ><button
+                                class="btn btn-primary"
+                                onclick="openCreateUserModal()"
+                            >
+                                <i class="fas fa-user-plus"></i> Create User
+                            </button>
+                        </h2>
+                        <div class="table-wrap">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Role</th>
+                                        <th>Auth</th>
+                                        <th>Status</th>
+                                        <th>Storage</th>
+                                        <th>Last Login</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-tbody">
+                                    <tr>
+                                        <td
+                                            colspan="7"
+                                            class="table-loading-cell"
+                                        >
+                                            <i
+                                                class="fas fa-spinner fa-spin"
+                                            ></i>
+                                            Loading users…
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="pagination">
+                            <span id="users-info">—</span>
+                            <div class="flex-gap-6">
+                                <button
+                                    class="btn btn-sm btn-secondary"
+                                    id="prev-btn"
+                                    onclick="prevPage()"
+                                    disabled
+                                >
+                                    <i class="fas fa-chevron-left"></i> Prev
+                                </button>
+                                <button
+                                    class="btn btn-sm btn-secondary"
+                                    id="next-btn"
+                                    onclick="nextPage()"
+                                >
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-oidc" class="tab-content">
+                    <div class="admin-card">
+                        <h2>
+                            <i class="fas fa-shield-alt"></i> Single Sign-On
+                            (OIDC / SSO)
+                        </h2>
+                        <div class="toggle-row">
+                            <label>Enable SSO Authentication</label>
+                            <label class="switch"
+                                ><input
+                                    type="checkbox"
+                                    id="oidc-enabled" /><span
+                                    class="slider"
+                                ></span
+                            ></label>
+                        </div>
+                        <div id="oidc-form">
+                            <div class="form-group">
+                                <label
+                                    >Provider Name
+                                    <span id="badge-provider_name"></span
+                                ></label>
+                                <input
+                                    type="text"
+                                    id="provider-name"
+                                    placeholder="e.g., Authentik, Keycloak"
+                                />
+                            </div>
+                            <div class="form-group">
+                                <label
+                                    >Issuer URL
+                                    <span id="badge-issuer_url"></span
+                                ></label>
+                                <input
+                                    type="url"
+                                    id="issuer-url"
+                                    placeholder="https://auth.example.com/application/o/oxicloud/"
+                                />
+                                <small
+                                    >OpenID Connect issuer URL of your identity
+                                    provider</small
+                                >
+                            </div>
+                            <div class="oidc-discover-wrap">
+                                <button
+                                    class="btn btn-secondary btn-sm"
+                                    id="discover-btn"
+                                    onclick="testConnection()"
+                                >
+                                    <i class="fas fa-search"></i> Auto-discover
+                                </button>
+                            </div>
+                            <div id="discovery-result"></div>
+                            <div class="form-group">
+                                <label
+                                    >Client ID <span id="badge-client_id"></span
+                                ></label>
+                                <input
+                                    type="text"
+                                    id="client-id"
+                                    placeholder="oxicloud"
+                                />
+                            </div>
+                            <div class="form-group">
+                                <label
+                                    >Client Secret
+                                    <span id="badge-client_secret"></span
+                                ></label>
+                                <input
+                                    type="password"
+                                    id="client-secret"
+                                    placeholder="Leave empty to keep current value"
+                                />
+                                <small id="secret-hint"
+                                    ><i
+                                        class="fas fa-check-circle secret-icon"
+                                    ></i>
+                                    A client secret is already configured</small
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label
+                                    >Callback URL
+                                    <small class="small-muted"
+                                        >(register in your IdP)</small
+                                    ></label
+                                >
+                                <div class="readonly-field">
+                                    <span id="callback-url">—</span
+                                    ><button
+                                        onclick="copyCallback()"
+                                        title="Copy"
+                                    >
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <details>
+                                <summary>
+                                    <i
+                                        class="fas fa-sliders-h summary-icon-right"
+                                    ></i>
+                                    Advanced Settings
+                                </summary>
+                                <div class="form-group">
+                                    <label
+                                        >Scopes <span id="badge-scopes"></span
+                                    ></label>
+                                    <input
+                                        type="text"
+                                        id="scopes"
+                                        placeholder="openid profile email"
+                                    />
+                                </div>
+                                <div class="toggle-row">
+                                    <label
+                                        >Auto-provision users on first
+                                        login</label
+                                    >
+                                    <label class="switch"
+                                        ><input
+                                            type="checkbox"
+                                            id="auto-provision"
+                                            checked /><span
+                                            class="slider"
+                                        ></span
+                                    ></label>
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        >Admin Groups
+                                        <span id="badge-admin_groups"></span
+                                    ></label>
+                                    <input
+                                        type="text"
+                                        id="admin-groups"
+                                        placeholder="e.g., oxicloud-admins"
+                                    />
+                                    <small
+                                        >Comma-separated OIDC group names that
+                                        map to admin role</small
+                                    >
+                                </div>
+                                <div class="toggle-row">
+                                    <label
+                                        >Disable password login (OIDC
+                                        only)</label
+                                    >
+                                    <label class="switch"
+                                        ><input
+                                            type="checkbox"
+                                            id="disable-password" /><span
+                                            class="slider"
+                                        ></span
+                                    ></label>
+                                </div>
+                                <div class="warning" id="password-warning">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    This will prevent ALL password-based logins!
+                                </div>
+                            </details>
+                            <div class="oidc-actions">
+                                <button
+                                    class="btn btn-secondary"
+                                    onclick="testConnection()"
+                                >
+                                    <i class="fas fa-vial"></i> Test
+                                </button>
+                                <button
+                                    class="btn btn-primary"
+                                    id="save-btn"
+                                    onclick="saveOidcSettings()"
+                                >
+                                    <i class="fas fa-save"></i> Save
+                                </button>
+                            </div>
+                            <div id="oidc-status" class="alert"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-    <div id="cu-error" class="alert alert-no-margin"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="btn-close-create-user">Cancel</button>
-      <button class="btn btn-primary" id="cu-submit"><i class="fas fa-user-plus"></i> Create</button>
-    </div>
-  </div>
-</div>
 
-<div id="reset-pw-modal" class="modal-overlay">
-  <div class="modal">
-    <h3><i class="fas fa-key modal-title-icon"></i> Reset Password</h3>
-    <div class="form-group">
-      <label>User: <strong id="rp-username"></strong></label>
-    </div>
-    <div class="form-group">
-      <label>New Password</label>
-      <input type="password" id="rp-password" placeholder="Min 8 characters" minlength="8">
-    </div>
-    <div id="rp-error" class="alert alert-no-margin"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="btn-close-reset-pw">Cancel</button>
-      <button class="btn btn-primary" id="rp-submit"><i class="fas fa-save"></i> Reset</button>
-    </div>
-  </div>
-</div>
+        <div id="quota-modal" class="modal-overlay hidden">
+            <div class="modal">
+                <h3>
+                    <i class="fas fa-box modal-title-icon"></i> Update Storage
+                    Quota
+                </h3>
+                <div class="form-group">
+                    <label>User: <strong id="qm-username"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>New Quota</label>
+                    <div class="quota-input-row">
+                        <input
+                            type="number"
+                            id="qm-value"
+                            min="0"
+                            step="1"
+                            class="flex-2"
+                        />
+                        <select id="qm-unit" class="select-qm-unit">
+                            <option value="1073741824">GB</option>
+                            <option value="1048576">MB</option>
+                            <option value="1099511627776">TB</option>
+                        </select>
+                    </div>
+                    <small>Set to 0 for unlimited</small>
+                </div>
+                <div class="modal-actions">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeQuotaModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" onclick="saveQuota()">
+                        <i class="fas fa-save"></i> Save
+                    </button>
+                </div>
+            </div>
+        </div>
 
-<script src="/js/views/admin/admin.js" defer></script>
-</body>
+        <div id="create-user-modal" class="modal-overlay hidden">
+            <div class="modal">
+                <h3>
+                    <i class="fas fa-user-plus modal-title-icon"></i> Create New
+                    User
+                </h3>
+                <div class="form-group">
+                    <label>Username *</label>
+                    <input
+                        type="text"
+                        id="cu-username"
+                        placeholder="johndoe"
+                        minlength="3"
+                        maxlength="32"
+                    />
+                    <small>3–32 characters</small>
+                </div>
+                <div class="form-group">
+                    <label>Password *</label>
+                    <input
+                        type="password"
+                        id="cu-password"
+                        placeholder="Min 8 characters"
+                        minlength="8"
+                    />
+                </div>
+                <div class="form-group">
+                    <label
+                        >Email
+                        <small class="small-muted">(optional)</small></label
+                    >
+                    <input
+                        type="text"
+                        id="cu-email"
+                        placeholder="user@example.com (auto-generated if empty)"
+                    />
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-1">
+                        <label>Role</label>
+                        <select id="cu-role" class="select-cu-role">
+                            <option value="user">User</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label>Quota</label>
+                        <div class="quota-row">
+                            <input
+                                type="number"
+                                id="cu-quota-value"
+                                min="0"
+                                step="1"
+                                value="1"
+                                class="flex-1"
+                            />
+                            <select
+                                id="cu-quota-unit"
+                                class="select-cu-quota-unit"
+                            >
+                                <option value="1073741824">GB</option>
+                                <option value="1048576">MB</option>
+                                <option value="1099511627776">TB</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="cu-error" class="alert alert-no-margin"></div>
+                <div class="modal-actions">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeCreateUserModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        id="cu-submit"
+                        onclick="submitCreateUser()"
+                    >
+                        <i class="fas fa-user-plus"></i> Create
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="reset-pw-modal" class="modal-overlay hidden">
+            <div class="modal">
+                <h3>
+                    <i class="fas fa-key modal-title-icon"></i> Reset Password
+                </h3>
+                <div class="form-group">
+                    <label>User: <strong id="rp-username"></strong></label>
+                </div>
+                <div class="form-group">
+                    <label>New Password</label>
+                    <input
+                        type="password"
+                        id="rp-password"
+                        placeholder="Min 8 characters"
+                        minlength="8"
+                    />
+                </div>
+                <div id="rp-error" class="alert alert-no-margin"></div>
+                <div class="modal-actions">
+                    <button
+                        class="btn btn-secondary"
+                        onclick="closeResetPasswordModal()"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        class="btn btn-primary"
+                        id="rp-submit"
+                        onclick="submitResetPassword()"
+                    >
+                        <i class="fas fa-save"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <script src="/js/views/admin/admin.js" defer></script>
+    </body>
 </html>

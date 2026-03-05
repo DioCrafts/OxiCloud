@@ -279,15 +279,17 @@ impl FileUploadUseCase for FileUploadService {
 
         // File doesn't exist — create it via streaming upload
         let path_normalized = path.trim_start_matches('/').trim_end_matches('/');
-        let (parent_path, filename) = if let Some(idx) = path_normalized.rfind('/') {
+        let (_, filename) = if let Some(idx) = path_normalized.rfind('/') {
             (&path_normalized[..idx], &path_normalized[idx + 1..])
         } else {
             ("", path_normalized)
         };
 
-        let parent_id = if !parent_path.is_empty() {
+        // get_parent_folder_id expects the full file path — it strips the
+        // last segment (filename) internally to find the parent folder.
+        let parent_id = if path_normalized.contains('/') {
             if let Some(file_read) = &self.file_read {
-                file_read.get_parent_folder_id(parent_path).await.ok()
+                file_read.get_parent_folder_id(path_normalized).await.ok()
             } else {
                 None
             }

@@ -572,15 +572,23 @@ async fn handle_mkcol(
         parent_id: Some(parent_folder.id.clone()),
     };
 
-    folder_service
-        .create_folder(dto)
-        .await
-        .map_err(|e| AppError::internal_error(format!("Failed to create folder: {}", e)))?;
-
-    Ok(Response::builder()
-        .status(StatusCode::CREATED)
-        .body(Body::empty())
-        .unwrap())
+    match folder_service.create_folder(dto).await {
+        Ok(_) => Ok(Response::builder()
+            .status(StatusCode::CREATED)
+            .body(Body::empty())
+            .unwrap()),
+        Err(e) if e.message.contains("already exists") || e.message.contains("Already Exists") => {
+            // RFC 4918 §9.3.1: MKCOL on existing resource → 405
+            Ok(Response::builder()
+                .status(StatusCode::METHOD_NOT_ALLOWED)
+                .body(Body::empty())
+                .unwrap())
+        }
+        Err(e) => Err(AppError::internal_error(format!(
+            "Failed to create folder: {}",
+            e
+        ))),
+    }
 }
 
 // ──────────────────── DELETE ────────────────────

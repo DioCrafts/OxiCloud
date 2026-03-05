@@ -276,9 +276,20 @@ impl DedupService {
             })?;
 
             if let Err(e) = fs::rename(&temp_path, &blob_path).await {
-                // Another writer already placed the blob — discard ours
-                let _ = fs::remove_file(&temp_path).await;
-                tracing::debug!("Blob file already placed by concurrent writer: {}", e);
+                if e.raw_os_error() == Some(18) {
+                    // EXDEV: cross-device link — fall back to copy+delete
+                    fs::copy(&temp_path, &blob_path).await.map_err(|ce| {
+                        DomainError::internal_error(
+                            "Dedup",
+                            format!("Failed to copy temp blob cross-device: {}", ce),
+                        )
+                    })?;
+                    let _ = fs::remove_file(&temp_path).await;
+                } else {
+                    // Another writer already placed the blob — discard ours
+                    let _ = fs::remove_file(&temp_path).await;
+                    tracing::debug!("Blob file already placed by concurrent writer: {}", e);
+                }
             }
         }
 
@@ -365,8 +376,17 @@ impl DedupService {
             // dirs live on different filesystems (rare), this falls back to
             // copy+delete which is slower but still correct.
             if let Err(e) = fs::rename(source_path, &blob_path).await {
-                // Another writer may have placed the blob concurrently
-                if blob_path.exists() {
+                if e.raw_os_error() == Some(18) {
+                    // EXDEV: cross-device link — fall back to copy+delete
+                    fs::copy(source_path, &blob_path).await.map_err(|ce| {
+                        DomainError::internal_error(
+                            "Dedup",
+                            format!("Failed to copy file to blob store: {}", ce),
+                        )
+                    })?;
+                    let _ = fs::remove_file(source_path).await;
+                } else if blob_path.exists() {
+                    // Another writer may have placed the blob concurrently
                     let _ = fs::remove_file(source_path).await;
                     tracing::debug!("Blob file placed by concurrent writer: {}", e);
                 } else {

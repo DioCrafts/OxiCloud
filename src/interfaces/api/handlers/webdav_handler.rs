@@ -180,12 +180,53 @@ async fn handle_webdav_methods(
     handle_webdav_dispatch(state, req, path).await
 }
 
+/// If `path` doesn't already start with the user's home folder name, prepend
+/// the home folder path so downstream services can find the resource in the DB.
+/// Returns `None` when the path already includes the prefix or resolution fails.
+async fn resolve_webdav_path(
+    state: &Arc<AppState>,
+    user_id: &str,
+    path: &str,
+) -> Option<String> {
+    let folder_service = &state.applications.folder_service;
+    let home_folders = folder_service
+        .list_folders_for_owner(None, user_id)
+        .await
+        .ok()?;
+    let home = home_folders.first()?;
+
+    if path.starts_with(&home.name) {
+        None // Already prefixed
+    } else {
+        Some(format!("{}/{}", home.path, path))
+    }
+}
+
 async fn handle_webdav_dispatch(
     state: Arc<AppState>,
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
     let method = req.method().clone();
+
+    // Translate WebDAV path → DB path by prepending user's home folder
+    // prefix when the path doesn't already include it.
+    // Extract user_id before any async call to keep the future Send.
+    let path = if !path.is_empty() && method.as_str() != "OPTIONS" {
+        let user_id = req
+            .extensions()
+            .get::<CurrentUser>()
+            .map(|u| u.id.clone());
+        if let Some(uid) = user_id {
+            resolve_webdav_path(&state, &uid, &path)
+                .await
+                .unwrap_or(path)
+        } else {
+            path
+        }
+    } else {
+        path
+    };
 
     match method.as_str() {
         "OPTIONS" => handle_options(path).await,
@@ -927,22 +968,15 @@ async fn handle_mkcol(
     req: Request<Body>,
     path: String,
 ) -> Result<Response<Body>, AppError> {
-    let user = extract_user(&req)?;
-
-    // Get folder service from state
     let folder_service = &state.applications.folder_service;
 
-    // Check if path is empty (root folder)
     if path.is_empty() || path == "/" {
         return Err(AppError::conflict("Root folder already exists"));
     }
 
-    // Read request body - must be empty for MKCOL
+    // Read request body - must be empty for MKCOL (RFC 4918 §9.3)
     let body_bytes = {
-        // Convert the request into a body
         let body = req.into_body();
-
-        // Read request body (MKCOL — must be empty per RFC 4918)
         body::to_bytes(body, MAX_MKCOL_BODY)
             .await
             .map_err(|e| AppError::payload_too_large(format!("MKCOL body too large: {}", e)))?
@@ -954,50 +988,41 @@ async fn handle_mkcol(
         ));
     }
 
-    // Extract folder name from path
-    let folder_name = path.split('/').next_back().unwrap_or("unnamed");
+    // Path is already translated by dispatch (e.g. "My Folder - jared/03/01").
+    // Walk each segment: the first is the home folder (already exists),
+    // subsequent segments are created as needed with proper parent_id.
+    let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    let mut parent_id: Option<String> = None;
+    let mut accumulated_path = String::new();
 
-    // Get parent folder path
-    let parent_path = if let Some(idx) = path.rfind('/') {
-        &path[..idx]
-    } else {
-        ""
-    };
+    for segment in &segments {
+        if !accumulated_path.is_empty() {
+            accumulated_path.push('/');
+        }
+        accumulated_path.push_str(segment);
 
-    // ── Resolve parent folder (user-scoped) ────────────────────
-    let parent_id = if parent_path.is_empty() {
-        None
-    } else if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(parent_path, &user.id).await {
-            Ok(ResolvedResource::Folder(parent)) => Some(parent.id),
-            _ => {
-                return Err(AppError::not_found(format!(
-                    "Parent folder not found: {}",
-                    parent_path
-                )));
+        match folder_service.get_folder_by_path(&accumulated_path).await {
+            Ok(existing) => {
+                parent_id = Some(existing.id);
+            }
+            Err(_) => {
+                let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
+                    name: segment.to_string(),
+                    parent_id: parent_id.clone(),
+                };
+                let created = folder_service
+                    .create_folder(create_dto)
+                    .await
+                    .map_err(|e| {
+                        AppError::internal_error(format!(
+                            "Failed to create folder '{}': {}",
+                            accumulated_path, e
+                        ))
+                    })?;
+                parent_id = Some(created.id);
             }
         }
-    } else {
-        // Legacy fallback — ownership check
-        match folder_service.get_folder_by_path(parent_path).await {
-            Ok(parent) => {
-                assert_owner(parent.owner_id.as_deref(), &user.id, parent_path)?;
-                Some(parent.id)
-            }
-            Err(_) => None,
-        }
-    };
-
-    // Create folder (user_id is inherited from the parent in the DB layer)
-    let create_dto = crate::application::dtos::folder_dto::CreateFolderDto {
-        name: folder_name.to_string(),
-        parent_id,
-    };
-
-    folder_service
-        .create_folder(create_dto)
-        .await
-        .map_err(|e| AppError::internal_error(format!("Failed to create folder: {}", e)))?;
+    }
 
     Ok(Response::builder()
         .status(StatusCode::CREATED)
