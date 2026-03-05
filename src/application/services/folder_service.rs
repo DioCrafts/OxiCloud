@@ -32,7 +32,11 @@ impl FolderService {
                 Ok(FolderDto::empty())
             }
 
-            async fn get_folder_owned(&self, _id: &str, _caller_id: &str) -> Result<FolderDto, DomainError> {
+            async fn get_folder_owned(
+                &self,
+                _id: &str,
+                _caller_id: &str,
+            ) -> Result<FolderDto, DomainError> {
                 Ok(FolderDto::empty())
             }
 

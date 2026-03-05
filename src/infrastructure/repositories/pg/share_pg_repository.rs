@@ -22,6 +22,19 @@ impl SharePgRepository {
         Self { db_pool }
     }
 
+    /// Creates a stub instance for testing — never hits PG.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        Self {
+            db_pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+        }
+    }
+
     /// Maps a [`sqlx::postgres::PgRow`] to the domain [`Share`] entity.
     fn row_to_entity(row: &sqlx::postgres::PgRow) -> Result<Share, DomainError> {
         let id: String = row
@@ -189,10 +202,7 @@ impl ShareStoragePort for SharePgRepository {
                 .await
                 .map_err(|e| {
                     tracing::error!("Database error deleting share for user: {}", e);
-                    DomainError::internal_error(
-                        "Share",
-                        format!("Failed to delete share: {e}"),
-                    )
+                    DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
                 })?;
 
         if result.rows_affected() == 0 {
@@ -229,10 +239,7 @@ impl ShareStoragePort for SharePgRepository {
         .await
         .map_err(|e| {
             tracing::error!("Database error finding shares by item for user: {}", e);
-            DomainError::internal_error(
-                "Share",
-                format!("Failed to find shares by item: {e}"),
-            )
+            DomainError::internal_error("Share", format!("Failed to find shares by item: {e}"))
         })?;
 
         rows.iter().map(Self::row_to_entity).collect()

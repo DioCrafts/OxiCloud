@@ -8,11 +8,8 @@ fn tiny_png() -> Vec<u8> {
     let mut img = image::RgbaImage::new(1, 1);
     img.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
     let mut buf = Vec::new();
-    img.write_to(
-        &mut std::io::Cursor::new(&mut buf),
-        image::ImageFormat::Png,
-    )
-    .expect("encode test PNG");
+    img.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Png)
+        .expect("encode test PNG");
     buf
 }
 

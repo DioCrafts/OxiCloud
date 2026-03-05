@@ -6,10 +6,11 @@
 use bytes::Bytes;
 use futures::Stream;
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Mutex;
 
-use crate::application::ports::storage_ports::FileReadPort;
+use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
@@ -117,11 +118,127 @@ impl FileReadPort for MockFileReadPort {
         Ok(0)
     }
 
+    async fn get_folder_id_by_path(&self, _folder_path: &str) -> Result<String, DomainError> {
+        unimplemented!()
+    }
+
     async fn stream_files_in_subtree(
         &self,
         _folder_id: &str,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<File, DomainError>> + Send>>, DomainError> {
         Ok(Box::pin(futures::stream::empty()))
+    }
+}
+
+/// Minimal mock write port — only `move_file` and `rename_file` need real logic.
+#[allow(dead_code)]
+struct MockFileWritePort {
+    files: Mutex<HashMap<String, File>>,
+}
+
+impl MockFileWritePort {
+    #[allow(dead_code)]
+    fn new() -> Self {
+        Self {
+            files: Mutex::new(HashMap::new()),
+        }
+    }
+
+    #[allow(dead_code)]
+    fn insert(&self, id: &str, name: &str) {
+        let file = File::new(
+            id.to_string(),
+            name.to_string(),
+            StoragePath::from_string(&format!("/{}", name)),
+            42,
+            "text/plain".to_string(),
+            None,
+        )
+        .unwrap();
+        self.files.lock().unwrap().insert(id.to_string(), file);
+    }
+}
+
+impl FileWritePort for MockFileWritePort {
+    async fn save_file_from_temp(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _temp_path: &Path,
+        _size: u64,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<File, DomainError> {
+        unimplemented!()
+    }
+
+    async fn move_file(
+        &self,
+        file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> Result<File, DomainError> {
+        let files = self.files.lock().unwrap();
+        files
+            .get(file_id)
+            .cloned()
+            .ok_or_else(|| DomainError::not_found("File", file_id.to_string()))
+    }
+
+    async fn rename_file(&self, file_id: &str, _new_name: &str) -> Result<File, DomainError> {
+        let files = self.files.lock().unwrap();
+        files
+            .get(file_id)
+            .cloned()
+            .ok_or_else(|| DomainError::not_found("File", file_id.to_string()))
+    }
+
+    async fn delete_file(&self, _id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn update_file_content_from_temp(
+        &self,
+        _file_id: &str,
+        _temp_path: &Path,
+        _size: u64,
+        _content_type: Option<String>,
+        _pre_computed_hash: Option<String>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn register_file_deferred(
+        &self,
+        _name: String,
+        _folder_id: Option<String>,
+        _content_type: String,
+        _size: u64,
+    ) -> Result<(File, PathBuf), DomainError> {
+        unimplemented!()
+    }
+
+    async fn copy_file(
+        &self,
+        _file_id: &str,
+        _target_folder_id: Option<String>,
+    ) -> Result<File, DomainError> {
+        unimplemented!()
+    }
+
+    async fn move_to_trash(&self, _file_id: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn restore_from_trash(
+        &self,
+        _file_id: &str,
+        _original_path: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn delete_file_permanently(&self, _file_id: &str) -> Result<(), DomainError> {
+        Ok(())
     }
 }
 

@@ -92,29 +92,34 @@ class InlineViewer {
     console.log('Opening file:', file);
 
     // WOPI editor intercept: open Office documents in the WOPI editor
-    if (window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+    // But NOT image files - those should be previewed in the inline viewer
+    // Detect images by mime type OR extension (uploads via WebDAV may lack correct mime)
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
+    const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
+    if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }
 
     this.currentFile = file;
-    
+
     // Get container
     const modal = document.getElementById('inline-viewer-modal');
     const container = modal.querySelector('.inline-viewer-container');
     const title = modal.querySelector('.inline-viewer-title');
-    
+
     // Clear container
     container.innerHTML = '';
-    
+
     // Set title
     title.textContent = file.name;
-    
+
     // Set controls visibility
     const controls = modal.querySelector('.inline-viewer-controls');
-    
+
     // Show viewer based on file type
-    if (file.mime_type && file.mime_type.startsWith('image/')) {
+    if (isImage) {
       // Show zoom controls
       controls.style.display = 'flex';
       

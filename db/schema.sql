@@ -6,6 +6,9 @@
 -- All tables use IF NOT EXISTS for idempotent re-runs.
 -- ============================================================
 
+-- ── Extensions required by indexes below ──
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 -- ============================================================
 -- 0. REQUIRED EXTENSIONS (must come before any table/index)
 -- ============================================================
@@ -72,6 +75,7 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 
 CREATE INDEX IF NOT EXISTS idx_sessions_active ON auth.sessions(user_id, revoked)
 WHERE NOT revoked AND auth.is_session_active(expires_at);
+
 
 -- File ownership tracking
 CREATE TABLE IF NOT EXISTS auth.user_files (
@@ -466,6 +470,16 @@ CREATE INDEX IF NOT EXISTS idx_folders_path ON storage.folders (path text_patter
 -- GIN trigram index for ILIKE substring search (search_folders, suggest_folders_by_name)
 CREATE INDEX IF NOT EXISTS idx_folders_name_trgm
     ON storage.folders USING gin (name gin_trgm_ops);
+
+-- Nextcloud object ID mapping (stable numeric fileids)
+CREATE TABLE IF NOT EXISTS storage.nextcloud_object_ids (
+    id BIGSERIAL PRIMARY KEY,
+    object_type TEXT NOT NULL CHECK (object_type IN ('file', 'folder')),
+    object_id UUID NOT NULL,
+    UNIQUE (object_type, object_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_nc_object_ids_type ON storage.nextcloud_object_ids(object_type);
 
 -- ── ltree trigger: compute path & lpath on INSERT or UPDATE of name/parent_id ──
 CREATE OR REPLACE FUNCTION storage.compute_folder_path()

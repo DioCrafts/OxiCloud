@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Access - OxiCloud</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/views/auth.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-panel">
+            <div class="auth-logo">
+                <div class="auth-logo-icon">
+                    <svg viewBox="0 0 500 500">
+                        <path d="M345 310c32 0 58-26 58-58s-26-58-58-58c-6.2 0-12 0.9-17.5 2.7C318 166 289 143 255 143c-34.3 0-63.1 22.6-73 53.7C176.9 195.7 171 195 165 195c-32 0-58 26-58 58s26 58 58 58h180z" fill="#fff"/>
+                    </svg>
+                </div>
+                <div class="auth-logo-text">OxiCloud</div>
+            </div>
+            
+            <h2 class="auth-title">Grant Access</h2>
+            <p style="margin-bottom: 20px; color: #6b7280; font-size: 14px;">
+                A Nextcloud client is requesting access to your account.
+            </p>
+            
+            <form class="auth-form" method="POST" id="login-flow-form">
+                <div class="auth-input-group">
+                    <label class="auth-label" for="user">Username</label>
+                    <input 
+                        type="text" 
+                        id="user"
+                        name="user" 
+                        class="auth-input" 
+                        placeholder="Enter your username"
+                        required
+                        autocomplete="username"
+                        autofocus
+                    >
+                </div>
+                
+                <div class="auth-input-group">
+                    <label class="auth-label" for="password">Password</label>
+                    <input 
+                        type="password" 
+                        id="password"
+                        name="password" 
+                        class="auth-input" 
+                        placeholder="Enter your password"
+                        required
+                        autocomplete="current-password"
+                    >
+                </div>
+                
+                <button type="submit" class="auth-button" id="password-submit">Grant Access</button>
+            </form>
+
+            <!-- OIDC/SSO login — shown only when OIDC is enabled -->
+            <div id="oidc-section" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 12px; margin: 16px 0;">
+                    <hr style="flex: 1; border: none; border-top: 1px solid #e5e7eb;">
+                    <span style="color: #9ca3af; font-size: 13px;">or</span>
+                    <hr style="flex: 1; border: none; border-top: 1px solid #e5e7eb;">
+                </div>
+                <button type="button" id="oidc-button" class="auth-button" style="background: #4f46e5;">
+                    Sign in with SSO
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Extract token from URL path and set form action
+        const pathParts = window.location.pathname.split('/');
+        const token = pathParts[pathParts.length - 1];
+        // Validate token is hex-only to prevent injection
+        if (!/^[0-9a-fA-F]+$/.test(token)) {
+            document.body.innerHTML = '<p>Invalid session token.</p>';
+            throw new Error('Invalid token format');
+        }
+        document.getElementById('login-flow-form').action = `/login/v2/flow/${token}`;
+
+        // Check if OIDC is available and configure SSO button
+        (async function() {
+            try {
+                const resp = await fetch('/api/auth/oidc/providers');
+                if (!resp.ok) return;
+                const info = await resp.json();
+                if (!info.enabled) return;
+
+                // Show OIDC section
+                const section = document.getElementById('oidc-section');
+                section.style.display = 'block';
+
+                // Update button text with provider name
+                const btn = document.getElementById('oidc-button');
+                btn.textContent = `Sign in with ${info.provider_name || 'SSO'}`;
+
+                // If password login is disabled, hide the password form
+                if (!info.password_login_enabled) {
+                    document.getElementById('login-flow-form').style.display = 'none';
+                }
+
+                // SSO button redirects to the OIDC flow for this NC token
+                btn.addEventListener('click', () => {
+                    window.location.href = `/login/v2/flow/${token}/oidc`;
+                });
+            } catch(e) {
+                // OIDC not available — silently keep password-only mode
+            }
+        })();
+    </script>
+</body>
+</html>

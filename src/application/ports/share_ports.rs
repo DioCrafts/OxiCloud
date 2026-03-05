@@ -16,11 +16,7 @@ pub trait ShareUseCase: Send + Sync + 'static {
     ) -> Result<ShareDto, DomainError>;
 
     /// Get a shared link by its ID (ownership-verified)
-    async fn get_shared_link(
-        &self,
-        id: &str,
-        requester_id: &str,
-    ) -> Result<ShareDto, DomainError>;
+    async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError>;
 
     /// Get a shared link by its token (for access by non-users)
     async fn get_shared_link_by_token(&self, token: &str) -> Result<ShareDto, DomainError>;

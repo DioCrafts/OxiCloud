@@ -20,7 +20,10 @@ use crate::{
             storage_ports::FileReadPort,
         },
     },
-    common::{config::AppConfig, errors::{DomainError, ErrorKind}},
+    common::{
+        config::AppConfig,
+        errors::{DomainError, ErrorKind},
+    },
     domain::entities::share::{Share, ShareItemType, SharePermissions},
 };
 
@@ -147,11 +150,7 @@ impl ShareService {
     /// but belongs to a different user — this prevents share-ID enumeration
     /// attacks where an attacker probes IDs and uses 403-vs-404 to learn
     /// which ones are valid.
-    async fn fetch_owned_share(
-        &self,
-        id: &str,
-        requester_id: &str,
-    ) -> Result<Share, DomainError> {
+    async fn fetch_owned_share(&self, id: &str, requester_id: &str) -> Result<Share, DomainError> {
         let share = self
             .share_repository
             .find_share_by_id_for_user(id, requester_id)
@@ -206,11 +205,7 @@ impl ShareUseCase for ShareService {
         Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
     }
 
-    async fn get_shared_link(
-        &self,
-        id: &str,
-        requester_id: &str,
-    ) -> Result<ShareDto, DomainError> {
+    async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError> {
         // SECURITY: ownership-verified lookup — returns 404 if the share
         // doesn't exist OR belongs to another user.
         let share = self.fetch_owned_share(id, requester_id).await?;
@@ -430,16 +425,295 @@ impl ShareUseCase for ShareService {
     }
 }
 
-#[cfg(integration_tests)]
+#[cfg(feature = "integration_tests")]
+#[allow(dead_code)]
 mod tests {
     use super::*;
+    #[allow(unused_imports)]
     use crate::application::dtos::share_dto::SharePermissionsDto;
     use crate::application::ports::auth_ports::PasswordHasherPort;
     use crate::application::ports::share_ports::ShareStoragePort;
+    use crate::application::ports::storage_ports::FileReadPort;
     use crate::common::config::AppConfig;
     use crate::domain::repositories::folder_repository::FolderRepository;
     use std::collections::HashMap;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
+
+    /// Test-only service that mirrors `ShareService` logic but accepts generic repos.
+    struct ShareServiceForTest<SR, FR, FoR, PH> {
+        config: Arc<AppConfig>,
+        share_repository: Arc<SR>,
+        file_repository: Arc<FR>,
+        folder_repository: Arc<FoR>,
+        password_hasher: Arc<PH>,
+        hash_semaphore: Arc<Semaphore>,
+    }
+
+    impl<SR, FR, FoR, PH> ShareServiceForTest<SR, FR, FoR, PH>
+    where
+        SR: ShareStoragePort,
+        FR: FileReadPort,
+        FoR: FolderRepository,
+        PH: PasswordHasherPort,
+    {
+        fn new(
+            config: Arc<AppConfig>,
+            share_repository: Arc<SR>,
+            file_repository: Arc<FR>,
+            folder_repository: Arc<FoR>,
+            password_hasher: Arc<PH>,
+        ) -> Self {
+            Self {
+                config,
+                share_repository,
+                file_repository,
+                folder_repository,
+                password_hasher,
+                hash_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_HASHES)),
+            }
+        }
+
+        async fn verify_item_exists(
+            &self,
+            item_id: &str,
+            item_type: &ShareItemType,
+        ) -> Result<(), ShareServiceError> {
+            match item_type {
+                ShareItemType::File => {
+                    self.file_repository.get_file(item_id).await.map_err(|_| {
+                        ShareServiceError::ItemNotFound(format!(
+                            "File with ID {} not found",
+                            item_id
+                        ))
+                    })?;
+                }
+                ShareItemType::Folder => {
+                    self.folder_repository
+                        .get_folder(item_id)
+                        .await
+                        .map_err(|_| {
+                            ShareServiceError::ItemNotFound(format!(
+                                "Folder with ID {} not found",
+                                item_id
+                            ))
+                        })?;
+                }
+            }
+            Ok(())
+        }
+
+        async fn hash_password_async(&self, password: &str) -> Result<String, DomainError> {
+            let _permit = self.hash_semaphore.acquire().await.map_err(|_| {
+                DomainError::internal_error("ShareService", "Hash semaphore closed".to_string())
+            })?;
+            self.password_hasher.hash_password(password).await
+        }
+    }
+
+    impl<SR, FR, FoR, PH> ShareUseCase for ShareServiceForTest<SR, FR, FoR, PH>
+    where
+        SR: ShareStoragePort,
+        FR: FileReadPort,
+        FoR: FolderRepository,
+        PH: PasswordHasherPort,
+    {
+        async fn create_shared_link(
+            &self,
+            user_id: &str,
+            dto: CreateShareDto,
+        ) -> Result<ShareDto, DomainError> {
+            let item_type = ShareItemType::try_from(dto.item_type.as_str())
+                .map_err(|e| ShareServiceError::InvalidItemType(e.to_string()))?;
+            self.verify_item_exists(&dto.item_id, &item_type).await?;
+            let permissions = dto.permissions.map(|p| p.to_entity());
+            let password_hash = match dto.password {
+                Some(p) => Some(self.hash_password_async(&p).await?),
+                None => None,
+            };
+            let share = Share::new(
+                dto.item_id.clone(),
+                dto.item_name.clone(),
+                item_type,
+                user_id.to_string(),
+                permissions,
+                password_hash,
+                dto.expires_at,
+            )
+            .map_err(|e| ShareServiceError::Validation(e.to_string()))?;
+            let saved_share = self
+                .share_repository
+                .save_share(&share)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
+        }
+
+        async fn get_shared_link(
+            &self,
+            id: &str,
+            requester_id: &str,
+        ) -> Result<ShareDto, DomainError> {
+            let share = self
+                .share_repository
+                .find_share_by_id_for_user(id, requester_id)
+                .await
+                .map_err(|e| {
+                    ShareServiceError::NotFound(format!("Share {} not found: {}", id, e))
+                })?;
+            if share.is_expired() {
+                return Err(ShareServiceError::Expired.into());
+            }
+            Ok(ShareDto::from_entity(&share, &self.config.base_url()))
+        }
+
+        async fn get_shared_link_by_token(&self, token: &str) -> Result<ShareDto, DomainError> {
+            let share = self
+                .share_repository
+                .find_share_by_token(token)
+                .await
+                .map_err(|e| {
+                    ShareServiceError::NotFound(format!("Share token {} not found: {}", token, e))
+                })?;
+            if share.is_expired() {
+                return Err(ShareServiceError::Expired.into());
+            }
+            Ok(ShareDto::from_entity(&share, &self.config.base_url()))
+        }
+
+        async fn get_shared_links_for_item(
+            &self,
+            item_id: &str,
+            item_type: &ShareItemType,
+            requester_id: &str,
+        ) -> Result<Vec<ShareDto>, DomainError> {
+            let shares = self
+                .share_repository
+                .find_shares_by_item_for_user(item_id, item_type, requester_id)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            Ok(shares
+                .into_iter()
+                .filter(|s| !s.is_expired())
+                .map(|s| ShareDto::from_entity(&s, &self.config.base_url()))
+                .collect())
+        }
+
+        async fn update_shared_link(
+            &self,
+            id: &str,
+            requester_id: &str,
+            dto: UpdateShareDto,
+        ) -> Result<ShareDto, DomainError> {
+            let mut share = self
+                .share_repository
+                .find_share_by_id_for_user(id, requester_id)
+                .await
+                .map_err(|e| {
+                    ShareServiceError::NotFound(format!("Share {} not found: {}", id, e))
+                })?;
+            if let Some(p) = dto.permissions {
+                share = share.with_permissions(SharePermissions::new(p.read, p.write, p.reshare));
+            }
+            if let Some(password) = dto.password {
+                let hash = if password.is_empty() {
+                    None
+                } else {
+                    Some(self.hash_password_async(&password).await?)
+                };
+                share = share.with_password(hash);
+            }
+            if dto.expires_at.is_some() {
+                share = share.with_expiration(dto.expires_at);
+            }
+            let updated = self
+                .share_repository
+                .update_share(&share)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            Ok(ShareDto::from_entity(&updated, &self.config.base_url()))
+        }
+
+        async fn delete_shared_link(
+            &self,
+            id: &str,
+            requester_id: &str,
+        ) -> Result<(), DomainError> {
+            self.share_repository
+                .delete_share_for_user(id, requester_id)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            Ok(())
+        }
+
+        async fn get_user_shared_links(
+            &self,
+            user_id: &str,
+            page: usize,
+            per_page: usize,
+        ) -> Result<PaginatedResponseDto<ShareDto>, DomainError> {
+            let offset = (page - 1) * per_page;
+            let (shares, total) = self
+                .share_repository
+                .find_shares_by_user(user_id, offset, per_page)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            let dtos = shares
+                .iter()
+                .map(|s| ShareDto::from_entity(s, &self.config.base_url()))
+                .collect();
+            Ok(PaginatedResponseDto::new(dtos, page, per_page, total))
+        }
+
+        async fn verify_shared_link_password(
+            &self,
+            token: &str,
+            password: &str,
+        ) -> Result<ShareDto, DomainError> {
+            let share = self
+                .share_repository
+                .find_share_by_token(token)
+                .await
+                .map_err(|e| {
+                    ShareServiceError::NotFound(format!("Share token {} not found: {}", token, e))
+                })?;
+            if share.is_expired() {
+                return Err(ShareServiceError::Expired.into());
+            }
+            match share.password_hash() {
+                Some(hash) => {
+                    let valid = self.password_hasher.verify_password(password, hash).await?;
+                    if !valid {
+                        return Err(DomainError::new(
+                            crate::common::errors::ErrorKind::AccessDenied,
+                            "Share",
+                            "Invalid share password",
+                        ));
+                    }
+                    Ok(ShareDto::from_entity(&share, &self.config.base_url()))
+                }
+                None => Ok(ShareDto::from_entity(&share, &self.config.base_url())),
+            }
+        }
+
+        async fn register_shared_link_access(&self, token: &str) -> Result<(), DomainError> {
+            let share = self
+                .share_repository
+                .find_share_by_token(token)
+                .await
+                .map_err(|e| {
+                    ShareServiceError::NotFound(format!("Share token {} not found: {}", token, e))
+                })?;
+            if share.is_expired() {
+                return Err(ShareServiceError::Expired.into());
+            }
+            let updated = share.increment_access_count();
+            self.share_repository
+                .update_share(&updated)
+                .await
+                .map_err(|e| ShareServiceError::Repository(e.to_string()))?;
+            Ok(())
+        }
+    }
 
     struct MockPasswordHasher;
 
@@ -516,6 +790,10 @@ mod tests {
         }
 
         async fn get_parent_folder_id(&self, _path: &str) -> Result<String, DomainError> {
+            unimplemented!()
+        }
+
+        async fn get_folder_id_by_path(&self, _folder_path: &str) -> Result<String, DomainError> {
             unimplemented!()
         }
 
@@ -831,7 +1109,7 @@ mod tests {
         let password_hasher = Arc::new(MockPasswordHasher);
 
         let service =
-            ShareService::new(config, share_repo, file_repo, folder_repo, password_hasher);
+            ShareServiceForTest::new(config, share_repo, file_repo, folder_repo, password_hasher);
 
         // Test creating a file share
         let dto = CreateShareDto {

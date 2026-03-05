@@ -7,6 +7,7 @@ mod contact_persistence_dto;
 mod contact_pg_repository;
 mod device_code_pg_repository;
 mod favorites_pg_repository;
+mod nextcloud_object_id_repository;
 mod recent_items_pg_repository;
 mod session_pg_repository;
 mod settings_pg_repository;
@@ -32,6 +33,7 @@ pub use favorites_pg_repository::FavoritesPgRepository;
 pub use file_blob_read_repository::FileBlobReadRepository;
 pub use file_blob_write_repository::FileBlobWriteRepository;
 pub use folder_db_repository::FolderDbRepository;
+pub use nextcloud_object_id_repository::NextcloudObjectIdRepository;
 pub use recent_items_pg_repository::RecentItemsPgRepository;
 pub use session_pg_repository::SessionPgRepository;
 pub use settings_pg_repository::SettingsPgRepository;
@@ -48,6 +50,9 @@ pub use user_pg_repository::UserPgRepository;
 /// `%` is a wildcard in LIKE patterns.
 #[inline]
 pub fn like_escape(raw: &str) -> String {
-    let escaped = raw.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let escaped = raw
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     format!("%{escaped}%")
 }

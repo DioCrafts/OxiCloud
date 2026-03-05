@@ -12,6 +12,8 @@ pub mod file_upload_service;
 pub mod file_use_case_factory;
 pub mod folder_service;
 pub mod i18n_application_service;
+pub mod nextcloud_file_id_service;
+pub mod nextcloud_login_flow_service;
 pub mod recent_service;
 pub mod search_service;
 pub mod share_service;
@@ -22,7 +24,7 @@ pub mod wopi_token_service;
 
 #[cfg(test)]
 mod idor_protection_test;
-#[cfg(all(test, integration_tests))]
+#[cfg(test)]
 mod trash_service_test;
 
 // Re-exportar para facilitar acceso

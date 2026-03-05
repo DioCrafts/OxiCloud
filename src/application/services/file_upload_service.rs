@@ -182,9 +182,11 @@ impl FileUploadUseCase for FileUploadService {
         content: &[u8],
         content_type: &str,
     ) -> Result<FileDto, DomainError> {
+        // Look up the folder ID by folder path
         let parent_id = if !parent_path.is_empty() {
             if let Some(file_read) = &self.file_read {
-                file_read.get_parent_folder_id(parent_path).await.ok()
+                // Use get_folder_id_by_path to look up the folder directly
+                file_read.get_folder_id_by_path(parent_path).await.ok()
             } else {
                 None
             }
@@ -220,7 +222,12 @@ impl FileUploadUseCase for FileUploadService {
     ///
     /// Spools the in-memory `&[u8]` to a temp file with hash-on-write,
     /// then delegates to the streaming update/create path.
-    async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError> {
+    async fn update_file(
+        &self,
+        path: &str,
+        content: &[u8],
+        content_type: &str,
+    ) -> Result<(), DomainError> {
         // Spool to temp file + hash
         let temp = tempfile::NamedTempFile::new()
             .map_err(|e| DomainError::internal_error("FileUpload", format!("temp file: {e}")))?;
@@ -233,7 +240,7 @@ impl FileUploadUseCase for FileUploadService {
             path,
             temp.path(),
             content.len() as u64,
-            "application/octet-stream",
+            content_type,
             Some(hash),
         )
         .await

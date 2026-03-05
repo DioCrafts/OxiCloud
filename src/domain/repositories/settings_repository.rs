@@ -34,10 +34,7 @@ pub trait SettingsRepository: Send + Sync + 'static {
     /// The default implementation falls back to the non-atomic
     /// get-then-set pattern for repositories that don't support a native
     /// atomic upsert.
-    async fn try_claim_initialization(
-        &self,
-        admin_user_id: &str,
-    ) -> Result<bool, DomainError> {
+    async fn try_claim_initialization(&self, admin_user_id: &str) -> Result<bool, DomainError> {
         // Default: non-atomic fallback (overridden by PG implementation)
         match self.get("system_initialized").await? {
             Some(v) if v == "true" => Ok(false),

@@ -30,6 +30,20 @@ impl TrashDbRepository {
         }
     }
 
+    /// Creates a stub instance for testing — never hits PG.
+    #[cfg(test)]
+    pub fn new_stub() -> Self {
+        Self {
+            pool: Arc::new(
+                sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
+                    .max_connections(1)
+                    .connect_lazy("postgres://invalid:5432/none")
+                    .unwrap(),
+            ),
+            retention_days: 30,
+        }
+    }
+
     /// Convert a trash_items view row into a TrashedItem entity.
     fn row_to_trashed_item(
         &self,

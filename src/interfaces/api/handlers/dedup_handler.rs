@@ -231,9 +231,7 @@ impl DedupHandler {
                         return Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
                             .header(header::CONTENT_TYPE, "application/json")
-                            .body(Body::from(
-                                r#"{"error": "Upload failed"}"#,
-                            ))
+                            .body(Body::from(r#"{"error": "Upload failed"}"#))
                             .unwrap()
                             .into_response();
                     }
@@ -408,9 +406,7 @@ impl DedupHandler {
                 return Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(
-                        r#"{"error": "Verification failed"}"#,
-                    ))
+                    .body(Body::from(r#"{"error": "Verification failed"}"#))
                     .unwrap()
                     .into_response();
             }

@@ -6,8 +6,8 @@
 //! Compatible with Authentik, Keycloak, and any standard OIDC provider.
 
 use serde::Deserialize;
-use tokio::sync::RwLock;
 use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 use crate::application::ports::auth_ports::{OidcIdClaims, OidcServicePort, OidcTokenSet};
 use crate::common::config::OidcConfig;

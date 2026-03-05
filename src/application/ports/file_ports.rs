@@ -63,7 +63,12 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
     ) -> Result<FileDto, DomainError>;
 
     /// Updates the content of an existing file (for WebDAV)
-    async fn update_file(&self, path: &str, content: &[u8]) -> Result<(), DomainError>;
+    async fn update_file(
+        &self,
+        path: &str,
+        content: &[u8],
+        content_type: &str,
+    ) -> Result<(), DomainError>;
 
     /// Streaming update — spools body to a temp file with incremental hash,
     /// then atomically replaces the file content via dedup store.
@@ -240,7 +245,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
         let all = self.list_files_batch(folder_id, offset, limit).await?;
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id.as_deref().map_or(false, |o| o == owner_id))
+            .filter(|f| f.owner_id.as_deref().is_some_and(|o| o == owner_id))
             .collect())
     }
 }

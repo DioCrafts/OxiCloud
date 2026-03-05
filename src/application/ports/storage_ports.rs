@@ -58,7 +58,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         let all = self.list_files(folder_id).await?;
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
             .collect())
     }
 
@@ -81,6 +81,9 @@ pub trait FileReadPort: Send + Sync + 'static {
 
     /// Gets the parent folder ID from a path (WebDAV).
     async fn get_parent_folder_id(&self, path: &str) -> Result<String, DomainError>;
+
+    /// Gets a folder ID by its path.
+    async fn get_folder_id_by_path(&self, folder_path: &str) -> Result<String, DomainError>;
 
     /// Gets the content-addressable blob hash for a file (O(1) DB lookup).
     ///
@@ -139,7 +142,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         let all = self.list_files_batch(folder_id, offset, limit).await?;
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().map_or(false, |o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
             .collect())
     }
 

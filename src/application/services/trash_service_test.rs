@@ -7,9 +7,10 @@ use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
+use crate::application::dtos::trash_dto::TrashedItemDto;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
-use crate::application::services::trash_service::TrashService;
-use crate::common::errors::{DomainError, Result};
+use crate::application::ports::trash_ports::TrashUseCase;
+use crate::common::errors::{DomainError, ErrorKind, Result};
 use crate::domain::entities::file::File;
 use crate::domain::entities::folder::Folder;
 use crate::domain::entities::trashed_item::{TrashedItem, TrashedItemType};
@@ -17,7 +18,299 @@ use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::repositories::trash_repository::TrashRepository;
 use crate::domain::services::path_service::StoragePath;
 
+/// Test-only service that mirrors `TrashService` logic but accepts generic repos,
+/// allowing mock repositories to be injected in unit tests.
+#[allow(dead_code)]
+struct TrashServiceForTest<TR, FR, FW, FoR> {
+    trash_repository: Arc<TR>,
+    file_read_port: Arc<FR>,
+    file_write_port: Arc<FW>,
+    folder_storage_port: Arc<FoR>,
+    retention_days: u32,
+}
+
+impl<TR, FR, FW, FoR> TrashServiceForTest<TR, FR, FW, FoR>
+where
+    TR: TrashRepository,
+    FR: FileReadPort,
+    FW: FileWritePort,
+    FoR: FolderRepository,
+{
+    #[allow(dead_code)]
+    fn new(
+        trash_repository: Arc<TR>,
+        file_read_port: Arc<FR>,
+        file_write_port: Arc<FW>,
+        folder_storage_port: Arc<FoR>,
+        retention_days: u32,
+    ) -> Self {
+        Self {
+            trash_repository,
+            file_read_port,
+            file_write_port,
+            folder_storage_port,
+            retention_days,
+        }
+    }
+}
+
+impl<TR, FR, FW, FoR> TrashUseCase for TrashServiceForTest<TR, FR, FW, FoR>
+where
+    TR: TrashRepository,
+    FR: FileReadPort,
+    FW: FileWritePort,
+    FoR: FolderRepository,
+{
+    async fn get_trash_items(&self, user_id: &str) -> Result<Vec<TrashedItemDto>> {
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+        let items = self.trash_repository.get_trash_items(&user_uuid).await?;
+        Ok(items
+            .into_iter()
+            .map(|item| {
+                let days_until_deletion = item.days_until_deletion();
+                TrashedItemDto {
+                    id: item.id().to_string(),
+                    original_id: item.original_id().to_string(),
+                    item_type: match item.item_type() {
+                        TrashedItemType::File => "file".to_string(),
+                        TrashedItemType::Folder => "folder".to_string(),
+                    },
+                    name: item.name().to_string(),
+                    original_path: item.original_path().to_string(),
+                    trashed_at: item.trashed_at(),
+                    days_until_deletion,
+                }
+            })
+            .collect())
+    }
+
+    async fn move_to_trash(&self, item_id: &str, item_type: &str, user_id: &str) -> Result<()> {
+        let item_uuid = Uuid::parse_str(item_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid item ID: {}", e)))?;
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+
+        match item_type {
+            "file" => {
+                let file = self.file_read_port.get_file(item_id).await.map_err(|e| {
+                    DomainError::new(
+                        ErrorKind::NotFound,
+                        "File",
+                        format!("Error retrieving file {}: {}", item_id, e),
+                    )
+                })?;
+                let original_path = file.storage_path().to_string();
+                let trashed_item = TrashedItem::new(
+                    item_uuid,
+                    user_uuid,
+                    TrashedItemType::File,
+                    file.name().to_string(),
+                    original_path,
+                    self.retention_days,
+                );
+                self.trash_repository
+                    .add_to_trash(&trashed_item)
+                    .await
+                    .map_err(|e| {
+                        DomainError::internal_error(
+                            "TrashRepository",
+                            format!("Failed to add file to trash: {}", e),
+                        )
+                    })?;
+                self.file_write_port
+                    .move_to_trash(item_id)
+                    .await
+                    .map_err(|e| {
+                        DomainError::new(
+                            ErrorKind::InternalError,
+                            "File",
+                            format!("Error moving file {} to trash: {}", item_id, e),
+                        )
+                    })?;
+                Ok(())
+            }
+            "folder" => {
+                let folder = self
+                    .folder_storage_port
+                    .get_folder(item_id)
+                    .await
+                    .map_err(|e| {
+                        DomainError::new(
+                            ErrorKind::NotFound,
+                            "Folder",
+                            format!("Error retrieving folder {}: {}", item_id, e),
+                        )
+                    })?;
+                let original_path = folder.storage_path().to_string();
+                let trashed_item = TrashedItem::new(
+                    item_uuid,
+                    user_uuid,
+                    TrashedItemType::Folder,
+                    folder.name().to_string(),
+                    original_path,
+                    self.retention_days,
+                );
+                self.trash_repository
+                    .add_to_trash(&trashed_item)
+                    .await
+                    .map_err(|e| {
+                        DomainError::internal_error(
+                            "TrashRepository",
+                            format!("Failed to add folder to trash: {}", e),
+                        )
+                    })?;
+                self.folder_storage_port
+                    .move_to_trash(item_id)
+                    .await
+                    .map_err(|e| {
+                        DomainError::new(
+                            ErrorKind::InternalError,
+                            "Folder",
+                            format!("Error moving folder {} to trash: {}", item_id, e),
+                        )
+                    })?;
+                Ok(())
+            }
+            _ => Err(DomainError::validation_error(format!(
+                "Invalid item type: {}",
+                item_type
+            ))),
+        }
+    }
+
+    async fn restore_item(&self, trash_id: &str, user_id: &str) -> Result<()> {
+        let trash_uuid = Uuid::parse_str(trash_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid trash ID: {}", e)))?;
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+
+        let item = self
+            .trash_repository
+            .get_trash_item(&trash_uuid, &user_uuid)
+            .await?;
+        match item {
+            Some(item) => {
+                match item.item_type() {
+                    TrashedItemType::File => {
+                        let file_id = item.original_id().to_string();
+                        let original_path = item.original_path().to_string();
+                        let result = self
+                            .file_write_port
+                            .restore_from_trash(&file_id, &original_path)
+                            .await;
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "File",
+                                format!("Error restoring file {} from trash: {}", file_id, e),
+                            ));
+                        }
+                    }
+                    TrashedItemType::Folder => {
+                        let folder_id = item.original_id().to_string();
+                        let original_path = item.original_path().to_string();
+                        let result = self
+                            .folder_storage_port
+                            .restore_from_trash(&folder_id, &original_path)
+                            .await;
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "Folder",
+                                format!("Error restoring folder {} from trash: {}", folder_id, e),
+                            ));
+                        }
+                    }
+                }
+                self.trash_repository
+                    .restore_from_trash(&trash_uuid, &user_uuid)
+                    .await
+                    .map_err(|e| {
+                        DomainError::new(
+                            ErrorKind::InternalError,
+                            "Trash",
+                            format!("Error removing trash entry after restoration: {}", e),
+                        )
+                    })?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
+    async fn delete_permanently(&self, trash_id: &str, user_id: &str) -> Result<()> {
+        let trash_uuid = Uuid::parse_str(trash_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid trash ID: {}", e)))?;
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+
+        let item = self
+            .trash_repository
+            .get_trash_item(&trash_uuid, &user_uuid)
+            .await?;
+        match item {
+            Some(item) => {
+                match item.item_type() {
+                    TrashedItemType::File => {
+                        let file_id = item.original_id().to_string();
+                        let result = self.file_write_port.delete_file_permanently(&file_id).await;
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "File",
+                                format!("Error deleting file {} permanently: {}", file_id, e),
+                            ));
+                        }
+                    }
+                    TrashedItemType::Folder => {
+                        let folder_id = item.original_id().to_string();
+                        let result = self
+                            .folder_storage_port
+                            .delete_folder_permanently(&folder_id)
+                            .await;
+                        if let Err(e) = result
+                            && !format!("{}", e).contains("not found")
+                        {
+                            return Err(DomainError::new(
+                                ErrorKind::InternalError,
+                                "Folder",
+                                format!("Error deleting folder {} permanently: {}", folder_id, e),
+                            ));
+                        }
+                    }
+                }
+                self.trash_repository
+                    .delete_permanently(&trash_uuid, &user_uuid)
+                    .await
+                    .map_err(|e| {
+                        DomainError::new(
+                            ErrorKind::InternalError,
+                            "Trash",
+                            format!("Error removing trash entry: {}", e),
+                        )
+                    })?;
+                Ok(())
+            }
+            None => Ok(()),
+        }
+    }
+
+    async fn empty_trash(&self, user_id: &str) -> Result<()> {
+        let user_uuid = Uuid::parse_str(user_id)
+            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
+        self.trash_repository.clear_trash(&user_uuid).await
+    }
+}
+
 // Mock repositories for testing
+#[allow(dead_code)]
 struct MockTrashRepository {
     trash_items: Mutex<HashMap<Uuid, TrashedItem>>,
     /// Shared refs to the file/folder trashed maps so `clear_trash` can
@@ -27,6 +320,7 @@ struct MockTrashRepository {
 }
 
 impl MockTrashRepository {
+    #[allow(dead_code)]
     fn new(
         trashed_files: Arc<Mutex<HashMap<String, File>>>,
         trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
@@ -104,12 +398,14 @@ impl TrashRepository for MockTrashRepository {
     }
 }
 
+#[allow(dead_code)]
 struct MockFileRepository {
     files: Mutex<HashMap<String, File>>,
     trashed_files: Arc<Mutex<HashMap<String, File>>>,
 }
 
 impl MockFileRepository {
+    #[allow(dead_code)]
     fn new(trashed_files: Arc<Mutex<HashMap<String, File>>>) -> Self {
         Self {
             files: Mutex::new(HashMap::new()),
@@ -117,6 +413,7 @@ impl MockFileRepository {
         }
     }
 
+    #[allow(dead_code)]
     fn add_test_file(&self, id: &str, name: &str, path: &str) {
         let file = File::new(
             id.to_string(),
@@ -177,6 +474,13 @@ impl FileReadPort for MockFileRepository {
     }
 
     async fn get_parent_folder_id(&self, _path: &str) -> std::result::Result<String, DomainError> {
+        unimplemented!()
+    }
+
+    async fn get_folder_id_by_path(
+        &self,
+        _folder_path: &str,
+    ) -> std::result::Result<String, DomainError> {
         unimplemented!()
     }
 
@@ -328,12 +632,14 @@ impl FileWritePort for MockFileRepository {
     }
 }
 
+#[allow(dead_code)]
 struct MockFolderRepository {
     folders: Mutex<HashMap<String, Folder>>,
     trashed_folders: Arc<Mutex<HashMap<String, Folder>>>,
 }
 
 impl MockFolderRepository {
+    #[allow(dead_code)]
     fn new(trashed_folders: Arc<Mutex<HashMap<String, Folder>>>) -> Self {
         Self {
             folders: Mutex::new(HashMap::new()),
@@ -341,6 +647,7 @@ impl MockFolderRepository {
         }
     }
 
+    #[allow(dead_code)]
     fn add_test_folder(&self, id: &str, name: &str, path: &str) {
         let folder = Folder::new(
             id.to_string(),
@@ -501,9 +808,13 @@ impl FolderRepository for MockFolderRepository {
 
 #[cfg(integration_tests)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
+    #[allow(unused_imports)]
     use crate::application::ports::trash_ports::TrashUseCase;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    #[allow(unused_imports)]
     use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 
     #[tokio::test]
@@ -518,10 +829,10 @@ mod tests {
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
-        let service = TrashService::new(
+        let service = TrashServiceForTest::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<FileBlobReadRepository>,
-            file_repo.clone() as Arc<FileBlobWriteRepository>,
+            file_repo.clone(),
+            file_repo.clone(),
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -592,10 +903,10 @@ mod tests {
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
-        let service = TrashService::new(
+        let service = TrashServiceForTest::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<FileBlobReadRepository>,
-            file_repo.clone() as Arc<FileBlobWriteRepository>,
+            file_repo.clone(),
+            file_repo.clone(),
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -657,10 +968,10 @@ mod tests {
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
-        let service = TrashService::new(
+        let service = TrashServiceForTest::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<FileBlobReadRepository>,
-            file_repo.clone() as Arc<FileBlobWriteRepository>,
+            file_repo.clone(),
+            file_repo.clone(),
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -727,10 +1038,10 @@ mod tests {
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
-        let service = TrashService::new(
+        let service = TrashServiceForTest::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<FileBlobReadRepository>,
-            file_repo.clone() as Arc<FileBlobWriteRepository>,
+            file_repo.clone(),
+            file_repo.clone(),
             folder_repo.clone(),
             30, // 30 days retention
         );
@@ -796,10 +1107,10 @@ mod tests {
         let file_repo = Arc::new(MockFileRepository::new(trashed_files));
         let folder_repo = Arc::new(MockFolderRepository::new(trashed_folders));
 
-        let service = TrashService::new(
+        let service = TrashServiceForTest::new(
             trash_repo.clone(),
-            file_repo.clone() as Arc<FileBlobReadRepository>,
-            file_repo.clone() as Arc<FileBlobWriteRepository>,
+            file_repo.clone(),
+            file_repo.clone(),
             folder_repo.clone(),
             30, // 30 days retention
         );

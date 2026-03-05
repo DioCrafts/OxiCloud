@@ -371,11 +371,7 @@ impl ChunkedUploadService {
 
     /// Verify that the given session belongs to the given user.
     /// Returns 404 (not 403) to avoid revealing the existence of other users' sessions.
-    fn verify_session_owner(
-        &self,
-        upload_id: &str,
-        user_id: &str,
-    ) -> Result<(), String> {
+    fn verify_session_owner(&self, upload_id: &str, user_id: &str) -> Result<(), String> {
         let session = self
             .sessions
             .get(upload_id)
@@ -592,7 +588,11 @@ impl ChunkedUploadService {
     }
 
     /// Get upload status
-    async fn get_status_inner(&self, upload_id: &str, user_id: &str) -> Result<UploadStatusResponseDto, String> {
+    async fn get_status_inner(
+        &self,
+        upload_id: &str,
+        user_id: &str,
+    ) -> Result<UploadStatusResponseDto, String> {
         self.verify_session_owner(upload_id, user_id)?;
 
         let session = self
@@ -808,9 +808,16 @@ impl ChunkedUploadPort for ChunkedUploadService {
         total_size: u64,
         chunk_size: Option<usize>,
     ) -> Result<CreateUploadResponseDto, DomainError> {
-        self.create_session_inner(user_id.to_owned(), filename, folder_id, content_type, total_size, chunk_size)
-            .await
-            .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
+        self.create_session_inner(
+            user_id.to_owned(),
+            filename,
+            folder_id,
+            content_type,
+            total_size,
+            chunk_size,
+        )
+        .await
+        .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
     async fn upload_chunk(
@@ -826,7 +833,11 @@ impl ChunkedUploadPort for ChunkedUploadService {
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn get_status(&self, upload_id: &str, user_id: &str) -> Result<UploadStatusResponseDto, DomainError> {
+    async fn get_status(
+        &self,
+        upload_id: &str,
+        user_id: &str,
+    ) -> Result<UploadStatusResponseDto, DomainError> {
         self.get_status_inner(upload_id, user_id)
             .await
             .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))
@@ -1097,14 +1108,19 @@ mod tests {
         assert_eq!(r1.bytes_received, 1024);
 
         // 3. Status check
-        let status = service.get_status_inner(&id, "test-user").await.expect("status");
+        let status = service
+            .get_status_inner(&id, "test-user")
+            .await
+            .expect("status");
         assert!(status.is_complete);
         assert_eq!(status.completed_chunks, 2);
         assert!(status.pending_chunks.is_empty());
 
         // 4. Complete (assemble)
-        let (path, filename, _folder, _ct, size, hash) =
-            service.complete_upload_inner(&id, "test-user").await.expect("complete");
+        let (path, filename, _folder, _ct, size, hash) = service
+            .complete_upload_inner(&id, "test-user")
+            .await
+            .expect("complete");
         assert_eq!(filename, "test.txt");
         assert_eq!(size, 1024);
         assert!(!hash.is_empty());
@@ -1116,7 +1132,10 @@ mod tests {
         assert_eq!(&content[512..], &[b'B'; 512]);
 
         // 6. Finalize
-        service.finalize_upload_inner(&id, "test-user").await.expect("finalize");
+        service
+            .finalize_upload_inner(&id, "test-user")
+            .await
+            .expect("finalize");
         assert_eq!(service.active_sessions().await, 0);
 
         let _ = fs::remove_dir_all(&base).await;

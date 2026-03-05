@@ -120,6 +120,62 @@ pub enum LockType {
     Write,
 }
 
+/// Extra property context for Nextcloud/ownCloud WebDAV extensions.
+#[derive(Debug, Clone)]
+pub struct NextcloudPropContext {
+    pub file_id: Option<i64>,
+    pub oc_id: Option<String>,
+    pub owner_id: Option<String>,
+    pub owner_display_name: Option<String>,
+    pub permissions: String,
+    pub size: u64,
+    pub has_preview: bool,
+    pub is_encrypted: bool,
+    pub mount_type: String,
+    pub contained_file_count: u64,
+    pub contained_folder_count: u64,
+}
+
+impl NextcloudPropContext {
+    pub fn for_folder(
+        file_id: Option<i64>,
+        oc_id: Option<String>,
+        owner: &str,
+        contained_files: u64,
+        contained_folders: u64,
+    ) -> Self {
+        Self {
+            file_id,
+            oc_id,
+            owner_id: Some(owner.to_string()),
+            owner_display_name: Some(owner.to_string()),
+            permissions: "RGDNVCK".to_string(),
+            size: 0,
+            has_preview: false,
+            is_encrypted: false,
+            mount_type: "dir".to_string(),
+            contained_file_count: contained_files,
+            contained_folder_count: contained_folders,
+        }
+    }
+
+    pub fn for_file(file_id: Option<i64>, oc_id: Option<String>, owner: &str, size: u64) -> Self {
+        Self {
+            file_id,
+            oc_id,
+            owner_id: Some(owner.to_string()),
+            owner_display_name: Some(owner.to_string()),
+            permissions: "RGDNVW".to_string(),
+            size,
+            has_preview: false,
+            is_encrypted: false,
+            mount_type: "file".to_string(),
+            contained_file_count: 0,
+            contained_folder_count: 0,
+        }
+    }
+}
+
 /// WebDAV adapter for converting between XML and domain objects
 pub struct WebDavAdapter;
 

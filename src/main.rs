@@ -1,3 +1,5 @@
+#![allow(async_fn_in_trait)]
+
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
@@ -161,6 +163,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    // Build Nextcloud routes if enabled
+    let nextcloud_router = if config.nextcloud.enabled {
+        use oxicloud::interfaces::nextcloud::routes::nextcloud_routes_with_state;
+        Some(nextcloud_routes_with_state(app_state.clone()))
+    } else {
+        None
+    };
+
     // Apply auth middleware to protected API routes when auth is enabled
     if config.features.enable_auth {
         // SECURITY: if auth is required, auth_service MUST be present at this
@@ -177,7 +187,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             auth_protected_routes, auth_public_routes, login_route, refresh_route, register_route,
             setup_route,
         };
-        use oxicloud::interfaces::api::handlers::app_password_handler;
         use oxicloud::interfaces::api::handlers::device_auth_handler;
         use oxicloud::interfaces::middleware::auth::auth_middleware;
         use oxicloud::interfaces::middleware::csrf::csrf_middleware;
@@ -262,15 +271,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ))
             .with_state(app_state.clone());
 
-        // App Password management endpoints (protected — require JWT)
-        let app_password_protected = app_password_handler::app_password_routes()
-            .layer(axum::middleware::from_fn(csrf_middleware))
-            .layer(axum::middleware::from_fn_with_state(
-                app_state.clone(),
-                auth_middleware,
-            ))
-            .with_state(app_state.clone());
-
         // Protected API routes — require valid JWT token
         let protected_api = api_routes
             .layer(axum::middleware::from_fn(csrf_middleware))
@@ -308,8 +308,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .nest("/api/auth/device", device_public)
             // Device Auth Grant protected endpoints (verify + device management)
             .nest("/api/auth/device", device_protected)
-            // App Password management endpoints (create, list, revoke)
-            .nest("/api/auth", app_password_protected)
             // Public API routes (share access, i18n) — no auth required
             .nest("/api", public_api_routes)
             // All other API routes are protected by auth middleware
@@ -322,6 +320,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(webdav_protected)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
+
+        // Mount Nextcloud routes (uses its own Basic Auth middleware)
+        if let Some(nc_router) = nextcloud_router {
+            app = app.merge(nc_router.with_state(app_state.clone()));
+        }
 
         // Mount WOPI routes (protocol routes use own token auth, API routes behind auth middleware)
         if let Some((wopi_protocol, wopi_api)) = wopi_routes {
@@ -349,6 +352,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(webdav_router)
             .merge(web_routes)
             .layer(TraceLayer::new_for_http());
+
+        // Mount Nextcloud routes
+        if let Some(nc_router) = nextcloud_router {
+            app = app.merge(nc_router.with_state(app_state.clone()));
+        }
 
         // Mount WOPI routes (no auth middleware when auth is disabled)
         if let Some((wopi_protocol, wopi_api)) = wopi_routes {

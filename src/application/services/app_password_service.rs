@@ -7,13 +7,14 @@ use crate::application::dtos::app_password_dto::*;
 use crate::application::ports::auth_ports::{
     AppPasswordStoragePort, PasswordHasherPort, UserStoragePort,
 };
-use crate::common::errors::DomainError;
+use crate::common::errors::{DomainError, ErrorKind};
 use crate::domain::entities::app_password::AppPassword;
 use crate::infrastructure::repositories::pg::AppPasswordPgRepository;
 use crate::infrastructure::repositories::pg::UserPgRepository;
 use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use chrono::{Duration, Utc};
 use moka::future::Cache;
+use rand_core::RngCore;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
@@ -21,6 +22,11 @@ use std::time::Duration as StdDuration;
 const TOKEN_LENGTH: usize = 32;
 /// Prefix for all app password tokens (makes them easily identifiable).
 const TOKEN_PREFIX: &str = "oxicloud-";
+
+// ── Nextcloud-format app password constants ──
+const NC_APP_PASSWORD_GROUPS: usize = 5;
+const NC_APP_PASSWORD_GROUP_LEN: usize = 5;
+const NC_PREFIX_LEN: usize = 8;
 
 /// TTL for cached Basic Auth verification results.
 /// Balances performance (avoids repeated Argon2id + DB queries) with security
@@ -231,13 +237,16 @@ impl AppPasswordService {
         user_id: &str,
         id: &str,
     ) -> Result<AppPasswordRevokeResponseDto, DomainError> {
+        // Ownership enforced at SQL level (WHERE user_id = $2).
+        // The get_by_id pre-check gives a clear error message when
+        // the password doesn't belong to the caller.
         let ap = self.repo.get_by_id(id).await?;
         if ap.user_id != user_id {
             return Err(DomainError::unauthorized(
                 "You can only revoke your own app passwords",
             ));
         }
-        self.repo.revoke(id).await?;
+        self.repo.revoke(id, user_id).await?;
 
         // Invalidate all cached auth entries for this user so the
         // revocation is effective immediately.
@@ -262,23 +271,19 @@ impl AppPasswordService {
     ///
     /// Returns `(user_id, username, email, role)` on success.
     ///
-    /// ## Performance
+    /// Handles both `oxicloud-` format and Nextcloud format (`XXXXX-XXXXX-...`)
+    /// passwords. Uses prefix-based DB lookup to minimize Argon2id attempts.
     ///
     /// Successful verifications are cached for `BASIC_AUTH_CACHE_TTL_SECS`
-    /// (default 30 s) keyed by `blake3(username:password)`.  This avoids
-    /// the expensive Argon2id computation **and** the three PostgreSQL
-    /// round-trips on every repeated DAV request from the same client.
-    ///
-    /// Failed verifications are **never** cached, preserving the full
-    /// Argon2id cost as a brute-force deterrent.
+    /// keyed by `blake3(username:password)`.  Failed verifications are
+    /// **never** cached, preserving the full Argon2id cost as a brute-force
+    /// deterrent.
     pub async fn verify_basic_auth(
         &self,
         username: &str,
         password: &str,
     ) -> Result<(String, String, String, String), DomainError> {
         // ── 1. Compute cache key = blake3("username:password") ────────
-        //    The plain-text password is never stored; only the 32-byte
-        //    cryptographic digest is used as lookup key.
         let cache_key: [u8; 32] =
             blake3::hash(format!("{}:{}", username, password).as_bytes()).into();
 
@@ -288,30 +293,57 @@ impl AppPasswordService {
         }
 
         // ── 3. Cache miss → full verification ────────────────────────
-        // Look up user by username
         let user = self
             .user_repo
             .get_user_by_username(username)
             .await
             .map_err(|_| DomainError::unauthorized("Invalid username or app password"))?;
 
-        // Get all active app passwords for this user
-        let app_passwords = self.repo.get_active_by_user_id(user.id()).await?;
-
-        if app_passwords.is_empty() {
+        if !user.is_active() {
             return Err(DomainError::unauthorized(
                 "Invalid username or app password",
             ));
         }
 
-        // Try each app password hash (Argon2id — CPU-intensive)
-        for ap in &app_passwords {
+        // Determine the password form and prefix for DB lookup.
+        // oxicloud- format: use raw password, prefix = first 17 chars
+        // NC format: normalize (strip dashes/whitespace, uppercase), prefix = first 8 chars
+        let (verify_password, prefix) = if password.starts_with(TOKEN_PREFIX) {
+            let pfx = password
+                .get(..TOKEN_PREFIX.len() + 8)
+                .unwrap_or(password)
+                .to_string();
+            (password.to_string(), pfx)
+        } else {
+            let norm = nc_normalize_password(password);
+            match nc_token_prefix(&norm) {
+                Ok(pfx) => (norm, pfx),
+                Err(_) => {
+                    return Err(DomainError::unauthorized(
+                        "Invalid username or app password",
+                    ));
+                }
+            }
+        };
+
+        // Use prefix-based lookup for efficiency (fewer Argon2id attempts)
+        let candidates = self
+            .repo
+            .get_active_by_user_prefix(user.id(), &prefix)
+            .await?;
+
+        if candidates.is_empty() {
+            return Err(DomainError::unauthorized(
+                "Invalid username or app password",
+            ));
+        }
+
+        for ap in &candidates {
             if let Ok(true) = self
                 .hasher
-                .verify_password(password, &ap.password_hash)
+                .verify_password(&verify_password, &ap.password_hash)
                 .await
             {
-                // Update last_used_at (fire-and-forget; don't fail auth on touch error)
                 let _ = self.repo.touch_last_used(&ap.id).await;
 
                 let result = CachedBasicAuthResult {
@@ -321,17 +353,198 @@ impl AppPasswordService {
                     role: user.role().to_string(),
                 };
 
-                // ── 4. Cache the successful result ────────────────────
                 self.auth_cache.insert(cache_key, result.clone()).await;
-
                 return Ok((result.user_id, result.username, result.email, result.role));
             }
         }
 
-        // Failed verifications are intentionally NOT cached so that
-        // brute-force attackers always pay the full Argon2id cost.
         Err(DomainError::unauthorized(
             "Invalid username or app password",
         ))
+    }
+
+    // ========================================================================
+    // Nextcloud-format app password methods
+    // ========================================================================
+
+    /// Create a Nextcloud-format app password (`XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`).
+    ///
+    /// Returns `(id, plain_password)`.
+    pub async fn create_nc(
+        &self,
+        user_id: &str,
+        label: &str,
+    ) -> Result<(String, String), DomainError> {
+        let password = generate_nc_app_password();
+        let normalized = nc_normalize_password(&password);
+        let prefix = nc_token_prefix(&normalized)?;
+        let hash = self.hasher.hash_password(&normalized).await?;
+
+        let ap = AppPassword::new(
+            user_id.to_string(),
+            label.to_string(),
+            hash,
+            prefix,
+            "all".to_string(),
+            None,
+        );
+
+        let saved = self.repo.create(ap).await?;
+        Ok((saved.id, password))
+    }
+
+    /// Revoke an app password by matching the raw password value.
+    /// Scoped to the authenticated user (fixes I3 — no global prefix search).
+    pub async fn revoke_by_password(
+        &self,
+        user_id: &str,
+        password: &str,
+    ) -> Result<(), DomainError> {
+        let normalized = nc_normalize_password(password);
+        let prefix = match nc_token_prefix(&normalized) {
+            Ok(pfx) => pfx,
+            Err(_) => return Ok(()),
+        };
+
+        let candidates = self
+            .repo
+            .get_active_by_user_prefix(user_id, &prefix)
+            .await?;
+
+        for ap in candidates {
+            if let Ok(true) = self
+                .hasher
+                .verify_password(&normalized, &ap.password_hash)
+                .await
+            {
+                self.repo.revoke(&ap.id, user_id).await?;
+
+                // Invalidate cache for this user
+                let uid = user_id.to_string();
+                self.auth_cache
+                    .invalidate_entries_if(move |_key, val| val.user_id == uid)
+                    .ok();
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// List app passwords for a user (simple summary for NC UI).
+    pub async fn list_nc(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError> {
+        self.repo.list_by_user(user_id).await
+    }
+
+    /// Delete an app password by ID, scoped to the owning user.
+    pub async fn delete_by_user(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+        let deleted = self.repo.delete_by_user_and_id(id, user_id).await?;
+        if !deleted {
+            return Err(DomainError::new(
+                ErrorKind::NotFound,
+                "AppPassword",
+                "App password not found",
+            ));
+        }
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Nextcloud app password helpers (module-private)
+// ============================================================================
+
+/// Generate a Nextcloud-format app password: `XXXXX-XXXXX-XXXXX-XXXXX-XXXXX`
+/// using rejection sampling to avoid modulo bias.
+fn generate_nc_app_password() -> String {
+    let mut rng = rand_core::OsRng;
+    let chars = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let len = chars.len() as u32; // 36
+    let mut groups = Vec::with_capacity(NC_APP_PASSWORD_GROUPS);
+
+    for _ in 0..NC_APP_PASSWORD_GROUPS {
+        let mut group = String::with_capacity(NC_APP_PASSWORD_GROUP_LEN);
+        for _ in 0..NC_APP_PASSWORD_GROUP_LEN {
+            let threshold = u32::MAX - (u32::MAX % len);
+            let idx = loop {
+                let val = rng.next_u32();
+                if val < threshold {
+                    break (val % len) as usize;
+                }
+            };
+            group.push(chars[idx] as char);
+        }
+        groups.push(group);
+    }
+
+    groups.join("-")
+}
+
+/// Normalize a Nextcloud-format password: strip dashes/whitespace, uppercase.
+fn nc_normalize_password(password: &str) -> String {
+    password
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '-')
+        .map(|c| c.to_ascii_uppercase())
+        .collect()
+}
+
+/// Extract the first 8 characters as the token prefix for DB lookup.
+fn nc_token_prefix(normalized: &str) -> Result<String, DomainError> {
+    if normalized.len() < NC_PREFIX_LEN {
+        return Err(DomainError::new(
+            ErrorKind::InvalidInput,
+            "AppPassword",
+            "App password too short",
+        ));
+    }
+    Ok(normalized[..NC_PREFIX_LEN].to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_nc_app_password_format() {
+        let password = generate_nc_app_password();
+        let groups: Vec<&str> = password.split('-').collect();
+        assert_eq!(groups.len(), NC_APP_PASSWORD_GROUPS);
+        for group in &groups {
+            assert_eq!(group.len(), NC_APP_PASSWORD_GROUP_LEN);
+            assert!(group.chars().all(|c| c.is_ascii_alphanumeric()));
+        }
+    }
+
+    #[test]
+    fn test_nc_normalize_password_strips_dashes_and_whitespace() {
+        assert_eq!(
+            nc_normalize_password("AB12C-DE34F-GH56I"),
+            "AB12CDE34FGH56I"
+        );
+    }
+
+    #[test]
+    fn test_nc_normalize_password_uppercases() {
+        assert_eq!(nc_normalize_password("abc-def"), "ABCDEF");
+    }
+
+    #[test]
+    fn test_nc_token_prefix_extracts_first_8_chars() {
+        assert_eq!(nc_token_prefix("ABCDEFGHIJKLMNOP").unwrap(), "ABCDEFGH");
+    }
+
+    #[test]
+    fn test_nc_token_prefix_too_short() {
+        assert!(nc_token_prefix("SHORT").is_err());
+    }
+
+    #[test]
+    fn test_generated_nc_password_produces_valid_prefix() {
+        let password = generate_nc_app_password();
+        let normalized = nc_normalize_password(&password);
+        let prefix = nc_token_prefix(&normalized);
+        assert!(prefix.is_ok());
+        assert_eq!(prefix.unwrap().len(), NC_PREFIX_LEN);
     }
 }

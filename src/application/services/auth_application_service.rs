@@ -22,11 +22,31 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
 
+/// Result of a successful OIDC callback. The handler layer inspects this to
+/// decide whether to redirect to the regular frontend or complete a Nextcloud
+/// Login Flow v2 session.
+pub enum OidcCallbackResult {
+    /// Regular web login — contains a one-time exchange code for the frontend.
+    WebLogin { exchange_code: String },
+    /// Nextcloud Login Flow v2 — the user authenticated via OIDC but the flow
+    /// was initiated from the Nextcloud login page. The handler must create an
+    /// app password and complete the NC login flow.
+    NextcloudLogin {
+        nc_flow_token: String,
+        user_id: String,
+        username: String,
+    },
+}
+
 /// Tracks a pending OIDC authorization flow (CSRF + PKCE + nonce)
 #[derive(Clone)]
 struct PendingOidcFlow {
     pkce_verifier: String,
     nonce: String,
+    /// When set, this OIDC flow was initiated from the Nextcloud Login Flow v2
+    /// page. On successful callback the flow will mint an app-password and
+    /// complete the Nextcloud login flow instead of issuing internal JWTs.
+    nc_flow_token: Option<String>,
 }
 
 /// Tracks a pending one-time token exchange after successful OIDC callback
@@ -410,6 +430,49 @@ impl AuthApplicationService {
         })
     }
 
+    /// Verifies username/password credentials without creating a session.
+    pub async fn verify_credentials(
+        &self,
+        username: &str,
+        password: &str,
+    ) -> Result<crate::application::dtos::user_dto::CurrentUser, DomainError> {
+        let user = self
+            .user_storage
+            .get_user_by_username(username)
+            .await
+            .map_err(|_| {
+                DomainError::new(ErrorKind::AccessDenied, "Auth", "Invalid credentials")
+            })?;
+
+        if !user.is_active() {
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "Auth",
+                "Account deactivated",
+            ));
+        }
+
+        let is_valid = self
+            .password_hasher
+            .verify_password(password, user.password_hash())
+            .await?;
+
+        if !is_valid {
+            return Err(DomainError::new(
+                ErrorKind::AccessDenied,
+                "Auth",
+                "Invalid credentials",
+            ));
+        }
+
+        Ok(crate::application::dtos::user_dto::CurrentUser {
+            id: user.id().to_string(),
+            username: user.username().to_string(),
+            email: user.email().to_string(),
+            role: user.role().to_string(),
+        })
+    }
+
     pub async fn refresh_token(
         &self,
         dto: RefreshTokenDto,
@@ -602,6 +665,11 @@ impl AuthApplicationService {
 
     pub async fn list_users(&self, limit: i64, offset: i64) -> Result<Vec<UserDto>, DomainError> {
         let users = self.user_storage.list_users(limit, offset).await?;
+        Ok(users.into_iter().map(UserDto::from).collect())
+    }
+
+    pub async fn search_users(&self, query: &str, limit: i64) -> Result<Vec<UserDto>, DomainError> {
+        let users = self.user_storage.search_users(query, limit).await?;
         Ok(users.into_iter().map(UserDto::from).collect())
     }
 
@@ -856,6 +924,7 @@ impl AuthApplicationService {
             PendingOidcFlow {
                 pkce_verifier,
                 nonce: nonce.clone(),
+                nc_flow_token: None,
             },
         );
 
@@ -872,11 +941,77 @@ impl AuthApplicationService {
         Ok(authorize_url)
     }
 
+    /// Prepare an OIDC authorization flow for a Nextcloud Login Flow v2 session.
+    ///
+    /// Works like [`prepare_oidc_authorize`] but associates the Nextcloud flow
+    /// token with the OIDC state so that [`oidc_callback`] can complete the
+    /// Nextcloud login flow (app-password + poll result) instead of issuing
+    /// internal JWTs.
+    pub async fn prepare_oidc_authorize_for_nextcloud(
+        &self,
+        nc_flow_token: &str,
+    ) -> Result<String, DomainError> {
+        let oidc = self.oidc_service().ok_or_else(|| {
+            DomainError::new(
+                ErrorKind::InternalError,
+                "OIDC",
+                "OIDC service not configured",
+            )
+        })?;
+
+        use rand_core::{OsRng, RngCore};
+        let mut state_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut state_bytes);
+        let state_token = hex::encode(state_bytes);
+
+        let mut nonce_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let nonce = hex::encode(nonce_bytes);
+
+        let mut verifier_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut verifier_bytes);
+        let pkce_verifier = base64_url_encode(&verifier_bytes);
+        let pkce_challenge = {
+            use sha2::{Digest, Sha256};
+            let hash = Sha256::digest(pkce_verifier.as_bytes());
+            base64_url_encode(&hash)
+        };
+
+        // Store pending flow (auto-expires after 10 min via moka TTL)
+        self.pending_oidc_flows.insert(
+            state_token.clone(),
+            PendingOidcFlow {
+                pkce_verifier,
+                nonce: nonce.clone(),
+                nc_flow_token: Some(nc_flow_token.to_string()),
+            },
+        );
+
+        let authorize_url = oidc
+            .get_authorize_url(&state_token, &nonce, &pkce_challenge)
+            .await?;
+
+        tracing::info!(
+            "OIDC authorize flow prepared for Nextcloud Login Flow v2 (state={}...)",
+            &state_token[..8]
+        );
+
+        Ok(authorize_url)
+    }
+
     /// Handle the OIDC callback: validate CSRF state, exchange code with PKCE,
     /// validate ID token nonce, find or create user (JIT provisioning),
     /// issue internal tokens, and return a one-time exchange code.
-    pub async fn oidc_callback(&self, code: &str, state: &str) -> Result<String, DomainError> {
-        // 0. Validate CSRF state and retrieve PKCE verifier + nonce
+    ///
+    /// If the pending flow carries a Nextcloud flow token, this method returns
+    /// `Err(NcOidcComplete { .. })` with a special error kind so the handler
+    /// layer can complete the Nextcloud flow instead.
+    pub async fn oidc_callback(
+        &self,
+        code: &str,
+        state: &str,
+    ) -> Result<OidcCallbackResult, DomainError> {
+        // 0. Validate CSRF state and retrieve PKCE verifier + nonce + optional NC token
         //    (entry is auto-expired by moka TTL — remove returns None if expired)
         let flow = self.pending_oidc_flows.remove(state).ok_or_else(|| {
             tracing::warn!("OIDC callback with invalid/expired state token");
@@ -885,7 +1020,8 @@ impl AuthApplicationService {
                 "Invalid or expired OIDC state — possible CSRF attack. Please try logging in again.",
             )
         })?;
-        let (pkce_verifier, nonce) = (flow.pkce_verifier, flow.nonce);
+        let (pkce_verifier, nonce, nc_flow_token) =
+            (flow.pkce_verifier, flow.nonce, flow.nc_flow_token);
 
         // Clone the Arc and config out of the RwLock so we don't hold the lock across await points
         let (oidc, oidc_config) = {
@@ -1063,6 +1199,21 @@ impl AuthApplicationService {
             }
         };
 
+        // ── Branch: Nextcloud Login Flow v2 vs regular web login ──
+        if let Some(nc_token) = nc_flow_token {
+            // Nextcloud path: return user info so the handler can mint an
+            // app-password and complete the NC login flow.
+            tracing::info!(
+                user = %user.username(),
+                "OIDC login successful for Nextcloud Login Flow v2"
+            );
+            return Ok(OidcCallbackResult::NextcloudLogin {
+                nc_flow_token: nc_token,
+                user_id: user.id().to_string(),
+                username: user.username().to_string(),
+            });
+        }
+
         // 6. Issue internal tokens (same as regular login)
         let access_token = self.token_service.generate_access_token(&user)?;
         let refresh_token = self.token_service.generate_refresh_token();
@@ -1096,7 +1247,7 @@ impl AuthApplicationService {
 
         tracing::info!("OIDC login successful, one-time exchange code generated");
 
-        Ok(exchange_code)
+        Ok(OidcCallbackResult::WebLogin { exchange_code })
     }
 
     /// Exchange a one-time code for the authentication tokens.

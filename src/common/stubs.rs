@@ -96,6 +96,10 @@ impl FileReadPort for StubFileReadPort {
         Ok("root".to_string())
     }
 
+    async fn get_folder_id_by_path(&self, _folder_path: &str) -> Result<String, DomainError> {
+        Ok("stub-folder-id".to_string())
+    }
+
     async fn get_blob_hash(&self, _file_id: &str) -> Result<String, DomainError> {
         Ok(String::new())
     }
@@ -355,7 +359,11 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
-    async fn get_folder_owned(&self, _id: &str, _caller_id: &str) -> Result<FolderDto, DomainError> {
+    async fn get_folder_owned(
+        &self,
+        _id: &str,
+        _caller_id: &str,
+    ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
@@ -463,7 +471,12 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         Ok(FileDto::default())
     }
 
-    async fn update_file(&self, _path: &str, _content: &[u8]) -> Result<(), DomainError> {
+    async fn update_file(
+        &self,
+        _path: &str,
+        _content: &[u8],
+        _content_type: &str,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
 
@@ -771,6 +784,10 @@ impl DedupPort for StubDedupPort {
 
     async fn hash_file(&self, _path: &Path) -> Result<String, DomainError> {
         Ok(String::new())
+    }
+
+    fn blob_path(&self, hash: &str) -> PathBuf {
+        PathBuf::from(format!("stub_blob_{}.blob", hash))
     }
 
     async fn get_stats(&self) -> DedupStatsDto {

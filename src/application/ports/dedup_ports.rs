@@ -152,6 +152,12 @@ pub trait DedupPort: Send + Sync + 'static {
     /// Calculate BLAKE3 hash of a file (streaming).
     async fn hash_file(&self, path: &Path) -> Result<String, DomainError>;
 
+    /// Get the physical filesystem path for a blob by its hash.
+    ///
+    /// Returns the path where the blob is stored on disk.
+    /// Used by services that need direct filesystem access (e.g., thumbnail generation).
+    fn blob_path(&self, hash: &str) -> PathBuf;
+
     /// Get deduplication statistics.
     async fn get_stats(&self) -> DedupStatsDto;
 

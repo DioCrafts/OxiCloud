@@ -63,12 +63,13 @@ impl WebDavLockStore {
     ///
     /// Returns `Ok(LockEntry)` on success, or `Err(existing)` if the resource
     /// is already exclusively locked by a different token.
-    pub fn acquire(&self, path: &str, info: LockInfo) -> Result<LockEntry, Box<LockEntry>> {
+    #[allow(clippy::result_large_err)]
+    pub fn acquire(&self, path: &str, info: LockInfo) -> Result<LockEntry, LockEntry> {
         // Check for existing conflicting lock
         if let Some(existing) = self.by_path.get(path)
             && existing.info.scope == LockScope::Exclusive
         {
-            return Err(Box::new(existing));
+            return Err(existing);
         }
 
         let ttl = Self::parse_timeout(info.timeout.as_deref());

@@ -119,10 +119,10 @@ impl PathResolverService {
              LIMIT 1
             "#,
         )
-        .bind(path)          // $1
-        .bind(filename)      // $2
-        .bind(&folder_path)  // $3
-        .bind(user_id)       // $4
+        .bind(path) // $1
+        .bind(filename) // $2
+        .bind(&folder_path) // $3
+        .bind(user_id) // $4
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("PathResolver", format!("resolve_for_user: {e}")))?
@@ -215,7 +215,9 @@ impl PathResolverService {
         .bind(user_id)
         .fetch_one(self.pool.as_ref())
         .await
-        .map_err(|e| DomainError::internal_error("PathResolver", format!("exists_for_user: {e}")))?;
+        .map_err(|e| {
+            DomainError::internal_error("PathResolver", format!("exists_for_user: {e}"))
+        })?;
 
         Ok(exists)
     }

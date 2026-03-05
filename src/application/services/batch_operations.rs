@@ -682,7 +682,11 @@ impl BatchOperationService {
 
         // ── Add folders as sub-trees (bulk subtree queries, not N+1) ─────
         for folder_id in &folder_ids {
-            match self.folder_service.get_folder_owned(folder_id, caller_id).await {
+            match self
+                .folder_service
+                .get_folder_owned(folder_id, caller_id)
+                .await
+            {
                 Ok(root_folder) => {
                     if let Err(e) = self
                         .add_folder_subtree_to_zip(&mut zip, folder_id, &root_folder, caller_id)
@@ -928,11 +932,11 @@ impl BatchOperationService {
 
             async move {
                 // If a parent is specified, verify the caller owns it
-                if let Some(ref pid) = parent_id {
-                    if let Err(e) = folder_service.get_folder_owned(pid, &caller).await {
-                        let id = format!("{}:{}", name, pid);
-                        return (id, Err(e.into()));
-                    }
+                if let Some(ref pid) = parent_id
+                    && let Err(e) = folder_service.get_folder_owned(pid, &caller).await
+                {
+                    let id = format!("{}:{}", name, pid);
+                    return (id, Err(e));
                 }
                 let dto = crate::application::dtos::folder_dto::CreateFolderDto {
                     name: name.clone(),
@@ -1041,19 +1045,28 @@ impl BatchOperationService {
 
 #[cfg(integration_tests)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
-    use crate::common::stubs::{StubFileManagementUseCase, StubFileRetrievalUseCase};
+    #[allow(unused_imports)]
+    use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
+    #[allow(unused_imports)]
+    use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+    #[allow(unused_imports)]
+    use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+    #[allow(unused_imports)]
     use std::sync::Arc;
 
     #[tokio::test]
     async fn test_generic_batch_operation() {
-        // Create the batch service with stubs
+        // Create the batch service with stub repositories (lazy pool — no SQL is executed
+        // in this test; generic_batch_operation never touches file/folder services).
+        let folder_repo = Arc::new(FolderDbRepository::new_stub());
+        let file_read_repo = Arc::new(FileBlobReadRepository::new_stub());
+        let file_write_repo = Arc::new(FileBlobWriteRepository::new_stub());
         let batch_service = BatchOperationService::new(
-            Arc::new(StubFileRetrievalUseCase),
-            Arc::new(StubFileManagementUseCase),
-            Arc::new(FolderService::new(Arc::new(
-                crate::common::stubs::StubFolderStoragePort,
-            ))),
+            Arc::new(FileRetrievalService::new(file_read_repo)),
+            Arc::new(FileManagementService::new(file_write_repo)),
+            Arc::new(FolderService::new(folder_repo)),
             AppConfig::default(),
         );
 

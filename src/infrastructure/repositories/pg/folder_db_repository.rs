@@ -198,6 +198,7 @@ impl FolderRepository for FolderDbRepository {
         Self::row_to_folder(row.0, row.1, row.2, row.3, Some(row.4), row.5, row.6)
     }
 
+    #[allow(clippy::type_complexity)]
     async fn list_folders(&self, parent_id: Option<&str>) -> Result<Vec<Folder>, DomainError> {
         let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
             sqlx::query_as(
@@ -236,6 +237,7 @@ impl FolderRepository for FolderDbRepository {
             .collect()
     }
 
+    #[allow(clippy::type_complexity)]
     async fn list_folders_by_owner(
         &self,
         parent_id: Option<&str>,
@@ -283,6 +285,7 @@ impl FolderRepository for FolderDbRepository {
     /// Paginated folder listing — single query with `COUNT(*) OVER()` window
     /// function so the total matching count comes back alongside the data rows,
     /// eliminating a separate COUNT round-trip.
+    #[allow(clippy::type_complexity)]
     async fn list_folders_paginated(
         &self,
         parent_id: Option<&str>,
@@ -346,6 +349,7 @@ impl FolderRepository for FolderDbRepository {
 
     /// Paginated folder listing filtered by owner — single query with
     /// `COUNT(*) OVER()` to avoid a separate COUNT round-trip.
+    #[allow(clippy::type_complexity)]
     async fn list_folders_by_owner_paginated(
         &self,
         parent_id: Option<&str>,
@@ -685,6 +689,7 @@ impl FolderRepository for FolderDbRepository {
     ///
     /// Single GiST-indexed query: `fo.lpath <@ (root's lpath)`.
     /// Ordered by `fo.path` so callers can iterate in directory order.
+    #[allow(clippy::type_complexity)]
     async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<Folder>, DomainError> {
         let sql = "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
                           fo.user_id::text, \
@@ -716,6 +721,7 @@ impl FolderRepository for FolderDbRepository {
     /// - Non-recursive: `WHERE parent_id = $1 AND user_id = $2 [AND LIKE]`
     /// - Recursive + folder_id: delegates to `list_descendant_folders`
     /// - Recursive + no folder_id: `WHERE user_id = $1 [AND LIKE]`
+    #[allow(clippy::type_complexity)]
     async fn search_folders(
         &self,
         parent_id: Option<&str>,
@@ -854,6 +860,7 @@ impl FolderRepository for FolderDbRepository {
     ///
     /// Single SQL query: `fo.lpath <@ (root's lpath)` fetches the entire
     /// subtree in one indexed scan. Optional name filter is pushed to SQL.
+    #[allow(clippy::type_complexity)]
     async fn list_descendant_folders(
         &self,
         folder_id: &str,
@@ -861,7 +868,9 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if name.len() >= 3 => (" AND fo.name ILIKE $3", Some(super::like_escape(name))),
+            Some(name) if name.len() >= 3 => {
+                (" AND fo.name ILIKE $3", Some(super::like_escape(name)))
+            }
             _ => ("", None),
         };
 
@@ -902,6 +911,7 @@ impl FolderRepository for FolderDbRepository {
             .collect()
     }
 
+    #[allow(clippy::type_complexity)]
     async fn suggest_folders_by_name(
         &self,
         parent_id: Option<&str>,
