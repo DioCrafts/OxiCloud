@@ -14,6 +14,10 @@ use crate::application::services::batch_operations::{
 use crate::interfaces::api::handlers::ApiResult;
 use crate::interfaces::middleware::auth::AuthUser;
 
+/// Maximum number of items allowed in a single batch request.
+/// Prevents fan-out amplification attacks and database connection exhaustion.
+const MAX_BATCH_SIZE: usize = 1_000;
+
 /// Shared state for the batch handler
 #[derive(Clone)]
 pub struct BatchHandlerState {
@@ -143,6 +147,15 @@ pub async fn move_files_batch(
         )
             .into_response());
     }
+    if request.file_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.file_ids.len(), MAX_BATCH_SIZE)
+            })),
+        )
+            .into_response());
+    }
 
     // Execute batch operation
     let result = state
@@ -187,6 +200,15 @@ pub async fn copy_files_batch(
         )
             .into_response());
     }
+    if request.file_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.file_ids.len(), MAX_BATCH_SIZE)
+            })),
+        )
+            .into_response());
+    }
 
     // Execute batch operation
     let result = state
@@ -227,6 +249,15 @@ pub async fn delete_files_batch(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
                 "error": "No file IDs provided"
+            })),
+        )
+            .into_response());
+    }
+    if request.file_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.file_ids.len(), MAX_BATCH_SIZE)
             })),
         )
             .into_response());
@@ -283,6 +314,15 @@ pub async fn delete_folders_batch(
         )
             .into_response());
     }
+    if request.folder_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.folder_ids.len(), MAX_BATCH_SIZE)
+            })),
+        )
+            .into_response());
+    }
 
     // Execute batch operation
     let result = state
@@ -331,6 +371,15 @@ pub async fn create_folders_batch(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
                 "error": "No folders provided"
+            })),
+        )
+            .into_response());
+    }
+    if request.folders.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.folders.len(), MAX_BATCH_SIZE)
             })),
         )
             .into_response());
@@ -386,6 +435,15 @@ pub async fn get_files_batch(
         )
             .into_response());
     }
+    if request.file_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.file_ids.len(), MAX_BATCH_SIZE)
+            })),
+        )
+            .into_response());
+    }
 
     // Execute batch operation
     let result = state
@@ -426,6 +484,15 @@ pub async fn get_folders_batch(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
                 "error": "No folder IDs provided"
+            })),
+        )
+            .into_response());
+    }
+    if request.folder_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.folder_ids.len(), MAX_BATCH_SIZE)
             })),
         )
             .into_response());
@@ -491,6 +558,16 @@ pub async fn trash_batch(
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({
                 "error": "No file or folder IDs provided"
+            })),
+        )
+            .into_response());
+    }
+    let combined_size = request.file_ids.len() + request.folder_ids.len();
+    if combined_size > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", combined_size, MAX_BATCH_SIZE)
             })),
         )
             .into_response());
@@ -597,6 +674,15 @@ pub async fn move_folders_batch(
         )
             .into_response());
     }
+    if request.folder_ids.len() > MAX_BATCH_SIZE {
+        return Ok((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Batch size {} exceeds maximum of {}", request.folder_ids.len(), MAX_BATCH_SIZE)
+            })),
+        )
+            .into_response());
+    }
 
     let result = state
         .batch_service
@@ -635,6 +721,13 @@ pub async fn download_batch(
         return Err((
             StatusCode::BAD_REQUEST,
             "No file or folder IDs provided".to_string(),
+        ));
+    }
+    let combined_size = request.file_ids.len() + request.folder_ids.len();
+    if combined_size > MAX_BATCH_SIZE {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("Batch size {} exceeds maximum of {}", combined_size, MAX_BATCH_SIZE),
         ));
     }
 

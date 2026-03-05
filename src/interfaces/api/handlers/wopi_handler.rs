@@ -386,6 +386,28 @@ pub struct EditorUrlResponse {
     pub access_token_ttl: i64,
 }
 
+/// Determines if `caller_id` can access `file_id` and with what permissions.
+///
+/// Uses the SQL-level ownership check (`get_file_owned`) so that files
+/// belonging to other users — or non-existent files — both return `NOT_FOUND`,
+/// avoiding existence-leak oracles.
+///
+/// Returns `(FileDto, can_write)` on success.
+async fn authorize_wopi_access<S: FileRetrievalUseCase>(
+    file_retrieval: &S,
+    file_id: &str,
+    caller_id: &str,
+    requested_action: &str,
+) -> Result<(crate::application::dtos::file_dto::FileDto, bool), StatusCode> {
+    let file = file_retrieval
+        .get_file_owned(file_id, caller_id)
+        .await
+        .map_err(|_| StatusCode::NOT_FOUND)?;
+    // Owner verified — grant write unless explicitly requesting view-only.
+    let can_write = requested_action != "view";
+    Ok((file, can_write))
+}
+
 /// GET /api/wopi/editor-url — Returns the editor iframe URL + WOPI token.
 ///
 /// This endpoint is behind normal auth middleware. The authenticated user
@@ -399,16 +421,17 @@ pub async fn get_editor_url(
     Query(params): Query<EditorUrlParams>,
     State(state): State<WopiState>,
 ) -> Response {
-    // Get file info to determine extension
-    let file = match state
-        .app_state
-        .applications
-        .file_retrieval_service
-        .get_file(&params.file_id)
-        .await
+    // Verify the caller owns the file (SQL-level check, no existence leak).
+    let (file, can_write) = match authorize_wopi_access(
+        state.app_state.applications.file_retrieval_service.as_ref(),
+        &params.file_id,
+        &user_id,
+        &params.action,
+    )
+    .await
     {
-        Ok(f) => f,
-        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+        Ok(result) => result,
+        Err(status) => return status.into_response(),
     };
 
     // Extract extension from filename
@@ -435,13 +458,6 @@ pub async fn get_editor_url(
             tracing::error!("WOPI discovery error: {}", e);
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
-    };
-
-    // Determine write permission: owner can write, others read-only.
-    // If no owner_id on the file, default to allowing write.
-    let can_write = match &file.owner_id {
-        Some(owner) => owner == &user_id,
-        None => true,
     };
 
     // Generate WOPI access token
@@ -485,20 +501,22 @@ async fn host_page(
         return StatusCode::UNAUTHORIZED.into_response();
     }
 
-    // Get file info for extension
-    let file = match state
-        .app_state
-        .applications
-        .file_retrieval_service
-        .get_file(&file_id)
-        .await
+    // Re-verify ownership even though the token was valid — defence in depth.
+    let requested_action = if claims.can_write { "edit" } else { "view" };
+    let file = match authorize_wopi_access(
+        state.app_state.applications.file_retrieval_service.as_ref(),
+        &file_id,
+        &claims.sub,
+        requested_action,
+    )
+    .await
     {
-        Ok(f) => f,
-        Err(_) => return StatusCode::NOT_FOUND.into_response(),
+        Ok((f, _)) => f,
+        Err(status) => return status.into_response(),
     };
 
     let extension = file.name.rsplit('.').next().unwrap_or("").to_lowercase();
-    let action = if claims.can_write { "edit" } else { "view" };
+    let action = requested_action;
     let wopi_src = format!("{}/wopi/files/{}", state.wopi_base_url, file_id);
 
     let editor_url = match state

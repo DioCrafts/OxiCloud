@@ -569,10 +569,30 @@ impl AppConfig {
 
         // Auth configuration
         if let Ok(jwt_secret) = env::var("OXICLOUD_JWT_SECRET") {
+            // SECURITY: Validate JWT secret minimum entropy (RFC 7518 §3.2
+            // recommends ≥256 bits for HS256). Panic on dangerously short
+            // secrets, warn on sub-optimal ones.
+            let len = jwt_secret.len();
+            if config.features.enable_auth && len < 16 {
+                panic!(
+                    "FATAL: OXICLOUD_JWT_SECRET is dangerously short ({} bytes). \
+                     Minimum: 32 bytes (256 bits) for HS256. \
+                     Generate a secure secret with: openssl rand -hex 32",
+                    len
+                );
+            } else if config.features.enable_auth && len < 32 {
+                tracing::warn!("==========================================================");
+                tracing::warn!(
+                    "OXICLOUD_JWT_SECRET is only {} bytes — recommended minimum is 32 (256 bits).",
+                    len
+                );
+                tracing::warn!("Generate a stronger secret with: openssl rand -hex 32");
+                tracing::warn!("==========================================================");
+            }
             config.auth.jwt_secret = jwt_secret;
         }
 
-        // SECURITY: Validate JWT secret when auth is enabled
+        // SECURITY: Generate ephemeral secret when none is provided
         if config.features.enable_auth && config.auth.jwt_secret.is_empty() {
             // Generate a random secret for this session and warn loudly
             use rand_core::{OsRng, RngCore};

@@ -39,6 +39,10 @@ use crate::interfaces::middleware::auth::CurrentUser;
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 
+/// Maximum allowed request body size for CalDAV XML/iCal endpoints (1 MB).
+/// Prevents OOM/DoS via unbounded body buffering.
+const MAX_CALDAV_BODY: usize = 1_048_576;
+
 /// Creates CalDAV routes with full path prefixes.
 ///
 /// Uses `merge()` instead of `nest()` to avoid Axum's trailing-slash routing gap.
@@ -182,7 +186,7 @@ async fn handle_propfind(
     let user = extract_user(&req)?;
     let calendar_service = get_calendar_service(&state)?;
 
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_CALDAV_BODY)
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
 
@@ -423,7 +427,7 @@ async fn handle_report(
     let user = extract_user(&req)?;
     let calendar_service = get_calendar_service(&state)?;
 
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_CALDAV_BODY)
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
 
@@ -498,7 +502,7 @@ async fn handle_mkcalendar(
     let user = extract_user(&req)?;
     let calendar_service = get_calendar_service(&state)?;
 
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_CALDAV_BODY)
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
 
@@ -551,7 +555,7 @@ async fn handle_put(
 
     let calendar_id = parts[0];
 
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_CALDAV_BODY)
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
 
@@ -795,7 +799,7 @@ async fn handle_proppatch(
     let user = extract_user(&req)?;
     let calendar_service = get_calendar_service(&state)?;
 
-    let body_bytes = body::to_bytes(req.into_body(), usize::MAX)
+    let body_bytes = body::to_bytes(req.into_body(), MAX_CALDAV_BODY)
         .await
         .map_err(|e| AppError::bad_request(format!("Failed to read request body: {}", e)))?;
 
