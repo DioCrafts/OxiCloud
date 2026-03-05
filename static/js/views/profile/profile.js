@@ -152,14 +152,26 @@ function renderPwRow(pw) {
   created.textContent = new Date(pw.created_at).toLocaleDateString();
   const lastUsed = document.createElement('td');
   lastUsed.textContent = pw.last_used_at ? timeAgo(pw.last_used_at) : 'Never';
+  const status = document.createElement('td');
+  const badge = document.createElement('span');
+  if (pw.active !== false) {
+    badge.className = 'badge badge-active';
+    badge.textContent = 'Active';
+  } else {
+    badge.className = 'badge badge-expired';
+    badge.textContent = 'Revoked';
+  }
+  status.appendChild(badge);
   const actions = document.createElement('td');
-  const btn = document.createElement('button');
-  btn.className = 'btn btn-danger-sm';
-  btn.innerHTML = '<i class="fas fa-trash"></i>';
-  btn.title = 'Revoke';
-  btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
-  actions.appendChild(btn);
-  tr.append(label, created, lastUsed, actions);
+  if (pw.active !== false) {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-danger-sm';
+    btn.innerHTML = '<i class="fas fa-trash"></i>';
+    btn.title = 'Revoke';
+    btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
+    actions.appendChild(btn);
+  }
+  tr.append(label, created, lastUsed, status, actions);
   return tr;
 }
 
