@@ -868,7 +868,9 @@ impl FolderRepository for FolderDbRepository {
         user_id: &str,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
-            Some(name) if name.len() >= 3 => (" AND fo.name ILIKE $3", Some(super::like_escape(name))),
+            Some(name) if name.len() >= 3 => {
+                (" AND fo.name ILIKE $3", Some(super::like_escape(name)))
+            }
             _ => ("", None),
         };
 

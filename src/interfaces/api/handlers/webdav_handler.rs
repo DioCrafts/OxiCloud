@@ -1161,10 +1161,7 @@ async fn handle_move(
 
     // Resolve source: single-query when PathResolver is available (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver
-            .resolve_path_for_user(&source_path, &user.id)
-            .await
-        {
+        match resolver.resolve_path_for_user(&source_path, &user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 let dest_folder_name = destination_path
                     .split('/')
@@ -1183,7 +1180,11 @@ async fn handle_move(
                         match folder_service.get_folder_by_path(dest_parent_path).await {
                             Ok(parent) => {
                                 // SECURITY: verify destination parent belongs to caller (V-08)
-                                assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                                assert_owner(
+                                    parent.owner_id.as_deref(),
+                                    &user.id,
+                                    dest_parent_path,
+                                )?;
                                 Some(parent.id)
                             }
                             Err(_) => None,
@@ -1228,7 +1229,10 @@ async fn handle_move(
 
                 if source_parent_path != dest_parent_path {
                     // SECURITY: verify destination parent belongs to caller (V-08)
-                    if !dest_parent_path.is_empty() && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
+                    if !dest_parent_path.is_empty()
+                        && let Ok(parent) =
+                            folder_service.get_folder_by_path(dest_parent_path).await
+                    {
                         assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
                     }
                     file_management_service
@@ -1327,7 +1331,9 @@ async fn handle_move(
 
             if source_parent_path != dest_parent_path {
                 // SECURITY: verify destination parent belongs to caller (V-08)
-                if !dest_parent_path.is_empty() && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await {
+                if !dest_parent_path.is_empty()
+                    && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await
+                {
                     assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
                 }
                 file_management_service
@@ -1436,10 +1442,7 @@ async fn handle_copy(
 
     // Resolve source: single-query when PathResolver is available (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver
-            .resolve_path_for_user(&source_path, &user.id)
-            .await
-        {
+        match resolver.resolve_path_for_user(&source_path, &user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 let recursive = depth != "0";
 

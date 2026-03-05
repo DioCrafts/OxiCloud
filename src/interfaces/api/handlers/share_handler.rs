@@ -40,12 +40,9 @@ pub async fn create_shared_link(
     auth_user: AuthUser,
     Json(dto): Json<CreateShareDto>,
 ) -> impl IntoResponse {
-    match share_use_case
-        .create_shared_link(&auth_user.id, dto)
-        .await
-    {
+    match share_use_case.create_shared_link(&auth_user.id, dto).await {
         Ok(share) => (StatusCode::CREATED, Json(share)).into_response(),
-        Err(err) => AppError::from(err).into_response()
+        Err(err) => AppError::from(err).into_response(),
     }
 }
 
@@ -57,7 +54,7 @@ pub async fn get_shared_link(
 ) -> impl IntoResponse {
     match share_use_case.get_shared_link(&id, &auth_user.id).await {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
-        Err(err) => AppError::from(err).into_response()
+        Err(err) => AppError::from(err).into_response(),
     }
 }
 
@@ -116,7 +113,7 @@ pub async fn update_shared_link(
         .await
     {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
-        Err(err) => AppError::from(err).into_response()
+        Err(err) => AppError::from(err).into_response(),
     }
 }
 
@@ -126,12 +123,9 @@ pub async fn delete_shared_link(
     auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match share_use_case
-        .delete_shared_link(&id, &auth_user.id)
-        .await
-    {
+    match share_use_case.delete_shared_link(&id, &auth_user.id).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
-        Err(err) => AppError::from(err).into_response()
+        Err(err) => AppError::from(err).into_response(),
     }
 }
 
@@ -160,8 +154,7 @@ pub async fn access_shared_item(
                         .into_response();
                 }
                 if err.message.contains("expired") {
-                    return AppError::new(StatusCode::GONE, err.message, "Expired")
-                        .into_response();
+                    return AppError::new(StatusCode::GONE, err.message, "Expired").into_response();
                 }
             }
             AppError::from(err).into_response()
@@ -183,8 +176,7 @@ pub async fn verify_shared_item_password(
         Err(err) => {
             if err.kind == ErrorKind::AccessDenied {
                 if err.message.contains("expired") {
-                    return AppError::new(StatusCode::GONE, err.message, "Expired")
-                        .into_response();
+                    return AppError::new(StatusCode::GONE, err.message, "Expired").into_response();
                 }
                 if err.message.contains("password") {
                     return AppError::unauthorized("Invalid password").into_response();

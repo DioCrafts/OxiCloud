@@ -50,6 +50,9 @@ pub use user_pg_repository::UserPgRepository;
 /// `%` is a wildcard in LIKE patterns.
 #[inline]
 pub fn like_escape(raw: &str) -> String {
-    let escaped = raw.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+    let escaped = raw
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
     format!("%{escaped}%")
 }

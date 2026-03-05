@@ -292,8 +292,10 @@ impl User {
             ));
         }
         // Disallow leading/trailing dots or hyphens
-        if username.starts_with('.') || username.starts_with('-')
-            || username.ends_with('.') || username.ends_with('-')
+        if username.starts_with('.')
+            || username.starts_with('-')
+            || username.ends_with('.')
+            || username.ends_with('-')
         {
             return Err(UserError::InvalidUsername(
                 "Username must not start or end with a dot or hyphen".to_string(),
@@ -310,7 +312,9 @@ impl User {
     fn validate_email(email: &str) -> UserResult<()> {
         let parts: Vec<&str> = email.splitn(2, '@').collect();
         if parts.len() != 2 {
-            return Err(UserError::ValidationError("Invalid email: missing @".to_string()));
+            return Err(UserError::ValidationError(
+                "Invalid email: missing @".to_string(),
+            ));
         }
         let (local, domain) = (parts[0], parts[1]);
         if local.is_empty() || domain.is_empty() {
@@ -324,7 +328,9 @@ impl User {
             ));
         }
         // Reject characters commonly used in XSS / header injection
-        let forbidden = ['<', '>', '"', '\'', '\\', ' ', '\t', '\n', '\r', '(', ')', ',', ';'];
+        let forbidden = [
+            '<', '>', '"', '\'', '\\', ' ', '\t', '\n', '\r', '(', ')', ',', ';',
+        ];
         if email.chars().any(|c| forbidden.contains(&c)) {
             return Err(UserError::ValidationError(
                 "Invalid email: contains forbidden characters".to_string(),

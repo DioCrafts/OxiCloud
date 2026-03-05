@@ -359,7 +359,11 @@ impl FolderUseCase for StubFolderUseCase {
         Ok(FolderDto::default())
     }
 
-    async fn get_folder_owned(&self, _id: &str, _caller_id: &str) -> Result<FolderDto, DomainError> {
+    async fn get_folder_owned(
+        &self,
+        _id: &str,
+        _caller_id: &str,
+    ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 

@@ -80,7 +80,11 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     ) -> Result<ChunkUploadResponseDto, DomainError>;
 
     /// Get the current status of an upload session.
-    async fn get_status(&self, upload_id: &str, user_id: &str) -> Result<UploadStatusResponseDto, DomainError>;
+    async fn get_status(
+        &self,
+        upload_id: &str,
+        user_id: &str,
+    ) -> Result<UploadStatusResponseDto, DomainError>;
 
     /// Assemble all chunks into the final file.
     ///

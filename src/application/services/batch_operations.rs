@@ -682,7 +682,11 @@ impl BatchOperationService {
 
         // ── Add folders as sub-trees (bulk subtree queries, not N+1) ─────
         for folder_id in &folder_ids {
-            match self.folder_service.get_folder_owned(folder_id, caller_id).await {
+            match self
+                .folder_service
+                .get_folder_owned(folder_id, caller_id)
+                .await
+            {
                 Ok(root_folder) => {
                     if let Err(e) = self
                         .add_folder_subtree_to_zip(&mut zip, folder_id, &root_folder, caller_id)
@@ -928,7 +932,9 @@ impl BatchOperationService {
 
             async move {
                 // If a parent is specified, verify the caller owns it
-                if let Some(ref pid) = parent_id && let Err(e) = folder_service.get_folder_owned(pid, &caller).await {
+                if let Some(ref pid) = parent_id
+                    && let Err(e) = folder_service.get_folder_owned(pid, &caller).await
+                {
                     let id = format!("{}:{}", name, pid);
                     return (id, Err(e));
                 }

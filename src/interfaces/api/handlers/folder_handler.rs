@@ -70,19 +70,24 @@ impl FolderHandler {
         // ── SECURITY: Verify parent folder ownership (IDOR V-04 fix) ──
         if let Some(ref parent_id) = dto.parent_id {
             use crate::application::ports::inbound::FolderUseCase;
-            if service.get_folder_owned(parent_id, &auth_user.id).await.is_err() {
+            if service
+                .get_folder_owned(parent_id, &auth_user.id)
+                .await
+                .is_err()
+            {
                 tracing::warn!(
                     "create_folder: user '{}' attempted to create folder in parent '{}' owned by another user",
                     auth_user.username,
                     parent_id,
                 );
-                return AppError::not_found(format!("Parent folder not found: {}", parent_id)).into_response();
+                return AppError::not_found(format!("Parent folder not found: {}", parent_id))
+                    .into_response();
             }
         }
 
         match service.create_folder(dto).await {
             Ok(folder) => (StatusCode::CREATED, Json(folder)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -109,7 +114,7 @@ impl FolderHandler {
                 }
                 (StatusCode::OK, Json(folder)).into_response()
             }
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -154,7 +159,7 @@ impl FolderHandler {
             .await
         {
             Ok(paginated_result) => (StatusCode::OK, Json(paginated_result)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -171,7 +176,7 @@ impl FolderHandler {
             .await
         {
             Ok(folders) => (StatusCode::OK, Json(folders)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -237,7 +242,7 @@ impl FolderHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            (Err(err), _) | (_, Err(err)) => AppError::from(err).into_response()
+            (Err(err), _) | (_, Err(err)) => AppError::from(err).into_response(),
         }
     }
 
@@ -250,7 +255,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.rename_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -263,7 +268,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.move_folder(&id, dto, &auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -275,7 +280,7 @@ impl FolderHandler {
     ) -> impl IntoResponse {
         match service.delete_folder(&id, &auth_user.id).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -313,9 +318,7 @@ impl FolderHandler {
                 tracing::info!("Folder permanently deleted: {}", id);
                 StatusCode::NO_CONTENT.into_response()
             }
-            Err(err) => {
-                AppError::from(err).into_response()
-            }
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 

@@ -228,7 +228,10 @@ impl FileRetrievalUseCase for FileRetrievalService {
         folder_id: Option<&str>,
         owner_id: &str,
     ) -> Result<Vec<FileDto>, DomainError> {
-        let files = self.file_read.list_files_for_owner(folder_id, owner_id).await?;
+        let files = self
+            .file_read
+            .list_files_for_owner(folder_id, owner_id)
+            .await?;
         Ok(files.into_iter().map(FileDto::from).collect())
     }
 

@@ -186,7 +186,11 @@ impl TrashUseCase for TrashService {
                 // Returns NotFound if the file does not exist OR belongs to
                 // another user, preventing cross-user trash operations.
                 debug!("Getting file data (owner-scoped): {}", item_id);
-                let file = match self.file_read_port.get_file_for_owner(item_id, user_id).await {
+                let file = match self
+                    .file_read_port
+                    .get_file_for_owner(item_id, user_id)
+                    .await
+                {
                     Ok(file) => {
                         debug!("File found: {} ({})", file.name(), item_id);
                         file

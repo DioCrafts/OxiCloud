@@ -20,7 +20,10 @@ use crate::{
             storage_ports::FileReadPort,
         },
     },
-    common::{config::AppConfig, errors::{DomainError, ErrorKind}},
+    common::{
+        config::AppConfig,
+        errors::{DomainError, ErrorKind},
+    },
     domain::entities::share::{Share, ShareItemType, SharePermissions},
 };
 
@@ -147,11 +150,7 @@ impl ShareService {
     /// but belongs to a different user — this prevents share-ID enumeration
     /// attacks where an attacker probes IDs and uses 403-vs-404 to learn
     /// which ones are valid.
-    async fn fetch_owned_share(
-        &self,
-        id: &str,
-        requester_id: &str,
-    ) -> Result<Share, DomainError> {
+    async fn fetch_owned_share(&self, id: &str, requester_id: &str) -> Result<Share, DomainError> {
         let share = self
             .share_repository
             .find_share_by_id_for_user(id, requester_id)
@@ -206,11 +205,7 @@ impl ShareUseCase for ShareService {
         Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
     }
 
-    async fn get_shared_link(
-        &self,
-        id: &str,
-        requester_id: &str,
-    ) -> Result<ShareDto, DomainError> {
+    async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError> {
         // SECURITY: ownership-verified lookup — returns 404 if the share
         // doesn't exist OR belongs to another user.
         let share = self.fetch_owned_share(id, requester_id).await?;
@@ -553,7 +548,11 @@ mod tests {
             Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
         }
 
-        async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError> {
+        async fn get_shared_link(
+            &self,
+            id: &str,
+            requester_id: &str,
+        ) -> Result<ShareDto, DomainError> {
             let share = self
                 .share_repository
                 .find_share_by_id_for_user(id, requester_id)
@@ -634,7 +633,11 @@ mod tests {
             Ok(ShareDto::from_entity(&updated, &self.config.base_url()))
         }
 
-        async fn delete_shared_link(&self, id: &str, requester_id: &str) -> Result<(), DomainError> {
+        async fn delete_shared_link(
+            &self,
+            id: &str,
+            requester_id: &str,
+        ) -> Result<(), DomainError> {
             self.share_repository
                 .delete_share_for_user(id, requester_id)
                 .await

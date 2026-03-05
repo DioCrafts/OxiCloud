@@ -342,7 +342,9 @@ async fn logout(
         .ok()
         .map(|dto| dto.refresh_token)
         .or_else(|| cookie_auth::extract_cookie_value(&headers, cookie_auth::REFRESH_COOKIE))
-        .ok_or_else(|| AppError::unauthorized("Refresh token required for logout (JSON body or cookie)"))?;
+        .ok_or_else(|| {
+            AppError::unauthorized("Refresh token required for logout (JSON body or cookie)")
+        })?;
 
     auth_service
         .auth_application_service

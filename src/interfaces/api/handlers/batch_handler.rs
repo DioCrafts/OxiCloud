@@ -164,7 +164,10 @@ pub async fn move_files_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch move_files failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Convert result to DTO
@@ -217,7 +220,10 @@ pub async fn copy_files_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch copy_files failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Convert result to DTO
@@ -270,7 +276,10 @@ pub async fn delete_files_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch delete_files failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Create custom response for string IDs
@@ -331,7 +340,10 @@ pub async fn delete_folders_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch delete_folders failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Create custom response for string IDs
@@ -399,7 +411,10 @@ pub async fn create_folders_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch create_folders failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Convert result to DTO
@@ -452,7 +467,10 @@ pub async fn get_files_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch get_files failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Convert result to DTO
@@ -505,7 +523,10 @@ pub async fn get_folders_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch get_folders failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     // Convert result to DTO
@@ -690,7 +711,10 @@ pub async fn move_folders_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch move_folders failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch operation failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch operation failed".to_string(),
+            )
         })?;
 
     let response: BatchOperationResponse<FolderDto> = result.into();
@@ -727,7 +751,10 @@ pub async fn download_batch(
     if combined_size > MAX_BATCH_SIZE {
         return Err((
             StatusCode::BAD_REQUEST,
-            format!("Batch size {} exceeds maximum of {}", combined_size, MAX_BATCH_SIZE),
+            format!(
+                "Batch size {} exceeds maximum of {}",
+                combined_size, MAX_BATCH_SIZE
+            ),
         ));
     }
 
@@ -737,7 +764,10 @@ pub async fn download_batch(
         .await
         .map_err(|e| {
             tracing::error!("Batch download ZIP failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, "Batch download failed".to_string())
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Batch download failed".to_string(),
+            )
         })?;
 
     // Read file size for Content-Length before splitting ownership

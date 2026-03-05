@@ -325,9 +325,7 @@ impl FileReadPort for FileBlobReadRepository {
             .fetch_all(self.pool.as_ref())
             .await
         }
-        .map_err(|e| {
-            DomainError::internal_error("FileBlobRead", format!("list_for_owner: {e}"))
-        })?;
+        .map_err(|e| DomainError::internal_error("FileBlobRead", format!("list_for_owner: {e}")))?;
 
         rows.into_iter()
             .map(|(id, name, fid, fpath, size, mime, ca, ma, uid)| {

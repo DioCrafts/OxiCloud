@@ -202,10 +202,7 @@ impl ShareStoragePort for SharePgRepository {
                 .await
                 .map_err(|e| {
                     tracing::error!("Database error deleting share for user: {}", e);
-                    DomainError::internal_error(
-                        "Share",
-                        format!("Failed to delete share: {e}"),
-                    )
+                    DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
                 })?;
 
         if result.rows_affected() == 0 {
@@ -242,10 +239,7 @@ impl ShareStoragePort for SharePgRepository {
         .await
         .map_err(|e| {
             tracing::error!("Database error finding shares by item for user: {}", e);
-            DomainError::internal_error(
-                "Share",
-                format!("Failed to find shares by item: {e}"),
-            )
+            DomainError::internal_error("Share", format!("Failed to find shares by item: {e}"))
         })?;
 
         rows.iter().map(Self::row_to_entity).collect()
