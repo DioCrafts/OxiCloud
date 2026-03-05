@@ -37,6 +37,7 @@ dotenvy = "0.15.7"
 moka = { version = "0.12", features = ["future", "sync"] }
 http-range-header = "0.4"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+kamadak-exif = "0.5"
 md-5 = "0.10"
 sha2 = "0.10.9"
 blake3 = { version = "1.8.3", features = ["rayon"] }

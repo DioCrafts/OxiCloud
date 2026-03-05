@@ -271,7 +271,7 @@ function cacheElements() {
     elements.pageTitle = document.querySelector('.page-title');
     elements.actionsBar = document.querySelector('.actions-bar');
     elements.navItems = document.querySelectorAll('.nav-item');
-    elements.trashBtn = document.querySelector('.nav-item:nth-child(5)'); // The trash nav item
+    elements.trashBtn = document.querySelector('.nav-item:nth-child(6)'); // The trash nav item (after Photos)
     elements.searchInput = document.querySelector('.search-container input');
 }
 
@@ -436,7 +436,13 @@ function setupEventListeners() {
                 switchToRecentFilesView();
                 return;
             }
-            
+
+            // Check if this is the photos item
+            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.photos') {
+                switchToPhotosView();
+                return;
+            }
+
             // Check if this is the trash item
             if (item === elements.trashBtn) {
                 // Hide shared view if active

@@ -73,7 +73,8 @@ const VIEW_FLAGS = {
     'shared': 'isSharedView',
     'recent': 'isRecentView',
     'favorites': 'isFavoritesView',
-    'trash': 'isTrashView'
+    'trash': 'isTrashView',
+    'photos': 'isPhotosView'
 };
 
 /**
@@ -113,6 +114,11 @@ function setCurrentSection(section) {
     // Hide sharedView when switching to any other section
     if (section !== 'shared' && window.sharedView) {
         window.sharedView.hide();
+    }
+
+    // Hide photosView when switching to any other section
+    if (section !== 'photos' && window.photosView) {
+        window.photosView.hide();
     }
 }
 
@@ -223,7 +229,30 @@ function switchToRecentFilesView() {
     }
 }
 
+function switchToPhotosView() {
+    setCurrentSection('photos');
+
+    // Hide breadcrumb
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
+
+    // Hide actions-bar (photos has its own upload via selection bar)
+    window.setActionsBarMode('hidden');
+
+    // Hide file containers
+    const filesGrid = document.getElementById('files-grid');
+    const filesListView = document.getElementById('files-list-view');
+    if (filesGrid) filesGrid.style.display = 'none';
+    if (filesListView) filesListView.style.display = 'none';
+
+    // Show photos view
+    if (window.photosView) {
+        window.photosView.show();
+    }
+}
+
 window.switchToFilesView = switchToFilesView;
 window.switchToSharedView = switchToSharedView;
 window.switchToFavoritesView = switchToFavoritesView;
 window.switchToRecentFilesView = switchToRecentFilesView;
+window.switchToPhotosView = switchToPhotosView;

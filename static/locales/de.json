@@ -8,7 +8,16 @@
     "shared": "Geteilt",
     "recent": "Zuletzt verwendet",
     "favorites": "Favoriten",
+    "photos": "Fotos",
     "trash": "Papierkorb"
+  },
+  "photos": {
+    "empty_state": "Noch keine Fotos",
+    "empty_hint": "Laden Sie Bilder oder Videos hoch, um sie hier zu sehen",
+    "items_selected": "ausgewählt",
+    "view_daily": "Tag",
+    "view_monthly": "Monat",
+    "view_yearly": "Jahr"
   },
   "actions": {
     "search": "Dateien suchen...",

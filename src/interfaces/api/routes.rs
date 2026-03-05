@@ -146,6 +146,7 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/upload", post(FileHandler::upload_file_with_thumbnails))
         .route("/{id}", get(FileHandler::download_file))
         .route("/{id}/thumbnail/{size}", get(FileHandler::get_thumbnail))
+        .route("/{id}/metadata", get(FileHandler::get_file_metadata))
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)) // 10 GB for file uploads
         .with_state(app_state.clone());
 
@@ -307,6 +308,17 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
         .nest("/shares", share_router)
         .nest("/favorites", favorites_router)
         .nest("/recent", recent_router);
+
+    // Photos timeline endpoint — lists all image/video files sorted by capture date
+    {
+        use crate::interfaces::api::handlers::photos_handler;
+
+        let photos_router = Router::new()
+            .route("/", get(photos_handler::list_photos))
+            .with_state(app_state.clone());
+
+        router = router.nest("/photos", photos_router);
+    }
 
     // Re-enable trash routes to make the trash view work
     if let Some(_trash_service_ref) = trash_service.clone() {

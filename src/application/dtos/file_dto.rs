@@ -51,6 +51,11 @@ pub struct FileDto {
     /// Owner user ID (omitted from JSON when None)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner_id: Option<String>,
+
+    /// Sort date for Photos timeline — COALESCE(EXIF captured_at, created_at).
+    /// Only populated by the /api/photos endpoint.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_date: Option<u64>,
 }
 
 impl From<File> for FileDto {
@@ -73,6 +78,7 @@ impl From<File> for FileDto {
             category: Arc::from(category_for(name, mime)),
             size_formatted: format_file_size(size),
             owner_id: file.owner_id().map(String::from),
+            sort_date: None,
         }
     }
 }
@@ -112,6 +118,7 @@ impl FileDto {
             category: Arc::from("Document"),
             size_formatted: "0 Bytes".to_string(),
             owner_id: None,
+            sort_date: None,
         }
     }
 }

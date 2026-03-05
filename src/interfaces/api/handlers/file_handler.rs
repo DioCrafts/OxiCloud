@@ -605,7 +605,7 @@ impl FileHandler {
             Err(response) => return response.into_response(),
         };
 
-        // Generate thumbnails for supported images in background
+        // Generate thumbnails and extract EXIF metadata for supported images in background
         if state
             .core
             .thumbnail_service
@@ -615,6 +615,7 @@ impl FileHandler {
             let thumbnail_service = state.core.thumbnail_service.clone();
             let dedup_service = state.core.dedup_service.clone();
             let file_read = state.repositories.file_read_repository.clone();
+            let metadata_repo = state.repositories.file_metadata_repository.clone();
 
             tokio::spawn(async move {
                 // Resolve the actual blob path on disk (not the logical file path,
@@ -627,12 +628,76 @@ impl FileHandler {
                     }
                 };
                 let file_path = dedup_service.blob_path(&blob_hash);
+
+                // Extract EXIF metadata (reads only header bytes, very fast).
+                // Runs before thumbnail generation so the OS page cache is primed.
+                {
+                    use crate::infrastructure::services::exif_service::ExifService;
+                    match tokio::fs::read(&file_path).await {
+                        Ok(data) => {
+                            if let Some(meta) = ExifService::extract(&data)
+                                && let Err(e) = metadata_repo.upsert(&file_id, &meta).await
+                            {
+                                tracing::warn!("Failed to store EXIF for {}: {}", file_id, e);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to read file for EXIF extraction {}: {}",
+                                file_id,
+                                e
+                            );
+                        }
+                    }
+                }
+
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
                 thumbnail_service.generate_all_sizes_background(file_id, file_path);
             });
         }
 
         Self::created_json_response(&file).into_response()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  METADATA
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Returns EXIF/media metadata for a file.
+    ///
+    /// Used by the Photos lightbox and for testing EXIF extraction.
+    pub async fn get_file_metadata(
+        State(state): State<GlobalState>,
+        auth_user: AuthUser,
+        Path(file_id): Path<String>,
+    ) -> impl IntoResponse {
+        // Verify ownership
+        let file_read = &state.repositories.file_read_repository;
+        if let Err(e) = file_read.verify_file_owner(&file_id, &auth_user.id).await {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response();
+        }
+
+        let metadata_repo = &state.repositories.file_metadata_repository;
+        match metadata_repo.get(&file_id).await {
+            Ok(Some(meta)) => (StatusCode::OK, Json(meta)).into_response(),
+            Ok(None) => (
+                StatusCode::OK,
+                Json(serde_json::json!({
+                    "file_id": file_id,
+                    "message": "No EXIF metadata available"
+                })),
+            )
+                .into_response(),
+            Err(e) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+                .into_response(),
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -1,0 +1,303 @@
+/* Photos timeline view */
+.photos-container {
+    padding: 0;
+    display: none;
+}
+
+.photos-container.active {
+    display: block;
+}
+
+/* Toolbar with group mode toggle */
+.photos-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding: 8px 8px 4px;
+}
+
+/* Toggle buttons — wider for text labels */
+.photos-toolbar .toggle-btn {
+    width: auto;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Group header */
+.photos-day-header {
+    padding: 16px 8px 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.photos-day-header .photos-day-count {
+    font-weight: 400;
+    color: #94a3b8;
+    font-size: 13px;
+    margin-left: 8px;
+}
+
+/* Photo grid — base (daily mode) */
+.photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 4px;
+    padding: 0 8px;
+    margin-bottom: 16px;
+}
+
+/* Monthly mode — larger tiles, more breathing room */
+.photos-group-monthly .photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px;
+}
+
+.photos-group-monthly .photos-day-header {
+    font-size: 17px;
+    padding: 20px 8px 12px;
+}
+
+/* Yearly mode — smaller tiles, more items visible */
+.photos-group-yearly .photos-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px;
+}
+
+.photos-group-yearly .photos-day-header {
+    font-size: 20px;
+    padding: 24px 8px 14px;
+}
+
+/* Individual photo tile */
+.photo-tile {
+    position: relative;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #e2e8f0;
+}
+
+.photo-tile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.2s ease;
+}
+
+.photo-tile:hover img {
+    transform: scale(1.05);
+}
+
+/* Selection checkbox */
+.photo-tile .photo-check {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    background: rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 11px;
+    z-index: 2;
+}
+
+.photo-tile:hover .photo-check,
+.photo-tile.selected .photo-check {
+    opacity: 1;
+}
+
+.photo-tile.selected .photo-check {
+    background: #ff5e3a;
+    border-color: #ff5e3a;
+}
+
+.photo-tile.selected {
+    outline: 3px solid #ff5e3a;
+    outline-offset: -3px;
+}
+
+.photo-tile.selected img {
+    transform: scale(0.92);
+}
+
+/* Video badge */
+.photo-tile .video-badge {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 12px;
+    z-index: 2;
+}
+
+/* Duration badge for videos */
+.photo-tile .video-duration {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    font-size: 11px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    padding: 2px 6px;
+    border-radius: 4px;
+    z-index: 2;
+}
+
+/* Empty state */
+.photos-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 20px;
+    text-align: center;
+    color: #94a3b8;
+}
+
+.photos-empty i {
+    font-size: 56px;
+    margin-bottom: 16px;
+    color: #cbd5e1;
+}
+
+.photos-empty p {
+    margin: 4px 0;
+    font-size: 15px;
+}
+
+.photos-empty .photos-empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+/* Infinite scroll sentinel */
+.photos-sentinel {
+    height: 1px;
+    width: 100%;
+}
+
+/* Loading spinner */
+.photos-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    color: #94a3b8;
+    font-size: 14px;
+    gap: 8px;
+}
+
+.photos-loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Selection bar */
+.photos-selection-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    font-size: 14px;
+}
+
+.photos-selection-bar button {
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+
+.photos-selection-bar button:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.photos-selection-bar .selection-count {
+    font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        gap: 2px;
+        padding: 0 2px;
+        margin-bottom: 8px;
+    }
+
+    .photos-group-monthly .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    }
+
+    .photos-group-yearly .photos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    }
+
+    .photo-tile .photo-check {
+        opacity: 1;
+    }
+
+    .photos-day-header {
+        font-size: 14px;
+        padding: 10px 4px 6px;
+    }
+
+    .photos-toolbar {
+        padding: 6px 4px 2px;
+    }
+}
+
+/* Dark theme */
+[data-theme="dark"] .photos-day-header {
+    color: #e2e8f0;
+}
+
+[data-theme="dark"] .photo-tile {
+    background: #334155;
+}
+
+[data-theme="dark"] .photos-empty i {
+    color: #475569;
+}
+
+[data-theme="dark"] .photos-empty .photos-empty-title {
+    color: #94a3b8;
+}
+
+[data-theme="dark"] .photos-empty p {
+    color: #64748b;
+}

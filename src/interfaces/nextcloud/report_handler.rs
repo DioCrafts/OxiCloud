@@ -265,6 +265,7 @@ fn file_dto_from_search(fr: &crate::application::dtos::search_dto::SearchFileRes
         category: category_for(&fr.name, &fr.mime_type).to_string().into(),
         size_formatted: format_file_size(fr.size),
         owner_id: None,
+        sort_date: None,
     }
 }
 

@@ -173,6 +173,7 @@ impl PathResolverService {
                     category: Arc::from(category_for(&name, &mime)),
                     size_formatted: format_file_size(sz),
                     owner_id: uid,
+                    sort_date: None,
                 }))
             }
         }

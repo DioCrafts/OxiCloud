@@ -269,6 +269,17 @@ impl ThumbnailService {
             let img = image::load_from_memory(&data)
                 .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
+            // Apply EXIF orientation so thumbnails display correctly
+            let img = {
+                use crate::infrastructure::services::exif_service::{
+                    ExifService, apply_orientation,
+                };
+                let orientation = ExifService::extract(&data)
+                    .and_then(|m| m.orientation)
+                    .unwrap_or(1);
+                apply_orientation(img, orientation)
+            };
+
             // Calculate new dimensions preserving aspect ratio
             let (orig_width, orig_height) = (img.width(), img.height());
             let (new_width, new_height) = if orig_width > orig_height {
@@ -348,6 +359,17 @@ impl ThumbnailService {
                 // Full decode from the same in-memory buffer (no 2nd disk read)
                 let img = image::load_from_memory(&data)
                     .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+
+                // Apply EXIF orientation so thumbnails display correctly
+                let img = {
+                    use crate::infrastructure::services::exif_service::{
+                        ExifService, apply_orientation,
+                    };
+                    let orientation = ExifService::extract(&data)
+                        .and_then(|m| m.orientation)
+                        .unwrap_or(1);
+                    apply_orientation(img, orientation)
+                };
 
                 let (orig_w, orig_h) = (img.width(), img.height());
 
