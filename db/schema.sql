@@ -646,6 +646,28 @@ CREATE INDEX IF NOT EXISTS idx_shares_created_by ON storage.shares(created_by);
 
 COMMENT ON TABLE storage.shares IS 'Shared links for files and folders with token-based access';
 
+-- ── EXIF / media metadata for image and video files ─────────────────────
+-- Separate table keeps storage.files lean (most files aren't images).
+-- Populated at upload time by the ExifService.
+CREATE TABLE IF NOT EXISTS storage.file_metadata (
+    file_id     UUID PRIMARY KEY REFERENCES storage.files(id) ON DELETE CASCADE,
+    captured_at TIMESTAMP WITH TIME ZONE,    -- EXIF DateTimeOriginal
+    latitude    DOUBLE PRECISION,            -- GPS latitude (decimal degrees)
+    longitude   DOUBLE PRECISION,            -- GPS longitude (decimal degrees)
+    camera_make TEXT,                         -- EXIF Make
+    camera_model TEXT,                        -- EXIF Model
+    orientation SMALLINT,                     -- EXIF Orientation (1-8)
+    width       INTEGER,                      -- Original pixel width
+    height      INTEGER,                      -- Original pixel height
+    created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- For the Photos timeline: ORDER BY captured_at DESC with cursor pagination
+CREATE INDEX IF NOT EXISTS idx_file_metadata_captured
+    ON storage.file_metadata(captured_at DESC) WHERE captured_at IS NOT NULL;
+
+COMMENT ON TABLE storage.file_metadata IS 'EXIF and media metadata extracted at upload time';
+
 -- ── Atomic recursive folder copy (WebDAV COPY Depth: infinity) ──────────
 --
 -- Copies the entire subtree rooted at `p_source_id` under `p_target_parent_id`.

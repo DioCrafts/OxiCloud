@@ -24,7 +24,7 @@ use crate::common::config::AppConfig;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::SharePgRepository;
 use crate::infrastructure::repositories::pg::{
-    FileBlobReadRepository, FileBlobWriteRepository, FolderDbRepository, TrashDbRepository,
+    FileBlobReadRepository, FileBlobWriteRepository, FileMetadataRepository, FolderDbRepository, TrashDbRepository,
 };
 use crate::infrastructure::services::file_content_cache::{
     FileContentCache, FileContentCacheConfig,
@@ -214,6 +214,9 @@ impl AppServiceFactory {
             None
         };
 
+        // File metadata repository — EXIF/media metadata for images
+        let file_metadata_repository = Arc::new(FileMetadataRepository::new(db_pool.clone()));
+
         tracing::info!(
             "Repository services initialized with 100% blob storage model (PG metadata + DedupService blobs)"
         );
@@ -223,6 +226,7 @@ impl AppServiceFactory {
             folder_repo_concrete,
             file_read_repository,
             file_write_repository,
+            file_metadata_repository,
             i18n_repository,
             trash_repository,
         }
@@ -815,6 +819,7 @@ pub struct RepositoryServices {
     pub folder_repo_concrete: Arc<FolderDbRepository>,
     pub file_read_repository: Arc<FileBlobReadRepository>,
     pub file_write_repository: Arc<FileBlobWriteRepository>,
+    pub file_metadata_repository: Arc<FileMetadataRepository>,
     pub i18n_repository: Arc<FileSystemI18nService>,
     pub trash_repository: Option<Arc<TrashDbRepository>>,
 }

@@ -146,6 +146,7 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/upload", post(FileHandler::upload_file_with_thumbnails))
         .route("/{id}", get(FileHandler::download_file))
         .route("/{id}/thumbnail/{size}", get(FileHandler::get_thumbnail))
+        .route("/{id}/metadata", get(FileHandler::get_file_metadata))
         .layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)) // 10 GB for file uploads
         .with_state(app_state.clone());
 
