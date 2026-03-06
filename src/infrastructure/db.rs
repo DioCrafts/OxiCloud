@@ -204,49 +204,55 @@ async fn apply_schema(pool: &PgPool) -> Result<()> {
 /// - Single-quoted strings (`'...'`)
 /// - Line comments (`-- ...`)
 /// - Block comments (`/* ... */`)
+///
+/// Uses byte-level iteration over the `&str` directly — no intermediate
+/// `Vec<char>` allocation (saves ~4× the input size in heap memory).
+/// SQL is ASCII-safe, so byte comparison is sufficient for all delimiters.
 fn split_sql_statements(sql: &str) -> Vec<String> {
     let mut statements = Vec::new();
     let mut current = String::new();
-    let chars: Vec<char> = sql.chars().collect();
-    let len = chars.len();
+    let bytes = sql.as_bytes();
+    let len = bytes.len();
     let mut i = 0;
 
     while i < len {
+        let b = bytes[i];
+
         // Line comment
-        if i + 1 < len && chars[i] == '-' && chars[i + 1] == '-' {
-            while i < len && chars[i] != '\n' {
-                current.push(chars[i]);
+        if b == b'-' && i + 1 < len && bytes[i + 1] == b'-' {
+            while i < len && bytes[i] != b'\n' {
+                current.push(bytes[i] as char);
                 i += 1;
             }
             continue;
         }
 
         // Block comment
-        if i + 1 < len && chars[i] == '/' && chars[i + 1] == '*' {
-            current.push(chars[i]);
-            current.push(chars[i + 1]);
+        if b == b'/' && i + 1 < len && bytes[i + 1] == b'*' {
+            current.push('/');
+            current.push('*');
             i += 2;
-            while i + 1 < len && !(chars[i] == '*' && chars[i + 1] == '/') {
-                current.push(chars[i]);
+            while i + 1 < len && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
+                current.push(bytes[i] as char);
                 i += 1;
             }
             if i + 1 < len {
-                current.push(chars[i]);
-                current.push(chars[i + 1]);
+                current.push('*');
+                current.push('/');
                 i += 2;
             }
             continue;
         }
 
         // Single-quoted string
-        if chars[i] == '\'' {
-            current.push(chars[i]);
+        if b == b'\'' {
+            current.push('\'');
             i += 1;
             while i < len {
-                current.push(chars[i]);
-                if chars[i] == '\'' {
-                    if i + 1 < len && chars[i + 1] == '\'' {
-                        current.push(chars[i + 1]);
+                current.push(bytes[i] as char);
+                if bytes[i] == b'\'' {
+                    if i + 1 < len && bytes[i + 1] == b'\'' {
+                        current.push('\'');
                         i += 2;
                     } else {
                         i += 1;
@@ -260,32 +266,31 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
         }
 
         // Dollar-quoted string ($tag$...$tag$ or $$...$$)
-        if chars[i] == '$' {
-            let _start = i;
+        if b == b'$' {
             i += 1;
             let mut tag = String::from("$");
-            while i < len && (chars[i].is_alphanumeric() || chars[i] == '_') {
-                tag.push(chars[i]);
+            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
+                tag.push(bytes[i] as char);
                 i += 1;
             }
-            if i < len && chars[i] == '$' {
+            if i < len && bytes[i] == b'$' {
                 tag.push('$');
                 i += 1;
                 // We have a dollar-quote tag, find the closing tag
                 current.push_str(&tag);
+                let tag_bytes = tag.as_bytes();
                 loop {
                     if i >= len {
                         break;
                     }
-                    if chars[i] == '$' {
-                        let remaining = &sql[i..];
-                        if remaining.starts_with(&tag) {
-                            current.push_str(&tag);
-                            i += tag.len();
-                            break;
-                        }
+                    if bytes[i] == b'$' && i + tag_bytes.len() <= len
+                        && &bytes[i..i + tag_bytes.len()] == tag_bytes
+                    {
+                        current.push_str(&tag);
+                        i += tag_bytes.len();
+                        break;
                     }
-                    current.push(chars[i]);
+                    current.push(bytes[i] as char);
                     i += 1;
                 }
             } else {
@@ -296,7 +301,7 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
         }
 
         // Statement separator
-        if chars[i] == ';' {
+        if b == b';' {
             current.push(';');
             let trimmed = current.trim().to_string();
             if !trimmed.is_empty() && trimmed != ";" {
@@ -307,7 +312,7 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
             continue;
         }
 
-        current.push(chars[i]);
+        current.push(b as char);
         i += 1;
     }
 
