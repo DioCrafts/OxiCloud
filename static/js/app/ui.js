@@ -758,11 +758,12 @@ const ui = {
             const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
             const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
             const isPdf = ext === 'pdf';
-            if (!isImage && !isPdf && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+            const isViewable = self.isViewableFile(file) || isImage;
+            if (!isViewable && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
                 window.wopiEditor.openInModal(file.id, file.name, 'edit');
                 return;
             }
-            if (self.isViewableFile(file) || isImage) {
+            if (isViewable) {
                 if (window.inlineViewer) window.inlineViewer.openFile(file);
                 else window.fileOps.downloadFile(file.id, file.name);
             } else {
