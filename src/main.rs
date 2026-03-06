@@ -379,6 +379,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Without this Axum caps Multipart bodies at 2 MB.
     app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
 
+    // ── HTTP compression (gzip + Brotli) ─────────────────────────────────
+    // Negotiates the best encoding via Accept-Encoding.  Skips responses
+    // that are already compressed or wouldn't benefit (images, video, etc.).
+    // Compatible with a future reverse proxy — if the proxy sees
+    // `Content-Encoding` it will pass the response through untouched.
+    {
+        use tower_http::compression::CompressionLayer;
+        use tower_http::compression::predicate::{NotForContentType, Predicate, SizeAbove};
+
+        let predicate = SizeAbove::new(256)
+            .and(NotForContentType::GRPC)
+            .and(NotForContentType::IMAGES)
+            .and(NotForContentType::SSE)
+            .and(NotForContentType::const_new("application/octet-stream"))
+            .and(NotForContentType::const_new("application/zip"))
+            .and(NotForContentType::const_new("application/gzip"))
+            .and(NotForContentType::const_new("application/x-tar"))
+            .and(NotForContentType::const_new("application/pdf"))
+            .and(NotForContentType::const_new("video/"))
+            .and(NotForContentType::const_new("audio/"));
+
+        app = app.layer(CompressionLayer::new().compress_when(predicate));
+    }
+
     // ── Security headers ─────────────────────────────────────────────────
     // Applied globally so every response (API, static, DAV) carries them.
     use axum::http::HeaderValue;
