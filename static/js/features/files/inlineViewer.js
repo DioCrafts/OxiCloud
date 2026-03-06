@@ -151,17 +151,17 @@ class InlineViewer {
       this.createBlobUrlViewer(file, 'image', container, loader);
     } 
     else if (file.mime_type && file.mime_type === 'application/pdf') {
-      // Hide zoom controls for PDFs
+      // Hide zoom controls for PDFs (PDF.js has its own)
       controls.style.display = 'none';
-      
+
       // Show loading indicator
       const loader = document.createElement('div');
       loader.className = 'inline-viewer-loader';
       loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
       container.appendChild(loader);
-      
-      // Create PDF viewer using object tag with blob URL
-      this.createBlobUrlViewer(file, 'pdf', container, loader);
+
+      // Create PDF.js viewer
+      this.createPdfJsViewer(file, container, loader);
     } 
     else if (file.mime_type && this.isTextViewable(file.mime_type)) {
       // Hide zoom controls for text files
@@ -326,32 +326,6 @@ class InlineViewer {
           this.showErrorMessage(container);
         };
       } 
-      else if (type === 'pdf') {
-        console.log('Creating PDF viewer');
-        
-        // Create iframe for PDF (more reliable than object tag)
-        const iframe = document.createElement('iframe');
-        iframe.className = 'inline-viewer-pdf';
-        iframe.src = blobUrl;
-        iframe.setAttribute('allowfullscreen', 'true');
-        container.appendChild(iframe);
-        
-        // Monitor iframe for loading issues
-        setTimeout(() => {
-          if (!iframe.contentDocument || 
-              iframe.contentDocument.body.innerHTML === '') {
-            console.warn('PDF viewer might be having issues, adding fallback');
-            
-            // Add fallback embed
-            const embed = document.createElement('embed');
-            embed.className = 'inline-viewer-pdf-fallback';
-            embed.type = 'application/pdf';
-            embed.src = blobUrl;
-            container.appendChild(embed);
-          }
-        }, 2000);
-      }
-      
       // Store blob URL for cleaning up later
       this.currentBlobUrl = blobUrl;
     } 
@@ -367,6 +341,42 @@ class InlineViewer {
     }
   }
   
+  // Creates a PDF.js viewer using authenticated blob fetch
+  async createPdfJsViewer(file, container, loader) {
+    try {
+      // Fetch the PDF as a blob (authenticated)
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `/api/files/${file.id}?inline=true`, true);
+      xhr.responseType = 'blob';
+      xhr.withCredentials = true;
+
+      const blob = await new Promise((resolve, reject) => {
+        xhr.onload = function () {
+          if (this.status >= 200 && this.status < 300) resolve(this.response);
+          else reject(new Error(`HTTP ${this.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send();
+      });
+
+      const blobUrl = URL.createObjectURL(blob);
+      this.currentBlobUrl = blobUrl;
+
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+
+      // Create iframe pointing to PDF.js viewer with the blob URL
+      const iframe = document.createElement('iframe');
+      iframe.className = 'inline-viewer-pdf';
+      iframe.src = `/vendor/pdfjs/web/viewer.html?file=${encodeURIComponent(blobUrl)}`;
+      iframe.setAttribute('allowfullscreen', 'true');
+      container.appendChild(iframe);
+    } catch (error) {
+      console.error('Error creating PDF.js viewer:', error);
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+      this.showErrorMessage(container);
+    }
+  }
+
   // Creates an audio or video player using blob URL (authenticated fetch)
   async createMediaViewer(file, mediaType, container, loader) {
     try {
