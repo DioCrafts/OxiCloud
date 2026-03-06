@@ -163,6 +163,14 @@ class InlineViewer {
       // Create PDF.js viewer
       this.createPdfJsViewer(file, container, loader);
     } 
+    else if (this.isMarkdownFile(file.name)) {
+      controls.style.display = 'none';
+      const loader = document.createElement('div');
+      loader.className = 'inline-viewer-loader';
+      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      container.appendChild(loader);
+      this.createMarkdownViewer(file, container, loader);
+    }
     else if (file.mime_type && this.isTextViewable(file.mime_type)) {
       // Hide zoom controls for text files
       controls.style.display = 'none';
@@ -223,6 +231,74 @@ class InlineViewer {
     modal.classList.add('active');
   }
   
+  isMarkdownFile(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    return ['md', 'markdown', 'mdown', 'mkd'].includes(ext);
+  }
+
+  async loadScript(src) {
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  async loadStylesheet(href) {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  async createMarkdownViewer(file, container, loader) {
+    try {
+      // Lazy-load marked and highlight.js in parallel
+      await Promise.all([
+        this.loadScript('/vendor/marked/marked.min.js'),
+        this.loadScript('/vendor/highlightjs/highlight.min.js'),
+      ]);
+
+      // Load appropriate highlight.js theme
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      this.loadStylesheet(isDark
+        ? '/vendor/highlightjs/styles/github-dark.min.css'
+        : '/vendor/highlightjs/styles/github.min.css');
+
+      // Fetch markdown source
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+
+      // Parse and render
+      const html = marked.parse(text, { gfm: true, breaks: true });
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'inline-viewer-markdown';
+      wrapper.innerHTML = html;
+
+      // Sanitize: remove script tags
+      wrapper.querySelectorAll('script').forEach(el => el.remove());
+
+      // Apply syntax highlighting to code blocks
+      wrapper.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+      });
+
+      container.appendChild(wrapper);
+    } catch (error) {
+      console.error('Error creating markdown viewer:', error);
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+      this.showErrorMessage(container);
+    }
+  }
+
   // Check if a MIME type is text-viewable — delegates to window.isTextViewable
   isTextViewable(mimeType) {
     return window.isTextViewable ? window.isTextViewable(mimeType) : false;
