@@ -396,6 +396,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  script-src 'self'; \
                  style-src 'self'; \
                  img-src 'self' data: blob:; \
+                 media-src 'self' blob:; \
                  connect-src 'self'; \
                  font-src 'self' data:; \
                  frame-src *; \
