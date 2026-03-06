@@ -10,46 +10,42 @@ class InlineViewer {
   }
   
   setupViewer() {
-    // Create the viewer modal if it doesn't exist
-    if (document.getElementById('inline-viewer-modal')) {
-      return;
-    }
-    
     // Verify document.body exists
     if (!document.body) {
       console.warn('Document body not available yet for inline viewer, will retry later');
       setTimeout(() => this.setupViewer(), 200);
       return;
     }
-    
-    // Create modal container
-    const modal = document.createElement('div');
-    modal.id = 'inline-viewer-modal';
-    modal.className = 'inline-viewer-modal';
-    modal.innerHTML = `
-      <div class="inline-viewer-content">
-        <div class="inline-viewer-header">
-          <div class="inline-viewer-title">File Viewer</div>
-          <button class="inline-viewer-close"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="inline-viewer-container"></div>
-        <div class="inline-viewer-toolbar">
-          <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
-          <div class="inline-viewer-toolbar-right">
-            <button class="inline-viewer-fullscreen" title="Toggle Fullscreen (F)"><i class="fas fa-expand"></i></button>
-            <div class="inline-viewer-controls">
-              <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
-              <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand-arrows-alt"></i></button>
-              <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+
+    // Create the viewer modal if it doesn't exist
+    let modal = document.getElementById('inline-viewer-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'inline-viewer-modal';
+      modal.className = 'inline-viewer-modal';
+      modal.innerHTML = `
+        <div class="inline-viewer-content">
+          <div class="inline-viewer-header">
+            <div class="inline-viewer-title">File Viewer</div>
+            <button class="inline-viewer-close"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="inline-viewer-container"></div>
+          <div class="inline-viewer-toolbar">
+            <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
+            <div class="inline-viewer-toolbar-right">
+              <button class="inline-viewer-fullscreen" title="Toggle Fullscreen (F)"><i class="fas fa-expand"></i></button>
+              <div class="inline-viewer-controls">
+                <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+                <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand-arrows-alt"></i></button>
+                <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    // Add to document
-    document.body.appendChild(modal);
-    
+      `;
+      document.body.appendChild(modal);
+    }
+
     // Add event listeners
     modal.querySelector('.inline-viewer-close').addEventListener('click', () => {
       this.closeViewer();
@@ -602,22 +598,9 @@ class InlineViewer {
   }
   
   downloadFile(file) {
-    fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      })
-      .catch(err => console.error('Download error:', err));
+    if (window.fileOps && window.fileOps.downloadFile) {
+      window.fileOps.downloadFile(file.id, file.name);
+    }
   }
   
   zoomImage(factor) {
