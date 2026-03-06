@@ -40,6 +40,11 @@ pub fn nextcloud_routes_with_state(state: Arc<AppState>) -> Router<Arc<AppState>
     // Public routes — no auth required.
     let public = Router::new()
         .route("/status.php", get(status_handler::handle_status))
+        // NC connectivity check — app expects 204 to confirm server is reachable.
+        .route("/index.php/204", get(handle_connectivity_check))
+        // Bare /remote.php/dav — NC clients probe this to confirm WebDAV is available.
+        .route("/remote.php/dav", any(handle_dav_discovery))
+        .route("/remote.php/dav/", any(handle_dav_discovery))
         .route(
             "/index.php/login/v2",
             post(login_v2_handler::handle_login_initiate),
@@ -95,6 +100,10 @@ pub fn nextcloud_routes_with_state(state: Arc<AppState>) -> Router<Arc<AppState>
         .route(
             "/ocs/v2.php/apps/notifications/api/v2/push",
             post(ocs_handler::handle_notifications_push),
+        )
+        .route(
+            "/ocs/v2.php/apps/recommendations/api/v1/recommendations",
+            get(ocs_handler::handle_recommendations),
         )
         .route(
             "/ocs/v2.php/apps/files_sharing/api/v1/sharees",
@@ -253,4 +262,23 @@ async fn handle_dav_trashbin_root(
     trashbin_handler::handle_nc_trashbin(state, req, user_ext, String::new())
         .await
         .map_err(|e| e.into_response())
+}
+
+/// `GET /index.php/204` — NC app connectivity check. Returns 204 No Content.
+async fn handle_connectivity_check() -> Response {
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .body(Body::empty())
+        .unwrap()
+}
+
+/// Bare `/remote.php/dav` — NC clients (especially Android) probe this endpoint
+/// during server discovery to confirm WebDAV is available.
+async fn handle_dav_discovery() -> Response {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("DAV", "1, 3")
+        .header("Allow", "OPTIONS, GET, HEAD, PROPFIND")
+        .body(Body::empty())
+        .unwrap()
 }

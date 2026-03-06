@@ -532,6 +532,7 @@ const multiSelect = {
 
     _hookGlobalDeselect() {
         document.addEventListener('click', (e) => {
+            if (window.__rubberBandJustFinished) return;
             if (e.target.closest('.file-card, .file-item, .context-menu, .batch-action-bar, .list-header.selection-mode, .about-modal, .rename-dialog, .share-dialog, .confirm-dialog, .modal-overlay, input, button')) return;
             if (this.hasSelection) this.clear();
         });

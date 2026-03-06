@@ -1350,9 +1350,11 @@ function initRubberBandSelection() {
     container.addEventListener('mousedown', (e) => {
         // Only start if clicking empty area (not on a card, button, menu, input…)
         if (e.button !== 0) return; // left click only
-        if (e.target.closest('.file-card') || e.target.closest('.context-menu') ||
+        if (e.target.closest('.file-card') || e.target.closest('.file-item') ||
+            e.target.closest('.context-menu') ||
             e.target.closest('.upload-dropdown') || e.target.closest('button') ||
-            e.target.closest('input') || e.target.closest('.breadcrumb')) return;
+            e.target.closest('input') || e.target.closest('.breadcrumb') ||
+            e.target.closest('.list-header')) return;
 
         active = true;
         startX = e.clientX;
@@ -1420,9 +1422,16 @@ function initRubberBandSelection() {
     document.addEventListener('mouseup', () => {
         if (!active) return;
         active = false;
+        const hadSelection = selRect.style.display === 'block';
         selRect.style.display = 'none';
         // Update the batch bar after rubber band selection completes
         if (window.multiSelect) window.multiSelect._syncUI();
+        // Suppress the click event that follows mouseup so the global
+        // deselect handler doesn't immediately clear the selection.
+        if (hadSelection) {
+            window.__rubberBandJustFinished = true;
+            requestAnimationFrame(() => { window.__rubberBandJustFinished = false; });
+        }
     });
 }
 

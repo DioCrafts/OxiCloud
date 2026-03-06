@@ -7,6 +7,20 @@
 //! File paths are resolved by JOINing with `storage.folders.path` (the
 //! materialized path column), so no recursive CTEs or N+1 queries are needed.
 
+/// Row shape returned by media-file queries (avoids `clippy::type_complexity`).
+type MediaFileRow = (
+    String,         // id
+    String,         // name
+    Option<String>, // folder_id
+    Option<String>, // folder path
+    i64,            // size
+    String,         // mime_type
+    i64,            // created_at
+    i64,            // updated_at
+    Option<String>, // user_id
+    i64,            // sort_date
+);
+
 use bytes::Bytes;
 use futures::{Stream, TryStreamExt};
 use moka::sync::Cache;
@@ -156,18 +170,7 @@ impl FileBlobReadRepository {
         before: Option<i64>,
         limit: i64,
     ) -> Result<(Vec<File>, Vec<i64>), DomainError> {
-        let rows: Vec<(
-            String,         // id
-            String,         // name
-            Option<String>, // folder_id
-            Option<String>, // folder path
-            i64,            // size
-            String,         // mime_type
-            i64,            // created_at
-            i64,            // updated_at
-            Option<String>, // user_id
-            i64,            // sort_date
-        )> = sqlx::query_as(
+        let rows: Vec<MediaFileRow> = sqlx::query_as(
             r#"
             SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                    fi.size, fi.mime_type,

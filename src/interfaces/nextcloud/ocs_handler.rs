@@ -229,6 +229,19 @@ pub async fn handle_notifications_push() -> Response {
     Json(ocs_ok(200, json!({}))).into_response()
 }
 
+/// GET /ocs/v2.php/apps/recommendations/api/v1/recommendations
+///
+/// Returns recommended files. Stub that returns an empty list.
+pub async fn handle_recommendations() -> Response {
+    Json(json!({
+        "ocs": {
+            "meta": { "status": "ok", "statuscode": 200, "message": "OK" },
+            "data": []
+        }
+    }))
+    .into_response()
+}
+
 /// GET /ocs/v2.php/apps/files_sharing/api/v1/sharees?search={query}&itemType={type}
 ///
 /// Returns matching users for the sharing autocomplete UI.
