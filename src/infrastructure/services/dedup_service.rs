@@ -48,13 +48,6 @@ use crate::application::ports::dedup_ports::{
 };
 use crate::domain::errors::{DomainError, ErrorKind};
 
-/// Block size for BLAKE3 file hashing (1MB — optimal syscall/throughput ratio).
-const HASH_BLOCK_SIZE: usize = 1024 * 1024;
-
-/// Files larger than this threshold use multithreaded BLAKE3 hashing via
-/// `update_rayon()`, which splits the work across all available cores.
-const RAYON_HASH_THRESHOLD: u64 = 10 * 1024 * 1024; // 10 MB
-
 /// Chunk size for streaming file reads (256 KB)
 const STREAM_CHUNK_SIZE: usize = 256 * 1024;
 
@@ -175,12 +168,12 @@ impl DedupService {
 
     // ── Hash helpers ─────────────────────────────────────────────
 
-    /// Calculate BLAKE3 hash of content (~5× faster than SHA-256).
+    /// Calculate BLAKE3 hash of in-memory content (~5× faster than SHA-256).
     ///
-    /// For buffers larger than 10 MB the computation is parallelised across
+    /// For buffers larger than 128 KB the computation is parallelised across
     /// all available cores via `update_rayon()`.
     pub fn hash_bytes(content: &[u8]) -> String {
-        if content.len() as u64 > RAYON_HASH_THRESHOLD {
+        if content.len() > 128 * 1024 {
             let mut hasher = blake3::Hasher::new();
             hasher.update_rayon(content);
             hasher.finalize().to_hex().to_string()
@@ -194,33 +187,16 @@ impl DedupService {
     /// Runs entirely on `spawn_blocking` with synchronous I/O so the Tokio
     /// worker threads are never blocked by CPU-bound hashing.
     ///
-    /// For files larger than 10 MB the hash is computed with `update_rayon()`,
-    /// which splits the work across all available cores.  Smaller files use
-    /// sequential 1 MB reads for optimal syscall-to-throughput ratio.
+    /// Uses memory-mapped I/O (`update_mmap_rayon`) which avoids loading the
+    /// entire file into the heap.  The OS pages in data on demand and BLAKE3
+    /// parallelises the computation across all available cores via rayon.
+    /// Peak RAM for a 500 MB file is only a few MB of active pages instead
+    /// of the full 500 MB.
     pub async fn hash_file(path: &Path) -> std::io::Result<String> {
         let path = path.to_path_buf();
         tokio::task::spawn_blocking(move || {
-            let file_size = std::fs::metadata(&path)?.len();
             let mut hasher = blake3::Hasher::new();
-
-            if file_size > RAYON_HASH_THRESHOLD {
-                // Large file: read into memory and hash with all cores
-                let content = std::fs::read(&path)?;
-                hasher.update_rayon(&content);
-            } else {
-                // Small file: sequential streaming with 1 MB reads
-                use std::io::Read;
-                let mut file = std::fs::File::open(&path)?;
-                let mut buffer = vec![0u8; HASH_BLOCK_SIZE];
-                loop {
-                    let n = file.read(&mut buffer)?;
-                    if n == 0 {
-                        break;
-                    }
-                    hasher.update(&buffer[..n]);
-                }
-            }
-
+            hasher.update_mmap_rayon(&path)?;
             Ok(hasher.finalize().to_hex().to_string())
         })
         .await
