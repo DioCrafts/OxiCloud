@@ -118,6 +118,15 @@
 	background-color: #334155;
 }
 
+[data-theme="dark"] .language-selector-toggle .lang-code {
+	color: #cbd5e1;
+}
+
+[data-theme="dark"] .language-selector-toggle i,
+[data-theme="dark"] .language-selector-toggle .dropdown-arrow {
+	color: #94a3b8;
+}
+
 [data-theme="dark"] .language-selector-dropdown {
 	background-color: #1e293b;
 	border-color: #334155;

@@ -69,14 +69,15 @@ async function loadFiles(options = {}) {
 
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");
+            const _te = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
             elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
             elements.filesListView.innerHTML = `
                 <div class="list-header">
                     <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                    <div>Name</div>
-                    <div>Type</div>
-                    <div>Size</div>
-                    <div>Modified</div>
+                    <div data-i18n="files.name">${_te('files.name')}</div>
+                    <div data-i18n="files.type">${_te('files.type')}</div>
+                    <div data-i18n="files.size">${_te('files.size')}</div>
+                    <div data-i18n="files.modified">${_te('files.modified')}</div>
                 </div>
             `;
             return;
