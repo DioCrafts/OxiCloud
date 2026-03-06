@@ -52,7 +52,7 @@ impl FileHandler {
         multipart: Multipart,
     ) -> impl IntoResponse {
         match Self::upload_file_inner(&state, &auth_user, multipart).await {
-            Ok(file) => Self::created_json_response(&file).into_response(),
+            Ok((file, _blob_hash)) => Self::created_json_response(&file).into_response(),
             Err(response) => response.into_response(),
         }
     }
@@ -60,13 +60,16 @@ impl FileHandler {
     /// Core upload logic shared by [`Self::upload_file`] and
     /// [`Self::upload_file_with_thumbnails`].
     ///
-    /// Returns the typed `FileDto` on success so callers can use it
-    /// directly (e.g. for thumbnail generation) without re-parsing JSON.
+    /// Returns `(FileDto, blob_hash)` on success.  The blob hash is the
+    /// BLAKE3 digest computed during the hash-on-write spool and is
+    /// propagated without an extra database round-trip so that callers
+    /// (e.g. thumbnail generation) can resolve the physical blob path
+    /// immediately.
     async fn upload_file_inner(
         state: &GlobalState,
         auth_user: &AuthUser,
         mut multipart: Multipart,
-    ) -> Result<crate::application::dtos::file_dto::FileDto, Response<Body>> {
+    ) -> Result<(crate::application::dtos::file_dto::FileDto, String), Response<Body>> {
         let upload_service = &state.applications.file_upload_service;
         let mut folder_id: Option<String> = None;
 
@@ -106,11 +109,7 @@ impl FileHandler {
                 if let Some(ref fid) = folder_id {
                     use crate::application::ports::inbound::FolderUseCase;
                     let folder_service = &state.applications.folder_service;
-                    if folder_service
-                        .get_folder_owned(fid, &auth_user.id)
-                        .await
-                        .is_err()
-                    {
+                    if folder_service.get_folder_owned(fid, &auth_user.id).await.is_err() {
                         tracing::warn!(
                             "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
                             auth_user.username,
@@ -208,17 +207,18 @@ impl FileHandler {
                 // Empty file — use streaming path with the (empty) temp file
                 if total_size == 0 {
                     let hash = hasher.finalize().to_hex().to_string();
-                    return upload_service
+                    let dto = upload_service
                         .upload_file_streaming(
                             filename,
                             folder_id,
                             content_type,
                             &temp_path,
                             0,
-                            Some(hash),
+                            Some(hash.clone()),
                         )
                         .await
-                        .map_err(Self::domain_error_response);
+                        .map_err(Self::domain_error_response)?;
+                    return Ok((dto, hash));
                 }
 
                 // Finalize hash
@@ -256,7 +256,7 @@ impl FileHandler {
                         content_type,
                         &temp_path,
                         total_size,
-                        Some(hash),
+                        Some(hash.clone()),
                     )
                     .await
                 {
@@ -267,7 +267,7 @@ impl FileHandler {
                             total_size,
                             file.id
                         );
-                        return Ok(file);
+                        return Ok((file, hash));
                     }
                     Err(err) => {
                         let _ = tokio::fs::remove_file(&temp_path).await;
@@ -370,8 +370,10 @@ impl FileHandler {
                     .unwrap()
                     .into_response()
             }
-            Err(err) => AppError::internal_error(format!("Thumbnail generation failed: {}", err))
-                .into_response(),
+            Err(err) => {
+                AppError::internal_error(format!("Thumbnail generation failed: {}", err))
+                    .into_response()
+            }
         }
     }
 
@@ -544,7 +546,9 @@ impl FileHandler {
                     .unwrap()
                     .into_response(),
             },
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => {
+                AppError::from(err).into_response()
+            }
         }
     }
 
@@ -594,7 +598,9 @@ impl FileHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => {
+                AppError::from(err).into_response()
+            }
         }
     }
 
@@ -608,12 +614,14 @@ impl FileHandler {
         auth_user: AuthUser,
         multipart: Multipart,
     ) -> impl IntoResponse {
-        let file = match Self::upload_file_inner(&state, &auth_user, multipart).await {
-            Ok(f) => f,
+        let (file, blob_hash) = match Self::upload_file_inner(&state, &auth_user, multipart).await {
+            Ok(pair) => pair,
             Err(response) => return response.into_response(),
         };
 
-        // Generate thumbnails for supported images in background
+        // Generate thumbnails for supported images in background.
+        // The blob_hash was already computed during the hash-on-write spool,
+        // so we resolve the physical path directly — no extra DB round-trip.
         if state
             .core
             .thumbnail_service
@@ -621,29 +629,13 @@ impl FileHandler {
         {
             let file_id = file.id.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();
+            let file_path = state.core.dedup_service.blob_path(&blob_hash);
 
-            // Resolve physical blob path before spawning
-            match state
-                .repositories
-                .file_read_repository
-                .get_blob_hash(&file_id)
-                .await
-            {
-                Ok(blob_hash) => {
-                    let file_path = state.core.dedup_service.blob_path(&blob_hash);
-                    tokio::spawn(async move {
-                        tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                        thumbnail_service.generate_all_sizes_background(file_id, file_path);
-                    });
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "⚠️ Cannot generate thumbnails for {}: blob hash not found: {}",
-                        file_id,
-                        e
-                    );
-                }
-            }
+            tokio::spawn(async move {
+                tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
+                thumbnail_service
+                    .generate_all_sizes_background(file_id, file_path);
+            });
         }
 
         Self::created_json_response(&file).into_response()
@@ -723,7 +715,7 @@ impl FileHandler {
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -755,7 +747,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -775,7 +767,7 @@ impl FileHandler {
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -794,7 +786,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -853,7 +845,9 @@ impl FileHandler {
             })
             .collect();
 
-        format!("{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}")
+        format!(
+            "{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}"
+        )
     }
 
     /// Build a 201 Created JSON response.
