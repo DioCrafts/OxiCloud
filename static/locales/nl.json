@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "Minimalistisch cloudopslagsysteem"
   },
+  "upload": {
+    "uploading": "Uploaden…",
+    "uploading_folder": "📁 {{folder}} uploaden…",
+    "complete": "{{count}} / {{total}} geüpload",
+    "files_label": "bestanden"
+  },
   "nav": {
     "files": "Bestanden",
     "shared": "Gedeeld",
@@ -25,8 +31,6 @@
     "upload": "Uploaden",
     "upload_files": "Bestanden uploaden",
     "upload_folder": "Map uploaden",
-    "upload.uploading": "Uploaden...",
-    "upload.complete": "{count} / {total} geüpload",
     "rename": "Hernoemen",
     "move": "Verplaatsen naar...",
     "move_to": "Verplaatsen naar",
@@ -197,7 +201,8 @@
       "presentation": "Presentatie",
       "archive": "Archief",
       "installer": "Installatiebestand",
-      "code": "Code"
+      "code": "Code",
+      "markdown": "Markdown"
     }
   },
   "dialogs": {

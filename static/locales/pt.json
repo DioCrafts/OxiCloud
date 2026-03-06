@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "Sistema de armazenamento em nuvem minimalista"
   },
+  "upload": {
+    "uploading": "Enviando…",
+    "uploading_folder": "📁 Enviando {{folder}}…",
+    "complete": "{{count}} / {{total}} enviados",
+    "files_label": "arquivos"
+  },
   "nav": {
     "files": "Arquivos",
     "shared": "Compartilhados",
@@ -25,8 +31,6 @@
     "upload": "Enviar",
     "upload_files": "Enviar arquivos",
     "upload_folder": "Enviar pasta",
-    "upload.uploading": "Enviando...",
-    "upload.complete": "{count} / {total} enviados",
     "rename": "Renomear",
     "move": "Mover para...",
     "move_to": "Mover para",

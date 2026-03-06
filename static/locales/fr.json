@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "Système de stockage cloud minimaliste"
   },
+  "upload": {
+    "uploading": "Envoi en cours…",
+    "uploading_folder": "📁 Envoi de {{folder}}…",
+    "complete": "{{count}} / {{total}} envoyés",
+    "files_label": "fichiers"
+  },
   "nav": {
     "files": "Fichiers",
     "shared": "Partagés",
@@ -25,8 +31,6 @@
     "upload": "Téléverser",
     "upload_files": "Téléverser des fichiers",
     "upload_folder": "Téléverser un dossier",
-    "upload.uploading": "Envoi en cours...",
-    "upload.complete": "{count} / {total} envoyés",
     "rename": "Renommer",
     "move": "Déplacer vers...",
     "move_to": "Déplacer vers",
@@ -197,7 +201,8 @@
       "presentation": "Présentation",
       "archive": "Archive",
       "installer": "Installateur",
-      "code": "Code"
+      "code": "Code",
+      "markdown": "Markdown"
     }
   },
   "dialogs": {

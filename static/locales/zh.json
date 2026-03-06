@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "极简云存储系统"
   },
+  "upload": {
+    "uploading": "上传中…",
+    "uploading_folder": "📁 正在上传 {{folder}}…",
+    "complete": "{{count}} / {{total}} 已上传",
+    "files_label": "个文件"
+  },
   "nav": {
     "files": "文件",
     "shared": "共享",
@@ -25,8 +31,6 @@
     "upload": "上传",
     "upload_files": "上传文件",
     "upload_folder": "上传文件夹",
-    "upload.uploading": "上传中...",
-    "upload.complete": "{count} / {total} 已上传",
     "rename": "重命名",
     "move": "移动到...",
     "move_to": "移动到",
