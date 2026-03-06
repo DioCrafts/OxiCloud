@@ -158,14 +158,35 @@ impl DedupHandler {
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                // Collect all chunks
+                // Collect all chunks — explicit match to detect client disconnection
                 let mut chunks: Vec<Bytes> = Vec::new();
                 let mut total_size: usize = 0;
                 let mut field = field;
 
-                while let Ok(Some(chunk)) = field.chunk().await {
-                    total_size += chunk.len();
-                    chunks.push(chunk);
+                loop {
+                    match field.chunk().await {
+                        Ok(Some(chunk)) => {
+                            total_size += chunk.len();
+                            chunks.push(chunk);
+                        }
+                        Ok(None) => break,
+                        Err(e) => {
+                            tracing::warn!(
+                                "Connection lost during dedup upload (received {} bytes): {}",
+                                total_size,
+                                e
+                            );
+                            return Response::builder()
+                                .status(StatusCode::BAD_REQUEST)
+                                .header(header::CONTENT_TYPE, "application/json")
+                                .body(Body::from(format!(
+                                    r#"{{"error": "Connection lost during upload: {}"}}"#,
+                                    e
+                                )))
+                                .unwrap()
+                                .into_response();
+                        }
+                    }
                 }
 
                 if chunks.is_empty() {

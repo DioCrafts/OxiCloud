@@ -62,8 +62,12 @@ const fileOps = {
         return new Promise((resolve) => {
             const xhr = new XMLHttpRequest();
             const notif = window.notifications;
-            xhr.timeout = timeoutMs;
-            const hardDeadlineMs = Math.max(timeoutMs * 2, 180000);
+            // Do NOT set xhr.timeout — it is a TOTAL deadline from send() to
+            // response and would kill large uploads even while data is flowing.
+            // Instead we rely on the stall timer (no progress for N seconds)
+            // and a generous hard deadline that scales with file size.
+            xhr.timeout = 0;
+            const hardDeadlineMs = Math.max(timeoutMs * 4, 600000); // min 10 min
             let lastProgressPctSent = -1;
 
             let isSettled = false;
@@ -121,8 +125,8 @@ const fileOps = {
                 resetStallTimer();
                 if (e.lengthComputable) {
                     const pct = Math.round((e.loaded / e.total) * 100);
-                    // Throttle UI updates from very chatty progress events
-                    if (pct === 100 || pct - lastProgressPctSent >= 10) {
+                    // Throttle UI updates: every 2% for smooth progress on large files
+                    if (pct === 100 || pct - lastProgressPctSent >= 2) {
                         lastProgressPctSent = pct;
                         safeUpdateFile(pct, 'uploading');
                     }
@@ -320,7 +324,11 @@ const fileOps = {
                     file: file.name, size: file.size
                 });
 
-                const result = await this._uploadFileXHR(formData, batchId, file.name);
+                // Scale stall timeout with file size:
+                // base 120s + 60s per GB, so a 7 GB file gets ~540s stall limit
+                const sizeGB = file.size / (1024 * 1024 * 1024);
+                const dynamicTimeout = Math.max(120000, 120000 + Math.ceil(sizeGB) * 60000);
+                const result = await this._uploadFileXHR(formData, batchId, file.name, dynamicTimeout);
 
                 uploadedCount++;
 
