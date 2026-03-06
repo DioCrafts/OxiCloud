@@ -3,6 +3,24 @@ use crate::domain::services::path_service::StoragePath;
 // Re-export entity errors from the centralized module
 pub use super::entity_errors::{FileError, FileResult};
 
+/// Owned parts of a [`File`] entity, produced by [`File::into_parts()`].
+///
+/// Consuming a `File` into `FileParts` **moves** every field without cloning,
+/// eliminating 3-5 heap allocations that previously occurred when converting
+/// `File → FileDto` via `.to_string()` on each getter.
+pub struct FileParts {
+    pub id: String,
+    pub name: String,
+    pub storage_path: StoragePath,
+    pub path_string: String,
+    pub size: u64,
+    pub mime_type: String,
+    pub folder_id: Option<String>,
+    pub created_at: u64,
+    pub modified_at: u64,
+    pub owner_id: Option<String>,
+}
+
 /**
  * Represents a file in the system's domain model.
  *
@@ -165,6 +183,25 @@ impl File {
             modified_at,
             owner_id,
         })
+    }
+
+    /// Consume the entity and return all fields by ownership.
+    ///
+    /// Use this when converting `File` into a DTO to avoid cloning
+    /// every `String` field (saves 3-5 heap allocations per file).
+    pub fn into_parts(self) -> FileParts {
+        FileParts {
+            id: self.id,
+            name: self.name,
+            storage_path: self.storage_path,
+            path_string: self.path_string,
+            size: self.size,
+            mime_type: self.mime_type,
+            folder_id: self.folder_id,
+            created_at: self.created_at,
+            modified_at: self.modified_at,
+            owner_id: self.owner_id,
+        }
     }
 
     // Getters

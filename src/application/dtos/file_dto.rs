@@ -60,24 +60,30 @@ pub struct FileDto {
 
 impl From<File> for FileDto {
     fn from(file: File) -> Self {
-        let name = file.name();
-        let mime = file.mime_type();
-        let size = file.size();
+        // Consume the entity by moving all fields — zero heap allocations
+        // for id, name, path, folder_id, owner_id (previously 5× .to_string()).
+        let parts = file.into_parts();
+
+        let icon_class = Arc::from(icon_class_for(&parts.name, &parts.mime_type));
+        let icon_special_class = Arc::from(icon_special_class_for(&parts.name, &parts.mime_type));
+        let category = Arc::from(category_for(&parts.name, &parts.mime_type));
+        let size_formatted = format_file_size(parts.size);
+        let mime_type = Arc::from(parts.mime_type.as_str());
 
         Self {
-            id: file.id().to_string(),
-            name: name.to_string(),
-            path: file.path_string().to_string(),
-            size,
-            mime_type: Arc::from(mime),
-            folder_id: file.folder_id().map(String::from),
-            created_at: file.created_at(),
-            modified_at: file.modified_at(),
-            icon_class: Arc::from(icon_class_for(name, mime)),
-            icon_special_class: Arc::from(icon_special_class_for(name, mime)),
-            category: Arc::from(category_for(name, mime)),
-            size_formatted: format_file_size(size),
-            owner_id: file.owner_id().map(String::from),
+            id: parts.id,
+            name: parts.name,
+            path: parts.path_string,
+            size: parts.size,
+            mime_type,
+            folder_id: parts.folder_id,
+            created_at: parts.created_at,
+            modified_at: parts.modified_at,
+            icon_class,
+            icon_special_class,
+            category,
+            size_formatted,
+            owner_id: parts.owner_id,
             sort_date: None,
         }
     }
