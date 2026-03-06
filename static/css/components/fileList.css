@@ -13,6 +13,7 @@
 .list-header {
 	display: grid;
 	grid-template-columns: var(--files-list-columns);
+	column-gap: 12px;
 	padding: 15px;
 	font-weight: 600;
 	color: #2d3748;
@@ -24,6 +25,7 @@
 .file-item {
 	display: grid;
 	grid-template-columns: var(--files-list-columns);
+	column-gap: 12px;
 	padding: 12px 15px;
 	border-bottom: 1px solid #f0f0f0;
 	align-items: center;
@@ -332,6 +334,7 @@
 	border: 2px dashed #ffc107;
 }
 
+
 [data-theme="dark"] .files-list-view {
 	background-color: #1e293b;
 	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -380,3 +383,4 @@
 [data-theme="dark"] .file-item.drop-target {
 	background-color: rgba(255, 193, 7, 0.05);
 }
+

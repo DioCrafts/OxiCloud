@@ -39,7 +39,11 @@ pub async fn handle_preview(
 ) -> impl IntoResponse {
     // Parse the Nextcloud file ID — the NC app may append an instance suffix
     // (e.g. "00000326ocnca"), so strip non-digit characters first.
-    let numeric_part: String = params.file_id.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let numeric_part: String = params
+        .file_id
+        .chars()
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
     let nc_file_id: i64 = match numeric_part.parse() {
         Ok(id) => id,
         Err(_) => {

@@ -10,6 +10,19 @@ use tracing::error;
 use crate::common::errors::DomainError;
 use crate::infrastructure::services::exif_service::ExifMetadata;
 
+/// Row shape returned by metadata queries (avoids `clippy::type_complexity`).
+type MetadataRow = (
+    String,
+    Option<DateTime<Utc>>,
+    Option<f64>,
+    Option<f64>,
+    Option<String>,
+    Option<String>,
+    Option<i16>,
+    Option<i32>,
+    Option<i32>,
+);
+
 /// Metadata as stored/retrieved from the database.
 #[derive(Debug, Clone, Serialize)]
 pub struct StoredMetadata {
@@ -73,17 +86,7 @@ impl FileMetadataRepository {
 
     /// Get metadata for a single file.
     pub async fn get(&self, file_id: &str) -> Result<Option<StoredMetadata>, DomainError> {
-        let row: Option<(
-            String,
-            Option<DateTime<Utc>>,
-            Option<f64>,
-            Option<f64>,
-            Option<String>,
-            Option<String>,
-            Option<i16>,
-            Option<i32>,
-            Option<i32>,
-        )> = sqlx::query_as(
+        let row: Option<MetadataRow> = sqlx::query_as(
             r#"
             SELECT file_id::text, captured_at, latitude, longitude,
                    camera_make, camera_model, orientation, width, height
@@ -135,17 +138,7 @@ impl FileMetadataRepository {
             return Ok(HashMap::new());
         }
 
-        let rows: Vec<(
-            String,
-            Option<DateTime<Utc>>,
-            Option<f64>,
-            Option<f64>,
-            Option<String>,
-            Option<String>,
-            Option<i16>,
-            Option<i32>,
-            Option<i32>,
-        )> = sqlx::query_as(
+        let rows: Vec<MetadataRow> = sqlx::query_as(
             r#"
             SELECT file_id::text, captured_at, latitude, longitude,
                    camera_make, camera_model, orientation, width, height
