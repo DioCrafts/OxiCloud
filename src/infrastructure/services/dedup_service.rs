@@ -244,7 +244,7 @@ impl DedupService {
         // both produce identical files.  The rename is atomic on the
         // same filesystem; if it fails because the other writer won,
         // we just discard our temp file — the blob is already there.
-        if !blob_path.exists() {
+        if !fs::try_exists(&blob_path).await.unwrap_or(false) {
             // Parent directory (xx/) guaranteed to exist — created by initialize()
             let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
             fs::write(&temp_path, content).await.map_err(|e| {
@@ -342,7 +342,7 @@ impl DedupService {
         //
         // If the blob file already exists on disk, the source is simply
         // deleted — the file content is identical by definition.
-        if blob_path.exists() {
+        if fs::try_exists(&blob_path).await.unwrap_or(false) {
             // Blob already on disk — discard the source file
             let _ = fs::remove_file(source_path).await;
         } else {
@@ -361,7 +361,7 @@ impl DedupService {
                         )
                     })?;
                     let _ = fs::remove_file(source_path).await;
-                } else if blob_path.exists() {
+                } else if fs::try_exists(&blob_path).await.unwrap_or(false) {
                     // Another writer may have placed the blob concurrently
                     let _ = fs::remove_file(source_path).await;
                     tracing::debug!("Blob file placed by concurrent writer: {}", e);
