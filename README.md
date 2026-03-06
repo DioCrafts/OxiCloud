@@ -153,13 +153,13 @@ Clean / Hexagonal architecture — each layer depends only on the one below:
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  Interfaces    │ REST API, WebDAV, CalDAV, CardDAV, WOPI     │
+│  Interfaces    │ REST API, WebDAV, CalDAV, CardDAV, WOPI      │
 ├───────────────────────────────────────────────────────────────┤
-│  Application   │ Use cases, DTOs, port definitions           │
+│  Application   │ Use cases, DTOs, port definitions            │
 ├───────────────────────────────────────────────────────────────┤
-│  Domain        │ Entities, business rules, repository traits │
+│  Domain        │ Entities, business rules, repository traits  │
 ├───────────────────────────────────────────────────────────────┤
-│  Infrastructure│ PostgreSQL, filesystem, caching, auth       │
+│  Infrastructure│ PostgreSQL, filesystem, caching, auth        │
 └───────────────────────────────────────────────────────────────┘
 ```
 
