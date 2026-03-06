@@ -1,0 +1,12 @@
+# ── Build-time CPU optimisation ────────────────────────────────────────
+# Compile for the host CPU so BLAKE3 SIMD (AVX2 / AVX-512 / NEON),
+# image processing and crypto routines use the fastest available
+# instructions.  Works on x86-64 (Intel/AMD) and ARM (Apple Silicon,
+# Raspberry Pi) — the compiler auto-detects the local CPU features.
+#
+# NOTE: the resulting binary is NOT portable to CPUs with fewer
+# features than the build host.  For portable Docker images, override
+# with:  RUSTFLAGS="-C target-cpu=x86-64-v3"  (AVX2, most servers).
+
+[target.'cfg(any(target_arch = "x86_64", target_arch = "aarch64"))']
+rustflags = ["-C", "target-cpu=native"]

@@ -17,8 +17,9 @@
 *.su
 *.idb
 
-# Build cache
-.cargo/
+# Build cache (keep .cargo/config.toml for project build settings)
+.cargo/*
+!.cargo/config.toml
 
 # Visual Studio Code directory
 .vscode/
