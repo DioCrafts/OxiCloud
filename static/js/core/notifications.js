@@ -204,21 +204,34 @@ const notifications = (() => {
 
         if (status === 'error') batch.errorCount = (batch.errorCount || 0) + 1;
 
-        // Only update the current-file label (single DOM element)
-        const curEl = $(batchId + '-current');
-        if (curEl && status === 'uploading') {
+        // Update the current-file label AND progress bar during upload
+        if (status === 'uploading') {
             const now = Date.now();
             const fileChanged = batch.lastLabelFile !== fileName;
+            // Throttle DOM updates to avoid reflow storms (every 300ms or on file change)
             const shouldUpdate = fileChanged || now - (batch.lastLabelUpdateTs || 0) >= 300 || pct >= 100;
             if (!shouldUpdate) return;
 
             // Show just the file name being uploaded (truncate long paths)
-            const shortName = fileName.length > 50
-                ? '…' + fileName.slice(-49)
-                : fileName;
-            curEl.textContent = shortName;
+            const curEl = $(batchId + '-current');
+            if (curEl) {
+                const shortName = fileName.length > 50
+                    ? '…' + fileName.slice(-49)
+                    : fileName;
+                curEl.textContent = shortName;
+            }
             batch.lastLabelFile = fileName;
             batch.lastLabelUpdateTs = now;
+
+            // Update progress bar with per-file granularity:
+            // overall% = (completed_files + current_file_fraction) / total_files
+            const overallPct = Math.round(
+                ((batch.completed + (pct / 100)) / batch.totalFiles) * 100
+            );
+            const fillEl  = $(batchId + '-fill');
+            const pctEl   = $(batchId + '-pct');
+            if (fillEl) fillEl.style.width = overallPct + '%';
+            if (pctEl)  pctEl.textContent  = overallPct + '%';
         }
     }
 

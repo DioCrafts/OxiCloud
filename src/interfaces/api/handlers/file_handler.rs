@@ -106,11 +106,7 @@ impl FileHandler {
                 if let Some(ref fid) = folder_id {
                     use crate::application::ports::inbound::FolderUseCase;
                     let folder_service = &state.applications.folder_service;
-                    if folder_service
-                        .get_folder_owned(fid, &auth_user.id)
-                        .await
-                        .is_err()
-                    {
+                    if folder_service.get_folder_owned(fid, &auth_user.id).await.is_err() {
                         tracing::warn!(
                             "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
                             auth_user.username,
@@ -169,12 +165,26 @@ impl FileHandler {
                     // 512 KB buffer — 8× fewer write syscalls than 64 KB
                     let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
                     let mut field = field;
-                    while let Ok(Some(chunk)) = field.chunk().await {
-                        total_size += chunk.len() as u64;
-                        hasher.update(&chunk);
-                        tokio::io::AsyncWriteExt::write_all(&mut writer, &chunk)
-                            .await
-                            .map_err(|e| format!("Failed to write chunk: {}", e))?;
+                    // IMPORTANT: use explicit match instead of `while let Ok(Some(..))`.
+                    // The old pattern silently swallowed Err (client disconnect)
+                    // and accepted partially received data as a complete upload.
+                    loop {
+                        match field.chunk().await {
+                            Ok(Some(chunk)) => {
+                                total_size += chunk.len() as u64;
+                                hasher.update(&chunk);
+                                tokio::io::AsyncWriteExt::write_all(&mut writer, &chunk)
+                                    .await
+                                    .map_err(|e| format!("Failed to write chunk: {}", e))?;
+                            }
+                            Ok(None) => break, // End of field — upload complete
+                            Err(e) => {
+                                return Err(format!(
+                                    "Connection lost during upload (received {} bytes): {}",
+                                    total_size, e
+                                ));
+                            }
+                        }
                     }
                     tokio::io::AsyncWriteExt::flush(&mut writer)
                         .await
@@ -326,28 +336,22 @@ impl FileHandler {
                 .into_response();
         }
 
-        // Resolve the actual blob path on disk (not the logical file path).
+        // Resolve the physical blob path (content-addressable storage)
         let blob_hash = match state
             .repositories
             .file_read_repository
             .get_blob_hash(&id)
             .await
         {
-            Ok(h) => h,
-            Err(err) => {
-                return (
-                    StatusCode::NOT_FOUND,
-                    Json(serde_json::json!({
-                        "error": format!("File content not found: {}", err)
-                    })),
-                )
-                    .into_response();
+            Ok(hash) => hash,
+            Err(_) => {
+                return AppError::internal_error("File blob not found").into_response();
             }
         };
-        let blob_path = state.core.dedup_service.blob_path(&blob_hash);
+        let file_path = state.core.dedup_service.blob_path(&blob_hash);
 
         match thumbnail_service
-            .get_thumbnail(&id, thumb_size.into(), &blob_path)
+            .get_thumbnail(&id, thumb_size.into(), &file_path)
             .await
         {
             Ok(data) => {
@@ -362,8 +366,10 @@ impl FileHandler {
                     .unwrap()
                     .into_response()
             }
-            Err(err) => AppError::internal_error(format!("Thumbnail generation failed: {}", err))
-                .into_response(),
+            Err(err) => {
+                AppError::internal_error(format!("Thumbnail generation failed: {}", err))
+                    .into_response()
+            }
         }
     }
 
@@ -536,7 +542,9 @@ impl FileHandler {
                     .unwrap()
                     .into_response(),
             },
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => {
+                AppError::from(err).into_response()
+            }
         }
     }
 
@@ -586,7 +594,9 @@ impl FileHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => {
+                AppError::from(err).into_response()
+            }
         }
     }
 
@@ -605,7 +615,7 @@ impl FileHandler {
             Err(response) => return response.into_response(),
         };
 
-        // Generate thumbnails and extract EXIF metadata for supported images in background
+        // Generate thumbnails for supported images in background
         if state
             .core
             .thumbnail_service
@@ -613,47 +623,30 @@ impl FileHandler {
         {
             let file_id = file.id.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();
-            let dedup_service = state.core.dedup_service.clone();
-            let file_read = state.repositories.file_read_repository.clone();
-            let metadata_repo = state.repositories.file_metadata_repository.clone();
 
-            tokio::spawn(async move {
-                // Resolve the actual blob path on disk (not the logical file path,
-                // which doesn't exist when using blob storage).
-                let blob_hash = match file_read.get_blob_hash(&file_id).await {
-                    Ok(h) => h,
-                    Err(e) => {
-                        tracing::warn!("Skipping thumbnails for {}: {}", file_id, e);
-                        return;
-                    }
-                };
-                let file_path = dedup_service.blob_path(&blob_hash);
-
-                // Extract EXIF metadata (reads only header bytes, very fast).
-                // Runs before thumbnail generation so the OS page cache is primed.
-                {
-                    use crate::infrastructure::services::exif_service::ExifService;
-                    match tokio::fs::read(&file_path).await {
-                        Ok(data) => {
-                            if let Some(meta) = ExifService::extract(&data)
-                                && let Err(e) = metadata_repo.upsert(&file_id, &meta).await
-                            {
-                                tracing::warn!("Failed to store EXIF for {}: {}", file_id, e);
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to read file for EXIF extraction {}: {}",
-                                file_id,
-                                e
-                            );
-                        }
-                    }
+            // Resolve physical blob path before spawning
+            match state
+                .repositories
+                .file_read_repository
+                .get_blob_hash(&file_id)
+                .await
+            {
+                Ok(blob_hash) => {
+                    let file_path = state.core.dedup_service.blob_path(&blob_hash);
+                    tokio::spawn(async move {
+                        tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
+                        thumbnail_service
+                            .generate_all_sizes_background(file_id, file_path);
+                    });
                 }
-
-                tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                thumbnail_service.generate_all_sizes_background(file_id, file_path);
-            });
+                Err(e) => {
+                    tracing::warn!(
+                        "⚠️ Cannot generate thumbnails for {}: blob hash not found: {}",
+                        file_id,
+                        e
+                    );
+                }
+            }
         }
 
         Self::created_json_response(&file).into_response()
@@ -674,9 +667,10 @@ impl FileHandler {
         // Verify ownership
         let file_read = &state.repositories.file_read_repository;
         if let Err(e) = file_read.verify_file_owner(&file_id, &auth_user.id).await {
+            let msg = e.to_string();
             return (
                 StatusCode::NOT_FOUND,
-                Json(serde_json::json!({ "error": e.to_string() })),
+                Json(serde_json::json!({ "error": msg })),
             )
                 .into_response();
         }
@@ -732,7 +726,7 @@ impl FileHandler {
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -764,7 +758,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -784,7 +778,7 @@ impl FileHandler {
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -803,7 +797,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response(),
+            Err(err) => AppError::from(err).into_response()
         }
     }
 
@@ -867,7 +861,9 @@ impl FileHandler {
             })
             .collect();
 
-        format!("{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}")
+        format!(
+            "{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}"
+        )
     }
 
     /// Build a 201 Created JSON response.

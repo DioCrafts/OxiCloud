@@ -177,6 +177,43 @@ This document contains the task list for the development of OxiCloud, a minimali
 - [x] Add content-aware compression by file format
 - [ ] Implement dynamic thumbnail resizing based on viewport
 
+### Bandwidth & Transfer Optimization
+- [ ] **Sub-file chunked dedup (Restic/Borg style)**
+  - [ ] Implement Content-Defined Chunking (CDC) with FastCDC/Rabin rolling hash
+  - [ ] Variable-size chunks (target 1-4 MB) instead of whole-file blobs
+  - [ ] Per-chunk BLAKE3 hashing and dedup (saves storage + bandwidth on similar files)
+  - [ ] Chunk-level Zstd compression (better ratio than whole-file)
+  - [ ] Migrate existing whole-file blobs to chunked storage
+- [ ] **Delta sync / rsync-style transfers**
+  - [ ] Implement rolling checksum algorithm for block-level diffing
+  - [ ] Client sends only changed blocks on re-upload (not the full file)
+  - [ ] Server-side block assembly from delta + existing chunks
+  - [ ] Huge savings for large files with small edits (VMs, databases, ISOs)
+- [ ] **Resumable uploads & downloads (RFC 7233 / tus.io)**
+  - [ ] Server tracks partial upload state; client resumes from last byte on failure
+  - [ ] HTTP Range responses for download resume after network drops
+  - [ ] tus.io protocol support for cross-client compatibility
+- [ ] **Client-side optimization before upload**
+  - [ ] Resize images to configurable max dimensions before upload (e.g. 4K cap)
+  - [ ] Re-encode videos to efficient codec (H.265/AV1) client-side before upload
+  - [ ] ⚡ **HIGH IMPACT / QUICK WIN** — Pre-compute BLAKE3 hash client-side (WASM); query server before upload; skip transfer entirely if blob already exists (instant dedup, zero bandwidth)
+- [ ] **Server-side on-demand transcoding**
+  - [ ] Store originals; serve WebP/AVIF for images on request (saves download BW)
+  - [ ] Adaptive video streaming (HLS/DASH) from stored originals
+  - [ ] Lazy generation + cache of transcoded variants
+- [ ] **Smart sync (placeholder/on-demand files)**
+  - [ ] Sync client downloads metadata only; fetch file content on first open
+  - [ ] Pin/unpin files for offline availability
+  - [ ] Automatic eviction of least-recently-used local copies
+- [ ] **Transfer-level compression**
+  - [ ] Zstd streaming compression for HTTP responses (better than gzip for large files)
+  - [ ] Brotli for static assets; Zstd for dynamic/binary content
+  - [ ] Content-aware: skip compression for already-compressed formats (JPEG, ZIP, etc.)
+- [ ] **Batched & multiplexed operations**
+  - [ ] Batch small file uploads into single request (tar-stream or multipart bundle)
+  - [ ] HTTP/2 multiplexing for parallel chunk transfers on single connection
+  - [ ] Server-side ZIP streaming for multi-file download (already partial)
+
 ## Infrastructure and Deployment
 
 - [x] Create Docker configuration
