@@ -35,10 +35,13 @@ class InlineViewer {
         <div class="inline-viewer-container"></div>
         <div class="inline-viewer-toolbar">
           <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
-          <div class="inline-viewer-controls">
-            <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
-            <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand"></i></button>
-            <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+          <div class="inline-viewer-toolbar-right">
+            <button class="inline-viewer-fullscreen" title="Toggle Fullscreen (F)"><i class="fas fa-expand"></i></button>
+            <div class="inline-viewer-controls">
+              <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+              <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand-arrows-alt"></i></button>
+              <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+            </div>
           </div>
         </div>
       </div>
@@ -70,11 +73,26 @@ class InlineViewer {
     modal.querySelector('.inline-viewer-zoom-reset').addEventListener('click', () => {
       this.resetZoom();
     });
-    
-    // Close on ESC key
+
+    modal.querySelector('.inline-viewer-fullscreen').addEventListener('click', () => {
+      this.toggleFullscreen();
+    });
+
+    // Close on ESC key, toggle fullscreen on F key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('active')) {
-        this.closeViewer();
+      if (!modal.classList.contains('active')) return;
+      if (e.key === 'Escape') {
+        if (modal.querySelector('.inline-viewer-content').classList.contains('inline-viewer-fullscreen')) {
+          this.toggleFullscreen();
+        } else {
+          this.closeViewer();
+        }
+        return;
+      }
+      if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey
+          && document.activeElement.tagName !== 'INPUT'
+          && document.activeElement.tagName !== 'TEXTAREA') {
+        this.toggleFullscreen();
       }
     });
     
@@ -465,10 +483,24 @@ class InlineViewer {
     container.appendChild(message);
   }
   
+  toggleFullscreen() {
+    const content = document.querySelector('#inline-viewer-modal .inline-viewer-content');
+    const btn = document.querySelector('.inline-viewer-fullscreen i');
+    content.classList.toggle('inline-viewer-fullscreen');
+    const isFs = content.classList.contains('inline-viewer-fullscreen');
+    btn.className = isFs ? 'fas fa-compress' : 'fas fa-expand';
+  }
+
   closeViewer() {
     // Get modal
     const modal = document.getElementById('inline-viewer-modal');
-    
+
+    // Reset fullscreen state
+    const content = modal.querySelector('.inline-viewer-content');
+    content.classList.remove('inline-viewer-fullscreen');
+    const fsBtn = modal.querySelector('.inline-viewer-fullscreen i');
+    if (fsBtn) fsBtn.className = 'fas fa-expand';
+
     // Hide modal
     modal.classList.remove('active');
     

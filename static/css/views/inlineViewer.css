@@ -260,6 +260,42 @@
   outline: none;
 }
 
+/* Toolbar right group */
+.inline-viewer-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Fullscreen toggle button */
+button.inline-viewer-fullscreen {
+  background-color: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #64748b;
+  transition: all 0.2s;
+}
+
+button.inline-viewer-fullscreen:hover {
+  background-color: #e2e8f0;
+  color: #334155;
+}
+
+/* Fullscreen mode */
+.inline-viewer-content.inline-viewer-fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  border-radius: 0;
+  transition: all 0.2s ease;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .inline-viewer-content {
