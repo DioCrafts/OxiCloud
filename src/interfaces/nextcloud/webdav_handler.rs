@@ -277,8 +277,31 @@ async fn handle_get(
     user: &CurrentUser,
     subpath: &str,
 ) -> Result<Response<Body>, AppError> {
+    // GET on root folder — NC clients use this as an existence check
+    if subpath.is_empty() || subpath == "/" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("DAV", "1, 3")
+            .body(Body::empty())
+            .unwrap());
+    }
+
     let internal_path = nc_to_internal_path(&user.username, subpath)?;
     let file_service = &state.applications.file_retrieval_service;
+    let folder_service = &state.applications.folder_service;
+
+    // Check if path is a folder first (NC clients use GET as existence check)
+    if folder_service
+        .get_folder_by_path(&internal_path)
+        .await
+        .is_ok()
+    {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("DAV", "1, 3")
+            .body(Body::empty())
+            .unwrap());
+    }
 
     let file = file_service
         .get_file_by_path(&internal_path)
@@ -311,8 +334,31 @@ async fn handle_head(
     user: &CurrentUser,
     subpath: &str,
 ) -> Result<Response<Body>, AppError> {
+    // HEAD on root folder — NC clients use this as an existence check
+    if subpath.is_empty() || subpath == "/" {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("DAV", "1, 3")
+            .body(Body::empty())
+            .unwrap());
+    }
+
     let internal_path = nc_to_internal_path(&user.username, subpath)?;
     let file_service = &state.applications.file_retrieval_service;
+    let folder_service = &state.applications.folder_service;
+
+    // Check if path is a folder (NC clients use HEAD as existence check)
+    if folder_service
+        .get_folder_by_path(&internal_path)
+        .await
+        .is_ok()
+    {
+        return Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("DAV", "1, 3")
+            .body(Body::empty())
+            .unwrap());
+    }
 
     let file = file_service
         .get_file_by_path(&internal_path)
@@ -552,43 +598,75 @@ async fn handle_mkcol(
     use crate::application::dtos::folder_dto::CreateFolderDto;
 
     let folder_service = &state.applications.folder_service;
+    let internal_path = nc_to_internal_path(&user.username, subpath)?;
 
-    // Split into parent + new folder name.
-    let (parent_subpath, folder_name) = match subpath.rsplit_once('/') {
-        Some((parent, name)) => (parent, name),
-        None => ("", subpath),
-    };
-
-    let parent_internal = nc_to_internal_path(&user.username, parent_subpath)?;
-
-    // Resolve parent folder ID.
-    let parent_folder = folder_service
-        .get_folder_by_path(&parent_internal)
+    // If the folder already exists, return 405 per RFC 4918 §9.3.1
+    if folder_service
+        .get_folder_by_path(&internal_path)
         .await
-        .map_err(|_| AppError::not_found("Parent folder not found"))?;
-
-    let dto = CreateFolderDto {
-        name: folder_name.to_string(),
-        parent_id: Some(parent_folder.id.clone()),
-    };
-
-    match folder_service.create_folder(dto).await {
-        Ok(_) => Ok(Response::builder()
-            .status(StatusCode::CREATED)
+        .is_ok()
+    {
+        return Ok(Response::builder()
+            .status(StatusCode::METHOD_NOT_ALLOWED)
             .body(Body::empty())
-            .unwrap()),
-        Err(e) if e.message.contains("already exists") || e.message.contains("Already Exists") => {
-            // RFC 4918 §9.3.1: MKCOL on existing resource → 405
-            Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .body(Body::empty())
-                .unwrap())
-        }
-        Err(e) => Err(AppError::internal_error(format!(
-            "Failed to create folder: {}",
-            e
-        ))),
+            .unwrap());
     }
+
+    // Collect path segments that need to be created (walk from root to leaf)
+    let segments: Vec<&str> = subpath.split('/').filter(|s| !s.is_empty()).collect();
+
+    let user_root = nc_to_internal_path(&user.username, "")?;
+    let mut current_path = user_root.clone();
+    let mut parent_id = folder_service
+        .get_folder_by_path(&user_root)
+        .await
+        .map_err(|_| AppError::not_found("User root folder not found"))?
+        .id
+        .clone();
+
+    for segment in &segments {
+        current_path = format!("{}/{}", current_path, segment);
+        match folder_service.get_folder_by_path(&current_path).await {
+            Ok(existing) => {
+                parent_id = existing.id.clone();
+            }
+            Err(_) => {
+                let dto = CreateFolderDto {
+                    name: segment.to_string(),
+                    parent_id: Some(parent_id.clone()),
+                };
+                match folder_service.create_folder(dto).await {
+                    Ok(created) => {
+                        parent_id = created.id.clone();
+                    }
+                    Err(e)
+                        if e.message.contains("already exists")
+                            || e.message.contains("Already Exists") =>
+                    {
+                        // Race condition — folder created concurrently
+                        let folder = folder_service
+                            .get_folder_by_path(&current_path)
+                            .await
+                            .map_err(|_| {
+                                AppError::internal_error("Folder exists but cannot be found")
+                            })?;
+                        parent_id = folder.id.clone();
+                    }
+                    Err(e) => {
+                        return Err(AppError::internal_error(format!(
+                            "Failed to create folder: {}",
+                            e
+                        )));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(Response::builder()
+        .status(StatusCode::CREATED)
+        .body(Body::empty())
+        .unwrap())
 }
 
 // ──────────────────── DELETE ────────────────────
@@ -874,10 +952,18 @@ async fn write_nc_multistatus<W: std::io::Write>(
         )?;
     }
 
-    if depth != "0" {
+    // When folder is None, files are the target resource itself (single-file
+    // PROPFIND) and must always be emitted. When folder is Some, files/subfolders
+    // are children and should only be listed when depth > 0.
+    let emit_children = folder.is_none() || depth != "0";
+
+    if emit_children {
         // Files.
         for file in files {
-            let child_sub = if subpath.is_empty() {
+            let child_sub = if folder.is_none() {
+                // Single-file PROPFIND — subpath already points to the file.
+                subpath.to_string()
+            } else if subpath.is_empty() {
                 file.name.clone()
             } else {
                 format!("{}/{}", subpath.trim_end_matches('/'), file.name)

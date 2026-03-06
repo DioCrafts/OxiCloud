@@ -621,7 +621,11 @@ async fn oidc_callback(
                     user = %username,
                     "OIDC login completed Nextcloud Login Flow v2 successfully"
                 );
-                Ok(Redirect::temporary("/nextcloud-success.html"))
+                let nc_url = format!(
+                    "nc://login/server:{}&user:{}&password:{}",
+                    base_url, username, app_password
+                );
+                Ok(Redirect::temporary(&nc_url))
             } else {
                 tracing::error!(
                     user = %username,

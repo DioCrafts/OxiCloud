@@ -196,16 +196,21 @@ pub async fn handle_login_submit(
             base_url = %base_url,
             "Login Flow v2: flow completed successfully"
         );
+        // Redirect to nc:// deep link so the Nextcloud mobile app receives
+        // the credentials via Android/iOS intent.  Desktop clients use polling
+        // instead, so they will pick up the result from the poll endpoint.
+        let nc_url = format!(
+            "nc://login/server:{}&user:{}&password:{}",
+            base_url, current_user.username, app_password
+        );
+        axum::response::Redirect::to(&nc_url).into_response()
     } else {
         tracing::error!(
             user = %current_user.username,
             "Login Flow v2: complete() returned false — flow token not found"
         );
-        return axum::response::Redirect::to("/nextcloud-error.html?type=session-expired")
-            .into_response();
+        axum::response::Redirect::to("/nextcloud-error.html?type=session-expired").into_response()
     }
-
-    html_with_csp(include_str!("../../../static/nextcloud-success.html"))
 }
 
 /// GET /login/v2/flow/{token}/oidc — Start an OIDC authorization flow that is
