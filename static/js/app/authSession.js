@@ -92,24 +92,36 @@ async function checkAuthentication() {
 
             window.updateStorageUsageDisplay(userData);
 
-            refreshUserData().then(freshData => {
-                if (freshData) {
-                    console.log('Storage usage updated from server');
-                } else {
-                    // Session expired — try silent refresh first
-                    console.warn('Session may have expired, trying refresh...');
-                    fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() }, body: '{}' })
-                        .then(r => r.ok ? refreshUserData() : Promise.reject(new Error('refresh failed')))
-                        .catch(() => {
-                            localStorage.removeItem(USER_DATA_KEY);
-                            window.location.href = '/login?source=session_expired';
-                        });
+            // Validate session BEFORE loading files to avoid 401 race condition
+            const freshData = await refreshUserData();
+            if (freshData) {
+                console.log('Storage usage updated from server');
+            } else {
+                // Session expired — try silent refresh first
+                console.warn('Session may have expired, trying refresh...');
+                try {
+                    const r = await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+                        body: '{}'
+                    });
+                    if (r.ok) {
+                        await refreshUserData();
+                    } else {
+                        localStorage.removeItem(USER_DATA_KEY);
+                        window.location.href = '/login?source=session_expired';
+                        return;
+                    }
+                } catch (err) {
+                    localStorage.removeItem(USER_DATA_KEY);
+                    window.location.href = '/login?source=session_expired';
+                    return;
                 }
-            }).catch(err => {
-                console.warn('Could not refresh user data:', err);
-            });
+            }
 
-            resolveHomeFolder().then(() => window.loadFiles());
+            await resolveHomeFolder();
+            window.loadFiles();
         } else {
             // No cached user data — must verify session from server
             console.log('No cached user data, fetching from server');

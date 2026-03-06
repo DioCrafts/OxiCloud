@@ -106,7 +106,11 @@ impl FileHandler {
                 if let Some(ref fid) = folder_id {
                     use crate::application::ports::inbound::FolderUseCase;
                     let folder_service = &state.applications.folder_service;
-                    if folder_service.get_folder_owned(fid, &auth_user.id).await.is_err() {
+                    if folder_service
+                        .get_folder_owned(fid, &auth_user.id)
+                        .await
+                        .is_err()
+                    {
                         tracing::warn!(
                             "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
                             auth_user.username,
@@ -366,10 +370,8 @@ impl FileHandler {
                     .unwrap()
                     .into_response()
             }
-            Err(err) => {
-                AppError::internal_error(format!("Thumbnail generation failed: {}", err))
-                    .into_response()
-            }
+            Err(err) => AppError::internal_error(format!("Thumbnail generation failed: {}", err))
+                .into_response(),
         }
     }
 
@@ -542,9 +544,7 @@ impl FileHandler {
                     .unwrap()
                     .into_response(),
             },
-            Err(err) => {
-                AppError::from(err).into_response()
-            }
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -594,9 +594,7 @@ impl FileHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            Err(err) => {
-                AppError::from(err).into_response()
-            }
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -635,8 +633,7 @@ impl FileHandler {
                     let file_path = state.core.dedup_service.blob_path(&blob_hash);
                     tokio::spawn(async move {
                         tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                        thumbnail_service
-                            .generate_all_sizes_background(file_id, file_path);
+                        thumbnail_service.generate_all_sizes_background(file_id, file_path);
                     });
                 }
                 Err(e) => {
@@ -726,7 +723,7 @@ impl FileHandler {
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -758,7 +755,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -778,7 +775,7 @@ impl FileHandler {
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -797,7 +794,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -856,9 +853,7 @@ impl FileHandler {
             })
             .collect();
 
-        format!(
-            "{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}"
-        )
+        format!("{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}")
     }
 
     /// Build a 201 Created JSON response.
