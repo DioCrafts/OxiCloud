@@ -115,7 +115,8 @@ class InlineViewer {
     const ext = (file.name || '').split('.').pop().toLowerCase();
     const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
     const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
-    if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+    const isPdf = file.mime_type && file.mime_type === 'application/pdf';
+    if (!isImage && !isPdf && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }
@@ -571,7 +572,7 @@ class InlineViewer {
   
   toggleFullscreen() {
     const content = document.querySelector('#inline-viewer-modal .inline-viewer-content');
-    const btn = document.querySelector('.inline-viewer-fullscreen i');
+    const btn = document.querySelector('button.inline-viewer-fullscreen i');
     content.classList.toggle('inline-viewer-fullscreen');
     const isFs = content.classList.contains('inline-viewer-fullscreen');
     btn.className = isFs ? 'fas fa-compress' : 'fas fa-expand';
@@ -584,7 +585,7 @@ class InlineViewer {
     // Reset fullscreen state
     const content = modal.querySelector('.inline-viewer-content');
     content.classList.remove('inline-viewer-fullscreen');
-    const fsBtn = modal.querySelector('.inline-viewer-fullscreen i');
+    const fsBtn = modal.querySelector('button.inline-viewer-fullscreen i');
     if (fsBtn) fsBtn.className = 'fas fa-expand';
 
     // Hide modal
