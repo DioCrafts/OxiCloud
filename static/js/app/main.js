@@ -474,7 +474,7 @@ function setupEventListeners() {
                 const filesGrid = document.getElementById('files-grid');
                 const filesListView = document.getElementById('files-list-view');
                 if (filesGrid) filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none';
-                if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
+                if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none';
                 
                 // Update UI
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';

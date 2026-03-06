@@ -157,7 +157,7 @@ function switchToFilesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
 
     // Reset to home folder and update breadcrumb
     window.app.currentPath = window.app.userHomeFolderId || '';
@@ -180,7 +180,7 @@ function switchToFavoritesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
 
     if (window.favorites) {
         window.favorites.displayFavorites();
@@ -211,7 +211,7 @@ function switchToRecentFilesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
 
     if (window.recent) {
         window.recent.displayRecentFiles();
