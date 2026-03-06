@@ -112,7 +112,8 @@ class InlineViewer {
     const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
     const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
     const isPdf = file.mime_type && file.mime_type === 'application/pdf';
-    if (!isImage && !isPdf && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+    const isViewable = this.isMarkdownFile(file.name) || this.isTextViewable(file.mime_type);
+    if (!isImage && !isPdf && !isViewable && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }
