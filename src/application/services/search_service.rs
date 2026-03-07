@@ -323,7 +323,7 @@ impl SearchUseCase for SearchService {
                 .search_folders(
                     criteria.folder_id.as_deref(),
                     criteria.name_contains.as_deref(),
-                    &user_id_str,
+                    user_id,
                     false,
                 )
                 .await?;
@@ -405,7 +405,7 @@ impl SearchUseCase for SearchService {
             .search_folders(
                 criteria.folder_id.as_deref(),
                 criteria.name_contains.as_deref(),
-                &user_id_str,
+                user_id,
                 true,
             )
             .await?;

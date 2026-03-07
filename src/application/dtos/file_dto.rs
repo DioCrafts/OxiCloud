@@ -83,7 +83,7 @@ impl From<File> for FileDto {
             icon_special_class,
             category,
             size_formatted,
-            owner_id: parts.owner_id,
+            owner_id: parts.owner_id.map(|u| u.to_string()),
             sort_date: None,
         }
     }

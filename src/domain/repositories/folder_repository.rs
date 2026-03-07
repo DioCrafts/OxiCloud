@@ -11,6 +11,7 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::folder::Folder;
 use crate::domain::services::path_service::StoragePath;
+use uuid::Uuid;
 
 /// Domain port for folder persistence.
 ///
@@ -39,7 +40,7 @@ pub trait FolderRepository: Send + Sync + 'static {
     async fn list_folders_by_owner(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<Folder>, DomainError>;
 
     /// Lists folders with pagination
@@ -57,7 +58,7 @@ pub trait FolderRepository: Send + Sync + 'static {
     async fn list_folders_by_owner_paginated(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: usize,
         limit: usize,
         include_total: bool,
@@ -99,7 +100,7 @@ pub trait FolderRepository: Send + Sync + 'static {
 
     /// Creates a root-level home folder for a user.
     /// This is used during user registration to create the user's personal folder.
-    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError>;
+    async fn create_home_folder(&self, user_id: Uuid, name: String) -> Result<Folder, DomainError>;
 
     /// Lists every folder in a subtree rooted at `folder_id` (inclusive).
     ///
@@ -123,7 +124,7 @@ pub trait FolderRepository: Send + Sync + 'static {
         &self,
         folder_id: &str,
         name_contains: Option<&str>,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<Folder>, DomainError> {
         let _ = (folder_id, name_contains, user_id);
         Ok(Vec::new())
@@ -144,7 +145,7 @@ pub trait FolderRepository: Send + Sync + 'static {
         &self,
         parent_id: Option<&str>,
         name_contains: Option<&str>,
-        user_id: &str,
+        user_id: Uuid,
         recursive: bool,
     ) -> Result<Vec<Folder>, DomainError> {
         // Recursive with folder_id → use optimised ltree scan

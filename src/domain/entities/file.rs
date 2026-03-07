@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use crate::domain::services::path_service::StoragePath;
 
 // Re-export entity errors from the centralized module
@@ -18,7 +20,7 @@ pub struct FileParts {
     pub folder_id: Option<String>,
     pub created_at: u64,
     pub modified_at: u64,
-    pub owner_id: Option<String>,
+    pub owner_id: Option<Uuid>,
 }
 
 /**
@@ -61,7 +63,7 @@ pub struct File {
     modified_at: u64,
 
     /// Owner user ID (from storage.files.user_id)
-    owner_id: Option<String>,
+    owner_id: Option<Uuid>,
 }
 
 // We no longer need this module, now we use a String directly
@@ -161,7 +163,7 @@ impl File {
         folder_id: Option<String>,
         created_at: u64,
         modified_at: u64,
-        owner_id: Option<String>,
+        owner_id: Option<Uuid>,
     ) -> FileResult<Self> {
         // Validate file name
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -241,8 +243,8 @@ impl File {
         self.modified_at
     }
 
-    pub fn owner_id(&self) -> Option<&str> {
-        self.owner_id.as_deref()
+    pub fn owner_id(&self) -> Option<Uuid> {
+        self.owner_id
     }
 
     #[allow(clippy::too_many_arguments)]

@@ -246,7 +246,7 @@ impl FolderRepository for StubFolderStoragePort {
     async fn list_folders_by_owner(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
     ) -> Result<Vec<Folder>, DomainError> {
         Ok(Vec::new())
     }
@@ -264,7 +264,7 @@ impl FolderRepository for StubFolderStoragePort {
     async fn list_folders_by_owner_paginated(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
         _offset: usize,
         _limit: usize,
         _include_total: bool,
@@ -314,7 +314,7 @@ impl FolderRepository for StubFolderStoragePort {
 
     async fn create_home_folder(
         &self,
-        _user_id: &str,
+        _user_id: Uuid,
         _name: String,
     ) -> Result<Folder, DomainError> {
         Ok(Folder::default())

@@ -57,10 +57,9 @@ pub trait FileReadPort: Send + Sync + 'static {
         owner_id: Uuid,
     ) -> Result<Vec<File>, DomainError> {
         let all = self.list_files(folder_id).await?;
-        let owner_str = owner_id.to_string();
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().is_some_and(|o| o == owner_str))
+            .filter(|f| f.owner_id() == Some(owner_id))
             .collect())
     }
 
@@ -142,10 +141,9 @@ pub trait FileReadPort: Send + Sync + 'static {
     ) -> Result<Vec<File>, DomainError> {
         // Default: filter in-memory (repos should override with SQL)
         let all = self.list_files_batch(folder_id, offset, limit).await?;
-        let owner_str = owner_id.to_string();
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().is_some_and(|o| o == owner_str))
+            .filter(|f| f.owner_id() == Some(owner_id))
             .collect())
     }
 

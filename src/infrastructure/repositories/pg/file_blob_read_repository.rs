@@ -17,7 +17,7 @@ type MediaFileRow = (
     String,         // mime_type
     i64,            // created_at
     i64,            // updated_at
-    Option<String>, // user_id
+    Option<Uuid>,   // user_id
     i64,            // sort_date
 );
 
@@ -47,7 +47,7 @@ type FileRow = (
     String,
     i64,
     i64,
-    Option<String>,
+    Option<Uuid>,
 );
 
 /// File read repository backed by PostgreSQL metadata + blob storage.
@@ -114,7 +114,7 @@ impl FileBlobReadRepository {
         mime_type: String,
         created_at: i64,
         modified_at: i64,
-        owner_id: Option<String>,
+        owner_id: Option<Uuid>,
     ) -> Result<File, DomainError> {
         let storage_path = Self::make_file_path(folder_path.as_deref(), &name);
         File::with_timestamps(
@@ -177,7 +177,7 @@ impl FileBlobReadRepository {
                    fi.size, fi.mime_type,
                    EXTRACT(EPOCH FROM fi.created_at)::bigint,
                    EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                   fi.user_id::text,
+                   fi.user_id,
                    EXTRACT(EPOCH FROM COALESCE(fm.captured_at, fi.created_at))::bigint AS sort_date
               FROM storage.files fi
               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
@@ -226,7 +226,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,            // created_at
                 i64,            // updated_at
                 String,         // blob_hash
-                Option<String>, // user_id (owner)
+                Option<Uuid>,   // user_id (owner)
             ),
         >(
             r#"
@@ -235,7 +235,7 @@ impl FileReadPort for FileBlobReadRepository {
                    EXTRACT(EPOCH FROM fi.created_at)::bigint,
                    EXTRACT(EPOCH FROM fi.updated_at)::bigint,
                    fi.blob_hash,
-                   fi.user_id::text
+                   fi.user_id
               FROM storage.files fi
               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
              WHERE fi.id = $1::uuid AND NOT fi.is_trashed
@@ -269,7 +269,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,            // created_at
                 i64,            // updated_at
                 String,         // blob_hash
-                Option<String>, // user_id (owner)
+                Option<Uuid>,   // user_id (owner)
             ),
         >(
             r#"
@@ -278,7 +278,7 @@ impl FileReadPort for FileBlobReadRepository {
                    EXTRACT(EPOCH FROM fi.created_at)::bigint,
                    EXTRACT(EPOCH FROM fi.updated_at)::bigint,
                    fi.blob_hash,
-                   fi.user_id::text
+                   fi.user_id
               FROM storage.files fi
               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
              WHERE fi.id = $1::uuid
@@ -310,7 +310,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
@@ -327,7 +327,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
@@ -360,7 +360,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
@@ -379,7 +379,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
@@ -422,7 +422,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
@@ -442,7 +442,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
@@ -480,7 +480,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid AND NOT fi.is_trashed
@@ -502,7 +502,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL AND NOT fi.is_trashed
@@ -640,7 +640,7 @@ impl FileReadPort for FileBlobReadRepository {
                     String,
                     i64,
                     i64,
-                    Option<String>,
+                    Option<Uuid>,
                 ),
             >(
                 r#"
@@ -648,7 +648,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.name = $1 AND fi.folder_id IS NULL AND NOT fi.is_trashed
@@ -670,7 +670,7 @@ impl FileReadPort for FileBlobReadRepository {
                     String,
                     i64,
                     i64,
-                    Option<String>,
+                    Option<Uuid>,
                 ),
             >(
                 r#"
@@ -678,7 +678,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fo.path = $1 AND fi.name = $2 AND NOT fi.is_trashed
@@ -713,14 +713,14 @@ impl FileReadPort for FileBlobReadRepository {
         let stream = async_stream::try_stream! {
             let mut row_stream = sqlx::query_as::<_, (
                 String, String, Option<String>, Option<String>,
-                i64, String, i64, i64, Option<String>,
+                i64, String, i64, i64, Option<Uuid>,
             )>(
                 r#"
                 SELECT fi.id::text, fi.name, fi.folder_id::text, fo.path,
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $1::uuid)
@@ -772,7 +772,7 @@ impl FileReadPort for FileBlobReadRepository {
 
         // ── Build dynamic WHERE + bind indices ───────────────────────────
         let mut conditions: Vec<String> = vec![
-            "fi.user_id = $1::uuid".to_string(),
+            "fi.user_id = $1".to_string(),
             "fi.is_trashed = false".to_string(),
         ];
         let mut bind_idx = 1u32; // $1 = user_id
@@ -798,7 +798,7 @@ impl FileReadPort for FileBlobReadRepository {
                     fi.size, fi.mime_type, \
                     EXTRACT(EPOCH FROM fi.created_at)::bigint, \
                     EXTRACT(EPOCH FROM fi.updated_at)::bigint, \
-                    fi.user_id::text, \
+                    fi.user_id, \
                     COUNT(*) OVER() AS total_count \
                FROM storage.files fi \
                LEFT JOIN storage.folders fo ON fo.id = fi.folder_id \
@@ -819,7 +819,7 @@ impl FileReadPort for FileBlobReadRepository {
                 String,
                 i64,
                 i64,
-                Option<String>,
+                Option<Uuid>,
                 i64,
             ),
         >(&sql)
@@ -959,7 +959,7 @@ impl FileReadPort for FileBlobReadRepository {
                     fi.size, fi.mime_type, \
                     EXTRACT(EPOCH FROM fi.created_at)::bigint, \
                     EXTRACT(EPOCH FROM fi.updated_at)::bigint, \
-                    fi.user_id::text, \
+                    fi.user_id, \
                     COUNT(*) OVER() AS total_count \
                FROM storage.files fi \
                JOIN storage.folders fo ON fo.id = fi.folder_id \
@@ -980,7 +980,7 @@ impl FileReadPort for FileBlobReadRepository {
                 String,
                 i64,
                 i64,
-                Option<String>,
+                Option<Uuid>,
                 i64,
             ),
         >(&sql)
@@ -1069,7 +1069,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id = $1::uuid
@@ -1097,7 +1097,7 @@ impl FileReadPort for FileBlobReadRepository {
                        fi.size, fi.mime_type,
                        EXTRACT(EPOCH FROM fi.created_at)::bigint,
                        EXTRACT(EPOCH FROM fi.updated_at)::bigint,
-                       fi.user_id::text
+                       fi.user_id
                   FROM storage.files fi
                   LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
                  WHERE fi.folder_id IS NULL

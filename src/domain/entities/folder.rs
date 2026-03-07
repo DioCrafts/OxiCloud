@@ -1,3 +1,5 @@
+use uuid::Uuid;
+
 use crate::domain::services::path_service::StoragePath;
 
 // Re-export entity errors from the centralized module
@@ -23,7 +25,7 @@ pub struct Folder {
 
     /// Owner user ID — scopes folder visibility per user.
     /// `None` only for legacy/stub folders; real folders always have an owner.
-    owner_id: Option<String>,
+    owner_id: Option<Uuid>,
 
     /// Creation timestamp
     created_at: u64,
@@ -66,7 +68,7 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
-        owner_id: Option<String>,
+        owner_id: Option<Uuid>,
     ) -> FolderResult<Self> {
         // Validate folder name
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -119,7 +121,7 @@ impl Folder {
         name: String,
         storage_path: StoragePath,
         parent_id: Option<String>,
-        owner_id: Option<String>,
+        owner_id: Option<Uuid>,
         created_at: u64,
         modified_at: u64,
     ) -> FolderResult<Self> {
@@ -172,8 +174,8 @@ impl Folder {
         self.modified_at
     }
 
-    pub fn owner_id(&self) -> Option<&str> {
-        self.owner_id.as_deref()
+    pub fn owner_id(&self) -> Option<Uuid> {
+        self.owner_id
     }
 
     /// Creates a new Folder instance from a DTO

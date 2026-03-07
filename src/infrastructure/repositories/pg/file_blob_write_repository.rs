@@ -10,6 +10,7 @@
 use sqlx::PgPool;
 use std::path::PathBuf;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::ports::storage_ports::{CopyFolderTreeResult, FileWritePort};
 use crate::common::errors::DomainError;
@@ -98,7 +99,7 @@ impl FileBlobWriteRepository {
         mime_type: String,
         created_at: i64,
         modified_at: i64,
-        owner_id: Option<String>,
+        owner_id: Option<Uuid>,
     ) -> Result<File, DomainError> {
         let storage_path = Self::make_file_path(folder_path.as_deref(), &name);
         File::with_timestamps(
@@ -116,7 +117,7 @@ impl FileBlobWriteRepository {
     }
 
     /// Derive user_id from the parent folder, or error if folder_id is None.
-    async fn resolve_user_id(&self, folder_id: Option<&str>) -> Result<String, DomainError> {
+    async fn resolve_user_id(&self, folder_id: Option<&str>) -> Result<Uuid, DomainError> {
         match folder_id {
             Some(fid) => self.folder_repo.get_folder_user_id(fid).await,
             None => Err(DomainError::internal_error(
@@ -219,7 +220,7 @@ impl FileWritePort for FileBlobWriteRepository {
         let row = match sqlx::query_as::<_, (String, i64, i64)>(
             r#"
             INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
-            VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6)
+            VALUES ($1, $2::uuid, $3, $4, $5, $6)
             RETURNING id::text,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
@@ -227,7 +228,7 @@ impl FileWritePort for FileBlobWriteRepository {
         )
         .bind(&name)
         .bind(&folder_id)
-        .bind(&user_id)
+        .bind(user_id)
         .bind(&blob_hash)
         .bind(size as i64)
         .bind(&content_type)
@@ -500,7 +501,7 @@ impl FileWritePort for FileBlobWriteRepository {
         let row = sqlx::query_as::<_, (String, i64, i64)>(
             r#"
             INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
-            VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6)
+            VALUES ($1, $2::uuid, $3, $4, $5, $6)
             RETURNING id::text,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
@@ -508,7 +509,7 @@ impl FileWritePort for FileBlobWriteRepository {
         )
         .bind(&name)
         .bind(&folder_id)
-        .bind(&user_id)
+        .bind(user_id)
         .bind(placeholder_hash)
         .bind(size as i64)
         .bind(&content_type)

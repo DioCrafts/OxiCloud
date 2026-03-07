@@ -75,7 +75,7 @@ impl From<Folder> for FolderDto {
             name: folder.name().to_string(),
             path: folder.path_string().to_string(),
             parent_id: folder.parent_id().map(String::from),
-            owner_id: folder.owner_id().map(String::from),
+            owner_id: folder.owner_id().map(|u| u.to_string()),
             created_at: folder.created_at(),
             modified_at: folder.modified_at(),
             is_root,

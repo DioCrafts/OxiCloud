@@ -10,6 +10,7 @@
 
 use sqlx::PgPool;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::common::errors::DomainError;
 use crate::domain::entities::folder::Folder;
@@ -17,7 +18,7 @@ use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::domain::services::path_service::StoragePath;
 
 /// Type alias for folder metadata rows from SQL queries.
-type FolderRow = (String, String, String, Option<String>, String, i64, i64);
+type FolderRow = (String, String, String, Option<String>, Uuid, i64, i64);
 
 /// Type alias for paginated folder rows (includes total_count).
 type FolderRowPaginated = (
@@ -25,7 +26,7 @@ type FolderRowPaginated = (
     String,
     String,
     Option<String>,
-    String,
+    Uuid,
     i64,
     i64,
     i64,
@@ -37,7 +38,7 @@ type FolderRowOptUser = (
     String,
     String,
     Option<String>,
-    Option<String>,
+    Option<Uuid>,
     i64,
     i64,
 );
@@ -79,7 +80,7 @@ impl FolderDbRepository {
         name: String,
         path: String,
         parent_id: Option<String>,
-        user_id: Option<String>,
+        user_id: Option<Uuid>,
         created_at: i64,
         modified_at: i64,
     ) -> Result<Folder, DomainError> {
@@ -106,9 +107,9 @@ impl FolderRepository for FolderDbRepository {
         // Derive user_id from parent folder.  Root-level folders require the
         // caller to have set up the home folder beforehand (done during user
         // registration).
-        let user_id: String = if let Some(ref pid) = parent_id {
-            sqlx::query_scalar::<_, String>(
-                "SELECT user_id::text FROM storage.folders WHERE id = $1::uuid",
+        let user_id: Uuid = if let Some(ref pid) = parent_id {
+            sqlx::query_scalar::<_, Uuid>(
+                "SELECT user_id FROM storage.folders WHERE id = $1::uuid",
             )
             .bind(pid)
             .fetch_optional(self.pool())
@@ -125,7 +126,7 @@ impl FolderRepository for FolderDbRepository {
         let row = sqlx::query_as::<_, (String, String, i64, i64)>(
             r#"
             INSERT INTO storage.folders (name, parent_id, user_id)
-            VALUES ($1, $2::uuid, $3::uuid)
+            VALUES ($1, $2::uuid, $3)
             RETURNING id::text,
                       path,
                       EXTRACT(EPOCH FROM created_at)::bigint,
@@ -134,7 +135,7 @@ impl FolderRepository for FolderDbRepository {
         )
         .bind(&name)
         .bind(&parent_id)
-        .bind(&user_id)
+        .bind(user_id)
         .fetch_one(self.pool())
         .await
         .map_err(|e| {
@@ -153,9 +154,9 @@ impl FolderRepository for FolderDbRepository {
     }
 
     async fn get_folder(&self, id: &str) -> Result<Folder, DomainError> {
-        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, Uuid, i64, i64)>(
             r#"
-            SELECT id::text, name, path, parent_id::text, user_id::text,
+            SELECT id::text, name, path, parent_id::text, user_id,
                    EXTRACT(EPOCH FROM created_at)::bigint,
                    EXTRACT(EPOCH FROM updated_at)::bigint
               FROM storage.folders
@@ -180,9 +181,9 @@ impl FolderRepository for FolderDbRepository {
             return Err(DomainError::not_found("Folder", "empty path"));
         }
 
-        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, Uuid, i64, i64)>(
             r#"
-            SELECT id::text, name, path, parent_id::text, user_id::text,
+            SELECT id::text, name, path, parent_id::text, user_id,
                    EXTRACT(EPOCH FROM created_at)::bigint,
                    EXTRACT(EPOCH FROM updated_at)::bigint
               FROM storage.folders
@@ -203,7 +204,7 @@ impl FolderRepository for FolderDbRepository {
         let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
@@ -217,7 +218,7 @@ impl FolderRepository for FolderDbRepository {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
@@ -241,16 +242,16 @@ impl FolderRepository for FolderDbRepository {
     async fn list_folders_by_owner(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<Folder>, DomainError> {
         let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
-                 WHERE parent_id = $1::uuid AND user_id = $2::uuid AND NOT is_trashed
+                 WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
                  ORDER BY name
                 "#,
             )
@@ -261,11 +262,11 @@ impl FolderRepository for FolderDbRepository {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
-                 WHERE parent_id IS NULL AND user_id = $1::uuid AND NOT is_trashed
+                 WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
                  ORDER BY name
                 "#,
             )
@@ -296,7 +297,7 @@ impl FolderRepository for FolderDbRepository {
         let rows: Vec<FolderRowPaginated> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
                        COUNT(*) OVER() AS total_count
@@ -314,7 +315,7 @@ impl FolderRepository for FolderDbRepository {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
                        COUNT(*) OVER() AS total_count
@@ -353,7 +354,7 @@ impl FolderRepository for FolderDbRepository {
     async fn list_folders_by_owner_paginated(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: usize,
         limit: usize,
         include_total: bool,
@@ -361,12 +362,12 @@ impl FolderRepository for FolderDbRepository {
         let rows: Vec<FolderRowPaginated> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
                        COUNT(*) OVER() AS total_count
                   FROM storage.folders
-                 WHERE parent_id = $1::uuid AND user_id = $2::uuid AND NOT is_trashed
+                 WHERE parent_id = $1::uuid AND user_id = $2 AND NOT is_trashed
                  ORDER BY name
                  LIMIT $3 OFFSET $4
                 "#,
@@ -380,12 +381,12 @@ impl FolderRepository for FolderDbRepository {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint,
                        COUNT(*) OVER() AS total_count
                   FROM storage.folders
-                 WHERE parent_id IS NULL AND user_id = $1::uuid AND NOT is_trashed
+                 WHERE parent_id IS NULL AND user_id = $1 AND NOT is_trashed
                  ORDER BY name
                  LIMIT $2 OFFSET $3
                 "#,
@@ -417,12 +418,12 @@ impl FolderRepository for FolderDbRepository {
         // The BEFORE UPDATE trigger recomputes path/lpath for this row;
         // the AFTER UPDATE cascade trigger then batch-updates all
         // descendants in a single UPDATE using the GiST lpath index.
-        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, Uuid, i64, i64)>(
             r#"
             UPDATE storage.folders
                SET name = $1, updated_at = NOW()
              WHERE id = $2::uuid AND NOT is_trashed
-            RETURNING id::text, name, path, parent_id::text, user_id::text,
+            RETURNING id::text, name, path, parent_id::text, user_id,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
             "#,
@@ -452,12 +453,12 @@ impl FolderRepository for FolderDbRepository {
         // The BEFORE UPDATE trigger recomputes path/lpath for this row;
         // the AFTER UPDATE cascade trigger then batch-updates all
         // descendants in a single UPDATE using the GiST lpath index.
-        let row = sqlx::query_as::<_, (String, String, String, Option<String>, String, i64, i64)>(
+        let row = sqlx::query_as::<_, (String, String, String, Option<String>, Uuid, i64, i64)>(
             r#"
             UPDATE storage.folders
                SET parent_id = $1::uuid, updated_at = NOW()
              WHERE id = $2::uuid AND NOT is_trashed
-            RETURNING id::text, name, path, parent_id::text, user_id::text,
+            RETURNING id::text, name, path, parent_id::text, user_id,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
             "#,
@@ -627,11 +628,11 @@ impl FolderRepository for FolderDbRepository {
         Ok(())
     }
 
-    async fn create_home_folder(&self, user_id: &str, name: String) -> Result<Folder, DomainError> {
+    async fn create_home_folder(&self, user_id: Uuid, name: String) -> Result<Folder, DomainError> {
         let row = sqlx::query_as::<_, (String, String, i64, i64)>(
             r#"
             INSERT INTO storage.folders (name, parent_id, user_id)
-            VALUES ($1, NULL, $2::uuid)
+            VALUES ($1, NULL, $2)
             ON CONFLICT DO NOTHING
             RETURNING id::text,
                       path,
@@ -651,7 +652,7 @@ impl FolderRepository for FolderDbRepository {
                 name.clone(),
                 path,
                 None,
-                Some(user_id.to_string()),
+                Some(user_id),
                 ca,
                 ma,
             ),
@@ -664,7 +665,7 @@ impl FolderRepository for FolderDbRepository {
                            EXTRACT(EPOCH FROM created_at)::bigint,
                            EXTRACT(EPOCH FROM updated_at)::bigint
                       FROM storage.folders
-                     WHERE name = $1 AND user_id = $2::uuid AND parent_id IS NULL
+                     WHERE name = $1 AND user_id = $2 AND parent_id IS NULL
                     "#,
                 )
                 .bind(&name)
@@ -677,7 +678,7 @@ impl FolderRepository for FolderDbRepository {
                     name,
                     existing.1,
                     None,
-                    Some(user_id.to_string()),
+                    Some(user_id),
                     existing.2,
                     existing.3,
                 )
@@ -692,7 +693,7 @@ impl FolderRepository for FolderDbRepository {
     #[allow(clippy::type_complexity)]
     async fn list_subtree_folders(&self, folder_id: &str) -> Result<Vec<Folder>, DomainError> {
         let sql = "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
-                          fo.user_id::text, \
+                          fo.user_id, \
                           EXTRACT(EPOCH FROM fo.created_at)::bigint, \
                           EXTRACT(EPOCH FROM fo.updated_at)::bigint \
                      FROM storage.folders fo \
@@ -726,7 +727,7 @@ impl FolderRepository for FolderDbRepository {
         &self,
         parent_id: Option<&str>,
         name_contains: Option<&str>,
-        user_id: &str,
+        user_id: Uuid,
         recursive: bool,
     ) -> Result<Vec<Folder>, DomainError> {
         // Recursive with folder scope → existing optimised ltree scan
@@ -754,11 +755,11 @@ impl FolderRepository for FolderDbRepository {
             // Recursive, no folder scope → ALL user folders
             let sql = format!(
                 "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
-                        fo.user_id::text, \
+                        fo.user_id, \
                         EXTRACT(EPOCH FROM fo.created_at)::bigint, \
                         EXTRACT(EPOCH FROM fo.updated_at)::bigint \
                    FROM storage.folders fo \
-                  WHERE fo.user_id = $1::uuid \
+                  WHERE fo.user_id = $1 \
                     AND fo.is_trashed = false \
                     {name_clause} \
                   ORDER BY fo.name"
@@ -790,12 +791,12 @@ impl FolderRepository for FolderDbRepository {
         let sql = if parent_id.is_some() {
             format!(
                 "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
-                        fo.user_id::text, \
+                        fo.user_id, \
                         EXTRACT(EPOCH FROM fo.created_at)::bigint, \
                         EXTRACT(EPOCH FROM fo.updated_at)::bigint \
                    FROM storage.folders fo \
                   WHERE fo.parent_id = $1::uuid \
-                    AND fo.user_id = $2::uuid \
+                    AND fo.user_id = $2 \
                     AND fo.is_trashed = false \
                     {name_clause} \
                   ORDER BY fo.name"
@@ -808,12 +809,12 @@ impl FolderRepository for FolderDbRepository {
             };
             format!(
                 "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
-                        fo.user_id::text, \
+                        fo.user_id, \
                         EXTRACT(EPOCH FROM fo.created_at)::bigint, \
                         EXTRACT(EPOCH FROM fo.updated_at)::bigint \
                    FROM storage.folders fo \
                   WHERE fo.parent_id IS NULL \
-                    AND fo.user_id = $1::uuid \
+                    AND fo.user_id = $1 \
                     AND fo.is_trashed = false \
                     {name_clause_root} \
                   ORDER BY fo.name"
@@ -865,7 +866,7 @@ impl FolderRepository for FolderDbRepository {
         &self,
         folder_id: &str,
         name_contains: Option<&str>,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<Folder>, DomainError> {
         let (where_extra, name_pattern) = match name_contains {
             Some(name) if name.len() >= 3 => {
@@ -876,11 +877,11 @@ impl FolderRepository for FolderDbRepository {
 
         let sql = format!(
             "SELECT fo.id::text, fo.name, fo.path, fo.parent_id::text, \
-                    fo.user_id::text, \
+                    fo.user_id, \
                     EXTRACT(EPOCH FROM fo.created_at)::bigint, \
                     EXTRACT(EPOCH FROM fo.updated_at)::bigint \
                FROM storage.folders fo \
-              WHERE fo.user_id = $1::uuid \
+              WHERE fo.user_id = $1 \
                 AND fo.is_trashed = false \
                 AND fo.lpath <@ (SELECT lpath FROM storage.folders WHERE id = $2::uuid) \
                 AND fo.id != $2::uuid \
@@ -924,7 +925,7 @@ impl FolderRepository for FolderDbRepository {
         let rows: Vec<FolderRow> = if let Some(pid) = parent_id {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
@@ -949,7 +950,7 @@ impl FolderRepository for FolderDbRepository {
         } else {
             sqlx::query_as(
                 r#"
-                SELECT id::text, name, path, parent_id::text, user_id::text,
+                SELECT id::text, name, path, parent_id::text, user_id,
                        EXTRACT(EPOCH FROM created_at)::bigint,
                        EXTRACT(EPOCH FROM updated_at)::bigint
                   FROM storage.folders
@@ -985,8 +986,8 @@ impl FolderRepository for FolderDbRepository {
 
 impl FolderDbRepository {
     /// Returns user_id for a given folder. Used by file repositories.
-    pub async fn get_folder_user_id(&self, folder_id: &str) -> Result<String, DomainError> {
-        sqlx::query_scalar::<_, String>("SELECT user_id::text FROM storage.folders WHERE id = $1::uuid")
+    pub async fn get_folder_user_id(&self, folder_id: &str) -> Result<Uuid, DomainError> {
+        sqlx::query_scalar::<_, Uuid>("SELECT user_id FROM storage.folders WHERE id = $1::uuid")
             .bind(folder_id)
             .fetch_optional(self.pool())
             .await
