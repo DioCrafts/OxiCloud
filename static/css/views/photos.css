@@ -43,7 +43,7 @@
 .photos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 4px;
+    gap: 12px;
     padding: 0 8px;
     margin-bottom: 16px;
 }
@@ -51,7 +51,7 @@
 /* Monthly mode — larger tiles, more breathing room */
 .photos-group-monthly .photos-grid {
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 6px;
+    gap: 14px;
 }
 
 .photos-group-monthly .photos-day-header {
@@ -62,7 +62,7 @@
 /* Yearly mode — smaller tiles, more items visible */
 .photos-group-yearly .photos-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 4px;
+    gap: 10px;
 }
 
 .photos-group-yearly .photos-day-header {
@@ -75,20 +75,30 @@
     position: relative;
     aspect-ratio: 1;
     overflow: hidden;
-    border-radius: 4px;
+    border-radius: 12px;
+    border: 2px solid #e2e8f0;
     cursor: pointer;
-    background: #e2e8f0;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .photo-tile img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    border-radius: 10px;
     transition: transform 0.2s ease;
 }
 
+.photo-tile:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    border-color: #cbd5e0;
+}
+
 .photo-tile:hover img {
-    transform: scale(1.05);
+    transform: scale(1.03);
 }
 
 /* Selection checkbox */
@@ -122,12 +132,13 @@
 }
 
 .photo-tile.selected {
-    outline: 3px solid #ff5e3a;
-    outline-offset: -3px;
+    border-color: #ff5e3a;
+    background: #fff8f6;
+    box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.15), 0 4px 12px rgba(255, 94, 58, 0.1);
 }
 
 .photo-tile.selected img {
-    transform: scale(0.92);
+    transform: scale(0.95);
 }
 
 /* Video badge */
