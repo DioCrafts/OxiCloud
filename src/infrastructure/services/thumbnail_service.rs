@@ -265,8 +265,13 @@ impl ThumbnailService {
 
     /// Store an externally-generated thumbnail (e.g. client-side video frame).
     ///
-    /// Validates the image data, re-encodes to WebP for cache consistency,
-    /// and persists to both disk and in-memory cache.
+    /// **Fast path**: if the payload is already a valid WebP whose dimensions
+    /// fit within the target size, it is stored as-is — zero decode, zero
+    /// encode.  The browser pre-scales the canvas to 400 px, so this fast
+    /// path is hit on every normal video-thumbnail upload.
+    ///
+    /// **Slow path**: decode → optional resize → re-encode to WebP.  Only
+    /// triggered when a client sends an oversized or non-WebP image.
     pub async fn store_external_thumbnail(
         &self,
         file_id: &str,
@@ -275,12 +280,28 @@ impl ThumbnailService {
     ) -> Result<Bytes, ThumbnailError> {
         let max_dim = size.max_dimension();
 
-        // Validate + re-encode in blocking thread (tiny image, ~1 ms)
+        // Validate + optionally re-encode in blocking thread
         let webp_bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
+            // ── Fast path: already a correctly-sized WebP ─────────────
+            // WebP files start with RIFF....WEBP.  Read dimensions from
+            // the header without a full decode (~0 CPU).
+            if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+                if let Ok(reader) = image::ImageReader::new(std::io::Cursor::new(&data))
+                    .with_guessed_format()
+                {
+                    if let Ok((w, h)) = reader.into_dimensions() {
+                        if w <= max_dim && h <= max_dim {
+                            // Already WebP at correct size — zero-copy store
+                            return Ok(data.to_vec());
+                        }
+                    }
+                }
+            }
+
+            // ── Slow path: decode, resize, re-encode ─────────────────
             let img = image::load_from_memory(&data)
                 .map_err(|e| ThumbnailError::ImageError(format!("Invalid image data: {e}")))?;
 
-            // Resize if larger than target size
             let (w, h) = (img.width(), img.height());
             let img = if w > max_dim || h > max_dim {
                 let filter = FilterType::CatmullRom;

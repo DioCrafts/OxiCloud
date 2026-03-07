@@ -165,6 +165,12 @@ impl FileBlobReadRepository {
     ///
     /// Returns `(Vec<File>, Vec<i64>)` where the second vec contains the
     /// `sort_date` epoch for each file (used as pagination cursor).
+    ///
+    /// Uses the denormalised `media_sort_date` column (synced from
+    /// `file_metadata.captured_at` by trigger) so no JOIN with
+    /// `file_metadata` is needed.  The partial index
+    /// `idx_files_media_timeline` covers the full query: filter + ORDER BY
+    /// in a single Index Scan — O(LIMIT) not O(N).
     pub async fn list_media_files(
         &self,
         owner_id: Uuid,
@@ -178,16 +184,15 @@ impl FileBlobReadRepository {
                    EXTRACT(EPOCH FROM fi.created_at)::bigint,
                    EXTRACT(EPOCH FROM fi.updated_at)::bigint,
                    fi.user_id,
-                   EXTRACT(EPOCH FROM COALESCE(fm.captured_at, fi.created_at))::bigint AS sort_date
+                   EXTRACT(EPOCH FROM fi.media_sort_date)::bigint AS sort_date
               FROM storage.files fi
               LEFT JOIN storage.folders fo ON fo.id = fi.folder_id
-              LEFT JOIN storage.file_metadata fm ON fm.file_id = fi.id
              WHERE fi.user_id = $1
                AND NOT fi.is_trashed
                AND (fi.mime_type LIKE 'image/%' OR fi.mime_type LIKE 'video/%')
                AND ($2::bigint IS NULL
-                    OR EXTRACT(EPOCH FROM COALESCE(fm.captured_at, fi.created_at))::bigint < $2::bigint)
-             ORDER BY COALESCE(fm.captured_at, fi.created_at) DESC
+                    OR EXTRACT(EPOCH FROM fi.media_sort_date)::bigint < $2::bigint)
+             ORDER BY fi.media_sort_date DESC
              LIMIT $3
             "#,
         )

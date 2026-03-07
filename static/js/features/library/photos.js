@@ -257,11 +257,16 @@ const photosView = {
         }, { once: true });
 
         video.addEventListener('seeked', () => {
+            // Pre-scale to thumbnail size in the browser — saves ~22× RAM,
+            // ~15× bandwidth, and lets the server skip resize entirely.
+            const MAX_THUMB = 400; // must match ThumbnailSize::Preview
+            const scale = Math.min(MAX_THUMB / video.videoWidth,
+                                   MAX_THUMB / video.videoHeight, 1);
             const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            canvas.width  = Math.round(video.videoWidth  * scale);
+            canvas.height = Math.round(video.videoHeight * scale);
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // Try WebP first, fall back to JPEG
             const mimeType = typeof canvas.toBlob === 'function'

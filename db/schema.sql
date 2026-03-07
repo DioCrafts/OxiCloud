@@ -553,7 +553,11 @@ CREATE TABLE IF NOT EXISTS storage.files (
     trashed_at TIMESTAMP WITH TIME ZONE,
     original_folder_id UUID,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Denormalised sort key for the Photos timeline.
+    -- Equals COALESCE(file_metadata.captured_at, created_at).
+    -- Kept in sync by trg_sync_media_sort_date on file_metadata.
+    media_sort_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- A user cannot have two non-trashed files with the same name in the same folder
@@ -567,6 +571,13 @@ CREATE INDEX IF NOT EXISTS idx_files_folder_id ON storage.files(folder_id);
 CREATE INDEX IF NOT EXISTS idx_files_blob_hash ON storage.files(blob_hash);
 CREATE INDEX IF NOT EXISTS idx_files_trashed ON storage.files(user_id, is_trashed);
 CREATE INDEX IF NOT EXISTS idx_files_name_search ON storage.files(user_id, name text_pattern_ops);
+-- Partial covering index for the Photos timeline query.
+-- Satisfies filter (user + not-trashed + media mime) AND ORDER BY media_sort_date DESC
+-- in a single Index Scan — no heap filter, no Sort node, O(LIMIT) not O(N).
+CREATE INDEX IF NOT EXISTS idx_files_media_timeline
+    ON storage.files(user_id, media_sort_date DESC)
+    WHERE NOT is_trashed
+      AND (mime_type LIKE 'image/%' OR mime_type LIKE 'video/%');
 -- GIN trigram index for ILIKE substring search (search_files, suggest_files_by_name)
 CREATE INDEX IF NOT EXISTS idx_files_name_trgm
     ON storage.files USING gin (name gin_trgm_ops);
@@ -662,11 +673,24 @@ CREATE TABLE IF NOT EXISTS storage.file_metadata (
     created_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- For the Photos timeline: ORDER BY captured_at DESC with cursor pagination
-CREATE INDEX IF NOT EXISTS idx_file_metadata_captured
-    ON storage.file_metadata(captured_at DESC) WHERE captured_at IS NOT NULL;
-
 COMMENT ON TABLE storage.file_metadata IS 'EXIF and media metadata extracted at upload time';
+
+-- ── Trigger: sync files.media_sort_date when EXIF captured_at is set ─────
+-- Keeps the denormalised sort key in storage.files up to date so the
+-- Photos timeline query never needs to JOIN file_metadata.
+CREATE OR REPLACE FUNCTION storage.sync_media_sort_date()
+RETURNS trigger AS $$
+BEGIN
+    UPDATE storage.files
+       SET media_sort_date = COALESCE(NEW.captured_at, created_at)
+     WHERE id = NEW.file_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_media_sort_date
+    AFTER INSERT OR UPDATE OF captured_at ON storage.file_metadata
+    FOR EACH ROW EXECUTE FUNCTION storage.sync_media_sort_date();
 
 -- ── Atomic recursive folder copy (WebDAV COPY Depth: infinity) ──────────
 --
@@ -753,8 +777,8 @@ BEGIN
     END LOOP;
 
     -- ── Batch copy all files (zero-copy: same blob_hash) ──
-    INSERT INTO storage.files(name, folder_id, user_id, blob_hash, size, mime_type)
-    SELECT f.name, cm.new_id, f.user_id, f.blob_hash, f.size, f.mime_type
+    INSERT INTO storage.files(name, folder_id, user_id, blob_hash, size, mime_type, media_sort_date)
+    SELECT f.name, cm.new_id, f.user_id, f.blob_hash, f.size, f.mime_type, f.media_sort_date
       FROM storage.files f
       JOIN _copy_map cm ON f.folder_id = cm.old_id
      WHERE NOT f.is_trashed;
