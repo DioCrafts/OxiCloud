@@ -757,11 +757,13 @@ const ui = {
             const ext = (file.name || '').split('.').pop().toLowerCase();
             const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
             const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
-            if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+            const isPdf = ext === 'pdf';
+            const isViewable = self.isViewableFile(file) || isImage;
+            if (!isViewable && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
                 window.wopiEditor.openInModal(file.id, file.name, 'edit');
                 return;
             }
-            if (self.isViewableFile(file) || isImage) {
+            if (isViewable) {
                 if (window.inlineViewer) window.inlineViewer.openFile(file);
                 else window.fileOps.downloadFile(file.id, file.name);
             } else {
@@ -1079,7 +1081,7 @@ const ui = {
                 <i class="fas fa-folder"></i>
             </div>
             <div class="file-name">${escapeHtml(folder.name)}</div>
-            <div class="file-info">Folder</div>
+            <div class="file-info">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
         `;
 
         if (window.app.currentPath !== "") {
@@ -1147,7 +1149,7 @@ const ui = {
                 <i class="${iconClass}"></i>
             </div>
             <div class="file-name">${escapeHtml(file.name)}</div>
-            <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
+            <div class="file-info">${window.i18n ? window.i18n.t('files.modified') : 'Modified'} ${formattedDate.split(' ')[0]}</div>
         `;
         var thumb = el.querySelector('.file-thumb');
         if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });

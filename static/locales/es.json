@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "Sistema de almacenamiento en la nube minimalista"
   },
+  "upload": {
+    "uploading": "Subiendo…",
+    "uploading_folder": "📁 Subiendo {{folder}}…",
+    "complete": "{{count}} / {{total}} subidos",
+    "files_label": "archivos"
+  },
   "nav": {
     "files": "Archivos",
     "shared": "Compartidos",
@@ -144,8 +150,6 @@
     "upload": "Subir",
     "upload_files": "Subir archivos",
     "upload_folder": "Subir carpeta",
-    "upload.uploading": "Subiendo...",
-    "upload.complete": "{count} / {total} subidos",
     "rename": "Renombrar",
     "move": "Mover a...",
     "move_to": "Mover a",

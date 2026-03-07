@@ -1,0 +1,50 @@
+/* OxiCloud theme overrides for PDF.js viewer */
+
+/* Toolbar background */
+.toolbar {
+  background-color: #2a3042 !important;
+}
+
+/* Secondary toolbar */
+#secondaryToolbar {
+  background-color: #232838 !important;
+}
+
+/* Buttons hover */
+.toolbarButton:hover,
+.dropdownToolbarButton:hover {
+  background-color: rgba(255, 94, 58, 0.2) !important;
+}
+
+/* Active/toggled buttons */
+.toolbarButton.toggled,
+.splitToolbarButton.toggled > .toolbarButton.toggled {
+  background-color: rgba(255, 94, 58, 0.3) !important;
+}
+
+/* Sidebar */
+#sidebarContainer {
+  background-color: #1e293b !important;
+}
+
+/* Page number input */
+#pageNumber {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Find bar */
+#findbar {
+  background-color: #2a3042 !important;
+}
+
+#findInput {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #fff !important;
+}
+
+/* Loading bar accent */
+#loadingBar .progress {
+  background-color: #ff5e3a !important;
+}

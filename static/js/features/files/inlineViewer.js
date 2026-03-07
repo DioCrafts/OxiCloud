@@ -10,43 +10,42 @@ class InlineViewer {
   }
   
   setupViewer() {
-    // Create the viewer modal if it doesn't exist
-    if (document.getElementById('inline-viewer-modal')) {
-      return;
-    }
-    
     // Verify document.body exists
     if (!document.body) {
       console.warn('Document body not available yet for inline viewer, will retry later');
       setTimeout(() => this.setupViewer(), 200);
       return;
     }
-    
-    // Create modal container
-    const modal = document.createElement('div');
-    modal.id = 'inline-viewer-modal';
-    modal.className = 'inline-viewer-modal';
-    modal.innerHTML = `
-      <div class="inline-viewer-content">
-        <div class="inline-viewer-header">
-          <div class="inline-viewer-title">File Viewer</div>
-          <button class="inline-viewer-close"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="inline-viewer-container"></div>
-        <div class="inline-viewer-toolbar">
-          <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
-          <div class="inline-viewer-controls">
-            <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
-            <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand"></i></button>
-            <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+
+    // Create the viewer modal if it doesn't exist
+    let modal = document.getElementById('inline-viewer-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'inline-viewer-modal';
+      modal.className = 'inline-viewer-modal';
+      modal.innerHTML = `
+        <div class="inline-viewer-content">
+          <div class="inline-viewer-header">
+            <div class="inline-viewer-title">File Viewer</div>
+            <button class="inline-viewer-close"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="inline-viewer-container"></div>
+          <div class="inline-viewer-toolbar">
+            <button class="inline-viewer-download"><i class="fas fa-download"></i> Download</button>
+            <div class="inline-viewer-toolbar-right">
+              <button class="inline-viewer-fullscreen" title="Toggle Fullscreen (F)"><i class="fas fa-expand"></i></button>
+              <div class="inline-viewer-controls">
+                <button class="inline-viewer-zoom-out" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+                <button class="inline-viewer-zoom-reset" title="Reset Zoom"><i class="fas fa-expand-arrows-alt"></i></button>
+                <button class="inline-viewer-zoom-in" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    `;
-    
-    // Add to document
-    document.body.appendChild(modal);
-    
+      `;
+      document.body.appendChild(modal);
+    }
+
     // Add event listeners
     modal.querySelector('.inline-viewer-close').addEventListener('click', () => {
       this.closeViewer();
@@ -70,11 +69,26 @@ class InlineViewer {
     modal.querySelector('.inline-viewer-zoom-reset').addEventListener('click', () => {
       this.resetZoom();
     });
-    
-    // Close on ESC key
+
+    modal.querySelector('.inline-viewer-fullscreen').addEventListener('click', () => {
+      this.toggleFullscreen();
+    });
+
+    // Close on ESC key, toggle fullscreen on F key
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && modal.classList.contains('active')) {
-        this.closeViewer();
+      if (!modal.classList.contains('active')) return;
+      if (e.key === 'Escape') {
+        if (modal.querySelector('.inline-viewer-content').classList.contains('inline-viewer-fullscreen')) {
+          this.toggleFullscreen();
+        } else {
+          this.closeViewer();
+        }
+        return;
+      }
+      if (e.key === 'f' && !e.ctrlKey && !e.metaKey && !e.altKey
+          && document.activeElement.tagName !== 'INPUT'
+          && document.activeElement.tagName !== 'TEXTAREA') {
+        this.toggleFullscreen();
       }
     });
     
@@ -97,7 +111,9 @@ class InlineViewer {
     const ext = (file.name || '').split('.').pop().toLowerCase();
     const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
     const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
-    if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+    const isPdf = file.mime_type && file.mime_type === 'application/pdf';
+    const isViewable = this.isMarkdownFile(file.name) || this.isTextViewable(file.mime_type);
+    if (!isImage && !isPdf && !isViewable && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
         window.wopiEditor.openInModal(file.id, file.name, 'edit');
         return;
     }
@@ -133,18 +149,26 @@ class InlineViewer {
       this.createBlobUrlViewer(file, 'image', container, loader);
     } 
     else if (file.mime_type && file.mime_type === 'application/pdf') {
-      // Hide zoom controls for PDFs
+      // Hide zoom controls for PDFs (PDF.js has its own)
       controls.style.display = 'none';
-      
+
       // Show loading indicator
       const loader = document.createElement('div');
       loader.className = 'inline-viewer-loader';
       loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
       container.appendChild(loader);
-      
-      // Create PDF viewer using object tag with blob URL
-      this.createBlobUrlViewer(file, 'pdf', container, loader);
+
+      // Create PDF.js viewer
+      this.createPdfJsViewer(file, container, loader);
     } 
+    else if (this.isMarkdownFile(file.name)) {
+      controls.style.display = 'none';
+      const loader = document.createElement('div');
+      loader.className = 'inline-viewer-loader';
+      loader.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+      container.appendChild(loader);
+      this.createMarkdownViewer(file, container, loader);
+    }
     else if (file.mime_type && this.isTextViewable(file.mime_type)) {
       // Hide zoom controls for text files
       controls.style.display = 'none';
@@ -205,6 +229,74 @@ class InlineViewer {
     modal.classList.add('active');
   }
   
+  isMarkdownFile(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    return ['md', 'markdown', 'mdown', 'mkd'].includes(ext);
+  }
+
+  async loadScript(src) {
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error(`Failed to load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  async loadStylesheet(href) {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  }
+
+  async createMarkdownViewer(file, container, loader) {
+    try {
+      // Lazy-load marked and highlight.js in parallel
+      await Promise.all([
+        this.loadScript('/vendor/marked/marked.min.js'),
+        this.loadScript('/vendor/highlightjs/highlight.min.js'),
+      ]);
+
+      // Load appropriate highlight.js theme
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      this.loadStylesheet(isDark
+        ? '/vendor/highlightjs/styles/github-dark.min.css'
+        : '/vendor/highlightjs/styles/github.min.css');
+
+      // Fetch markdown source
+      const response = await fetch(`/api/files/${file.id}?inline=true`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const text = await response.text();
+
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+
+      // Parse and render
+      const html = marked.parse(text, { gfm: true, breaks: true });
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'inline-viewer-markdown';
+      wrapper.innerHTML = html;
+
+      // Sanitize: remove script tags
+      wrapper.querySelectorAll('script').forEach(el => el.remove());
+
+      // Apply syntax highlighting to code blocks
+      wrapper.querySelectorAll('pre code').forEach(block => {
+        hljs.highlightElement(block);
+      });
+
+      container.appendChild(wrapper);
+    } catch (error) {
+      console.error('Error creating markdown viewer:', error);
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+      this.showErrorMessage(container);
+    }
+  }
+
   // Check if a MIME type is text-viewable — delegates to window.isTextViewable
   isTextViewable(mimeType) {
     return window.isTextViewable ? window.isTextViewable(mimeType) : false;
@@ -308,32 +400,6 @@ class InlineViewer {
           this.showErrorMessage(container);
         };
       } 
-      else if (type === 'pdf') {
-        console.log('Creating PDF viewer');
-        
-        // Create iframe for PDF (more reliable than object tag)
-        const iframe = document.createElement('iframe');
-        iframe.className = 'inline-viewer-pdf';
-        iframe.src = blobUrl;
-        iframe.setAttribute('allowfullscreen', 'true');
-        container.appendChild(iframe);
-        
-        // Monitor iframe for loading issues
-        setTimeout(() => {
-          if (!iframe.contentDocument || 
-              iframe.contentDocument.body.innerHTML === '') {
-            console.warn('PDF viewer might be having issues, adding fallback');
-            
-            // Add fallback embed
-            const embed = document.createElement('embed');
-            embed.className = 'inline-viewer-pdf-fallback';
-            embed.type = 'application/pdf';
-            embed.src = blobUrl;
-            container.appendChild(embed);
-          }
-        }, 2000);
-      }
-      
       // Store blob URL for cleaning up later
       this.currentBlobUrl = blobUrl;
     } 
@@ -349,6 +415,42 @@ class InlineViewer {
     }
   }
   
+  // Creates a PDF.js viewer using authenticated blob fetch
+  async createPdfJsViewer(file, container, loader) {
+    try {
+      // Fetch the PDF as a blob (authenticated)
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `/api/files/${file.id}?inline=true`, true);
+      xhr.responseType = 'blob';
+      xhr.withCredentials = true;
+
+      const blob = await new Promise((resolve, reject) => {
+        xhr.onload = function () {
+          if (this.status >= 200 && this.status < 300) resolve(this.response);
+          else reject(new Error(`HTTP ${this.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send();
+      });
+
+      const blobUrl = URL.createObjectURL(blob);
+      this.currentBlobUrl = blobUrl;
+
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+
+      // Create iframe pointing to PDF.js viewer with the blob URL
+      const iframe = document.createElement('iframe');
+      iframe.className = 'inline-viewer-pdf';
+      iframe.src = `/vendor/pdfjs/web/viewer.html?file=${encodeURIComponent(blobUrl)}`;
+      iframe.setAttribute('allowfullscreen', 'true');
+      container.appendChild(iframe);
+    } catch (error) {
+      console.error('Error creating PDF.js viewer:', error);
+      if (loader && loader.parentNode) loader.parentNode.removeChild(loader);
+      this.showErrorMessage(container);
+    }
+  }
+
   // Creates an audio or video player using blob URL (authenticated fetch)
   async createMediaViewer(file, mediaType, container, loader) {
     try {
@@ -465,10 +567,24 @@ class InlineViewer {
     container.appendChild(message);
   }
   
+  toggleFullscreen() {
+    const content = document.querySelector('#inline-viewer-modal .inline-viewer-content');
+    const btn = document.querySelector('button.inline-viewer-fullscreen i');
+    content.classList.toggle('inline-viewer-fullscreen');
+    const isFs = content.classList.contains('inline-viewer-fullscreen');
+    btn.className = isFs ? 'fas fa-compress' : 'fas fa-expand';
+  }
+
   closeViewer() {
     // Get modal
     const modal = document.getElementById('inline-viewer-modal');
-    
+
+    // Reset fullscreen state
+    const content = modal.querySelector('.inline-viewer-content');
+    content.classList.remove('inline-viewer-fullscreen');
+    const fsBtn = modal.querySelector('button.inline-viewer-fullscreen i');
+    if (fsBtn) fsBtn.className = 'fas fa-expand';
+
     // Hide modal
     modal.classList.remove('active');
     
@@ -483,22 +599,9 @@ class InlineViewer {
   }
   
   downloadFile(file) {
-    fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      })
-      .catch(err => console.error('Download error:', err));
+    if (window.fileOps && window.fileOps.downloadFile) {
+      window.fileOps.downloadFile(file.id, file.name);
+    }
   }
   
   zoomImage(factor) {

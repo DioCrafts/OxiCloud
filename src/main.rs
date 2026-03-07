@@ -417,13 +417,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // origin is configured at runtime (Collabora, OnlyOffice, etc.).
             HeaderValue::from_static(
                 "default-src 'self'; \
-                 script-src 'self'; \
-                 style-src 'self'; \
+                 script-src 'self' 'wasm-unsafe-eval'; \
+                 style-src 'self' 'unsafe-inline'; \
                  img-src 'self' data: blob:; \
-                 connect-src 'self'; \
+                 media-src 'self' blob:; \
+                 connect-src 'self' blob:; \
                  font-src 'self' data:; \
                  frame-src *; \
-                 frame-ancestors 'none'; \
+                 frame-ancestors 'self'; \
                  base-uri 'self'; \
                  form-action 'self'",
             ),

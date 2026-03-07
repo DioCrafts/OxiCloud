@@ -1,7 +1,6 @@
 /* File list - Improved style */
 .files-list-view {
 	--files-list-columns: 36px minmax(200px, 2fr) 100px 110px 160px;
-	display: flex;
 	flex-direction: column;
 	width: 100%;
 	border-radius: 10px;

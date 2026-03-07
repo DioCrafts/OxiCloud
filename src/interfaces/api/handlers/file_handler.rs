@@ -800,10 +800,15 @@ impl FileHandler {
     /// filenames with quotes, non-ASCII characters, or other special chars.
     /// A sanitised ASCII `filename=` fallback is included for legacy clients.
     fn content_disposition(name: &str, mime: &str, params: &HashMap<String, String>) -> String {
+        let force_download = params
+            .get("download")
+            .is_some_and(|v| v == "true" || v == "1");
         let force_inline = params
             .get("inline")
             .is_some_and(|v| v == "true" || v == "1");
-        let disposition = if force_inline
+        let disposition = if force_download {
+            "attachment"
+        } else if force_inline
             || mime.starts_with("image/")
             || mime == "application/pdf"
             || mime.starts_with("video/")

@@ -3,6 +3,12 @@
     "title": "OxiCloud",
     "description": "سیستم ذخیره‌سازی ابری ساده‌گرا"
   },
+  "upload": {
+    "uploading": "…در حال بارگذاری",
+    "uploading_folder": "📁 …در حال بارگذاری {{folder}}",
+    "complete": "{{count}} / {{total}} بارگذاری شد",
+    "files_label": "فایل"
+  },
   "nav": {
     "files": "پرونده‌ها",
     "shared": "هم‌رسانی شده",
@@ -25,8 +31,6 @@
     "upload": "بارگذاری",
     "upload_files": "بارگذاری پرونده‌ها",
     "upload_folder": "بارگذاری پوشه",
-    "upload.uploading": "...در حال بارگذاری",
-    "upload.complete": "{count} / {total} بارگذاری شد",
     "rename": "تغییر نام",
     "move": "انتقال به...",
     "move_to": "انتقال به",

@@ -143,11 +143,11 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
+        const _t = (window.i18n && window.i18n.t) ? window.i18n.t.bind(window.i18n) : k => k.split('.').pop();
         const uploadingText = folderName
-            ? (locale.startsWith('es') ? `📁 Subiendo ${_esc(folderName)}…` : `📁 Uploading ${_esc(folderName)}…`)
-            : (locale.startsWith('es') ? 'Subiendo…' : 'Uploading…');
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+            ? _t('upload.uploading_folder', { folder: _esc(folderName) })
+            : _t('upload.uploading');
+        const filesLabel = _t('upload.files_label');
 
         item.innerHTML = `
             <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
@@ -254,8 +254,8 @@ const notifications = (() => {
         const pctEl   = $(batchId + '-pct');
         const statsEl = $(batchId + '-stats');
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+        const _t = (window.i18n && window.i18n.t) ? window.i18n.t.bind(window.i18n) : k => k.split('.').pop();
+        const filesLabel = _t('upload.files_label');
 
         if (fillEl)  fillEl.style.width = pctVal + '%';
         if (pctEl)   pctEl.textContent = pctVal + '%';
@@ -282,11 +282,8 @@ const notifications = (() => {
         const curEl = $(batchId + '-current');
         if (curEl) curEl.textContent = '';
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
-        const completeText = locale.startsWith('es')
-            ? `✅ ${successCount} / ${totalFiles} ${filesLabel} subidos`
-            : `✅ ${successCount} / ${totalFiles} ${filesLabel} uploaded`;
+        const _t = (window.i18n && window.i18n.t) ? window.i18n.t.bind(window.i18n) : k => k.split('.').pop();
+        const completeText = `✅ ${_t('upload.complete', { count: successCount, total: totalFiles })}`;
         if (titleEl) titleEl.textContent = completeText;
 
         if (iconEl) {

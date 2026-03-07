@@ -10,6 +10,9 @@ const uiFileTypes = {
         if (file.mime_type === 'application/pdf') return true;
         if (file.mime_type.startsWith('audio/')) return true;
         if (file.mime_type.startsWith('video/')) return true;
+        // Markdown files (may have text/plain or text/markdown mime)
+        const ext = (file.name || '').split('.').pop().toLowerCase();
+        if (['md', 'markdown', 'mdown', 'mkd'].includes(ext)) return true;
         return window.isTextViewable ? window.isTextViewable(file.mime_type) : false;
     },
 
