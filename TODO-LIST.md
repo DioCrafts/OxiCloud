@@ -433,3 +433,6 @@ This document contains the task list for the development of OxiCloud, a minimali
   - [ ] Develop case-based retention
   - [ ] Add evidence preservation
   - [ ] Implement chain of custody
+
+
+- lightcss for frontend.
