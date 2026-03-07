@@ -95,8 +95,8 @@ const PROPFIND_BATCH_SIZE: i64 = 500;
 /// user-scoped `PathResolverService` methods.
 fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
     req.extensions()
-        .get::<CurrentUser>()
-        .cloned()
+        .get::<Arc<CurrentUser>>()
+        .map(|arc| (**arc).clone())
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 
@@ -209,7 +209,7 @@ async fn handle_webdav_dispatch(
     // prefix when the path doesn't already include it.
     // Extract user_id before any async call to keep the future Send.
     let path = if !path.is_empty() && method.as_str() != "OPTIONS" {
-        let user_id = req.extensions().get::<CurrentUser>().map(|u| u.id.clone());
+        let user_id = req.extensions().get::<Arc<CurrentUser>>().map(|u| u.id.clone());
         if let Some(uid) = user_id {
             resolve_webdav_path(&state, &uid, &path)
                 .await

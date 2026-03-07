@@ -53,15 +53,17 @@ pub struct SearchService {
 
 /// Compute relevance score (0–100) for a name against a query.
 /// Exact match = 100, starts-with = 80, contains = 50, no match = 0.
-fn compute_relevance(name: &str, query: &str) -> u32 {
+///
+/// `query_lower` **must** already be lowercased by the caller so that the
+/// allocation happens once per search, not once per result.
+fn compute_relevance(name: &str, query_lower: &str) -> u32 {
     let name_lower = name.to_lowercase();
-    let query_lower = query.to_lowercase();
 
     if name_lower == query_lower {
         100
-    } else if name_lower.starts_with(&query_lower) {
+    } else if name_lower.starts_with(query_lower) {
         80
-    } else if name_lower.contains(&query_lower) {
+    } else if name_lower.contains(query_lower) {
         // Bonus for shorter names (more specific match)
         let ratio = query_lower.len() as f64 / name_lower.len() as f64;
         50 + (ratio * 20.0) as u32
@@ -146,11 +148,13 @@ impl SearchService {
     }
 
     /// Enrich a FileDto → SearchFileResultDto with server-computed metadata.
-    fn enrich_file(file: &FileDto, query: &str) -> SearchFileResultDto {
-        let relevance = if query.is_empty() {
+    ///
+    /// `query_lower` must already be lowercased (empty string when no query).
+    fn enrich_file(file: &FileDto, query_lower: &str) -> SearchFileResultDto {
+        let relevance = if query_lower.is_empty() {
             50
         } else {
-            compute_relevance(&file.name, query)
+            compute_relevance(&file.name, query_lower)
         };
 
         SearchFileResultDto {
@@ -171,11 +175,13 @@ impl SearchService {
     }
 
     /// Enrich a FolderDto → SearchFolderResultDto with server-computed metadata.
-    fn enrich_folder(folder: &FolderDto, query: &str) -> SearchFolderResultDto {
-        let relevance = if query.is_empty() {
+    ///
+    /// `query_lower` must already be lowercased (empty string when no query).
+    fn enrich_folder(folder: &FolderDto, query_lower: &str) -> SearchFolderResultDto {
+        let relevance = if query_lower.is_empty() {
             50
         } else {
-            compute_relevance(&folder.name, query)
+            compute_relevance(&folder.name, query_lower)
         };
 
         SearchFolderResultDto {
@@ -214,9 +220,12 @@ impl SearchService {
         let mut suggestions: Vec<SearchSuggestionItem> =
             Vec::with_capacity(files.len() + folders.len());
 
+        // Pre-compute once — avoids N heap allocations inside the loops.
+        let query_lower = query.to_lowercase();
+
         for file in &files {
             let file_dto = FileDto::from(file.clone());
-            let score = compute_relevance(&file_dto.name, query);
+            let score = compute_relevance(&file_dto.name, &query_lower);
             suggestions.push(SearchSuggestionItem {
                 name: file_dto.name.clone(),
                 item_type: "file".to_string(),
@@ -230,7 +239,7 @@ impl SearchService {
 
         for folder in &folders {
             let folder_dto = FolderDto::from(folder.clone());
-            let score = compute_relevance(&folder_dto.name, query);
+            let score = compute_relevance(&folder_dto.name, &query_lower);
             suggestions.push(SearchSuggestionItem {
                 name: folder_dto.name.clone(),
                 item_type: "folder".to_string(),
@@ -287,6 +296,8 @@ impl SearchUseCase for SearchService {
         }
 
         let query = criteria.name_contains.as_deref().unwrap_or("");
+        // Pre-compute once — avoids N heap allocations inside enrich_file/enrich_folder.
+        let query_lower = query.to_lowercase();
 
         // For non-recursive searches, use efficient database-level pagination
         // This avoids loading all files into memory
@@ -301,7 +312,7 @@ impl SearchUseCase for SearchService {
             let file_dtos: Vec<FileDto> = files.into_iter().map(FileDto::from).collect();
             let enriched_files: Vec<SearchFileResultDto> = file_dtos
                 .iter()
-                .map(|f| Self::enrich_file(f, query))
+                .map(|f| Self::enrich_file(f, &query_lower))
                 .collect();
 
             // Get folders for this folder (non-recursive, filtered in SQL)
@@ -321,7 +332,7 @@ impl SearchUseCase for SearchService {
             // For folders, apply sorting and pagination in memory (usually fewer folders)
             let mut enriched_folders: Vec<SearchFolderResultDto> = filtered_folders
                 .iter()
-                .map(|f| Self::enrich_folder(f, query))
+                .map(|f| Self::enrich_folder(f, &query_lower))
                 .collect();
 
             // Sort folders (cached_key avoids O(N log N) temporary String allocations)
@@ -401,13 +412,13 @@ impl SearchUseCase for SearchService {
         let file_dtos: Vec<FileDto> = found_files.into_iter().map(FileDto::from).collect();
         let enriched_files: Vec<SearchFileResultDto> = file_dtos
             .iter()
-            .map(|f| Self::enrich_file(f, query))
+            .map(|f| Self::enrich_file(f, &query_lower))
             .collect();
 
         let folder_dtos: Vec<FolderDto> = found_folders.into_iter().map(FolderDto::from).collect();
         let mut enriched_folders: Vec<SearchFolderResultDto> = folder_dtos
             .iter()
-            .map(|f| Self::enrich_folder(f, query))
+            .map(|f| Self::enrich_folder(f, &query_lower))
             .collect();
 
         // ── Sort folders (cached_key avoids O(N log N) temporary String allocations) ──

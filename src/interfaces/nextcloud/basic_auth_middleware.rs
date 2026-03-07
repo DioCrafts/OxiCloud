@@ -89,12 +89,12 @@ pub async fn basic_auth_middleware(
             if let Some(auth_svc) = state.auth_service.as_ref() {
                 auth_svc.login_lockout.record_success(&username);
             }
-            request.extensions_mut().insert(CurrentUser {
+            request.extensions_mut().insert(Arc::new(CurrentUser {
                 id: user_id,
                 username: uname,
                 email,
                 role,
-            });
+            }));
             Ok(next.run(request).await)
         }
         Err(_) => {

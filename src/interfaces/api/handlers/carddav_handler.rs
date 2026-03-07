@@ -128,8 +128,8 @@ fn reject_path_traversal(path: &str) -> Result<(), AppError> {
 
 fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
     req.extensions()
-        .get::<CurrentUser>()
-        .cloned()
+        .get::<Arc<CurrentUser>>()
+        .map(|arc| (**arc).clone())
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 
