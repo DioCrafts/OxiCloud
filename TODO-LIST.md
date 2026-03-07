@@ -34,6 +34,10 @@ This document contains the task list for the development of OxiCloud, a minimali
 - [x] Implement multiple file uploads
 - [ ] Add progress indicators for long operations
 - [x] Implement UI notifications for events
+- [ ] Photos timeline: virtual scrolling
+  - Solo mantener en el DOM las filas visibles en el viewport + un margen. Al hacer scroll, reciclar los nodos que salen por arriba para los que entran por abajo.
+  - Ventajas: Funciona perfectamente con 50,000 fotos. Uso de memoria constante.
+  - Excesiva para ahora — evaluar cuando el volumen de fotos lo justifique.
 
 ## Phase 2: Authentication and Multi-User
 

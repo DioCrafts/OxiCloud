@@ -30,6 +30,8 @@ const photosView = {
     _activeDecodes: 0,
     /** @type {Array} Pending video decode queue */
     _decodeQueue: [],
+    /** @type {number} Items already rendered in the DOM */
+    _renderedCount: 0,
 
     PAGE_SIZE: 200,
 
@@ -66,7 +68,8 @@ const photosView = {
         this.nextCursor = null;
         this.exhausted = false;
         this.selected.clear();
-        this._render();
+        this._renderedCount = 0;
+        this._container.innerHTML = '';
         this._loadPage();
     },
 
@@ -84,7 +87,8 @@ const photosView = {
         if (this.groupMode === mode) return;
         this.groupMode = mode;
         localStorage.setItem('oxicloud-photos-group', mode);
-        this._render();
+        this._renderedCount = 0;
+        this._renderFull();
     },
 
     /** Fetch a page of photos from the API */
@@ -92,6 +96,7 @@ const photosView = {
         if (this.loading || this.exhausted) return;
         this.loading = true;
         this._showLoading(true);
+        const prevCount = this.items.length;
 
         try {
             let url = `/api/photos?limit=${this.PAGE_SIZE}`;
@@ -125,16 +130,24 @@ const photosView = {
         } finally {
             this.loading = false;
             this._showLoading(false);
-            this._render();
+            if (prevCount === 0) {
+                this._renderFull();
+            } else {
+                this._appendBatch(prevCount);
+            }
         }
     },
 
-    /** Render the full timeline from this.items */
-    _render() {
+    // ── Rendering ───────────────────────────────────────────────────
+    // Two render paths:
+    //   _renderFull()   — full DOM rebuild (first load, group-mode change, delete)
+    //   _appendBatch(n) — append-only for infinite-scroll pages (O(batch))
+
+    /** Full DOM rebuild — first load, group-mode switch, or after deletions. */
+    _renderFull() {
         if (!this._container) return;
         this._destroyObserver();
 
-        // Set group mode class on container
         this._container.classList.remove('photos-group-daily', 'photos-group-monthly', 'photos-group-yearly');
         this._container.classList.add(`photos-group-${this.groupMode}`);
 
@@ -142,57 +155,104 @@ const photosView = {
             this._renderEmpty();
             return;
         }
-
         if (this.items.length === 0) return;
 
-        // Group by selected mode
         const groups = this._groupItems(this.items);
         let html = this._renderToolbar();
 
         for (const [label, files] of groups) {
-            html += `<div class="photos-day-header">${this._escHtml(label)}<span class="photos-day-count">${files.length}</span></div>`;
+            html += `<div class="photos-day-header" data-group="${this._escAttr(label)}">${this._escHtml(label)}<span class="photos-day-count">${files.length}</span></div>`;
             html += '<div class="photos-grid">';
-            for (const file of files) {
-                const isVideo = file.mime_type && file.mime_type.startsWith('video/');
-                const selected = this.selected.has(file.id) ? ' selected' : '';
-                // For videos with a cached local thumb, use it directly;
-                // avoids the 204 → error → re-decode cycle on re-renders.
-                const cachedThumb = isVideo && this._videoThumbCache.has(file.id)
-                    ? this._videoThumbCache.get(file.id)
-                    : null;
-                const thumbUrl = cachedThumb || `/api/files/${file.id}/thumbnail/preview`;
-                html += `<div class="photo-tile${selected}" data-id="${this._escAttr(file.id)}" data-mime="${this._escAttr(file.mime_type)}">`;
-                html += `<div class="photo-check"><i class="fas fa-check"></i></div>`;
-                html += `<img src="${thumbUrl}" loading="lazy" alt="${this._escAttr(file.name)}">`;
-                if (isVideo) {
-                    html += `<div class="video-badge"><i class="fas fa-play"></i></div>`;
-                }
-                html += `</div>`;
-            }
+            for (const file of files) html += this._renderTile(file);
             html += '</div>';
         }
 
-        // Sentinel for infinite scroll
         html += '<div class="photos-sentinel"></div>';
-
         this._container.innerHTML = html;
-
-        // Attach click handlers via delegation
         this._container.onclick = (e) => this._handleClick(e);
+        this._renderedCount = this.items.length;
+        this._observeSentinel();
+        this._setupVideoThumbnails();
+    },
 
-        // Observe sentinel for infinite scroll
+    /** Append-only render for infinite scroll — inserts only the items
+     *  from this.items[startIndex..] without destroying existing DOM.
+     *  Complexity: O(batch) instead of O(total_items). */
+    _appendBatch(startIndex) {
+        if (!this._container) return;
+        this._destroyObserver();
+
+        const newItems = this.items.slice(startIndex);
+        if (newItems.length === 0) {
+            this._observeSentinel();
+            return;
+        }
+
+        const newGroups = this._groupItems(newItems);
         const sentinel = this._container.querySelector('.photos-sentinel');
+        if (!sentinel) {
+            // Fallback: sentinel missing — full rebuild
+            this._renderedCount = 0;
+            this._renderFull();
+            return;
+        }
+
+        for (const [label, files] of newGroups) {
+            let tilesHtml = '';
+            for (const file of files) tilesHtml += this._renderTile(file);
+
+            // Does this date-group already exist in the DOM?
+            const existingHeader = this._container.querySelector(
+                `.photos-day-header[data-group="${CSS.escape(label)}"]`
+            );
+
+            if (existingHeader) {
+                // Append tiles to existing grid and update count badge
+                const grid = existingHeader.nextElementSibling;
+                if (grid && grid.classList.contains('photos-grid')) {
+                    grid.insertAdjacentHTML('beforeend', tilesHtml);
+                    const countSpan = existingHeader.querySelector('.photos-day-count');
+                    if (countSpan) countSpan.textContent = grid.children.length;
+                }
+            } else {
+                // New group — insert header + grid before sentinel
+                const sectionHtml =
+                    `<div class="photos-day-header" data-group="${this._escAttr(label)}">${this._escHtml(label)}<span class="photos-day-count">${files.length}</span></div>` +
+                    `<div class="photos-grid">${tilesHtml}</div>`;
+                sentinel.insertAdjacentHTML('beforebegin', sectionHtml);
+            }
+        }
+
+        this._renderedCount = this.items.length;
+        this._observeSentinel();
+        this._setupVideoThumbnails(startIndex);
+    },
+
+    /** Generate HTML for a single photo/video tile */
+    _renderTile(file) {
+        const isVideo = file.mime_type && file.mime_type.startsWith('video/');
+        const selected = this.selected.has(file.id) ? ' selected' : '';
+        const cachedThumb = isVideo && this._videoThumbCache.has(file.id)
+            ? this._videoThumbCache.get(file.id) : null;
+        const thumbUrl = cachedThumb || `/api/files/${file.id}/thumbnail/preview`;
+        let h = `<div class="photo-tile${selected}" data-id="${this._escAttr(file.id)}" data-mime="${this._escAttr(file.mime_type)}">`;
+        h += `<div class="photo-check"><i class="fas fa-check"></i></div>`;
+        h += `<img src="${thumbUrl}" loading="lazy" alt="${this._escAttr(file.name)}">`;
+        if (isVideo) h += `<div class="video-badge"><i class="fas fa-play"></i></div>`;
+        h += `</div>`;
+        return h;
+    },
+
+    /** (Re-)observe the sentinel element for infinite scroll */
+    _observeSentinel() {
+        this._destroyObserver();
+        const sentinel = this._container?.querySelector('.photos-sentinel');
         if (sentinel && !this.exhausted) {
             this._observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) {
-                    this._loadPage();
-                }
+                if (entries[0].isIntersecting) this._loadPage();
             }, { rootMargin: '400px' });
             this._observer.observe(sentinel);
         }
-
-        // Set up client-side video thumbnail generation
-        this._setupVideoThumbnails();
     },
 
     // ── Client-side video thumbnail generation ──────────────────────
@@ -202,18 +262,22 @@ const photosView = {
 
     /** Attach error handlers to video tile images; on failure, extract a
      *  frame from the video using the browser's built-in codec. */
-    _setupVideoThumbnails() {
+    /** @param {number} [startIndex=0] When > 0, only process video tiles
+     *  for items[startIndex..] — avoids re-scanning the entire DOM. */
+    _setupVideoThumbnails(startIndex = 0) {
         const tiles = this._container.querySelectorAll('.photo-tile[data-mime^="video/"]');
-        for (const tile of tiles) {
-            const img = tile.querySelector('img');
-            if (!img) continue;
-            const fileId = tile.dataset.id;
+        const newIds = startIndex > 0
+            ? new Set(this.items.slice(startIndex).map(f => f.id))
+            : null;
 
-            // Skip if already cached locally (URL was set during render)
+        for (const tile of tiles) {
+            const fileId = tile.dataset.id;
+            if (newIds && !newIds.has(fileId)) continue;
             if (this._videoThumbCache.has(fileId)) continue;
 
-            // The server returns 204 for videos without a cached thumbnail,
-            // which causes the <img> to fire 'error'.
+            const img = tile.querySelector('img');
+            if (!img) continue;
+
             img.addEventListener('error', () => {
                 this._enqueueVideoThumbnail(tile, img);
             }, { once: true });
@@ -241,7 +305,7 @@ const photosView = {
     },
 
     /** Extract a single frame from a video and display it as the tile
-     *  thumbnail, then upload the WebP to the server for caching. */
+     *  thumbnail, then upload the JPEG to the server for caching. */
     _generateVideoThumbnail(tile, img) {
         const fileId = tile.dataset.id;
         const video = document.createElement('video');
@@ -299,7 +363,7 @@ const photosView = {
                     if (resp.ok) {
                         // Switch from blob URL to server URL so the blob
                         // can be garbage-collected and future loads use
-                        // the permanently cached WebP from the server.
+                        // the permanently cached JPEG from the server.
                         const serverUrl = `/api/files/${fileId}/thumbnail/preview?v=1`;
                         this._videoThumbCache.set(fileId, serverUrl);
                     }
@@ -457,7 +521,8 @@ const photosView = {
             this.items = this.items.filter(f => !this.selected.has(f.id));
             this.selected.clear();
             this._hideSelectionBar();
-            this._render();
+            this._renderedCount = 0;
+            this._renderFull();
         };
 
         bar.querySelector('#photos-sel-download').onclick = async () => {
