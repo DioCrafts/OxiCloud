@@ -8,6 +8,7 @@ use crate::application::services::trash_service::TrashService;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+use crate::infrastructure::services::thumbnail_service::ThumbnailService;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
@@ -21,6 +22,7 @@ pub struct FileManagementService {
     file_repository: Arc<FileBlobWriteRepository>,
     file_read: Option<Arc<FileBlobReadRepository>>,
     trash_service: Option<Arc<TrashService>>,
+    thumbnail_service: Option<Arc<ThumbnailService>>,
 }
 
 impl FileManagementService {
@@ -30,6 +32,7 @@ impl FileManagementService {
             file_repository,
             file_read: None,
             trash_service: None,
+            thumbnail_service: None,
         }
     }
 
@@ -38,11 +41,13 @@ impl FileManagementService {
         file_repository: Arc<FileBlobWriteRepository>,
         trash_service: Option<Arc<TrashService>>,
         file_read: Option<Arc<FileBlobReadRepository>>,
+        thumbnail_service: Option<Arc<ThumbnailService>>,
     ) -> Self {
         Self {
             file_repository,
             file_read,
             trash_service,
+            thumbnail_service,
         }
     }
 
@@ -171,7 +176,14 @@ impl FileManagementUseCase for FileManagementService {
     }
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
-        self.file_repository.delete_file(id).await
+        self.file_repository.delete_file(id).await?;
+        // Best-effort thumbnail cleanup
+        if let Some(thumb) = &self.thumbnail_service {
+            if let Err(e) = thumb.delete_thumbnails(id).await {
+                warn!("Failed to delete thumbnails for file {}: {}", id, e);
+            }
+        }
+        Ok(())
     }
 
     async fn delete_file_owned(&self, id: &str, caller_id: Uuid) -> Result<(), DomainError> {
@@ -210,6 +222,12 @@ impl FileManagementUseCase for FileManagementService {
         // Step 2: Permanent delete — trigger handles blob ref_count
         warn!("Permanently deleting file: {}", id);
         self.file_repository.delete_file(id).await?;
+        // Best-effort thumbnail cleanup
+        if let Some(thumb) = &self.thumbnail_service {
+            if let Err(e) = thumb.delete_thumbnails(id).await {
+                warn!("Failed to delete thumbnails for file {}: {}", id, e);
+            }
+        }
         info!("File permanently deleted: {}", id);
 
         Ok(false) // permanently deleted

@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
 use crate::application::dtos::trash_dto::TrashedItemDto;
@@ -13,6 +13,7 @@ use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlob
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 use crate::infrastructure::repositories::pg::trash_db_repository::TrashDbRepository;
+use crate::infrastructure::services::thumbnail_service::ThumbnailService;
 
 /**
  * Application service for trash operations.
@@ -40,6 +41,9 @@ pub struct TrashService {
     /// Port for folder operations (get folder, trash, restore, delete)
     folder_storage_port: Arc<FolderDbRepository>,
 
+    /// Thumbnail service for cleaning up thumbnails on permanent delete
+    thumbnail_service: Option<Arc<ThumbnailService>>,
+
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
 }
@@ -51,12 +55,14 @@ impl TrashService {
         file_write_port: Arc<FileBlobWriteRepository>,
         folder_storage_port: Arc<FolderDbRepository>,
         retention_days: u32,
+        thumbnail_service: Option<Arc<ThumbnailService>>,
     ) -> Self {
         Self {
             trash_repository,
             file_read_port,
             file_write_port,
             folder_storage_port,
+            thumbnail_service,
             retention_days,
         }
     }
@@ -557,6 +563,14 @@ impl TrashUseCase for TrashService {
                                 }
                             }
                         }
+
+                        // Best-effort thumbnail cleanup — thumbnails are cache
+                        // artifacts, so failure must not block file deletion.
+                        if let Some(thumb) = &self.thumbnail_service {
+                            if let Err(e) = thumb.delete_thumbnails(&file_id).await {
+                                warn!("Failed to delete thumbnails for file {}: {}", file_id, e);
+                            }
+                        }
                     }
                     TrashedItemType::Folder => {
                         // Permanently delete the folder
@@ -647,6 +661,25 @@ impl TrashUseCase for TrashService {
     async fn empty_trash(&self, user_id: Uuid) -> Result<()> {
         info!("Emptying trash for user {}", user_id);
 
+        // Collect trashed file IDs BEFORE bulk-deleting so we can clean up
+        // their thumbnails afterward.  This is best-effort — if the query
+        // fails we still proceed with the bulk delete.
+        let trashed_file_ids: Vec<String> = if self.thumbnail_service.is_some() {
+            match self.trash_repository.get_trash_items(&user_id).await {
+                Ok(items) => items
+                    .iter()
+                    .filter(|i| matches!(i.item_type(), TrashedItemType::File))
+                    .map(|i| i.original_id().to_string())
+                    .collect(),
+                Err(e) => {
+                    warn!("Could not list trashed items for thumbnail cleanup: {}", e);
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
+
         // clear_trash() already performs bulk SQL DELETEs in 2 queries:
         //   1. DELETE FROM storage.files  WHERE user_id = $1 AND is_trashed = TRUE
         //   2. DELETE FROM storage.folders WHERE user_id = $1 AND is_trashed = TRUE
@@ -658,6 +691,15 @@ impl TrashUseCase for TrashService {
         //
         // Finally it clears the trash_items index for the user.
         self.trash_repository.clear_trash(&user_id).await?;
+
+        // Best-effort thumbnail cleanup for all deleted files
+        if let Some(thumb) = &self.thumbnail_service {
+            for file_id in &trashed_file_ids {
+                if let Err(e) = thumb.delete_thumbnails(file_id).await {
+                    warn!("Failed to delete thumbnails for file {}: {}", file_id, e);
+                }
+            }
+        }
 
         info!("Trash emptied for user {}", user_id);
         Ok(())

@@ -261,6 +261,7 @@ impl AppServiceFactory {
             repos.file_write_repository.clone(),
             trash_service.clone(),
             Some(repos.file_read_repository.clone()),
+            Some(core.thumbnail_service.clone()),
         ));
 
         let file_use_case_factory = Arc::new(AppFileUseCaseFactory::new(
@@ -302,6 +303,7 @@ impl AppServiceFactory {
     pub async fn create_trash_service(
         &self,
         repos: &RepositoryServices,
+        core: &CoreServices,
     ) -> Option<Arc<TrashService>> {
         if !self.config.features.enable_trash {
             tracing::info!("Trash service is disabled in configuration");
@@ -317,6 +319,7 @@ impl AppServiceFactory {
             repos.file_write_repository.clone(),
             repos.folder_repository.clone(),
             self.config.storage.trash_retention_days,
+            Some(core.thumbnail_service.clone()),
         ));
 
         // Initialize cleanup service (bulk-deletes expired items in 2 SQL queries)
@@ -457,7 +460,7 @@ impl AppServiceFactory {
         let repos = self.create_repository_services(&core, &pool);
 
         // 3. Trash service (needed before application services)
-        let trash_service = self.create_trash_service(&repos).await;
+        let trash_service = self.create_trash_service(&repos, &core).await;
 
         // 4. Application services (with trash already wired)
         let mut apps = self.create_application_services(&core, &repos, trash_service.clone());
