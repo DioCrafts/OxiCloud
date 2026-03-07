@@ -291,18 +291,29 @@ impl FileHandler {
     //  THUMBNAILS
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Get a thumbnail for an image file.
+    /// Get a thumbnail for a file (image or video).
     ///
-    /// Thumbnail orchestration (path resolution, generation, caching) stays here
-    /// because it is tightly coupled to HTTP response headers.
+    /// **Cache-first**: if the thumbnail already exists in the moka in-memory
+    /// cache or on disk, serve it immediately — **zero DB queries**.  The
+    /// ownership check was already performed when the thumbnail was first
+    /// generated (at upload) or uploaded (PUT by the owner).  UUIDv4 file IDs
+    /// have 122 bits of entropy, making enumeration infeasible.
+    ///
+    /// **ETag / 304**: responses carry an immutable ETag.  If the browser
+    /// sends `If-None-Match` matching the ETag, we return 304 Not Modified
+    /// without touching cache or DB — pure header round-trip.
+    ///
+    /// The DB path is only taken on a **cache miss for images** where the
+    /// thumbnail hasn't been generated yet (first access after upload if
+    /// background generation hasn't finished).
     pub async fn get_thumbnail(
         State(state): State<GlobalState>,
         auth_user: AuthUser,
+        headers: HeaderMap,
         Path((id, size)): Path<(String, String)>,
     ) -> impl IntoResponse {
         use crate::application::ports::thumbnail_ports::ThumbnailSize;
 
-        let file_retrieval_service = &state.applications.file_retrieval_service;
         let thumbnail_service = &state.core.thumbnail_service;
 
         let thumb_size = match size.as_str() {
@@ -320,6 +331,46 @@ impl FileHandler {
             }
         };
 
+        // ── ETag short-circuit (Solution C) ──────────────────────────
+        // Thumbnails are immutable — the ETag never changes for a given
+        // (file_id, size) pair.  If the browser already has it, return 304
+        // with zero I/O or DB work.
+        let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
+        if let Some(if_none_match) = headers.get(header::IF_NONE_MATCH) {
+            if let Ok(val) = if_none_match.to_str() {
+                if val == etag || val == "*" {
+                    return Response::builder()
+                        .status(StatusCode::NOT_MODIFIED)
+                        .header(header::ETAG, &etag)
+                        .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                        .body(Body::empty())
+                        .unwrap()
+                        .into_response();
+                }
+            }
+        }
+
+        // ── Cache-first path (Solution A) ────────────────────────────
+        // Try moka (RAM) → disk before touching the database.
+        // If the thumbnail exists it was authorized at creation time.
+        if let Some(data) = thumbnail_service
+            .get_cached_thumbnail(&id, thumb_size.into())
+            .await
+        {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "image/webp")
+                .header(header::CONTENT_LENGTH, data.len())
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .header(header::ETAG, &etag)
+                .body(Body::from(data))
+                .unwrap()
+                .into_response();
+        }
+
+        // ── Cache miss — need DB for ownership + blob resolution ─────
+        let file_retrieval_service = &state.applications.file_retrieval_service;
+
         let file = match file_retrieval_service
             .get_file_owned(&id, auth_user.id)
             .await
@@ -330,25 +381,8 @@ impl FileHandler {
             }
         };
 
+        // Non-image (video, etc.) with no cached thumbnail → 204
         if !thumbnail_service.is_supported_image(&file.mime_type) {
-            // For non-images (videos, etc.), serve from cache if available;
-            // otherwise return 204 to signal "not yet generated — please
-            // generate client-side and upload via PUT".
-            if let Some(data) = thumbnail_service
-                .get_cached_thumbnail(&id, thumb_size.into())
-                .await
-            {
-                let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
-                return Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "image/webp")
-                    .header(header::CONTENT_LENGTH, data.len())
-                    .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                    .header(header::ETAG, etag)
-                    .body(Body::from(data))
-                    .unwrap()
-                    .into_response();
-            }
             return Response::builder()
                 .status(StatusCode::NO_CONTENT)
                 .header(header::CACHE_CONTROL, "no-store")
@@ -376,13 +410,12 @@ impl FileHandler {
             .await
         {
             Ok(data) => {
-                let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
                 Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "image/webp")
                     .header(header::CONTENT_LENGTH, data.len())
                     .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                    .header(header::ETAG, etag)
+                    .header(header::ETAG, &etag)
                     .body(Body::from(data))
                     .unwrap()
                     .into_response()

@@ -105,12 +105,16 @@ impl ThumbnailService {
         // for variable-size thumbnails than entry-count limits.
         let _ = max_cache_entries;
 
+        // No time_to_live — thumbnails are immutable (content never changes
+        // for a given file_id).  Eviction is purely weight-based: when the
+        // cache exceeds max_cache_bytes the lightest entries are dropped.
+        // On eviction the thumbnail is still on disk; the next request
+        // promotes it back with a single async read (~0.1 ms).
         let cache = moka::future::Cache::builder()
             .max_capacity(max_cache_bytes as u64)
             .weigher(|_key: &ThumbnailCacheKey, value: &Bytes| -> u32 {
                 value.len().min(u32::MAX as usize) as u32
             })
-            .time_to_live(std::time::Duration::from_secs(600))
             .build();
 
         Self {
@@ -512,7 +516,8 @@ impl ThumbnailService {
                 }
             };
 
-            // Save each size to disk (async I/O, very fast for small WebP files)
+            // Save each size to disk AND populate moka so the very first
+            // GET after upload is served from RAM (zero disk I/O).
             for (size, bytes) in thumbnails {
                 let thumb_path = self.get_thumbnail_path(&file_id, size);
                 if let Some(parent) = thumb_path.parent() {
@@ -521,6 +526,12 @@ impl ThumbnailService {
                 if let Err(e) = fs::write(&thumb_path, &bytes).await {
                     tracing::warn!("Failed to save thumbnail {} {:?}: {}", file_id, size, e);
                 } else {
+                    // Populate in-memory cache for instant first-hit serving
+                    let cache_key = ThumbnailCacheKey {
+                        file_id: file_id.clone(),
+                        size,
+                    };
+                    self.cache.insert(cache_key, bytes).await;
                     tracing::debug!("✅ Generated thumbnail: {} {:?}", file_id, size);
                 }
             }
