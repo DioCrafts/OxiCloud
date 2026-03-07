@@ -22,6 +22,14 @@ const photosView = {
     _initialized: false,
     /** @type {'daily'|'monthly'|'yearly'} */
     groupMode: 'monthly',
+    /** @type {Map<string, string>} fileId → thumbnail URL (persists across re-renders) */
+    _videoThumbCache: new Map(),
+    /** @type {number} Max concurrent video thumbnail extractions */
+    _maxConcurrentDecodes: 3,
+    /** @type {number} Currently running video decodes */
+    _activeDecodes: 0,
+    /** @type {Array} Pending video decode queue */
+    _decodeQueue: [],
 
     PAGE_SIZE: 200,
 
@@ -147,7 +155,12 @@ const photosView = {
             for (const file of files) {
                 const isVideo = file.mime_type && file.mime_type.startsWith('video/');
                 const selected = this.selected.has(file.id) ? ' selected' : '';
-                const thumbUrl = `/api/files/${file.id}/thumbnail/preview`;
+                // For videos with a cached local thumb, use it directly;
+                // avoids the 204 → error → re-decode cycle on re-renders.
+                const cachedThumb = isVideo && this._videoThumbCache.has(file.id)
+                    ? this._videoThumbCache.get(file.id)
+                    : null;
+                const thumbUrl = cachedThumb || `/api/files/${file.id}/thumbnail/preview`;
                 html += `<div class="photo-tile${selected}" data-id="${this._escAttr(file.id)}" data-mime="${this._escAttr(file.mime_type)}">`;
                 html += `<div class="photo-check"><i class="fas fa-check"></i></div>`;
                 html += `<img src="${thumbUrl}" loading="lazy" alt="${this._escAttr(file.name)}">`;
@@ -194,13 +207,36 @@ const photosView = {
         for (const tile of tiles) {
             const img = tile.querySelector('img');
             if (!img) continue;
+            const fileId = tile.dataset.id;
+
+            // Skip if already cached locally (URL was set during render)
+            if (this._videoThumbCache.has(fileId)) continue;
 
             // The server returns 204 for videos without a cached thumbnail,
-            // which causes the <img> to fire 'error'.  We could also detect
-            // a natural 0×0 image.
+            // which causes the <img> to fire 'error'.
             img.addEventListener('error', () => {
-                this._generateVideoThumbnail(tile, img);
+                this._enqueueVideoThumbnail(tile, img);
             }, { once: true });
+        }
+    },
+
+    /** Enqueue a video thumbnail decode, respecting concurrency limit. */
+    _enqueueVideoThumbnail(tile, img) {
+        if (this._activeDecodes < this._maxConcurrentDecodes) {
+            this._activeDecodes++;
+            this._generateVideoThumbnail(tile, img);
+        } else {
+            this._decodeQueue.push({ tile, img });
+        }
+    },
+
+    /** Process next item in the decode queue. */
+    _drainDecodeQueue() {
+        this._activeDecodes--;
+        if (this._decodeQueue.length > 0) {
+            const next = this._decodeQueue.shift();
+            this._activeDecodes++;
+            this._generateVideoThumbnail(next.tile, next.img);
         }
     },
 
@@ -232,13 +268,18 @@ const photosView = {
                 ? 'image/webp' : 'image/jpeg';
 
             canvas.toBlob((blob) => {
-                if (!blob) return;
+                if (!blob) {
+                    this._drainDecodeQueue();
+                    return;
+                }
 
                 // Show immediately in the tile
                 const url = URL.createObjectURL(blob);
                 img.src = url;
+                // Cache locally so re-renders are instant
+                this._videoThumbCache.set(fileId, url);
 
-                // Upload to server for permanent caching (fire-and-forget)
+                // Upload to server for permanent caching
                 const token = localStorage.getItem('token')
                     || sessionStorage.getItem('token');
                 const headers = { 'Content-Type': blob.type };
@@ -248,11 +289,20 @@ const photosView = {
                     method: 'PUT',
                     headers,
                     body: blob,
+                }).then((resp) => {
+                    if (resp.ok) {
+                        // Switch from blob URL to server URL so the blob
+                        // can be garbage-collected and future loads use
+                        // the permanently cached WebP from the server.
+                        const serverUrl = `/api/files/${fileId}/thumbnail/preview?v=1`;
+                        this._videoThumbCache.set(fileId, serverUrl);
+                    }
                 }).catch(() => { /* best-effort */ });
 
                 // Release video resources
                 video.src = '';
                 video.load();
+                this._drainDecodeQueue();
             }, mimeType, 0.80);
         }, { once: true });
 
@@ -260,6 +310,7 @@ const photosView = {
         video.addEventListener('error', () => {
             video.src = '';
             video.load();
+            this._drainDecodeQueue();
         }, { once: true });
     },
 

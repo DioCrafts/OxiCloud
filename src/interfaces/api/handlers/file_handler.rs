@@ -349,7 +349,12 @@ impl FileHandler {
                     .unwrap()
                     .into_response();
             }
-            return StatusCode::NO_CONTENT.into_response();
+            return Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .header(header::CACHE_CONTROL, "no-store")
+                .body(Body::empty())
+                .unwrap()
+                .into_response();
         }
 
         // Resolve the physical blob path (content-addressable storage)
