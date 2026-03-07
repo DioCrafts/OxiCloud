@@ -4,10 +4,7 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>OxiCloud — Admin Panel</title>
-        <script>
-            if (localStorage.getItem("oxicloud_theme") === "dark")
-                document.documentElement.setAttribute("data-theme", "dark");
-        </script>
+        <script src="/js/core/theme-init.js"></script>
         <script src="/js/core/icons.js" defer></script>
         <script src="/js/core/formatters.js" defer></script>
         <script src="/js/core/csrf.js" defer></script>
@@ -49,14 +46,14 @@
                 <div class="admin-tabs">
                     <button
                         class="admin-tab active"
-                        onclick="switchTab('dashboard',this)"
+                        id="tab-btn-dashboard"
                     >
                         <i class="fas fa-chart-pie"></i> Dashboard
                     </button>
-                    <button class="admin-tab" onclick="switchTab('users',this)">
+                    <button class="admin-tab" id="tab-btn-users">
                         <i class="fas fa-users"></i> Users
                     </button>
-                    <button class="admin-tab" onclick="switchTab('oidc',this)">
+                    <button class="admin-tab" id="tab-btn-oidc">
                         <i class="fas fa-key"></i> SSO / OIDC
                     </button>
                 </div>
@@ -202,7 +199,7 @@
                                 Management</span
                             ><button
                                 class="btn btn-primary"
-                                onclick="openCreateUserModal()"
+                                id="btn-create-user"
                             >
                                 <i class="fas fa-user-plus"></i> Create User
                             </button>
@@ -241,7 +238,6 @@
                                 <button
                                     class="btn btn-sm btn-secondary"
                                     id="prev-btn"
-                                    onclick="prevPage()"
                                     disabled
                                 >
                                     <i class="fas fa-chevron-left"></i> Prev
@@ -249,7 +245,6 @@
                                 <button
                                     class="btn btn-sm btn-secondary"
                                     id="next-btn"
-                                    onclick="nextPage()"
                                 >
                                     Next <i class="fas fa-chevron-right"></i>
                                 </button>
@@ -305,7 +300,6 @@
                                 <button
                                     class="btn btn-secondary btn-sm"
                                     id="discover-btn"
-                                    onclick="testConnection()"
                                 >
                                     <i class="fas fa-search"></i> Auto-discover
                                 </button>
@@ -348,7 +342,7 @@
                                 <div class="readonly-field">
                                     <span id="callback-url">—</span
                                     ><button
-                                        onclick="copyCallback()"
+                                        id="btn-copy-callback"
                                         title="Copy"
                                     >
                                         <i class="fas fa-copy"></i>
@@ -422,14 +416,13 @@
                             <div class="oidc-actions">
                                 <button
                                     class="btn btn-secondary"
-                                    onclick="testConnection()"
+                                    id="btn-test-oidc"
                                 >
                                     <i class="fas fa-vial"></i> Test
                                 </button>
                                 <button
                                     class="btn btn-primary"
                                     id="save-btn"
-                                    onclick="saveOidcSettings()"
                                 >
                                     <i class="fas fa-save"></i> Save
                                 </button>
@@ -471,11 +464,11 @@
                 <div class="modal-actions">
                     <button
                         class="btn btn-secondary"
-                        onclick="closeQuotaModal()"
+                        id="btn-close-quota"
                     >
                         Cancel
                     </button>
-                    <button class="btn btn-primary" onclick="saveQuota()">
+                    <button class="btn btn-primary" id="btn-save-quota">
                         <i class="fas fa-save"></i> Save
                     </button>
                 </div>
@@ -553,14 +546,13 @@
                 <div class="modal-actions">
                     <button
                         class="btn btn-secondary"
-                        onclick="closeCreateUserModal()"
+                        id="btn-close-create-user"
                     >
                         Cancel
                     </button>
                     <button
                         class="btn btn-primary"
                         id="cu-submit"
-                        onclick="submitCreateUser()"
                     >
                         <i class="fas fa-user-plus"></i> Create
                     </button>
@@ -589,14 +581,13 @@
                 <div class="modal-actions">
                     <button
                         class="btn btn-secondary"
-                        onclick="closeResetPasswordModal()"
+                        id="btn-close-reset-pw"
                     >
                         Cancel
                     </button>
                     <button
                         class="btn btn-primary"
                         id="rp-submit"
-                        onclick="submitResetPassword()"
                     >
                         <i class="fas fa-save"></i> Reset
                     </button>
