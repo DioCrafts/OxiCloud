@@ -688,6 +688,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_sync_media_sort_date ON storage.file_metadata;
 CREATE TRIGGER trg_sync_media_sort_date
     AFTER INSERT OR UPDATE OF captured_at ON storage.file_metadata
     FOR EACH ROW EXECUTE FUNCTION storage.sync_media_sort_date();
