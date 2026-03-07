@@ -84,6 +84,27 @@ pub trait ThumbnailPort: Send + Sync + 'static {
     /// Delete all thumbnails for a file.
     async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError>;
 
+    /// Try to get a cached thumbnail without generating one.
+    ///
+    /// Returns `None` if no cached thumbnail exists on disk or in memory.
+    /// Used for non-image file types (videos) where thumbnails are
+    /// generated client-side and uploaded.
+    async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        size: ThumbnailSize,
+    ) -> Option<Bytes>;
+
+    /// Store an externally-generated thumbnail (e.g. client-side video frame).
+    ///
+    /// Validates the image, re-encodes to WebP, and persists to cache.
+    async fn store_external_thumbnail(
+        &self,
+        file_id: &str,
+        size: ThumbnailSize,
+        data: Bytes,
+    ) -> Result<Bytes, DomainError>;
+
     /// Get cache statistics.
     async fn get_stats(&self) -> ThumbnailStatsDto;
 }

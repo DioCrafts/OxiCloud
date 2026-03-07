@@ -226,6 +226,101 @@ impl ThumbnailService {
         Ok(bytes)
     }
 
+    /// Try to serve a thumbnail from cache only (memory → disk).
+    ///
+    /// Unlike `get_thumbnail`, this does **not** generate a new thumbnail.
+    /// Useful for non-image file types (videos) where a client-generated
+    /// thumbnail may have been uploaded previously.
+    pub async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        size: ThumbnailSize,
+    ) -> Option<Bytes> {
+        // 1. Check in-memory cache
+        let cache_key = ThumbnailCacheKey {
+            file_id: file_id.to_string(),
+            size,
+        };
+        if let Some(bytes) = self.cache.get(&cache_key).await {
+            if !bytes.is_empty() {
+                return Some(bytes);
+            }
+        }
+
+        // 2. Check disk
+        let thumb_path = self.get_thumbnail_path(file_id, size);
+        if let Ok(data) = fs::read(&thumb_path).await {
+            let bytes = Bytes::from(data);
+            // Populate in-memory cache for next hit
+            self.cache.insert(cache_key, bytes.clone()).await;
+            Some(bytes)
+        } else {
+            None
+        }
+    }
+
+    /// Store an externally-generated thumbnail (e.g. client-side video frame).
+    ///
+    /// Validates the image data, re-encodes to WebP for cache consistency,
+    /// and persists to both disk and in-memory cache.
+    pub async fn store_external_thumbnail(
+        &self,
+        file_id: &str,
+        size: ThumbnailSize,
+        data: Bytes,
+    ) -> Result<Bytes, ThumbnailError> {
+        let max_dim = size.max_dimension();
+
+        // Validate + re-encode in blocking thread (tiny image, ~1 ms)
+        let webp_bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
+            let img = image::load_from_memory(&data)
+                .map_err(|e| ThumbnailError::ImageError(format!("Invalid image data: {e}")))?;
+
+            // Resize if larger than target size
+            let (w, h) = (img.width(), img.height());
+            let img = if w > max_dim || h > max_dim {
+                let filter = FilterType::CatmullRom;
+                if w > h {
+                    let ratio = max_dim as f32 / w as f32;
+                    img.resize(max_dim, (h as f32 * ratio) as u32, filter)
+                } else {
+                    let ratio = max_dim as f32 / h as f32;
+                    img.resize((w as f32 * ratio) as u32, max_dim, filter)
+                }
+            } else {
+                img
+            };
+
+            let mut buffer = Vec::new();
+            img.write_to(&mut std::io::Cursor::new(&mut buffer), ImageFormat::WebP)
+                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+            Ok(buffer)
+        })
+        .await
+        .map_err(|e| ThumbnailError::TaskError(e.to_string()))??;
+
+        let bytes = Bytes::from(webp_bytes);
+
+        // Save to disk
+        let thumb_path = self.get_thumbnail_path(file_id, size);
+        if let Some(parent) = thumb_path.parent() {
+            let _ = fs::create_dir_all(parent).await;
+        }
+        fs::write(&thumb_path, &bytes)
+            .await
+            .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
+
+        // Populate in-memory cache
+        let cache_key = ThumbnailCacheKey {
+            file_id: file_id.to_string(),
+            size,
+        };
+        self.cache.insert(cache_key, bytes.clone()).await;
+
+        tracing::info!("✅ Stored external thumbnail: {} {:?}", file_id, size);
+        Ok(bytes)
+    }
+
     /// Generate a thumbnail from an image file.
     ///
     /// Concurrency is bounded by `decode_semaphore` to prevent OOM when
@@ -501,6 +596,25 @@ impl ThumbnailPort for ThumbnailService {
 
     async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError> {
         self.delete_thumbnails(file_id)
+            .await
+            .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
+    }
+
+    async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        size: PortThumbnailSize,
+    ) -> Option<Bytes> {
+        self.get_cached_thumbnail(file_id, size.into()).await
+    }
+
+    async fn store_external_thumbnail(
+        &self,
+        file_id: &str,
+        size: PortThumbnailSize,
+        data: Bytes,
+    ) -> Result<Bytes, DomainError> {
+        self.store_external_thumbnail(file_id, size.into(), data)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
     }

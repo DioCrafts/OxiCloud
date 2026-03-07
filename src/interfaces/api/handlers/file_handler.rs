@@ -331,13 +331,25 @@ impl FileHandler {
         };
 
         if !thumbnail_service.is_supported_image(&file.mime_type) {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({
-                    "error": "File is not a supported image type"
-                })),
-            )
-                .into_response();
+            // For non-images (videos, etc.), serve from cache if available;
+            // otherwise return 204 to signal "not yet generated — please
+            // generate client-side and upload via PUT".
+            if let Some(data) = thumbnail_service
+                .get_cached_thumbnail(&id, thumb_size.into())
+                .await
+            {
+                let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
+                return Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "image/webp")
+                    .header(header::CONTENT_LENGTH, data.len())
+                    .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                    .header(header::ETAG, etag)
+                    .body(Body::from(data))
+                    .unwrap()
+                    .into_response();
+            }
+            return StatusCode::NO_CONTENT.into_response();
         }
 
         // Resolve the physical blob path (content-addressable storage)
@@ -372,6 +384,73 @@ impl FileHandler {
             }
             Err(err) => {
                 AppError::internal_error(format!("Thumbnail generation failed: {}", err))
+                    .into_response()
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  UPLOAD THUMBNAIL (client-generated, e.g. video frames)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Accept a client-generated thumbnail (e.g. video frame extracted via
+    /// `<video>` + `<canvas>` in the browser) and persist it in the server
+    /// cache.  The image is validated, re-encoded to WebP, and stored so
+    /// subsequent `GET …/thumbnail/{size}` requests are served instantly.
+    ///
+    /// **Max body: 512 KB** — thumbnails are small.
+    pub async fn upload_thumbnail(
+        State(state): State<GlobalState>,
+        auth_user: AuthUser,
+        Path((id, size)): Path<(String, String)>,
+        body: Bytes,
+    ) -> impl IntoResponse {
+        use crate::application::ports::thumbnail_ports::ThumbnailSize;
+
+        let thumbnail_service = &state.core.thumbnail_service;
+
+        // Validate size
+        let thumb_size = match size.as_str() {
+            "icon" => ThumbnailSize::Icon,
+            "preview" => ThumbnailSize::Preview,
+            "large" => ThumbnailSize::Large,
+            _ => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": "Invalid thumbnail size. Use: icon, preview, or large"
+                    })),
+                )
+                    .into_response();
+            }
+        };
+
+        // Reject oversized payloads (512 KB)
+        if body.len() > 512 * 1024 {
+            return (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                Json(serde_json::json!({ "error": "Thumbnail exceeds 512 KB limit" })),
+            )
+                .into_response();
+        }
+
+        // Validate file ownership
+        let file_retrieval_service = &state.applications.file_retrieval_service;
+        if let Err(err) = file_retrieval_service
+            .get_file_owned(&id, auth_user.id)
+            .await
+        {
+            return AppError::from(err).into_response();
+        }
+
+        // Validate, re-encode to WebP, and store
+        match thumbnail_service
+            .store_external_thumbnail(&id, thumb_size.into(), body)
+            .await
+        {
+            Ok(_) => StatusCode::CREATED.into_response(),
+            Err(err) => {
+                AppError::internal_error(format!("Failed to store thumbnail: {}", err))
                     .into_response()
             }
         }

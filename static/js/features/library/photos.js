@@ -177,6 +177,90 @@ const photosView = {
             }, { rootMargin: '400px' });
             this._observer.observe(sentinel);
         }
+
+        // Set up client-side video thumbnail generation
+        this._setupVideoThumbnails();
+    },
+
+    // ── Client-side video thumbnail generation ──────────────────────
+    // Uses the browser's native video decoder (<video> + <canvas>) to
+    // extract a frame, show it immediately, and upload to the server
+    // for permanent caching.  Zero server-side dependencies (no ffmpeg).
+
+    /** Attach error handlers to video tile images; on failure, extract a
+     *  frame from the video using the browser's built-in codec. */
+    _setupVideoThumbnails() {
+        const tiles = this._container.querySelectorAll('.photo-tile[data-mime^="video/"]');
+        for (const tile of tiles) {
+            const img = tile.querySelector('img');
+            if (!img) continue;
+
+            // The server returns 204 for videos without a cached thumbnail,
+            // which causes the <img> to fire 'error'.  We could also detect
+            // a natural 0×0 image.
+            img.addEventListener('error', () => {
+                this._generateVideoThumbnail(tile, img);
+            }, { once: true });
+        }
+    },
+
+    /** Extract a single frame from a video and display it as the tile
+     *  thumbnail, then upload the WebP to the server for caching. */
+    _generateVideoThumbnail(tile, img) {
+        const fileId = tile.dataset.id;
+        const video = document.createElement('video');
+        video.crossOrigin = 'anonymous';
+        video.preload = 'metadata';
+        video.muted = true;
+        // Auth is handled via HttpOnly cookie — direct URL works
+        video.src = `/api/files/${fileId}`;
+
+        video.addEventListener('loadeddata', () => {
+            // Seek to 25 % of duration, clamped between 0.5 s and 5 s
+            video.currentTime = Math.min(5, Math.max(0.5, video.duration * 0.25));
+        }, { once: true });
+
+        video.addEventListener('seeked', () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+
+            // Try WebP first, fall back to JPEG
+            const mimeType = typeof canvas.toBlob === 'function'
+                ? 'image/webp' : 'image/jpeg';
+
+            canvas.toBlob((blob) => {
+                if (!blob) return;
+
+                // Show immediately in the tile
+                const url = URL.createObjectURL(blob);
+                img.src = url;
+
+                // Upload to server for permanent caching (fire-and-forget)
+                const token = localStorage.getItem('token')
+                    || sessionStorage.getItem('token');
+                const headers = { 'Content-Type': blob.type };
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                fetch(`/api/files/${fileId}/thumbnail/preview`, {
+                    method: 'PUT',
+                    headers,
+                    body: blob,
+                }).catch(() => { /* best-effort */ });
+
+                // Release video resources
+                video.src = '';
+                video.load();
+            }, mimeType, 0.80);
+        }, { once: true });
+
+        // If the video can't be loaded at all, keep the generic play badge
+        video.addEventListener('error', () => {
+            video.src = '';
+            video.load();
+        }, { once: true });
     },
 
     /** Render the group mode toolbar */
