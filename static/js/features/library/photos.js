@@ -282,12 +282,13 @@ const photosView = {
                 // Upload to server for permanent caching
                 const token = localStorage.getItem('token')
                     || sessionStorage.getItem('token');
-                const headers = { 'Content-Type': blob.type };
+                const headers = { 'Content-Type': blob.type, ...getCsrfHeaders() };
                 if (token) headers['Authorization'] = `Bearer ${token}`;
 
                 fetch(`/api/files/${fileId}/thumbnail/preview`, {
                     method: 'PUT',
                     headers,
+                    credentials: 'same-origin',
                     body: blob,
                 }).then((resp) => {
                     if (resp.ok) {
