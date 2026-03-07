@@ -268,9 +268,9 @@ const photosView = {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Try WebP first, fall back to JPEG
-            const mimeType = typeof canvas.toBlob === 'function'
-                ? 'image/webp' : 'image/jpeg';
+            // JPEG: explicit quality control, universally supported,
+            // and server stores as-is when dimensions fit (zero re-encode).
+            const mimeType = 'image/jpeg';
 
             canvas.toBlob((blob) => {
                 if (!blob) {

@@ -40,10 +40,10 @@ async fn generate_thumbnail_from_blob_path() {
     let thumb_bytes = result.expect("thumbnail generation should succeed from blob path");
     assert!(!thumb_bytes.is_empty(), "thumbnail bytes must not be empty");
 
-    // Verify it's valid WebP (starts with "RIFF" magic)
+    // Verify it's valid JPEG (starts with SOI marker 0xFF 0xD8)
     assert!(
-        thumb_bytes.len() > 12 && &thumb_bytes[0..4] == b"RIFF",
-        "output should be WebP format"
+        thumb_bytes.len() > 2 && thumb_bytes[0] == 0xFF && thumb_bytes[1] == 0xD8,
+        "output should be JPEG format"
     );
 }
 

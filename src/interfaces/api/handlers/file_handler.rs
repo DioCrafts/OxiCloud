@@ -359,7 +359,7 @@ impl FileHandler {
         {
             return Response::builder()
                 .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "image/webp")
+                .header(header::CONTENT_TYPE, "image/jpeg")
                 .header(header::CONTENT_LENGTH, data.len())
                 .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
                 .header(header::ETAG, &etag)
@@ -412,7 +412,7 @@ impl FileHandler {
             Ok(data) => {
                 Response::builder()
                     .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "image/webp")
+                    .header(header::CONTENT_TYPE, "image/jpeg")
                     .header(header::CONTENT_LENGTH, data.len())
                     .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
                     .header(header::ETAG, &etag)

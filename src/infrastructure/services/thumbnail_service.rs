@@ -1,5 +1,6 @@
 use bytes::Bytes;
-use image::{ImageFormat, imageops::FilterType};
+use image::imageops::FilterType;
+use image::codecs::jpeg::JpegEncoder;
 /**
  * Thumbnail Generation Service
  *
@@ -8,7 +9,7 @@ use image::{ImageFormat, imageops::FilterType};
  * Features:
  * - Background thumbnail generation after upload
  * - Multiple sizes (icon 150x150, preview 800x600)
- * - WebP output for smaller file sizes
+ * - JPEG output (lossy q=80) for compact thumbnails
  * - Lock-free moka cache with weight-based eviction
  * - Lazy generation on first request if not pre-generated
  */
@@ -150,7 +151,7 @@ impl ThumbnailService {
     fn get_thumbnail_path(&self, file_id: &str, size: ThumbnailSize) -> PathBuf {
         self.thumbnails_root
             .join(size.dir_name())
-            .join(format!("{}.webp", file_id))
+            .join(format!("{}.jpg", file_id))
     }
 
     /// Get a thumbnail, generating it if needed.
@@ -161,7 +162,7 @@ impl ThumbnailService {
     /// * `original_path` - Path to the original image file
     ///
     /// # Returns
-    /// Bytes of the thumbnail image (WebP format)
+    /// Bytes of the thumbnail image (JPEG format)
     pub async fn get_thumbnail(
         &self,
         file_id: &str,
@@ -265,13 +266,13 @@ impl ThumbnailService {
 
     /// Store an externally-generated thumbnail (e.g. client-side video frame).
     ///
-    /// **Fast path**: if the payload is already a valid WebP whose dimensions
-    /// fit within the target size, it is stored as-is — zero decode, zero
-    /// encode.  The browser pre-scales the canvas to 400 px, so this fast
-    /// path is hit on every normal video-thumbnail upload.
+    /// **Fast path**: if the payload is already a correctly-sized JPEG, it is
+    /// stored as-is — zero decode, zero encode.  The browser pre-scales the
+    /// canvas to 400 px and sends JPEG, so this fast path is hit on every
+    /// normal video-thumbnail upload.
     ///
-    /// **Slow path**: decode → optional resize → re-encode to WebP.  Only
-    /// triggered when a client sends an oversized or non-WebP image.
+    /// **Slow path**: decode → optional resize → re-encode to JPEG q=80.
+    /// Only triggered when a client sends an oversized or non-JPEG image.
     pub async fn store_external_thumbnail(
         &self,
         file_id: &str,
@@ -281,24 +282,23 @@ impl ThumbnailService {
         let max_dim = size.max_dimension();
 
         // Validate + optionally re-encode in blocking thread
-        let webp_bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
-            // ── Fast path: already a correctly-sized WebP ─────────────
-            // WebP files start with RIFF....WEBP.  Read dimensions from
-            // the header without a full decode (~0 CPU).
-            if data.len() >= 12 && &data[..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        let jpeg_bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
+            // ── Fast path: already a correctly-sized JPEG ─────────────
+            // JPEG files start with SOI marker 0xFF 0xD8.
+            if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
                 if let Ok(reader) = image::ImageReader::new(std::io::Cursor::new(&data))
                     .with_guessed_format()
                 {
                     if let Ok((w, h)) = reader.into_dimensions() {
                         if w <= max_dim && h <= max_dim {
-                            // Already WebP at correct size — zero-copy store
+                            // Already JPEG at correct size — zero-copy store
                             return Ok(data.to_vec());
                         }
                     }
                 }
             }
 
-            // ── Slow path: decode, resize, re-encode ─────────────────
+            // ── Slow path: decode, resize, re-encode to JPEG ─────────
             let img = image::load_from_memory(&data)
                 .map_err(|e| ThumbnailError::ImageError(format!("Invalid image data: {e}")))?;
 
@@ -316,15 +316,17 @@ impl ThumbnailService {
                 img
             };
 
+            let rgb = img.to_rgb8();
             let mut buffer = Vec::new();
-            img.write_to(&mut std::io::Cursor::new(&mut buffer), ImageFormat::WebP)
+            let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+            rgb.write_with_encoder(encoder)
                 .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
             Ok(buffer)
         })
         .await
         .map_err(|e| ThumbnailError::TaskError(e.to_string()))??;
 
-        let bytes = Bytes::from(webp_bytes);
+        let bytes = Bytes::from(jpeg_bytes);
 
         // Save to disk
         let thumb_path = self.get_thumbnail_path(file_id, size);
@@ -419,10 +421,12 @@ impl ThumbnailService {
             };
             let thumbnail = img.resize(new_width, new_height, filter);
 
-            // Encode as WebP for smaller file size
+            // Encode as JPEG (lossy q=80) — explicit quality control,
+            // ~2× smaller than image-webp's Rust encoder at same visual quality
+            let rgb = thumbnail.to_rgb8();
             let mut buffer = Vec::new();
-            thumbnail
-                .write_to(&mut std::io::Cursor::new(&mut buffer), ImageFormat::WebP)
+            let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+            rgb.write_with_encoder(encoder)
                 .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
             Ok(buffer)
@@ -513,9 +517,10 @@ impl ThumbnailService {
                         };
                         let thumb = img.resize(new_w, new_h, filter);
 
+                        let rgb = thumb.to_rgb8();
                         let mut buf = Vec::new();
-                        thumb
-                            .write_to(&mut std::io::Cursor::new(&mut buf), ImageFormat::WebP)
+                        let encoder = JpegEncoder::new_with_quality(&mut buf, 80);
+                        rgb.write_with_encoder(encoder)
                             .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
                         Ok((size, Bytes::from(buf)))
