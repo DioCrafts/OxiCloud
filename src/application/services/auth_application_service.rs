@@ -17,6 +17,7 @@ use crate::infrastructure::services::jwt_service::JwtTokenService;
 use crate::infrastructure::services::oidc_service::OidcService;
 use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use moka::sync::Cache;
+use uuid::Uuid;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
@@ -33,7 +34,7 @@ pub enum OidcCallbackResult {
     /// app password and complete the NC login flow.
     NextcloudLogin {
         nc_flow_token: String,
-        user_id: String,
+        user_id: Uuid,
         username: String,
     },
 }
@@ -411,7 +412,7 @@ impl AuthApplicationService {
 
         // Save session
         let session = Session::new(
-            user.id().to_string(),
+            user.id(),
             refresh_token.clone(),
             None, // IP (can be added from the HTTP layer)
             None, // User-Agent (can be added from the HTTP layer)
@@ -466,7 +467,7 @@ impl AuthApplicationService {
         }
 
         Ok(crate::application::dtos::user_dto::CurrentUser {
-            id: user.id().to_string(),
+            id: user.id(),
             username: user.username().to_string(),
             email: user.email().to_string(),
             role: user.role().to_string(),
@@ -514,7 +515,7 @@ impl AuthApplicationService {
 
         // Create new session
         let new_session = Session::new(
-            user.id().to_string(),
+            user.id(),
             new_refresh_token.clone(),
             None,
             None,
@@ -532,7 +533,7 @@ impl AuthApplicationService {
         })
     }
 
-    pub async fn logout(&self, user_id: &str, refresh_token: &str) -> Result<(), DomainError> {
+    pub async fn logout(&self, user_id: Uuid, refresh_token: &str) -> Result<(), DomainError> {
         // Get session
         let session = match self
             .session_storage
@@ -559,7 +560,7 @@ impl AuthApplicationService {
         Ok(())
     }
 
-    pub async fn logout_all(&self, user_id: &str) -> Result<u64, DomainError> {
+    pub async fn logout_all(&self, user_id: Uuid) -> Result<u64, DomainError> {
         // Revoke all user sessions
         let revoked_count = self
             .session_storage
@@ -571,7 +572,7 @@ impl AuthApplicationService {
 
     pub async fn change_password(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         dto: ChangePasswordDto,
     ) -> Result<(), DomainError> {
         // Get user
@@ -627,13 +628,13 @@ impl AuthApplicationService {
         Ok(())
     }
 
-    pub async fn get_user(&self, user_id: &str) -> Result<UserDto, DomainError> {
+    pub async fn get_user(&self, user_id: Uuid) -> Result<UserDto, DomainError> {
         let user = self.user_storage.get_user_by_id(user_id).await?;
         Ok(UserDto::from(user))
     }
 
     // Alias for consistency with handler method
-    pub async fn get_user_by_id(&self, user_id: &str) -> Result<UserDto, DomainError> {
+    pub async fn get_user_by_id(&self, user_id: Uuid) -> Result<UserDto, DomainError> {
         self.get_user(user_id).await
     }
 
@@ -778,7 +779,7 @@ impl AuthApplicationService {
     /// Admin-only: reset a user's password.
     pub async fn admin_reset_password(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         new_password: &str,
     ) -> Result<(), DomainError> {
         // Block password reset for OIDC-provisioned users
@@ -812,13 +813,13 @@ impl AuthApplicationService {
     }
 
     /// Get a single user by ID (for admin panel)
-    pub async fn get_user_admin(&self, user_id: &str) -> Result<UserDto, DomainError> {
+    pub async fn get_user_admin(&self, user_id: Uuid) -> Result<UserDto, DomainError> {
         let user = self.user_storage.get_user_by_id(user_id).await?;
         Ok(UserDto::from(user))
     }
 
     /// Delete a user by ID (admin only)
-    pub async fn delete_user_admin(&self, user_id: &str) -> Result<(), DomainError> {
+    pub async fn delete_user_admin(&self, user_id: Uuid) -> Result<(), DomainError> {
         // Prevent deleting yourself
         let user = self.user_storage.get_user_by_id(user_id).await?;
         tracing::info!("Admin deleting user: {} ({})", user.username(), user_id);
@@ -826,14 +827,14 @@ impl AuthApplicationService {
     }
 
     /// Activate or deactivate a user (admin only)
-    pub async fn set_user_active(&self, user_id: &str, active: bool) -> Result<(), DomainError> {
+    pub async fn set_user_active(&self, user_id: Uuid, active: bool) -> Result<(), DomainError> {
         self.user_storage
             .set_user_active_status(user_id, active)
             .await
     }
 
     /// Change user role (admin only)
-    pub async fn change_user_role(&self, user_id: &str, role: &str) -> Result<(), DomainError> {
+    pub async fn change_user_role(&self, user_id: Uuid, role: &str) -> Result<(), DomainError> {
         if role != "admin" && role != "user" {
             return Err(DomainError::new(
                 ErrorKind::InvalidInput,
@@ -847,7 +848,7 @@ impl AuthApplicationService {
     /// Update user's storage quota (admin only)
     pub async fn update_user_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         quota_bytes: i64,
     ) -> Result<(), DomainError> {
         if quota_bytes < 0 {
@@ -865,7 +866,7 @@ impl AuthApplicationService {
     /// Check if a user has enough quota for an upload of the given size
     pub async fn check_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         additional_bytes: i64,
     ) -> Result<bool, DomainError> {
         let user = self.user_storage.get_user_by_id(user_id).await?;
@@ -1209,7 +1210,7 @@ impl AuthApplicationService {
             );
             return Ok(OidcCallbackResult::NextcloudLogin {
                 nc_flow_token: nc_token,
-                user_id: user.id().to_string(),
+                user_id: user.id(),
                 username: user.username().to_string(),
             });
         }
@@ -1219,7 +1220,7 @@ impl AuthApplicationService {
         let refresh_token = self.token_service.generate_refresh_token();
 
         let session = Session::new(
-            user.id().to_string(),
+            user.id(),
             refresh_token.clone(),
             None,
             None,
@@ -1282,7 +1283,7 @@ impl AuthApplicationService {
     }
 
     /// Helper to create a personal folder for a new user
-    async fn create_personal_folder(&self, username: &str, user_id: &str) {
+    async fn create_personal_folder(&self, username: &str, user_id: Uuid) {
         if let Some(folder_service) = &self.folder_service {
             let folder_name = format!("My Folder - {}", username);
             match folder_service

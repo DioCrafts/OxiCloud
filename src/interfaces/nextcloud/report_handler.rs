@@ -67,7 +67,7 @@ async fn handle_filter_files(
     };
 
     let favorites = fav_svc
-        .get_favorites(&user.id)
+        .get_favorites(user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to get favorites: {}", e)))?;
 
@@ -179,7 +179,7 @@ async fn handle_search(
     };
 
     let results = search_svc
-        .search(criteria, &user.id)
+        .search(criteria, user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Search failed: {}", e)))?;
 

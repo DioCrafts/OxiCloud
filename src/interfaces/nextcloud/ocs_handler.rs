@@ -47,7 +47,7 @@ pub async fn handle_capabilities_v2(State(state): State<Arc<AppState>>) -> Respo
 
 pub async fn handle_user_info(State(state): State<Arc<AppState>>, user: CurrentUser) -> Response {
     let quota: (i64, i64) = match state.storage_usage_service.as_ref() {
-        Some(service) => match service.get_user_storage_info(&user.id).await {
+        Some(service) => match service.get_user_storage_info(user.id).await {
             Ok((used, total)) => (used, total),
             Err(_) => (0, 0),
         },
@@ -151,7 +151,7 @@ async fn user_provisioning_response(
 
     // Fetch quota from storage usage service
     let quota: (i64, i64) = match state.storage_usage_service.as_ref() {
-        Some(service) => match service.get_user_storage_info(&user_dto.id).await {
+        Some(service) => match service.get_user_storage_info(uuid::Uuid::parse_str(&user_dto.id).unwrap_or_default()).await {
             Ok((used, total)) => (used, total),
             Err(_) => (0, 0),
         },
@@ -212,7 +212,7 @@ pub async fn handle_revoke_apppassword(
 
     if let Err(e) = nextcloud
         .app_passwords
-        .revoke_by_password(&user.id, &app_password)
+        .revoke_by_password(user.id, &app_password)
         .await
     {
         tracing::warn!("Failed to revoke app password for {}: {}", user.id, e);
@@ -367,7 +367,7 @@ pub async fn handle_search(
         ..SearchCriteriaDto::default()
     };
 
-    let results = match search_service.search(criteria, &user.id).await {
+    let results = match search_service.search(criteria, user.id).await {
         Ok(r) => r,
         Err(_) => return empty_search_response().into_response(),
     };

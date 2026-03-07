@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use uuid::Uuid;
+
 use crate::application::dtos::folder_dto::{
     CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
 };
@@ -20,7 +22,7 @@ pub trait FolderUseCase: Send + Sync + 'static {
     ///
     /// Returns `NotFound` if the folder does not exist **or** belongs to
     /// another user.  All user-facing handlers should use this method.
-    async fn get_folder_owned(&self, id: &str, caller_id: &str) -> Result<FolderDto, DomainError>;
+    async fn get_folder_owned(&self, id: &str, caller_id: Uuid) -> Result<FolderDto, DomainError>;
 
     /// Gets a folder by its path
     async fn get_folder_by_path(&self, path: &str) -> Result<FolderDto, DomainError>;
@@ -33,7 +35,7 @@ pub trait FolderUseCase: Send + Sync + 'static {
     async fn list_folders_for_owner(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<FolderDto>, DomainError>;
 
     /// Lists folders with pagination
@@ -47,7 +49,7 @@ pub trait FolderUseCase: Send + Sync + 'static {
     async fn list_folders_for_owner_paginated(
         &self,
         parent_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         pagination: &crate::application::dtos::pagination::PaginationRequestDto,
     ) -> Result<crate::application::dtos::pagination::PaginatedResponseDto<FolderDto>, DomainError>;
 
@@ -56,7 +58,7 @@ pub trait FolderUseCase: Send + Sync + 'static {
         &self,
         id: &str,
         dto: RenameFolderDto,
-        caller_id: &str,
+        caller_id: Uuid,
     ) -> Result<FolderDto, DomainError>;
 
     /// Moves a folder to another parent (ownership verified against caller_id)
@@ -64,16 +66,16 @@ pub trait FolderUseCase: Send + Sync + 'static {
         &self,
         id: &str,
         dto: MoveFolderDto,
-        caller_id: &str,
+        caller_id: Uuid,
     ) -> Result<FolderDto, DomainError>;
 
     /// Deletes a folder (ownership verified against caller_id)
-    async fn delete_folder(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
+    async fn delete_folder(&self, id: &str, caller_id: Uuid) -> Result<(), DomainError>;
 
     /// Creates a root-level home folder for a user during registration.
     async fn create_home_folder(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         name: String,
     ) -> Result<FolderDto, DomainError>;
 
@@ -103,7 +105,7 @@ pub trait SearchUseCase: Send + Sync + 'static {
     async fn search(
         &self,
         criteria: SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Arc<SearchResultsDto>, DomainError>;
 
     /// Returns quick suggestions for autocomplete (lightweight, fast).

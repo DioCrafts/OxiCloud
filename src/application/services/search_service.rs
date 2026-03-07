@@ -19,6 +19,7 @@ use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 use std::hash::{Hash, Hasher};
+use uuid::Uuid;
 
 /**
  * High-performance search service implementation for files and folders.
@@ -285,12 +286,13 @@ impl SearchUseCase for SearchService {
     async fn search(
         &self,
         criteria: SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Arc<SearchResultsDto>> {
         let start = Instant::now();
+        let user_id_str = user_id.to_string();
 
         // Try to get from cache
-        let cache_key = Self::create_cache_key(&criteria, user_id);
+        let cache_key = Self::create_cache_key(&criteria, &user_id_str);
         if let Some(cached_results) = self.get_from_cache(cache_key).await {
             return Ok(cached_results);
         }
@@ -321,7 +323,7 @@ impl SearchUseCase for SearchService {
                 .search_folders(
                     criteria.folder_id.as_deref(),
                     criteria.name_contains.as_deref(),
-                    user_id,
+                    &user_id_str,
                     false,
                 )
                 .await?;
@@ -403,7 +405,7 @@ impl SearchUseCase for SearchService {
             .search_folders(
                 criteria.folder_id.as_deref(),
                 criteria.name_contains.as_deref(),
-                user_id,
+                &user_id_str,
                 true,
             )
             .await?;
@@ -504,7 +506,7 @@ impl SearchService {
             async fn search(
                 &self,
                 _criteria: SearchCriteriaDto,
-                _user_id: &str,
+                _user_id: Uuid,
             ) -> Result<Arc<SearchResultsDto>> {
                 Ok(Arc::new(SearchResultsDto::empty()))
             }

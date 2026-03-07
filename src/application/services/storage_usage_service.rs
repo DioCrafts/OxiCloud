@@ -6,6 +6,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::task;
 use tracing::{debug, error, info};
+use uuid::Uuid;
 
 /**
  * Service for managing and updating user storage usage statistics.
@@ -31,7 +32,7 @@ impl StorageUsageService {
     }
 
     /// Calculates and updates storage usage for a specific user
-    pub async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError> {
+    pub async fn update_user_storage_usage(&self, user_id: Uuid) -> Result<i64, DomainError> {
         info!("Updating storage usage for user: {}", user_id);
 
         // Calculate storage usage directly from database
@@ -52,12 +53,11 @@ impl StorageUsageService {
 
     /// Calculates a user's storage usage by summing all their file sizes.
     /// Uses a direct SQL query for O(1) performance.
-    async fn calculate_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError> {
+    async fn calculate_user_storage_usage(&self, user_id: Uuid) -> Result<i64, DomainError> {
         debug!("Calculating storage for user: {}", user_id);
 
         // Direct SQL query to sum all file sizes for this user
         // This is much more efficient than recursively walking folders
-        // Note: user_id is stored as varchar, not uuid, so we bind it directly as text
         let total_size: i64 = sqlx::query_scalar(
             r#"
             SELECT COALESCE(SUM(size), 0)::bigint
@@ -88,14 +88,14 @@ impl StorageUsageService {
         info!("Updating storage usage for username: {}", username);
 
         let user = self.user_repository.get_user_by_username(username).await?;
-        let user_id = user.id().to_string();
+        let user_id = user.id();
 
         // Reuse the existing calculation logic
-        let total_usage = self.calculate_user_storage_usage(&user_id).await?;
+        let total_usage = self.calculate_user_storage_usage(user_id).await?;
 
         // Update the user's storage usage in the database
         self.user_repository
-            .update_storage_usage(&user_id, total_usage)
+            .update_storage_usage(user_id, total_usage)
             .await?;
 
         info!(
@@ -112,7 +112,7 @@ impl StorageUsageService {
  * to the application layer.
  */
 impl StorageUsagePort for StorageUsageService {
-    async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError> {
+    async fn update_user_storage_usage(&self, user_id: Uuid) -> Result<i64, DomainError> {
         StorageUsageService::update_user_storage_usage(self, user_id).await
     }
 
@@ -133,12 +133,12 @@ impl StorageUsagePort for StorageUsageService {
 
         // Process users in parallel
         for user in users {
-            let user_id = user.id().to_string();
+            let user_id = user.id();
             let service_clone = self.clone();
 
             // Spawn a background task for each user
             let task = task::spawn(async move {
-                match service_clone.update_user_storage_usage(&user_id).await {
+                match service_clone.update_user_storage_usage(user_id).await {
                     Ok(usage) => {
                         debug!(
                             "Updated storage usage for user {}: {} bytes",
@@ -168,7 +168,7 @@ impl StorageUsagePort for StorageUsageService {
 
     async fn check_storage_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         additional_bytes: u64,
     ) -> Result<(), DomainError> {
         let user = self.user_repository.get_user_by_id(user_id).await?;
@@ -206,7 +206,7 @@ impl StorageUsagePort for StorageUsageService {
         Ok(())
     }
 
-    async fn get_user_storage_info(&self, user_id: &str) -> Result<(i64, i64), DomainError> {
+    async fn get_user_storage_info(&self, user_id: Uuid) -> Result<(i64, i64), DomainError> {
         let user = self.user_repository.get_user_by_id(user_id).await?;
         Ok((user.storage_used_bytes(), user.storage_quota_bytes()))
     }

@@ -1,5 +1,6 @@
 use crate::common::errors::DomainError;
 use crate::domain::entities::session::Session;
+use uuid::Uuid;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SessionRepositoryError {
@@ -33,7 +34,7 @@ pub trait SessionRepository: Send + Sync + 'static {
     async fn create_session(&self, session: Session) -> SessionRepositoryResult<Session>;
 
     /// Gets a session by ID
-    async fn get_session_by_id(&self, id: &str) -> SessionRepositoryResult<Session>;
+    async fn get_session_by_id(&self, id: Uuid) -> SessionRepositoryResult<Session>;
 
     /// Gets a session by refresh token
     async fn get_session_by_refresh_token(
@@ -42,14 +43,14 @@ pub trait SessionRepository: Send + Sync + 'static {
     ) -> SessionRepositoryResult<Session>;
 
     /// Gets all sessions for a user
-    async fn get_sessions_by_user_id(&self, user_id: &str)
+    async fn get_sessions_by_user_id(&self, user_id: Uuid)
     -> SessionRepositoryResult<Vec<Session>>;
 
     /// Revokes a specific session
-    async fn revoke_session(&self, session_id: &str) -> SessionRepositoryResult<()>;
+    async fn revoke_session(&self, session_id: Uuid) -> SessionRepositoryResult<()>;
 
     /// Revokes all sessions for a user
-    async fn revoke_all_user_sessions(&self, user_id: &str) -> SessionRepositoryResult<u64>;
+    async fn revoke_all_user_sessions(&self, user_id: Uuid) -> SessionRepositoryResult<u64>;
 
     /// Deletes expired sessions
     async fn delete_expired_sessions(&self) -> SessionRepositoryResult<u64>;

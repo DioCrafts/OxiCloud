@@ -22,6 +22,7 @@ use crate::infrastructure::repositories::pg::DeviceCodePgRepository;
 use crate::infrastructure::repositories::pg::SessionPgRepository;
 use crate::infrastructure::repositories::pg::UserPgRepository;
 use crate::infrastructure::services::jwt_service::JwtTokenService;
+use uuid::Uuid;
 
 /// Default device code lifetime: 15 minutes (RFC 8628 recommends 5-30 min).
 const DEVICE_CODE_LIFETIME_SECS: i64 = 900;
@@ -155,7 +156,7 @@ impl DeviceAuthService {
     ///
     /// * `user_code` — the code from the verification page
     /// * `user_id` — the authenticated user's ID (from session/JWT)
-    pub async fn approve(&self, user_code: &str, user_id: &str) -> Result<(), DomainError> {
+    pub async fn approve(&self, user_code: &str, user_id: Uuid) -> Result<(), DomainError> {
         let normalized = user_code.trim().to_uppercase().replace(' ', "");
 
         let mut dc = self
@@ -180,7 +181,7 @@ impl DeviceAuthService {
 
         // Persist refresh token as a session
         let session = Session::new(
-            user_id.to_string(),
+            user_id,
             refresh_token.clone(),
             None,                                         // ip_address
             Some(format!("device:{}", dc.client_name())), // user_agent
@@ -189,7 +190,7 @@ impl DeviceAuthService {
         self.session_storage.create_session(session).await?;
 
         // Store tokens on the device code entity
-        dc.authorize(user_id.to_string(), access_token, refresh_token);
+        dc.authorize(user_id, access_token, refresh_token);
         self.device_code_storage.update_device_code(dc).await?;
 
         tracing::info!(
@@ -297,7 +298,7 @@ impl DeviceAuthService {
 
     pub async fn list_user_devices(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<DeviceInfoDto>, DomainError> {
         let codes = self.device_code_storage.list_by_user(user_id).await?;
         Ok(codes
@@ -318,7 +319,7 @@ impl DeviceAuthService {
     // 8. Revoke — user revokes a device authorization
     // ========================================================================
 
-    pub async fn revoke_device(&self, device_id: &str, user_id: &str) -> Result<(), DomainError> {
+    pub async fn revoke_device(&self, device_id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
         // Verify ownership before deleting
         let devices = self.device_code_storage.list_by_user(user_id).await?;
         let found = devices.iter().any(|d| d.id() == device_id);

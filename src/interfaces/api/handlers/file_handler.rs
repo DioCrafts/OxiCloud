@@ -109,7 +109,7 @@ impl FileHandler {
                 if let Some(ref fid) = folder_id {
                     use crate::application::ports::inbound::FolderUseCase;
                     let folder_service = &state.applications.folder_service;
-                    if folder_service.get_folder_owned(fid, &auth_user.id).await.is_err() {
+                    if folder_service.get_folder_owned(fid, auth_user.id).await.is_err() {
                         tracing::warn!(
                             "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
                             auth_user.username,
@@ -130,7 +130,7 @@ impl FileHandler {
                         .and_then(|s| s.parse::<u64>().ok())
                         .unwrap_or(0);
                     if let Err(err) = storage_svc
-                        .check_storage_quota(&auth_user.id, estimated_size)
+                        .check_storage_quota(auth_user.id, estimated_size)
                         .await
                     {
                         tracing::warn!(
@@ -235,7 +235,7 @@ impl FileHandler {
                 // ── Quota enforcement ────────────────────────────────
                 if let Some(storage_svc) = state.storage_usage_service.as_ref()
                     && let Err(err) = storage_svc
-                        .check_storage_quota(&auth_user.id, total_size)
+                        .check_storage_quota(auth_user.id, total_size)
                         .await
                 {
                     let _ = tokio::fs::remove_file(&temp_path).await;
@@ -321,7 +321,7 @@ impl FileHandler {
         };
 
         let file = match file_retrieval_service
-            .get_file_owned(&id, &auth_user.id)
+            .get_file_owned(&id, auth_user.id)
             .await
         {
             Ok(f) => f,
@@ -397,7 +397,7 @@ impl FileHandler {
         let retrieval = &state.applications.file_retrieval_service;
 
         // ── Get file metadata (ownership-scoped) ────────────────────────
-        let file_dto = match retrieval.get_file_owned(&id, &auth_user.id).await {
+        let file_dto = match retrieval.get_file_owned(&id, auth_user.id).await {
             Ok(f) => f,
             Err(err) => {
                 return AppError::from(err).into_response();
@@ -455,7 +455,7 @@ impl FileHandler {
                         Self::content_disposition(&file_dto.name, &file_dto.mime_type, &params);
 
                     match retrieval
-                        .get_file_range_stream_owned(&id, &auth_user.id, start, Some(end + 1))
+                        .get_file_range_stream_owned(&id, auth_user.id, start, Some(end + 1))
                         .await
                     {
                         Ok(stream) => {
@@ -569,7 +569,7 @@ impl FileHandler {
         tracing::info!("API: Listing files with folder_id: {:?}", folder_id);
 
         let retrieval = &state.applications.file_retrieval_service;
-        match retrieval.list_files_owned(folder_id, &auth_user.id).await {
+        match retrieval.list_files_owned(folder_id, auth_user.id).await {
             Ok(files) => {
                 // Compute lightweight ETag from max modified_at + count
                 let max_mod = files.iter().map(|f| f.modified_at).max().unwrap_or(0);
@@ -655,7 +655,7 @@ impl FileHandler {
     ) -> impl IntoResponse {
         // Verify ownership
         let file_read = &state.repositories.file_read_repository;
-        if let Err(e) = file_read.verify_file_owner(&file_id, &auth_user.id).await {
+        if let Err(e) = file_read.verify_file_owner(&file_id, auth_user.id).await {
             let msg = e.to_string();
             return (
                 StatusCode::NOT_FOUND,
@@ -703,7 +703,7 @@ impl FileHandler {
 
         // Auth required: trash-first with dedup cleanup + ownership verification
         let result = mgmt
-            .delete_with_cleanup(&id, &auth_user.id)
+            .delete_with_cleanup(&id, auth_user.id)
             .await
             .map(|was_trashed| {
                 if was_trashed {
@@ -745,7 +745,7 @@ impl FileHandler {
 
         tracing::info!("Renaming file {} to \"{}\"", id, new_name);
         let mgmt = &state.applications.file_management_service;
-        match mgmt.rename_file_owned(&id, &auth_user.id, &new_name).await {
+        match mgmt.rename_file_owned(&id, auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => AppError::from(err).into_response()
         }
@@ -763,7 +763,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
 
         match mgmt
-            .move_file_owned(&id, &auth_user.id, payload.folder_id)
+            .move_file_owned(&id, auth_user.id, payload.folder_id)
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
@@ -784,7 +784,7 @@ impl FileHandler {
             .map(|s| s.to_string());
 
         let mgmt = &state.applications.file_management_service;
-        match mgmt.move_file_owned(&id, &auth_user.id, folder_id).await {
+        match mgmt.move_file_owned(&id, auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
             Err(err) => AppError::from(err).into_response()
         }

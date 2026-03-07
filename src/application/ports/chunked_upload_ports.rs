@@ -8,6 +8,7 @@ use crate::common::errors::DomainError;
 use bytes::Bytes;
 use serde::Serialize;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 /// Default chunk size (5 MB) — optimised for parallel transfers.
 pub const DEFAULT_CHUNK_SIZE: usize = 5 * 1024 * 1024;
@@ -59,7 +60,7 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     /// total number of chunks, and expiration timestamp.
     async fn create_session(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         filename: String,
         folder_id: Option<String>,
         content_type: String,
@@ -73,7 +74,7 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     async fn upload_chunk(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
         chunk_index: usize,
         data: Bytes,
         checksum: Option<String>,
@@ -83,7 +84,7 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     async fn get_status(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<UploadStatusResponseDto, DomainError>;
 
     /// Assemble all chunks into the final file.
@@ -94,14 +95,14 @@ pub trait ChunkedUploadPort: Send + Sync + 'static {
     async fn complete_upload(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), DomainError>;
 
     /// Finalize upload: clean up the session and temporary files.
-    async fn finalize_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn finalize_upload(&self, upload_id: &str, user_id: Uuid) -> Result<(), DomainError>;
 
     /// Cancel an upload and clean up all temporary data.
-    async fn cancel_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn cancel_upload(&self, upload_id: &str, user_id: Uuid) -> Result<(), DomainError>;
 
     /// Check if a file size qualifies for chunked upload.
     fn should_use_chunked(&self, size: u64) -> bool;

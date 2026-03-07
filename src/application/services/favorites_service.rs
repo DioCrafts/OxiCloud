@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use tracing::info;
+use uuid::Uuid;
 
 use crate::application::dtos::favorites_dto::{
     BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto,
@@ -27,7 +28,7 @@ impl FavoritesService {
 
 impl FavoritesUseCase for FavoritesService {
     /// Get all favorites for a user
-    async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>> {
+    async fn get_favorites(&self, user_id: Uuid) -> Result<Vec<FavoriteItemDto>> {
         info!("Getting favorites for user: {}", user_id);
         let favorites = self.repo.get_favorites(user_id).await?;
         info!(
@@ -39,7 +40,7 @@ impl FavoritesUseCase for FavoritesService {
     }
 
     /// Add an item to user's favorites
-    async fn add_to_favorites(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()> {
+    async fn add_to_favorites(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<()> {
         info!(
             "Adding {} '{}' to favorites for user {}",
             item_type, item_id, user_id
@@ -64,7 +65,7 @@ impl FavoritesUseCase for FavoritesService {
     /// Remove an item from user's favorites
     async fn remove_from_favorites(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         item_id: &str,
         item_type: &str,
     ) -> Result<bool> {
@@ -91,7 +92,7 @@ impl FavoritesUseCase for FavoritesService {
     }
 
     /// Check if an item is in user's favorites
-    async fn is_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool> {
+    async fn is_favorite(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<bool> {
         info!(
             "Checking if {} '{}' is favorite for user {}",
             item_type, item_id, user_id
@@ -101,7 +102,7 @@ impl FavoritesUseCase for FavoritesService {
 
     async fn batch_add_to_favorites(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         items: &[(String, String)],
     ) -> Result<BatchFavoritesResult> {
         info!(
@@ -148,7 +149,7 @@ impl FavoritesUseCase for FavoritesService {
 
     async fn batch_check_favorites(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         item_ids: &[(&str, &str)],
     ) -> Result<HashSet<String>> {
         self.repo.batch_check_favorites(user_id, item_ids).await

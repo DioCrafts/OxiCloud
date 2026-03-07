@@ -25,7 +25,7 @@ pub async fn get_recent_items(
     auth_user: AuthUser,
     Query(params): Query<GetRecentParams>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     match recent_service.get_recent_items(user_id, params.limit).await {
         Ok(items) => {
@@ -51,7 +51,7 @@ pub async fn record_item_access(
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     // Validate item type
     if item_type != "file" && item_type != "folder" {
@@ -97,7 +97,7 @@ pub async fn remove_from_recent(
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     match recent_service
         .remove_from_recent(user_id, &item_id, &item_type)
@@ -142,7 +142,7 @@ pub async fn clear_recent_items(
     State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     match recent_service.clear_recent_items(user_id).await {
         Ok(_) => {

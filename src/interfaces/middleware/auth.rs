@@ -6,6 +6,7 @@ use axum::{
 };
 use std::convert::Infallible;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::common::di::AppState;
 
@@ -22,7 +23,7 @@ pub struct CookieAuthenticated;
 // Structure for use in Axum extractors
 #[derive(Clone, Debug)]
 pub struct AuthUser {
-    pub id: String,
+    pub id: Uuid,
     pub username: String,
     pub role: String,
 }
@@ -35,7 +36,7 @@ pub struct AuthUser {
 /// async fn my_handler(CurrentUserId(user_id): CurrentUserId) -> impl IntoResponse { ... }
 /// ```
 #[derive(Clone, Debug)]
-pub struct CurrentUserId(pub String);
+pub struct CurrentUserId(pub Uuid);
 
 // Implement FromRequestParts for AuthUser — allows using `auth_user: AuthUser` in handlers
 impl<S> FromRequestParts<S> for AuthUser
@@ -49,7 +50,7 @@ where
             .extensions
             .get::<Arc<CurrentUser>>()
             .map(|cu| AuthUser {
-                id: cu.id.clone(),
+                id: cu.id,
                 username: cu.username.clone(),
                 role: cu.role.clone(),
             })
@@ -86,7 +87,7 @@ where
         parts
             .extensions
             .get::<Arc<CurrentUser>>()
-            .map(|cu| CurrentUserId(cu.id.clone()))
+            .map(|cu| CurrentUserId(cu.id))
             .ok_or(AuthError::UserNotFound)
     }
 }
@@ -94,7 +95,7 @@ where
 /// Optional user ID extractor – never fails.
 /// Yields `Some(id)` when auth middleware ran, `None` otherwise.
 #[derive(Clone, Debug)]
-pub struct OptionalUserId(pub Option<String>);
+pub struct OptionalUserId(pub Option<Uuid>);
 
 impl<S> FromRequestParts<S> for OptionalUserId
 where
@@ -107,7 +108,7 @@ where
             parts
                 .extensions
                 .get::<Arc<CurrentUser>>()
-                .map(|cu| cu.id.clone()),
+                .map(|cu| cu.id),
         ))
     }
 }
@@ -126,7 +127,7 @@ where
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(OptionalAuthUser(parts.extensions.get::<Arc<CurrentUser>>().map(
             |cu| AuthUser {
-                id: cu.id.clone(),
+                id: cu.id,
                 username: cu.username.clone(),
                 role: cu.role.clone(),
             },
@@ -216,8 +217,11 @@ pub async fn auth_middleware(
                                 "Token validated successfully for user: {}",
                                 claims.username
                             );
+                            let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
+                                AuthError::InvalidToken("Invalid user ID in token".to_string())
+                            })?;
                             let current_user = Arc::new(CurrentUser {
-                                id: claims.sub,
+                                id: user_id,
                                 username: claims.username,
                                 email: claims.email,
                                 role: claims.role,
@@ -303,8 +307,11 @@ pub async fn auth_middleware(
                 match token_service.validate_token(&token_str) {
                     Ok(claims) => {
                         tracing::debug!("Cookie token validated for user: {}", claims.username);
+                        let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
+                            AuthError::InvalidToken("Invalid user ID in token".to_string())
+                        })?;
                         let current_user = Arc::new(CurrentUser {
-                            id: claims.sub,
+                            id: user_id,
                             username: claims.username,
                             email: claims.email,
                             role: claims.role,

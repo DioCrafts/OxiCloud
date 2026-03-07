@@ -13,6 +13,7 @@ use crate::infrastructure::services::image_transcode_service::{
     ImageTranscodeService, OutputFormat,
 };
 use tracing::{debug, info};
+use uuid::Uuid;
 
 /// Threshold below which files are served from RAM cache (10 MB).
 const CACHE_THRESHOLD: u64 = 10 * 1024 * 1024;
@@ -201,7 +202,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
         Ok(FileDto::from(file))
     }
 
-    async fn get_file_owned(&self, id: &str, caller_id: &str) -> Result<FileDto, DomainError> {
+    async fn get_file_owned(&self, id: &str, caller_id: Uuid) -> Result<FileDto, DomainError> {
         let file = self.file_read.get_file_for_owner(id, caller_id).await?;
         Ok(FileDto::from(file))
     }
@@ -226,7 +227,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn list_files_owned(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<FileDto>, DomainError> {
         let files = self
             .file_read
@@ -245,7 +246,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn get_file_stream_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         self.file_read.verify_file_owner(id, caller_id).await?;
         self.file_read.get_file_stream(id).await
@@ -267,7 +268,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn get_file_optimized_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         accept_webp: bool,
         prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
@@ -302,7 +303,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn get_file_range_stream_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
@@ -336,7 +337,7 @@ impl FileRetrievalUseCase for FileRetrievalService {
     async fn list_files_batch_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<FileDto>, DomainError> {

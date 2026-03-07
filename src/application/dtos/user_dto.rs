@@ -1,6 +1,7 @@
 use crate::domain::entities::user::User;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserDto {
@@ -80,7 +81,7 @@ pub struct RefreshTokenDto {
 /// Authenticated current user data (for use in application services)
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CurrentUser {
-    pub id: String,
+    pub id: Uuid,
     pub username: String,
     pub email: String,
     pub role: String,

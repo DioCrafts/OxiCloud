@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::settings_dto::{
     OidcSettingsDto, OidcTestResultDto, SaveOidcSettingsDto, TestOidcConnectionDto,
@@ -181,7 +182,7 @@ impl AdminSettingsService {
     pub async fn save_oidc_settings(
         &self,
         dto: SaveOidcSettingsDto,
-        updated_by: &str,
+        updated_by: Uuid,
     ) -> Result<(), DomainError> {
         let cat = "oidc";
         let by = Some(updated_by);
@@ -366,7 +367,7 @@ impl AdminSettingsService {
     }
 
     /// Mark the system as initialized after the first admin is created.
-    pub async fn mark_system_initialized(&self, admin_user_id: &str) -> Result<(), DomainError> {
+    pub async fn mark_system_initialized(&self, admin_user_id: Uuid) -> Result<(), DomainError> {
         self.settings_repo
             .set(
                 "system_initialized",
@@ -384,7 +385,7 @@ impl AdminSettingsService {
     /// initialized (the caller "won" the race), or `Ok(false)` if another
     /// request already did it.  This eliminates the race-condition window
     /// between `is_system_initialized()` and `mark_system_initialized()`.
-    pub async fn try_claim_initialization(&self, admin_user_id: &str) -> Result<bool, DomainError> {
+    pub async fn try_claim_initialization(&self, admin_user_id: Uuid) -> Result<bool, DomainError> {
         self.settings_repo
             .try_claim_initialization(admin_user_id)
             .await
@@ -412,7 +413,7 @@ impl AdminSettingsService {
     pub async fn set_registration_enabled(
         &self,
         enabled: bool,
-        updated_by: &str,
+        updated_by: Uuid,
     ) -> Result<(), DomainError> {
         self.settings_repo
             .set(

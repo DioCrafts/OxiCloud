@@ -48,13 +48,13 @@ impl std::fmt::Display for DeviceCodeStatus {
 /// Domain entity for a Device Authorization flow.
 #[derive(Debug, Clone)]
 pub struct DeviceCode {
-    id: String,
+    id: Uuid,
     device_code: String,
     user_code: String,
     client_name: String,
     scopes: String,
     status: DeviceCodeStatus,
-    user_id: Option<String>,
+    user_id: Option<Uuid>,
     access_token: Option<String>,
     refresh_token: Option<String>,
     verification_uri: String,
@@ -89,7 +89,7 @@ impl DeviceCode {
     ) -> Self {
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             device_code,
             user_code,
             client_name,
@@ -111,13 +111,13 @@ impl DeviceCode {
     /// Reconstruct from database row.
     #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
-        id: String,
+        id: Uuid,
         device_code: String,
         user_code: String,
         client_name: String,
         scopes: String,
         status: DeviceCodeStatus,
-        user_id: Option<String>,
+        user_id: Option<Uuid>,
         access_token: Option<String>,
         refresh_token: Option<String>,
         verification_uri: String,
@@ -150,8 +150,8 @@ impl DeviceCode {
 
     // ── Getters ──────────────────────────────────────────────────
 
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> Uuid {
+        self.id
     }
 
     pub fn device_code(&self) -> &str {
@@ -174,8 +174,8 @@ impl DeviceCode {
         self.status
     }
 
-    pub fn user_id(&self) -> Option<&str> {
-        self.user_id.as_deref()
+    pub fn user_id(&self) -> Option<Uuid> {
+        self.user_id
     }
 
     pub fn access_token(&self) -> Option<&str> {
@@ -243,7 +243,7 @@ impl DeviceCode {
     }
 
     /// Authorize this device code for a specific user, storing the tokens.
-    pub fn authorize(&mut self, user_id: String, access_token: String, refresh_token: String) {
+    pub fn authorize(&mut self, user_id: Uuid, access_token: String, refresh_token: String) {
         self.status = DeviceCodeStatus::Authorized;
         self.user_id = Some(user_id);
         self.access_token = Some(access_token);

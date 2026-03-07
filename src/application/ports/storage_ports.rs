@@ -3,6 +3,7 @@ use futures::Stream;
 use serde_json::Value;
 use std::path::PathBuf;
 use std::pin::Pin;
+use uuid::Uuid;
 
 use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::common::errors::DomainError;
@@ -33,13 +34,13 @@ pub trait FileReadPort: Send + Sync + 'static {
     /// Returns `NotFound` if the file does not exist **or** belongs to a
     /// different user.  This is the primary IDOR-safe accessor — handlers
     /// serving end-user requests should always prefer this over `get_file`.
-    async fn get_file_for_owner(&self, id: &str, owner_id: &str) -> Result<File, DomainError>;
+    async fn get_file_for_owner(&self, id: &str, owner_id: Uuid) -> Result<File, DomainError>;
 
     /// Verifies that the file identified by `id` belongs to `owner_id`.
     ///
     /// Returns `Ok(())` on success or `NotFound` when the file does not
     /// exist or belongs to another user.
-    async fn verify_file_owner(&self, id: &str, owner_id: &str) -> Result<(), DomainError> {
+    async fn verify_file_owner(&self, id: &str, owner_id: Uuid) -> Result<(), DomainError> {
         self.get_file_for_owner(id, owner_id).await.map(|_| ())
     }
 
@@ -53,12 +54,13 @@ pub trait FileReadPort: Send + Sync + 'static {
     async fn list_files_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<File>, DomainError> {
         let all = self.list_files(folder_id).await?;
+        let owner_str = owner_id.to_string();
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_str))
             .collect())
     }
 
@@ -134,15 +136,16 @@ pub trait FileReadPort: Send + Sync + 'static {
     async fn list_files_batch_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<File>, DomainError> {
         // Default: filter in-memory (repos should override with SQL)
         let all = self.list_files_batch(folder_id, offset, limit).await?;
+        let owner_str = owner_id.to_string();
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id().is_some_and(|o| o == owner_id))
+            .filter(|f| f.owner_id().is_some_and(|o| o == owner_str))
             .collect())
     }
 
@@ -175,7 +178,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         &self,
         folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError>;
 
     /// Search files recursively in a folder subtree using ltree.
@@ -190,7 +193,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         &self,
         root_folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError> {
         // Default: delegate to paginated search (non-recursive fallback)
         self.search_files_paginated(root_folder_id, criteria, user_id)
@@ -204,7 +207,7 @@ pub trait FileReadPort: Send + Sync + 'static {
         &self,
         folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<usize, DomainError>;
 
     /// Return up to `limit` files whose name contains `query` (case-insensitive).
@@ -359,7 +362,7 @@ pub trait FileWritePort: Send + Sync + 'static {
 /// Secondary port for storage usage management
 pub trait StorageUsagePort: Send + Sync + 'static {
     /// Updates storage usage statistics for a user
-    async fn update_user_storage_usage(&self, user_id: &str) -> Result<i64, DomainError>;
+    async fn update_user_storage_usage(&self, user_id: Uuid) -> Result<i64, DomainError>;
 
     /// Updates storage usage statistics for a user, looked up by username
     async fn update_user_storage_usage_by_username(
@@ -375,12 +378,12 @@ pub trait StorageUsagePort: Send + Sync + 'static {
     /// descriptive message otherwise.
     async fn check_storage_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         additional_bytes: u64,
     ) -> Result<(), DomainError>;
 
     /// Returns (used_bytes, quota_bytes) for a user.
-    async fn get_user_storage_info(&self, user_id: &str) -> Result<(i64, i64), DomainError>;
+    async fn get_user_storage_info(&self, user_id: Uuid) -> Result<(i64, i64), DomainError>;
 }
 
 /// Generic storage service interface for calendar and contact services

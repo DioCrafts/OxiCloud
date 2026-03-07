@@ -1,4 +1,5 @@
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::domain::{
     entities::share::{Share, ShareItemType},
@@ -24,7 +25,7 @@ pub trait ShareRepository: Send + Sync + 'static {
     async fn save(&self, share: &Share) -> Result<Share, ShareRepositoryError>;
 
     /// Find a share by its ID
-    async fn find_by_id(&self, id: &str) -> Result<Share, ShareRepositoryError>;
+    async fn find_by_id(&self, id: Uuid) -> Result<Share, ShareRepositoryError>;
 
     /// Find a share by its token
     async fn find_by_token(&self, token: &str) -> Result<Share, ShareRepositoryError>;
@@ -37,10 +38,10 @@ pub trait ShareRepository: Send + Sync + 'static {
     ) -> Result<Vec<Share>, ShareRepositoryError>;
 
     /// Delete a share by its ID
-    async fn delete(&self, id: &str) -> Result<(), ShareRepositoryError>;
+    async fn delete(&self, id: Uuid) -> Result<(), ShareRepositoryError>;
 
     /// Find all shares created by a specific user
-    async fn find_by_user(&self, user_id: &str) -> Result<Vec<Share>, ShareRepositoryError>;
+    async fn find_by_user(&self, user_id: Uuid) -> Result<Vec<Share>, ShareRepositoryError>;
 
     /// Find all shares (admin operation)
     async fn find_all(&self) -> Result<Vec<Share>, ShareRepositoryError>;

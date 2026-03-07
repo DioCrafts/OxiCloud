@@ -9,6 +9,7 @@ use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 /// Service for file management operations (move, delete).
 ///
@@ -46,7 +47,7 @@ impl FileManagementService {
     }
 
     /// Verifies ownership via the read repository.
-    async fn verify_owner(&self, file_id: &str, caller_id: &str) -> Result<(), DomainError> {
+    async fn verify_owner(&self, file_id: &str, caller_id: Uuid) -> Result<(), DomainError> {
         if let Some(read) = &self.file_read {
             read.verify_file_owner(file_id, caller_id).await
         } else {
@@ -92,7 +93,7 @@ impl FileManagementUseCase for FileManagementService {
     async fn move_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
         self.verify_owner(file_id, caller_id).await?;
@@ -131,7 +132,7 @@ impl FileManagementUseCase for FileManagementService {
     async fn copy_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         target_folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
         self.verify_owner(file_id, caller_id).await?;
@@ -162,7 +163,7 @@ impl FileManagementUseCase for FileManagementService {
     async fn rename_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         new_name: &str,
     ) -> Result<FileDto, DomainError> {
         self.verify_owner(file_id, caller_id).await?;
@@ -173,7 +174,7 @@ impl FileManagementUseCase for FileManagementService {
         self.file_repository.delete_file(id).await
     }
 
-    async fn delete_file_owned(&self, id: &str, caller_id: &str) -> Result<(), DomainError> {
+    async fn delete_file_owned(&self, id: &str, caller_id: Uuid) -> Result<(), DomainError> {
         self.verify_owner(id, caller_id).await?;
         self.delete_file(id).await
     }
@@ -184,7 +185,7 @@ impl FileManagementUseCase for FileManagementService {
     /// `trg_files_decrement_blob_ref` which fires on DELETE FROM storage.files.
     /// We do NOT decrement here — trashing is a soft-delete (UPDATE, not DELETE)
     /// so the blob must remain referenced until the file is permanently deleted.
-    async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError> {
+    async fn delete_with_cleanup(&self, id: &str, user_id: Uuid) -> Result<bool, DomainError> {
         // Step 1: Try trash (soft delete — file row stays, blob stays referenced)
         if let Some(trash) = &self.trash_service {
             info!("Moving file to trash: {}", id);

@@ -50,7 +50,7 @@ impl TrashDbRepository {
         id: Uuid,
         name: String,
         item_type: String,
-        user_id: String,
+        user_id: Uuid,
         trashed_at: Option<DateTime<Utc>>,
     ) -> TrashedItem {
         let trashed_at = trashed_at.unwrap_or_else(Utc::now);
@@ -61,14 +61,12 @@ impl TrashDbRepository {
             _ => TrashedItemType::File,
         };
 
-        let user_uuid = Uuid::parse_str(&user_id).unwrap_or_else(|_| Uuid::nil());
-
         // In the soft-delete model, the trash entry ID is the same as the
         // original item ID since there is no separate trash table.
         TrashedItem::from_raw(
-            id,        // trash entry id (same as original)
-            id,        // original item id
-            user_uuid, // owner
+            id,       // trash entry id (same as original)
+            id,       // original item id
+            user_id,  // owner
             item_type_enum,
             name.clone(),
             String::new(), // original_path — not stored separately in soft-delete model
@@ -87,7 +85,7 @@ impl TrashRepository for TrashDbRepository {
     }
 
     async fn get_trash_items(&self, user_id: &Uuid) -> Result<Vec<TrashedItem>> {
-        let rows = sqlx::query_as::<_, (Uuid, String, String, String, Option<DateTime<Utc>>)>(
+        let rows = sqlx::query_as::<_, (Uuid, String, String, Uuid, Option<DateTime<Utc>>)>(
             r#"
             SELECT id, name, item_type, user_id, trashed_at
               FROM storage.trash_items
@@ -95,7 +93,7 @@ impl TrashRepository for TrashDbRepository {
              ORDER BY trashed_at DESC
             "#,
         )
-        .bind(user_id.to_string())
+        .bind(user_id)
         .fetch_all(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("TrashDb", format!("list: {e}")))?;
@@ -109,7 +107,7 @@ impl TrashRepository for TrashDbRepository {
     }
 
     async fn get_trash_item(&self, id: &Uuid, user_id: &Uuid) -> Result<Option<TrashedItem>> {
-        let row = sqlx::query_as::<_, (Uuid, String, String, String, Option<DateTime<Utc>>)>(
+        let row = sqlx::query_as::<_, (Uuid, String, String, Uuid, Option<DateTime<Utc>>)>(
             r#"
             SELECT id, name, item_type, user_id, trashed_at
               FROM storage.trash_items
@@ -117,7 +115,7 @@ impl TrashRepository for TrashDbRepository {
             "#,
         )
         .bind(id)
-        .bind(user_id.to_string())
+        .bind(user_id)
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("TrashDb", format!("get: {e}")))?;
@@ -144,14 +142,14 @@ impl TrashRepository for TrashDbRepository {
     async fn clear_trash(&self, user_id: &Uuid) -> Result<()> {
         // Delete all trashed files for this user
         sqlx::query("DELETE FROM storage.files WHERE user_id = $1 AND is_trashed = TRUE")
-            .bind(user_id.to_string())
+            .bind(user_id)
             .execute(self.pool.as_ref())
             .await
             .map_err(|e| DomainError::internal_error("TrashDb", format!("clear files: {e}")))?;
 
         // Delete all trashed folders for this user
         sqlx::query("DELETE FROM storage.folders WHERE user_id = $1 AND is_trashed = TRUE")
-            .bind(user_id.to_string())
+            .bind(user_id)
             .execute(self.pool.as_ref())
             .await
             .map_err(|e| DomainError::internal_error("TrashDb", format!("clear folders: {e}")))?;

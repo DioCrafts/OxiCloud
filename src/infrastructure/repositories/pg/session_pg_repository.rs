@@ -2,6 +2,7 @@ use chrono::Utc;
 use futures::future::BoxFuture;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::ports::auth_ports::SessionStoragePort;
 use crate::common::errors::DomainError;
@@ -104,7 +105,7 @@ impl SessionRepository for SessionPgRepository {
     }
 
     /// Gets a session by ID
-    async fn get_session_by_id(&self, id: &str) -> SessionRepositoryResult<Session> {
+    async fn get_session_by_id(&self, id: Uuid) -> SessionRepositoryResult<Session> {
         let row = sqlx::query(
             r#"
             SELECT 
@@ -165,7 +166,7 @@ impl SessionRepository for SessionPgRepository {
     /// Gets all sessions for a user
     async fn get_sessions_by_user_id(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> SessionRepositoryResult<Vec<Session>> {
         let rows = sqlx::query(
             r#"
@@ -202,8 +203,8 @@ impl SessionRepository for SessionPgRepository {
     }
 
     /// Revokes a specific session using a transaction
-    async fn revoke_session(&self, session_id: &str) -> SessionRepositoryResult<()> {
-        let id = session_id.to_string(); // Clone for use in closure
+    async fn revoke_session(&self, session_id: Uuid) -> SessionRepositoryResult<()> {
+        let id = session_id; // Copy for use in closure
 
         with_transaction(&self.pool, "revoke_session", |tx| {
             Box::pin(async move {
@@ -216,14 +217,14 @@ impl SessionRepository for SessionPgRepository {
                         RETURNING user_id
                         "#,
                 )
-                .bind(&id)
+                .bind(id)
                 .fetch_optional(&mut **tx)
                 .await
                 .map_err(Self::map_sqlx_error)?;
 
                 // If we found the session, we can log a security event
                 if let Some(row) = result {
-                    let user_id: String = row.try_get("user_id").unwrap_or_default();
+                    let user_id: Uuid = row.try_get("user_id").unwrap_or_default();
 
                     // Log security event (in a security table)
                     // This is optional but shows how additional operations
@@ -238,8 +239,8 @@ impl SessionRepository for SessionPgRepository {
     }
 
     /// Revokes all sessions for a user using a transaction
-    async fn revoke_all_user_sessions(&self, user_id: &str) -> SessionRepositoryResult<u64> {
-        let user_id_clone = user_id.to_string(); // Clone for use in closure
+    async fn revoke_all_user_sessions(&self, user_id: Uuid) -> SessionRepositoryResult<u64> {
+        let user_id_copy = user_id; // Copy for use in closure
 
         with_transaction(&self.pool, "revoke_all_user_sessions", |tx| {
             Box::pin(async move {
@@ -251,7 +252,7 @@ impl SessionRepository for SessionPgRepository {
                         WHERE user_id = $1 AND revoked = false
                         "#,
                 )
-                .bind(&user_id_clone)
+                .bind(user_id_copy)
                 .execute(&mut **tx)
                 .await
                 .map_err(Self::map_sqlx_error)?;
@@ -260,7 +261,7 @@ impl SessionRepository for SessionPgRepository {
 
                 // Log security event
                 if affected > 0 {
-                    tracing::info!("Revoked {} sessions for user {}", affected, user_id_clone);
+                    tracing::info!("Revoked {} sessions for user {}", affected, user_id_copy);
                 }
 
                 Ok(affected)
@@ -305,13 +306,13 @@ impl SessionStoragePort for SessionPgRepository {
             .map_err(DomainError::from)
     }
 
-    async fn revoke_session(&self, session_id: &str) -> Result<(), DomainError> {
+    async fn revoke_session(&self, session_id: Uuid) -> Result<(), DomainError> {
         SessionRepository::revoke_session(self, session_id)
             .await
             .map_err(DomainError::from)
     }
 
-    async fn revoke_all_user_sessions(&self, user_id: &str) -> Result<u64, DomainError> {
+    async fn revoke_all_user_sessions(&self, user_id: Uuid) -> Result<u64, DomainError> {
         SessionRepository::revoke_all_user_sessions(self, user_id)
             .await
             .map_err(DomainError::from)

@@ -18,7 +18,7 @@ pub async fn get_trash_items(
     // SECURITY: Always use the authenticated user's ID from the JWT token.
     // Never allow user ID override via query parameters to prevent
     // privilege escalation attacks.
-    let effective_user = auth_user.id.clone();
+    let effective_user = auth_user.id;
 
     debug!("Request to list trash items for user {}", effective_user);
 
@@ -34,7 +34,7 @@ pub async fn get_trash_items(
         }
     };
 
-    let result = trash_service.get_trash_items(&effective_user).await;
+    let result = trash_service.get_trash_items(effective_user).await;
 
     match result {
         Ok(items) => {
@@ -60,7 +60,7 @@ pub async fn move_file_to_trash(
     auth_user: AuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
     debug!(
         "Request to move file to trash: id={}, user={}",
         item_id, user_id
@@ -111,7 +111,7 @@ pub async fn move_folder_to_trash(
     auth_user: AuthUser,
     Path(item_id): Path<String>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
     debug!(
         "Request to move folder to trash: id={}, user={}",
         item_id, user_id
@@ -177,7 +177,7 @@ pub async fn restore_from_trash(
             );
         }
     };
-    let result = trash_service.restore_item(&trash_id, &auth_user.id).await;
+    let result = trash_service.restore_item(&trash_id, auth_user.id).await;
 
     match result {
         Ok(_) => {
@@ -239,7 +239,7 @@ pub async fn delete_permanently(
         }
     };
     let result = trash_service
-        .delete_permanently(&trash_id, &auth_user.id)
+        .delete_permanently(&trash_id, auth_user.id)
         .await;
 
     match result {
@@ -300,7 +300,7 @@ pub async fn empty_trash(
             );
         }
     };
-    let result = trash_service.empty_trash(&auth_user.id).await;
+    let result = trash_service.empty_trash(auth_user.id).await;
 
     match result {
         Ok(_) => {

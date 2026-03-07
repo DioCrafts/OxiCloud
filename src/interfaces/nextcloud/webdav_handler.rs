@@ -193,7 +193,7 @@ async fn handle_propfind(
                 items.push((&sf.id, "folder"));
             }
             fav_svc
-                .batch_check_favorites(&user.id, &items)
+                .batch_check_favorites(user.id, &items)
                 .await
                 .unwrap_or_default()
         } else {
@@ -234,7 +234,7 @@ async fn handle_propfind(
         let favorite_ids = if let Some(fav_svc) = state.favorites_service.as_ref() {
             let items: Vec<(&str, &str)> = vec![(&file.id, "file")];
             fav_svc
-                .batch_check_favorites(&user.id, &items)
+                .batch_check_favorites(user.id, &items)
                 .await
                 .unwrap_or_default()
         } else {
@@ -414,14 +414,14 @@ async fn handle_proppatch(
         if let Some(fav_svc) = state.favorites_service.as_ref() {
             if value == 1 {
                 fav_svc
-                    .add_to_favorites(&user.id, &item_id, item_type)
+                    .add_to_favorites(user.id, &item_id, item_type)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to add favorite: {}", e))
                     })?;
             } else {
                 fav_svc
-                    .remove_from_favorites(&user.id, &item_id, item_type)
+                    .remove_from_favorites(user.id, &item_id, item_type)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to remove favorite: {}", e))
@@ -685,7 +685,7 @@ async fn handle_delete(
     if let Some(trash_svc) = state.trash_service.as_ref() {
         if let Ok(folder) = folder_service.get_folder_by_path(&internal_path).await {
             trash_svc
-                .move_to_trash(&folder.id, "folder", &user.id)
+                .move_to_trash(&folder.id, "folder", user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to trash folder: {}", e)))?;
             return Ok(Response::builder()
@@ -695,7 +695,7 @@ async fn handle_delete(
         }
         if let Ok(file) = file_service.get_file_by_path(&internal_path).await {
             trash_svc
-                .move_to_trash(&file.id, "file", &user.id)
+                .move_to_trash(&file.id, "file", user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to trash file: {}", e)))?;
             return Ok(Response::builder()
@@ -711,7 +711,7 @@ async fn handle_delete(
 
     if let Ok(folder) = folder_service.get_folder_by_path(&internal_path).await {
         folder_service
-            .delete_folder(&folder.id, &user.id)
+            .delete_folder(&folder.id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
 
@@ -835,7 +835,7 @@ async fn handle_move(
                     RenameFolderDto {
                         name: dest_name.to_string(),
                     },
-                    &user.id,
+                    user.id,
                 )
                 .await
                 .map_err(|e| AppError::internal_error(format!("Rename failed: {}", e)))?;
@@ -853,7 +853,7 @@ async fn handle_move(
                     MoveFolderDto {
                         parent_id: Some(dest_parent.id.clone()),
                     },
-                    &user.id,
+                    user.id,
                 )
                 .await
                 .map_err(|e| AppError::internal_error(format!("Move failed: {}", e)))?;
@@ -867,7 +867,7 @@ async fn handle_move(
                         RenameFolderDto {
                             name: dest_name.to_string(),
                         },
-                        &user.id,
+                        user.id,
                     )
                     .await
                     .map_err(|e| AppError::internal_error(format!("Rename failed: {}", e)))?;

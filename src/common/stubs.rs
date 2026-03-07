@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::Stream;
+use uuid::Uuid;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::dtos::folder_dto::{
@@ -108,7 +109,7 @@ impl FileReadPort for StubFileReadPort {
         &self,
         _folder_id: Option<&str>,
         _criteria: &SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError> {
         Ok((Vec::new(), 0))
     }
@@ -117,7 +118,7 @@ impl FileReadPort for StubFileReadPort {
         &self,
         _folder_id: Option<&str>,
         _criteria: &SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> Result<usize, DomainError> {
         Ok(0)
     }
@@ -129,7 +130,7 @@ impl FileReadPort for StubFileReadPort {
         Ok(Box::pin(futures::stream::empty()))
     }
 
-    async fn get_file_for_owner(&self, _id: &str, _owner_id: &str) -> Result<File, DomainError> {
+    async fn get_file_for_owner(&self, _id: &str, _owner_id: Uuid) -> Result<File, DomainError> {
         Ok(File::default())
     }
 }
@@ -362,7 +363,7 @@ impl FolderUseCase for StubFolderUseCase {
     async fn get_folder_owned(
         &self,
         _id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
     ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
@@ -378,7 +379,7 @@ impl FolderUseCase for StubFolderUseCase {
     async fn list_folders_for_owner(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
     ) -> Result<Vec<FolderDto>, DomainError> {
         Ok(Vec::new())
     }
@@ -394,7 +395,7 @@ impl FolderUseCase for StubFolderUseCase {
     async fn list_folders_for_owner_paginated(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
         _pagination: &PaginationRequestDto,
     ) -> Result<PaginatedResponseDto<FolderDto>, DomainError> {
         Ok(PaginatedResponseDto::new(Vec::new(), 0, 10, 0))
@@ -404,7 +405,7 @@ impl FolderUseCase for StubFolderUseCase {
         &self,
         _id: &str,
         _dto: RenameFolderDto,
-        _caller_id: &str,
+        _caller_id: Uuid,
     ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
@@ -413,18 +414,18 @@ impl FolderUseCase for StubFolderUseCase {
         &self,
         _id: &str,
         _dto: MoveFolderDto,
-        _caller_id: &str,
+        _caller_id: Uuid,
     ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
     }
 
-    async fn delete_folder(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
+    async fn delete_folder(&self, _id: &str, _caller_id: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
 
     async fn create_home_folder(
         &self,
-        _user_id: &str,
+        _user_id: Uuid,
         _name: String,
     ) -> Result<FolderDto, DomainError> {
         Ok(FolderDto::default())
@@ -510,7 +511,7 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
     async fn list_files_owned(
         &self,
         _folder_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
     ) -> Result<Vec<FileDto>, DomainError> {
         Ok(Vec::new())
     }
@@ -526,7 +527,7 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
     async fn get_file_stream_owned(
         &self,
         _id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
         let empty_stream = futures::stream::empty::<Result<Bytes, std::io::Error>>();
         Ok(Box::new(empty_stream))
@@ -569,14 +570,14 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
         Ok(Box::pin(futures::stream::empty()))
     }
 
-    async fn get_file_owned(&self, _id: &str, _caller_id: &str) -> Result<FileDto, DomainError> {
+    async fn get_file_owned(&self, _id: &str, _caller_id: Uuid) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
     }
 
     async fn get_file_optimized_owned(
         &self,
         _id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
         _accept_webp: bool,
         _prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError> {
@@ -593,7 +594,7 @@ impl FileRetrievalUseCase for StubFileRetrievalUseCase {
     async fn get_file_range_stream_owned(
         &self,
         _id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
         _start: u64,
         _end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError> {
@@ -628,7 +629,7 @@ impl FileManagementUseCase for StubFileManagementUseCase {
     async fn copy_file_owned(
         &self,
         _file_id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
         _folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
@@ -642,18 +643,18 @@ impl FileManagementUseCase for StubFileManagementUseCase {
         Ok(())
     }
 
-    async fn delete_file_owned(&self, _id: &str, _caller_id: &str) -> Result<(), DomainError> {
+    async fn delete_file_owned(&self, _id: &str, _caller_id: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
 
-    async fn delete_with_cleanup(&self, _id: &str, _user_id: &str) -> Result<bool, DomainError> {
+    async fn delete_with_cleanup(&self, _id: &str, _user_id: Uuid) -> Result<bool, DomainError> {
         Ok(false)
     }
 
     async fn move_file_owned(
         &self,
         _file_id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
         _folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
@@ -662,7 +663,7 @@ impl FileManagementUseCase for StubFileManagementUseCase {
     async fn rename_file_owned(
         &self,
         _file_id: &str,
-        _caller_id: &str,
+        _caller_id: Uuid,
         _new_name: &str,
     ) -> Result<FileDto, DomainError> {
         Ok(FileDto::default())
@@ -679,7 +680,7 @@ impl SearchUseCase for StubSearchUseCase {
     async fn search(
         &self,
         _criteria: SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> Result<Arc<SearchResultsDto>, DomainError> {
         Ok(Arc::new(SearchResultsDto::empty()))
     }

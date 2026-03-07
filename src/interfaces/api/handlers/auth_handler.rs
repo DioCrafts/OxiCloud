@@ -6,6 +6,7 @@ use axum::{
     routing::{get, post, put},
 };
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::user_dto::{
     ChangePasswordDto, LoginDto, OidcCallbackQueryDto, OidcExchangeDto, OidcProviderInfoDto,
@@ -273,7 +274,7 @@ async fn get_current_user(
     if let Some(storage_usage_service) = state.storage_usage_service.as_ref() {
         // Calculate storage synchronously (we await the result)
         match storage_usage_service
-            .update_user_storage_usage(&user_id)
+            .update_user_storage_usage(user_id)
             .await
         {
             Ok(usage) => {
@@ -293,7 +294,7 @@ async fn get_current_user(
     // Now get the user data WITH the updated storage
     let user = auth_service
         .auth_application_service
-        .get_user_by_id(&user_id)
+        .get_user_by_id(user_id)
         .await?;
 
     Ok((StatusCode::OK, Json(user)))
@@ -311,7 +312,7 @@ async fn change_password(
 
     auth_service
         .auth_application_service
-        .change_password(&user_id, dto)
+        .change_password(user_id, dto)
         .await?;
 
     Ok(StatusCode::OK)
@@ -341,7 +342,7 @@ async fn logout(
 
     auth_service
         .auth_application_service
-        .logout(&user_id, &refresh_token)
+        .logout(user_id, &refresh_token)
         .await?;
 
     // Clear HttpOnly + CSRF cookies so the browser forgets the session
@@ -393,10 +394,10 @@ async fn setup_admin(
     }
 
     // 4. ATOMIC: claim initialization — only one concurrent request can win.
-    //    We use a placeholder user_id ("pending") because the admin user
+    //    We use Uuid::nil() as a placeholder because the admin user
     //    doesn't exist yet. It will be updated to the real id below.
     let claimed = admin_svc
-        .try_claim_initialization("pending")
+        .try_claim_initialization(Uuid::nil())
         .await
         .map_err(|e| {
             tracing::error!("Failed to claim system initialization: {}", e);
@@ -426,7 +427,8 @@ async fn setup_admin(
         })?;
 
     // 5. Update the initialization record with the real admin user_id
-    if let Err(e) = admin_svc.mark_system_initialized(&user.id).await {
+    let real_user_id = Uuid::parse_str(&user.id).unwrap_or_default();
+    if let Err(e) = admin_svc.mark_system_initialized(real_user_id).await {
         // Not fatal — the claim already prevents concurrent re-initialization,
         // and the "pending" marker is still "true" so the system stays locked.
         tracing::error!(
@@ -603,7 +605,7 @@ async fn oidc_callback(
 
             let (_id, app_password) = nextcloud
                 .app_passwords
-                .create_nc(&user_id, "Nextcloud (OIDC)")
+                .create_nc(user_id, "Nextcloud (OIDC)")
                 .await
                 .map_err(|e| {
                     tracing::error!(error = %e, user = %username, "OIDC+NC: failed to create app password");

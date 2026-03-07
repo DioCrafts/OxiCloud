@@ -209,7 +209,7 @@ async fn handle_propfind(
             vec![]
         } else {
             calendar_service
-                .list_my_calendars(&user.id)
+                .list_my_calendars(user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list calendars: {}", e)))?
         };
@@ -264,13 +264,13 @@ async fn handle_propfind(
 
         if parts.len() == 1 {
             // Single path segment: try as calendar ID first, fall back to user home
-            let calendar_result = calendar_service.get_calendar(first_segment, &user.id).await;
+            let calendar_result = calendar_service.get_calendar(first_segment, user.id).await;
 
             if let Ok(calendar) = calendar_result {
                 // Valid calendar ID — return calendar collection
                 let events = if depth != "0" {
                     calendar_service
-                        .list_events(first_segment, None, None, &user.id)
+                        .list_events(first_segment, None, None, user.id)
                         .await
                         .unwrap_or_default()
                 } else {
@@ -300,7 +300,7 @@ async fn handle_propfind(
                 // List all calendars for this user
                 let calendars =
                     calendar_service
-                        .list_my_calendars(&user.id)
+                        .list_my_calendars(user.id)
                         .await
                         .map_err(|e| {
                             AppError::internal_error(format!("Failed to list calendars: {}", e))
@@ -328,7 +328,7 @@ async fn handle_propfind(
             let rest = parts[1];
 
             // Check if first_segment is a valid calendar ID
-            let calendar_result = calendar_service.get_calendar(first_segment, &user.id).await;
+            let calendar_result = calendar_service.get_calendar(first_segment, user.id).await;
 
             let (calendar_id, event_path) = if calendar_result.is_ok() {
                 // first_segment is a calendar ID, rest is event path
@@ -341,13 +341,13 @@ async fn handle_propfind(
                     // /caldav/{username}/{calendar_id}
                     // Try to get this as a calendar collection
                     let cal = calendar_service
-                        .get_calendar(sub_parts[0], &user.id)
+                        .get_calendar(sub_parts[0], user.id)
                         .await
                         .map_err(|e| AppError::not_found(format!("Calendar not found: {}", e)))?;
 
                     let events = if depth != "0" {
                         calendar_service
-                            .list_events(sub_parts[0], None, None, &user.id)
+                            .list_events(sub_parts[0], None, None, user.id)
                             .await
                             .unwrap_or_default()
                     } else {
@@ -384,7 +384,7 @@ async fn handle_propfind(
             let ical_uid = event_path.trim_end_matches(".ics");
 
             let events = calendar_service
-                .list_events(calendar_id, None, None, &user.id)
+                .list_events(calendar_id, None, None, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
@@ -444,14 +444,14 @@ async fn handle_report(
         CalDavReportType::CalendarQuery { time_range, .. } => {
             if let Some((start, end)) = time_range {
                 calendar_service
-                    .get_events_in_range(calendar_id, *start, *end, &user.id)
+                    .get_events_in_range(calendar_id, *start, *end, user.id)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to query events: {}", e))
                     })?
             } else {
                 calendar_service
-                    .list_events(calendar_id, None, None, &user.id)
+                    .list_events(calendar_id, None, None, user.id)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to list events: {}", e))
@@ -460,7 +460,7 @@ async fn handle_report(
         }
         CalDavReportType::CalendarMultiget { hrefs, .. } => {
             let all_events = calendar_service
-                .list_events(calendar_id, None, None, &user.id)
+                .list_events(calendar_id, None, None, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
@@ -470,7 +470,7 @@ async fn handle_report(
                 .collect()
         }
         CalDavReportType::SyncCollection { .. } => calendar_service
-            .list_events(calendar_id, None, None, &user.id)
+            .list_events(calendar_id, None, None, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?,
     };
@@ -526,7 +526,7 @@ async fn handle_mkcalendar(
     };
 
     calendar_service
-        .create_calendar(create_dto, &user.id)
+        .create_calendar(create_dto, user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to create calendar: {}", e)))?;
 
@@ -566,7 +566,7 @@ async fn handle_put(
 
     let existing = if let Some(ref uid) = ical_uid {
         let events = calendar_service
-            .list_events(calendar_id, None, None, &user.id)
+            .list_events(calendar_id, None, None, user.id)
             .await
             .unwrap_or_default();
         events.into_iter().find(|e| e.ical_uid == *uid)
@@ -577,7 +577,7 @@ async fn handle_put(
     if let Some(existing_event) = existing {
         // Update existing event — re-create from iCal for full fidelity
         calendar_service
-            .delete_event(&existing_event.id, &user.id)
+            .delete_event(&existing_event.id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update event: {}", e)))?;
 
@@ -586,7 +586,7 @@ async fn handle_put(
             ical_data,
         };
         let event = calendar_service
-            .create_event_from_ical(create_dto, &user.id)
+            .create_event_from_ical(create_dto, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to recreate event: {}", e)))?;
 
@@ -602,7 +602,7 @@ async fn handle_put(
         };
 
         let event = calendar_service
-            .create_event_from_ical(create_dto, &user.id)
+            .create_event_from_ical(create_dto, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to create event: {}", e)))?;
 
@@ -641,12 +641,12 @@ async fn handle_get(
     if parts.len() < 2 {
         // GET on calendar collection
         let events = calendar_service
-            .list_events(calendar_id, None, None, &user.id)
+            .list_events(calendar_id, None, None, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
         let calendar = calendar_service
-            .get_calendar(calendar_id, &user.id)
+            .get_calendar(calendar_id, user.id)
             .await
             .map_err(|e| AppError::not_found(format!("Calendar not found: {}", e)))?;
 
@@ -664,7 +664,7 @@ async fn handle_get(
         let ical_uid = event_file.trim_end_matches(".ics");
 
         let events = calendar_service
-            .list_events(calendar_id, None, None, &user.id)
+            .list_events(calendar_id, None, None, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
@@ -760,7 +760,7 @@ async fn handle_delete(
 
     if parts.len() < 2 {
         calendar_service
-            .delete_calendar(calendar_id, &user.id)
+            .delete_calendar(calendar_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to delete calendar: {}", e)))?;
     } else {
@@ -768,7 +768,7 @@ async fn handle_delete(
         let ical_uid = event_file.trim_end_matches(".ics");
 
         let events = calendar_service
-            .list_events(calendar_id, None, None, &user.id)
+            .list_events(calendar_id, None, None, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list events: {}", e)))?;
 
@@ -778,7 +778,7 @@ async fn handle_delete(
             .ok_or_else(|| AppError::not_found(format!("Event not found: {}", ical_uid)))?;
 
         calendar_service
-            .delete_event(&event.id, &user.id)
+            .delete_event(&event.id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to delete event: {}", e)))?;
     }
@@ -833,7 +833,7 @@ async fn handle_proppatch(
 
     if update.name.is_some() || update.description.is_some() || update.color.is_some() {
         calendar_service
-            .update_calendar(calendar_id, update, &user.id)
+            .update_calendar(calendar_id, update, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update calendar: {}", e)))?;
     }

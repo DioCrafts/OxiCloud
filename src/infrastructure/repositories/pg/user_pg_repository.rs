@@ -1,6 +1,7 @@
 use futures::future::BoxFuture;
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::ports::auth_ports::UserStoragePort;
 use crate::common::errors::DomainError;
@@ -101,7 +102,7 @@ impl UserRepository for UserPgRepository {
     }
 
     /// Gets a user by ID
-    async fn get_user_by_id(&self, id: &str) -> UserRepositoryResult<User> {
+    async fn get_user_by_id(&self, id: Uuid) -> UserRepositoryResult<User> {
         let row = sqlx::query(
             r#"
             SELECT 
@@ -278,7 +279,7 @@ impl UserRepository for UserPgRepository {
     /// Updates only the storage usage of a user
     async fn update_storage_usage(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         usage_bytes: i64,
     ) -> UserRepositoryResult<()> {
         sqlx::query(
@@ -300,7 +301,7 @@ impl UserRepository for UserPgRepository {
     }
 
     /// Updates the last login date
-    async fn update_last_login(&self, user_id: &str) -> UserRepositoryResult<()> {
+    async fn update_last_login(&self, user_id: Uuid) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
             UPDATE auth.users
@@ -423,7 +424,7 @@ impl UserRepository for UserPgRepository {
     /// Activates or deactivates a user
     async fn set_user_active_status(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         active: bool,
     ) -> UserRepositoryResult<()> {
         sqlx::query(
@@ -447,7 +448,7 @@ impl UserRepository for UserPgRepository {
     /// Changes a user's password
     async fn change_password(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         password_hash: &str,
     ) -> UserRepositoryResult<()> {
         sqlx::query(
@@ -469,7 +470,7 @@ impl UserRepository for UserPgRepository {
     }
 
     /// Changes a user's role
-    async fn change_role(&self, user_id: &str, role: UserRole) -> UserRepositoryResult<()> {
+    async fn change_role(&self, user_id: Uuid, role: UserRole) -> UserRepositoryResult<()> {
         // Convert the role to string for the binding
         let role_str = role.to_string();
 
@@ -542,7 +543,7 @@ impl UserRepository for UserPgRepository {
     }
 
     /// Deletes a user
-    async fn delete_user(&self, user_id: &str) -> UserRepositoryResult<()> {
+    async fn delete_user(&self, user_id: Uuid) -> UserRepositoryResult<()> {
         sqlx::query(
             r#"
             DELETE FROM auth.users
@@ -606,7 +607,7 @@ impl UserRepository for UserPgRepository {
     /// Updates a user's storage quota
     async fn update_storage_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         quota_bytes: i64,
     ) -> UserRepositoryResult<()> {
         sqlx::query(
@@ -675,7 +676,7 @@ impl UserStoragePort for UserPgRepository {
             .map_err(DomainError::from)
     }
 
-    async fn get_user_by_id(&self, id: &str) -> Result<User, DomainError> {
+    async fn get_user_by_id(&self, id: Uuid) -> Result<User, DomainError> {
         UserRepository::get_user_by_id(self, id)
             .await
             .map_err(DomainError::from)
@@ -701,7 +702,7 @@ impl UserStoragePort for UserPgRepository {
 
     async fn update_storage_usage(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         usage_bytes: i64,
     ) -> Result<(), DomainError> {
         UserRepository::update_storage_usage(self, user_id, usage_bytes)
@@ -727,13 +728,13 @@ impl UserStoragePort for UserPgRepository {
             .map_err(DomainError::from)
     }
 
-    async fn delete_user(&self, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_user(&self, user_id: Uuid) -> Result<(), DomainError> {
         UserRepository::delete_user(self, user_id)
             .await
             .map_err(DomainError::from)
     }
 
-    async fn change_password(&self, user_id: &str, password_hash: &str) -> Result<(), DomainError> {
+    async fn change_password(&self, user_id: Uuid, password_hash: &str) -> Result<(), DomainError> {
         UserRepository::change_password(self, user_id, password_hash)
             .await
             .map_err(DomainError::from)
@@ -749,13 +750,13 @@ impl UserStoragePort for UserPgRepository {
             .map_err(DomainError::from)
     }
 
-    async fn set_user_active_status(&self, user_id: &str, active: bool) -> Result<(), DomainError> {
+    async fn set_user_active_status(&self, user_id: Uuid, active: bool) -> Result<(), DomainError> {
         UserRepository::set_user_active_status(self, user_id, active)
             .await
             .map_err(DomainError::from)
     }
 
-    async fn change_role(&self, user_id: &str, role: &str) -> Result<(), DomainError> {
+    async fn change_role(&self, user_id: Uuid, role: &str) -> Result<(), DomainError> {
         let user_role = match role {
             "admin" => UserRole::Admin,
             _ => UserRole::User,
@@ -767,7 +768,7 @@ impl UserStoragePort for UserPgRepository {
 
     async fn update_storage_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         quota_bytes: i64,
     ) -> Result<(), DomainError> {
         UserRepository::update_storage_quota(self, user_id, quota_bytes)

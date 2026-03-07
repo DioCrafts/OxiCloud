@@ -34,7 +34,7 @@ END $BODY$;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS auth.users (
-    id VARCHAR(36) PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -52,8 +52,8 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON auth.users(email);
 
 -- Sessions table for refresh tokens
 CREATE TABLE IF NOT EXISTS auth.sessions (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     refresh_token TEXT NOT NULL UNIQUE,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
     ip_address TEXT,
@@ -80,7 +80,7 @@ WHERE NOT revoked AND auth.is_session_active(expires_at);
 -- File ownership tracking
 CREATE TABLE IF NOT EXISTS auth.user_files (
     id SERIAL PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     file_path TEXT NOT NULL,
     file_id TEXT NOT NULL,
     size_bytes BIGINT NOT NULL DEFAULT 0,
@@ -95,7 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_user_files_file_id ON auth.user_files(file_id);
 -- User favorites
 CREATE TABLE IF NOT EXISTS auth.user_favorites (
     id SERIAL PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     item_id TEXT NOT NULL,
     item_type TEXT NOT NULL, -- 'file' or 'folder'
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -111,7 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_user_favorites_user_type ON auth.user_favorites(u
 -- Recent files
 CREATE TABLE IF NOT EXISTS auth.user_recent_files (
     id SERIAL PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     item_id TEXT NOT NULL,
     item_type TEXT NOT NULL, -- 'file' or 'folder'
     accessed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -137,7 +137,7 @@ CREATE TABLE IF NOT EXISTS auth.admin_settings (
     category VARCHAR(50) NOT NULL DEFAULT 'general',
     is_secret BOOLEAN NOT NULL DEFAULT FALSE,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(36)
+    updated_by UUID
 );
 
 CREATE INDEX IF NOT EXISTS idx_admin_settings_category ON auth.admin_settings(category);
@@ -172,13 +172,13 @@ BEGIN
 END $BODY$;
 
 CREATE TABLE IF NOT EXISTS auth.device_codes (
-    id VARCHAR(36) PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_code VARCHAR(128) UNIQUE NOT NULL,
     user_code VARCHAR(16) UNIQUE NOT NULL,
     client_name VARCHAR(255) NOT NULL DEFAULT 'Unknown Client',
     scopes VARCHAR(512) NOT NULL DEFAULT 'webdav,caldav,carddav',
     status auth.device_code_status NOT NULL DEFAULT 'pending',
-    user_id VARCHAR(36) REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     access_token TEXT,
     refresh_token TEXT,
     verification_uri TEXT NOT NULL,
@@ -203,8 +203,8 @@ COMMENT ON TABLE auth.device_codes IS 'OAuth 2.0 Device Authorization Grant (RFC
 
 -- App Passwords (application-specific passwords for DAV clients with HTTP Basic Auth)
 CREATE TABLE IF NOT EXISTS auth.app_passwords (
-    id VARCHAR(36) PRIMARY KEY,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     label VARCHAR(255) NOT NULL,
     password_hash TEXT NOT NULL,
     prefix VARCHAR(50) NOT NULL,
@@ -231,7 +231,7 @@ CREATE SCHEMA IF NOT EXISTS caldav;
 CREATE TABLE IF NOT EXISTS caldav.calendars (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
-    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     description TEXT,
     color VARCHAR(9), -- #RRGGBB or #RRGGBBAA
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
@@ -271,7 +271,7 @@ CREATE INDEX IF NOT EXISTS idx_calendar_events_summary_trgm
 CREATE TABLE IF NOT EXISTS caldav.calendar_shares (
     id SERIAL PRIMARY KEY,
     calendar_id UUID NOT NULL REFERENCES caldav.calendars(id) ON DELETE CASCADE,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     access_level VARCHAR(10) NOT NULL DEFAULT 'read', -- read, write, owner
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(calendar_id, user_id)
@@ -305,7 +305,7 @@ CREATE SCHEMA IF NOT EXISTS carddav;
 CREATE TABLE IF NOT EXISTS carddav.address_books (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
-    owner_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    owner_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     description TEXT,
     color VARCHAR(9),
     is_public BOOLEAN NOT NULL DEFAULT FALSE,
@@ -364,7 +364,7 @@ CREATE INDEX IF NOT EXISTS idx_contacts_phone_text_trgm
 CREATE TABLE IF NOT EXISTS carddav.address_book_shares (
     id SERIAL PRIMARY KEY,
     address_book_id UUID NOT NULL REFERENCES carddav.address_books(id) ON DELETE CASCADE,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     can_write BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(address_book_id, user_id)
@@ -444,7 +444,7 @@ CREATE TABLE IF NOT EXISTS storage.folders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     parent_id UUID REFERENCES storage.folders(id) ON DELETE CASCADE,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     path TEXT NOT NULL DEFAULT '',
     lpath ltree NOT NULL DEFAULT '',
     is_trashed BOOLEAN NOT NULL DEFAULT FALSE,
@@ -545,7 +545,7 @@ CREATE TABLE IF NOT EXISTS storage.files (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     folder_id UUID REFERENCES storage.folders(id) ON DELETE CASCADE,
-    user_id VARCHAR(36) NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     blob_hash VARCHAR(64) NOT NULL,
     size BIGINT NOT NULL DEFAULT 0,
     mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
@@ -636,7 +636,7 @@ CREATE TABLE IF NOT EXISTS storage.shares (
     permissions_write   BOOLEAN NOT NULL DEFAULT FALSE,
     permissions_reshare BOOLEAN NOT NULL DEFAULT FALSE,
     created_at  BIGINT NOT NULL,  -- unix epoch seconds
-    created_by  VARCHAR(36) NOT NULL,
+    created_by  UUID NOT NULL,
     access_count BIGINT NOT NULL DEFAULT 0
 );
 

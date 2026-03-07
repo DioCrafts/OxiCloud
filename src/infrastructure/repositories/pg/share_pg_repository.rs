@@ -1,5 +1,6 @@
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::{
     application::ports::share_ports::ShareStoragePort,
@@ -37,7 +38,7 @@ impl SharePgRepository {
 
     /// Maps a [`sqlx::postgres::PgRow`] to the domain [`Share`] entity.
     fn row_to_entity(row: &sqlx::postgres::PgRow) -> Result<Share, DomainError> {
-        let id: String = row
+        let id: Uuid = row
             .try_get("id")
             .map_err(|e| DomainError::internal_error("Share", format!("Failed to read id: {e}")))?;
         let item_id: String = row.try_get("item_id").map_err(|e| {
@@ -58,7 +59,7 @@ impl SharePgRepository {
         let created_at: i64 = row.try_get("created_at").map_err(|e| {
             DomainError::internal_error("Share", format!("Failed to read created_at: {e}"))
         })?;
-        let created_by: String = row.try_get("created_by").map_err(|e| {
+        let created_by: Uuid = row.try_get("created_by").map_err(|e| {
             DomainError::internal_error("Share", format!("Failed to read created_by: {e}"))
         })?;
         let access_count: i64 = row.try_get("access_count").unwrap_or(0);
@@ -93,7 +94,7 @@ impl ShareStoragePort for SharePgRepository {
                  expires_at, permissions_read, permissions_write, permissions_reshare,
                  created_at, created_by, access_count)
             VALUES
-                ($1::UUID, $2, $3, $4, $5, $6,
+                ($1, $2, $3, $4, $5, $6,
                  $7, $8, $9, $10,
                  $11, $12, $13)
             ON CONFLICT (id) DO UPDATE SET
@@ -105,7 +106,7 @@ impl ShareStoragePort for SharePgRepository {
                 permissions_reshare = EXCLUDED.permissions_reshare,
                 access_count      = EXCLUDED.access_count
             RETURNING
-                id::TEXT, item_id, item_name, item_type, token, password_hash,
+                id, item_id, item_name, item_type, token, password_hash,
                 expires_at, permissions_read, permissions_write, permissions_reshare,
                 created_at, created_by, access_count
             "#,
@@ -136,7 +137,7 @@ impl ShareStoragePort for SharePgRepository {
     async fn find_share_by_token(&self, token: &str) -> Result<Share, DomainError> {
         let row = sqlx::query(
             r#"
-            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
+            SELECT id, item_id, item_name, item_type, token, password_hash,
                    expires_at, permissions_read, permissions_write, permissions_reshare,
                    created_at, created_by, access_count
             FROM storage.shares
@@ -162,16 +163,16 @@ impl ShareStoragePort for SharePgRepository {
 
     async fn find_share_by_id_for_user(
         &self,
-        id: &str,
-        user_id: &str,
+        id: Uuid,
+        user_id: Uuid,
     ) -> Result<Share, DomainError> {
         let row = sqlx::query(
             r#"
-            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
+            SELECT id, item_id, item_name, item_type, token, password_hash,
                    expires_at, permissions_read, permissions_write, permissions_reshare,
                    created_at, created_by, access_count
             FROM storage.shares
-            WHERE id = $1::UUID AND created_by = $2
+            WHERE id = $1 AND created_by = $2
             "#,
         )
         .bind(id)
@@ -193,9 +194,9 @@ impl ShareStoragePort for SharePgRepository {
         }
     }
 
-    async fn delete_share_for_user(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_share_for_user(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
         let result =
-            sqlx::query("DELETE FROM storage.shares WHERE id = $1::UUID AND created_by = $2")
+            sqlx::query("DELETE FROM storage.shares WHERE id = $1 AND created_by = $2")
                 .bind(id)
                 .bind(user_id)
                 .execute(&*self.db_pool)
@@ -220,11 +221,11 @@ impl ShareStoragePort for SharePgRepository {
         &self,
         item_id: &str,
         item_type: &ShareItemType,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<Share>, DomainError> {
         let rows = sqlx::query(
             r#"
-            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
+            SELECT id, item_id, item_name, item_type, token, password_hash,
                    expires_at, permissions_read, permissions_write, permissions_reshare,
                    created_at, created_by, access_count
             FROM storage.shares
@@ -256,9 +257,9 @@ impl ShareStoragePort for SharePgRepository {
                 permissions_write = $6,
                 permissions_reshare = $7,
                 access_count      = $8
-            WHERE id = $1::UUID
+            WHERE id = $1
             RETURNING
-                id::TEXT, item_id, item_name, item_type, token, password_hash,
+                id, item_id, item_name, item_type, token, password_hash,
                 expires_at, permissions_read, permissions_write, permissions_reshare,
                 created_at, created_by, access_count
             "#,
@@ -289,14 +290,14 @@ impl ShareStoragePort for SharePgRepository {
 
     async fn find_shares_by_user(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         offset: usize,
         limit: usize,
     ) -> Result<(Vec<Share>, usize), DomainError> {
         // Single query with window function — count + rows in one roundtrip
         let rows = sqlx::query(
             r#"
-            SELECT id::TEXT, item_id, item_name, item_type, token, password_hash,
+            SELECT id, item_id, item_name, item_type, token, password_hash,
                    expires_at, permissions_read, permissions_write, permissions_reshare,
                    created_at, created_by, access_count,
                    COUNT(*) OVER() AS total_count

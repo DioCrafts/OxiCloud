@@ -90,7 +90,8 @@ pub async fn handle_preview(
     };
 
     // Verify the authenticated user owns this file
-    if file.owner_id.as_deref() != Some(&user.id) {
+    let user_id_str = user.id.to_string();
+    if file.owner_id.as_deref() != Some(user_id_str.as_str()) {
         return Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::from("File not found"))

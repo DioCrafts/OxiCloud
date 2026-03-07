@@ -30,7 +30,7 @@ pub async fn get_favorites(
     State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     match favorites_service.get_favorites(user_id).await {
         Ok(favorites) => {
@@ -56,7 +56,7 @@ pub async fn add_favorite(
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     // Validate item_type
     if item_type != "file" && item_type != "folder" {
@@ -99,7 +99,7 @@ pub async fn remove_favorite(
     auth_user: AuthUser,
     Path((item_type, item_id)): Path<(String, String)>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     match favorites_service
         .remove_from_favorites(user_id, &item_id, &item_type)
@@ -143,7 +143,7 @@ pub async fn batch_add_favorites(
     auth_user: AuthUser,
     Json(body): Json<BatchFavoritesRequest>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     if body.items.is_empty() {
         return (

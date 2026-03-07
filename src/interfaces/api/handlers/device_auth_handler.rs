@@ -16,6 +16,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::device_auth_dto::*;
 use crate::application::services::device_auth_service::DeviceAuthService;
@@ -145,7 +146,7 @@ async fn device_verify_action(
     match body.action.to_lowercase().as_str() {
         "approve" | "allow" | "accept" => {
             device_service
-                .approve(&body.user_code, &auth_user.id)
+                .approve(&body.user_code, auth_user.id)
                 .await
                 .map_err(|e| {
                     tracing::error!("Device approve failed: {}", e);
@@ -181,7 +182,7 @@ async fn list_devices(
     let device_service = get_device_service(&state)?;
 
     let devices = device_service
-        .list_user_devices(&auth_user.id)
+        .list_user_devices(auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("List devices failed: {}", e);
@@ -202,8 +203,10 @@ async fn revoke_device(
 ) -> Result<impl IntoResponse, AppError> {
     let device_service = get_device_service(&state)?;
 
+    let device_id = Uuid::parse_str(&device_id).map_err(|_| AppError::bad_request("Invalid device ID"))?;
+
     device_service
-        .revoke_device(&device_id, &auth_user.id)
+        .revoke_device(device_id, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Revoke device failed: {}", e);

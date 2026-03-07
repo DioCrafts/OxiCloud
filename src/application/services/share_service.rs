@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use tokio::sync::Semaphore;
+use uuid::Uuid;
 
 use crate::domain::repositories::folder_repository::FolderRepository;
 use crate::infrastructure::repositories::pg::SharePgRepository;
@@ -150,7 +151,7 @@ impl ShareService {
     /// but belongs to a different user — this prevents share-ID enumeration
     /// attacks where an attacker probes IDs and uses 403-vs-404 to learn
     /// which ones are valid.
-    async fn fetch_owned_share(&self, id: &str, requester_id: &str) -> Result<Share, DomainError> {
+    async fn fetch_owned_share(&self, id: Uuid, requester_id: Uuid) -> Result<Share, DomainError> {
         let share = self
             .share_repository
             .find_share_by_id_for_user(id, requester_id)
@@ -163,7 +164,7 @@ impl ShareService {
 impl ShareUseCase for ShareService {
     async fn create_shared_link(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         dto: CreateShareDto,
     ) -> Result<ShareDto, DomainError> {
         // Convert the item type
@@ -187,7 +188,7 @@ impl ShareUseCase for ShareService {
             dto.item_id.clone(),
             dto.item_name.clone(),
             item_type,
-            user_id.to_string(),
+            user_id,
             permissions,
             password_hash,
             dto.expires_at,
@@ -205,7 +206,7 @@ impl ShareUseCase for ShareService {
         Ok(ShareDto::from_entity(&saved_share, &self.config.base_url()))
     }
 
-    async fn get_shared_link(&self, id: &str, requester_id: &str) -> Result<ShareDto, DomainError> {
+    async fn get_shared_link(&self, id: Uuid, requester_id: Uuid) -> Result<ShareDto, DomainError> {
         // SECURITY: ownership-verified lookup — returns 404 if the share
         // doesn't exist OR belongs to another user.
         let share = self.fetch_owned_share(id, requester_id).await?;
@@ -253,7 +254,7 @@ impl ShareUseCase for ShareService {
         &self,
         item_id: &str,
         item_type: &ShareItemType,
-        requester_id: &str,
+        requester_id: Uuid,
     ) -> Result<Vec<ShareDto>, DomainError> {
         // SECURITY: only return shares created by the requester
         let shares = self
@@ -276,8 +277,8 @@ impl ShareUseCase for ShareService {
 
     async fn update_shared_link(
         &self,
-        id: &str,
-        requester_id: &str,
+        id: Uuid,
+        requester_id: Uuid,
         dto: UpdateShareDto,
     ) -> Result<ShareDto, DomainError> {
         // SECURITY: ownership-verified lookup — prevents IDOR
@@ -322,7 +323,7 @@ impl ShareUseCase for ShareService {
         ))
     }
 
-    async fn delete_shared_link(&self, id: &str, requester_id: &str) -> Result<(), DomainError> {
+    async fn delete_shared_link(&self, id: Uuid, requester_id: Uuid) -> Result<(), DomainError> {
         // SECURITY: ownership-verified delete — only the creator can remove
         self.share_repository
             .delete_share_for_user(id, requester_id)
@@ -333,7 +334,7 @@ impl ShareUseCase for ShareService {
 
     async fn get_user_shared_links(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         page: usize,
         per_page: usize,
     ) -> Result<PaginatedResponseDto<ShareDto>, DomainError> {
@@ -519,7 +520,7 @@ mod tests {
     {
         async fn create_shared_link(
             &self,
-            user_id: &str,
+            user_id: Uuid,
             dto: CreateShareDto,
         ) -> Result<ShareDto, DomainError> {
             let item_type = ShareItemType::try_from(dto.item_type.as_str())
@@ -534,7 +535,7 @@ mod tests {
                 dto.item_id.clone(),
                 dto.item_name.clone(),
                 item_type,
-                user_id.to_string(),
+                user_id,
                 permissions,
                 password_hash,
                 dto.expires_at,
@@ -550,8 +551,8 @@ mod tests {
 
         async fn get_shared_link(
             &self,
-            id: &str,
-            requester_id: &str,
+            id: Uuid,
+            requester_id: Uuid,
         ) -> Result<ShareDto, DomainError> {
             let share = self
                 .share_repository
@@ -584,7 +585,7 @@ mod tests {
             &self,
             item_id: &str,
             item_type: &ShareItemType,
-            requester_id: &str,
+            requester_id: Uuid,
         ) -> Result<Vec<ShareDto>, DomainError> {
             let shares = self
                 .share_repository
@@ -600,8 +601,8 @@ mod tests {
 
         async fn update_shared_link(
             &self,
-            id: &str,
-            requester_id: &str,
+            id: Uuid,
+            requester_id: Uuid,
             dto: UpdateShareDto,
         ) -> Result<ShareDto, DomainError> {
             let mut share = self
@@ -635,8 +636,8 @@ mod tests {
 
         async fn delete_shared_link(
             &self,
-            id: &str,
-            requester_id: &str,
+            id: Uuid,
+            requester_id: Uuid,
         ) -> Result<(), DomainError> {
             self.share_repository
                 .delete_share_for_user(id, requester_id)
@@ -647,7 +648,7 @@ mod tests {
 
         async fn get_user_shared_links(
             &self,
-            user_id: &str,
+            user_id: Uuid,
             page: usize,
             per_page: usize,
         ) -> Result<PaginatedResponseDto<ShareDto>, DomainError> {
@@ -1018,28 +1019,30 @@ mod tests {
 
         async fn find_share_by_id_for_user(
             &self,
-            id: &str,
-            user_id: &str,
+            id: Uuid,
+            user_id: Uuid,
         ) -> Result<Share, DomainError> {
             let shares = self.shares.lock().unwrap();
+            let id_str = id.to_string();
             shares
-                .get(id)
+                .get(&id_str)
                 .filter(|s| s.created_by() == user_id)
                 .cloned()
-                .ok_or_else(|| DomainError::not_found("Share", id))
+                .ok_or_else(|| DomainError::not_found("Share", &id_str))
         }
 
-        async fn delete_share_for_user(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+        async fn delete_share_for_user(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
             let mut shares = self.shares.lock().unwrap();
             let mut tokens = self.tokens.lock().unwrap();
+            let id_str = id.to_string();
 
             let share = shares
-                .get(id)
+                .get(&id_str)
                 .filter(|s| s.created_by() == user_id)
-                .ok_or_else(|| DomainError::not_found("Share", id))?;
+                .ok_or_else(|| DomainError::not_found("Share", &id_str))?;
 
             tokens.remove(share.token());
-            shares.remove(id);
+            shares.remove(&id_str);
             Ok(())
         }
 
@@ -1047,7 +1050,7 @@ mod tests {
             &self,
             item_id: &str,
             item_type: &ShareItemType,
-            user_id: &str,
+            user_id: Uuid,
         ) -> Result<Vec<Share>, DomainError> {
             let shares = self.shares.lock().unwrap();
             let type_str = item_type.to_string();
@@ -1078,7 +1081,7 @@ mod tests {
 
         async fn find_shares_by_user(
             &self,
-            user_id: &str,
+            user_id: Uuid,
             offset: usize,
             limit: usize,
         ) -> Result<(Vec<Share>, usize), DomainError> {
@@ -1125,7 +1128,7 @@ mod tests {
             }),
         };
 
-        let result = service.create_shared_link("user123", dto).await;
+        let result = service.create_shared_link(Uuid::new_v4(), dto).await;
         assert!(result.is_ok());
 
         let share_dto = result.unwrap();

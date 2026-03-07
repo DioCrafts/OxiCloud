@@ -75,7 +75,7 @@ async fn handle_propfind(
         .ok_or_else(|| AppError::internal_error("Trash service not available"))?;
 
     let items = trash_svc
-        .get_trash_items(&user.id)
+        .get_trash_items(user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to list trash: {}", e)))?;
 
@@ -109,7 +109,7 @@ async fn handle_restore(
         .ok_or_else(|| AppError::internal_error("Trash service not available"))?;
 
     trash_svc
-        .restore_item(&id, &user.id)
+        .restore_item(&id, user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to restore item: {}", e)))?;
 
@@ -131,7 +131,7 @@ async fn handle_empty_trash(
         .ok_or_else(|| AppError::internal_error("Trash service not available"))?;
 
     trash_svc
-        .empty_trash(&user.id)
+        .empty_trash(user.id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to empty trash: {}", e)))?;
 
@@ -156,7 +156,7 @@ async fn handle_delete_permanent(
         .ok_or_else(|| AppError::internal_error("Trash service not available"))?;
 
     trash_svc
-        .delete_permanently(&id, &user.id)
+        .delete_permanently(&id, user.id)
         .await
         .map_err(|e| {
             AppError::internal_error(format!("Failed to permanently delete item: {}", e))

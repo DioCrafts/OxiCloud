@@ -6,6 +6,7 @@ use crate::domain::entities::app_password::AppPassword;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use std::sync::Arc;
+use uuid::Uuid;
 
 pub struct AppPasswordPgRepository {
     pool: Arc<PgPool>,
@@ -48,7 +49,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         Ok(ap)
     }
 
-    async fn list_by_user(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError> {
+    async fn list_by_user(&self, user_id: Uuid) -> Result<Vec<AppPassword>, DomainError> {
         let rows = sqlx::query_as::<_, AppPasswordRow>(
             r#"
             SELECT id, user_id, label, password_hash, prefix, scopes,
@@ -66,7 +67,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
-    async fn get_by_id(&self, id: &str) -> Result<AppPassword, DomainError> {
+    async fn get_by_id(&self, id: Uuid) -> Result<AppPassword, DomainError> {
         let row = sqlx::query_as::<_, AppPasswordRow>(
             r#"
             SELECT id, user_id, label, password_hash, prefix, scopes,
@@ -79,12 +80,12 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         .fetch_optional(self.pool())
         .await
         .map_err(|e| DomainError::internal_error("AppPasswordPg", format!("get_by_id: {e}")))?
-        .ok_or_else(|| DomainError::not_found("AppPassword", id))?;
+        .ok_or_else(|| DomainError::not_found("AppPassword", id.to_string()))?;
 
         Ok(row.into())
     }
 
-    async fn get_active_by_user_id(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError> {
+    async fn get_active_by_user_id(&self, user_id: Uuid) -> Result<Vec<AppPassword>, DomainError> {
         let rows = sqlx::query_as::<_, AppPasswordRow>(
             r#"
             SELECT id, user_id, label, password_hash, prefix, scopes,
@@ -105,7 +106,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
 
     async fn get_active_by_user_prefix(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         prefix: &str,
     ) -> Result<Vec<AppPassword>, DomainError> {
         let rows = sqlx::query_as::<_, AppPasswordRow>(
@@ -131,7 +132,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
-    async fn touch_last_used(&self, id: &str) -> Result<(), DomainError> {
+    async fn touch_last_used(&self, id: Uuid) -> Result<(), DomainError> {
         sqlx::query("UPDATE auth.app_passwords SET last_used_at = NOW() WHERE id = $1")
             .bind(id)
             .execute(self.pool())
@@ -140,7 +141,7 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         Ok(())
     }
 
-    async fn revoke(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn revoke(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
         let result = sqlx::query(
             "UPDATE auth.app_passwords SET active = FALSE WHERE id = $1 AND user_id = $2",
         )
@@ -151,12 +152,12 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
         .map_err(|e| DomainError::internal_error("AppPasswordPg", format!("revoke: {e}")))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::not_found("AppPassword", id));
+            return Err(DomainError::not_found("AppPassword", id.to_string()));
         }
         Ok(())
     }
 
-    async fn delete_by_user_and_id(&self, id: &str, user_id: &str) -> Result<bool, DomainError> {
+    async fn delete_by_user_and_id(&self, id: Uuid, user_id: Uuid) -> Result<bool, DomainError> {
         let result = sqlx::query("DELETE FROM auth.app_passwords WHERE id = $1 AND user_id = $2")
             .bind(id)
             .bind(user_id)
@@ -190,8 +191,8 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
 /// Internal row struct for sqlx mapping.
 #[derive(sqlx::FromRow)]
 struct AppPasswordRow {
-    id: String,
-    user_id: String,
+    id: Uuid,
+    user_id: Uuid,
     label: String,
     password_hash: String,
     prefix: String,

@@ -3,6 +3,7 @@ use crate::domain::entities::app_password::AppPassword;
 use crate::domain::entities::device_code::DeviceCode;
 use crate::domain::entities::session::Session;
 use crate::domain::entities::user::User;
+use uuid::Uuid;
 
 // ============================================================================
 // Cryptography Ports - Extracted from Domain to maintain Clean Architecture
@@ -72,7 +73,7 @@ pub trait UserStoragePort: Send + Sync + 'static {
     async fn create_user(&self, user: User) -> Result<User, DomainError>;
 
     /// Gets a user by ID
-    async fn get_user_by_id(&self, id: &str) -> Result<User, DomainError>;
+    async fn get_user_by_id(&self, id: Uuid) -> Result<User, DomainError>;
 
     /// Gets a user by username
     async fn get_user_by_username(&self, username: &str) -> Result<User, DomainError>;
@@ -86,7 +87,7 @@ pub trait UserStoragePort: Send + Sync + 'static {
     /// Updates only the storage usage of a user
     async fn update_storage_usage(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         usage_bytes: i64,
     ) -> Result<(), DomainError>;
 
@@ -100,10 +101,10 @@ pub trait UserStoragePort: Send + Sync + 'static {
     async fn list_users_by_role(&self, role: &str) -> Result<Vec<User>, DomainError>;
 
     /// Deletes a user by their ID
-    async fn delete_user(&self, user_id: &str) -> Result<(), DomainError>;
+    async fn delete_user(&self, user_id: Uuid) -> Result<(), DomainError>;
 
     /// Changes a user's password
-    async fn change_password(&self, user_id: &str, password_hash: &str) -> Result<(), DomainError>;
+    async fn change_password(&self, user_id: Uuid, password_hash: &str) -> Result<(), DomainError>;
 
     /// Finds a user by OIDC provider + subject pair
     async fn get_user_by_oidc_subject(
@@ -113,15 +114,15 @@ pub trait UserStoragePort: Send + Sync + 'static {
     ) -> Result<User, DomainError>;
 
     /// Activates or deactivates a user
-    async fn set_user_active_status(&self, user_id: &str, active: bool) -> Result<(), DomainError>;
+    async fn set_user_active_status(&self, user_id: Uuid, active: bool) -> Result<(), DomainError>;
 
     /// Changes a user's role
-    async fn change_role(&self, user_id: &str, role: &str) -> Result<(), DomainError>;
+    async fn change_role(&self, user_id: Uuid, role: &str) -> Result<(), DomainError>;
 
     /// Updates a user's storage quota
     async fn update_storage_quota(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         quota_bytes: i64,
     ) -> Result<(), DomainError>;
 
@@ -197,10 +198,10 @@ pub trait SessionStoragePort: Send + Sync + 'static {
     ) -> Result<Session, DomainError>;
 
     /// Revokes a specific session
-    async fn revoke_session(&self, session_id: &str) -> Result<(), DomainError>;
+    async fn revoke_session(&self, session_id: Uuid) -> Result<(), DomainError>;
 
     /// Revokes all sessions of a user
-    async fn revoke_all_user_sessions(&self, user_id: &str) -> Result<u64, DomainError>;
+    async fn revoke_all_user_sessions(&self, user_id: Uuid) -> Result<u64, DomainError>;
 }
 
 // ============================================================================
@@ -224,10 +225,10 @@ pub trait DeviceCodeStoragePort: Send + Sync + 'static {
     async fn delete_expired(&self) -> Result<u64, DomainError>;
 
     /// List authorized device codes for a user (for UI management)
-    async fn list_by_user(&self, user_id: &str) -> Result<Vec<DeviceCode>, DomainError>;
+    async fn list_by_user(&self, user_id: Uuid) -> Result<Vec<DeviceCode>, DomainError>;
 
     /// Delete a specific device code by ID (revocation)
-    async fn delete_by_id(&self, id: &str) -> Result<(), DomainError>;
+    async fn delete_by_id(&self, id: Uuid) -> Result<(), DomainError>;
 }
 
 // ============================================================================
@@ -240,31 +241,31 @@ pub trait AppPasswordStoragePort: Send + Sync + 'static {
     async fn create(&self, app_password: AppPassword) -> Result<AppPassword, DomainError>;
 
     /// Get all active (non-expired) app passwords for a user.
-    async fn list_by_user(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError>;
+    async fn list_by_user(&self, user_id: Uuid) -> Result<Vec<AppPassword>, DomainError>;
 
     /// Get a specific app password by ID.
-    async fn get_by_id(&self, id: &str) -> Result<AppPassword, DomainError>;
+    async fn get_by_id(&self, id: Uuid) -> Result<AppPassword, DomainError>;
 
     /// Get all active app passwords for a user ID (for Basic auth verification).
     /// This includes the password hash for verification.
-    async fn get_active_by_user_id(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError>;
+    async fn get_active_by_user_id(&self, user_id: Uuid) -> Result<Vec<AppPassword>, DomainError>;
 
     /// Update the `last_used_at` timestamp after a successful authentication.
-    async fn touch_last_used(&self, id: &str) -> Result<(), DomainError>;
+    async fn touch_last_used(&self, id: Uuid) -> Result<(), DomainError>;
 
     /// Get active app passwords for a user filtered by token prefix (first 8 chars).
     /// More efficient than `get_active_by_user_id` when the password prefix is known.
     async fn get_active_by_user_prefix(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         prefix: &str,
     ) -> Result<Vec<AppPassword>, DomainError>;
 
     /// Deactivate (soft-delete) an app password, scoped to the owning user.
-    async fn revoke(&self, id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn revoke(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError>;
 
     /// Delete an app password owned by a specific user. Returns true if found and deleted.
-    async fn delete_by_user_and_id(&self, id: &str, user_id: &str) -> Result<bool, DomainError>;
+    async fn delete_by_user_and_id(&self, id: Uuid, user_id: Uuid) -> Result<bool, DomainError>;
 
     /// Hard-delete expired/revoked app passwords (cleanup).
     async fn delete_expired(&self) -> Result<u64, DomainError>;

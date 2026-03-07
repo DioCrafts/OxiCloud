@@ -22,7 +22,7 @@ impl std::fmt::Display for UserRole {
 
 #[derive(Debug, Clone)]
 pub struct User {
-    id: String,
+    id: Uuid,
     username: String,
     email: String,
     password_hash: String,
@@ -70,7 +70,7 @@ impl User {
         let now = Utc::now();
 
         Ok(Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             username,
             email,
             password_hash,
@@ -99,7 +99,7 @@ impl User {
         Self::validate_email(&email)?;
         let now = Utc::now();
         Ok(Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             username,
             email,
             password_hash: "__OIDC_NO_PASSWORD__".to_string(),
@@ -117,7 +117,7 @@ impl User {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_data(
-        id: String,
+        id: Uuid,
         username: String,
         email: String,
         password_hash: String,
@@ -148,7 +148,7 @@ impl User {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_data_full(
-        id: String,
+        id: Uuid,
         username: String,
         email: String,
         password_hash: String,
@@ -180,8 +180,8 @@ impl User {
     }
 
     // Getters
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> Uuid {
+        self.id
     }
 
     pub fn username(&self) -> &str {

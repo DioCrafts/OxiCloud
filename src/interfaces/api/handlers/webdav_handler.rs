@@ -183,7 +183,7 @@ async fn handle_webdav_methods(
 /// If `path` doesn't already start with the user's home folder name, prepend
 /// the home folder path so downstream services can find the resource in the DB.
 /// Returns `None` when the path already includes the prefix or resolution fails.
-async fn resolve_webdav_path(state: &Arc<AppState>, user_id: &str, path: &str) -> Option<String> {
+async fn resolve_webdav_path(state: &Arc<AppState>, user_id: Uuid, path: &str) -> Option<String> {
     let folder_service = &state.applications.folder_service;
     let home_folders = folder_service
         .list_folders_for_owner(None, user_id)
@@ -209,9 +209,9 @@ async fn handle_webdav_dispatch(
     // prefix when the path doesn't already include it.
     // Extract user_id before any async call to keep the future Send.
     let path = if !path.is_empty() && method.as_str() != "OPTIONS" {
-        let user_id = req.extensions().get::<Arc<CurrentUser>>().map(|u| u.id.clone());
+        let user_id = req.extensions().get::<Arc<CurrentUser>>().map(|u| u.id);
         if let Some(uid) = user_id {
-            resolve_webdav_path(&state, &uid, &path)
+            resolve_webdav_path(&state, uid, &path)
                 .await
                 .unwrap_or(path)
         } else {
@@ -371,14 +371,14 @@ async fn handle_propfind(
             propfind_request,
             folder_service,
             file_retrieval_service,
-            &user.id,
+            user.id,
         )
         .await;
     }
 
     // Single-query path resolution: folder OR file in one DB round-trip
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&path, &user.id).await {
+        match resolver.resolve_path_for_user(&path, user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 let folder_id = folder.id.clone();
                 return build_streaming_propfind_response(
@@ -389,7 +389,7 @@ async fn handle_propfind(
                     propfind_request,
                     folder_service,
                     file_retrieval_service,
-                    &user.id,
+                    user.id,
                 )
                 .await;
             }
@@ -420,7 +420,7 @@ async fn handle_propfind(
     } else {
         // Fallback: legacy double-query path when PathResolver is unavailable
         if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
-            assert_owner(folder.owner_id.as_deref(), &user.id, &path)?;
+            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &path)?;
             let folder_id = folder.id.clone();
             return build_streaming_propfind_response(
                 folder,
@@ -430,12 +430,12 @@ async fn handle_propfind(
                 propfind_request,
                 folder_service,
                 file_retrieval_service,
-                &user.id,
+                user.id,
             )
             .await;
         }
         if let Ok(file) = file_retrieval_service.get_file_by_path(&path).await {
-            assert_owner(file.owner_id.as_deref(), &user.id, &path)?;
+            assert_owner(file.owner_id.as_deref(), &user.id.to_string(), &path)?;
             let mut buf = Vec::with_capacity(1024);
             {
                 let mut xml_writer = Writer::new(&mut buf);
@@ -477,12 +477,11 @@ async fn build_streaming_propfind_response(
     propfind_request: PropFindRequest,
     folder_service: std::sync::Arc<FolderService>,
     file_retrieval_service: std::sync::Arc<FileRetrievalService>,
-    user_id: &str,
+    user_id: Uuid,
 ) -> Result<Response<Body>, AppError> {
     let depth = depth.to_string();
     let base_href = base_href.to_string();
     let propfind_request = Arc::new(propfind_request);
-    let user_id = user_id.to_string();
 
     let stream = async_stream::try_stream! {
         // ── XML header + <D:multistatus> + folder entry ──────────
@@ -512,7 +511,7 @@ async fn build_streaming_propfind_response(
                     page_size: pagination.page_size,
                 };
                 let result = folder_service
-                    .list_folders_for_owner_paginated(fid_ref, &user_id, &pag)
+                    .list_folders_for_owner_paginated(fid_ref, user_id, &pag)
                     .await
                     .map_err(|e| std::io::Error::other(e.to_string()))?;
 
@@ -542,7 +541,7 @@ async fn build_streaming_propfind_response(
             let mut offset: i64 = 0;
             loop {
                 let batch: Vec<FileDto> = file_retrieval_service
-                    .list_files_batch_for_owner(fid_ref, &user_id, offset, PROPFIND_BATCH_SIZE)
+                    .list_files_batch_for_owner(fid_ref, user_id, offset, PROPFIND_BATCH_SIZE)
                     .await
                     .map_err(|e| std::io::Error::other(e.to_string()))?;
 
@@ -675,7 +674,7 @@ async fn handle_get(
 
     // Resolve file — user-scoped when PathResolver is available
     let file = if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&path, &user.id).await {
+        match resolver.resolve_path_for_user(&path, user.id).await {
             Ok(ResolvedResource::File(f)) => f,
             Ok(ResolvedResource::Folder(_)) => {
                 return Err(AppError::bad_request("Cannot GET a directory"));
@@ -690,7 +689,7 @@ async fn handle_get(
             .get_file_by_path(&path)
             .await
             .map_err(|_e| AppError::not_found(format!("File not found: {}", path)))?;
-        assert_owner(f.owner_id.as_deref(), &user.id, &path)?;
+        assert_owner(f.owner_id.as_deref(), &user.id.to_string(), &path)?;
         f
     };
 
@@ -740,7 +739,7 @@ async fn handle_head(
 
     // Single-query path resolution (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&path, &user.id).await {
+        match resolver.resolve_path_for_user(&path, user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
@@ -771,7 +770,7 @@ async fn handle_head(
 
     // Fallback: legacy double-query path (with ownership check)
     if let Ok(folder) = folder_service.get_folder_by_path(&path).await {
-        assert_owner(folder.owner_id.as_deref(), &user.id, &path)?;
+        assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &path)?;
         return Ok(Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "httpd/unix-directory")
@@ -786,7 +785,7 @@ async fn handle_head(
         .get_file_by_path(&path)
         .await
         .map_err(|_e| AppError::not_found(format!("Resource not found: {}", path)))?;
-    assert_owner(file.owner_id.as_deref(), &user.id, &path)?;
+    assert_owner(file.owner_id.as_deref(), &user.id.to_string(), &path)?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -840,7 +839,7 @@ async fn handle_put(
     // parent folder (create). Without this check a user could
     // overwrite another user's file via a crafted PUT path.
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&path, &user.id).await {
+        match resolver.resolve_path_for_user(&path, user.id).await {
             Ok(ResolvedResource::File(_)) => { /* existing file owned by user — OK */ }
             Ok(ResolvedResource::Folder(_)) => {
                 return Err(AppError::bad_request("Cannot PUT to a directory"));
@@ -854,7 +853,7 @@ async fn handle_put(
                 };
                 if !parent_path.is_empty() {
                     resolver
-                        .resolve_path_for_user(parent_path, &user.id)
+                        .resolve_path_for_user(parent_path, user.id)
                         .await
                         .map_err(|_| {
                             AppError::not_found(format!("Parent folder not found: {}", parent_path))
@@ -1052,10 +1051,10 @@ async fn handle_delete(
 
     // Single-query path resolution (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&path, &user.id).await {
+        match resolver.resolve_path_for_user(&path, user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 folder_service
-                    .delete_folder(&folder.id, &user.id)
+                    .delete_folder(&folder.id, user.id)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to delete folder: {}", e))
@@ -1076,9 +1075,9 @@ async fn handle_delete(
         let folder_result = folder_service.get_folder_by_path(&path).await;
 
         if let Ok(folder) = folder_result {
-            assert_owner(folder.owner_id.as_deref(), &user.id, &path)?;
+            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &path)?;
             folder_service
-                .delete_folder(&folder.id, &user.id)
+                .delete_folder(&folder.id, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to delete folder: {}", e)))?;
         } else {
@@ -1086,7 +1085,7 @@ async fn handle_delete(
                 .get_file_by_path(&path)
                 .await
                 .map_err(|_e| AppError::not_found(format!("Resource not found: {}", path)))?;
-            assert_owner(file.owner_id.as_deref(), &user.id, &path)?;
+            assert_owner(file.owner_id.as_deref(), &user.id.to_string(), &path)?;
 
             file_management_service
                 .delete_file(&file.id)
@@ -1157,7 +1156,7 @@ async fn handle_move(
     if !overwrite {
         let dest_exists = if let Some(resolver) = &state.path_resolver {
             resolver
-                .exists_for_user(&destination_path, &user.id)
+                .exists_for_user(&destination_path, user.id)
                 .await
                 .unwrap_or(false)
         } else {
@@ -1179,7 +1178,7 @@ async fn handle_move(
 
     // Resolve source: single-query when PathResolver is available (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&source_path, &user.id).await {
+        match resolver.resolve_path_for_user(&source_path, user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 let dest_folder_name = destination_path
                     .split('/')
@@ -1200,7 +1199,7 @@ async fn handle_move(
                                 // SECURITY: verify destination parent belongs to caller (V-08)
                                 assert_owner(
                                     parent.owner_id.as_deref(),
-                                    &user.id,
+                                    &user.id.to_string(),
                                     dest_parent_path,
                                 )?;
                                 Some(parent.id)
@@ -1211,7 +1210,7 @@ async fn handle_move(
                 };
 
                 folder_service
-                    .move_folder(&folder.id, move_dto, &user.id)
+                    .move_folder(&folder.id, move_dto, user.id)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to move folder: {}", e))
@@ -1222,7 +1221,7 @@ async fn handle_move(
                         name: dest_folder_name.to_string(),
                     };
                     folder_service
-                        .rename_folder(&folder.id, rename_dto, &user.id)
+                        .rename_folder(&folder.id, rename_dto, user.id)
                         .await
                         .map_err(|e| {
                             AppError::internal_error(format!("Failed to rename folder: {}", e))
@@ -1251,7 +1250,7 @@ async fn handle_move(
                         && let Ok(parent) =
                             folder_service.get_folder_by_path(dest_parent_path).await
                     {
-                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                     }
                     file_management_service
                         .move_file(&file.id, Some(dest_parent_path.to_string()))
@@ -1281,7 +1280,7 @@ async fn handle_move(
         let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
         if let Ok(folder) = folder_result {
-            assert_owner(folder.owner_id.as_deref(), &user.id, &source_path)?;
+            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
             let dest_folder_name = destination_path
                 .split('/')
                 .next_back()
@@ -1299,7 +1298,7 @@ async fn handle_move(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1308,7 +1307,7 @@ async fn handle_move(
             };
 
             folder_service
-                .move_folder(&folder.id, move_dto, &user.id)
+                .move_folder(&folder.id, move_dto, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to move folder: {}", e)))?;
 
@@ -1317,7 +1316,7 @@ async fn handle_move(
                     name: dest_folder_name.to_string(),
                 };
                 folder_service
-                    .rename_folder(&folder.id, rename_dto, &user.id)
+                    .rename_folder(&folder.id, rename_dto, user.id)
                     .await
                     .map_err(|e| {
                         AppError::internal_error(format!("Failed to rename folder: {}", e))
@@ -1330,7 +1329,7 @@ async fn handle_move(
                 .map_err(|_e| {
                     AppError::not_found(format!("Resource not found: {}", source_path))
                 })?;
-            assert_owner(file.owner_id.as_deref(), &user.id, &source_path)?;
+            assert_owner(file.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
 
             let dest_filename = destination_path
                 .split('/')
@@ -1352,7 +1351,7 @@ async fn handle_move(
                 if !dest_parent_path.is_empty()
                     && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await
                 {
-                    assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                    assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                 }
                 file_management_service
                     .move_file(&file.id, Some(dest_parent_path.to_string()))
@@ -1438,7 +1437,7 @@ async fn handle_copy(
     if !overwrite {
         let dest_exists = if let Some(resolver) = &state.path_resolver {
             resolver
-                .exists_for_user(&destination_path, &user.id)
+                .exists_for_user(&destination_path, user.id)
                 .await
                 .unwrap_or(false)
         } else {
@@ -1460,7 +1459,7 @@ async fn handle_copy(
 
     // Resolve source: single-query when PathResolver is available (user-scoped)
     if let Some(resolver) = &state.path_resolver {
-        match resolver.resolve_path_for_user(&source_path, &user.id).await {
+        match resolver.resolve_path_for_user(&source_path, user.id).await {
             Ok(ResolvedResource::Folder(folder)) => {
                 let recursive = depth != "0";
 
@@ -1480,7 +1479,7 @@ async fn handle_copy(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1528,7 +1527,7 @@ async fn handle_copy(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1553,7 +1552,7 @@ async fn handle_copy(
         let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
         if let Ok(folder) = folder_result {
-            assert_owner(folder.owner_id.as_deref(), &user.id, &source_path)?;
+            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
             let recursive = depth != "0";
 
             let dest_folder_name = destination_path
@@ -1572,7 +1571,7 @@ async fn handle_copy(
                 match folder_service.get_folder_by_path(dest_parent_path).await {
                     Ok(parent) => {
                         // SECURITY: verify destination parent belongs to caller (V-08)
-                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                         Some(parent.id)
                     }
                     Err(_) => None,
@@ -1613,7 +1612,7 @@ async fn handle_copy(
                 .map_err(|_e| {
                     AppError::not_found(format!("Resource not found: {}", source_path))
                 })?;
-            assert_owner(file.owner_id.as_deref(), &user.id, &source_path)?;
+            assert_owner(file.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
 
             let dest_parent_path = if let Some(idx) = destination_path.rfind('/') {
                 &destination_path[..idx]
@@ -1627,7 +1626,7 @@ async fn handle_copy(
                 match folder_service.get_folder_by_path(dest_parent_path).await {
                     Ok(parent) => {
                         // SECURITY: verify destination parent belongs to caller (V-08)
-                        assert_owner(parent.owner_id.as_deref(), &user.id, dest_parent_path)?;
+                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
                         Some(parent.id)
                     }
                     Err(_) => None,
@@ -1737,7 +1736,7 @@ async fn handle_lock(
         let token = format!("opaquelocktoken:{}", Uuid::new_v4());
         let lock_info = LockInfo {
             token,
-            owner: owner.or(Some(user.id.clone())),
+            owner: owner.or(Some(user.id.to_string())),
             depth: depth.to_string(),
             timeout,
             scope,

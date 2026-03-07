@@ -17,6 +17,7 @@ use moka::future::Cache;
 use rand_core::RngCore;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
+use uuid::Uuid;
 
 /// App password token length (32 random alphanumeric chars after prefix).
 const TOKEN_LENGTH: usize = 32;
@@ -41,7 +42,7 @@ const BASIC_AUTH_CACHE_MAX_ENTRIES: u64 = 10_000;
 /// Cached identity returned after a successful Basic Auth verification.
 #[derive(Clone)]
 struct CachedBasicAuthResult {
-    user_id: String,
+    user_id: Uuid,
     username: String,
     email: String,
     role: String,
@@ -118,7 +119,7 @@ impl AppPasswordService {
     /// Returns the response DTO that includes the plain-text password (shown only once).
     pub async fn create(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         request: CreateAppPasswordRequestDto,
     ) -> Result<AppPasswordCreatedResponseDto, DomainError> {
         // Validate label
@@ -147,7 +148,7 @@ impl AppPasswordService {
 
         // Create entity
         let app_password = AppPassword::new(
-            user_id.to_string(),
+            user_id,
             label.clone(),
             password_hash,
             prefix.clone(),
@@ -165,7 +166,7 @@ impl AppPasswordService {
         );
 
         Ok(AppPasswordCreatedResponseDto {
-            id: saved.id,
+            id: saved.id.to_string(),
             label,
             password: plain_token,
             username: username.clone(),
@@ -200,7 +201,7 @@ impl AppPasswordService {
     }
 
     /// List all app passwords for a user (excludes plain-text passwords).
-    pub async fn list(&self, user_id: &str) -> Result<AppPasswordListResponseDto, DomainError> {
+    pub async fn list(&self, user_id: Uuid) -> Result<AppPasswordListResponseDto, DomainError> {
         let passwords = self.repo.list_by_user(user_id).await?;
         let total = passwords.len();
 
@@ -209,7 +210,7 @@ impl AppPasswordService {
             .map(|ap| {
                 let is_active = ap.active && !ap.is_expired();
                 AppPasswordSummaryDto {
-                    id: ap.id,
+                    id: ap.id.to_string(),
                     label: ap.label,
                     prefix: format!("{}...", ap.prefix),
                     scopes: ap.scopes,
@@ -234,8 +235,8 @@ impl AppPasswordService {
     /// up to `BASIC_AUTH_CACHE_TTL_SECS`).
     pub async fn revoke(
         &self,
-        user_id: &str,
-        id: &str,
+        user_id: Uuid,
+        id: Uuid,
     ) -> Result<AppPasswordRevokeResponseDto, DomainError> {
         // Ownership enforced at SQL level (WHERE user_id = $2).
         // The get_by_id pre-check gives a clear error message when
@@ -250,7 +251,7 @@ impl AppPasswordService {
 
         // Invalidate all cached auth entries for this user so the
         // revocation is effective immediately.
-        let uid = user_id.to_string();
+        let uid = user_id;
         self.auth_cache
             .invalidate_entries_if(move |_key, val| val.user_id == uid)
             .ok();
@@ -282,7 +283,7 @@ impl AppPasswordService {
         &self,
         username: &str,
         password: &str,
-    ) -> Result<(String, String, String, String), DomainError> {
+    ) -> Result<(Uuid, String, String, String), DomainError> {
         // ── 1. Compute cache key = blake3("username:password") ────────
         let cache_key: [u8; 32] =
             blake3::hash(format!("{}:{}", username, password).as_bytes()).into();
@@ -344,10 +345,10 @@ impl AppPasswordService {
                 .verify_password(&verify_password, &ap.password_hash)
                 .await
             {
-                let _ = self.repo.touch_last_used(&ap.id).await;
+                let _ = self.repo.touch_last_used(ap.id).await;
 
                 let result = CachedBasicAuthResult {
-                    user_id: user.id().to_string(),
+                    user_id: user.id(),
                     username: user.username().to_string(),
                     email: user.email().to_string(),
                     role: user.role().to_string(),
@@ -372,16 +373,16 @@ impl AppPasswordService {
     /// Returns `(id, plain_password)`.
     pub async fn create_nc(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         label: &str,
-    ) -> Result<(String, String), DomainError> {
+    ) -> Result<(Uuid, String), DomainError> {
         let password = generate_nc_app_password();
         let normalized = nc_normalize_password(&password);
         let prefix = nc_token_prefix(&normalized)?;
         let hash = self.hasher.hash_password(&normalized).await?;
 
         let ap = AppPassword::new(
-            user_id.to_string(),
+            user_id,
             label.to_string(),
             hash,
             prefix,
@@ -397,7 +398,7 @@ impl AppPasswordService {
     /// Scoped to the authenticated user (fixes I3 — no global prefix search).
     pub async fn revoke_by_password(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         password: &str,
     ) -> Result<(), DomainError> {
         let normalized = nc_normalize_password(password);
@@ -417,10 +418,10 @@ impl AppPasswordService {
                 .verify_password(&normalized, &ap.password_hash)
                 .await
             {
-                self.repo.revoke(&ap.id, user_id).await?;
+                self.repo.revoke(ap.id, user_id).await?;
 
                 // Invalidate cache for this user
-                let uid = user_id.to_string();
+                let uid = user_id;
                 self.auth_cache
                     .invalidate_entries_if(move |_key, val| val.user_id == uid)
                     .ok();
@@ -432,12 +433,12 @@ impl AppPasswordService {
     }
 
     /// List app passwords for a user (simple summary for NC UI).
-    pub async fn list_nc(&self, user_id: &str) -> Result<Vec<AppPassword>, DomainError> {
+    pub async fn list_nc(&self, user_id: Uuid) -> Result<Vec<AppPassword>, DomainError> {
         self.repo.list_by_user(user_id).await
     }
 
     /// Delete an app password by ID, scoped to the owning user.
-    pub async fn delete_by_user(&self, id: &str, user_id: &str) -> Result<(), DomainError> {
+    pub async fn delete_by_user(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
         let deleted = self.repo.delete_by_user_and_id(id, user_id).await?;
         if !deleted {
             return Err(DomainError::new(

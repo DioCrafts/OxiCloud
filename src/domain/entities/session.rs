@@ -3,8 +3,8 @@ use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Session {
-    id: String,
-    user_id: String,
+    id: Uuid,
+    user_id: Uuid,
     refresh_token: String,
     expires_at: DateTime<Utc>,
     ip_address: Option<String>,
@@ -15,22 +15,19 @@ pub struct Session {
 
 impl Session {
     pub fn new(
-        user_id: String,
+        user_id: Uuid,
         refresh_token: String,
         ip_address: Option<String>,
         user_agent: Option<String>,
         expires_in_days: i64,
     ) -> Self {
-        if user_id.is_empty() {
-            panic!("Session user_id cannot be empty");
-        }
         if refresh_token.is_empty() {
             panic!("Session refresh_token cannot be empty");
         }
 
         let now = Utc::now();
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             user_id,
             refresh_token,
             expires_at: now + Duration::days(expires_in_days),
@@ -43,8 +40,8 @@ impl Session {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
-        id: String,
-        user_id: String,
+        id: Uuid,
+        user_id: Uuid,
         refresh_token: String,
         expires_at: DateTime<Utc>,
         ip_address: Option<String>,
@@ -65,12 +62,12 @@ impl Session {
     }
 
     // Getters
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> Uuid {
+        self.id
     }
 
-    pub fn user_id(&self) -> &str {
-        &self.user_id
+    pub fn user_id(&self) -> Uuid {
+        self.user_id
     }
 
     pub fn refresh_token(&self) -> &str {

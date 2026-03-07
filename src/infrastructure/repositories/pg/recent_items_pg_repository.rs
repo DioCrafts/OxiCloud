@@ -19,9 +19,7 @@ impl RecentItemsPgRepository {
 }
 
 impl RecentItemsRepositoryPort for RecentItemsPgRepository {
-    async fn get_recent_items(&self, user_id: &str, limit: i32) -> Result<Vec<RecentItemDto>> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn get_recent_items(&self, user_id: Uuid, limit: i32) -> Result<Vec<RecentItemDto>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -39,12 +37,12 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
                                          AND f.id = ur.item_id::UUID
             LEFT JOIN storage.folders fld ON ur.item_type = 'folder'
                                          AND fld.id = ur.item_id::UUID
-            WHERE ur.user_id = $1::TEXT
+            WHERE ur.user_id = $1
             ORDER BY ur.accessed_at DESC
             LIMIT $2
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(limit)
         .fetch_all(&*self.db_pool)
         .await
@@ -83,18 +81,16 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         Ok(items)
     }
 
-    async fn upsert_access(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn upsert_access(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO auth.user_recent_files (user_id, item_id, item_type, accessed_at)
-            VALUES ($1::TEXT, $2, $3, CURRENT_TIMESTAMP)
+            VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
             ON CONFLICT (user_id, item_id, item_type)
             DO UPDATE SET accessed_at = CURRENT_TIMESTAMP
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(item_id)
         .bind(item_type)
         .execute(&*self.db_pool)
@@ -111,16 +107,14 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         Ok(())
     }
 
-    async fn remove_item(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn remove_item(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<bool> {
         let result = sqlx::query(
             r#"
             DELETE FROM auth.user_recent_files
-            WHERE user_id = $1::TEXT AND item_id = $2 AND item_type = $3
+            WHERE user_id = $1 AND item_id = $2 AND item_type = $3
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(item_id)
         .bind(item_type)
         .execute(&*self.db_pool)
@@ -137,16 +131,14 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn clear_all(&self, user_id: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn clear_all(&self, user_id: Uuid) -> Result<()> {
         sqlx::query(
             r#"
             DELETE FROM auth.user_recent_files
-            WHERE user_id = $1::TEXT
+            WHERE user_id = $1
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .execute(&*self.db_pool)
         .await
         .map_err(|e| {
@@ -161,21 +153,19 @@ impl RecentItemsRepositoryPort for RecentItemsPgRepository {
         Ok(())
     }
 
-    async fn prune(&self, user_id: &str, max_items: i32) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn prune(&self, user_id: Uuid, max_items: i32) -> Result<()> {
         sqlx::query(
             r#"
             DELETE FROM auth.user_recent_files
             WHERE id IN (
                 SELECT id FROM auth.user_recent_files
-                WHERE user_id = $1::TEXT
+                WHERE user_id = $1
                 ORDER BY accessed_at DESC
                 OFFSET $2
             )
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(max_items)
         .execute(&*self.db_pool)
         .await

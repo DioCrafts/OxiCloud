@@ -4,6 +4,7 @@ use crate::common::errors::{DomainError, ErrorKind, Result};
 use crate::infrastructure::repositories::pg::RecentItemsPgRepository;
 use std::sync::Arc;
 use tracing::info;
+use uuid::Uuid;
 
 /// Implementation of the use case for managing recent items.
 ///
@@ -28,7 +29,7 @@ impl RecentItemsUseCase for RecentService {
     /// Get recent items for a user
     async fn get_recent_items(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         limit: Option<i32>,
     ) -> Result<Vec<RecentItemDto>> {
         info!("Getting recent items for user: {}", user_id);
@@ -47,7 +48,7 @@ impl RecentItemsUseCase for RecentService {
     /// Record access to an item
     async fn record_item_access(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         item_id: &str,
         item_type: &str,
     ) -> Result<()> {
@@ -77,7 +78,7 @@ impl RecentItemsUseCase for RecentService {
     /// Remove an item from recent
     async fn remove_from_recent(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         item_id: &str,
         item_type: &str,
     ) -> Result<bool> {
@@ -101,7 +102,7 @@ impl RecentItemsUseCase for RecentService {
     }
 
     /// Clear all recent items
-    async fn clear_recent_items(&self, user_id: &str) -> Result<()> {
+    async fn clear_recent_items(&self, user_id: Uuid) -> Result<()> {
         info!("Clearing all recent items for user {}", user_id);
         self.repo.clear_all(user_id).await?;
         info!("Cleared all recent items for user {}", user_id);

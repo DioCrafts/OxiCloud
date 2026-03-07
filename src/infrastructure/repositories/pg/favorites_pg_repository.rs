@@ -20,9 +20,7 @@ impl FavoritesPgRepository {
 }
 
 impl FavoritesRepositoryPort for FavoritesPgRepository {
-    async fn get_favorites(&self, user_id: &str) -> Result<Vec<FavoriteItemDto>> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn get_favorites(&self, user_id: Uuid) -> Result<Vec<FavoriteItemDto>> {
         let rows = sqlx::query(
             r#"
             SELECT
@@ -41,12 +39,12 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
                                          AND f.id = uf.item_id::UUID
             LEFT JOIN storage.folders fld ON uf.item_type = 'folder'
                                          AND fld.id = uf.item_id::UUID
-            WHERE uf.user_id = $1::TEXT
+            WHERE uf.user_id = $1
             ORDER BY uf.created_at DESC
             LIMIT 500
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .fetch_all(&*self.db_pool)
         .await
         .map_err(|e| {
@@ -85,17 +83,15 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         Ok(favorites)
     }
 
-    async fn add_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn add_favorite(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<()> {
         sqlx::query(
             r#"
             INSERT INTO auth.user_favorites (user_id, item_id, item_type)
-            VALUES ($1::TEXT, $2, $3)
+            VALUES ($1, $2, $3)
             ON CONFLICT (user_id, item_id, item_type) DO NOTHING
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(item_id)
         .bind(item_type)
         .execute(&*self.db_pool)
@@ -112,16 +108,14 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         Ok(())
     }
 
-    async fn remove_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn remove_favorite(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<bool> {
         let result = sqlx::query(
             r#"
             DELETE FROM auth.user_favorites
-            WHERE user_id = $1::TEXT AND item_id = $2 AND item_type = $3
+            WHERE user_id = $1 AND item_id = $2 AND item_type = $3
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(item_id)
         .bind(item_type)
         .execute(&*self.db_pool)
@@ -138,18 +132,16 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn is_favorite(&self, user_id: &str, item_id: &str, item_type: &str) -> Result<bool> {
-        let user_uuid = Uuid::parse_str(user_id)?;
-
+    async fn is_favorite(&self, user_id: Uuid, item_id: &str, item_type: &str) -> Result<bool> {
         let row = sqlx::query(
             r#"
             SELECT EXISTS (
                 SELECT 1 FROM auth.user_favorites
-                WHERE user_id = $1::TEXT AND item_id = $2 AND item_type = $3
+                WHERE user_id = $1 AND item_id = $2 AND item_type = $3
             ) AS "is_favorite"
             "#,
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(item_id)
         .bind(item_type)
         .fetch_one(&*self.db_pool)
@@ -166,12 +158,10 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
         Ok(row.try_get("is_favorite").unwrap_or(false))
     }
 
-    async fn add_favorites_batch(&self, user_id: &str, items: &[(String, String)]) -> Result<u64> {
+    async fn add_favorites_batch(&self, user_id: Uuid, items: &[(String, String)]) -> Result<u64> {
         if items.is_empty() {
             return Ok(0);
         }
-
-        let user_uuid = Uuid::parse_str(user_id)?;
 
         // Validate all item_types upfront
         for (_, item_type) in items {
@@ -210,7 +200,7 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
                     query.push_str(", ");
                 }
                 query.push_str(&format!(
-                    "(${}::TEXT, ${}, ${})",
+                    "(${}, ${}, ${})",
                     param_idx,
                     param_idx + 1,
                     param_idx + 2
@@ -222,7 +212,7 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
 
             let mut q = sqlx::query(&query);
             for (item_id, item_type) in chunk {
-                q = q.bind(user_uuid).bind(item_id).bind(item_type);
+                q = q.bind(user_id).bind(item_id).bind(item_type);
             }
 
             let result = q.execute(&mut *tx).await.map_err(|e| {
@@ -251,22 +241,20 @@ impl FavoritesRepositoryPort for FavoritesPgRepository {
 
     async fn batch_check_favorites(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         item_ids: &[(&str, &str)],
     ) -> Result<HashSet<String>> {
         if item_ids.is_empty() {
             return Ok(HashSet::new());
         }
 
-        let user_uuid = Uuid::parse_str(user_id)?;
-
         // Collect just the IDs for the IN clause
         let ids: Vec<String> = item_ids.iter().map(|(id, _)| id.to_string()).collect();
 
         let rows = sqlx::query(
-            "SELECT item_id FROM auth.user_favorites WHERE user_id = $1::TEXT AND item_id = ANY($2)",
+            "SELECT item_id FROM auth.user_favorites WHERE user_id = $1 AND item_id = ANY($2)",
         )
-        .bind(user_uuid)
+        .bind(user_id)
         .bind(&ids)
         .fetch_all(&*self.db_pool)
         .await

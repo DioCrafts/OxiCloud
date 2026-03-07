@@ -7,6 +7,7 @@ use crate::application::dtos::contact_dto::{
     GroupMembershipDto, UpdateContactDto, UpdateContactGroupDto,
 };
 use crate::common::errors::DomainError;
+use uuid::Uuid;
 
 pub type CardDavRepositoryError = DomainError;
 
@@ -24,16 +25,16 @@ pub trait AddressBookUseCase: Send + Sync + 'static {
     async fn delete_address_book(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError>;
     async fn get_address_book(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<AddressBookDto, DomainError>;
     async fn list_user_address_books(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<AddressBookDto>, DomainError>;
     async fn list_public_address_books(&self) -> Result<Vec<AddressBookDto>, DomainError>;
 
@@ -41,17 +42,17 @@ pub trait AddressBookUseCase: Send + Sync + 'static {
     async fn share_address_book(
         &self,
         dto: ShareAddressBookDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError>;
     async fn unshare_address_book(
         &self,
         dto: UnshareAddressBookDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError>;
     async fn get_address_book_shares(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<(String, bool)>, DomainError>;
 }
 
@@ -67,19 +68,19 @@ pub trait ContactUseCase: Send + Sync + 'static {
         contact_id: &str,
         update: UpdateContactDto,
     ) -> Result<ContactDto, DomainError>;
-    async fn delete_contact(&self, contact_id: &str, user_id: &str) -> Result<(), DomainError>;
-    async fn get_contact(&self, contact_id: &str, user_id: &str)
+    async fn delete_contact(&self, contact_id: &str, user_id: Uuid) -> Result<(), DomainError>;
+    async fn get_contact(&self, contact_id: &str, user_id: Uuid)
     -> Result<ContactDto, DomainError>;
     async fn list_contacts(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError>;
     async fn search_contacts(
         &self,
         address_book_id: &str,
         query: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError>;
 
     // Contact Group operations
@@ -92,49 +93,49 @@ pub trait ContactUseCase: Send + Sync + 'static {
         group_id: &str,
         update: UpdateContactGroupDto,
     ) -> Result<ContactGroupDto, DomainError>;
-    async fn delete_group(&self, group_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn delete_group(&self, group_id: &str, user_id: Uuid) -> Result<(), DomainError>;
     async fn get_group(
         &self,
         group_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<ContactGroupDto, DomainError>;
     async fn list_groups(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactGroupDto>, DomainError>;
 
     // Group membership
     async fn add_contact_to_group(
         &self,
         dto: GroupMembershipDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError>;
     async fn remove_contact_from_group(
         &self,
         dto: GroupMembershipDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError>;
     async fn list_contacts_in_group(
         &self,
         group_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError>;
     async fn list_groups_for_contact(
         &self,
         contact_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactGroupDto>, DomainError>;
 
     // vCard operations
     async fn get_contact_vcard(
         &self,
         contact_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<String, DomainError>;
     async fn get_contacts_as_vcards(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<(String, String)>, DomainError>;
 }

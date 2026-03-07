@@ -144,7 +144,7 @@ impl AddressBookRepository for AddressBookPgRepository {
 
     async fn get_address_books_by_owner(
         &self,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> AddressBookRepositoryResult<Vec<AddressBook>> {
         let rows = sqlx::query(
             r#"
@@ -182,7 +182,7 @@ impl AddressBookRepository for AddressBookPgRepository {
 
     async fn get_shared_address_books(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> AddressBookRepositoryResult<Vec<AddressBook>> {
         let rows = sqlx::query(
             r#"
@@ -254,7 +254,7 @@ impl AddressBookRepository for AddressBookPgRepository {
     async fn share_address_book(
         &self,
         address_book_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
         can_write: bool,
     ) -> AddressBookRepositoryResult<()> {
         sqlx::query(
@@ -277,7 +277,7 @@ impl AddressBookRepository for AddressBookPgRepository {
     async fn unshare_address_book(
         &self,
         address_book_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
     ) -> AddressBookRepositoryResult<()> {
         sqlx::query(
             r#"

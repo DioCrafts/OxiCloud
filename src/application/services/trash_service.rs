@@ -123,13 +123,10 @@ impl TrashService {
 
 impl TrashUseCase for TrashService {
     #[instrument(skip(self))]
-    async fn get_trash_items(&self, user_id: &str) -> Result<Vec<TrashedItemDto>> {
+    async fn get_trash_items(&self, user_id: Uuid) -> Result<Vec<TrashedItemDto>> {
         debug!("Getting trash items for user: {}", user_id);
 
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
-
-        let items = self.trash_repository.get_trash_items(&user_uuid).await?;
+        let items = self.trash_repository.get_trash_items(&user_id).await?;
 
         let dtos = items.into_iter().map(|item| self.to_dto(item)).collect();
 
@@ -137,7 +134,7 @@ impl TrashUseCase for TrashService {
     }
 
     #[instrument(skip(self))]
-    async fn move_to_trash(&self, item_id: &str, item_type: &str, user_id: &str) -> Result<()> {
+    async fn move_to_trash(&self, item_id: &str, item_type: &str, user_id: Uuid) -> Result<()> {
         info!(
             "Moving to trash: type={}, id={}, user={}",
             item_type, item_id, user_id
@@ -163,20 +160,7 @@ impl TrashUseCase for TrashService {
             }
         };
 
-        debug!("Validating user UUID: {}", user_id);
-        let user_uuid = match Uuid::parse_str(user_id) {
-            Ok(uuid) => {
-                debug!("Valid user UUID: {}", uuid);
-                uuid
-            }
-            Err(e) => {
-                error!("Invalid user UUID: {} - Error: {}", user_id, e);
-                return Err(DomainError::validation_error(format!(
-                    "Invalid user ID: {}",
-                    e
-                )));
-            }
-        };
+        let user_uuid = user_id;
 
         match item_type {
             "file" => {
@@ -276,7 +260,7 @@ impl TrashUseCase for TrashService {
 
                 // Ownership check — return NotFound (not Forbidden) to
                 // prevent leaking whether the folder exists.
-                if folder.owner_id().is_none_or(|o| o != user_id) {
+                if folder.owner_id().is_none_or(|o| o != user_id.to_string()) {
                     return Err(DomainError::not_found(
                         "Folder",
                         format!("Folder not found: {}", item_id),
@@ -331,7 +315,7 @@ impl TrashUseCase for TrashService {
     }
 
     #[instrument(skip(self))]
-    async fn restore_item(&self, trash_id: &str, user_id: &str) -> Result<()> {
+    async fn restore_item(&self, trash_id: &str, user_id: Uuid) -> Result<()> {
         info!("Restoring item {} for user {}", trash_id, user_id);
 
         let trash_uuid = match Uuid::parse_str(trash_id) {
@@ -348,19 +332,7 @@ impl TrashUseCase for TrashService {
             }
         };
 
-        let user_uuid = match Uuid::parse_str(user_id) {
-            Ok(id) => {
-                info!("User UUID parsed successfully: {}", id);
-                id
-            }
-            Err(e) => {
-                error!("Invalid user ID format: {} - {}", user_id, e);
-                return Err(DomainError::validation_error(format!(
-                    "Invalid user ID: {}",
-                    e
-                )));
-            }
-        };
+        let user_uuid = user_id;
 
         // Get the trash item
         info!("Retrieving trash item from repository: ID={}", trash_id);
@@ -514,7 +486,7 @@ impl TrashUseCase for TrashService {
     }
 
     #[instrument(skip(self))]
-    async fn delete_permanently(&self, trash_id: &str, user_id: &str) -> Result<()> {
+    async fn delete_permanently(&self, trash_id: &str, user_id: Uuid) -> Result<()> {
         info!(
             "Permanently deleting item {} for user {}",
             trash_id, user_id
@@ -534,19 +506,7 @@ impl TrashUseCase for TrashService {
             }
         };
 
-        let user_uuid = match Uuid::parse_str(user_id) {
-            Ok(id) => {
-                info!("User UUID parsed successfully: {}", id);
-                id
-            }
-            Err(e) => {
-                error!("Invalid user ID format: {} - {}", user_id, e);
-                return Err(DomainError::validation_error(format!(
-                    "Invalid user ID: {}",
-                    e
-                )));
-            }
-        };
+        let user_uuid = user_id;
 
         // Get the trash item
         info!("Retrieving trash item from repository: ID={}", trash_id);
@@ -684,11 +644,8 @@ impl TrashUseCase for TrashService {
     }
 
     #[instrument(skip(self))]
-    async fn empty_trash(&self, user_id: &str) -> Result<()> {
+    async fn empty_trash(&self, user_id: Uuid) -> Result<()> {
         info!("Emptying trash for user {}", user_id);
-
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
         // clear_trash() already performs bulk SQL DELETEs in 2 queries:
         //   1. DELETE FROM storage.files  WHERE user_id = $1 AND is_trashed = TRUE
@@ -700,7 +657,7 @@ impl TrashUseCase for TrashService {
         // remove_reference() call is needed.
         //
         // Finally it clears the trash_items index for the user.
-        self.trash_repository.clear_trash(&user_uuid).await?;
+        self.trash_repository.clear_trash(&user_id).await?;
 
         info!("Trash emptied for user {}", user_id);
         Ok(())

@@ -801,7 +801,7 @@ impl ChunkedUploadService {
 impl ChunkedUploadPort for ChunkedUploadService {
     async fn create_session(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         filename: String,
         folder_id: Option<String>,
         content_type: String,
@@ -809,7 +809,7 @@ impl ChunkedUploadPort for ChunkedUploadService {
         chunk_size: Option<usize>,
     ) -> Result<CreateUploadResponseDto, DomainError> {
         self.create_session_inner(
-            user_id.to_owned(),
+            user_id.to_string(),
             filename,
             folder_id,
             content_type,
@@ -823,12 +823,12 @@ impl ChunkedUploadPort for ChunkedUploadService {
     async fn upload_chunk(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
         chunk_index: usize,
         data: bytes::Bytes,
         checksum: Option<String>,
     ) -> Result<ChunkUploadResponseDto, DomainError> {
-        self.upload_chunk_inner(upload_id, user_id, chunk_index, data, checksum)
+        self.upload_chunk_inner(upload_id, &user_id.to_string(), chunk_index, data, checksum)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
@@ -836,9 +836,9 @@ impl ChunkedUploadPort for ChunkedUploadService {
     async fn get_status(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<UploadStatusResponseDto, DomainError> {
-        self.get_status_inner(upload_id, user_id)
+        self.get_status_inner(upload_id, &user_id.to_string())
             .await
             .map_err(|e| DomainError::new(ErrorKind::NotFound, "ChunkedUpload", e))
     }
@@ -846,21 +846,21 @@ impl ChunkedUploadPort for ChunkedUploadService {
     async fn complete_upload(
         &self,
         upload_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(PathBuf, String, Option<String>, String, u64, String), DomainError> {
-        self.complete_upload_inner(upload_id, user_id)
+        self.complete_upload_inner(upload_id, &user_id.to_string())
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn finalize_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError> {
-        self.finalize_upload_inner(upload_id, user_id)
+    async fn finalize_upload(&self, upload_id: &str, user_id: Uuid) -> Result<(), DomainError> {
+        self.finalize_upload_inner(upload_id, &user_id.to_string())
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }
 
-    async fn cancel_upload(&self, upload_id: &str, user_id: &str) -> Result<(), DomainError> {
-        self.cancel_upload_inner(upload_id, user_id)
+    async fn cancel_upload(&self, upload_id: &str, user_id: Uuid) -> Result<(), DomainError> {
+        self.cancel_upload_inner(upload_id, &user_id.to_string())
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "ChunkedUpload", e))
     }

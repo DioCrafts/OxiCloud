@@ -11,6 +11,7 @@ use axum::extract::State;
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use std::sync::Arc;
+use uuid::Uuid;
 
 /// Protected routes — require JWT auth middleware.
 pub fn app_password_routes() -> Router<Arc<AppState>> {
@@ -35,7 +36,7 @@ async fn create_app_password(
         .ok_or_else(|| AppError::internal_error("App password service not configured"))?;
 
     let response = service
-        .create(&user.id, request)
+        .create(user.id, request)
         .await
         .map_err(AppError::from)?;
 
@@ -55,7 +56,7 @@ async fn list_app_passwords(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("App password service not configured"))?;
 
-    let response = service.list(&user.id).await.map_err(AppError::from)?;
+    let response = service.list(user.id).await.map_err(AppError::from)?;
 
     Ok(Json(response))
 }
@@ -72,8 +73,10 @@ async fn revoke_app_password(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("App password service not configured"))?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     let response = service
-        .revoke(&user.id, &id)
+        .revoke(user.id, id)
         .await
         .map_err(AppError::from)?;
 

@@ -47,7 +47,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
     async fn create_calendar(
         &self,
         dto: CreateCalendarDto,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<CalendarDto, DomainError> {
         let calendar = Calendar::new(dto.name, owner_id.to_string(), dto.description, dto.color)?;
 
@@ -117,7 +117,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
 
     async fn list_calendars_by_owner(
         &self,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<CalendarDto>, DomainError> {
         let calendars = self
             .calendar_repository
@@ -128,7 +128,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
 
     async fn list_calendars_shared_with_user(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<CalendarDto>, DomainError> {
         let calendars = self
             .calendar_repository
@@ -152,7 +152,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
     async fn check_calendar_access(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<bool, DomainError> {
         let uuid = Uuid::parse_str(calendar_id).map_err(|_| {
             DomainError::new(
@@ -172,7 +172,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
     async fn share_calendar(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        user_id: Uuid,
         access_level: &str,
     ) -> Result<(), DomainError> {
         let uuid = Uuid::parse_str(calendar_id).map_err(|_| {
@@ -191,7 +191,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
     async fn remove_calendar_sharing(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let uuid = Uuid::parse_str(calendar_id).map_err(|_| {
             DomainError::new(

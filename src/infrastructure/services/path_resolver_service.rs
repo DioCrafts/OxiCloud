@@ -7,6 +7,7 @@
 
 use sqlx::PgPool;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::display_helpers::{
     category_for, format_file_size, icon_class_for, icon_special_class_for,
@@ -39,7 +40,7 @@ impl PathResolverService {
     pub async fn resolve_path_for_user(
         &self,
         path: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<ResolvedResource, DomainError> {
         let path = path.trim_start_matches('/').trim_end_matches('/');
         if path.is_empty() {
@@ -180,7 +181,7 @@ impl PathResolverService {
     }
 
     /// Returns `true` if the resource at `path` belongs to `user_id`.
-    pub async fn exists_for_user(&self, path: &str, user_id: &str) -> Result<bool, DomainError> {
+    pub async fn exists_for_user(&self, path: &str, user_id: Uuid) -> Result<bool, DomainError> {
         let path = path.trim_start_matches('/').trim_end_matches('/');
         if path.is_empty() {
             return Ok(false);

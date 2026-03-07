@@ -15,6 +15,7 @@ use crate::application::ports::auth_ports::TokenServicePort;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
 use std::sync::Arc;
+use uuid::Uuid;
 
 /// Admin API routes — all require admin role.
 pub fn admin_routes() -> Router<Arc<AppState>> {
@@ -41,7 +42,7 @@ pub fn admin_routes() -> Router<Arc<AppState>> {
 }
 
 /// Validate JWT and require admin role. Returns (user_id, role).
-async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, String), AppError> {
+async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(Uuid, String), AppError> {
     let auth = state
         .auth_service
         .as_ref()
@@ -72,7 +73,7 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(String, S
         ));
     }
 
-    Ok((claims.sub, claims.role))
+    Ok((Uuid::parse_str(&claims.sub).map_err(|_| AppError::internal_error("Invalid user ID in token"))?, claims.role))
 }
 
 /// GET /api/admin/settings/oidc — get OIDC settings for the admin panel
@@ -108,7 +109,7 @@ async fn save_oidc_settings(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    svc.save_oidc_settings(dto, &user_id)
+    svc.save_oidc_settings(dto, user_id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to save settings: {}", e)))?;
 
@@ -292,6 +293,8 @@ async fn get_user(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     let auth = state
         .auth_service
         .as_ref()
@@ -299,7 +302,7 @@ async fn get_user(
 
     let user = auth
         .auth_application_service
-        .get_user_admin(&id)
+        .get_user_admin(id)
         .await
         .map_err(|e| AppError::not_found(format!("User not found: {}", e)))?;
 
@@ -313,6 +316,8 @@ async fn delete_user(
     Path(id): Path<String>,
 ) -> Result<impl IntoResponse, AppError> {
     let (admin_id, _) = admin_guard(&state, &headers).await?;
+
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
 
     // Prevent self-deletion
     if admin_id == id {
@@ -329,7 +334,7 @@ async fn delete_user(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service
-        .delete_user_admin(&id)
+        .delete_user_admin(id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to delete user: {}", e)))?;
 
@@ -350,6 +355,8 @@ async fn update_user_role(
 ) -> Result<impl IntoResponse, AppError> {
     let (admin_id, _) = admin_guard(&state, &headers).await?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     // Prevent changing own role
     if admin_id == id {
         return Err(AppError::new(
@@ -365,7 +372,7 @@ async fn update_user_role(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service
-        .change_user_role(&id, &dto.role)
+        .change_user_role(id, &dto.role)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to change role: {}", e)))?;
 
@@ -386,6 +393,8 @@ async fn update_user_active(
 ) -> Result<impl IntoResponse, AppError> {
     let (admin_id, _) = admin_guard(&state, &headers).await?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     // Prevent deactivating yourself
     if admin_id == id && !dto.active {
         return Err(AppError::new(
@@ -401,7 +410,7 @@ async fn update_user_active(
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service
-        .set_user_active(&id, dto.active)
+        .set_user_active(id, dto.active)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to update user status: {}", e)))?;
 
@@ -427,13 +436,15 @@ async fn update_user_quota(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     let auth = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service
-        .update_user_quota(&id, dto.quota_bytes)
+        .update_user_quota(id, dto.quota_bytes)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to update quota: {}", e)))?;
 
@@ -487,13 +498,15 @@ async fn reset_user_password(
 ) -> Result<impl IntoResponse, AppError> {
     admin_guard(&state, &headers).await?;
 
+    let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
+
     let auth = state
         .auth_service
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Auth service not configured"))?;
 
     auth.auth_application_service
-        .admin_reset_password(&id, &dto.new_password)
+        .admin_reset_password(id, &dto.new_password)
         .await
         .map_err(|e| {
             AppError::new(
@@ -558,7 +571,7 @@ async fn set_registration_setting(
         .as_ref()
         .ok_or_else(|| AppError::internal_error("Admin settings service not available"))?;
 
-    svc.set_registration_enabled(enabled, &admin_id)
+    svc.set_registration_enabled(enabled, admin_id)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to save setting: {}", e)))?;
 

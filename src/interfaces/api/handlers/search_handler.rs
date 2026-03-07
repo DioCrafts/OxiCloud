@@ -60,7 +60,7 @@ impl SearchHandler {
             sort_by: params.sort_by.unwrap_or_else(|| "relevance".to_string()),
         };
 
-        match search_service.search(search_criteria, &auth_user.id).await {
+        match search_service.search(search_criteria, auth_user.id).await {
             Ok(results) => {
                 info!(
                     "Search completed in {}ms — {} files, {} folders",
@@ -101,7 +101,7 @@ impl SearchHandler {
             }
         };
 
-        match search_service.search(criteria, &auth_user.id).await {
+        match search_service.search(criteria, auth_user.id).await {
             Ok(results) => {
                 info!(
                     "Advanced search completed in {}ms — {} files, {} folders",

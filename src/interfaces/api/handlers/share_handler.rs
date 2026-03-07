@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use uuid::Uuid;
 
 use axum::{
     Json,
@@ -40,7 +41,7 @@ pub async fn create_shared_link(
     auth_user: AuthUser,
     Json(dto): Json<CreateShareDto>,
 ) -> impl IntoResponse {
-    match share_use_case.create_shared_link(&auth_user.id, dto).await {
+    match share_use_case.create_shared_link(auth_user.id, dto).await {
         Ok(share) => (StatusCode::CREATED, Json(share)).into_response(),
         Err(err) => AppError::from(err).into_response(),
     }
@@ -52,7 +53,11 @@ pub async fn get_shared_link(
     auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match share_use_case.get_shared_link(&id, &auth_user.id).await {
+    let id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return AppError::bad_request("Invalid UUID").into_response(),
+    };
+    match share_use_case.get_shared_link(id, auth_user.id).await {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
         Err(err) => AppError::from(err).into_response(),
     }
@@ -65,7 +70,7 @@ pub async fn get_user_shares(
     auth_user: AuthUser,
     Query(query): Query<GetSharesQuery>,
 ) -> impl IntoResponse {
-    let user_id = &auth_user.id;
+    let user_id = auth_user.id;
 
     // If both item_id and item_type are provided, return shares for that specific item
     if let (Some(item_id), Some(item_type_str)) = (&query.item_id, &query.item_type) {
@@ -108,8 +113,12 @@ pub async fn update_shared_link(
     Path(id): Path<String>,
     Json(dto): Json<UpdateShareDto>,
 ) -> impl IntoResponse {
+    let id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return AppError::bad_request("Invalid UUID").into_response(),
+    };
     match share_use_case
-        .update_shared_link(&id, &auth_user.id, dto)
+        .update_shared_link(id, auth_user.id, dto)
         .await
     {
         Ok(share) => (StatusCode::OK, Json(share)).into_response(),
@@ -123,7 +132,11 @@ pub async fn delete_shared_link(
     auth_user: AuthUser,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match share_use_case.delete_shared_link(&id, &auth_user.id).await {
+    let id = match Uuid::parse_str(&id) {
+        Ok(id) => id,
+        Err(_) => return AppError::bad_request("Invalid UUID").into_response(),
+    };
+    match share_use_case.delete_shared_link(id, auth_user.id).await {
         Ok(_) => StatusCode::NO_CONTENT.into_response(),
         Err(err) => AppError::from(err).into_response(),
     }

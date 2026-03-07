@@ -35,6 +35,7 @@ use crate::common::errors::DomainError;
 use crate::domain::entities::file::File;
 use crate::domain::services::path_service::StoragePath;
 use crate::infrastructure::services::dedup_service::DedupService;
+use uuid::Uuid;
 
 /// Type alias for file metadata rows from SQL queries.
 type FileRow = (
@@ -166,7 +167,7 @@ impl FileBlobReadRepository {
     /// `sort_date` epoch for each file (used as pagination cursor).
     pub async fn list_media_files(
         &self,
-        owner_id: &str,
+        owner_id: Uuid,
         before: Option<i64>,
         limit: i64,
     ) -> Result<(Vec<File>, Vec<i64>), DomainError> {
@@ -255,7 +256,7 @@ impl FileReadPort for FileBlobReadRepository {
         )
     }
 
-    async fn get_file_for_owner(&self, id: &str, owner_id: &str) -> Result<File, DomainError> {
+    async fn get_file_for_owner(&self, id: &str, owner_id: Uuid) -> Result<File, DomainError> {
         let row = sqlx::query_as::<
             _,
             (
@@ -286,7 +287,7 @@ impl FileReadPort for FileBlobReadRepository {
             "#,
         )
         .bind(id)
-        .bind(owner_id)
+        .bind(owner_id.to_string())
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("FileBlobRead", format!("get_for_owner: {e}")))?
@@ -350,8 +351,9 @@ impl FileReadPort for FileBlobReadRepository {
     async fn list_files_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<File>, DomainError> {
+        let owner_str = owner_id.to_string();
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
@@ -368,7 +370,7 @@ impl FileReadPort for FileBlobReadRepository {
                 "#,
             )
             .bind(fid)
-            .bind(owner_id)
+            .bind(&owner_str)
             .fetch_all(self.pool.as_ref())
             .await
         } else {
@@ -386,7 +388,7 @@ impl FileReadPort for FileBlobReadRepository {
                  ORDER BY fi.name
                 "#,
             )
-            .bind(owner_id)
+            .bind(&owner_str)
             .fetch_all(self.pool.as_ref())
             .await
         }
@@ -468,10 +470,11 @@ impl FileReadPort for FileBlobReadRepository {
     async fn list_files_batch_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<File>, DomainError> {
+        let owner_str = owner_id.to_string();
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
@@ -491,7 +494,7 @@ impl FileReadPort for FileBlobReadRepository {
             .bind(fid)
             .bind(limit)
             .bind(offset)
-            .bind(owner_id)
+            .bind(&owner_str)
             .fetch_all(self.pool.as_ref())
             .await
         } else {
@@ -512,7 +515,7 @@ impl FileReadPort for FileBlobReadRepository {
             )
             .bind(limit)
             .bind(offset)
-            .bind(owner_id)
+            .bind(&owner_str)
             .fetch_all(self.pool.as_ref())
             .await
         }
@@ -753,7 +756,7 @@ impl FileReadPort for FileBlobReadRepository {
         &self,
         folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError> {
         let offset = criteria.offset as i64;
         let limit = criteria.limit as i64;
@@ -822,7 +825,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,
             ),
         >(&sql)
-        .bind(user_id);
+        .bind(user_id.to_string());
 
         if let Some(fid) = folder_id {
             query = query.bind(fid);
@@ -867,7 +870,7 @@ impl FileReadPort for FileBlobReadRepository {
         &self,
         root_folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError> {
         // When no root folder specified, delegate to existing paginated search
         let root_id = match root_folder_id {
@@ -983,7 +986,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,
             ),
         >(&sql)
-        .bind(user_id)
+        .bind(user_id.to_string())
         .bind(root_id);
 
         if let Some(name) = &criteria.name_contains
@@ -1043,7 +1046,7 @@ impl FileReadPort for FileBlobReadRepository {
         &self,
         folder_id: Option<&str>,
         criteria: &SearchCriteriaDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<usize, DomainError> {
         let (_, count) = self
             .search_files_paginated(folder_id, criteria, user_id)

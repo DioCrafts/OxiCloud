@@ -11,9 +11,9 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct AppPassword {
     /// Unique identifier.
-    pub id: String,
+    pub id: Uuid,
     /// Owner user ID.
-    pub user_id: String,
+    pub user_id: Uuid,
     /// Human-readable label chosen by the user (e.g. "DAVx5 on Pixel 8").
     pub label: String,
     /// Argon2 hash of the generated password token.
@@ -41,7 +41,7 @@ impl AppPassword {
     /// The caller is responsible for hashing the raw token and passing
     /// the hash and prefix.
     pub fn new(
-        user_id: String,
+        user_id: Uuid,
         label: String,
         password_hash: String,
         prefix: String,
@@ -49,7 +49,7 @@ impl AppPassword {
         expires_at: Option<DateTime<Utc>>,
     ) -> Self {
         Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             user_id,
             label,
             password_hash,

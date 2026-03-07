@@ -160,7 +160,7 @@ pub async fn move_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .move_files(request.file_ids, request.target_folder_id, &auth_user.id)
+        .move_files(request.file_ids, request.target_folder_id, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch move_files failed: {}", e);
@@ -216,7 +216,7 @@ pub async fn copy_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .copy_files(request.file_ids, request.target_folder_id, &auth_user.id)
+        .copy_files(request.file_ids, request.target_folder_id, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch copy_files failed: {}", e);
@@ -272,7 +272,7 @@ pub async fn delete_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .delete_files(request.file_ids, &auth_user.id)
+        .delete_files(request.file_ids, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch delete_files failed: {}", e);
@@ -336,7 +336,7 @@ pub async fn delete_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .delete_folders(request.folder_ids, request.recursive, &auth_user.id)
+        .delete_folders(request.folder_ids, request.recursive, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch delete_folders failed: {}", e);
@@ -407,7 +407,7 @@ pub async fn create_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .create_folders(folders, &auth_user.id)
+        .create_folders(folders, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch create_folders failed: {}", e);
@@ -463,7 +463,7 @@ pub async fn get_files_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .get_multiple_files(request.file_ids, &auth_user.id)
+        .get_multiple_files(request.file_ids, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch get_files failed: {}", e);
@@ -519,7 +519,7 @@ pub async fn get_folders_batch(
     // Execute batch operation
     let result = state
         .batch_service
-        .get_multiple_folders(request.folder_ids, &auth_user.id)
+        .get_multiple_folders(request.folder_ids, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch get_folders failed: {}", e);
@@ -603,7 +603,7 @@ pub async fn trash_batch(
     if !request.file_ids.is_empty() {
         match state
             .batch_service
-            .trash_files(request.file_ids, &auth_user.id)
+            .trash_files(request.file_ids, auth_user.id)
             .await
         {
             Ok(result) => {
@@ -630,7 +630,7 @@ pub async fn trash_batch(
     if !request.folder_ids.is_empty() {
         match state
             .batch_service
-            .trash_folders(request.folder_ids, &auth_user.id)
+            .trash_folders(request.folder_ids, auth_user.id)
             .await
         {
             Ok(result) => {
@@ -707,7 +707,7 @@ pub async fn move_folders_batch(
 
     let result = state
         .batch_service
-        .move_folders(request.folder_ids, request.target_folder_id, &auth_user.id)
+        .move_folders(request.folder_ids, request.target_folder_id, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch move_folders failed: {}", e);
@@ -760,7 +760,7 @@ pub async fn download_batch(
 
     let temp_file = state
         .batch_service
-        .download_zip(request.file_ids, request.folder_ids, &auth_user.id)
+        .download_zip(request.file_ids, request.folder_ids, auth_user.id)
         .await
         .map_err(|e| {
             tracing::error!("Batch download ZIP failed: {}", e);

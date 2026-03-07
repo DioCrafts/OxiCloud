@@ -108,7 +108,7 @@ impl ChunkedUploadHandler {
         // ── Quota enforcement ────────────────────────────────────
         if let Some(storage_svc) = state.storage_usage_service.as_ref()
             && let Err(err) = storage_svc
-                .check_storage_quota(&auth_user.id, request.total_size)
+                .check_storage_quota(auth_user.id, request.total_size)
                 .await
         {
             tracing::warn!(
@@ -146,7 +146,7 @@ impl ChunkedUploadHandler {
 
         match chunked_service
             .create_session(
-                &auth_user.id,
+                auth_user.id,
                 request.filename,
                 request.folder_id,
                 content_type,
@@ -192,7 +192,7 @@ impl ChunkedUploadHandler {
         match chunked_service
             .upload_chunk(
                 &upload_id,
-                &auth_user.id,
+                auth_user.id,
                 params.chunk_index,
                 body,
                 checksum,
@@ -233,7 +233,7 @@ impl ChunkedUploadHandler {
     ) -> impl IntoResponse {
         let chunked_service = &state.core.chunked_upload_service;
 
-        match chunked_service.get_status(&upload_id, &auth_user.id).await {
+        match chunked_service.get_status(&upload_id, auth_user.id).await {
             Ok(status) => Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, "application/json")
@@ -268,7 +268,7 @@ impl ChunkedUploadHandler {
         // Assemble chunks (hash-on-write: SHA-256 computed during assembly)
         let (assembled_path, filename, folder_id, content_type, total_size, hash) =
             match chunked_service
-                .complete_upload(&upload_id, &auth_user.id)
+                .complete_upload(&upload_id, auth_user.id)
                 .await
             {
                 Ok(result) => result,
@@ -299,7 +299,7 @@ impl ChunkedUploadHandler {
             Ok(file) => {
                 // Cleanup session
                 let _ = chunked_service
-                    .finalize_upload(&upload_id, &auth_user.id)
+                    .finalize_upload(&upload_id, auth_user.id)
                     .await;
 
                 tracing::info!(
@@ -338,7 +338,7 @@ impl ChunkedUploadHandler {
         let chunked_service = &state.core.chunked_upload_service;
 
         match chunked_service
-            .cancel_upload(&upload_id, &auth_user.id)
+            .cancel_upload(&upload_id, auth_user.id)
             .await
         {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),

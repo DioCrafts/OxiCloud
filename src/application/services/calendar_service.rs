@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::calendar_dto::{
     CalendarDto, CalendarEventDto, CreateCalendarDto, CreateEventDto, CreateEventICalDto,
@@ -23,7 +24,7 @@ impl CalendarUseCase for CalendarService {
     async fn create_calendar(
         &self,
         calendar: CreateCalendarDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarDto, DomainError> {
         self.calendar_storage
             .create_calendar(calendar, user_id)
@@ -34,7 +35,7 @@ impl CalendarUseCase for CalendarService {
         &self,
         calendar_id: &str,
         update: UpdateCalendarDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarDto, DomainError> {
         let has_access = self
             .calendar_storage
@@ -52,7 +53,7 @@ impl CalendarUseCase for CalendarService {
             .await
     }
 
-    async fn delete_calendar(&self, calendar_id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_calendar(&self, calendar_id: &str, user_id: Uuid) -> Result<(), DomainError> {
         let has_access = self
             .calendar_storage
             .check_calendar_access(calendar_id, user_id)
@@ -70,7 +71,7 @@ impl CalendarUseCase for CalendarService {
     async fn get_calendar(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarDto, DomainError> {
         let calendar = self.calendar_storage.get_calendar(calendar_id).await?;
         let has_access = self
@@ -87,11 +88,11 @@ impl CalendarUseCase for CalendarService {
         Ok(calendar)
     }
 
-    async fn list_my_calendars(&self, user_id: &str) -> Result<Vec<CalendarDto>, DomainError> {
+    async fn list_my_calendars(&self, user_id: Uuid) -> Result<Vec<CalendarDto>, DomainError> {
         self.calendar_storage.list_calendars_by_owner(user_id).await
     }
 
-    async fn list_shared_calendars(&self, user_id: &str) -> Result<Vec<CalendarDto>, DomainError> {
+    async fn list_shared_calendars(&self, user_id: Uuid) -> Result<Vec<CalendarDto>, DomainError> {
         self.calendar_storage
             .list_calendars_shared_with_user(user_id)
             .await
@@ -112,12 +113,12 @@ impl CalendarUseCase for CalendarService {
     async fn share_calendar(
         &self,
         calendar_id: &str,
-        target_user_id: &str,
+        target_user_id: Uuid,
         access_level: &str,
-        caller_user_id: &str,
+        caller_user_id: Uuid,
     ) -> Result<(), DomainError> {
         let calendar = self.calendar_storage.get_calendar(calendar_id).await?;
-        if calendar.owner_id != caller_user_id {
+        if calendar.owner_id != caller_user_id.to_string() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Calendar",
@@ -145,11 +146,11 @@ impl CalendarUseCase for CalendarService {
     async fn remove_calendar_sharing(
         &self,
         calendar_id: &str,
-        target_user_id: &str,
-        caller_user_id: &str,
+        target_user_id: Uuid,
+        caller_user_id: Uuid,
     ) -> Result<(), DomainError> {
         let calendar = self.calendar_storage.get_calendar(calendar_id).await?;
-        if calendar.owner_id != caller_user_id {
+        if calendar.owner_id != caller_user_id.to_string() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Calendar",
@@ -164,10 +165,10 @@ impl CalendarUseCase for CalendarService {
     async fn get_calendar_shares(
         &self,
         calendar_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<(String, String)>, DomainError> {
         let calendar = self.calendar_storage.get_calendar(calendar_id).await?;
-        if calendar.owner_id != user_id {
+        if calendar.owner_id != user_id.to_string() {
             return Err(DomainError::new(
                 ErrorKind::AccessDenied,
                 "Calendar",
@@ -180,7 +181,7 @@ impl CalendarUseCase for CalendarService {
     async fn create_event(
         &self,
         event: CreateEventDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarEventDto, DomainError> {
         let has_access = self
             .calendar_storage
@@ -199,7 +200,7 @@ impl CalendarUseCase for CalendarService {
     async fn create_event_from_ical(
         &self,
         event: CreateEventICalDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarEventDto, DomainError> {
         let has_access = self
             .calendar_storage
@@ -219,7 +220,7 @@ impl CalendarUseCase for CalendarService {
         &self,
         event_id: &str,
         update: UpdateEventDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarEventDto, DomainError> {
         let event = self.calendar_storage.get_event(event_id).await?;
         let has_access = self
@@ -236,7 +237,7 @@ impl CalendarUseCase for CalendarService {
         self.calendar_storage.update_event(event_id, update).await
     }
 
-    async fn delete_event(&self, event_id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_event(&self, event_id: &str, user_id: Uuid) -> Result<(), DomainError> {
         let event = self.calendar_storage.get_event(event_id).await?;
         let has_access = self
             .calendar_storage
@@ -255,7 +256,7 @@ impl CalendarUseCase for CalendarService {
     async fn get_event(
         &self,
         event_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<CalendarEventDto, DomainError> {
         let event = self.calendar_storage.get_event(event_id).await?;
         let has_access = self
@@ -281,7 +282,7 @@ impl CalendarUseCase for CalendarService {
         calendar_id: &str,
         limit: Option<i64>,
         offset: Option<i64>,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<CalendarEventDto>, DomainError> {
         let has_access = self
             .calendar_storage
@@ -313,7 +314,7 @@ impl CalendarUseCase for CalendarService {
         calendar_id: &str,
         start: DateTime<Utc>,
         end: DateTime<Utc>,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<CalendarEventDto>, DomainError> {
         let has_access = self
             .calendar_storage

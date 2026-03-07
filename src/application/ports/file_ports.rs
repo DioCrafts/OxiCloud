@@ -3,6 +3,7 @@ use futures::Stream;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::application::ports::storage_ports::CopyFolderTreeResult;
@@ -116,7 +117,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     ///
     /// Returns `NotFound` if the file does not exist **or** belongs to
     /// another user.  All user-facing handlers should use this method.
-    async fn get_file_owned(&self, id: &str, caller_id: &str) -> Result<FileDto, DomainError>;
+    async fn get_file_owned(&self, id: &str, caller_id: Uuid) -> Result<FileDto, DomainError>;
 
     /// Gets a file by its path (for WebDAV)
     async fn get_file_by_path(&self, path: &str) -> Result<FileDto, DomainError>;
@@ -131,7 +132,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn list_files_owned(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> Result<Vec<FileDto>, DomainError>;
 
     /// Gets file content as a stream (for large files)
@@ -144,7 +145,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn get_file_stream_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
 
     /// Optimized multi-tier download.
@@ -166,7 +167,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn get_file_optimized_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         accept_webp: bool,
         prefer_original: bool,
     ) -> Result<(FileDto, OptimizedFileContent), DomainError>;
@@ -198,7 +199,7 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn get_file_range_stream_owned(
         &self,
         id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         start: u64,
         end: Option<u64>,
     ) -> Result<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>, DomainError>;
@@ -238,14 +239,15 @@ pub trait FileRetrievalUseCase: Send + Sync + 'static {
     async fn list_files_batch_for_owner(
         &self,
         folder_id: Option<&str>,
-        owner_id: &str,
+        owner_id: Uuid,
         offset: i64,
         limit: i64,
     ) -> Result<Vec<FileDto>, DomainError> {
         let all = self.list_files_batch(folder_id, offset, limit).await?;
+        let owner_str = owner_id.to_string();
         Ok(all
             .into_iter()
-            .filter(|f| f.owner_id.as_deref().is_some_and(|o| o == owner_id))
+            .filter(|f| f.owner_id.as_deref().is_some_and(|o| o == owner_str))
             .collect())
     }
 }
@@ -267,7 +269,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     async fn move_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
@@ -282,7 +284,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     async fn copy_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         target_folder_id: Option<String>,
     ) -> Result<FileDto, DomainError>;
 
@@ -293,7 +295,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     async fn rename_file_owned(
         &self,
         file_id: &str,
-        caller_id: &str,
+        caller_id: Uuid,
         new_name: &str,
     ) -> Result<FileDto, DomainError>;
 
@@ -301,7 +303,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     async fn delete_file(&self, id: &str) -> Result<(), DomainError>;
 
     /// Deletes a file, enforcing that `caller_id` is the owner.
-    async fn delete_file_owned(&self, id: &str, caller_id: &str) -> Result<(), DomainError>;
+    async fn delete_file_owned(&self, id: &str, caller_id: Uuid) -> Result<(), DomainError>;
 
     /// Smart delete: trash-first with dedup reference cleanup.
     ///
@@ -310,7 +312,7 @@ pub trait FileManagementUseCase: Send + Sync + 'static {
     /// 3. Decrements the dedup reference count for the content hash.
     ///
     /// Returns `Ok(true)` when trashed, `Ok(false)` when permanently deleted.
-    async fn delete_with_cleanup(&self, id: &str, user_id: &str) -> Result<bool, DomainError>;
+    async fn delete_with_cleanup(&self, id: &str, user_id: Uuid) -> Result<bool, DomainError>;
 
     /// Copies an entire folder subtree atomically (WebDAV COPY Depth: infinity).
     ///

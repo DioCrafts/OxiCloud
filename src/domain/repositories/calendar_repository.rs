@@ -21,20 +21,20 @@ pub trait CalendarRepository: Send + Sync + 'static {
     /// Lists all calendars for a specific user
     async fn list_calendars_by_owner(
         &self,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> CalendarRepositoryResult<Vec<Calendar>>;
 
     /// Finds a calendar by name and owner
     async fn find_calendar_by_name_and_owner(
         &self,
         name: &str,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> CalendarRepositoryResult<Calendar>;
 
     /// Lists calendars shared with a specific user
     async fn list_calendars_shared_with_user(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<Vec<Calendar>>;
 
     /// List public calendars
@@ -48,7 +48,7 @@ pub trait CalendarRepository: Send + Sync + 'static {
     async fn user_has_calendar_access(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<bool>;
 
     /// Gets a custom property for a calendar
@@ -83,7 +83,7 @@ pub trait CalendarRepository: Send + Sync + 'static {
     async fn share_calendar(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
         access_level: &str,
     ) -> CalendarRepositoryResult<()>;
 
@@ -91,7 +91,7 @@ pub trait CalendarRepository: Send + Sync + 'static {
     async fn remove_calendar_sharing(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<()>;
 
     /// Get calendar sharing information (who has access to this calendar)

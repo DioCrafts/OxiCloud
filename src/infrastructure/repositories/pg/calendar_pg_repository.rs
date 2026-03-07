@@ -140,7 +140,7 @@ impl CalendarRepository for CalendarPgRepository {
 
     async fn list_calendars_by_owner(
         &self,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> CalendarRepositoryResult<Vec<Calendar>> {
         let rows = sqlx::query(
             r#"
@@ -180,7 +180,7 @@ impl CalendarRepository for CalendarPgRepository {
     async fn find_calendar_by_name_and_owner(
         &self,
         name: &str,
-        owner_id: &str,
+        owner_id: Uuid,
     ) -> CalendarRepositoryResult<Calendar> {
         let row = sqlx::query(
             r#"
@@ -218,7 +218,7 @@ impl CalendarRepository for CalendarPgRepository {
 
     async fn list_calendars_shared_with_user(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<Vec<Calendar>> {
         let rows = sqlx::query(
             r#"
@@ -299,7 +299,7 @@ impl CalendarRepository for CalendarPgRepository {
     async fn user_has_calendar_access(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<bool> {
         // Check if the user is the owner of the calendar or has a share
         let row = sqlx::query(
@@ -327,7 +327,7 @@ impl CalendarRepository for CalendarPgRepository {
     async fn share_calendar(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
         access_level: &str,
     ) -> CalendarRepositoryResult<()> {
         // Validate access level
@@ -358,7 +358,7 @@ impl CalendarRepository for CalendarPgRepository {
     async fn remove_calendar_sharing(
         &self,
         calendar_id: &Uuid,
-        user_id: &str,
+        user_id: Uuid,
     ) -> CalendarRepositoryResult<()> {
         sqlx::query(
             r#"

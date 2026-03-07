@@ -203,7 +203,7 @@ async fn handle_propfind(
     if path.is_empty() {
         // Root CardDAV path — list user's address books
         let address_books = addressbook_service
-            .list_user_address_books(&user.id)
+            .list_user_address_books(user.id)
             .await
             .map_err(|e| {
                 AppError::internal_error(format!("Failed to list address books: {}", e))
@@ -231,13 +231,13 @@ async fn handle_propfind(
         if parts.len() == 1 {
             // Address book collection
             let address_book = addressbook_service
-                .get_address_book(address_book_id, &user.id)
+                .get_address_book(address_book_id, user.id)
                 .await
                 .map_err(|e| AppError::not_found(format!("Address book not found: {}", e)))?;
 
             let contacts = if depth != "0" {
                 contact_svc
-                    .list_contacts(address_book_id, &user.id)
+                    .list_contacts(address_book_id, user.id)
                     .await
                     .unwrap_or_default()
             } else {
@@ -269,7 +269,7 @@ async fn handle_propfind(
 
             // Look up by UID across all contacts in this address book
             let contacts = contact_svc
-                .list_contacts(address_book_id, &user.id)
+                .list_contacts(address_book_id, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?;
 
@@ -331,12 +331,12 @@ async fn handle_report(
 
     let contacts = match &report {
         CardDavReportType::AddressbookQuery { .. } => contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?,
         CardDavReportType::AddressbookMultiget { hrefs, .. } => {
             let all_contacts = contact_svc
-                .list_contacts(address_book_id, &user.id)
+                .list_contacts(address_book_id, user.id)
                 .await
                 .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?;
 
@@ -346,7 +346,7 @@ async fn handle_report(
                 .collect()
         }
         CardDavReportType::SyncCollection { .. } => contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?,
     };
@@ -403,7 +403,7 @@ async fn handle_mkcol(
 
     let create_dto = CreateAddressBookDto {
         name,
-        owner_id: user.id.clone(),
+        owner_id: user.id.to_string(),
         description,
         color,
         is_public: Some(false),
@@ -452,7 +452,7 @@ async fn handle_put(
     // Check if contact already exists
     let existing = if let Some(ref uid) = vcard_uid {
         let contacts = contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .unwrap_or_default();
         contacts.into_iter().find(|c| c.uid == *uid)
@@ -463,14 +463,14 @@ async fn handle_put(
     if let Some(existing_contact) = existing {
         // Update: delete + recreate from vCard
         contact_svc
-            .delete_contact(&existing_contact.id, &user.id)
+            .delete_contact(&existing_contact.id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update contact: {}", e)))?;
 
         let create_dto = CreateContactVCardDto {
             address_book_id: address_book_id.to_string(),
             vcard: vcard_data,
-            user_id: user.id.clone(),
+            user_id: user.id.to_string(),
         };
         let contact = contact_svc
             .create_contact_from_vcard(create_dto)
@@ -486,7 +486,7 @@ async fn handle_put(
         let create_dto = CreateContactVCardDto {
             address_book_id: address_book_id.to_string(),
             vcard: vcard_data,
-            user_id: user.id.clone(),
+            user_id: user.id.to_string(),
         };
 
         let contact = contact_svc
@@ -529,7 +529,7 @@ async fn handle_get(
     if parts.len() < 2 {
         // GET on address book collection — return all contacts as vcf
         let contacts = contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?;
 
@@ -549,7 +549,7 @@ async fn handle_get(
         let contact_uid = contact_file.trim_end_matches(".vcf");
 
         let contacts = contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?;
 
@@ -590,7 +590,7 @@ async fn handle_delete(
     if parts.len() < 2 {
         // Delete address book
         addressbook_service
-            .delete_address_book(address_book_id, &user.id)
+            .delete_address_book(address_book_id, user.id)
             .await
             .map_err(|e| {
                 AppError::internal_error(format!("Failed to delete address book: {}", e))
@@ -601,7 +601,7 @@ async fn handle_delete(
         let contact_uid = contact_file.trim_end_matches(".vcf");
 
         let contacts = contact_svc
-            .list_contacts(address_book_id, &user.id)
+            .list_contacts(address_book_id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to list contacts: {}", e)))?;
 
@@ -611,7 +611,7 @@ async fn handle_delete(
             .ok_or_else(|| AppError::not_found(format!("Contact not found: {}", contact_uid)))?;
 
         contact_svc
-            .delete_contact(&contact.id, &user.id)
+            .delete_contact(&contact.id, user.id)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to delete contact: {}", e)))?;
     }
@@ -653,7 +653,7 @@ async fn handle_proppatch(
         description: None,
         color: None,
         is_public: None,
-        user_id: user.id.clone(),
+        user_id: user.id.to_string(),
     };
 
     for prop in &props_to_set {

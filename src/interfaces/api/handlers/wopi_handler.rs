@@ -396,7 +396,7 @@ pub struct EditorUrlResponse {
 async fn authorize_wopi_access<S: FileRetrievalUseCase>(
     file_retrieval: &S,
     file_id: &str,
-    caller_id: &str,
+    caller_id: uuid::Uuid,
     requested_action: &str,
 ) -> Result<(crate::application::dtos::file_dto::FileDto, bool), StatusCode> {
     let file = file_retrieval
@@ -425,7 +425,7 @@ pub async fn get_editor_url(
     let (file, can_write) = match authorize_wopi_access(
         state.app_state.applications.file_retrieval_service.as_ref(),
         &params.file_id,
-        &user_id,
+        user_id,
         &params.action,
     )
     .await
@@ -464,7 +464,7 @@ pub async fn get_editor_url(
     let (access_token, access_token_ttl) =
         match state
             .token_service
-            .generate_token(&params.file_id, &user_id, &username, can_write)
+            .generate_token(&params.file_id, &user_id.to_string(), &username, can_write)
         {
             Ok(t) => t,
             Err(e) => {
@@ -503,10 +503,14 @@ async fn host_page(
 
     // Re-verify ownership even though the token was valid — defence in depth.
     let requested_action = if claims.can_write { "edit" } else { "view" };
+    let caller_uuid = match uuid::Uuid::parse_str(&claims.sub) {
+        Ok(u) => u,
+        Err(_) => return StatusCode::UNAUTHORIZED.into_response(),
+    };
     let file = match authorize_wopi_access(
         state.app_state.applications.file_retrieval_service.as_ref(),
         &file_id,
-        &claims.sub,
+        caller_uuid,
         requested_action,
     )
     .await

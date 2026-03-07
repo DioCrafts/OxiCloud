@@ -1,5 +1,5 @@
 use chrono::Utc;
-use sqlx::types::Uuid;
+use uuid::Uuid;
 use std::sync::Arc;
 
 use crate::application::dtos::address_book_dto::{
@@ -43,7 +43,7 @@ impl ContactService {
     async fn check_address_book_access(
         &self,
         address_book_id: &Uuid,
-        user_id: &str,
+        user_id: &Uuid,
     ) -> Result<AddressBook, DomainError> {
         let address_book = self
             .address_book_repository
@@ -52,7 +52,7 @@ impl ContactService {
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
         // Check if user is owner
-        if address_book.owner_id() == user_id {
+        if address_book.owner_id() == user_id.to_string() {
             return Ok(address_book);
         }
 
@@ -61,7 +61,7 @@ impl ContactService {
             .address_book_repository
             .get_address_book_shares(address_book_id)
             .await?;
-        if shares.iter().any(|(id, _)| id == user_id) {
+        if shares.iter().any(|(id, _)| id == &user_id.to_string()) {
             return Ok(address_book);
         }
 
@@ -78,7 +78,7 @@ impl ContactService {
     async fn check_address_book_write_access(
         &self,
         address_book_id: &Uuid,
-        user_id: &str,
+        user_id: &Uuid,
     ) -> Result<AddressBook, DomainError> {
         let address_book = self
             .address_book_repository
@@ -87,7 +87,7 @@ impl ContactService {
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
         // Check if user is owner
-        if address_book.owner_id() == user_id {
+        if address_book.owner_id() == user_id.to_string() {
             return Ok(address_book);
         }
 
@@ -98,7 +98,7 @@ impl ContactService {
             .await?;
         if shares
             .iter()
-            .any(|(id, can_write)| id == user_id && *can_write)
+            .any(|(id, can_write)| id == &user_id.to_string() && *can_write)
         {
             return Ok(address_book);
         }
@@ -296,7 +296,8 @@ impl AddressBookUseCase for ContactService {
 
         // Check if user has write access to the address book
         let address_book = self
-            .check_address_book_write_access(&id, &update.user_id)
+            .check_address_book_write_access(&id, &Uuid::parse_str(&update.user_id)
+                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
             .await?;
 
         // Apply updates
@@ -327,7 +328,7 @@ impl AddressBookUseCase for ContactService {
     async fn delete_address_book(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
@@ -339,7 +340,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id() != user_id {
+        if address_book.owner_id() != user_id.to_string() {
             return Err(DomainError::unauthorized(
                 "Only the owner can delete an address book",
             ));
@@ -354,18 +355,18 @@ impl AddressBookUseCase for ContactService {
     async fn get_address_book(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<AddressBookDto, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
-        let address_book = self.check_address_book_access(&id, user_id).await?;
+        let address_book = self.check_address_book_access(&id, &user_id).await?;
         Ok(AddressBookDto::from(address_book))
     }
 
     async fn list_user_address_books(
         &self,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<AddressBookDto>, DomainError> {
         // Get address books owned by the user
         let owned_address_books = self
@@ -397,7 +398,7 @@ impl AddressBookUseCase for ContactService {
         }
 
         for address_book in public_address_books {
-            if address_book.owner_id() != user_id
+            if address_book.owner_id() != user_id.to_string()
                 && !address_book_map.contains_key(address_book.id())
             {
                 address_book_map.insert(*address_book.id(), address_book);
@@ -428,7 +429,7 @@ impl AddressBookUseCase for ContactService {
     async fn share_address_book(
         &self,
         dto: ShareAddressBookDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let id = Uuid::parse_str(&dto.address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
@@ -440,21 +441,23 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id() != user_id {
+        if address_book.owner_id() != user_id.to_string() {
             return Err(DomainError::unauthorized(
                 "Only the owner can share an address book",
             ));
         }
 
         // Don't allow sharing with yourself
-        if dto.user_id == user_id {
+        if dto.user_id == user_id.to_string() {
             return Err(DomainError::validation_error(
                 "Cannot share an address book with yourself",
             ));
         }
 
+        let target_user_id = Uuid::parse_str(&dto.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid target user ID format"))?;
         self.address_book_repository
-            .share_address_book(&id, &dto.user_id, dto.can_write)
+            .share_address_book(&id, target_user_id, dto.can_write)
             .await?;
         Ok(())
     }
@@ -462,7 +465,7 @@ impl AddressBookUseCase for ContactService {
     async fn unshare_address_book(
         &self,
         dto: UnshareAddressBookDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let id = Uuid::parse_str(&dto.address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
@@ -474,14 +477,16 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id() != user_id {
+        if address_book.owner_id() != user_id.to_string() {
             return Err(DomainError::unauthorized(
                 "Only the owner can unshare an address book",
             ));
         }
 
+        let target_user_id = Uuid::parse_str(&dto.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid target user ID format"))?;
         self.address_book_repository
-            .unshare_address_book(&id, &dto.user_id)
+            .unshare_address_book(&id, target_user_id)
             .await?;
         Ok(())
     }
@@ -489,7 +494,7 @@ impl AddressBookUseCase for ContactService {
     async fn get_address_book_shares(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<(String, bool)>, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
@@ -501,7 +506,7 @@ impl AddressBookUseCase for ContactService {
             .await?
             .ok_or_else(|| DomainError::not_found("Address book", "not found"))?;
 
-        if address_book.owner_id() != user_id {
+        if address_book.owner_id() != user_id.to_string() {
             return Err(DomainError::unauthorized(
                 "Only the owner can view address book shares",
             ));
@@ -521,7 +526,8 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &dto.user_id)
+        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
             .await?;
 
         // Convert DTOs to domain entities
@@ -598,7 +604,8 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &dto.user_id)
+        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
             .await?;
 
         // Parse vCard data
@@ -633,7 +640,9 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(contact.address_book_id(), &update.user_id)
+        let update_user_id = Uuid::parse_str(&update.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?;
+        self.check_address_book_write_access(contact.address_book_id(), &update_user_id)
             .await?;
 
         // Destructure contact into owned parts for updates
@@ -720,7 +729,7 @@ impl ContactUseCase for ContactService {
         Ok(ContactDto::from(result))
     }
 
-    async fn delete_contact(&self, contact_id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_contact(&self, contact_id: &str, user_id: Uuid) -> Result<(), DomainError> {
         let id = Uuid::parse_str(contact_id)
             .map_err(|_| DomainError::validation_error("Invalid contact ID format"))?;
 
@@ -732,7 +741,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(contact.address_book_id(), user_id)
+        self.check_address_book_write_access(contact.address_book_id(), &user_id)
             .await?;
 
         // Delete the contact
@@ -743,7 +752,7 @@ impl ContactUseCase for ContactService {
     async fn get_contact(
         &self,
         contact_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<ContactDto, DomainError> {
         let id = Uuid::parse_str(contact_id)
             .map_err(|_| DomainError::validation_error("Invalid contact ID format"))?;
@@ -756,7 +765,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(contact.address_book_id(), user_id)
+        self.check_address_book_access(contact.address_book_id(), &user_id)
             .await?;
 
         Ok(ContactDto::from(contact))
@@ -765,13 +774,13 @@ impl ContactUseCase for ContactService {
     async fn list_contacts(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&id, user_id).await?;
+        self.check_address_book_access(&id, &user_id).await?;
 
         // Get contacts
         let contacts = self
@@ -787,13 +796,13 @@ impl ContactUseCase for ContactService {
         &self,
         address_book_id: &str,
         query: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&id, user_id).await?;
+        self.check_address_book_access(&id, &user_id).await?;
 
         // Search contacts
         let contacts = self.contact_repository.search_contacts(&id, query).await?;
@@ -810,7 +819,8 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &dto.user_id)
+        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
             .await?;
 
         let group = ContactGroup::new(address_book_id, dto.name);
@@ -835,7 +845,8 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(group.address_book_id(), &update.user_id)
+        self.check_address_book_write_access(group.address_book_id(), &Uuid::parse_str(&update.user_id)
+            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
             .await?;
 
         // Update the group
@@ -854,7 +865,7 @@ impl ContactUseCase for ContactService {
         Ok(ContactGroupDto::from(result))
     }
 
-    async fn delete_group(&self, group_id: &str, user_id: &str) -> Result<(), DomainError> {
+    async fn delete_group(&self, group_id: &str, user_id: Uuid) -> Result<(), DomainError> {
         let id = Uuid::parse_str(group_id)
             .map_err(|_| DomainError::validation_error("Invalid group ID format"))?;
 
@@ -866,7 +877,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(group.address_book_id(), user_id)
+        self.check_address_book_write_access(group.address_book_id(), &user_id)
             .await?;
 
         // Delete the group
@@ -877,7 +888,7 @@ impl ContactUseCase for ContactService {
     async fn get_group(
         &self,
         group_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<ContactGroupDto, DomainError> {
         let id = Uuid::parse_str(group_id)
             .map_err(|_| DomainError::validation_error("Invalid group ID format"))?;
@@ -890,7 +901,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(group.address_book_id(), user_id)
+        self.check_address_book_access(group.address_book_id(), &user_id)
             .await?;
 
         // Get the number of contacts in the group
@@ -908,13 +919,13 @@ impl ContactUseCase for ContactService {
     async fn list_groups(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactGroupDto>, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&id, user_id).await?;
+        self.check_address_book_access(&id, &user_id).await?;
 
         // Get groups
         let groups = self
@@ -929,7 +940,7 @@ impl ContactUseCase for ContactService {
     async fn add_contact_to_group(
         &self,
         dto: GroupMembershipDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let group_id = Uuid::parse_str(&dto.group_id)
             .map_err(|_| DomainError::validation_error("Invalid group ID format"))?;
@@ -945,7 +956,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(group.address_book_id(), user_id)
+        self.check_address_book_write_access(group.address_book_id(), &user_id)
             .await?;
 
         // Add contact to group
@@ -958,7 +969,7 @@ impl ContactUseCase for ContactService {
     async fn remove_contact_from_group(
         &self,
         dto: GroupMembershipDto,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<(), DomainError> {
         let group_id = Uuid::parse_str(&dto.group_id)
             .map_err(|_| DomainError::validation_error("Invalid group ID format"))?;
@@ -974,7 +985,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(group.address_book_id(), user_id)
+        self.check_address_book_write_access(group.address_book_id(), &user_id)
             .await?;
 
         // Remove contact from group
@@ -987,7 +998,7 @@ impl ContactUseCase for ContactService {
     async fn list_contacts_in_group(
         &self,
         group_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactDto>, DomainError> {
         let id = Uuid::parse_str(group_id)
             .map_err(|_| DomainError::validation_error("Invalid group ID format"))?;
@@ -1000,7 +1011,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(group.address_book_id(), user_id)
+        self.check_address_book_access(group.address_book_id(), &user_id)
             .await?;
 
         // Get contacts in group
@@ -1016,7 +1027,7 @@ impl ContactUseCase for ContactService {
     async fn list_groups_for_contact(
         &self,
         contact_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<ContactGroupDto>, DomainError> {
         let id = Uuid::parse_str(contact_id)
             .map_err(|_| DomainError::validation_error("Invalid contact ID format"))?;
@@ -1029,7 +1040,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(contact.address_book_id(), user_id)
+        self.check_address_book_access(contact.address_book_id(), &user_id)
             .await?;
 
         // Get groups for contact
@@ -1045,7 +1056,7 @@ impl ContactUseCase for ContactService {
     async fn get_contact_vcard(
         &self,
         contact_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<String, DomainError> {
         let id = Uuid::parse_str(contact_id)
             .map_err(|_| DomainError::validation_error("Invalid contact ID format"))?;
@@ -1058,7 +1069,7 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact", "not found"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(contact.address_book_id(), user_id)
+        self.check_address_book_access(contact.address_book_id(), &user_id)
             .await?;
 
         // Return the vCard data
@@ -1068,13 +1079,13 @@ impl ContactUseCase for ContactService {
     async fn get_contacts_as_vcards(
         &self,
         address_book_id: &str,
-        user_id: &str,
+        user_id: Uuid,
     ) -> Result<Vec<(String, String)>, DomainError> {
         let id = Uuid::parse_str(address_book_id)
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has access to the address book
-        self.check_address_book_access(&id, user_id).await?;
+        self.check_address_book_access(&id, &user_id).await?;
 
         // Get all contacts in the address book
         let contacts = self
@@ -1130,6 +1141,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.delete_address_book(address_book_id, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1142,6 +1155,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.get_address_book(address_book_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1150,6 +1165,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.list_user_address_books(user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1167,6 +1184,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.share_address_book(dto, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1180,6 +1199,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.unshare_address_book(dto, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1192,6 +1213,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self
                     .get_address_book_shares(address_book_id, user_id)
@@ -1239,6 +1262,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.delete_contact(contact_id, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1251,6 +1276,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.get_contact(contact_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1263,6 +1290,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.list_contacts(address_book_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1279,6 +1308,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self
                     .search_contacts(address_book_id, query, user_id)
@@ -1317,6 +1348,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.delete_group(group_id, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1329,6 +1362,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.get_group(group_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1341,6 +1376,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.list_groups(address_book_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1356,6 +1393,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.add_contact_to_group(dto, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1369,6 +1408,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 self.remove_contact_from_group(dto, user_id).await?;
                 Ok(serde_json::Value::Null)
@@ -1381,6 +1422,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.list_contacts_in_group(group_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1393,6 +1436,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.list_groups_for_contact(contact_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1407,6 +1452,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self.get_contact_vcard(contact_id, user_id).await?;
                 Ok(serde_json::to_value(result).unwrap())
@@ -1419,6 +1466,8 @@ impl StorageUseCase for ContactService {
                 let user_id = params["user_id"]
                     .as_str()
                     .ok_or_else(|| DomainError::validation_error("Missing user_id parameter"))?;
+                let user_id = Uuid::parse_str(user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user_id format"))?;
 
                 let result = self
                     .get_contacts_as_vcards(address_book_id, user_id)

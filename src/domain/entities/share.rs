@@ -6,7 +6,7 @@ pub use super::entity_errors::ShareError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Share {
-    id: String,
+    id: Uuid,
     item_id: String,
     item_name: Option<String>,
     item_type: ShareItemType,
@@ -15,7 +15,7 @@ pub struct Share {
     expires_at: Option<u64>,
     permissions: SharePermissions,
     created_at: u64,
-    created_by: String,
+    created_by: Uuid,
     access_count: u64,
 }
 
@@ -37,7 +37,7 @@ impl Share {
         item_id: String,
         item_name: Option<String>,
         item_type: ShareItemType,
-        created_by: String,
+        created_by: Uuid,
         permissions: Option<SharePermissions>,
         password_hash: Option<String>,
         expires_at: Option<u64>,
@@ -69,7 +69,7 @@ impl Share {
             .as_secs();
 
         Ok(Self {
-            id: Uuid::new_v4().to_string(),
+            id: Uuid::new_v4(),
             item_id,
             item_name,
             item_type,
@@ -89,7 +89,7 @@ impl Share {
 
     #[allow(clippy::too_many_arguments)]
     pub fn from_raw(
-        id: String,
+        id: Uuid,
         item_id: String,
         item_name: Option<String>,
         item_type: ShareItemType,
@@ -98,7 +98,7 @@ impl Share {
         expires_at: Option<u64>,
         permissions: SharePermissions,
         created_at: u64,
-        created_by: String,
+        created_by: Uuid,
         access_count: u64,
     ) -> Self {
         Self {
@@ -118,8 +118,8 @@ impl Share {
 
     // ── Getters ──
 
-    pub fn id(&self) -> &str {
-        &self.id
+    pub fn id(&self) -> Uuid {
+        self.id
     }
 
     pub fn item_id(&self) -> &str {
@@ -150,8 +150,8 @@ impl Share {
         self.created_at
     }
 
-    pub fn created_by(&self) -> &str {
-        &self.created_by
+    pub fn created_by(&self) -> Uuid {
+        self.created_by
     }
 
     pub fn access_count(&self) -> u64 {
@@ -262,13 +262,18 @@ impl TryFrom<&str> for ShareItemType {
 mod tests {
     use super::*;
 
+    fn test_user_id() -> Uuid {
+        Uuid::new_v4()
+    }
+
     #[test]
     fn test_create_share() {
+        let uid = test_user_id();
         let share = Share::new(
             "test_file_id".to_string(),
             None,
             ShareItemType::File,
-            "user123".to_string(),
+            uid,
             None,
             None,
             None,
@@ -277,7 +282,7 @@ mod tests {
 
         assert_eq!(share.item_id(), "test_file_id");
         assert_eq!(*share.item_type(), ShareItemType::File);
-        assert_eq!(share.created_by(), "user123");
+        assert_eq!(share.created_by(), uid);
         assert!(share.permissions().read());
         assert!(!share.permissions().write());
         assert!(!share.permissions().reshare());
@@ -299,7 +304,7 @@ mod tests {
             "test_file_id".to_string(),
             None,
             ShareItemType::File,
-            "user123".to_string(),
+            test_user_id(),
             None,
             None,
             Some(future),
@@ -314,7 +319,7 @@ mod tests {
             "test_file_id".to_string(),
             None,
             ShareItemType::File,
-            "user123".to_string(),
+            test_user_id(),
             None,
             None,
             Some(past),
@@ -349,7 +354,7 @@ mod tests {
             "test_file_id".to_string(),
             None,
             ShareItemType::File,
-            "user123".to_string(),
+            test_user_id(),
             None,
             Some("some_hash_value".to_string()),
             None,
@@ -366,7 +371,7 @@ mod tests {
             "test_file_id".to_string(),
             None,
             ShareItemType::File,
-            "user123".to_string(),
+            test_user_id(),
             None,
             None, // No password
             None,

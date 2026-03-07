@@ -2,6 +2,7 @@
 
 use sqlx::{PgPool, Row};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::ports::auth_ports::DeviceCodeStoragePort;
 use crate::common::errors::{DomainError, ErrorKind};
@@ -28,7 +29,7 @@ impl DeviceCodePgRepository {
         let status = DeviceCodeStatus::parse(&status_str).unwrap_or(DeviceCodeStatus::Expired);
 
         Ok(DeviceCode::from_raw(
-            row.try_get("id").unwrap_or_default(),
+            row.try_get("id").unwrap(),
             row.try_get("device_code").unwrap_or_default(),
             row.try_get("user_code").unwrap_or_default(),
             row.try_get("client_name").unwrap_or_default(),
@@ -212,7 +213,7 @@ impl DeviceCodeStoragePort for DeviceCodePgRepository {
         Ok(result.rows_affected())
     }
 
-    async fn list_by_user(&self, user_id: &str) -> Result<Vec<DeviceCode>, DomainError> {
+    async fn list_by_user(&self, user_id: Uuid) -> Result<Vec<DeviceCode>, DomainError> {
         let rows = sqlx::query(
             r#"
             SELECT id, device_code, user_code, client_name, scopes,
@@ -239,7 +240,7 @@ impl DeviceCodeStoragePort for DeviceCodePgRepository {
         rows.iter().map(Self::map_row).collect()
     }
 
-    async fn delete_by_id(&self, id: &str) -> Result<(), DomainError> {
+    async fn delete_by_id(&self, id: Uuid) -> Result<(), DomainError> {
         sqlx::query("DELETE FROM auth.device_codes WHERE id = $1")
             .bind(id)
             .execute(self.pool.as_ref())

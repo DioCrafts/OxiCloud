@@ -174,7 +174,7 @@ pub async fn handle_login_submit(
 
     let app_password = match nextcloud
         .app_passwords
-        .create_nc(&current_user.id, "Nextcloud")
+        .create_nc(current_user.id, "Nextcloud")
         .await
     {
         Ok((_id, password)) => password,

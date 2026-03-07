@@ -42,7 +42,7 @@ impl FolderHandler {
                 "create_folder: parent_id is None for user '{}', resolving home folder",
                 auth_user.username
             );
-            match service.list_folders_for_owner(None, &auth_user.id).await {
+            match service.list_folders_for_owner(None, auth_user.id).await {
                 Ok(folders) => {
                     if let Some(home) = folders.first() {
                         tracing::info!(
@@ -71,7 +71,7 @@ impl FolderHandler {
         if let Some(ref parent_id) = dto.parent_id {
             use crate::application::ports::inbound::FolderUseCase;
             if service
-                .get_folder_owned(parent_id, &auth_user.id)
+                .get_folder_owned(parent_id, auth_user.id)
                 .await
                 .is_err()
             {
@@ -102,7 +102,7 @@ impl FolderHandler {
             Ok(folder) => {
                 // Access check: folder must belong to the requesting user
                 if let Some(ref owner) = folder.owner_id
-                    && owner != &auth_user.id
+                    && owner != &auth_user.id.to_string()
                 {
                     tracing::warn!(
                         "get_folder: user '{}' attempted to access folder '{}' owned by '{}'",
@@ -155,7 +155,7 @@ impl FolderHandler {
         pagination: Query<PaginationRequestDto>,
     ) -> axum::response::Response {
         match service
-            .list_folders_for_owner_paginated(Some(&id), &auth_user.id, &pagination)
+            .list_folders_for_owner_paginated(Some(&id), auth_user.id, &pagination)
             .await
         {
             Ok(paginated_result) => (StatusCode::OK, Json(paginated_result)).into_response(),
@@ -172,7 +172,7 @@ impl FolderHandler {
         auth_user: &AuthUser,
     ) -> axum::response::Response {
         match service
-            .list_folders_for_owner(parent_id, &auth_user.id)
+            .list_folders_for_owner(parent_id, auth_user.id)
             .await
         {
             Ok(folders) => (StatusCode::OK, Json(folders)).into_response(),
@@ -215,8 +215,8 @@ impl FolderHandler {
 
         // Run both queries concurrently — no sequential wait.
         let (folders_result, files_result) = tokio::join!(
-            folder_service.list_folders_for_owner(Some(&id), &auth_user.id),
-            file_service.list_files_owned(Some(&id), &auth_user.id)
+            folder_service.list_folders_for_owner(Some(&id), auth_user.id),
+            file_service.list_files_owned(Some(&id), auth_user.id)
         );
 
         match (folders_result, files_result) {
@@ -253,7 +253,7 @@ impl FolderHandler {
         Path(id): Path<String>,
         Json(dto): Json<RenameFolderDto>,
     ) -> impl IntoResponse {
-        match service.rename_folder(&id, dto, &auth_user.id).await {
+        match service.rename_folder(&id, dto, auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
             Err(err) => AppError::from(err).into_response(),
         }
@@ -266,7 +266,7 @@ impl FolderHandler {
         Path(id): Path<String>,
         Json(dto): Json<MoveFolderDto>,
     ) -> impl IntoResponse {
-        match service.move_folder(&id, dto, &auth_user.id).await {
+        match service.move_folder(&id, dto, auth_user.id).await {
             Ok(folder) => (StatusCode::OK, Json(folder)).into_response(),
             Err(err) => AppError::from(err).into_response(),
         }
@@ -278,7 +278,7 @@ impl FolderHandler {
         auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
-        match service.delete_folder(&id, &auth_user.id).await {
+        match service.delete_folder(&id, auth_user.id).await {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
             Err(err) => AppError::from(err).into_response(),
         }
@@ -290,7 +290,7 @@ impl FolderHandler {
         auth_user: AuthUser,
         Path(id): Path<String>,
     ) -> impl IntoResponse {
-        let user_id = &auth_user.id;
+        let user_id = auth_user.id;
         // Check if trash service is available
         if let Some(trash_service) = &state.trash_service {
             tracing::info!("Moving folder to trash: {}", id);
@@ -337,7 +337,7 @@ impl FolderHandler {
         match folder_service.get_folder(&id).await {
             Ok(folder) => {
                 // Access check: folder must belong to the requesting user
-                if folder.owner_id.as_deref() != Some(&auth_user.id) {
+                if folder.owner_id.as_deref() != Some(&auth_user.id.to_string()) {
                     tracing::warn!(
                         "download_folder_zip: user '{}' attempted to download folder '{}' owned by '{:?}'",
                         auth_user.id,
