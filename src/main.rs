@@ -413,16 +413,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             HeaderName::from_static("content-security-policy"),
             // All inline scripts and styles have been migrated to external
             // files, so 'unsafe-inline' is no longer needed.
-            // frame-src is permissive (*) to allow WOPI editor iframes whose
-            // origin is configured at runtime (Collabora, OnlyOffice, etc.).
+            // frame-src: '*' only matches network schemes, so 'blob:' must be
+            // listed explicitly for inline PDF/document viewers.
+            // media-src: needed for blob: video/audio playback.
             HeaderValue::from_static(
                 "default-src 'self'; \
                  script-src 'self'; \
                  style-src 'self'; \
                  img-src 'self' data: blob:; \
+                 media-src 'self' blob:; \
                  connect-src 'self'; \
                  font-src 'self' data:; \
-                 frame-src *; \
+                 frame-src * blob:; \
                  frame-ancestors 'none'; \
                  base-uri 'self'; \
                  form-action 'self'",
