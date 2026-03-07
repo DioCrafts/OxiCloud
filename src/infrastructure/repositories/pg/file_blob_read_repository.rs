@@ -287,7 +287,7 @@ impl FileReadPort for FileBlobReadRepository {
             "#,
         )
         .bind(id)
-        .bind(owner_id.to_string())
+        .bind(owner_id)
         .fetch_optional(self.pool.as_ref())
         .await
         .map_err(|e| DomainError::internal_error("FileBlobRead", format!("get_for_owner: {e}")))?
@@ -353,7 +353,6 @@ impl FileReadPort for FileBlobReadRepository {
         folder_id: Option<&str>,
         owner_id: Uuid,
     ) -> Result<Vec<File>, DomainError> {
-        let owner_str = owner_id.to_string();
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
@@ -370,7 +369,7 @@ impl FileReadPort for FileBlobReadRepository {
                 "#,
             )
             .bind(fid)
-            .bind(&owner_str)
+            .bind(owner_id)
             .fetch_all(self.pool.as_ref())
             .await
         } else {
@@ -388,7 +387,7 @@ impl FileReadPort for FileBlobReadRepository {
                  ORDER BY fi.name
                 "#,
             )
-            .bind(&owner_str)
+            .bind(owner_id)
             .fetch_all(self.pool.as_ref())
             .await
         }
@@ -474,7 +473,6 @@ impl FileReadPort for FileBlobReadRepository {
         offset: i64,
         limit: i64,
     ) -> Result<Vec<File>, DomainError> {
-        let owner_str = owner_id.to_string();
         let rows: Vec<FileRow> = if let Some(fid) = folder_id {
             sqlx::query_as(
                 r#"
@@ -494,7 +492,7 @@ impl FileReadPort for FileBlobReadRepository {
             .bind(fid)
             .bind(limit)
             .bind(offset)
-            .bind(&owner_str)
+            .bind(owner_id)
             .fetch_all(self.pool.as_ref())
             .await
         } else {
@@ -515,7 +513,7 @@ impl FileReadPort for FileBlobReadRepository {
             )
             .bind(limit)
             .bind(offset)
-            .bind(&owner_str)
+            .bind(owner_id)
             .fetch_all(self.pool.as_ref())
             .await
         }
@@ -825,7 +823,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,
             ),
         >(&sql)
-        .bind(user_id.to_string());
+        .bind(user_id);
 
         if let Some(fid) = folder_id {
             query = query.bind(fid);
@@ -986,7 +984,7 @@ impl FileReadPort for FileBlobReadRepository {
                 i64,
             ),
         >(&sql)
-        .bind(user_id.to_string())
+        .bind(user_id)
         .bind(root_id);
 
         if let Some(name) = &criteria.name_contains

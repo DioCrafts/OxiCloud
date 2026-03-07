@@ -219,7 +219,7 @@ impl FileWritePort for FileBlobWriteRepository {
         let row = match sqlx::query_as::<_, (String, i64, i64)>(
             r#"
             INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
-            VALUES ($1, $2::uuid, $3, $4, $5, $6)
+            VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6)
             RETURNING id::text,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
@@ -500,7 +500,7 @@ impl FileWritePort for FileBlobWriteRepository {
         let row = sqlx::query_as::<_, (String, i64, i64)>(
             r#"
             INSERT INTO storage.files (name, folder_id, user_id, blob_hash, size, mime_type)
-            VALUES ($1, $2::uuid, $3, $4, $5, $6)
+            VALUES ($1, $2::uuid, $3::uuid, $4, $5, $6)
             RETURNING id::text,
                       EXTRACT(EPOCH FROM created_at)::bigint,
                       EXTRACT(EPOCH FROM updated_at)::bigint
