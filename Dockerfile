@@ -4,11 +4,14 @@ WORKDIR /app
 RUN apk --no-cache upgrade && \
     apk add --no-cache musl-dev pkgconfig postgresql-dev gcc perl make
 COPY Cargo.toml Cargo.lock ./
+# build.rs + static/ are needed so the build script can run and set OUT_DIR
+COPY build.rs ./
+COPY static static
 # Create a minimal project to download and cache dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
     RUSTFLAGS="-C target-cpu=native" cargo build --release && \
-    rm -rf src target/release/deps/oxicloud*
+    rm -rf src static-dist target/release/deps/oxicloud* target/release/build/oxicloud-*
 # Stage 2: Build the application
 FROM rust:1.94.0-alpine3.23 AS builder
 WORKDIR /app
@@ -17,8 +20,8 @@ RUN apk --no-cache upgrade && \
 # Copy cached dependencies (only target dir and cargo registry)
 COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo/registry /usr/local/cargo/registry
-# Copy source and static (login.html is embedded at compile-time via include_str!)
-COPY Cargo.toml Cargo.lock ./
+# Copy source, build script, and static assets
+COPY Cargo.toml Cargo.lock build.rs ./
 COPY src src
 COPY static static
 COPY db db
@@ -54,8 +57,8 @@ RUN chmod +x /usr/local/bin/oxicloud
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Copy static files and other resources needed at runtime
-COPY --chown=oxicloud:oxicloud static /app/static
+# Copy processed static files (bundled/minified by build.rs in release)
+COPY --from=builder --chown=oxicloud:oxicloud /app/static-dist /app/static
 COPY --chown=oxicloud:oxicloud db /app/db
 
 # Create storage directory with proper permissions

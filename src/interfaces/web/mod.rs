@@ -11,13 +11,25 @@ use tower_http::set_header::SetResponseHeaderLayer;
 pub fn create_web_routes() -> Router<Arc<AppState>> {
     // Get config to access static path
     let config = AppConfig::from_env();
-    let static_path = config.static_path.clone();
+
+    // In release builds, serve from static-dist/ (processed assets).
+    // In debug builds, serve from the original static/ directory.
+    let static_path = if cfg!(not(debug_assertions)) {
+        let dist = config
+            .static_path
+            .parent()
+            .unwrap_or(std::path::Path::new("."))
+            .join("static-dist");
+        if dist.exists() { dist } else { config.static_path.clone() }
+    } else {
+        config.static_path.clone()
+    };
 
     // Static assets (JS, CSS, JSON, SVG, ICO) served via ServeDir
     // with brotli + gzip compression and aggressive caching (7 days).
     // HTML pages are served via explicit routes (include_str!) and
     // do NOT pass through these layers.
-    let static_service = ServeDir::new(static_path);
+    let static_service = ServeDir::new(&static_path);
 
     Router::new()
         // Add specific routes for clean URLs (without .html)
@@ -36,20 +48,23 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
 
 /// Serve the login page
 async fn serve_login_page() -> Html<&'static str> {
-    Html(include_str!("../../../static/login.html"))
+    Html(include_str!(concat!(env!("OUT_DIR"), "/login.html")))
 }
 
 /// Serve the profile page
 async fn serve_profile_page() -> Html<&'static str> {
-    Html(include_str!("../../../static/profile.html"))
+    Html(include_str!(concat!(env!("OUT_DIR"), "/profile.html")))
 }
 
 /// Serve the admin page
 async fn serve_admin_page() -> Html<&'static str> {
-    Html(include_str!("../../../static/admin.html"))
+    Html(include_str!(concat!(env!("OUT_DIR"), "/admin.html")))
 }
 
 /// Serve the device verification page (RFC 8628 Device Authorization Grant)
 async fn serve_device_verify_page() -> Html<&'static str> {
-    Html(include_str!("../../../static/device-verify.html"))
+    Html(include_str!(concat!(
+        env!("OUT_DIR"),
+        "/device-verify.html"
+    )))
 }

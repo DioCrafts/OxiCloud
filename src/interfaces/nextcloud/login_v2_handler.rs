@@ -135,7 +135,10 @@ pub async fn handle_login_page(
         return StatusCode::NOT_FOUND.into_response();
     }
 
-    html_with_csp(include_str!("../../../static/nextcloud-login.html"))
+    html_with_csp(include_str!(concat!(
+        env!("OUT_DIR"),
+        "/nextcloud-login.html"
+    )))
 }
 
 pub async fn handle_login_submit(

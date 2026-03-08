@@ -36,7 +36,6 @@ services:
       - .env
     volumes:
       - storage_data:/app/storage
-      - ./static:/app/static
 
 networks:
   oxicloud:

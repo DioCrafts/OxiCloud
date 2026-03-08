@@ -63,6 +63,14 @@ integration_tests = []
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(integration_tests)'] }
 
+[build-dependencies]
+oxc_allocator = "0.116"
+oxc_parser = "0.116"
+oxc_span = "0.116"
+oxc_codegen = "0.116"
+oxc_minifier = "0.116"
+lightningcss = "1.0.0-alpha.70"
+
 [profile.release]
 lto = "fat"
 codegen-units = 1
