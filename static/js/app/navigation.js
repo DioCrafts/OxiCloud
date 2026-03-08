@@ -4,6 +4,34 @@
  */
 
 /**
+ * Sync the hidden class and inline display for the grid/list containers
+ * based on the current view preference.
+ */
+function syncViewContainers() {
+    const filesGrid = document.getElementById('files-grid');
+    const filesListView = document.getElementById('files-list-view');
+    const isGrid = window.app.currentView === 'grid';
+    if (filesGrid) {
+        filesGrid.style.display = isGrid ? 'grid' : 'none';
+        filesGrid.classList.toggle('hidden', !isGrid);
+    }
+    if (filesListView) {
+        filesListView.style.display = isGrid ? 'none' : 'flex';
+        filesListView.classList.toggle('hidden', isGrid);
+    }
+}
+
+/**
+ * Hide both grid and list containers (used when switching to non-file views).
+ */
+function hideFileContainers() {
+    const filesGrid = document.getElementById('files-grid');
+    const filesListView = document.getElementById('files-list-view');
+    if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
+    if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
+}
+
+/**
  * Mobile sidebar toggle functionality
  */
 function initSidebarToggle() {
@@ -136,6 +164,8 @@ function switchToSharedView() {
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = 'none';
     if (filesListView) filesListView.style.display = 'none';
+    if (filesGrid) filesGrid.classList.add('hidden');
+    if (filesListView) filesListView.classList.add('hidden');
 
     // Show shared view
     if (window.sharedView) {
@@ -157,7 +187,9 @@ function switchToFilesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
+    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
     // Reset to home folder and update breadcrumb
     window.app.currentPath = window.app.userHomeFolderId || '';
@@ -180,7 +212,9 @@ function switchToFavoritesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
+    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
     if (window.favorites) {
         window.favorites.displayFavorites();
@@ -211,7 +245,9 @@ function switchToRecentFilesView() {
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
     if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'block' : 'none';
+    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
+    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
+    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
     if (window.recent) {
         window.recent.displayRecentFiles();
@@ -242,8 +278,8 @@ function switchToPhotosView() {
     // Hide file containers
     const filesGrid = document.getElementById('files-grid');
     const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = 'none';
-    if (filesListView) filesListView.style.display = 'none';
+    if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
+    if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
 
     // Show photos view
     if (window.photosView) {

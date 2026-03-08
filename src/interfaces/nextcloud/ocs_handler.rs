@@ -11,7 +11,7 @@ use crate::application::dtos::search_dto::SearchCriteriaDto;
 use crate::application::ports::inbound::SearchUseCase;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::AuthUser;
 
 /// Build an OCS success response with the given statuscode and data.
 fn ocs_ok(statuscode: u16, data: serde_json::Value) -> serde_json::Value {
@@ -45,7 +45,7 @@ pub async fn handle_capabilities_v2(State(state): State<Arc<AppState>>) -> Respo
     Json(payload).into_response()
 }
 
-pub async fn handle_user_info(State(state): State<Arc<AppState>>, user: CurrentUser) -> Response {
+pub async fn handle_user_info(State(state): State<Arc<AppState>>, user: AuthUser) -> Response {
     let quota: (i64, i64) = match state.storage_usage_service.as_ref() {
         Some(service) => match service.get_user_storage_info(user.id).await {
             Ok((used, total)) => (used, total),
@@ -86,7 +86,7 @@ pub async fn handle_user_info(State(state): State<Arc<AppState>>, user: CurrentU
 pub async fn handle_user_provisioning_v1(
     state: State<Arc<AppState>>,
     path: Path<String>,
-    user: CurrentUser,
+    user: AuthUser,
 ) -> Response {
     user_provisioning_response(state, path, user, 1).await
 }
@@ -95,7 +95,7 @@ pub async fn handle_user_provisioning_v1(
 pub async fn handle_user_provisioning_v2(
     state: State<Arc<AppState>>,
     path: Path<String>,
-    user: CurrentUser,
+    user: AuthUser,
 ) -> Response {
     user_provisioning_response(state, path, user, 2).await
 }
@@ -105,7 +105,7 @@ pub async fn handle_user_provisioning_v2(
 async fn user_provisioning_response(
     State(state): State<Arc<AppState>>,
     Path(userid): Path<String>,
-    user: CurrentUser,
+    user: AuthUser,
     ocs_version: u8,
 ) -> Response {
     let statuscode = if ocs_version == 1 { 100 } else { 200 };
@@ -197,7 +197,7 @@ async fn user_provisioning_response(
 
 pub async fn handle_revoke_apppassword(
     State(state): State<Arc<AppState>>,
-    user: CurrentUser,
+    user: AuthUser,
     headers: axum::http::HeaderMap,
 ) -> Response {
     let nextcloud = match state.nextcloud.as_ref() {
@@ -249,7 +249,7 @@ pub async fn handle_recommendations() -> Response {
 /// this endpoint and expects a well-formed OCS response rather than a 404.
 pub async fn handle_sharees_search(
     State(state): State<Arc<AppState>>,
-    user: CurrentUser,
+    user: AuthUser,
     axum::extract::Query(params): axum::extract::Query<ShareeSearchParams>,
 ) -> Response {
     let search = params.search.unwrap_or_default();
@@ -343,7 +343,7 @@ pub async fn handle_search(
     State(state): State<Arc<AppState>>,
     Path(provider_id): Path<String>,
     axum::extract::Query(params): axum::extract::Query<UnifiedSearchParams>,
-    user: CurrentUser,
+    user: AuthUser,
 ) -> Response {
     // Only the "files" provider is supported
     if provider_id != "files" {

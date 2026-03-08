@@ -413,14 +413,12 @@ async fn authorize_wopi_access<S: FileRetrievalUseCase>(
 /// This endpoint is behind normal auth middleware. The authenticated user
 /// requests a WOPI session for a specific file.
 pub async fn get_editor_url(
-    AuthUser {
-        id: user_id,
-        username,
-        ..
-    }: AuthUser,
+    auth_user: AuthUser,
     Query(params): Query<EditorUrlParams>,
     State(state): State<WopiState>,
 ) -> Response {
+    let user_id = auth_user.id;
+    let username = &auth_user.username;
     // Verify the caller owns the file (SQL-level check, no existence leak).
     let (file, can_write) = match authorize_wopi_access(
         state.app_state.applications.file_retrieval_service.as_ref(),

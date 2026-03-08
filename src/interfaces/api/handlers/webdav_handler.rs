@@ -28,7 +28,7 @@ use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState;
 use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC, percent_decode_str, utf8_percent_encode};
 use std::sync::Arc;
 
@@ -93,10 +93,11 @@ const PROPFIND_BATCH_SIZE: i64 = 500;
 /// Every mutating or data-returning WebDAV handler **must** call this so
 /// that the real `user.id` is available for ownership checks and for the
 /// user-scoped `PathResolverService` methods.
-fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
+fn extract_user(req: &Request<Body>) -> Result<AuthUser, AppError> {
     req.extensions()
         .get::<Arc<CurrentUser>>()
-        .map(|arc| (**arc).clone())
+        .cloned()
+        .map(AuthUser)
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 

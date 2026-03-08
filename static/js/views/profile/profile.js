@@ -1,5 +1,11 @@
 const API = '/api';
 
+/* ── i18n helper — falls back to key if i18n not ready ── */
+function t(key, params) {
+  if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(key, params);
+  return key.split('.').pop().replace(/_/g, ' ');
+}
+
 function headers() {
   return { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 }
@@ -12,14 +18,14 @@ function formatBytes(bytes) {
 }
 
 function timeAgo(dateStr) {
-  if (!dateStr) return 'Never';
+  if (!dateStr) return t('profile.never');
   const d = new Date(dateStr);
   const now = new Date();
   const secs = Math.floor((now - d) / 1000);
-  if (secs < 60) return 'Just now';
-  if (secs < 3600) return Math.floor(secs/60) + ' min ago';
-  if (secs < 86400) return Math.floor(secs/3600) + 'h ago';
-  if (secs < 2592000) return Math.floor(secs/86400) + ' days ago';
+  if (secs < 60) return t('profile.just_now');
+  if (secs < 3600) return t('profile.minutes_ago', { n: Math.floor(secs/60) });
+  if (secs < 86400) return t('profile.hours_ago', { n: Math.floor(secs/3600) });
+  if (secs < 2592000) return t('profile.days_ago', { n: Math.floor(secs/86400) });
   return d.toLocaleDateString();
 }
 
@@ -37,15 +43,15 @@ async function init() {
     const badge = document.getElementById('p-role-badge');
     if (user.role === 'admin') {
       badge.className = 'role-badge role-badge-admin';
-      badge.innerHTML = '<i class="fas fa-shield-alt"></i> Administrator';
+      badge.innerHTML = '<i class="fas fa-shield-alt"></i> ' + t('profile.role_admin');
     } else {
       badge.className = 'role-badge role-badge-user';
-      badge.innerHTML = '<i class="fas fa-user"></i> User';
+      badge.innerHTML = '<i class="fas fa-user"></i> ' + t('profile.role_user');
     }
 
     document.getElementById('p-detail-username').textContent = user.username;
     document.getElementById('p-detail-email').textContent = user.email || '—';
-    document.getElementById('p-detail-role').textContent = user.role === 'admin' ? 'Administrator' : 'User';
+    document.getElementById('p-detail-role').textContent = user.role === 'admin' ? t('profile.role_admin') : t('profile.role_user');
     document.getElementById('p-detail-login').textContent = timeAgo(user.last_login_at);
 
     const used = user.storage_used_bytes || 0;
@@ -59,7 +65,7 @@ async function init() {
     const bar = document.getElementById('p-storage-bar');
     bar.style.width = pct + '%';
     bar.className = 'storage-fill ' + (pct > 90 ? 'red' : pct > 70 ? 'orange' : 'green');
-    document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : 'Unlimited');
+    document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : t('profile.unlimited'));
 
     if (user.auth_provider && user.auth_provider !== 'local') {
       document.getElementById('password-section').classList.add('hidden');
@@ -99,18 +105,18 @@ async function changePassword(e) {
   const statusEl = document.getElementById('pw-status');
 
   if (newPw !== confirmPw) {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Passwords do not match</div>';
+    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.passwords_no_match')) + '</div>';
     return false;
   }
 
   if (newPw.length < 8) {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Password must be at least 8 characters</div>';
+    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.password_too_short')) + '</div>';
     return false;
   }
 
   const btn = document.getElementById('pw-submit');
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating…';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('profile.updating'));
 
   try {
     const resp = await fetch(API + '/auth/change-password', {
@@ -121,18 +127,18 @@ async function changePassword(e) {
     });
 
     if (resp.ok) {
-      statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Password updated successfully</div>';
+      statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> ' + escapeHtml(t('profile.password_updated')) + '</div>';
       document.getElementById('password-form').reset();
     } else {
       const err = await resp.json().catch(() => ({}));
-      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(err.message || 'Failed to change password') + '</div>';
+      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(err.message || t('profile.password_change_failed')) + '</div>';
     }
   } catch (err) {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Network error: ' + escapeHtml(err.message) + '</div>';
+    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.error_network', { message: err.message })) + '</div>';
   }
 
   btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-save"></i> Update Password';
+  btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('profile.update_password'));
   return false;
 }
 
@@ -151,15 +157,15 @@ function renderPwRow(pw) {
   const created = document.createElement('td');
   created.textContent = new Date(pw.created_at).toLocaleDateString();
   const lastUsed = document.createElement('td');
-  lastUsed.textContent = pw.last_used_at ? timeAgo(pw.last_used_at) : 'Never';
+  lastUsed.textContent = pw.last_used_at ? timeAgo(pw.last_used_at) : t('profile.never');
   const status = document.createElement('td');
   const badge = document.createElement('span');
   if (pw.active !== false) {
     badge.className = 'badge badge-active';
-    badge.textContent = 'Active';
+    badge.textContent = t('profile.active');
   } else {
     badge.className = 'badge badge-expired';
-    badge.textContent = 'Revoked';
+    badge.textContent = t('profile.revoked');
   }
   status.appendChild(badge);
   const actions = document.createElement('td');
@@ -167,7 +173,7 @@ function renderPwRow(pw) {
     const btn = document.createElement('button');
     btn.className = 'btn btn-danger-sm';
     btn.innerHTML = '<i class="fas fa-trash"></i>';
-    btn.title = 'Revoke';
+    btn.title = t('profile.revoke_title');
     btn.addEventListener('click', function () { revokeAppPassword(pw.id, pw.label); });
     actions.appendChild(btn);
   }
@@ -232,12 +238,12 @@ async function createAppPassword() {
   const btn = document.getElementById('app-pw-generate');
 
   if (!label) {
-    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> Please enter a label</div>';
+    statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.error_label_required')) + '</div>';
     return;
   }
 
   btn.disabled = true;
-  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…';
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('profile.generating'));
   statusEl.innerHTML = '';
 
   try {
@@ -249,7 +255,7 @@ async function createAppPassword() {
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + (err.message || 'Failed to create app password') + '</div>';
+      statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(err.message || t('profile.error_create_pw')) + '</div>';
       return;
     }
     const result = await resp.json();
@@ -262,7 +268,7 @@ async function createAppPassword() {
     statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + err.message + '</div>';
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-plus"></i> Generate';
+    btn.innerHTML = '<i class="fas fa-plus"></i> ' + escapeHtml(t('profile.generate'));
   }
 }
 
@@ -276,7 +282,7 @@ function copyAppPassword() {
 }
 
 async function revokeAppPassword(id, label) {
-  if (!confirm('Revoke app password "' + label + '"? Clients using this password will stop working.')) return;
+  if (!confirm(t('profile.confirm_revoke', { label: label }))) return;
   try {
     const resp = await fetch(API + '/auth/app-passwords/' + encodeURIComponent(id), {
       method: 'DELETE',
@@ -288,10 +294,10 @@ async function revokeAppPassword(id, label) {
       loadAppPasswords();
     } else {
       const err = await resp.json().catch(() => ({}));
-      alert(err.message || 'Failed to revoke app password');
+      alert(err.message || t('profile.error_revoke'));
     }
   } catch (err) {
-    alert('Network error: ' + err.message);
+    alert(t('profile.error_network', { message: err.message }));
   }
 }
 
@@ -308,3 +314,7 @@ document.getElementById('password-form').addEventListener('submit', changePasswo
 document.getElementById('app-pw-generate').addEventListener('click', createAppPassword);
 document.getElementById('app-pw-copy-btn').addEventListener('click', copyAppPassword);
 document.getElementById('app-pw-auto-toggle').addEventListener('click', toggleAutoPasswords);
+
+/* Re-render when language changes */
+window.addEventListener('translationsLoaded', function () { init(); });
+window.addEventListener('localeChanged', function () { init(); });

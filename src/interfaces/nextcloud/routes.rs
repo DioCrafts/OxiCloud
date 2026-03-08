@@ -10,7 +10,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 use crate::interfaces::middleware::rate_limit::{RateLimiter, rate_limit_login};
 use crate::interfaces::nextcloud::avatar_handler;
 use crate::interfaces::nextcloud::basic_auth_middleware::basic_auth_middleware;
@@ -176,7 +176,7 @@ fn verify_url_user(url_user: &str, auth_user: &CurrentUser) -> Result<(), Respon
 async fn handle_dav_files(
     State(state): State<Arc<AppState>>,
     Path((url_user, subpath)): Path<(String, String)>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;
@@ -188,7 +188,7 @@ async fn handle_dav_files(
 async fn handle_dav_files_root(
     State(state): State<Arc<AppState>>,
     Path(url_user): Path<String>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;
@@ -200,7 +200,7 @@ async fn handle_dav_files_root(
 async fn handle_dav_uploads(
     State(state): State<Arc<AppState>>,
     Path((url_user, upload_id, rest)): Path<(String, String, String)>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;
@@ -212,7 +212,7 @@ async fn handle_dav_uploads(
 async fn handle_dav_uploads_root(
     State(state): State<Arc<AppState>>,
     Path((url_user, upload_id)): Path<(String, String)>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;
@@ -222,7 +222,7 @@ async fn handle_dav_uploads_root(
 }
 
 /// Legacy /remote.php/webdav/* — redirect to /remote.php/dav/files/{user}/*
-async fn handle_legacy_webdav(Path(subpath): Path<String>, user_ext: CurrentUser) -> Response {
+async fn handle_legacy_webdav(Path(subpath): Path<String>, user_ext: AuthUser) -> Response {
     let location = format!("/remote.php/dav/files/{}/{}", user_ext.username, subpath);
     Response::builder()
         .status(StatusCode::MOVED_PERMANENTLY)
@@ -231,7 +231,7 @@ async fn handle_legacy_webdav(Path(subpath): Path<String>, user_ext: CurrentUser
         .unwrap()
 }
 
-async fn handle_legacy_webdav_root(user_ext: CurrentUser) -> Response {
+async fn handle_legacy_webdav_root(user_ext: AuthUser) -> Response {
     let location = format!("/remote.php/dav/files/{}/", user_ext.username);
     Response::builder()
         .status(StatusCode::MOVED_PERMANENTLY)
@@ -243,7 +243,7 @@ async fn handle_legacy_webdav_root(user_ext: CurrentUser) -> Response {
 async fn handle_dav_trashbin(
     State(state): State<Arc<AppState>>,
     Path((url_user, subpath)): Path<(String, String)>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;
@@ -255,7 +255,7 @@ async fn handle_dav_trashbin(
 async fn handle_dav_trashbin_root(
     State(state): State<Arc<AppState>>,
     Path(url_user): Path<String>,
-    user_ext: CurrentUser,
+    user_ext: AuthUser,
     req: Request<Body>,
 ) -> Result<Response, Response> {
     verify_url_user(&url_user, &user_ext)?;

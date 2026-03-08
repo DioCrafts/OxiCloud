@@ -35,7 +35,7 @@ use crate::application::ports::carddav_ports::{AddressBookUseCase, ContactUseCas
 use crate::common::di::AppState;
 use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdapter;
 use crate::interfaces::errors::AppError;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 
 const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 
@@ -126,10 +126,11 @@ fn reject_path_traversal(path: &str) -> Result<(), AppError> {
 
 // ─── Helper: extract user from request ───────────────────────────────
 
-fn extract_user(req: &Request<Body>) -> Result<CurrentUser, AppError> {
+fn extract_user(req: &Request<Body>) -> Result<AuthUser, AppError> {
     req.extensions()
         .get::<Arc<CurrentUser>>()
-        .map(|arc| (**arc).clone())
+        .cloned()
+        .map(AuthUser)
         .ok_or_else(|| AppError::unauthorized("Authentication required"))
 }
 

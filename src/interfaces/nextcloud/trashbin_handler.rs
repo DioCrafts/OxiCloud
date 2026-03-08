@@ -12,7 +12,7 @@ use std::sync::Arc;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 use crate::interfaces::nextcloud::webdav_handler::{
     format_oc_id, resolve_file_id, resolve_folder_id, write_text_element,
 };
@@ -25,7 +25,7 @@ const HEADER_DAV: HeaderName = HeaderName::from_static("dav");
 pub async fn handle_nc_trashbin(
     state: Arc<AppState>,
     req: Request<Body>,
-    user: CurrentUser,
+    user: AuthUser,
     subpath: String,
 ) -> Result<Response<Body>, AppError> {
     let method = req.method().clone();

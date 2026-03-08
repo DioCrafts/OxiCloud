@@ -110,8 +110,19 @@ async function loadFiles(options = {}) {
         const folderList = Array.isArray(listing.folders) ? listing.folders : [];
         const fileList = Array.isArray(listing.files) ? listing.files : [];
 
-        window.ui.renderFolders(folderList);
-        window.ui.renderFiles(fileList);
+        if (folderList.length === 0 && fileList.length === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'empty-state';
+            emptyState.innerHTML = `
+                <i class="fas fa-folder-open empty-state-icon"></i>
+                <p>${_t('files.no_files')}</p>
+                <p>${_t('files.empty_hint')}</p>
+            `;
+            elements.filesGrid.appendChild(emptyState);
+        } else {
+            window.ui.renderFolders(folderList);
+            window.ui.renderFiles(fileList);
+        }
 
         console.log(`Loaded ${folderList.length} folders and ${fileList.length} files`);
     } catch (error) {

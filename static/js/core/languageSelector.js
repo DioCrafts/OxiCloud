@@ -3,11 +3,20 @@
  * Custom styled dropdown with flags
  */
 
+// Locale files that actually exist (have full translations)
+// Keep this list in sync when adding new locale JSON files
+const AVAILABLE_LOCALES = new Set([
+    'en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'it', 'nl',
+    'hi', 'ar', 'ru', 'ja', 'ko'
+]);
+
 // Language codes, names, and flag emojis
-// Uses ALL_LANGUAGES from auth.js if available, otherwise fallback
+// Only returns languages that have a real locale file
 function getAvailableLanguages() {
     if (typeof ALL_LANGUAGES !== 'undefined') {
-        return ALL_LANGUAGES.map(l => ({ code: l.code, name: l.nativeName, flag: l.flag }));
+        return ALL_LANGUAGES
+            .filter(l => AVAILABLE_LOCALES.has(l.code))
+            .map(l => ({ code: l.code, name: l.nativeName, flag: l.flag }));
     }
     return [
         { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -23,7 +32,7 @@ function getAvailableLanguages() {
 }
 
 // RTL languages
-const rtlLanguages = ['fa']; // ['fa', 'ar']
+const rtlLanguages = ['fa', 'ar'];
 
 // Update HTML lang attribute and dir for RTL languages
 function updateHtmlAttributes(langCode) {

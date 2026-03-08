@@ -19,8 +19,8 @@ const FIRST_RUN_KEY = 'oxicloud_first_run_completed';
 // Language selector texts (used before i18n is loaded)
 const LANGUAGE_TEXTS = {
     en: {
-        title: 'Welcome to OxiCloud',
-        subtitle: 'Please select your language',
+        title: 'Welcome!',
+        subtitle: 'Select your language to continue',
         continue: 'Continue',
         autodetected: 'We detected your language',
         moreLanguages: 'More languages...',
@@ -28,8 +28,8 @@ const LANGUAGE_TEXTS = {
         searchPlaceholder: 'Search language...'
     },
     es: {
-        title: 'Bienvenido a OxiCloud',
-        subtitle: 'Por favor, selecciona tu idioma',
+        title: '¡Bienvenido!',
+        subtitle: 'Selecciona tu idioma para continuar',
         continue: 'Continuar',
         autodetected: 'Hemos detectado tu idioma',
         moreLanguages: 'More languages...',
@@ -37,8 +37,8 @@ const LANGUAGE_TEXTS = {
         searchPlaceholder: 'Buscar idioma...'
     },
     zh: {
-        title: '欢迎使用 OxiCloud',
-        subtitle: '请选择您的语言',
+        title: '欢迎！',
+        subtitle: '选择您的语言以继续',
         continue: '继续',
         autodetected: '我们检测到了您的语言',
         moreLanguages: '更多语言...',
@@ -46,8 +46,8 @@ const LANGUAGE_TEXTS = {
         searchPlaceholder: '搜索语言...'
     },
     fa: {
-        title: 'به OxiCloud خوش آمدید',
-        subtitle: 'لطفا زبان خود را انتخاب کنید',
+        title: '!خوش آمدید',
+        subtitle: 'زبان خود را برای ادامه انتخاب کنید',
         continue: 'ادامه',
         autodetected: 'زبان شما شناسایی شد',
         moreLanguages: 'زبان‌های بیشتر...',
@@ -55,13 +55,58 @@ const LANGUAGE_TEXTS = {
         searchPlaceholder: 'جستجوی زبان...'
     },
     nl: {
-        title: 'Welkom bij OxiCloud',
-        subtitle: 'Selecteer uw taal',
+        title: 'Welkom!',
+        subtitle: 'Selecteer uw taal om door te gaan',
         continue: 'Doorgaan',
         autodetected: 'We hebben uw taal gedetecteerd',
         moreLanguages: 'Meer talen...',
         modalTitle: 'Taal selecteren',
         searchPlaceholder: 'Zoek taal...'
+    },
+    hi: {
+        title: 'स्वागत है!',
+        subtitle: 'जारी रखने के लिए अपनी भाषा चुनें',
+        continue: 'जारी रखें',
+        autodetected: 'हमने आपकी भाषा पहचान ली',
+        moreLanguages: 'और भाषाएँ...',
+        modalTitle: 'भाषा चुनें',
+        searchPlaceholder: 'भाषा खोजें...'
+    },
+    ar: {
+        title: '!مرحباً',
+        subtitle: 'اختر لغتك للمتابعة',
+        continue: 'متابعة',
+        autodetected: 'تم اكتشاف لغتك',
+        moreLanguages: 'المزيد من اللغات...',
+        modalTitle: 'اختر اللغة',
+        searchPlaceholder: 'ابحث عن لغة...'
+    },
+    ru: {
+        title: 'Добро пожаловать!',
+        subtitle: 'Выберите язык для продолжения',
+        continue: 'Продолжить',
+        autodetected: 'Мы определили ваш язык',
+        moreLanguages: 'Больше языков...',
+        modalTitle: 'Выберите язык',
+        searchPlaceholder: 'Поиск языка...'
+    },
+    ja: {
+        title: 'ようこそ！',
+        subtitle: '続行するには言語を選択してください',
+        continue: '続行',
+        autodetected: '言語を検出しました',
+        moreLanguages: 'その他の言語...',
+        modalTitle: '言語を選択',
+        searchPlaceholder: '言語を検索...'
+    },
+    ko: {
+        title: '환영합니다!',
+        subtitle: '계속하려면 언어를 선택하세요',
+        continue: '계속',
+        autodetected: '언어가 감지되었습니다',
+        moreLanguages: '더 많은 언어...',
+        modalTitle: '언어 선택',
+        searchPlaceholder: '언어 검색...'
     },
 };
 
@@ -76,11 +121,11 @@ const ALL_LANGUAGES = [
     { code: 'de', name: 'German',     nativeName: 'Deutsch',    flag: '🇩🇪', popular: true },
     { code: 'pt', name: 'Portuguese', nativeName: 'Português',  flag: '🇧🇷', popular: true },
     { code: 'it', name: 'Italian',    nativeName: 'Italiano',   flag: '🇮🇹', popular: true },
-    { code: 'ru', name: 'Russian',    nativeName: 'Русский',    flag: '🇷🇺', popular: false },
-    { code: 'ja', name: 'Japanese',   nativeName: '日本語',      flag: '🇯🇵', popular: false },
-    { code: 'ko', name: 'Korean',     nativeName: '한국어',      flag: '🇰🇷', popular: false },
-    { code: 'ar', name: 'Arabic',     nativeName: 'العربية',     flag: '🇸🇦', popular: false },
-    { code: 'hi', name: 'Hindi',      nativeName: 'हिन्दी',      flag: '🇮🇳', popular: false },
+    { code: 'ru', name: 'Russian',    nativeName: 'Русский',    flag: '🇷🇺', popular: true },
+    { code: 'ja', name: 'Japanese',   nativeName: '日本語',      flag: '🇯🇵', popular: true },
+    { code: 'ko', name: 'Korean',     nativeName: '한국어',      flag: '🇰🇷', popular: true },
+    { code: 'ar', name: 'Arabic',     nativeName: 'العربية',     flag: '🇸🇦', popular: true },
+    { code: 'hi', name: 'Hindi',      nativeName: 'हिन्दी',      flag: '🇮🇳', popular: true },
     { code: 'tr', name: 'Turkish',    nativeName: 'Türkçe',     flag: '🇹🇷', popular: false },
     { code: 'nl', name: 'Dutch',      nativeName: 'Nederlands', flag: '🇳🇱', popular: false },
     { code: 'pl', name: 'Polish',     nativeName: 'Polski',     flag: '🇵🇱', popular: false },

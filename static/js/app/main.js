@@ -473,8 +473,8 @@ function setupEventListeners() {
                 // Show files containers (to be filled with trash)
                 const filesGrid = document.getElementById('files-grid');
                 const filesListView = document.getElementById('files-list-view');
-                if (filesGrid) filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none';
-                if (filesListView) filesListView.style.display = app.currentView === 'list' ? 'block' : 'none';
+                if (filesGrid) { filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none'; filesGrid.classList.toggle('hidden', app.currentView !== 'grid'); }
+                if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
                 
                 // Update UI
                 elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';
@@ -494,6 +494,8 @@ function setupEventListeners() {
     const savedView = localStorage.getItem('oxicloud-view');
     if (savedView === 'list') {
         ui.switchToListView();
+    } else {
+        ui.switchToGridView();
     }
     
     // User menu

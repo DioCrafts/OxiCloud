@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>OxiCloud — Admin Panel</title>
         <script src="/js/core/theme-init.js"></script>
+        <script src="/js/core/i18n.js" defer></script>
         <script src="/js/core/icons.js" defer></script>
         <script src="/js/core/formatters.js" defer></script>
         <script src="/js/core/csrf.js" defer></script>
@@ -24,22 +25,22 @@
                     </div>
                     <span class="admin-title-text">OxiCloud</span>
                 </a>
-                <span class="admin-title-separator">· Admin</span>
+                <span class="admin-title-separator">· <span data-i18n="admin.tab_dashboard">Admin</span></span>
             </div>
             <div class="admin-header-right">
                 <a href="/"
-                    ><i class="fas fa-arrow-left"></i> Back to OxiCloud</a
+                    ><i class="fas fa-arrow-left"></i> <span data-i18n="admin.back_to_app">Back to OxiCloud</span></a
                 >
             </div>
         </div>
 
         <div class="admin-container">
-            <div id="loading"><i class="fas fa-circle-notch"></i> Loading…</div>
+            <div id="loading"><i class="fas fa-circle-notch"></i> <span data-i18n="admin.loading">Loading…</span></div>
             <div id="access-denied">
                 <div class="access-icon"><i class="fas fa-lock"></i></div>
-                <h2>Access Denied</h2>
-                <p>Administrator privileges required to access this panel.</p>
-                <a href="/login"><i class="fas fa-sign-in-alt"></i> Sign in</a>
+                <h2 data-i18n="admin.access_denied">Access Denied</h2>
+                <p data-i18n="admin.access_denied_desc">Administrator privileges required to access this panel.</p>
+                <a href="/login"><i class="fas fa-sign-in-alt"></i> <span data-i18n="admin.sign_in">Sign in</span></a>
             </div>
 
             <div id="main-content">
@@ -48,13 +49,13 @@
                         class="admin-tab active"
                         id="tab-btn-dashboard"
                     >
-                        <i class="fas fa-chart-pie"></i> Dashboard
+                        <i class="fas fa-chart-pie"></i> <span data-i18n="admin.tab_dashboard">Dashboard</span>
                     </button>
                     <button class="admin-tab" id="tab-btn-users">
-                        <i class="fas fa-users"></i> Users
+                        <i class="fas fa-users"></i> <span data-i18n="admin.tab_users">Users</span>
                     </button>
                     <button class="admin-tab" id="tab-btn-oidc">
-                        <i class="fas fa-key"></i> SSO / OIDC
+                        <i class="fas fa-key"></i> <span data-i18n="admin.tab_oidc">SSO / OIDC</span>
                     </button>
                 </div>
 
@@ -67,7 +68,7 @@
                             >
                                 —
                             </div>
-                            <div class="stat-label">Total Users</div>
+                            <div class="stat-label" data-i18n="admin.total_users">Total Users</div>
                         </div>
                         <div class="stat-card">
                             <div
@@ -76,7 +77,7 @@
                             >
                                 —
                             </div>
-                            <div class="stat-label">Active Users</div>
+                            <div class="stat-label" data-i18n="admin.active_users">Active Users</div>
                         </div>
                         <div class="stat-card">
                             <div
@@ -85,30 +86,30 @@
                             >
                                 —
                             </div>
-                            <div class="stat-label">Admins</div>
+                            <div class="stat-label" data-i18n="admin.admins">Admins</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-value" id="ds-version">—</div>
-                            <div class="stat-label">Version</div>
+                            <div class="stat-label" data-i18n="admin.version">Version</div>
                         </div>
                     </div>
 
                     <div class="admin-card">
-                        <h2><i class="fas fa-hdd"></i> Storage Overview</h2>
+                        <h2><i class="fas fa-hdd"></i> <span data-i18n="admin.storage_overview">Storage Overview</span></h2>
                         <div class="stats-grid">
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-used">—</div>
-                                <div class="stat-label">Used</div>
+                                <div class="stat-label" data-i18n="admin.used">Used</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-quota">—</div>
-                                <div class="stat-label">Total Quota</div>
+                                <div class="stat-label" data-i18n="admin.total_quota">Total Quota</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-usage-pct">
                                     —
                                 </div>
-                                <div class="stat-label">Usage %</div>
+                                <div class="stat-label" data-i18n="admin.usage_pct">Usage %</div>
                             </div>
                         </div>
                         <div class="progress-bar">
@@ -126,7 +127,7 @@
                                     >
                                         0
                                     </div>
-                                    <div class="stat-label">
+                                    <div class="stat-label" data-i18n="admin.users_over_80">
                                         Users &gt;80% quota
                                     </div>
                                 </div>
@@ -140,7 +141,7 @@
                                     >
                                         0
                                     </div>
-                                    <div class="stat-label">
+                                    <div class="stat-label" data-i18n="admin.users_over_quota">
                                         Users over quota
                                     </div>
                                 </div>
@@ -149,21 +150,21 @@
                     </div>
 
                     <div class="admin-card">
-                        <h2><i class="fas fa-server"></i> System</h2>
+                        <h2><i class="fas fa-server"></i> <span data-i18n="admin.system">System</span></h2>
                         <div class="stats-grid">
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-auth">—</div>
-                                <div class="stat-label">Auth</div>
+                                <div class="stat-label" data-i18n="admin.auth_label">Auth</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-oidc">—</div>
-                                <div class="stat-label">OIDC</div>
+                                <div class="stat-label" data-i18n="admin.oidc_label">OIDC</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-value" id="ds-quotas-flag">
                                     —
                                 </div>
-                                <div class="stat-label">Quotas</div>
+                                <div class="stat-label" data-i18n="admin.quotas_label">Quotas</div>
                             </div>
                         </div>
                         <div class="toggle-row toggle-row-strong">
@@ -171,22 +172,19 @@
                                 ><i
                                     class="fas fa-user-plus icon-muted-right"
                                 ></i>
-                                Allow public self-registration</label
+                                <span data-i18n="admin.allow_registration">Allow public self-registration</span></label
                             >
                             <label class="switch"
                                 ><input
                                     type="checkbox"
                                     id="ds-registration"
-                                    checked
-                                    onchange="toggleRegistration(this.checked)" /><span
+                                    checked /><span
                                     class="slider"
                                 ></span
                             ></label>
                         </div>
                         <div class="warning" id="registration-warning">
-                            <i class="fas fa-exclamation-triangle"></i> Public
-                            registration is disabled. Only admins can create new
-                            users.
+                            <i class="fas fa-exclamation-triangle"></i> <span data-i18n="admin.registration_warning">Public registration is disabled. Only admins can create new users.</span>
                         </div>
                     </div>
                 </div>
@@ -195,26 +193,25 @@
                     <div class="admin-card">
                         <h2 class="h2-space-between">
                             <span
-                                ><i class="fas fa-users-cog"></i> User
-                                Management</span
+                                ><i class="fas fa-users-cog"></i> <span data-i18n="admin.user_management">User Management</span></span
                             ><button
                                 class="btn btn-primary"
                                 id="btn-create-user"
                             >
-                                <i class="fas fa-user-plus"></i> Create User
+                                <i class="fas fa-user-plus"></i> <span data-i18n="admin.create_user">Create User</span>
                             </button>
                         </h2>
                         <div class="table-wrap">
                             <table>
                                 <thead>
                                     <tr>
-                                        <th>User</th>
-                                        <th>Role</th>
-                                        <th>Auth</th>
-                                        <th>Status</th>
-                                        <th>Storage</th>
-                                        <th>Last Login</th>
-                                        <th>Actions</th>
+                                        <th data-i18n="admin.col_user">User</th>
+                                        <th data-i18n="admin.col_role">Role</th>
+                                        <th data-i18n="admin.col_auth">Auth</th>
+                                        <th data-i18n="admin.col_status">Status</th>
+                                        <th data-i18n="admin.col_storage">Storage</th>
+                                        <th data-i18n="admin.col_last_login">Last Login</th>
+                                        <th data-i18n="admin.col_actions">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="users-tbody">
@@ -226,7 +223,7 @@
                                             <i
                                                 class="fas fa-spinner fa-spin"
                                             ></i>
-                                            Loading users…
+                                            <span data-i18n="admin.loading_users">Loading users…</span>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -240,13 +237,13 @@
                                     id="prev-btn"
                                     disabled
                                 >
-                                    <i class="fas fa-chevron-left"></i> Prev
+                                    <i class="fas fa-chevron-left"></i> <span data-i18n="admin.prev">Prev</span>
                                 </button>
                                 <button
                                     class="btn btn-sm btn-secondary"
                                     id="next-btn"
                                 >
-                                    Next <i class="fas fa-chevron-right"></i>
+                                    <span data-i18n="admin.next">Next</span> <i class="fas fa-chevron-right"></i>
                                 </button>
                             </div>
                         </div>
@@ -256,11 +253,10 @@
                 <div id="tab-oidc" class="tab-content">
                     <div class="admin-card">
                         <h2>
-                            <i class="fas fa-shield-alt"></i> Single Sign-On
-                            (OIDC / SSO)
+                            <i class="fas fa-shield-alt"></i> <span data-i18n="admin.sso_title">Single Sign-On (OIDC / SSO)</span>
                         </h2>
                         <div class="toggle-row">
-                            <label>Enable SSO Authentication</label>
+                            <label data-i18n="admin.enable_sso">Enable SSO Authentication</label>
                             <label class="switch"
                                 ><input
                                     type="checkbox"
@@ -272,7 +268,7 @@
                         <div id="oidc-form">
                             <div class="form-group">
                                 <label
-                                    >Provider Name
+                                    ><span data-i18n="admin.provider_name">Provider Name</span>
                                     <span id="badge-provider_name"></span
                                 ></label>
                                 <input
@@ -283,7 +279,7 @@
                             </div>
                             <div class="form-group">
                                 <label
-                                    >Issuer URL
+                                    ><span data-i18n="admin.issuer_url">Issuer URL</span>
                                     <span id="badge-issuer_url"></span
                                 ></label>
                                 <input
@@ -291,7 +287,7 @@
                                     id="issuer-url"
                                     placeholder="https://auth.example.com/application/o/oxicloud/"
                                 />
-                                <small
+                                <small data-i18n="admin.issuer_url_hint"
                                     >OpenID Connect issuer URL of your identity
                                     provider</small
                                 >
@@ -301,13 +297,13 @@
                                     class="btn btn-secondary btn-sm"
                                     id="discover-btn"
                                 >
-                                    <i class="fas fa-search"></i> Auto-discover
+                                    <i class="fas fa-search"></i> <span data-i18n="admin.auto_discover">Auto-discover</span>
                                 </button>
                             </div>
                             <div id="discovery-result"></div>
                             <div class="form-group">
                                 <label
-                                    >Client ID <span id="badge-client_id"></span
+                                    ><span data-i18n="admin.client_id">Client ID</span> <span id="badge-client_id"></span
                                 ></label>
                                 <input
                                     type="text"
@@ -317,25 +313,26 @@
                             </div>
                             <div class="form-group">
                                 <label
-                                    >Client Secret
+                                    ><span data-i18n="admin.client_secret">Client Secret</span>
                                     <span id="badge-client_secret"></span
                                 ></label>
                                 <input
                                     type="password"
                                     id="client-secret"
                                     placeholder="Leave empty to keep current value"
+                                    data-i18n-placeholder="admin.client_secret_placeholder"
                                 />
                                 <small id="secret-hint"
                                     ><i
                                         class="fas fa-check-circle secret-icon"
                                     ></i>
-                                    A client secret is already configured</small
+                                    <span data-i18n="admin.secret_configured">A client secret is already configured</span></small
                                 >
                             </div>
                             <div class="form-group">
                                 <label
-                                    >Callback URL
-                                    <small class="small-muted"
+                                    ><span data-i18n="admin.callback_url">Callback URL</span>
+                                    <small class="small-muted" data-i18n="admin.callback_url_hint"
                                         >(register in your IdP)</small
                                     ></label
                                 >
@@ -354,11 +351,11 @@
                                     <i
                                         class="fas fa-sliders-h summary-icon-right"
                                     ></i>
-                                    Advanced Settings
+                                    <span data-i18n="admin.advanced_settings">Advanced Settings</span>
                                 </summary>
                                 <div class="form-group">
                                     <label
-                                        >Scopes <span id="badge-scopes"></span
+                                        ><span data-i18n="admin.scopes">Scopes</span> <span id="badge-scopes"></span>
                                     ></label>
                                     <input
                                         type="text"
@@ -367,7 +364,7 @@
                                     />
                                 </div>
                                 <div class="toggle-row">
-                                    <label
+                                    <label data-i18n="admin.auto_provision"
                                         >Auto-provision users on first
                                         login</label
                                     >
@@ -382,21 +379,21 @@
                                 </div>
                                 <div class="form-group">
                                     <label
-                                        >Admin Groups
-                                        <span id="badge-admin_groups"></span
+                                        ><span data-i18n="admin.admin_groups">Admin Groups</span>
+                                        <span id="badge-admin_groups"></span>
                                     ></label>
                                     <input
                                         type="text"
                                         id="admin-groups"
                                         placeholder="e.g., oxicloud-admins"
                                     />
-                                    <small
+                                    <small data-i18n="admin.admin_groups_hint"
                                         >Comma-separated OIDC group names that
                                         map to admin role</small
                                     >
                                 </div>
                                 <div class="toggle-row">
-                                    <label
+                                    <label data-i18n="admin.disable_password"
                                         >Disable password login (OIDC
                                         only)</label
                                     >
@@ -410,7 +407,7 @@
                                 </div>
                                 <div class="warning" id="password-warning">
                                     <i class="fas fa-exclamation-triangle"></i>
-                                    This will prevent ALL password-based logins!
+                                    <span data-i18n="admin.password_warning">This will prevent ALL password-based logins!</span>
                                 </div>
                             </details>
                             <div class="oidc-actions">
@@ -418,13 +415,13 @@
                                     class="btn btn-secondary"
                                     id="btn-test-oidc"
                                 >
-                                    <i class="fas fa-vial"></i> Test
+                                    <i class="fas fa-vial"></i> <span data-i18n="admin.test_btn">Test</span>
                                 </button>
                                 <button
                                     class="btn btn-primary"
                                     id="save-btn"
                                 >
-                                    <i class="fas fa-save"></i> Save
+                                    <i class="fas fa-save"></i> <span data-i18n="admin.save_btn">Save</span>
                                 </button>
                             </div>
                             <div id="oidc-status" class="alert"></div>
@@ -437,14 +434,13 @@
         <div id="quota-modal" class="modal-overlay hidden">
             <div class="modal">
                 <h3>
-                    <i class="fas fa-box modal-title-icon"></i> Update Storage
-                    Quota
+                    <i class="fas fa-box modal-title-icon"></i> <span data-i18n="admin.quota_modal_title">Update Storage Quota</span>
                 </h3>
                 <div class="form-group">
-                    <label>User: <strong id="qm-username"></strong></label>
+                    <label><span data-i18n="admin.quota_user_label">User:</span> <strong id="qm-username"></strong></label>
                 </div>
                 <div class="form-group">
-                    <label>New Quota</label>
+                    <label data-i18n="admin.new_quota">New Quota</label>
                     <div class="quota-input-row">
                         <input
                             type="number"
@@ -459,17 +455,18 @@
                             <option value="1099511627776">TB</option>
                         </select>
                     </div>
-                    <small>Set to 0 for unlimited</small>
+                    <small data-i18n="admin.quota_unlimited_hint">Set to 0 for unlimited</small>
                 </div>
                 <div class="modal-actions">
                     <button
                         class="btn btn-secondary"
                         id="btn-close-quota"
+                        data-i18n="admin.cancel"
                     >
                         Cancel
                     </button>
                     <button class="btn btn-primary" id="btn-save-quota">
-                        <i class="fas fa-save"></i> Save
+                        <i class="fas fa-save"></i> <span data-i18n="admin.save_btn">Save</span>
                     </button>
                 </div>
             </div>
@@ -478,50 +475,52 @@
         <div id="create-user-modal" class="modal-overlay hidden">
             <div class="modal">
                 <h3>
-                    <i class="fas fa-user-plus modal-title-icon"></i> Create New
-                    User
+                    <i class="fas fa-user-plus modal-title-icon"></i> <span data-i18n="admin.create_user_title">Create New User</span>
                 </h3>
                 <div class="form-group">
-                    <label>Username *</label>
+                    <label><span data-i18n="admin.username_label">Username</span> *</label>
                     <input
                         type="text"
                         id="cu-username"
                         placeholder="johndoe"
+                        data-i18n-placeholder="admin.username_placeholder"
                         minlength="3"
                         maxlength="32"
                     />
-                    <small>3–32 characters</small>
+                    <small data-i18n="admin.username_hint">3–32 characters</small>
                 </div>
                 <div class="form-group">
-                    <label>Password *</label>
+                    <label><span data-i18n="admin.password_label">Password</span> *</label>
                     <input
                         type="password"
                         id="cu-password"
                         placeholder="Min 8 characters"
+                        data-i18n-placeholder="admin.password_placeholder"
                         minlength="8"
                     />
                 </div>
                 <div class="form-group">
                     <label
-                        >Email
-                        <small class="small-muted">(optional)</small></label
+                        ><span data-i18n="admin.email_label">Email</span>
+                        <small class="small-muted" data-i18n="admin.email_optional">(optional)</small></label
                     >
                     <input
                         type="text"
                         id="cu-email"
                         placeholder="user@example.com (auto-generated if empty)"
+                        data-i18n-placeholder="admin.email_placeholder"
                     />
                 </div>
                 <div class="form-row">
                     <div class="form-group flex-1">
-                        <label>Role</label>
+                        <label data-i18n="admin.role_label">Role</label>
                         <select id="cu-role" class="select-cu-role">
-                            <option value="user">User</option>
-                            <option value="admin">Admin</option>
+                            <option value="user" data-i18n="admin.role_user">User</option>
+                            <option value="admin" data-i18n="admin.role_admin">Admin</option>
                         </select>
                     </div>
                     <div class="form-group flex-1">
-                        <label>Quota</label>
+                        <label data-i18n="admin.quota_label">Quota</label>
                         <div class="quota-row">
                             <input
                                 type="number"
@@ -547,6 +546,7 @@
                     <button
                         class="btn btn-secondary"
                         id="btn-close-create-user"
+                        data-i18n="admin.cancel"
                     >
                         Cancel
                     </button>
@@ -554,7 +554,7 @@
                         class="btn btn-primary"
                         id="cu-submit"
                     >
-                        <i class="fas fa-user-plus"></i> Create
+                        <i class="fas fa-user-plus"></i> <span data-i18n="admin.create_user">Create</span>
                     </button>
                 </div>
             </div>
@@ -563,13 +563,13 @@
         <div id="reset-pw-modal" class="modal-overlay hidden">
             <div class="modal">
                 <h3>
-                    <i class="fas fa-key modal-title-icon"></i> Reset Password
+                    <i class="fas fa-key modal-title-icon"></i> <span data-i18n="admin.reset_pw_title">Reset Password</span>
                 </h3>
                 <div class="form-group">
-                    <label>User: <strong id="rp-username"></strong></label>
+                    <label><span data-i18n="admin.quota_user_label">User:</span> <strong id="rp-username"></strong></label>
                 </div>
                 <div class="form-group">
-                    <label>New Password</label>
+                    <label data-i18n="admin.new_password_label">New Password</label>
                     <input
                         type="password"
                         id="rp-password"
@@ -582,6 +582,7 @@
                     <button
                         class="btn btn-secondary"
                         id="btn-close-reset-pw"
+                        data-i18n="admin.cancel"
                     >
                         Cancel
                     </button>
@@ -589,8 +590,20 @@
                         class="btn btn-primary"
                         id="rp-submit"
                     >
-                        <i class="fas fa-save"></i> Reset
+                        <i class="fas fa-save"></i> <span data-i18n="admin.reset_btn">Reset</span>
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirm modal -->
+        <div id="confirm-modal" class="modal-overlay hidden">
+            <div class="modal modal-confirm">
+                <h3 id="confirm-title"><i class="fas fa-exclamation-circle modal-title-icon"></i> <span data-i18n="admin.confirm_action">Confirm Action</span></h3>
+                <p id="confirm-message"></p>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" id="confirm-cancel" data-i18n="admin.confirm_no">Cancel</button>
+                    <button class="btn btn-danger" id="confirm-yes" data-i18n="admin.confirm_yes">Confirm</button>
                 </div>
             </div>
         </div>

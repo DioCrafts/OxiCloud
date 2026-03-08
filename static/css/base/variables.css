@@ -1,9 +1,35 @@
 :root {
+    /* Backgrounds */
     --color-bg-page: #f5f7fa;
     --color-bg-surface: #ffffff;
+    --color-bg-input: #f9fafb;
+    --color-bg-hover: #f8fafc;
+
+    /* Borders */
     --color-border: #e2e8f0;
+    --color-border-light: #f1f5f9;
+
+    /* Text */
     --color-text: #2d3748;
+    --color-text-heading: #1e293b;
     --color-text-muted: #718096;
+    --color-text-faint: #94a3b8;
+
+    /* Accent */
     --color-accent: #ff5e3a;
     --color-accent-hover: #e04520;
+    --color-accent-gradient: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
+    --color-accent-shadow: rgba(255, 94, 58, 0.3);
+    --color-accent-ring: rgba(255, 94, 58, 0.1);
+    --color-accent-tint: #fff5f3;
+
+    /* Feedback */
+    --color-error-bg: #fee2e2;
+    --color-error-text: #b91c1c;
+    --color-success-bg: #dcfce7;
+    --color-success-text: #15803d;
+
+    /* Shadows */
+    --color-shadow: rgba(0, 0, 0, 0.1);
+    --color-shadow-lg: rgba(0, 0, 0, 0.12);
 }

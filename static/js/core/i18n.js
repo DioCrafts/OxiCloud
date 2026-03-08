@@ -13,7 +13,7 @@ let currentLocale =
 
 // Supported locales (languages that have locale files on the server)
 // When a locale file is not found, the system gracefully falls back to English
-const supportedLocales = ['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'nl'];
+const supportedLocales = ['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'nl', 'it', 'hi', 'ar', 'ru', 'ja', 'ko'];
 
 // Fallback to English if locale is not supported
 if (!supportedLocales.includes(currentLocale)) {
@@ -225,6 +225,9 @@ async function initI18n() {
     if (currentLocale !== 'en') {
         await loadTranslations('en');
     }
+
+    // Mark loaded BEFORE translatePage so safeT resolves properly
+    translationsLoaded = true;
     
     // Translate the page
     translatePage();
@@ -245,20 +248,23 @@ function translatePage() {
  * @param {Element|Document} root - The root element to search within
  */
 function translateElement(root) {
+    // Use safeT instead of bare t() to avoid issues when other scripts
+    // (e.g. admin.js) shadow the global t() function.
+    const resolve = safeT;
     const el = root || document;
     el.querySelectorAll('[data-i18n]').forEach(element => {
         const key = element.getAttribute('data-i18n');
-        element.textContent = t(key);
+        element.textContent = resolve(key);
     });
     
     el.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
         const key = element.getAttribute('data-i18n-placeholder');
-        element.placeholder = t(key);
+        element.placeholder = resolve(key);
     });
     
     el.querySelectorAll('[data-i18n-title]').forEach(element => {
         const key = element.getAttribute('data-i18n-title');
-        element.title = t(key);
+        element.title = resolve(key);
     });
 }
 
@@ -284,19 +290,29 @@ let translationsLoaded = false;
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
     await initI18n();
-    translationsLoaded = true;
+    // translationsLoaded already set inside initI18n
     // Dispatch an event when translations are fully loaded
     window.dispatchEvent(new Event('translationsLoaded'));
 });
 
-// Improved t function with fallback for early calls
+// Self-contained t wrapper — does NOT call the global t() because other
+// scripts (e.g. admin.js) may shadow it, which would cause infinite recursion.
 function safeT(key, params = {}) {
-    if (!translationsLoaded) {
-        console.warn(`Translations for ${currentLocale} not loaded yet`);
-        // Return a default value or the key depending on context
+    const localeData = translations[currentLocale];
+    if (!localeData) {
+        // Translations not loaded yet — return humanised key suffix
         return key.split('.').pop() || key;
     }
-    return t(key, params);
+
+    let value = getNestedValue(localeData, key);
+
+    // Fallback to English
+    if (!value && currentLocale !== 'en' && translations['en']) {
+        value = getNestedValue(translations['en'], key);
+    }
+
+    if (!value) return key;
+    return interpolate(value, params);
 }
 
 // Export functions for use in other modules

@@ -15,7 +15,7 @@ use crate::application::ports::file_ports::FileRetrievalUseCase;
 use crate::application::ports::storage_ports::FileReadPort;
 use crate::application::ports::thumbnail_ports::{ThumbnailPort, ThumbnailSize};
 use crate::common::di::AppState;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::AuthUser;
 
 #[derive(Debug, Deserialize)]
 pub struct PreviewParams {
@@ -34,7 +34,7 @@ pub struct PreviewParams {
 /// - Size selection based on request dimensions and forceIcon param
 pub async fn handle_preview(
     State(state): State<Arc<AppState>>,
-    user: CurrentUser,
+    user: AuthUser,
     Query(params): Query<PreviewParams>,
 ) -> impl IntoResponse {
     // Parse the Nextcloud file ID — the NC app may append an instance suffix

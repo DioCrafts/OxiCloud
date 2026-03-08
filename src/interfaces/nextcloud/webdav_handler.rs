@@ -22,7 +22,7 @@ use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
 use crate::common::mime_detect::{filename_from_path, refine_content_type};
 use crate::interfaces::errors::AppError;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 
 /// Extension trait to map XML write errors to `String` concisely.
 trait XmlResultExt<T> {
@@ -89,7 +89,7 @@ pub fn nc_href(username: &str, subpath: &str) -> String {
 pub async fn handle_nc_webdav(
     state: Arc<AppState>,
     req: Request<Body>,
-    user: CurrentUser,
+    user: AuthUser,
     subpath: String,
 ) -> Result<Response<Body>, AppError> {
     let method = req.method().clone();

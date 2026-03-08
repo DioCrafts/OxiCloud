@@ -1,11 +1,37 @@
 [data-theme="dark"] {
+    /* Backgrounds */
     --color-bg-page: #0f172a;
     --color-bg-surface: #1e293b;
+    --color-bg-input: #0f172a;
+    --color-bg-hover: #162032;
+
+    /* Borders */
     --color-border: #334155;
+    --color-border-light: #334155;
+
+    /* Text */
     --color-text: #e2e8f0;
+    --color-text-heading: #f1f5f9;
     --color-text-muted: #94a3b8;
+    --color-text-faint: #64748b;
+
+    /* Accent */
     --color-accent: #ff5e3a;
     --color-accent-hover: #ff7a5c;
+    --color-accent-gradient: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
+    --color-accent-shadow: rgba(255, 94, 58, 0.3);
+    --color-accent-ring: rgba(255, 94, 58, 0.15);
+    --color-accent-tint: #2a1a15;
+
+    /* Feedback */
+    --color-error-bg: #3b1111;
+    --color-error-text: #fca5a5;
+    --color-success-bg: #052e16;
+    --color-success-text: #86efac;
+
+    /* Shadows */
+    --color-shadow: rgba(0, 0, 0, 0.3);
+    --color-shadow-lg: rgba(0, 0, 0, 0.3);
 }
 
 [data-theme="dark"] body {

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OxiCloud — My Profile</title>
 <script src="/js/core/theme-init.js"></script>
+<script src="/js/core/i18n.js" defer></script>
 <script src="/js/core/icons.js" defer></script>
 <script src="/js/core/csrf.js" defer></script>
 <link rel="stylesheet" href="/css/main.css">
@@ -22,20 +23,20 @@
       </div>
       <span class="profile-title-text">OxiCloud</span>
     </a>
-    <span class="profile-title-separator">· Profile</span>
+    <span class="profile-title-separator">· <span data-i18n="profile.page_title">Profile</span></span>
   </div>
   <div class="profile-header-right">
-    <a href="/"><i class="fas fa-arrow-left"></i> Back to OxiCloud</a>
+    <a href="/"><i class="fas fa-arrow-left"></i> <span data-i18n="profile.back_to_app">Back to OxiCloud</span></a>
   </div>
 </div>
 
 <div class="profile-container">
-  <div id="loading"><i class="fas fa-circle-notch"></i> Loading…</div>
+  <div id="loading"><i class="fas fa-circle-notch"></i> <span data-i18n="profile.loading">Loading…</span></div>
   <div id="auth-error" class="hidden">
     <div class="err-icon"><i class="fas fa-lock"></i></div>
-    <h2>Not Authenticated</h2>
-    <p>Please sign in to view your profile.</p>
-    <a href="/login"><i class="fas fa-sign-in-alt"></i> Sign in</a>
+    <h2 data-i18n="profile.not_authenticated">Not Authenticated</h2>
+    <p data-i18n="profile.not_authenticated_desc">Please sign in to view your profile.</p>
+    <a href="/login"><i class="fas fa-sign-in-alt"></i> <span data-i18n="profile.sign_in">Sign in</span></a>
   </div>
 
   <div id="main-content" class="hidden">
@@ -51,41 +52,41 @@
     </div>
 
     <div class="profile-card">
-      <h2><i class="fas fa-id-card"></i> Account Details</h2>
+      <h2><i class="fas fa-id-card"></i> <span data-i18n="profile.account_details">Account Details</span></h2>
       <div class="info-grid">
         <div class="info-item">
-          <div class="info-label"><i class="fas fa-user"></i> Username</div>
+          <div class="info-label"><i class="fas fa-user"></i> <span data-i18n="profile.username">Username</span></div>
           <div class="info-value" id="p-detail-username">—</div>
         </div>
         <div class="info-item">
-          <div class="info-label"><i class="fas fa-envelope"></i> Email</div>
+          <div class="info-label"><i class="fas fa-envelope"></i> <span data-i18n="profile.email">Email</span></div>
           <div class="info-value" id="p-detail-email">—</div>
         </div>
         <div class="info-item">
-          <div class="info-label"><i class="fas fa-shield-alt"></i> Role</div>
+          <div class="info-label"><i class="fas fa-shield-alt"></i> <span data-i18n="profile.role">Role</span></div>
           <div class="info-value" id="p-detail-role">—</div>
         </div>
         <div class="info-item">
-          <div class="info-label"><i class="fas fa-clock"></i> Last Login</div>
+          <div class="info-label"><i class="fas fa-clock"></i> <span data-i18n="profile.last_login">Last Login</span></div>
           <div class="info-value" id="p-detail-login">—</div>
         </div>
       </div>
     </div>
 
     <div class="profile-card">
-      <h2><i class="fas fa-hdd"></i> Storage</h2>
+      <h2><i class="fas fa-hdd"></i> <span data-i18n="profile.storage">Storage</span></h2>
       <div class="storage-stats">
         <div class="storage-stat">
           <div class="stat-value" id="p-storage-used">—</div>
-          <div class="stat-label">Used</div>
+          <div class="stat-label" data-i18n="profile.used">Used</div>
         </div>
         <div class="storage-stat">
           <div class="stat-value" id="p-storage-quota">—</div>
-          <div class="stat-label">Quota</div>
+          <div class="stat-label" data-i18n="profile.quota">Quota</div>
         </div>
         <div class="storage-stat">
           <div class="stat-value" id="p-storage-pct">—</div>
-          <div class="stat-label">Usage</div>
+          <div class="stat-label" data-i18n="profile.usage">Usage</div>
         </div>
       </div>
       <div class="storage-bar-wrap">
@@ -95,44 +96,44 @@
     </div>
 
     <div class="profile-card" id="app-passwords-section">
-      <h2><i class="fas fa-key"></i> App Passwords</h2>
-      <p class="app-pw-desc">Generate passwords for WebDAV, CalDAV, and CardDAV clients. Each password is shown only once.</p>
+      <h2><i class="fas fa-key"></i> <span data-i18n="profile.app_passwords">App Passwords</span></h2>
+      <p class="app-pw-desc" data-i18n="profile.app_pw_desc">Generate passwords for WebDAV, CalDAV, and CardDAV clients. Each password is shown only once.</p>
 
       <div class="app-pw-create">
-        <input type="text" id="app-pw-label" placeholder="Label (e.g. Thunderbird, macOS)" maxlength="128">
-        <button class="btn btn-primary" id="app-pw-generate"><i class="fas fa-plus"></i> Generate</button>
+        <input type="text" id="app-pw-label" data-i18n-placeholder="profile.app_pw_label_placeholder" placeholder="Label (e.g. Thunderbird, macOS)" maxlength="128">
+        <button class="btn btn-primary" id="app-pw-generate"><i class="fas fa-plus"></i> <span data-i18n="profile.generate">Generate</span></button>
       </div>
 
       <div id="app-pw-created" class="app-pw-created hidden">
-        <div class="app-pw-created-label">New password for <strong id="app-pw-created-label"></strong>:</div>
+        <div class="app-pw-created-label"><span data-i18n="profile.new_password_for">New password for</span> <strong id="app-pw-created-label"></strong>:</div>
         <div class="app-pw-created-value">
           <code id="app-pw-created-password"></code>
-          <button class="btn btn-copy" id="app-pw-copy-btn" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
+          <button class="btn btn-copy" id="app-pw-copy-btn" data-i18n-title="profile.copy_to_clipboard" title="Copy to clipboard"><i class="fas fa-copy"></i></button>
         </div>
-        <small>Copy this password now. You won't be able to see it again.</small>
+        <small data-i18n="profile.copy_warning">Copy this password now. You won't be able to see it again.</small>
       </div>
 
       <div id="app-pw-status"></div>
 
       <table class="app-pw-table" id="app-pw-table">
         <thead>
-          <tr><th>Label</th><th>Created</th><th>Last Used</th><th>Status</th><th></th></tr>
+          <tr><th data-i18n="profile.col_label">Label</th><th data-i18n="profile.col_created">Created</th><th data-i18n="profile.col_last_used">Last Used</th><th data-i18n="profile.col_status">Status</th><th></th></tr>
         </thead>
         <tbody id="app-pw-tbody"></tbody>
       </table>
-      <div id="app-pw-empty" class="app-pw-empty hidden">No app passwords yet.</div>
+      <div id="app-pw-empty" class="app-pw-empty hidden" data-i18n="profile.no_app_passwords">No app passwords yet.</div>
 
       <div id="app-pw-auto-section" class="app-pw-auto-section hidden">
         <button class="app-pw-auto-toggle" id="app-pw-auto-toggle">
           <i class="fas fa-chevron-right" id="app-pw-auto-chevron"></i>
-          <span>Client sessions</span>
+          <span data-i18n="profile.client_sessions">Client sessions</span>
           <span class="app-pw-auto-count" id="app-pw-auto-count">0</span>
         </button>
         <div id="app-pw-auto-body" class="hidden">
-          <p class="app-pw-auto-desc">Auto-generated when you connect a Nextcloud-compatible client.</p>
+          <p class="app-pw-auto-desc" data-i18n="profile.client_sessions_desc">Auto-generated when you connect a Nextcloud-compatible client.</p>
           <table class="app-pw-table" id="app-pw-auto-table">
             <thead>
-              <tr><th>Client</th><th>Created</th><th>Last Used</th><th></th></tr>
+              <tr><th data-i18n="profile.col_client">Client</th><th data-i18n="profile.col_created">Created</th><th data-i18n="profile.col_last_used">Last Used</th><th></th></tr>
             </thead>
             <tbody id="app-pw-auto-tbody"></tbody>
           </table>
@@ -141,22 +142,22 @@
     </div>
 
     <div class="profile-card" id="password-section">
-      <h2><i class="fas fa-key"></i> Change Password</h2>
+      <h2><i class="fas fa-key"></i> <span data-i18n="profile.change_password">Change Password</span></h2>
       <form id="password-form">
         <div class="form-group">
-          <label for="current-password">Current Password</label>
+          <label for="current-password" data-i18n="profile.current_password">Current Password</label>
           <input type="password" id="current-password" required autocomplete="current-password">
         </div>
         <div class="form-group">
-          <label for="new-password">New Password</label>
+          <label for="new-password" data-i18n="profile.new_password">New Password</label>
           <input type="password" id="new-password" required minlength="8" autocomplete="new-password">
-          <small>At least 8 characters</small>
+          <small data-i18n="profile.min_8_chars">At least 8 characters</small>
         </div>
         <div class="form-group">
-          <label for="confirm-password">Confirm New Password</label>
+          <label for="confirm-password" data-i18n="profile.confirm_password">Confirm New Password</label>
           <input type="password" id="confirm-password" required minlength="8" autocomplete="new-password">
         </div>
-        <button type="submit" class="btn btn-primary" id="pw-submit"><i class="fas fa-save"></i> Update Password</button>
+        <button type="submit" class="btn btn-primary" id="pw-submit"><i class="fas fa-save"></i> <span data-i18n="profile.update_password">Update Password</span></button>
         <div id="pw-status"></div>
       </form>
     </div>

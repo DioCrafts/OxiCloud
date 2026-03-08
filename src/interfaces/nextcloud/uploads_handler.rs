@@ -9,7 +9,7 @@ use crate::application::ports::file_ports::{FileRetrievalUseCase, FileUploadUseC
 use crate::common::di::AppState;
 use crate::common::mime_detect::{filename_from_path, refine_content_type_from_file};
 use crate::interfaces::errors::AppError;
-use crate::interfaces::middleware::auth::CurrentUser;
+use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 
 /// Dispatch Nextcloud chunked upload WebDAV requests.
 ///
@@ -21,7 +21,7 @@ use crate::interfaces::middleware::auth::CurrentUser;
 pub async fn handle_nc_uploads(
     state: Arc<AppState>,
     req: Request<Body>,
-    user: CurrentUser,
+    user: AuthUser,
     upload_id: String,
     rest: String, // chunk name or ".file" or empty
 ) -> Result<Response<Body>, AppError> {

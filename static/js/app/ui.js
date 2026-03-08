@@ -450,7 +450,9 @@ const ui = {
         this._hydrateViewIfNeeded('grid');
 
         filesGrid.style.display = 'grid';
+        filesGrid.classList.remove('hidden');
         filesListView.style.display = 'none';
+        filesListView.classList.add('hidden');
         gridViewBtn.classList.add('active');
         listViewBtn.classList.remove('active');
         window.app.currentView = 'grid';
@@ -469,7 +471,9 @@ const ui = {
         this._hydrateViewIfNeeded('list');
 
         filesGrid.style.display = 'none';
+        filesGrid.classList.add('hidden');
         filesListView.style.display = 'flex';
+        filesListView.classList.remove('hidden');
         gridViewBtn.classList.remove('active');
         listViewBtn.classList.add('active');
         window.app.currentView = 'list';

@@ -4,13 +4,19 @@ let usersPage = 0;
 const PAGE_SIZE = 50;
 let totalUsers = 0;
 
-/** Escape a string for safe embedding inside a JS string literal within an HTML attribute.
- *  Converts all non-alphanumeric/space/dot/hyphen/underscore chars to \xHH escapes. */
+/* ── i18n helper — falls back to key if i18n not ready ── */
+function t(key, params) {
+  if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(key, params);
+  // fallback: strip prefix and humanise
+  return key.split('.').pop().replace(/_/g, ' ');
+}
+
+/** Escape a string for safe embedding inside a JS string literal within an HTML attribute. */
 function _escJs(s) {
-    if (typeof s !== 'string') return '';
-    return s.replace(/[^\w .\-]/g, function(c) {
-        return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0');
-    });
+  if (typeof s !== 'string') return '';
+  return s.replace(/[^\w .\-]/g, function(c) {
+    return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0');
+  });
 }
 
 function hideElement(id) {
@@ -43,22 +49,80 @@ function formatBytes(bytes) {
 }
 
 function timeAgo(dateStr) {
-  if (!dateStr) return 'Never';
+  if (!dateStr) return t('admin.never');
   const d = new Date(dateStr);
   const now = new Date();
   const secs = Math.floor((now - d) / 1000);
-  if (secs < 60) return 'Just now';
-  if (secs < 3600) return Math.floor(secs/60) + 'm ago';
-  if (secs < 86400) return Math.floor(secs/3600) + 'h ago';
-  if (secs < 2592000) return Math.floor(secs/86400) + 'd ago';
+  if (secs < 60) return t('admin.just_now');
+  if (secs < 3600) return t('admin.minutes_ago', { n: Math.floor(secs / 60) });
+  if (secs < 86400) return t('admin.hours_ago', { n: Math.floor(secs / 3600) });
+  if (secs < 2592000) return t('admin.days_ago', { n: Math.floor(secs / 86400) });
   return d.toLocaleDateString();
 }
 
+/* ── Custom confirm modal ── */
+function showConfirm(message) {
+  return new Promise(function(resolve) {
+    var overlay = document.getElementById('confirm-modal');
+    var msgEl = document.getElementById('confirm-message');
+    var yesBtn = document.getElementById('confirm-yes');
+    var noBtn = document.getElementById('confirm-cancel');
+    msgEl.textContent = message;
+    overlay.classList.remove('hidden');
+    overlay.classList.add('show-flex');
+
+    function cleanup(result) {
+      overlay.classList.remove('show-flex');
+      overlay.classList.add('hidden');
+      yesBtn.removeEventListener('click', onYes);
+      noBtn.removeEventListener('click', onNo);
+      overlay.removeEventListener('click', onOverlay);
+      resolve(result);
+    }
+    function onYes() { cleanup(true); }
+    function onNo() { cleanup(false); }
+    function onOverlay(e) { if (e.target === overlay) cleanup(false); }
+    yesBtn.addEventListener('click', onYes);
+    noBtn.addEventListener('click', onNo);
+    overlay.addEventListener('click', onOverlay);
+  });
+}
+
+/* ── Tab switching with fade animation ── */
+let activeTabName = 'dashboard';
+
 function switchTab(name, el) {
-  document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
+  if (name === activeTabName) return;
+  var oldTab = document.getElementById('tab-' + activeTabName);
+  var newTab = document.getElementById('tab-' + name);
+
+  document.querySelectorAll('.admin-tab').forEach(function(b) { b.classList.remove('active'); });
   if (el) el.classList.add('active');
+
+  // Fade-out old tab
+  if (oldTab) {
+    oldTab.classList.add('tab-fade-out');
+    oldTab.addEventListener('animationend', function handler() {
+      oldTab.removeEventListener('animationend', handler);
+      oldTab.classList.remove('active', 'tab-fade-out');
+      // Fade-in new tab
+      if (newTab) {
+        newTab.classList.add('active', 'tab-fade-in');
+        newTab.addEventListener('animationend', function handler2() {
+          newTab.removeEventListener('animationend', handler2);
+          newTab.classList.remove('tab-fade-in');
+        });
+      }
+    });
+  } else if (newTab) {
+    newTab.classList.add('active', 'tab-fade-in');
+    newTab.addEventListener('animationend', function handler2() {
+      newTab.removeEventListener('animationend', handler2);
+      newTab.classList.remove('tab-fade-in');
+    });
+  }
+
+  activeTabName = name;
   if (name === 'users') loadUsers();
   if (name === 'dashboard') loadDashboard();
 }
@@ -78,9 +142,9 @@ async function loadDashboard() {
     const bar = document.getElementById('ds-bar');
     bar.style.width = Math.min(d.storage_usage_percent, 100) + '%';
     bar.className = 'progress-fill ' + (d.storage_usage_percent > 90 ? 'red' : d.storage_usage_percent > 70 ? 'orange' : 'green');
-    document.getElementById('ds-auth').textContent = d.auth_enabled ? 'Enabled' : 'Disabled';
-    document.getElementById('ds-oidc').textContent = d.oidc_configured ? 'Active' : 'Off';
-    document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? 'Enabled' : 'Disabled';
+    document.getElementById('ds-auth').textContent = d.auth_enabled ? t('admin.enabled') : t('admin.disabled');
+    document.getElementById('ds-oidc').textContent = d.oidc_configured ? t('admin.active') : t('admin.off');
+    document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? t('admin.enabled') : t('admin.disabled');
 
     if (typeof d.registration_enabled !== 'undefined') {
       document.getElementById('ds-registration').checked = d.registration_enabled;
@@ -101,14 +165,14 @@ async function loadDashboard() {
 
 async function loadUsers() {
   const tbody = document.getElementById('users-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.loading_users')) + '</td></tr>';
   try {
     const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + (usersPage * PAGE_SIZE), { headers: headers(), credentials: 'same-origin' });
-    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Failed to load users</td></tr>'; return; }
+    if (!resp.ok) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('admin.failed_load_users')) + '</td></tr>'; return; }
     const data = await resp.json();
     totalUsers = data.total;
     const users = data.users;
-    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-empty">No users found</td></tr>'; return; }
+    if (users.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="table-status-empty">' + escapeHtml(t('admin.no_users_found')) + '</td></tr>'; return; }
 
     tbody.innerHTML = users.map(u => {
       const quotaPct = u.storage_quota_bytes > 0 ? ((u.storage_used_bytes / u.storage_quota_bytes) * 100) : 0;
@@ -118,20 +182,20 @@ async function loadUsers() {
       const isOidc = u.auth_provider && u.auth_provider !== 'local';
       const authBadge = isOidc
         ? '<span class="badge badge-oidc" title="Authenticated via ' + escapeHtml(u.auth_provider) + '"><i class="fas fa-key badge-admin-icon-small"></i> ' + escapeHtml(u.auth_provider) + '</span>'
-        : '<span class="badge badge-local">Local</span>';
+        : '<span class="badge badge-local">' + escapeHtml(t('admin.local')) + '</span>';
       return '<tr>' +
-        '<td><div class="user-info"><span class="user-name">' + escapeHtml(u.username) + (isSelf ? ' <span class="user-self-badge">(you)</span>' : '') + '</span><span class="user-email">' + escapeHtml(u.email) + '</span></div></td>' +
+        '<td><div class="user-info"><span class="user-name">' + escapeHtml(u.username) + (isSelf ? ' <span class="user-self-badge">' + escapeHtml(t('admin.you_badge')) + '</span>' : '') + '</span><span class="user-email">' + escapeHtml(u.email) + '</span></div></td>' +
         '<td><span class="badge badge-' + escapeHtml(u.role) + '">' + (u.role === 'admin' ? '<i class="fas fa-shield-alt badge-admin-icon-small"></i> ' : '') + escapeHtml(u.role) + '</span></td>' +
         '<td>' + authBadge + '</td>' +
-        '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? 'Active' : 'Inactive') + '</span></td>' +
+        '<td><span class="badge badge-' + (u.active ? 'active' : 'inactive') + '">' + (u.active ? escapeHtml(t('admin.active')) : escapeHtml(t('admin.inactive'))) + '</span></td>' +
         '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' + quotaColor + '" data-width="' + Math.min(quotaPct, 100) + '"></div></div><span class="quota-text">' + quotaText + '</span></div></td>' +
         '<td class="user-last-login-cell">' + timeAgo(u.last_login_at) + '</td>' +
         '<td><div class="actions-row">' +
-          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="quota" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" data-quota="' + u.storage_quota_bytes + '" title="Edit quota"><i class="fas fa-box"></i></button>' +
-          (isOidc ? '' : '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="reset-pw" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="Reset password"><i class="fas fa-key"></i></button>') +
-          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="toggle-role" data-uid="' + _escJs(u.id) + '" data-role="' + _escJs(u.role) + '" title="Toggle role"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
-          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + ' admin-action-btn" data-action="toggle-active" data-uid="' + _escJs(u.id) + '" data-active="' + u.active + '" title="' + (u.active ? 'Deactivate' : 'Activate') + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
-          '<button class="btn btn-sm btn-danger admin-action-btn" data-action="delete" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="Delete"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
+          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="quota" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" data-quota="' + u.storage_quota_bytes + '" title="' + escapeHtml(t('admin.edit_quota_title')) + '"><i class="fas fa-box"></i></button>' +
+          (isOidc ? '' : '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="reset-pw" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="' + escapeHtml(t('admin.reset_password_title')) + '"><i class="fas fa-key"></i></button>') +
+          '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="toggle-role" data-uid="' + _escJs(u.id) + '" data-role="' + _escJs(u.role) + '" title="' + escapeHtml(t('admin.toggle_role_title')) + '"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-' + (u.role === 'admin' ? 'user' : 'crown') + '"></i></button>' +
+          '<button class="btn btn-sm ' + (u.active ? 'btn-danger' : 'btn-success') + ' admin-action-btn" data-action="toggle-active" data-uid="' + _escJs(u.id) + '" data-active="' + u.active + '" title="' + (u.active ? escapeHtml(t('admin.deactivate_title')) : escapeHtml(t('admin.activate_title'))) + '"' + (isSelf && u.active ? ' disabled' : '') + '><i class="fas fa-' + (u.active ? 'ban' : 'check') + '"></i></button>' +
+          '<button class="btn btn-sm btn-danger admin-action-btn" data-action="delete" data-uid="' + _escJs(u.id) + '" data-uname="' + _escJs(u.username) + '" title="' + escapeHtml(t('admin.delete_title')) + '"' + (isSelf ? ' disabled' : '') + '><i class="fas fa-trash-alt"></i></button>' +
         '</div></td></tr>';
     }).join('');
 
@@ -153,11 +217,13 @@ async function loadUsers() {
       });
     });
 
-    document.getElementById('users-info').textContent = 'Showing ' + (usersPage * PAGE_SIZE + 1) + '-' + Math.min((usersPage + 1) * PAGE_SIZE, totalUsers) + ' of ' + totalUsers;
+    const from = usersPage * PAGE_SIZE + 1;
+    const to = Math.min((usersPage + 1) * PAGE_SIZE, totalUsers);
+    document.getElementById('users-info').textContent = t('admin.showing_users', { from: from, to: to, total: totalUsers });
     document.getElementById('prev-btn').disabled = usersPage === 0;
     document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> Error: ' + escapeHtml(e.message) + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('admin.error_network', { message: e.message })) + '</td></tr>';
   }
 }
 
@@ -166,32 +232,35 @@ function nextPage() { if ((usersPage + 1) * PAGE_SIZE < totalUsers) { usersPage+
 
 async function toggleRole(userId, currentRole) {
   const newRole = currentRole === 'admin' ? 'user' : 'admin';
-  if (!confirm('Change role to ' + newRole + '?')) return;
+  const ok = await showConfirm(t('admin.confirm_role_change', { role: newRole }));
+  if (!ok) return;
   try {
     const resp = await fetch(API + '/admin/users/' + userId + '/role', {
       method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ role: newRole })
     });
-    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
-  } catch (e) { alert('Error: ' + e.message); }
+    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || t('admin.error_generic')); }
+  } catch (e) { alert(t('admin.error_network', { message: e.message })); }
 }
 
 async function toggleActive(userId, currentActive) {
-  const action = currentActive ? 'deactivate' : 'activate';
-  if (!confirm('Are you sure you want to ' + action + ' this user?')) return;
+  const msg = currentActive ? t('admin.confirm_deactivate') : t('admin.confirm_activate');
+  const ok = await showConfirm(msg);
+  if (!ok) return;
   try {
     const resp = await fetch(API + '/admin/users/' + userId + '/active', {
       method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ active: !currentActive })
     });
-    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || 'Failed'); }
-  } catch (e) { alert('Error: ' + e.message); }
+    if (resp.ok) loadUsers(); else { const e = await resp.json(); alert(e.message || t('admin.error_generic')); }
+  } catch (e) { alert(t('admin.error_network', { message: e.message })); }
 }
 
 async function deleteUser(userId, username) {
-  if (!confirm('DELETE user "' + username + '"? This cannot be undone!')) return;
+  const ok = await showConfirm(t('admin.confirm_delete_user', { name: username }));
+  if (!ok) return;
   try {
     const resp = await fetch(API + '/admin/users/' + userId, { method: 'DELETE', headers: headers(), credentials: 'same-origin' });
-    if (resp.ok) { loadUsers(); loadDashboard(); } else { const e = await resp.json(); alert(e.message || 'Failed'); }
-  } catch (e) { alert('Error: ' + e.message); }
+    if (resp.ok) { loadUsers(); loadDashboard(); } else { const e = await resp.json(); alert(e.message || t('admin.error_generic')); }
+  } catch (e) { alert(t('admin.error_network', { message: e.message })); }
 }
 
 let quotaUserId = '';
@@ -214,8 +283,8 @@ async function saveQuota() {
       method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ quota_bytes: bytes })
     });
     if (resp.ok) { closeQuotaModal(); loadUsers(); loadDashboard(); }
-    else { const e = await resp.json(); alert(e.message || 'Failed'); }
-  } catch (e) { alert('Error: ' + e.message); }
+    else { const e = await resp.json(); alert(e.message || t('admin.error_generic')); }
+  } catch (e) { alert(t('admin.error_network', { message: e.message })); }
 }
 
 function openCreateUserModal() {
@@ -242,11 +311,11 @@ async function submitCreateUser() {
   const quotaBytes = Math.round(quotaVal * quotaUnit);
 
   const errorEl = document.getElementById('cu-error');
-  if (username.length < 3) { errorEl.textContent = 'Username must be at least 3 characters'; errorEl.className = 'alert alert-error'; return; }
-  if (password.length < 8) { errorEl.textContent = 'Password must be at least 8 characters'; errorEl.className = 'alert alert-error'; return; }
+  if (username.length < 3) { errorEl.textContent = t('admin.error_username_short'); errorEl.className = 'alert alert-error'; return; }
+  if (password.length < 8) { errorEl.textContent = t('admin.error_password_short'); errorEl.className = 'alert alert-error'; return; }
 
   const btn = document.getElementById('cu-submit');
-  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating…';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.creating'));
   try {
     const resp = await fetch(API + '/admin/users', {
       method: 'POST', headers: headers(), credentials: 'same-origin',
@@ -258,14 +327,14 @@ async function submitCreateUser() {
       loadDashboard();
     } else {
       const e = await resp.json().catch(() => ({}));
-      errorEl.textContent = e.message || 'Failed to create user';
+      errorEl.textContent = e.message || t('admin.error_create_user');
       errorEl.className = 'alert alert-error';
     }
   } catch (e) {
-    errorEl.textContent = 'Network error: ' + e.message;
+    errorEl.textContent = t('admin.error_network', { message: e.message });
     errorEl.className = 'alert alert-error';
   }
-  btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> Create';
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-user-plus"></i> ' + escapeHtml(t('admin.create_user'));
 }
 
 let resetPwUserId = '';
@@ -283,19 +352,19 @@ function closeResetPasswordModal() { hideElement('reset-pw-modal'); }
 async function submitResetPassword() {
   const password = document.getElementById('rp-password').value;
   const errorEl = document.getElementById('rp-error');
-  if (password.length < 8) { errorEl.textContent = 'Password must be at least 8 characters'; errorEl.className = 'alert alert-error'; return; }
+  if (password.length < 8) { errorEl.textContent = t('admin.error_password_short'); errorEl.className = 'alert alert-error'; return; }
 
   const btn = document.getElementById('rp-submit');
-  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resetting…';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.resetting'));
   try {
     const resp = await fetch(API + '/admin/users/' + resetPwUserId + '/password', {
       method: 'PUT', headers: headers(), credentials: 'same-origin',
       body: JSON.stringify({ new_password: password })
     });
     if (resp.ok) { closeResetPasswordModal(); }
-    else { const e = await resp.json().catch(() => ({})); errorEl.textContent = e.message || 'Failed'; errorEl.className = 'alert alert-error'; }
-  } catch (e) { errorEl.textContent = 'Error: ' + e.message; errorEl.className = 'alert alert-error'; }
-  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Reset';
+    else { const e = await resp.json().catch(() => ({})); errorEl.textContent = e.message || t('admin.error_generic'); errorEl.className = 'alert alert-error'; }
+  } catch (e) { errorEl.textContent = t('admin.error_network', { message: e.message }); errorEl.className = 'alert alert-error'; }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('admin.reset_btn'));
 }
 
 async function toggleRegistration(enabled) {
@@ -311,13 +380,13 @@ async function toggleRegistration(enabled) {
       if (!enabled) showElement('registration-warning', 'flex');
       else hideElement('registration-warning');
       const e = await resp.json().catch(() => ({}));
-      alert(e.message || 'Failed to update registration setting');
+      alert(e.message || t('admin.error_generic'));
     }
   } catch (e) {
     document.getElementById('ds-registration').checked = !enabled;
     if (!enabled) showElement('registration-warning', 'flex');
     else hideElement('registration-warning');
-    alert('Error: ' + e.message);
+    alert(t('admin.error_network', { message: e.message }));
   }
 }
 
@@ -345,7 +414,7 @@ async function testConnection() {
   const url = document.getElementById('issuer-url').value.trim();
   if (!url) { showOidcStatus('Enter an Issuer URL first', 'error'); return; }
   const btn = document.getElementById('discover-btn');
-  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Discovering…';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.discovering'));
   const resultDiv = document.getElementById('discovery-result');
   try {
     const resp = await fetch(API + '/admin/settings/oidc/test', { method: 'POST', headers: headers(), credentials: 'same-origin', body: JSON.stringify({ issuer_url: url }) });
@@ -357,12 +426,12 @@ async function testConnection() {
       resultDiv.innerHTML = '<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ' + escapeHtml(r.message) + '</strong></div>';
     }
   } catch (e) { resultDiv.innerHTML = '<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ' + escapeHtml(e.message) + '</div>'; }
-  btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> Auto-discover';
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-search"></i> ' + escapeHtml(t('admin.auto_discover'));
 }
 
 async function saveOidcSettings() {
   const btn = document.getElementById('save-btn');
-  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+  btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.saving'));
   const body = {
     enabled: document.getElementById('oidc-enabled').checked,
     issuer_url: document.getElementById('issuer-url').value.trim(),
@@ -376,10 +445,14 @@ async function saveOidcSettings() {
   };
   try {
     const resp = await fetch(API + '/admin/settings/oidc', { method: 'PUT', headers: headers(), credentials: 'same-origin', body: JSON.stringify(body) });
-    if (resp.ok) { showOidcStatus('Settings saved — OIDC is now ' + (body.enabled ? 'active' : 'disabled'), 'success'); loadDashboard(); }
+    if (resp.ok) {
+      const status = body.enabled ? t('admin.active').toLowerCase() : t('admin.disabled').toLowerCase();
+      showOidcStatus(t('admin.settings_saved', { status: status }), 'success');
+      loadDashboard();
+    }
     else { const e = await resp.json().catch(()=>({})); showOidcStatus('Error: ' + (e.message || resp.statusText), 'error'); }
-  } catch (e) { showOidcStatus('Network error: ' + e.message, 'error'); }
-  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save';
+  } catch (e) { showOidcStatus(t('admin.error_network', { message: e.message }), 'error'); }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('admin.save_btn'));
 }
 
 async function init() {
@@ -423,6 +496,19 @@ function showAccessDenied() {
   hideElement('loading');
   showElement('access-denied');
 }
+
+/* ── Apply i18n when translations load / change ── */
+document.addEventListener('translationsLoaded', function() {
+  if (window.i18n && window.i18n.translatePage) window.i18n.translatePage();
+  // Re-render dynamic content that uses t()
+  loadDashboard();
+  if (activeTabName === 'users') loadUsers();
+});
+document.addEventListener('localeChanged', function() {
+  if (window.i18n && window.i18n.translatePage) window.i18n.translatePage();
+  loadDashboard();
+  if (activeTabName === 'users') loadUsers();
+});
 
 init();
 

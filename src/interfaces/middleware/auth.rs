@@ -20,12 +20,18 @@ use crate::application::ports::auth_ports::TokenServicePort;
 #[derive(Clone, Copy, Debug)]
 pub struct CookieAuthenticated;
 
-// Structure for use in Axum extractors
+// Newtype over Arc<CurrentUser> for zero-allocation extraction.
+// `Deref<Target = CurrentUser>` lets handlers access `.id`, `.username`,
+// `.email`, `.role` transparently — no signature changes needed.
 #[derive(Clone, Debug)]
-pub struct AuthUser {
-    pub id: Uuid,
-    pub username: String,
-    pub role: String,
+pub struct AuthUser(pub Arc<CurrentUser>);
+
+impl std::ops::Deref for AuthUser {
+    type Target = CurrentUser;
+    #[inline]
+    fn deref(&self) -> &CurrentUser {
+        &self.0
+    }
 }
 
 /// Reusable extractor that gets the user_id of the authenticated user.
@@ -38,7 +44,8 @@ pub struct AuthUser {
 #[derive(Clone, Debug)]
 pub struct CurrentUserId(pub Uuid);
 
-// Implement FromRequestParts for AuthUser — allows using `auth_user: AuthUser` in handlers
+// Implement FromRequestParts for AuthUser — allows using `auth_user: AuthUser` in handlers.
+// Cost: 1 atomic increment (~1 ns) instead of 3 String clones (~100 ns + 3 mallocs).
 impl<S> FromRequestParts<S> for AuthUser
 where
     S: Send + Sync,
@@ -49,29 +56,8 @@ where
         parts
             .extensions
             .get::<Arc<CurrentUser>>()
-            .map(|cu| AuthUser {
-                id: cu.id,
-                username: cu.username.clone(),
-                role: cu.role.clone(),
-            })
-            .ok_or(AuthError::UserNotFound)
-    }
-}
-
-// Implement FromRequestParts for CurrentUser — full user extractor from extensions
-// The middleware inserts Arc<CurrentUser>; this extractor cheaply clones the Arc
-// (~1 ns atomic increment) instead of deep-cloning 4 Strings (~60-100 ns).
-impl<S> FromRequestParts<S> for CurrentUser
-where
-    S: Send + Sync,
-{
-    type Rejection = AuthError;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        parts
-            .extensions
-            .get::<Arc<CurrentUser>>()
-            .map(|arc| (**arc).clone())
+            .cloned()
+            .map(AuthUser)
             .ok_or(AuthError::UserNotFound)
     }
 }
@@ -113,27 +99,7 @@ where
     }
 }
 
-/// Optional auth user extractor – never fails.
-/// Yields `Some(AuthUser)` when auth middleware ran, `None` otherwise.
-#[derive(Clone, Debug)]
-pub struct OptionalAuthUser(pub Option<AuthUser>);
 
-impl<S> FromRequestParts<S> for OptionalAuthUser
-where
-    S: Send + Sync,
-{
-    type Rejection = Infallible;
-
-    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
-        Ok(OptionalAuthUser(parts.extensions.get::<Arc<CurrentUser>>().map(
-            |cu| AuthUser {
-                id: cu.id,
-                username: cu.username.clone(),
-                role: cu.role.clone(),
-            },
-        )))
-    }
-}
 
 // Error for authentication operations
 #[derive(Debug, thiserror::Error)]
