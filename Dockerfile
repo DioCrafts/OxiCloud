@@ -25,6 +25,7 @@ COPY Cargo.toml Cargo.lock build.rs ./
 COPY src src
 COPY static static
 COPY db db
+COPY migrations migrations
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
 RUN DATABASE_URL="${DATABASE_URL}" RUSTFLAGS="-C target-cpu=native" cargo build --release

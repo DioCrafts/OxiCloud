@@ -55,8 +55,11 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
+      - name: Verify schema.sql matches migration
+        run: diff db/schema.sql migrations/001_initial.sql
+
       - name: Initialize test database
-        run: psql -h localhost -U postgres -d oxicloud_test -f db/schema.sql
+        run: psql -h localhost -U postgres -d oxicloud_test -f migrations/001_initial.sql
         env:
           PGPASSWORD: postgres
 
