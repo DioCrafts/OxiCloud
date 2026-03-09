@@ -20,7 +20,11 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
             .parent()
             .unwrap_or(std::path::Path::new("."))
             .join("static-dist");
-        if dist.exists() { dist } else { config.static_path.clone() }
+        if dist.exists() {
+            dist
+        } else {
+            config.static_path.clone()
+        }
     } else {
         config.static_path.clone()
     };

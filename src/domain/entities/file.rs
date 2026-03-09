@@ -310,7 +310,7 @@ impl File {
             folder_id: self.folder_id.clone(),
             created_at: self.created_at,
             modified_at: now,
-            owner_id: self.owner_id.clone(),
+            owner_id: self.owner_id,
         })
     }
 
@@ -344,7 +344,7 @@ impl File {
             folder_id,
             created_at: self.created_at,
             modified_at: now,
-            owner_id: self.owner_id.clone(),
+            owner_id: self.owner_id,
         })
     }
 
@@ -365,7 +365,7 @@ impl File {
             folder_id: self.folder_id.clone(),
             created_at: self.created_at,
             modified_at: now,
-            owner_id: self.owner_id.clone(),
+            owner_id: self.owner_id,
         }
     }
 }

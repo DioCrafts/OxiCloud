@@ -1251,7 +1251,11 @@ async fn handle_move(
                         && let Ok(parent) =
                             folder_service.get_folder_by_path(dest_parent_path).await
                     {
-                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                        assert_owner(
+                            parent.owner_id.as_deref(),
+                            &user.id.to_string(),
+                            dest_parent_path,
+                        )?;
                     }
                     file_management_service
                         .move_file(&file.id, Some(dest_parent_path.to_string()))
@@ -1281,7 +1285,11 @@ async fn handle_move(
         let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
         if let Ok(folder) = folder_result {
-            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
+            assert_owner(
+                folder.owner_id.as_deref(),
+                &user.id.to_string(),
+                &source_path,
+            )?;
             let dest_folder_name = destination_path
                 .split('/')
                 .next_back()
@@ -1299,7 +1307,11 @@ async fn handle_move(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                            assert_owner(
+                                parent.owner_id.as_deref(),
+                                &user.id.to_string(),
+                                dest_parent_path,
+                            )?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1352,7 +1364,11 @@ async fn handle_move(
                 if !dest_parent_path.is_empty()
                     && let Ok(parent) = folder_service.get_folder_by_path(dest_parent_path).await
                 {
-                    assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                    assert_owner(
+                        parent.owner_id.as_deref(),
+                        &user.id.to_string(),
+                        dest_parent_path,
+                    )?;
                 }
                 file_management_service
                     .move_file(&file.id, Some(dest_parent_path.to_string()))
@@ -1480,7 +1496,11 @@ async fn handle_copy(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                            assert_owner(
+                                parent.owner_id.as_deref(),
+                                &user.id.to_string(),
+                                dest_parent_path,
+                            )?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1528,7 +1548,11 @@ async fn handle_copy(
                     match folder_service.get_folder_by_path(dest_parent_path).await {
                         Ok(parent) => {
                             // SECURITY: verify destination parent belongs to caller (V-08)
-                            assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                            assert_owner(
+                                parent.owner_id.as_deref(),
+                                &user.id.to_string(),
+                                dest_parent_path,
+                            )?;
                             Some(parent.id)
                         }
                         Err(_) => None,
@@ -1553,7 +1577,11 @@ async fn handle_copy(
         let folder_result = folder_service.get_folder_by_path(&source_path).await;
 
         if let Ok(folder) = folder_result {
-            assert_owner(folder.owner_id.as_deref(), &user.id.to_string(), &source_path)?;
+            assert_owner(
+                folder.owner_id.as_deref(),
+                &user.id.to_string(),
+                &source_path,
+            )?;
             let recursive = depth != "0";
 
             let dest_folder_name = destination_path
@@ -1572,7 +1600,11 @@ async fn handle_copy(
                 match folder_service.get_folder_by_path(dest_parent_path).await {
                     Ok(parent) => {
                         // SECURITY: verify destination parent belongs to caller (V-08)
-                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                        assert_owner(
+                            parent.owner_id.as_deref(),
+                            &user.id.to_string(),
+                            dest_parent_path,
+                        )?;
                         Some(parent.id)
                     }
                     Err(_) => None,
@@ -1627,7 +1659,11 @@ async fn handle_copy(
                 match folder_service.get_folder_by_path(dest_parent_path).await {
                     Ok(parent) => {
                         // SECURITY: verify destination parent belongs to caller (V-08)
-                        assert_owner(parent.owner_id.as_deref(), &user.id.to_string(), dest_parent_path)?;
+                        assert_owner(
+                            parent.owner_id.as_deref(),
+                            &user.id.to_string(),
+                            dest_parent_path,
+                        )?;
                         Some(parent.id)
                     }
                     Err(_) => None,

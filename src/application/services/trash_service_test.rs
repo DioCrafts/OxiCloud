@@ -61,10 +61,8 @@ where
     FW: FileWritePort,
     FoR: FolderRepository,
 {
-    async fn get_trash_items(&self, user_id: &str) -> Result<Vec<TrashedItemDto>> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
-        let items = self.trash_repository.get_trash_items(&user_uuid).await?;
+    async fn get_trash_items(&self, user_id: Uuid) -> Result<Vec<TrashedItemDto>> {
+        let items = self.trash_repository.get_trash_items(&user_id).await?;
         Ok(items
             .into_iter()
             .map(|item| {
@@ -85,11 +83,9 @@ where
             .collect())
     }
 
-    async fn move_to_trash(&self, item_id: &str, item_type: &str, user_id: &str) -> Result<()> {
+    async fn move_to_trash(&self, item_id: &str, item_type: &str, user_id: Uuid) -> Result<()> {
         let item_uuid = Uuid::parse_str(item_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid item ID: {}", e)))?;
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
         match item_type {
             "file" => {
@@ -103,7 +99,7 @@ where
                 let original_path = file.storage_path().to_string();
                 let trashed_item = TrashedItem::new(
                     item_uuid,
-                    user_uuid,
+                    user_id,
                     TrashedItemType::File,
                     file.name().to_string(),
                     original_path,
@@ -145,7 +141,7 @@ where
                 let original_path = folder.storage_path().to_string();
                 let trashed_item = TrashedItem::new(
                     item_uuid,
-                    user_uuid,
+                    user_id,
                     TrashedItemType::Folder,
                     folder.name().to_string(),
                     original_path,
@@ -179,15 +175,13 @@ where
         }
     }
 
-    async fn restore_item(&self, trash_id: &str, user_id: &str) -> Result<()> {
+    async fn restore_item(&self, trash_id: &str, user_id: Uuid) -> Result<()> {
         let trash_uuid = Uuid::parse_str(trash_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid trash ID: {}", e)))?;
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
         let item = self
             .trash_repository
-            .get_trash_item(&trash_uuid, &user_uuid)
+            .get_trash_item(&trash_uuid, &user_id)
             .await?;
         match item {
             Some(item) => {
@@ -228,7 +222,7 @@ where
                     }
                 }
                 self.trash_repository
-                    .restore_from_trash(&trash_uuid, &user_uuid)
+                    .restore_from_trash(&trash_uuid, &user_id)
                     .await
                     .map_err(|e| {
                         DomainError::new(
@@ -243,15 +237,13 @@ where
         }
     }
 
-    async fn delete_permanently(&self, trash_id: &str, user_id: &str) -> Result<()> {
+    async fn delete_permanently(&self, trash_id: &str, user_id: Uuid) -> Result<()> {
         let trash_uuid = Uuid::parse_str(trash_id)
             .map_err(|e| DomainError::validation_error(format!("Invalid trash ID: {}", e)))?;
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
 
         let item = self
             .trash_repository
-            .get_trash_item(&trash_uuid, &user_uuid)
+            .get_trash_item(&trash_uuid, &user_id)
             .await?;
         match item {
             Some(item) => {
@@ -287,7 +279,7 @@ where
                     }
                 }
                 self.trash_repository
-                    .delete_permanently(&trash_uuid, &user_uuid)
+                    .delete_permanently(&trash_uuid, &user_id)
                     .await
                     .map_err(|e| {
                         DomainError::new(
@@ -302,10 +294,8 @@ where
         }
     }
 
-    async fn empty_trash(&self, user_id: &str) -> Result<()> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| DomainError::validation_error(format!("Invalid user ID: {}", e)))?;
-        self.trash_repository.clear_trash(&user_uuid).await
+    async fn empty_trash(&self, user_id: Uuid) -> Result<()> {
+        self.trash_repository.clear_trash(&user_id).await
     }
 }
 
@@ -492,7 +482,7 @@ impl FileReadPort for MockFileRepository {
         &self,
         _folder_id: Option<&str>,
         _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> std::result::Result<(Vec<File>, usize), DomainError> {
         Ok((Vec::new(), 0))
     }
@@ -501,7 +491,7 @@ impl FileReadPort for MockFileRepository {
         &self,
         _folder_id: Option<&str>,
         _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> std::result::Result<usize, DomainError> {
         Ok(0)
     }
@@ -519,7 +509,7 @@ impl FileReadPort for MockFileRepository {
     async fn get_file_for_owner(
         &self,
         id: &str,
-        _owner_id: &str,
+        _owner_id: Uuid,
     ) -> std::result::Result<File, DomainError> {
         // In this mock, ignore ownership — trash tests don't focus on ownership
         self.get_file(id).await
@@ -697,7 +687,7 @@ impl FolderRepository for MockFolderRepository {
     async fn list_folders_by_owner(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
     ) -> std::result::Result<Vec<Folder>, DomainError> {
         Ok(vec![])
     }
@@ -715,7 +705,7 @@ impl FolderRepository for MockFolderRepository {
     async fn list_folders_by_owner_paginated(
         &self,
         _parent_id: Option<&str>,
-        _owner_id: &str,
+        _owner_id: Uuid,
         _offset: usize,
         _limit: usize,
         _include_total: bool,
@@ -799,7 +789,7 @@ impl FolderRepository for MockFolderRepository {
 
     async fn create_home_folder(
         &self,
-        _user_id: &str,
+        _user_id: Uuid,
         _name: String,
     ) -> std::result::Result<Folder, DomainError> {
         Ok(Folder::default())
@@ -839,18 +829,18 @@ mod tests {
 
         let file_id = "550e8400-e29b-41d4-a716-446655440000";
         let user_id = "550e8400-e29b-41d4-a716-446655440001";
+        let user_uuid = Uuid::parse_str(user_id).unwrap();
 
         // Add a test file to the repository
         file_repo.add_test_file(file_id, "test.txt", "/test/path/test.txt");
 
         // Act
-        let result = service.move_to_trash(file_id, "file", user_id).await;
+        let result = service.move_to_trash(file_id, "file", user_uuid).await;
 
         // Assert
         assert!(result.is_ok(), "Moving file to trash failed: {:?}", result);
 
         // Verify the file is in trash
-        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
 
         assert_eq!(
@@ -913,12 +903,13 @@ mod tests {
 
         let folder_id = "550e8400-e29b-41d4-a716-446655440002";
         let user_id = "550e8400-e29b-41d4-a716-446655440001";
+        let user_uuid = Uuid::parse_str(user_id).unwrap();
 
         // Add a test folder to the repository
         folder_repo.add_test_folder(folder_id, "test_folder", "/test/path/test_folder");
 
         // Act
-        let result = service.move_to_trash(folder_id, "folder", user_id).await;
+        let result = service.move_to_trash(folder_id, "folder", user_uuid).await;
 
         // Assert
         assert!(
@@ -928,7 +919,6 @@ mod tests {
         );
 
         // Verify the folder is in trash
-        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
 
         assert_eq!(
@@ -978,22 +968,22 @@ mod tests {
 
         let file_id = "550e8400-e29b-41d4-a716-446655440000";
         let user_id = "550e8400-e29b-41d4-a716-446655440001";
+        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let file_path = "/test/path/test.txt";
 
         // Add a test file and move it to trash
         file_repo.add_test_file(file_id, "test.txt", file_path);
         service
-            .move_to_trash(file_id, "file", user_id)
+            .move_to_trash(file_id, "file", user_uuid)
             .await
             .unwrap();
 
         // Get the trash item ID
-        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
         let trash_id = trash_items[0].id().to_string();
 
         // Act
-        let result = service.restore_item(&trash_id, user_id).await;
+        let result = service.restore_item(&trash_id, user_uuid).await;
 
         // Assert
         assert!(
@@ -1048,21 +1038,21 @@ mod tests {
 
         let file_id = "550e8400-e29b-41d4-a716-446655440000";
         let user_id = "550e8400-e29b-41d4-a716-446655440001";
+        let user_uuid = Uuid::parse_str(user_id).unwrap();
 
         // Add a test file and move it to trash
         file_repo.add_test_file(file_id, "test.txt", "/test/path/test.txt");
         service
-            .move_to_trash(file_id, "file", user_id)
+            .move_to_trash(file_id, "file", user_uuid)
             .await
             .unwrap();
 
         // Get the trash item ID
-        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
         let trash_id = trash_items[0].id().to_string();
 
         // Act
-        let result = service.delete_permanently(&trash_id, user_id).await;
+        let result = service.delete_permanently(&trash_id, user_uuid).await;
 
         // Assert
         assert!(
@@ -1116,6 +1106,7 @@ mod tests {
         );
 
         let user_id = "550e8400-e29b-41d4-a716-446655440001";
+        let user_uuid = Uuid::parse_str(user_id).unwrap();
 
         // Add multiple files and folders to trash
         let file_ids = [
@@ -1136,7 +1127,7 @@ mod tests {
                 &format!("/test/path/test{}.txt", i),
             );
             service
-                .move_to_trash(file_id, "file", user_id)
+                .move_to_trash(file_id, "file", user_uuid)
                 .await
                 .unwrap();
         }
@@ -1148,18 +1139,17 @@ mod tests {
                 &format!("/test/path/folder{}", i),
             );
             service
-                .move_to_trash(folder_id, "folder", user_id)
+                .move_to_trash(folder_id, "folder", user_uuid)
                 .await
                 .unwrap();
         }
 
         // Verify items are in trash
-        let user_uuid = Uuid::parse_str(user_id).unwrap();
         let trash_items = trash_repo.get_trash_items(&user_uuid).await.unwrap();
         assert_eq!(trash_items.len(), 4, "Should have 4 items in trash");
 
         // Act
-        let result = service.empty_trash(user_id).await;
+        let result = service.empty_trash(user_uuid).await;
 
         // Assert
         assert!(result.is_ok(), "Emptying trash failed: {:?}", result);

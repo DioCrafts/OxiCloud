@@ -75,10 +75,7 @@ async fn revoke_app_password(
 
     let id = Uuid::parse_str(&id).map_err(|_| AppError::bad_request("Invalid UUID"))?;
 
-    let response = service
-        .revoke(user.id, id)
-        .await
-        .map_err(AppError::from)?;
+    let response = service.revoke(user.id, id).await.map_err(AppError::from)?;
 
     Ok(Json(response))
 }

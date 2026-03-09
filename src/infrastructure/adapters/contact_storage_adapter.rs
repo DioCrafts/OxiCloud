@@ -86,7 +86,10 @@ impl ContactStorageAdapter {
             .address_book_repository
             .get_address_book_shares(address_book_id)
             .await?;
-        if shares.iter().any(|(shared_user, _)| shared_user == &user_id.to_string()) {
+        if shares
+            .iter()
+            .any(|(shared_user, _)| shared_user == &user_id.to_string())
+        {
             return Ok(address_book);
         }
 
@@ -248,7 +251,11 @@ impl AddressBookUseCase for ContactStorageAdapter {
 
         // Check write access
         let user_id = Uuid::parse_str(&update.user_id).map_err(|_| {
-            DomainError::new(ErrorKind::InvalidInput, "AddressBook", "Invalid user ID format")
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "AddressBook",
+                "Invalid user ID format",
+            )
         })?;
         let mut address_book = self.check_write_access(&uuid, user_id).await?;
 
@@ -364,7 +371,11 @@ impl AddressBookUseCase for ContactStorageAdapter {
         }
 
         let target_user_id = Uuid::parse_str(&dto.user_id).map_err(|_| {
-            DomainError::new(ErrorKind::InvalidInput, "AddressBook", "Invalid target user ID format")
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "AddressBook",
+                "Invalid target user ID format",
+            )
         })?;
 
         self.address_book_repository
@@ -397,7 +408,11 @@ impl AddressBookUseCase for ContactStorageAdapter {
         }
 
         let target_user_id = Uuid::parse_str(&dto.user_id).map_err(|_| {
-            DomainError::new(ErrorKind::InvalidInput, "AddressBook", "Invalid target user ID format")
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "AddressBook",
+                "Invalid target user ID format",
+            )
         })?;
 
         self.address_book_repository
@@ -443,8 +458,7 @@ impl ContactUseCase for ContactStorageAdapter {
         let user_id = Uuid::parse_str(&dto.user_id).map_err(|_| {
             DomainError::new(ErrorKind::InvalidInput, "Contact", "Invalid user ID format")
         })?;
-        self.check_write_access(&address_book_id, user_id)
-            .await?;
+        self.check_write_access(&address_book_id, user_id).await?;
 
         let now = chrono::Utc::now();
         let mut contact = Contact::from_raw(
@@ -488,8 +502,7 @@ impl ContactUseCase for ContactStorageAdapter {
         let user_id = Uuid::parse_str(&dto.user_id).map_err(|_| {
             DomainError::new(ErrorKind::InvalidInput, "Contact", "Invalid user ID format")
         })?;
-        self.check_write_access(&address_book_id, user_id)
-            .await?;
+        self.check_write_access(&address_book_id, user_id).await?;
 
         // Parse vCard fields
         let now = chrono::Utc::now();
@@ -742,10 +755,13 @@ impl ContactUseCase for ContactStorageAdapter {
 
         // Check write access
         let user_id = Uuid::parse_str(&dto.user_id).map_err(|_| {
-            DomainError::new(ErrorKind::InvalidInput, "ContactGroup", "Invalid user ID format")
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "ContactGroup",
+                "Invalid user ID format",
+            )
         })?;
-        self.check_write_access(&address_book_id, user_id)
-            .await?;
+        self.check_write_access(&address_book_id, user_id).await?;
 
         let group = ContactGroup::new(address_book_id, dto.name);
 
@@ -770,7 +786,11 @@ impl ContactUseCase for ContactStorageAdapter {
 
         // Check write access
         let user_id = Uuid::parse_str(&update.user_id).map_err(|_| {
-            DomainError::new(ErrorKind::InvalidInput, "ContactGroup", "Invalid user ID format")
+            DomainError::new(
+                ErrorKind::InvalidInput,
+                "ContactGroup",
+                "Invalid user ID format",
+            )
         })?;
         self.check_write_access(group.address_book_id(), user_id)
             .await?;

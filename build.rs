@@ -109,7 +109,7 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     fs::write(dist_dir.join("css").join(&css_name), &css_bundle).expect("write css bundle");
 
     // ── 4. Minify ALL individual CSS in static-dist/ ─────────────────────────
-    minify_tree_css(&dist_dir.join("css"), &css_name);
+    minify_tree_css(&dist_dir.join("css"));
 
     // ── 5. Build JS bundle for index.html ────────────────────────────────────
     let index_html = fs::read_to_string(static_dir.join("index.html")).expect("read index.html");
@@ -120,11 +120,11 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     fs::write(dist_dir.join("js").join(&js_name), &js_bundle).expect("write js bundle");
 
     // ── 6. Minify ALL individual JS in static-dist/ ──────────────────────────
-    minify_tree_js(&dist_dir.join("js"), &js_name);
+    minify_tree_js(&dist_dir.join("js"));
 
     // ── 7. Inline theme-init.js  &  rewrite index.html ──────────────────────
-    let theme_init = fs::read_to_string(static_dir.join("js/core/theme-init.js"))
-        .unwrap_or_default();
+    let theme_init =
+        fs::read_to_string(static_dir.join("js/core/theme-init.js")).unwrap_or_default();
     let theme_init_min = js_minify_safe(&theme_init);
     let rewritten_index = rewrite_index_html(
         &index_html,
@@ -153,9 +153,7 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     // index.html too (future use / embedded route)
     fs::write(out_dir.join("index.html"), &rewritten_index).expect("write out index.html");
 
-    eprintln!(
-        "cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}  JS: {js_name}"
-    );
+    eprintln!("cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}  JS: {js_name}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -206,8 +204,8 @@ fn css_minify_safe(source: &str) -> String {
 fn css_minify(source: &str) -> Result<String, String> {
     use lightningcss::stylesheet::{ParserOptions, PrinterOptions, StyleSheet};
 
-    let mut sheet = StyleSheet::parse(source, ParserOptions::default())
-        .map_err(|e| format!("{e}"))?;
+    let mut sheet =
+        StyleSheet::parse(source, ParserOptions::default()).map_err(|e| format!("{e}"))?;
 
     sheet
         .minify(Default::default())
@@ -224,12 +222,14 @@ fn css_minify(source: &str) -> Result<String, String> {
 }
 
 /// Walk a directory and minify every `.css` in-place (skips generated bundles).
-fn minify_tree_css(dir: &Path, skip_prefix: &str) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+fn minify_tree_css(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            minify_tree_css(&p, skip_prefix);
+            minify_tree_css(&p);
         } else if p.extension().is_some_and(|e| e == "css") {
             let fname = p.file_name().unwrap().to_string_lossy();
             // Skip the generated bundle and already-processed main.css
@@ -336,12 +336,14 @@ fn js_minify(source: &str) -> Result<String, String> {
 }
 
 /// Walk a directory and minify every `.js` in-place (skips generated bundles).
-fn minify_tree_js(dir: &Path, skip_prefix: &str) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+fn minify_tree_js(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            minify_tree_js(&p, skip_prefix);
+            minify_tree_js(&p);
         } else if p.extension().is_some_and(|e| e == "js") {
             let fname = p.file_name().unwrap().to_string_lossy();
             if fname.starts_with("app.") {
@@ -359,13 +361,15 @@ fn minify_tree_js(dir: &Path, skip_prefix: &str) {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 fn minify_tree_json(dir: &Path) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let p = entry.path();
-        if p.extension().is_some_and(|e| e == "json") {
-            if let Ok(src) = fs::read_to_string(&p) {
-                let _ = fs::write(&p, json_minify(&src));
-            }
+        if p.extension().is_some_and(|e| e == "json")
+            && let Ok(src) = fs::read_to_string(&p)
+        {
+            let _ = fs::write(&p, json_minify(&src));
         }
     }
 }
@@ -407,12 +411,7 @@ fn json_minify(source: &str) -> String {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Rewrite index.html: single CSS bundle, inline theme-init, single JS bundle.
-fn rewrite_index_html(
-    html: &str,
-    css_path: &str,
-    js_path: &str,
-    inline_theme_js: &str,
-) -> String {
+fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js: &str) -> String {
     let mut out: Vec<String> = Vec::with_capacity(html.lines().count());
     let mut css_done = false;
     let mut defer_done = false;
@@ -423,19 +422,14 @@ fn rewrite_index_html(
         // ── Replace all stylesheet <link>s with single bundle ────────────────
         if t.starts_with("<link") && t.contains("stylesheet") && t.contains("href=\"/css/") {
             if !css_done {
-                out.push(format!(
-                    "    <link rel=\"stylesheet\" href=\"{css_path}\">"
-                ));
+                out.push(format!("    <link rel=\"stylesheet\" href=\"{css_path}\">"));
                 css_done = true;
             }
             continue;
         }
 
         // ── Replace sync theme-init.js with inline <script> ─────────────────
-        if t.starts_with("<script")
-            && !t.contains("defer")
-            && t.contains("theme-init")
-        {
+        if t.starts_with("<script") && !t.contains("defer") && t.contains("theme-init") {
             out.push(format!("    <script>{inline_theme_js}</script>"));
             continue;
         }
@@ -443,9 +437,7 @@ fn rewrite_index_html(
         // ── Replace all defer <script>s with single bundle ──────────────────
         if t.starts_with("<script") && t.contains("defer") && t.contains("src=\"") {
             if !defer_done {
-                out.push(format!(
-                    "    <script defer src=\"{js_path}\"></script>"
-                ));
+                out.push(format!("    <script defer src=\"{js_path}\"></script>"));
                 defer_done = true;
             }
             continue;

@@ -91,15 +91,10 @@ where
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         Ok(OptionalUserId(
-            parts
-                .extensions
-                .get::<Arc<CurrentUser>>()
-                .map(|cu| cu.id),
+            parts.extensions.get::<Arc<CurrentUser>>().map(|cu| cu.id),
         ))
     }
 }
-
-
 
 // Error for authentication operations
 #[derive(Debug, thiserror::Error)]

@@ -299,13 +299,12 @@ async fn handle_propfind(
             } else {
                 // Not a calendar ID — treat as user calendar home (e.g. /caldav/{username}/)
                 // List all calendars for this user
-                let calendars =
-                    calendar_service
-                        .list_my_calendars(user.id)
-                        .await
-                        .map_err(|e| {
-                            AppError::internal_error(format!("Failed to list calendars: {}", e))
-                        })?;
+                let calendars = calendar_service
+                    .list_my_calendars(user.id)
+                    .await
+                    .map_err(|e| {
+                        AppError::internal_error(format!("Failed to list calendars: {}", e))
+                    })?;
 
                 let base_href = &format!("/caldav/{}/", first_segment);
                 let mut response_body = Vec::new();

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::common::errors::DomainError;
@@ -22,7 +23,7 @@ use crate::domain::services::path_service::StoragePath;
 /// A simple in-memory mock that maps (file_id → (File, owner_id)).
 struct MockFileReadPort {
     /// file_id → (File, owner_id)
-    files: Mutex<HashMap<String, (File, String)>>,
+    files: Mutex<HashMap<String, (File, Uuid)>>,
 }
 
 impl MockFileReadPort {
@@ -33,7 +34,7 @@ impl MockFileReadPort {
     }
 
     /// Insert a test file owned by `owner_id`.
-    fn insert(&self, id: &str, name: &str, owner_id: &str) {
+    fn insert(&self, id: &str, name: &str, owner_id: Uuid) {
         let file = File::new(
             id.to_string(),
             name.to_string(),
@@ -46,7 +47,7 @@ impl MockFileReadPort {
         self.files
             .lock()
             .unwrap()
-            .insert(id.to_string(), (file, owner_id.to_string()));
+            .insert(id.to_string(), (file, owner_id));
     }
 }
 
@@ -59,10 +60,10 @@ impl FileReadPort for MockFileReadPort {
             .ok_or_else(|| DomainError::not_found("File", id.to_string()))
     }
 
-    async fn get_file_for_owner(&self, id: &str, owner_id: &str) -> Result<File, DomainError> {
+    async fn get_file_for_owner(&self, id: &str, owner_id: Uuid) -> Result<File, DomainError> {
         let files = self.files.lock().unwrap();
         match files.get(id) {
-            Some((file, actual_owner)) if actual_owner == owner_id => Ok(file.clone()),
+            Some((file, actual_owner)) if *actual_owner == owner_id => Ok(file.clone()),
             // Return NotFound regardless — do not leak existence
             _ => Err(DomainError::not_found("File", id.to_string())),
         }
@@ -104,7 +105,7 @@ impl FileReadPort for MockFileReadPort {
         &self,
         _folder_id: Option<&str>,
         _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> Result<(Vec<File>, usize), DomainError> {
         Ok((Vec::new(), 0))
     }
@@ -113,7 +114,7 @@ impl FileReadPort for MockFileReadPort {
         &self,
         _folder_id: Option<&str>,
         _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-        _user_id: &str,
+        _user_id: Uuid,
     ) -> Result<usize, DomainError> {
         Ok(0)
     }
@@ -248,20 +249,23 @@ impl FileWritePort for MockFileWritePort {
 
 #[tokio::test]
 async fn get_file_for_owner_returns_file_for_correct_owner() {
+    let alice_id = Uuid::new_v4();
     let repo = MockFileReadPort::new();
-    repo.insert("file-1", "secret.txt", "alice");
+    repo.insert("file-1", "secret.txt", alice_id);
 
-    let result = repo.get_file_for_owner("file-1", "alice").await;
+    let result = repo.get_file_for_owner("file-1", alice_id).await;
     assert!(result.is_ok(), "owner should be able to read own file");
     assert_eq!(result.unwrap().id(), "file-1");
 }
 
 #[tokio::test]
 async fn get_file_for_owner_rejects_wrong_owner() {
+    let alice_id = Uuid::new_v4();
+    let bob_id = Uuid::new_v4();
     let repo = MockFileReadPort::new();
-    repo.insert("file-1", "secret.txt", "alice");
+    repo.insert("file-1", "secret.txt", alice_id);
 
-    let result = repo.get_file_for_owner("file-1", "bob").await;
+    let result = repo.get_file_for_owner("file-1", bob_id).await;
     assert!(result.is_err(), "non-owner should be rejected");
 
     // Must be NotFound, NOT Forbidden — avoids leaking existence
@@ -276,20 +280,23 @@ async fn get_file_for_owner_rejects_wrong_owner() {
 
 #[tokio::test]
 async fn get_file_for_owner_returns_not_found_for_missing_file() {
+    let alice_id = Uuid::new_v4();
     let repo = MockFileReadPort::new();
 
-    let result = repo.get_file_for_owner("nonexistent", "alice").await;
+    let result = repo.get_file_for_owner("nonexistent", alice_id).await;
     assert!(result.is_err());
 }
 
 #[tokio::test]
 async fn verify_file_owner_uses_default_impl() {
+    let alice_id = Uuid::new_v4();
+    let bob_id = Uuid::new_v4();
     let repo = MockFileReadPort::new();
-    repo.insert("file-1", "secret.txt", "alice");
+    repo.insert("file-1", "secret.txt", alice_id);
 
     // Default impl delegates to get_file_for_owner and maps to ()
-    assert!(repo.verify_file_owner("file-1", "alice").await.is_ok());
-    assert!(repo.verify_file_owner("file-1", "bob").await.is_err());
+    assert!(repo.verify_file_owner("file-1", alice_id).await.is_ok());
+    assert!(repo.verify_file_owner("file-1", bob_id).await.is_err());
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -310,15 +317,17 @@ async fn verify_file_owner_uses_default_impl() {
 async fn verify_file_owner_delegates_to_read_port() {
     // This test verifies the FileReadPort contract that verify_file_owner
     // returns Ok for the correct owner and Err for others.
+    let user_id = Uuid::new_v4();
+    let attacker_id = Uuid::new_v4();
     let read = MockFileReadPort::new();
-    read.insert("abc-123", "report.pdf", "user-42");
+    read.insert("abc-123", "report.pdf", user_id);
 
     // Same user → Ok
-    let ok = read.verify_file_owner("abc-123", "user-42").await;
+    let ok = read.verify_file_owner("abc-123", user_id).await;
     assert!(ok.is_ok(), "correct owner should pass verify_file_owner");
 
     // Different user → Err
-    let err = read.verify_file_owner("abc-123", "attacker-99").await;
+    let err = read.verify_file_owner("abc-123", attacker_id).await;
     assert!(err.is_err(), "wrong owner should fail verify_file_owner");
 }
 
@@ -326,15 +335,17 @@ async fn verify_file_owner_delegates_to_read_port() {
 async fn owned_methods_require_ownership_check_first() {
     // Simulate what the _owned methods do: verify_owner then delegate.
     // We test with the mock read port to prove the sequence.
+    let owner_id = Uuid::new_v4();
+    let attacker_id = Uuid::new_v4();
     let read = MockFileReadPort::new();
-    read.insert("file-1", "data.csv", "owner-a");
+    read.insert("file-1", "data.csv", owner_id);
 
     // Step 1: verify_owner for correct owner → Ok
-    let step1 = read.verify_file_owner("file-1", "owner-a").await;
+    let step1 = read.verify_file_owner("file-1", owner_id).await;
     assert!(step1.is_ok());
 
     // Step 2: verify_owner for attacker → Err, so the move/rename never executes
-    let step2 = read.verify_file_owner("file-1", "attacker").await;
+    let step2 = read.verify_file_owner("file-1", attacker_id).await;
     assert!(step2.is_err());
 }
 
@@ -347,18 +358,20 @@ use crate::common::stubs::StubFileManagementUseCase;
 
 #[tokio::test]
 async fn stub_move_file_owned_returns_ok() {
+    let user_id = Uuid::new_v4();
     let stub = StubFileManagementUseCase;
     let result = stub
-        .move_file_owned("file-1", "user-1", Some("folder-2".to_string()))
+        .move_file_owned("file-1", user_id, Some("folder-2".to_string()))
         .await;
     assert!(result.is_ok(), "stub should return Ok for move_file_owned");
 }
 
 #[tokio::test]
 async fn stub_rename_file_owned_returns_ok() {
+    let user_id = Uuid::new_v4();
     let stub = StubFileManagementUseCase;
     let result = stub
-        .rename_file_owned("file-1", "user-1", "new-name.txt")
+        .rename_file_owned("file-1", user_id, "new-name.txt")
         .await;
     assert!(
         result.is_ok(),
@@ -371,16 +384,18 @@ use crate::common::stubs::StubFileRetrievalUseCase;
 
 #[tokio::test]
 async fn stub_get_file_owned_returns_ok() {
+    let user_id = Uuid::new_v4();
     let stub = StubFileRetrievalUseCase;
-    let result = stub.get_file_owned("file-1", "user-1").await;
+    let result = stub.get_file_owned("file-1", user_id).await;
     assert!(result.is_ok(), "stub should return Ok for get_file_owned");
 }
 
 #[tokio::test]
 async fn stub_get_file_optimized_owned_returns_ok() {
+    let user_id = Uuid::new_v4();
     let stub = StubFileRetrievalUseCase;
     let result = stub
-        .get_file_optimized_owned("file-1", "user-1", true, false)
+        .get_file_optimized_owned("file-1", user_id, true, false)
         .await;
     assert!(
         result.is_ok(),

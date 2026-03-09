@@ -17,11 +17,11 @@ use crate::infrastructure::services::jwt_service::JwtTokenService;
 use crate::infrastructure::services::oidc_service::OidcService;
 use crate::infrastructure::services::password_hasher::Argon2PasswordHasher;
 use moka::sync::Cache;
-use uuid::Uuid;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
+use uuid::Uuid;
 
 /// Result of a successful OIDC callback. The handler layer inspects this to
 /// decide whether to redirect to the regular frontend or complete a Nextcloud

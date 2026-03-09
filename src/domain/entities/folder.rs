@@ -234,7 +234,7 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id: self.parent_id.clone(),
-            owner_id: self.owner_id.clone(),
+            owner_id: self.owner_id,
             created_at: self.created_at,
             modified_at: now,
         })
@@ -266,7 +266,7 @@ impl Folder {
             storage_path: new_storage_path,
             path_string: new_path_string,
             parent_id,
-            owner_id: self.owner_id.clone(),
+            owner_id: self.owner_id,
             created_at: self.created_at,
             modified_at: now,
         })

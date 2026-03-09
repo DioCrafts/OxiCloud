@@ -64,9 +64,9 @@ impl TrashDbRepository {
         // In the soft-delete model, the trash entry ID is the same as the
         // original item ID since there is no separate trash table.
         TrashedItem::from_raw(
-            id,       // trash entry id (same as original)
-            id,       // original item id
-            user_id,  // owner
+            id,      // trash entry id (same as original)
+            id,      // original item id
+            user_id, // owner
             item_type_enum,
             name.clone(),
             String::new(), // original_path — not stored separately in soft-delete model

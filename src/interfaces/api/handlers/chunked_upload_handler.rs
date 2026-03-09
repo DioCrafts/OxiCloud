@@ -190,13 +190,7 @@ impl ChunkedUploadHandler {
         });
 
         match chunked_service
-            .upload_chunk(
-                &upload_id,
-                auth_user.id,
-                params.chunk_index,
-                body,
-                checksum,
-            )
+            .upload_chunk(&upload_id, auth_user.id, params.chunk_index, body, checksum)
             .await
         {
             Ok(response) => {

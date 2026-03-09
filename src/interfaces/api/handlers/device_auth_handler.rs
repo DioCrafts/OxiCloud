@@ -203,7 +203,8 @@ async fn revoke_device(
 ) -> Result<impl IntoResponse, AppError> {
     let device_service = get_device_service(&state)?;
 
-    let device_id = Uuid::parse_str(&device_id).map_err(|_| AppError::bad_request("Invalid device ID"))?;
+    let device_id =
+        Uuid::parse_str(&device_id).map_err(|_| AppError::bad_request("Invalid device ID"))?;
 
     device_service
         .revoke_device(device_id, auth_user.id)
