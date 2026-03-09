@@ -1,6 +1,6 @@
 -- ============================================================
 -- OxiCloud Unified Database Schema
--- For clean installations: psql -f db/schema.sql
+-- Applied automatically via sqlx migrations on startup.
 -- ============================================================
 -- Order: auth (base) → caldav → carddav
 -- All tables use IF NOT EXISTS for idempotent re-runs.

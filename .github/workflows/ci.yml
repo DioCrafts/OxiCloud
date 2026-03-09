@@ -56,7 +56,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Initialize test database
-        run: psql -h localhost -U postgres -d oxicloud_test -f db/schema.sql
+        run: psql -h localhost -U postgres -d oxicloud_test -f migrations/20260307000000_initial_schema.sql
         env:
           PGPASSWORD: postgres
 

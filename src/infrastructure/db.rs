@@ -25,8 +25,9 @@ pub struct DbPools {
 
 /// Create both the primary and maintenance database pools.
 ///
-/// The schema is applied once via the primary pool.  The maintenance pool
-/// shares the same connection string but has its own, smaller budget.
+/// Pending migrations are applied via the primary pool on startup.
+/// The maintenance pool shares the same connection string but has its
+/// own, smaller budget.
 pub async fn create_database_pools(config: &AppConfig) -> Result<DbPools> {
     tracing::info!(
         "Initializing PostgreSQL connections with URL: {}",
@@ -48,16 +49,16 @@ pub async fn create_database_pools(config: &AppConfig) -> Result<DbPools> {
     )
     .await?;
 
-    // Apply schema through the primary pool (idempotent)
-    tracing::info!("Applying database schema...");
-    if let Err(e) = apply_schema(&primary).await {
+    // Run pending migrations (idempotent, tracked in _sqlx_migrations table)
+    tracing::info!("Running database migrations...");
+    if let Err(e) = run_migrations(&primary).await {
         return Err(DbError(format!(
-            "Database schema could not be applied: {}. \
-             Run manually: psql -f db/schema.sql",
+            "Database migrations failed: {}. \
+             Check the migrations/ directory for issues.",
             e
         )));
     }
-    tracing::info!("Database schema applied successfully");
+    tracing::info!("Database migrations complete");
 
     // --- maintenance pool ---
     let maintenance = create_pool_with_retries(
@@ -156,172 +157,14 @@ async fn create_pool_with_retries(
     )))
 }
 
-/// Apply the embedded schema.sql to the database.
-/// First tries `raw_sql` (simple query protocol). If that fails, falls back
-/// to splitting the SQL into individual statements and executing them one by one.
-async fn apply_schema(pool: &PgPool) -> Result<()> {
-    let schema_sql = include_str!("../../db/schema.sql");
-
-    // Attempt 1: raw_sql sends the entire script via the simple query protocol
-    match sqlx::raw_sql(schema_sql).execute(pool).await {
-        Ok(_) => return Ok(()),
-        Err(e) => {
-            tracing::warn!(
-                "raw_sql failed ({}), falling back to statement-by-statement execution",
-                e
-            );
-        }
-    }
-
-    // Attempt 2: split into individual statements respecting dollar-quoting
-    let statements = split_sql_statements(schema_sql);
-    for (i, stmt) in statements.iter().enumerate() {
-        let trimmed = stmt.trim();
-        if trimmed.is_empty() || trimmed == ";" {
-            continue;
-        }
-        if let Err(e) = sqlx::raw_sql(trimmed).execute(pool).await {
-            let preview = if trimmed.len() > 200 {
-                &trimmed[..200]
-            } else {
-                trimmed
-            };
-            tracing::error!(
-                "Schema statement {} failed: {}\n--- SQL ---\n{}\n-----------",
-                i + 1,
-                e,
-                preview
-            );
-            return Err(DbError(format!("Schema statement {} failed: {}", i + 1, e)));
-        }
-    }
-
-    Ok(())
-}
-
-/// Split a SQL script into individual statements, correctly handling:
-/// - Dollar-quoted blocks (`$BODY$...$BODY$`, `$$...$$`)
-/// - Single-quoted strings (`'...'`)
-/// - Line comments (`-- ...`)
-/// - Block comments (`/* ... */`)
+/// Run pending migrations from the `migrations/` directory.
 ///
-/// Uses byte-level iteration over the `&str` directly — no intermediate
-/// `Vec<char>` allocation (saves ~4× the input size in heap memory).
-/// SQL is ASCII-safe, so byte comparison is sufficient for all delimiters.
-fn split_sql_statements(sql: &str) -> Vec<String> {
-    let mut statements = Vec::new();
-    let mut current = String::new();
-    let bytes = sql.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-
-    while i < len {
-        let b = bytes[i];
-
-        // Line comment
-        if b == b'-' && i + 1 < len && bytes[i + 1] == b'-' {
-            while i < len && bytes[i] != b'\n' {
-                current.push(bytes[i] as char);
-                i += 1;
-            }
-            continue;
-        }
-
-        // Block comment
-        if b == b'/' && i + 1 < len && bytes[i + 1] == b'*' {
-            current.push('/');
-            current.push('*');
-            i += 2;
-            while i + 1 < len && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                current.push(bytes[i] as char);
-                i += 1;
-            }
-            if i + 1 < len {
-                current.push('*');
-                current.push('/');
-                i += 2;
-            }
-            continue;
-        }
-
-        // Single-quoted string
-        if b == b'\'' {
-            current.push('\'');
-            i += 1;
-            while i < len {
-                current.push(bytes[i] as char);
-                if bytes[i] == b'\'' {
-                    if i + 1 < len && bytes[i + 1] == b'\'' {
-                        current.push('\'');
-                        i += 2;
-                    } else {
-                        i += 1;
-                        break;
-                    }
-                } else {
-                    i += 1;
-                }
-            }
-            continue;
-        }
-
-        // Dollar-quoted string ($tag$...$tag$ or $$...$$)
-        if b == b'$' {
-            i += 1;
-            let mut tag = String::from("$");
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_') {
-                tag.push(bytes[i] as char);
-                i += 1;
-            }
-            if i < len && bytes[i] == b'$' {
-                tag.push('$');
-                i += 1;
-                // We have a dollar-quote tag, find the closing tag
-                current.push_str(&tag);
-                let tag_bytes = tag.as_bytes();
-                loop {
-                    if i >= len {
-                        break;
-                    }
-                    if bytes[i] == b'$'
-                        && i + tag_bytes.len() <= len
-                        && &bytes[i..i + tag_bytes.len()] == tag_bytes
-                    {
-                        current.push_str(&tag);
-                        i += tag_bytes.len();
-                        break;
-                    }
-                    current.push(bytes[i] as char);
-                    i += 1;
-                }
-            } else {
-                // Not a valid dollar-quote, push what we consumed
-                current.push_str(&tag);
-            }
-            continue;
-        }
-
-        // Statement separator
-        if b == b';' {
-            current.push(';');
-            let trimmed = current.trim().to_string();
-            if !trimmed.is_empty() && trimmed != ";" {
-                statements.push(trimmed);
-            }
-            current.clear();
-            i += 1;
-            continue;
-        }
-
-        current.push(b as char);
-        i += 1;
+/// Uses sqlx's built-in migration system which tracks applied migrations
+/// in a `_sqlx_migrations` table. Each migration runs in its own transaction.
+/// Migration files are embedded at compile time via `sqlx::migrate!()`.
+async fn run_migrations(pool: &PgPool) -> Result<()> {
+    match sqlx::migrate!().run(pool).await {
+        Ok(()) => Ok(()),
+        Err(e) => Err(DbError(format!("Migration error: {}", e))),
     }
-
-    // Trailing statement without semicolon
-    let trimmed = current.trim().to_string();
-    if !trimmed.is_empty() && trimmed != ";" {
-        statements.push(trimmed);
-    }
-
-    statements
 }

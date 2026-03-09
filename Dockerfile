@@ -24,7 +24,7 @@ COPY --from=cacher /usr/local/cargo/registry /usr/local/cargo/registry
 COPY Cargo.toml Cargo.lock build.rs ./
 COPY src src
 COPY static static
-COPY db db
+COPY migrations migrations
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
 RUN DATABASE_URL="${DATABASE_URL}" RUSTFLAGS="-C target-cpu=native" cargo build --release
@@ -59,8 +59,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Copy processed static files (bundled/minified by build.rs in release)
 COPY --from=builder --chown=oxicloud:oxicloud /app/static-dist /app/static
-COPY --chown=oxicloud:oxicloud db /app/db
-
 # Create storage directory with proper permissions
 RUN mkdir -p /app/storage && chown -R oxicloud:oxicloud /app/storage
 

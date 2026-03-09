@@ -70,7 +70,4 @@ jobs:
           echo "=== Static files present ==="
           docker run --rm --entrypoint sh test/oxicloud:test -c "ls /app/static/index.html && echo 'OK: static files present'"
 
-          echo "=== DB schema present ==="
-          docker run --rm --entrypoint sh test/oxicloud:test -c "ls /app/db/schema.sql && echo 'OK: schema present'"
-
           echo "✅ Docker build and test completed successfully"
