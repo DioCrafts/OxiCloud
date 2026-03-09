@@ -73,7 +73,11 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(Uuid, Str
         ));
     }
 
-    Ok((Uuid::parse_str(&claims.sub).map_err(|_| AppError::internal_error("Invalid user ID in token"))?, claims.role))
+    Ok((
+        Uuid::parse_str(&claims.sub)
+            .map_err(|_| AppError::internal_error("Invalid user ID in token"))?,
+        claims.role,
+    ))
 }
 
 /// GET /api/admin/settings/oidc — get OIDC settings for the admin panel

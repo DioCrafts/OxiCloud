@@ -448,11 +448,9 @@ impl BatchOperationService {
             },
         };
 
-        let uid = user_id;
-
         let mut operation_stream = stream::iter(file_ids.into_iter().map(|file_id| {
             let trash = trash_service.clone();
-            let uid = uid;
+            let uid = user_id;
 
             async move {
                 let trash_result = trash.move_to_trash(&file_id, "file", uid).await;
@@ -513,11 +511,9 @@ impl BatchOperationService {
             },
         };
 
-        let uid = user_id;
-
         let mut operation_stream = stream::iter(folder_ids.into_iter().map(|folder_id| {
             let trash = trash_service.clone();
-            let uid = uid;
+            let uid = user_id;
 
             async move {
                 let trash_result = trash.move_to_trash(&folder_id, "folder", uid).await;

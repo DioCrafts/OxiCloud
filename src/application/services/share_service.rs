@@ -806,7 +806,7 @@ mod tests {
             &self,
             _folder_id: Option<&str>,
             _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-            _user_id: &str,
+            _user_id: Uuid,
         ) -> Result<(Vec<crate::domain::entities::file::File>, usize), DomainError> {
             Ok((Vec::new(), 0))
         }
@@ -815,7 +815,7 @@ mod tests {
             &self,
             _folder_id: Option<&str>,
             _criteria: &crate::application::dtos::search_dto::SearchCriteriaDto,
-            _user_id: &str,
+            _user_id: Uuid,
         ) -> Result<usize, DomainError> {
             Ok(0)
         }
@@ -839,7 +839,7 @@ mod tests {
         async fn get_file_for_owner(
             &self,
             id: &str,
-            _owner_id: &str,
+            _owner_id: Uuid,
         ) -> Result<crate::domain::entities::file::File, DomainError> {
             self.get_file(id).await
         }
@@ -891,7 +891,7 @@ mod tests {
         async fn list_folders_by_owner(
             &self,
             _parent_id: Option<&str>,
-            _owner_id: &str,
+            _owner_id: Uuid,
         ) -> Result<Vec<crate::domain::entities::folder::Folder>, DomainError> {
             unimplemented!()
         }
@@ -910,7 +910,7 @@ mod tests {
         async fn list_folders_by_owner_paginated(
             &self,
             _parent_id: Option<&str>,
-            _owner_id: &str,
+            _owner_id: Uuid,
             _offset: usize,
             _limit: usize,
             _include_total: bool,
@@ -971,7 +971,7 @@ mod tests {
 
         async fn create_home_folder(
             &self,
-            _user_id: &str,
+            _user_id: Uuid,
             _name: String,
         ) -> Result<crate::domain::entities::folder::Folder, DomainError> {
             unimplemented!()

@@ -195,16 +195,15 @@ impl ShareStoragePort for SharePgRepository {
     }
 
     async fn delete_share_for_user(&self, id: Uuid, user_id: Uuid) -> Result<(), DomainError> {
-        let result =
-            sqlx::query("DELETE FROM storage.shares WHERE id = $1 AND created_by = $2")
-                .bind(id)
-                .bind(user_id)
-                .execute(&*self.db_pool)
-                .await
-                .map_err(|e| {
-                    tracing::error!("Database error deleting share for user: {}", e);
-                    DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
-                })?;
+        let result = sqlx::query("DELETE FROM storage.shares WHERE id = $1 AND created_by = $2")
+            .bind(id)
+            .bind(user_id)
+            .execute(&*self.db_pool)
+            .await
+            .map_err(|e| {
+                tracing::error!("Database error deleting share for user: {}", e);
+                DomainError::internal_error("Share", format!("Failed to delete share: {e}"))
+            })?;
 
         if result.rows_affected() == 0 {
             // SECURITY: could be non-existent or owned by another user — same 404

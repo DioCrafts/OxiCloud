@@ -151,7 +151,10 @@ async fn user_provisioning_response(
 
     // Fetch quota from storage usage service
     let quota: (i64, i64) = match state.storage_usage_service.as_ref() {
-        Some(service) => match service.get_user_storage_info(uuid::Uuid::parse_str(&user_dto.id).unwrap_or_default()).await {
+        Some(service) => match service
+            .get_user_storage_info(uuid::Uuid::parse_str(&user_dto.id).unwrap_or_default())
+            .await
+        {
             Ok((used, total)) => (used, total),
             Err(_) => (0, 0),
         },

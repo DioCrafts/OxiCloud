@@ -32,8 +32,8 @@ impl AppPasswordStoragePort for AppPasswordPgRepository {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             "#,
         )
-        .bind(&ap.id)
-        .bind(&ap.user_id)
+        .bind(ap.id)
+        .bind(ap.user_id)
         .bind(&ap.label)
         .bind(&ap.password_hash)
         .bind(&ap.prefix)

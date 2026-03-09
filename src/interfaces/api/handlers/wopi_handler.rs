@@ -459,17 +459,18 @@ pub async fn get_editor_url(
     };
 
     // Generate WOPI access token
-    let (access_token, access_token_ttl) =
-        match state
-            .token_service
-            .generate_token(&params.file_id, &user_id.to_string(), &username, can_write)
-        {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::error!("Failed to generate WOPI token: {}", e);
-                return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-            }
-        };
+    let (access_token, access_token_ttl) = match state.token_service.generate_token(
+        &params.file_id,
+        &user_id.to_string(),
+        username,
+        can_write,
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!("Failed to generate WOPI token: {}", e);
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
 
     axum::Json(EditorUrlResponse {
         editor_url,

@@ -1,6 +1,6 @@
 use chrono::Utc;
-use uuid::Uuid;
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::application::dtos::address_book_dto::{
     AddressBookDto, CreateAddressBookDto, ShareAddressBookDto, UnshareAddressBookDto,
@@ -296,8 +296,11 @@ impl AddressBookUseCase for ContactService {
 
         // Check if user has write access to the address book
         let address_book = self
-            .check_address_book_write_access(&id, &Uuid::parse_str(&update.user_id)
-                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
+            .check_address_book_write_access(
+                &id,
+                &Uuid::parse_str(&update.user_id)
+                    .map_err(|_| DomainError::validation_error("Invalid user ID format"))?,
+            )
             .await?;
 
         // Apply updates
@@ -526,9 +529,12 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
-            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
-            .await?;
+        self.check_address_book_write_access(
+            &address_book_id,
+            &Uuid::parse_str(&dto.user_id)
+                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?,
+        )
+        .await?;
 
         // Convert DTOs to domain entities
         let email: Vec<Email> = dto
@@ -604,9 +610,12 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
-            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
-            .await?;
+        self.check_address_book_write_access(
+            &address_book_id,
+            &Uuid::parse_str(&dto.user_id)
+                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?,
+        )
+        .await?;
 
         // Parse vCard data
         let mut contact = self.parse_vcard(&dto.vcard)?;
@@ -819,9 +828,12 @@ impl ContactUseCase for ContactService {
             .map_err(|_| DomainError::validation_error("Invalid address book ID format"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(&address_book_id, &Uuid::parse_str(&dto.user_id)
-            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
-            .await?;
+        self.check_address_book_write_access(
+            &address_book_id,
+            &Uuid::parse_str(&dto.user_id)
+                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?,
+        )
+        .await?;
 
         let group = ContactGroup::new(address_book_id, dto.name);
 
@@ -845,9 +857,12 @@ impl ContactUseCase for ContactService {
             .ok_or_else(|| DomainError::not_found("Contact group", "not found"))?;
 
         // Check if user has write access to the address book
-        self.check_address_book_write_access(group.address_book_id(), &Uuid::parse_str(&update.user_id)
-            .map_err(|_| DomainError::validation_error("Invalid user ID format"))?)
-            .await?;
+        self.check_address_book_write_access(
+            group.address_book_id(),
+            &Uuid::parse_str(&update.user_id)
+                .map_err(|_| DomainError::validation_error("Invalid user ID format"))?,
+        )
+        .await?;
 
         // Update the group
         let updated_group = ContactGroup::from_raw(

@@ -283,7 +283,8 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
                     if i >= len {
                         break;
                     }
-                    if bytes[i] == b'$' && i + tag_bytes.len() <= len
+                    if bytes[i] == b'$'
+                        && i + tag_bytes.len() <= len
                         && &bytes[i..i + tag_bytes.len()] == tag_bytes
                     {
                         current.push_str(&tag);

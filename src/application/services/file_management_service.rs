@@ -178,10 +178,10 @@ impl FileManagementUseCase for FileManagementService {
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         self.file_repository.delete_file(id).await?;
         // Best-effort thumbnail cleanup
-        if let Some(thumb) = &self.thumbnail_service {
-            if let Err(e) = thumb.delete_thumbnails(id).await {
-                warn!("Failed to delete thumbnails for file {}: {}", id, e);
-            }
+        if let Some(thumb) = &self.thumbnail_service
+            && let Err(e) = thumb.delete_thumbnails(id).await
+        {
+            warn!("Failed to delete thumbnails for file {}: {}", id, e);
         }
         Ok(())
     }
@@ -223,10 +223,10 @@ impl FileManagementUseCase for FileManagementService {
         warn!("Permanently deleting file: {}", id);
         self.file_repository.delete_file(id).await?;
         // Best-effort thumbnail cleanup
-        if let Some(thumb) = &self.thumbnail_service {
-            if let Err(e) = thumb.delete_thumbnails(id).await {
-                warn!("Failed to delete thumbnails for file {}: {}", id, e);
-            }
+        if let Some(thumb) = &self.thumbnail_service
+            && let Err(e) = thumb.delete_thumbnails(id).await
+        {
+            warn!("Failed to delete thumbnails for file {}: {}", id, e);
         }
         info!("File permanently deleted: {}", id);
 

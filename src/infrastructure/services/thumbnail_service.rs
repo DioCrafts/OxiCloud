@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use image::imageops::FilterType;
 use image::codecs::jpeg::JpegEncoder;
+use image::imageops::FilterType;
 /**
  * Thumbnail Generation Service
  *
@@ -236,20 +236,16 @@ impl ThumbnailService {
     /// Unlike `get_thumbnail`, this does **not** generate a new thumbnail.
     /// Useful for non-image file types (videos) where a client-generated
     /// thumbnail may have been uploaded previously.
-    pub async fn get_cached_thumbnail(
-        &self,
-        file_id: &str,
-        size: ThumbnailSize,
-    ) -> Option<Bytes> {
+    pub async fn get_cached_thumbnail(&self, file_id: &str, size: ThumbnailSize) -> Option<Bytes> {
         // 1. Check in-memory cache
         let cache_key = ThumbnailCacheKey {
             file_id: file_id.to_string(),
             size,
         };
-        if let Some(bytes) = self.cache.get(&cache_key).await {
-            if !bytes.is_empty() {
-                return Some(bytes);
-            }
+        if let Some(bytes) = self.cache.get(&cache_key).await
+            && !bytes.is_empty()
+        {
+            return Some(bytes);
         }
 
         // 2. Check disk
@@ -285,17 +281,17 @@ impl ThumbnailService {
         let jpeg_bytes = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
             // ── Fast path: already a correctly-sized JPEG ─────────────
             // JPEG files start with SOI marker 0xFF 0xD8.
-            if data.len() >= 2 && data[0] == 0xFF && data[1] == 0xD8 {
-                if let Ok(reader) = image::ImageReader::new(std::io::Cursor::new(&data))
-                    .with_guessed_format()
-                {
-                    if let Ok((w, h)) = reader.into_dimensions() {
-                        if w <= max_dim && h <= max_dim {
-                            // Already JPEG at correct size — zero-copy store
-                            return Ok(data.to_vec());
-                        }
-                    }
-                }
+            if data.len() >= 2
+                && data[0] == 0xFF
+                && data[1] == 0xD8
+                && let Ok(reader) =
+                    image::ImageReader::new(std::io::Cursor::new(&data)).with_guessed_format()
+                && let Ok((w, h)) = reader.into_dimensions()
+                && w <= max_dim
+                && h <= max_dim
+            {
+                // Already JPEG at correct size — zero-copy store
+                return Ok(data.to_vec());
             }
 
             // ── Slow path: decode, resize, re-encode to JPEG ─────────
@@ -637,11 +633,7 @@ impl ThumbnailPort for ThumbnailService {
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
     }
 
-    async fn get_cached_thumbnail(
-        &self,
-        file_id: &str,
-        size: PortThumbnailSize,
-    ) -> Option<Bytes> {
+    async fn get_cached_thumbnail(&self, file_id: &str, size: PortThumbnailSize) -> Option<Bytes> {
         self.get_cached_thumbnail(file_id, size.into()).await
     }
 

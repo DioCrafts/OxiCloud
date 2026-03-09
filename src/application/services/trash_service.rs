@@ -566,10 +566,10 @@ impl TrashUseCase for TrashService {
 
                         // Best-effort thumbnail cleanup — thumbnails are cache
                         // artifacts, so failure must not block file deletion.
-                        if let Some(thumb) = &self.thumbnail_service {
-                            if let Err(e) = thumb.delete_thumbnails(&file_id).await {
-                                warn!("Failed to delete thumbnails for file {}: {}", file_id, e);
-                            }
+                        if let Some(thumb) = &self.thumbnail_service
+                            && let Err(e) = thumb.delete_thumbnails(&file_id).await
+                        {
+                            warn!("Failed to delete thumbnails for file {}: {}", file_id, e);
                         }
                     }
                     TrashedItemType::Folder => {

@@ -21,16 +21,7 @@ use crate::domain::services::path_service::StoragePath;
 type FolderRow = (String, String, String, Option<String>, Uuid, i64, i64);
 
 /// Type alias for paginated folder rows (includes total_count).
-type FolderRowPaginated = (
-    String,
-    String,
-    String,
-    Option<String>,
-    Uuid,
-    i64,
-    i64,
-    i64,
-);
+type FolderRowPaginated = (String, String, String, Option<String>, Uuid, i64, i64, i64);
 
 /// Type alias for folder rows with optional user_id.
 type FolderRowOptUser = (
@@ -108,14 +99,14 @@ impl FolderRepository for FolderDbRepository {
         // caller to have set up the home folder beforehand (done during user
         // registration).
         let user_id: Uuid = if let Some(ref pid) = parent_id {
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT user_id FROM storage.folders WHERE id = $1::uuid",
-            )
-            .bind(pid)
-            .fetch_optional(self.pool())
-            .await
-            .map_err(|e| DomainError::internal_error("FolderDb", format!("parent lookup: {e}")))?
-            .ok_or_else(|| DomainError::not_found("Folder", pid))?
+            sqlx::query_scalar::<_, Uuid>("SELECT user_id FROM storage.folders WHERE id = $1::uuid")
+                .bind(pid)
+                .fetch_optional(self.pool())
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error("FolderDb", format!("parent lookup: {e}"))
+                })?
+                .ok_or_else(|| DomainError::not_found("Folder", pid))?
         } else {
             return Err(DomainError::internal_error(
                 "FolderDb",
@@ -647,15 +638,9 @@ impl FolderRepository for FolderDbRepository {
         .map_err(|e| DomainError::internal_error("FolderDb", format!("home folder: {e}")))?;
 
         match row {
-            Some((id, path, ca, ma)) => Self::row_to_folder(
-                id,
-                name.clone(),
-                path,
-                None,
-                Some(user_id),
-                ca,
-                ma,
-            ),
+            Some((id, path, ca, ma)) => {
+                Self::row_to_folder(id, name.clone(), path, None, Some(user_id), ca, ma)
+            }
             None => {
                 // Already exists — fetch it
                 let existing = sqlx::query_as::<_, (String, String, i64, i64)>(

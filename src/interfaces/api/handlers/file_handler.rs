@@ -109,7 +109,11 @@ impl FileHandler {
                 if let Some(ref fid) = folder_id {
                     use crate::application::ports::inbound::FolderUseCase;
                     let folder_service = &state.applications.folder_service;
-                    if folder_service.get_folder_owned(fid, auth_user.id).await.is_err() {
+                    if folder_service
+                        .get_folder_owned(fid, auth_user.id)
+                        .await
+                        .is_err()
+                    {
                         tracing::warn!(
                             "⛔ UPLOAD REJECTED (IDOR): user='{}' attempted upload to folder '{}' owned by another user",
                             auth_user.username,
@@ -336,18 +340,17 @@ impl FileHandler {
         // (file_id, size) pair.  If the browser already has it, return 304
         // with zero I/O or DB work.
         let etag = format!("\"thumb-{}-{:?}\"", id, thumb_size);
-        if let Some(if_none_match) = headers.get(header::IF_NONE_MATCH) {
-            if let Ok(val) = if_none_match.to_str() {
-                if val == etag || val == "*" {
-                    return Response::builder()
-                        .status(StatusCode::NOT_MODIFIED)
-                        .header(header::ETAG, &etag)
-                        .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                        .body(Body::empty())
-                        .unwrap()
-                        .into_response();
-                }
-            }
+        if let Some(if_none_match) = headers.get(header::IF_NONE_MATCH)
+            && let Ok(val) = if_none_match.to_str()
+            && (val == etag || val == "*")
+        {
+            return Response::builder()
+                .status(StatusCode::NOT_MODIFIED)
+                .header(header::ETAG, &etag)
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .body(Body::empty())
+                .unwrap()
+                .into_response();
         }
 
         // ── Cache-first path (Solution A) ────────────────────────────
@@ -409,21 +412,17 @@ impl FileHandler {
             .get_thumbnail(&id, thumb_size.into(), &file_path)
             .await
         {
-            Ok(data) => {
-                Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "image/jpeg")
-                    .header(header::CONTENT_LENGTH, data.len())
-                    .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
-                    .header(header::ETAG, &etag)
-                    .body(Body::from(data))
-                    .unwrap()
-                    .into_response()
-            }
-            Err(err) => {
-                AppError::internal_error(format!("Thumbnail generation failed: {}", err))
-                    .into_response()
-            }
+            Ok(data) => Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "image/jpeg")
+                .header(header::CONTENT_LENGTH, data.len())
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .header(header::ETAG, &etag)
+                .body(Body::from(data))
+                .unwrap()
+                .into_response(),
+            Err(err) => AppError::internal_error(format!("Thumbnail generation failed: {}", err))
+                .into_response(),
         }
     }
 
@@ -487,10 +486,8 @@ impl FileHandler {
             .await
         {
             Ok(_) => StatusCode::CREATED.into_response(),
-            Err(err) => {
-                AppError::internal_error(format!("Failed to store thumbnail: {}", err))
-                    .into_response()
-            }
+            Err(err) => AppError::internal_error(format!("Failed to store thumbnail: {}", err))
+                .into_response(),
         }
     }
 
@@ -663,9 +660,7 @@ impl FileHandler {
                     .unwrap()
                     .into_response(),
             },
-            Err(err) => {
-                AppError::from(err).into_response()
-            }
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -715,9 +710,7 @@ impl FileHandler {
                     .insert(header::ETAG, header::HeaderValue::from_str(&etag).unwrap());
                 resp
             }
-            Err(err) => {
-                AppError::from(err).into_response()
-            }
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -750,8 +743,7 @@ impl FileHandler {
 
             tokio::spawn(async move {
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                thumbnail_service
-                    .generate_all_sizes_background(file_id, file_path);
+                thumbnail_service.generate_all_sizes_background(file_id, file_path);
             });
         }
 
@@ -832,7 +824,7 @@ impl FileHandler {
 
         match result {
             Ok(_) => StatusCode::NO_CONTENT.into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -864,7 +856,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.rename_file_owned(&id, auth_user.id, &new_name).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -884,7 +876,7 @@ impl FileHandler {
             .await
         {
             Ok(file) => (StatusCode::OK, Json(file)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -903,7 +895,7 @@ impl FileHandler {
         let mgmt = &state.applications.file_management_service;
         match mgmt.move_file_owned(&id, auth_user.id, folder_id).await {
             Ok(file_dto) => (StatusCode::OK, Json(file_dto)).into_response(),
-            Err(err) => AppError::from(err).into_response()
+            Err(err) => AppError::from(err).into_response(),
         }
     }
 
@@ -962,9 +954,7 @@ impl FileHandler {
             })
             .collect();
 
-        format!(
-            "{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}"
-        )
+        format!("{disposition}; filename=\"{ascii_safe}\"; filename*=UTF-8''{encoded}")
     }
 
     /// Build a 201 Created JSON response.

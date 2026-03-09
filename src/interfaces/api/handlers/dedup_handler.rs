@@ -99,7 +99,9 @@ impl DedupHandler {
         }
 
         // Only reveal whether THIS user has the blob — no global oracle
-        let user_has_it = dedup.user_owns_blob_reference(&hash, &auth_user.id.to_string()).await;
+        let user_has_it = dedup
+            .user_owns_blob_reference(&hash, &auth_user.id.to_string())
+            .await;
 
         if user_has_it {
             // Fetch size from metadata (safe — user owns a reference)
@@ -346,7 +348,10 @@ impl DedupHandler {
         }
 
         // Verify the user owns at least one file referencing this blob
-        if !dedup.user_owns_blob_reference(&hash, &auth_user.id.to_string()).await {
+        if !dedup
+            .user_owns_blob_reference(&hash, &auth_user.id.to_string())
+            .await
+        {
             return Response::builder()
                 .status(StatusCode::NOT_FOUND)
                 .header(header::CONTENT_TYPE, "application/json")

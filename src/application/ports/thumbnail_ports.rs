@@ -89,11 +89,7 @@ pub trait ThumbnailPort: Send + Sync + 'static {
     /// Returns `None` if no cached thumbnail exists on disk or in memory.
     /// Used for non-image file types (videos) where thumbnails are
     /// generated client-side and uploaded.
-    async fn get_cached_thumbnail(
-        &self,
-        file_id: &str,
-        size: ThumbnailSize,
-    ) -> Option<Bytes>;
+    async fn get_cached_thumbnail(&self, file_id: &str, size: ThumbnailSize) -> Option<Bytes>;
 
     /// Store an externally-generated thumbnail (e.g. client-side video frame).
     ///

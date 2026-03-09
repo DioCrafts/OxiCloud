@@ -262,10 +262,11 @@ impl TokenServicePort for JwtTokenService {
 mod tests {
     use super::*;
     use crate::domain::entities::user::{User, UserRole};
+    use uuid::Uuid;
 
     fn create_test_user() -> User {
         User::from_data(
-            "test-user-id".to_string(),
+            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
             "testuser".to_string(),
             "test@example.com".to_string(),
             "hashed_password".to_string(),
@@ -295,7 +296,7 @@ mod tests {
         let claims = service
             .validate_token(&token)
             .expect("Should validate token");
-        assert_eq!(claims.sub, user.id());
+        assert_eq!(claims.sub, user.id().to_string());
         assert_eq!(claims.username, user.username());
         assert_eq!(claims.email, user.email());
     }
