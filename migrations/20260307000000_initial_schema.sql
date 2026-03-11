@@ -560,6 +560,10 @@ CREATE TABLE IF NOT EXISTS storage.files (
     media_sort_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Ensure media_sort_date exists on pre-existing tables (CREATE TABLE IF NOT EXISTS skips it)
+ALTER TABLE storage.files ADD COLUMN IF NOT EXISTS
+    media_sort_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
 -- A user cannot have two non-trashed files with the same name in the same folder
 CREATE UNIQUE INDEX IF NOT EXISTS idx_files_unique_name_in_folder
     ON storage.files(folder_id, name, user_id) WHERE NOT is_trashed AND folder_id IS NOT NULL;
