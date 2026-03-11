@@ -10,7 +10,7 @@ COPY static static
 # Create a minimal project to download and cache dependencies
 RUN mkdir -p src && \
     echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
-    RUSTFLAGS="-C target-cpu=native" cargo build --release && \
+    cargo build --release && \
     rm -rf src static-dist target/release/deps/oxicloud* target/release/build/oxicloud-*
 # Stage 2: Build the application
 FROM rust:1.94.0-alpine3.23 AS builder
@@ -27,7 +27,7 @@ COPY static static
 COPY migrations migrations
 # Build with all optimizations (DATABASE_URL only needed at compile-time for sqlx)
 ARG DATABASE_URL="postgres://postgres:postgres@localhost/oxicloud"
-RUN DATABASE_URL="${DATABASE_URL}" RUSTFLAGS="-C target-cpu=native" cargo build --release
+RUN DATABASE_URL="${DATABASE_URL}" cargo build --release
 
 # Stage 3: Create minimal final image
 FROM alpine:3.23.3
