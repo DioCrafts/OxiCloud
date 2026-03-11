@@ -445,42 +445,20 @@ function setupEventListeners() {
 
             // Check if this is the trash item
             if (item === elements.trashBtn) {
-                // Hide shared view if active
-                if (app.isSharedView) {
-                    // Hide shared view
-                    if (window.sharedView) {
-                        window.sharedView.hide();
-                    }
-                    
-                    // Reset shared view flag
-                    app.isSharedView = false;
-                    
-                    // Clean up shared containers if they exist
-                    const sharedContainer = document.getElementById('shared-container');
-                    if (sharedContainer) {
-                        sharedContainer.style.display = 'none';
-                    }
-                }
-                
+                setCurrentSection('trash');
+
                 // Hide breadcrumb (only shown in Files view)
                 const breadcrumb = document.querySelector('.breadcrumb');
                 if (breadcrumb) breadcrumb.style.display = 'none';
-                
-                // Show trash view
-                app.isTrashView = true;
-                app.currentSection = 'trash';
-                
+
                 // Show files containers (to be filled with trash)
                 const filesGrid = document.getElementById('files-grid');
                 const filesListView = document.getElementById('files-list-view');
                 if (filesGrid) { filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none'; filesGrid.classList.toggle('hidden', app.currentView !== 'grid'); }
                 if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
-                
-                // Update UI
-                elements.pageTitle.textContent = window.i18n ? window.i18n.t('nav.trash') : 'Trash';
-                elements.pageTitle.setAttribute('data-i18n', 'nav.trash');
+
                 setActionsBarMode('trash');
-                
+
                 // Load trash items
                 window.loadTrashItems();
             } else {
