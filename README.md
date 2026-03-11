@@ -107,6 +107,8 @@ docker compose up -d
 
 Open **http://localhost:8086**. That's it.
 
+If you want to access the server remotely set the OXICLOUD_BASE_URL to your server's domain/port or the authentication will fail after setting up the admin user.
+
 ### From source
 
 Requires **Rust 1.93+** and **PostgreSQL 13+**.
