@@ -77,3 +77,6 @@ storage/
 *.swp
 *.swo
 nohup.out
+
+# Helm chart dependencies
+charts/*/charts/*

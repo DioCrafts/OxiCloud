@@ -1,0 +1,76 @@
+---
+replicaCount: 1
+
+image:
+  repository: oxicloud
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+postgresql:
+  enabled: true
+  auth:
+    username: postgres
+    password: "change_me_in_production"
+    database: oxicloud
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+config:
+  server:
+    port: 8086
+    host: "0.0.0.0"
+    baseUrl: "http://cloud.example.com"
+  features:
+    enableAuth: "true"
+    enableSharing: "true"
+  mimalloc:
+    purgeDelay: "0"
+    allowLargeOsPages: "0"
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 50Gi
+
+wopi:
+  enabled: true
+  collabora:
+    url: "cloud.example.com"
+    image:
+      repository: collabora/code
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      port: 9980
+    admin:
+      username: admin
+      password: "wopi_admin_password"
+    # In production behind an ingress, you'd likely enable SSL termination.
+    extraParams: "--o:ssl.enable=false --o:ssl.termination=false --o:net.frame_ancestors=http://* https://*"
+
+secrets:
+  # If existingSecret is set, the chart will NOT create a Secret and will use this one instead.
+  existingSecret: ""
+  jwtSecret: ""
+  oidcClientSecret: ""
+
+service:
+  type: ClusterIP
+  port: 8086
+
+ingress:
+  enabled: true
+  className: "nginx" # Adjust to your ingress controller (e.g., traefik)
+  annotations: {}
+  hosts:
+    - host: cloud.example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: oxicloud-tls
+  #    hosts:
+  #      - cloud.example.com
