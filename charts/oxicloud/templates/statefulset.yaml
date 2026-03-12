@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "oxicloud.fullname" . }}
+  labels:
+    {{- include "oxicloud.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "oxicloud.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "oxicloud.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "oxicloud.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: oxicloud
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8086
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "oxicloud.fullname" . }}-config
+            - secretRef:
+                name: {{ if .Values.secrets.existingSecret }}{{ .Values.secrets.existingSecret }}{{ else }}{{ include "oxicloud.fullname" . }}-secret{{ end }}
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.secrets.existingSecret }}{{ .Values.secrets.existingSecret }}{{ else }}{{ include "oxicloud.fullname" . }}-secret{{ end }}
+                  key: DB_PASSWORD
+            - name: OXICLOUD_DB_CONNECTION_STRING
+              value: "postgres://{{ .Values.postgresql.auth.username }}:$(DB_PASSWORD)@{{ .Release.Name }}-postgresql/{{ .Values.postgresql.auth.database }}"
+          volumeMounts:
+            - name: storage-data
+              mountPath: /app/storage
+      {{- if not .Values.persistence.enabled }}
+      volumes:
+        - name: storage-data
+          emptyDir: {}
+      {{- end }}
+
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: storage-data
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

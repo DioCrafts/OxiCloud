@@ -1,0 +1,58 @@
+---
+{{- if .Values.wopi.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oxicloud.fullname" . }}-wopi
+  labels:
+    {{- include "oxicloud.labels" . | nindent 4 }}
+    app.kubernetes.io/component: wopi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "oxicloud.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: wopi
+  template:
+    metadata:
+      labels:
+        {{- include "oxicloud.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: wopi
+    spec:
+      containers:
+        - name: collabora
+          image: "{{ .Values.wopi.collabora.image.repository }}:{{ .Values.wopi.collabora.image.tag }}"
+          imagePullPolicy: {{ .Values.wopi.collabora.image.pullPolicy }}
+          # Required for Collabora to build chroot jails
+          securityContext:
+            capabilities:
+              add:
+                - MKNOD
+          ports:
+            - name: wopi
+              containerPort: 9980
+              protocol: TCP
+          env:
+            - name: aliasgroup1
+              value: "http://{{ .Values.wopi.collabora.domain }}"
+            - name: server_name
+              value: {{ .Values.wopi.collabora.domain | quote }}
+            - name: extra_params
+              value: {{ .Values.wopi.collabora.extraParams | quote }}
+            - name: username
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.secrets.existingSecret }}{{ .Values.secrets.existingSecret }}{{ else }}{{ include "oxicloud.fullname" . }}-secret{{ end }}
+                  key: WOPI_ADMIN_USERNAME
+            - name: password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.secrets.existingSecret }}{{ .Values.secrets.existingSecret }}{{ else }}{{ include "oxicloud.fullname" . }}-secret{{ end }}
+                  key: WOPI_ADMIN_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /hosting/discovery
+              port: wopi
+            initialDelaySeconds: 10
+            periodSeconds: 10
+{{- end }}

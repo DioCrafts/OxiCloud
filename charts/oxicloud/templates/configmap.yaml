@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oxicloud.fullname" . }}-config
+data:
+  OXICLOUD_SERVER_PORT: {{ .Values.config.server.port | quote }}
+  OXICLOUD_SERVER_HOST: {{ .Values.config.server.host | quote }}
+  {{- if .Values.config.server.baseUrl }}
+  OXICLOUD_BASE_URL: {{ .Values.config.server.baseUrl | quote }}
+  {{- end }}
+  OXICLOUD_ENABLE_AUTH: {{ .Values.config.features.enableAuth | quote }}
+  OXICLOUD_ENABLE_FILE_SHARING: {{ .Values.config.features.enableSharing | quote }}
+  MIMALLOC_PURGE_DELAY: {{ .Values.config.mimalloc.purgeDelay | quote }}
+  MIMALLOC_ALLOW_LARGE_OS_PAGES: {{ .Values.config.mimalloc.allowLargeOsPages | quote }}
+
+  {{- if .Values.wopi.enabled }}
+  OXICLOUD_WOPI_ENABLED: "true"
+  OXICLOUD_WOPI_DISCOVERY_URL: "{{ .Values.config.server.baseUrl }}/hosting/discovery"
+  {{- else }}
+  OXICLOUD_WOPI_ENABLED: "false"
+  {{- end }}
