@@ -216,3 +216,32 @@ Hardcoded defaults in `src/common/config.rs`:
 | Deduplication | No | No | Always on |
 | Thumbnails | No | No | Always on |
 | Chunked uploads | No | No | Always on |
+
+# Kubernetes Setup
+
+## 01 - Dependencies
+- K8S Cluster
+- Default StorageClass
+- Ingress Controller
+- Helm
+
+## 02 - Deployment
+Change the `charts/oxicloud/values.yaml` to match your setup.
+
+To install the Chart run:
+```bash
+helm upgrade --install oxicloud charts/oxicloud -f charts/oxicloud/values.yaml
+```
+
+## 03 - Verification
+
+To verify your deployment run:
+```bash
+kubectl get pods -n oxicloud
+kubectl logs statefulset/oxicloud -n oxicloud
+```
+
+If you have collabora enabled you want to check the logs:
+```bash
+kubectl logs statefulset/oxicloud -n oxicloud | grep "WOPI discovery loaded"
+```
