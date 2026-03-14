@@ -82,24 +82,8 @@ impl Calendar {
             ));
         }
 
-        // Validate color format if provided (#RRGGBB)
-        if let Some(ref color_str) = color {
-            if !color_str.starts_with('#') || color_str.len() != 7 {
-                return Err(DomainError::new(
-                    ErrorKind::InvalidInput,
-                    "Calendar",
-                    "Color must be in #RRGGBB format",
-                ));
-            }
-
-            // Check if remaining characters are valid hex
-            if color_str[1..].chars().any(|c| !c.is_ascii_hexdigit()) {
-                return Err(DomainError::new(
-                    ErrorKind::InvalidInput,
-                    "Calendar",
-                    "Color must be in #RRGGBB format with valid hex digits",
-                ));
-            }
+        if let Some(color_str) = &color {
+            Self::validate_color(color_str)?;
         }
 
         let now = Utc::now();
@@ -153,6 +137,10 @@ impl Calendar {
                 "Calendar",
                 "Owner ID cannot be empty",
             ));
+        }
+
+        if let Some(color_str) = &color {
+            Self::validate_color(color_str)?;
         }
 
         Ok(Self {
@@ -253,28 +241,28 @@ impl Calendar {
      * @return Result indicating success or containing a domain error
      */
     pub fn update_color(&mut self, color: Option<String>) -> Result<()> {
-        // Validate color format if provided (#RRGGBB)
-        if let Some(ref color_str) = color {
-            if !color_str.starts_with('#') || color_str.len() != 7 {
-                return Err(DomainError::new(
-                    ErrorKind::InvalidInput,
-                    "Calendar",
-                    "Color must be in #RRGGBB format",
-                ));
-            }
-
-            // Check if remaining characters are valid hex
-            if color_str[1..].chars().any(|c| !c.is_ascii_hexdigit()) {
-                return Err(DomainError::new(
-                    ErrorKind::InvalidInput,
-                    "Calendar",
-                    "Color must be in #RRGGBB format with valid hex digits",
-                ));
-            }
+        // Validate color format if provided
+        if let Some(color_str) = &color {
+            Self::validate_color(&color_str)?;
         }
 
         self.color = color;
         self.updated_at = Utc::now();
+        Ok(())
+    }
+
+    /// Validate a calendar color
+    fn validate_color(color: &str) -> Result<()> {
+        if !color.starts_with('#')
+            || !(color.len() == 7 || color.len() == 9)
+            || color[1..].chars().any(|c| !c.is_ascii_hexdigit())
+        {
+            return Err(DomainError::new(
+                ErrorKind::InvalidInput,
+                "Calendar",
+                "Color must be in #RRGGBB or #RRGGBBAA format",
+            ));
+        }
         Ok(())
     }
 
@@ -319,5 +307,61 @@ impl Calendar {
      */
     pub fn touch(&mut self) {
         self.updated_at = Utc::now();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_init() {
+        let res = Calendar::new("Name".to_string(), "ID".to_string(), None, None);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_init_color_rgb() {
+        let res = Calendar::new(
+            "Name".to_string(),
+            "ID".to_string(),
+            None,
+            Some("#84FFa9".to_string()),
+        );
+        assert!(res.is_ok());
+    }
+
+    /// Format as used by the android DAVx app
+    #[test]
+    fn test_init_color_rgba() {
+        let res = Calendar::new(
+            "Name".to_string(),
+            "ID".to_string(),
+            None,
+            Some("#abcdef51".to_string()),
+        );
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_init_bad_color_1() {
+        let res = Calendar::new(
+            "Name".to_string(),
+            "ID".to_string(),
+            None,
+            Some("foo".to_string()),
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_init_bad_color_2() {
+        let res = Calendar::new(
+            "Name".to_string(),
+            "ID".to_string(),
+            None,
+            Some("#xxjjff".to_string()),
+        );
+        assert!(res.is_err());
     }
 }
