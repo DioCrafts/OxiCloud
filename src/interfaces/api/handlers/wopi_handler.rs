@@ -280,6 +280,7 @@ async fn put_file(
             total_bytes,
             &content_type,
             Some(hash),
+            None,
         )
         .await;
 

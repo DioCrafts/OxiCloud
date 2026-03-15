@@ -69,7 +69,8 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         path: &str,
         content: &[u8],
         content_type: &str,
-    ) -> Result<(), DomainError>;
+        modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError>;
 
     /// Streaming update — spools body to a temp file with incremental hash,
     /// then atomically replaces the file content via dedup store.
@@ -83,7 +84,8 @@ pub trait FileUploadUseCase: Send + Sync + 'static {
         size: u64,
         content_type: &str,
         pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError>;
+        modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError>;
 }
 
 // ─────────────────────────────────────────────────────

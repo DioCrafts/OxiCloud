@@ -243,7 +243,7 @@ impl Calendar {
     pub fn update_color(&mut self, color: Option<String>) -> Result<()> {
         // Validate color format if provided
         if let Some(color_str) = &color {
-            Self::validate_color(&color_str)?;
+            Self::validate_color(color_str)?;
         }
 
         self.color = color;

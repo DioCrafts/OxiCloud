@@ -928,6 +928,7 @@ async fn handle_put(
             total_bytes as u64,
             &content_type,
             Some(hash),
+            None,
         )
         .await;
 

@@ -21,6 +21,7 @@ pub struct FileParts {
     pub created_at: u64,
     pub modified_at: u64,
     pub owner_id: Option<Uuid>,
+    pub etag: String,
 }
 
 /**
@@ -64,6 +65,9 @@ pub struct File {
 
     /// Owner user ID (from storage.files.user_id)
     owner_id: Option<Uuid>,
+
+    /// Content-addressable ETag (= blob_hash). Changes on every content write.
+    etag: String,
 }
 
 // We no longer need this module, now we use a String directly
@@ -81,6 +85,7 @@ impl Default for File {
             created_at: 0,
             modified_at: 0,
             owner_id: None,
+            etag: String::new(),
         }
     }
 }
@@ -119,6 +124,7 @@ impl File {
             created_at: now,
             modified_at: now,
             owner_id: None,
+            etag: String::new(),
         })
     }
 
@@ -150,6 +156,7 @@ impl File {
             created_at,
             modified_at,
             owner_id: None,
+            etag: String::new(),
         })
     }
 
@@ -164,6 +171,33 @@ impl File {
         created_at: u64,
         modified_at: u64,
         owner_id: Option<Uuid>,
+    ) -> FileResult<Self> {
+        Self::with_timestamps_and_etag(
+            id,
+            name,
+            storage_path,
+            size,
+            mime_type,
+            folder_id,
+            created_at,
+            modified_at,
+            owner_id,
+            String::new(),
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_timestamps_and_etag(
+        id: String,
+        name: String,
+        storage_path: StoragePath,
+        size: u64,
+        mime_type: String,
+        folder_id: Option<String>,
+        created_at: u64,
+        modified_at: u64,
+        owner_id: Option<Uuid>,
+        etag: String,
     ) -> FileResult<Self> {
         // Validate file name
         if name.is_empty() || name.contains('/') || name.contains('\\') {
@@ -184,6 +218,7 @@ impl File {
             created_at,
             modified_at,
             owner_id,
+            etag,
         })
     }
 
@@ -203,7 +238,12 @@ impl File {
             created_at: self.created_at,
             modified_at: self.modified_at,
             owner_id: self.owner_id,
+            etag: self.etag,
         }
+    }
+
+    pub fn etag(&self) -> &str {
+        &self.etag
     }
 
     // Getters
@@ -273,6 +313,7 @@ impl File {
             created_at,
             modified_at,
             owner_id: None,
+            etag: String::new(),
         }
     }
 
@@ -311,6 +352,7 @@ impl File {
             created_at: self.created_at,
             modified_at: now,
             owner_id: self.owner_id,
+            etag: self.etag.clone(),
         })
     }
 
@@ -345,6 +387,7 @@ impl File {
             created_at: self.created_at,
             modified_at: now,
             owner_id: self.owner_id,
+            etag: self.etag.clone(),
         })
     }
 
@@ -366,6 +409,7 @@ impl File {
             created_at: self.created_at,
             modified_at: now,
             owner_id: self.owner_id,
+            etag: self.etag.clone(),
         }
     }
 }

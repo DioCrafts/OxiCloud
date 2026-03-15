@@ -204,8 +204,9 @@ impl FileWritePort for MockFileWritePort {
         _size: u64,
         _content_type: Option<String>,
         _pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError> {
-        Ok(())
+        _modified_at: Option<i64>,
+    ) -> Result<String, DomainError> {
+        Ok(String::new())
     }
 
     async fn register_file_deferred(

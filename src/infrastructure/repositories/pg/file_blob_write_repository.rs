@@ -100,9 +100,10 @@ impl FileBlobWriteRepository {
         created_at: i64,
         modified_at: i64,
         owner_id: Option<Uuid>,
+        etag: String,
     ) -> Result<File, DomainError> {
         let storage_path = Self::make_file_path(folder_path.as_deref(), &name);
-        File::with_timestamps(
+        File::with_timestamps_and_etag(
             id,
             name,
             storage_path,
@@ -112,6 +113,7 @@ impl FileBlobWriteRepository {
             created_at as u64,
             modified_at as u64,
             owner_id,
+            etag,
         )
         .map_err(|e| DomainError::internal_error("FileBlobWrite", format!("entity: {e}")))
     }
@@ -132,12 +134,16 @@ impl FileBlobWriteRepository {
     /// Uses a CTE to capture the old hash before updating so the old blob
     /// reference can be decremented afterwards. Compensates on failure by
     /// removing the new blob reference.
+    ///
+    /// `modified_at`: if `Some`, sets `updated_at` to that Unix timestamp;
+    /// if `None`, uses `NOW()` (server time). Returns the new hash on success.
     async fn swap_blob_hash(
         &self,
         file_id: &str,
         new_hash: &str,
         new_size: i64,
-    ) -> Result<(), DomainError> {
+        modified_at: Option<i64>,
+    ) -> Result<String, DomainError> {
         // Atomic CTE: capture old hash then update in one round-trip, no TOCTOU.
         let old_hash = match sqlx::query_scalar::<_, String>(
             r#"
@@ -145,7 +151,8 @@ impl FileBlobWriteRepository {
                 SELECT id, blob_hash FROM storage.files WHERE id = $3::uuid FOR UPDATE
             )
             UPDATE storage.files f
-               SET blob_hash = $1, size = $2, updated_at = NOW()
+               SET blob_hash = $1, size = $2,
+                   updated_at = COALESCE(to_timestamp($4), NOW())
               FROM old
              WHERE f.id = old.id
             RETURNING old.blob_hash
@@ -154,6 +161,7 @@ impl FileBlobWriteRepository {
         .bind(new_hash)
         .bind(new_size)
         .bind(file_id)
+        .bind(modified_at.map(|t| t as f64))
         .fetch_optional(self.pool.as_ref())
         .await
         {
@@ -192,7 +200,7 @@ impl FileBlobWriteRepository {
             );
         }
 
-        Ok(())
+        Ok(new_hash.to_string())
     }
 }
 
@@ -277,6 +285,7 @@ impl FileWritePort for FileBlobWriteRepository {
             row.1,
             row.2,
             Some(user_id),
+            blob_hash.clone(),
         )
     }
 
@@ -314,6 +323,7 @@ impl FileWritePort for FileBlobWriteRepository {
             row.5,
             row.6,
             None,
+            String::new(),
         )
     }
 
@@ -407,6 +417,7 @@ impl FileWritePort for FileBlobWriteRepository {
             row.5,
             row.6,
             None,
+            row.7,
         )
     }
 
@@ -446,6 +457,7 @@ impl FileWritePort for FileBlobWriteRepository {
             row.5,
             row.6,
             None,
+            String::new(),
         )
     }
 
@@ -474,7 +486,8 @@ impl FileWritePort for FileBlobWriteRepository {
         size: u64,
         content_type: Option<String>,
         pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError> {
+        modified_at: Option<i64>,
+    ) -> Result<String, DomainError> {
         // Streaming: pass pre-computed hash so dedup skips re-reading the file.
         let dedup_result = self
             .dedup
@@ -482,7 +495,8 @@ impl FileWritePort for FileBlobWriteRepository {
             .await?;
         let new_hash = dedup_result.hash().to_string();
 
-        self.swap_blob_hash(file_id, &new_hash, size as i64).await
+        self.swap_blob_hash(file_id, &new_hash, size as i64, modified_at)
+            .await
     }
 
     async fn register_file_deferred(
@@ -528,6 +542,7 @@ impl FileWritePort for FileBlobWriteRepository {
             row.1,
             row.2,
             Some(user_id),
+            String::new(),
         )?;
 
         // The target_path is not meaningful for blob storage (content goes to .blobs/)

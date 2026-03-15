@@ -116,6 +116,12 @@ async fn handle_assemble(
         .ok_or_else(|| AppError::bad_request("Missing Destination header"))?
         .to_string();
 
+    let oc_mtime = req
+        .headers()
+        .get("x-oc-mtime")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<i64>().ok());
+
     let dest_subpath = extract_files_subpath(&destination, &user.username)
         .ok_or_else(|| AppError::bad_request("Invalid Destination URL"))?;
 
@@ -144,11 +150,19 @@ async fn handle_assemble(
     // Check if file exists (update vs create).
     let existing = file_service.get_file_by_path(&internal_path).await;
 
-    if existing.is_ok() {
-        upload_service
-            .update_file_streaming(&internal_path, &temp_path, size, &content_type, None)
+    let etag: Option<String> = if existing.is_ok() {
+        let dto = upload_service
+            .update_file_streaming(
+                &internal_path,
+                &temp_path,
+                size,
+                &content_type,
+                None,
+                oc_mtime,
+            )
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update file: {}", e)))?;
+        Some(dto.etag)
     } else {
         // For new files we still need to read the temp file since create_file takes &[u8].
         let assembled = tokio::fs::read(&temp_path).await.map_err(|e| {
@@ -166,11 +180,12 @@ async fn handle_assemble(
         );
         let parent_internal = parent_internal.trim_end_matches('/');
 
-        upload_service
+        let dto = upload_service
             .create_file(parent_internal, filename, &assembled, &content_type)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to create file: {}", e)))?;
-    }
+        Some(dto.etag)
+    };
 
     // Clean up temp file (session cleanup below removes the directory anyway).
     let _ = tokio::fs::remove_file(&temp_path).await;
@@ -178,11 +193,11 @@ async fn handle_assemble(
     // Cleanup session.
     let _ = nc.chunked_uploads.cleanup(&user.username, upload_id).await;
 
-    // Return etag if we can fetch the file.
-    if let Ok(file) = file_service.get_file_by_path(&internal_path).await {
+    if let Some(tag) = etag {
         return Ok(Response::builder()
             .status(StatusCode::CREATED)
-            .header(header::ETAG, format!("\"{}\"", file.id))
+            .header(header::ETAG, format!("\"{}\"", tag))
+            .header("oc-etag", format!("\"{}\"", tag))
             .body(Body::empty())
             .unwrap());
     }

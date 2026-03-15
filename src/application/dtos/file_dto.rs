@@ -56,6 +56,11 @@ pub struct FileDto {
     /// Only populated by the /api/photos endpoint.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_date: Option<u64>,
+
+    /// Content-addressable ETag (= blob_hash). Changes on every content write.
+    /// Used for WebDAV/Nextcloud ETag headers. Omitted from REST API JSON.
+    #[serde(skip)]
+    pub etag: String,
 }
 
 impl From<File> for FileDto {
@@ -85,6 +90,7 @@ impl From<File> for FileDto {
             size_formatted,
             owner_id: parts.owner_id.map(|u| u.to_string()),
             sort_date: None,
+            etag: parts.etag,
         }
     }
 }
@@ -124,6 +130,7 @@ impl FileDto {
             category: Arc::from("Document"),
             size_formatted: "0 Bytes".to_string(),
             owner_id: None,
+            etag: String::new(),
             sort_date: None,
         }
     }
