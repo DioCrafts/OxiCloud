@@ -505,8 +505,8 @@ fn capabilities_payload(state: &AppState, ocs_version: u8) -> serde_json::Value 
                         "chunking": "1.0"
                     },
                     "checksums": {
-                        "preferredUploadType": "SHA1",
-                        "supportedTypes": ["SHA1", "MD5"]
+                        "preferredUploadType": "",
+                        "supportedTypes": []
                     },
                     "files_sharing": {
                         "api_enabled": false,

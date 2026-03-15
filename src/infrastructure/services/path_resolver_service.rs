@@ -175,6 +175,7 @@ impl PathResolverService {
                     size_formatted: format_file_size(sz),
                     owner_id: uid,
                     sort_date: None,
+                    etag: String::new(),
                 }))
             }
         }

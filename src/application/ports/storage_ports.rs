@@ -291,7 +291,8 @@ pub trait FileWritePort: Send + Sync + 'static {
         size: u64,
         content_type: Option<String>,
         pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError>;
+        modified_at: Option<i64>,
+    ) -> Result<String, DomainError>;
 
     /// Registers file metadata WITHOUT writing content to disk (write-behind).
     ///

@@ -556,8 +556,9 @@ impl FileWritePort for MockFileRepository {
         _size: u64,
         _content_type: Option<String>,
         _pre_computed_hash: Option<String>,
-    ) -> std::result::Result<(), DomainError> {
-        Ok(())
+        _modified_at: Option<i64>,
+    ) -> std::result::Result<String, DomainError> {
+        Ok(String::new())
     }
 
     async fn register_file_deferred(

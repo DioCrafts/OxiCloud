@@ -227,7 +227,8 @@ impl FileUploadUseCase for FileUploadService {
         path: &str,
         content: &[u8],
         content_type: &str,
-    ) -> Result<(), DomainError> {
+        modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError> {
         // Spool to temp file + hash
         let temp = tempfile::NamedTempFile::new()
             .map_err(|e| DomainError::internal_error("FileUpload", format!("temp file: {e}")))?;
@@ -242,6 +243,7 @@ impl FileUploadUseCase for FileUploadService {
             content.len() as u64,
             content_type,
             Some(hash),
+            modified_at,
         )
         .await
     }
@@ -260,21 +262,26 @@ impl FileUploadUseCase for FileUploadService {
         size: u64,
         content_type: &str,
         pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError> {
+        modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError> {
         // Try to find the existing file first
         if let Some(file_read) = &self.file_read
             && let Some(file) = file_read.find_file_by_path(path).await?
         {
+            let file_id = file.id().to_string();
             self.file_write
                 .update_file_content_from_temp(
-                    file.id(),
+                    &file_id,
                     temp_path,
                     size,
                     Some(content_type.to_string()),
                     pre_computed_hash,
+                    modified_at,
                 )
                 .await?;
-            return Ok(());
+            // Re-read to get fresh DTO with updated etag and timestamps.
+            let updated = file_read.get_file(&file_id).await?;
+            return Ok(FileDto::from(updated));
         }
 
         // File doesn't exist — create it via streaming upload
@@ -297,7 +304,8 @@ impl FileUploadUseCase for FileUploadService {
             None
         };
 
-        self.file_write
+        let created = self
+            .file_write
             .save_file_from_temp(
                 filename.to_string(),
                 parent_id,
@@ -307,6 +315,6 @@ impl FileUploadUseCase for FileUploadService {
                 pre_computed_hash,
             )
             .await?;
-        Ok(())
+        Ok(FileDto::from(created))
     }
 }

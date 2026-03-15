@@ -266,6 +266,7 @@ fn file_dto_from_search(fr: &crate::application::dtos::search_dto::SearchFileRes
         size_formatted: format_file_size(fr.size),
         owner_id: None,
         sort_date: None,
+        etag: String::new(),
     }
 }
 

@@ -526,7 +526,7 @@ async fn handle_put(
         .unwrap_or("application/octet-stream")
         .to_string();
 
-    let _oc_mtime = req
+    let oc_mtime = req
         .headers()
         .get("x-oc-mtime")
         .and_then(|v| v.to_str().ok())
@@ -545,24 +545,16 @@ async fn handle_put(
     let existing = file_service.get_file_by_path(&internal_path).await;
 
     if existing.is_ok() {
-        // Update existing file.
-        upload_service
-            .update_file(&internal_path, &body_bytes, &content_type)
+        // Update existing file — returns FileDto with fresh content-hash etag.
+        let updated = upload_service
+            .update_file(&internal_path, &body_bytes, &content_type, oc_mtime)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update file: {}", e)))?;
 
-        // Re-fetch for etag.
-        if let Ok(updated) = file_service.get_file_by_path(&internal_path).await {
-            let builder = Response::builder()
-                .status(StatusCode::NO_CONTENT)
-                .header(header::ETAG, format!("\"{}\"", updated.id))
-                .header("oc-etag", format!("\"{}\"", updated.id));
-
-            return Ok(builder.body(Body::empty()).unwrap());
-        }
-
         return Ok(Response::builder()
             .status(StatusCode::NO_CONTENT)
+            .header(header::ETAG, format!("\"{}\"", updated.etag))
+            .header("oc-etag", format!("\"{}\"", updated.etag))
             .body(Body::empty())
             .unwrap());
     }
@@ -582,8 +574,8 @@ async fn handle_put(
 
     let builder = Response::builder()
         .status(StatusCode::CREATED)
-        .header(header::ETAG, format!("\"{}\"", file_dto.id))
-        .header("oc-etag", format!("\"{}\"", file_dto.id));
+        .header(header::ETAG, format!("\"{}\"", file_dto.etag))
+        .header("oc-etag", format!("\"{}\"", file_dto.etag));
 
     Ok(builder.body(Body::empty()).unwrap())
 }
@@ -1126,7 +1118,7 @@ pub fn write_file_response<W: std::io::Write>(
             .unwrap_or_else(Utc::now);
 
     write_text_element(xml, "d:getlastmodified", &modified_at.to_rfc2822())?;
-    write_text_element(xml, "d:getetag", &format!("\"{}\"", file.id))?;
+    write_text_element(xml, "d:getetag", &format!("\"{}\"", file.etag))?;
     write_text_element(xml, "d:creationdate", &created_at.to_rfc3339())?;
 
     // Nextcloud/ownCloud properties
@@ -1166,6 +1158,8 @@ pub fn write_file_response<W: std::io::Write>(
 
     write_text_element(xml, "nc:is-encrypted", "0")?;
     write_text_element(xml, "nc:mount-type", "")?;
+    write_text_element(xml, "nc:creation_time", &file.created_at.to_string())?;
+    write_text_element(xml, "nc:upload_time", &file.modified_at.to_string())?;
 
     xml.write_event(Event::End(BytesEnd::new("d:prop")))
         .xml_err()?;

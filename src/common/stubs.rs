@@ -185,8 +185,9 @@ impl FileWritePort for StubFileWritePort {
         _size: u64,
         _content_type: Option<String>,
         _pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError> {
-        Ok(())
+        _modified_at: Option<i64>,
+    ) -> Result<String, DomainError> {
+        Ok(String::new())
     }
 
     async fn register_file_deferred(
@@ -477,8 +478,9 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         _path: &str,
         _content: &[u8],
         _content_type: &str,
-    ) -> Result<(), DomainError> {
-        Ok(())
+        _modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
     }
 
     async fn update_file_streaming(
@@ -488,8 +490,9 @@ impl FileUploadUseCase for StubFileUploadUseCase {
         _size: u64,
         _content_type: &str,
         _pre_computed_hash: Option<String>,
-    ) -> Result<(), DomainError> {
-        Ok(())
+        _modified_at: Option<i64>,
+    ) -> Result<FileDto, DomainError> {
+        Ok(FileDto::default())
     }
 }
 
