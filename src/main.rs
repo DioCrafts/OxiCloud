@@ -375,9 +375,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Increase the default body limit to 10 GB to allow large file uploads.
+    // Increase the default body limit to allow large file uploads.
+    // Uses architecture-appropriate limit: 10 GB on 64-bit, 1 GB on 32-bit.
     // Without this Axum caps Multipart bodies at 2 MB.
-    app = app.layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024));
+    #[cfg(target_pointer_width = "64")]
+    const BODY_LIMIT: usize = 10 * 1024 * 1024 * 1024; // 10 GB
+    #[cfg(target_pointer_width = "32")]
+    const BODY_LIMIT: usize = 1024 * 1024 * 1024; // 1 GB
+    app = app.layer(DefaultBodyLimit::max(BODY_LIMIT));
 
     // ── HTTP compression (gzip + Brotli) ─────────────────────────────────
     // Negotiates the best encoding via Accept-Encoding.  Skips responses
