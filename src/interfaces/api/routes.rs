@@ -150,7 +150,14 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
             get(FileHandler::get_thumbnail).put(FileHandler::upload_thumbnail),
         )
         .route("/{id}/metadata", get(FileHandler::get_file_metadata))
-        .layer(DefaultBodyLimit::max(10 * 1024 * 1024 * 1024)) // 10 GB for file uploads
+        .layer(DefaultBodyLimit::max({
+            // Use architecture-appropriate body limit: 10 GB on 64-bit, 1 GB on 32-bit
+            #[cfg(target_pointer_width = "64")]
+            const FILE_BODY_LIMIT: usize = 10 * 1024 * 1024 * 1024;
+            #[cfg(target_pointer_width = "32")]
+            const FILE_BODY_LIMIT: usize = 1024 * 1024 * 1024;
+            FILE_BODY_LIMIT
+        })) // for file uploads
         .with_state(app_state.clone());
 
     // File operations with trash support

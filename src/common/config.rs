@@ -207,12 +207,18 @@ pub struct StorageConfig {
 
 impl Default for StorageConfig {
     fn default() -> Self {
+        // Architecture-appropriate max upload size to avoid overflow on 32-bit systems
+        const MAX_UPLOAD_SIZE: usize = if cfg!(target_pointer_width = "64") {
+            10 * 1024 * 1024 * 1024 // 10 GB on 64-bit
+        } else {
+            1024 * 1024 * 1024 // 1 GB on 32-bit
+        };
         Self {
             root_dir: "storage".to_string(),
             chunk_size: 1024 * 1024,                  // 1 MB
             parallel_threshold: 100 * 1024 * 1024,    // 100 MB
             trash_retention_days: 30,                 // 30 days
-            max_upload_size: 10 * 1024 * 1024 * 1024, // 10 GB
+            max_upload_size: MAX_UPLOAD_SIZE,
         }
     }
 }
