@@ -31,7 +31,7 @@ pub struct Calendar {
     name: String,
 
     /// ID of the user who owns this calendar
-    owner_id: String,
+    owner_id: Uuid,
 
     /// Optional description of the calendar
     description: Option<String>,
@@ -61,7 +61,7 @@ impl Calendar {
      */
     pub fn new(
         name: String,
-        owner_id: String,
+        owner_id: Uuid,
         description: Option<String>,
         color: Option<String>,
     ) -> Result<Self> {
@@ -71,14 +71,6 @@ impl Calendar {
                 ErrorKind::InvalidInput,
                 "Calendar",
                 "Calendar name cannot be empty",
-            ));
-        }
-
-        if owner_id.is_empty() {
-            return Err(DomainError::new(
-                ErrorKind::InvalidInput,
-                "Calendar",
-                "Owner ID cannot be empty",
             ));
         }
 
@@ -116,7 +108,7 @@ impl Calendar {
     pub fn with_id(
         id: Uuid,
         name: String,
-        owner_id: String,
+        owner_id: Uuid,
         description: Option<String>,
         color: Option<String>,
         created_at: DateTime<Utc>,
@@ -128,14 +120,6 @@ impl Calendar {
                 ErrorKind::InvalidInput,
                 "Calendar",
                 "Calendar name cannot be empty",
-            ));
-        }
-
-        if owner_id.is_empty() {
-            return Err(DomainError::new(
-                ErrorKind::InvalidInput,
-                "Calendar",
-                "Owner ID cannot be empty",
             ));
         }
 
@@ -168,7 +152,7 @@ impl Calendar {
     }
 
     /// Returns the ID of the user who owns this calendar
-    pub fn owner_id(&self) -> &str {
+    pub fn owner_id(&self) -> &Uuid {
         &self.owner_id
     }
 
@@ -297,8 +281,8 @@ impl Calendar {
      * @param user_id ID of the user to check ownership against
      * @return true if the calendar belongs to the user, false otherwise
      */
-    pub fn belongs_to(&self, user_id: &str) -> bool {
-        self.owner_id == user_id
+    pub fn belongs_to(&self, user_id: &Uuid) -> bool {
+        self.owner_id == *user_id
     }
 
     /**
@@ -316,15 +300,17 @@ mod tests {
 
     #[test]
     fn test_init() {
-        let res = Calendar::new("Name".to_string(), "ID".to_string(), None, None);
+        let owner_id = Uuid::new_v4();
+        let res = Calendar::new("Name".to_string(), owner_id, None, None);
         assert!(res.is_ok());
     }
 
     #[test]
     fn test_init_color_rgb() {
+        let owner_id = Uuid::new_v4();
         let res = Calendar::new(
             "Name".to_string(),
-            "ID".to_string(),
+            owner_id,
             None,
             Some("#84FFa9".to_string()),
         );
@@ -334,9 +320,10 @@ mod tests {
     /// Format as used by the android DAVx app
     #[test]
     fn test_init_color_rgba() {
+        let owner_id = Uuid::new_v4();
         let res = Calendar::new(
             "Name".to_string(),
-            "ID".to_string(),
+            owner_id,
             None,
             Some("#abcdef51".to_string()),
         );
@@ -345,9 +332,10 @@ mod tests {
 
     #[test]
     fn test_init_bad_color_1() {
+        let owner_id = Uuid::new_v4();
         let res = Calendar::new(
             "Name".to_string(),
-            "ID".to_string(),
+            owner_id,
             None,
             Some("foo".to_string()),
         );
@@ -356,9 +344,10 @@ mod tests {
 
     #[test]
     fn test_init_bad_color_2() {
+        let owner_id = Uuid::new_v4();
         let res = Calendar::new(
             "Name".to_string(),
-            "ID".to_string(),
+            owner_id,
             None,
             Some("#xxjjff".to_string()),
         );

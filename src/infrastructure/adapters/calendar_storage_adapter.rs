@@ -49,7 +49,7 @@ impl CalendarStoragePort for CalendarStorageAdapter {
         dto: CreateCalendarDto,
         owner_id: Uuid,
     ) -> Result<CalendarDto, DomainError> {
-        let calendar = Calendar::new(dto.name, owner_id.to_string(), dto.description, dto.color)?;
+        let calendar = Calendar::new(dto.name, owner_id, dto.description, dto.color)?;
 
         let created = self.calendar_repository.create_calendar(calendar).await?;
         Ok(CalendarDto::from(created))
