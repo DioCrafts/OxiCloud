@@ -166,13 +166,15 @@
 .nav-item:nth-child(2) i, .nav-item:nth-child(2) .oxi-icon { color: #74b9ff; } /* Shared - blue */
 .nav-item:nth-child(3) i, .nav-item:nth-child(3) .oxi-icon { color: #81ecec; } /* Recent - teal */
 .nav-item:nth-child(4) i, .nav-item:nth-child(4) .oxi-icon { color: #ffd43b; } /* Favorites - gold */
-.nav-item:nth-child(5) i, .nav-item:nth-child(5) .oxi-icon { color: #ff7675; } /* Trash - red */
+.nav-item:nth-child(5) i, .nav-item:nth-child(5) .oxi-icon { color: #ff6b9d; } /* Photos - pink */
+.nav-item:nth-child(6) i, .nav-item:nth-child(6) .oxi-icon { color: #ff7675; } /* Trash - red */
 
 .nav-item.active:nth-child(1) i, .nav-item.active:nth-child(1) .oxi-icon { color: #ff5e3a; }
 .nav-item.active:nth-child(2) i, .nav-item.active:nth-child(2) .oxi-icon { color: #0984e3; }
 .nav-item.active:nth-child(3) i, .nav-item.active:nth-child(3) .oxi-icon { color: #00cec9; }
 .nav-item.active:nth-child(4) i, .nav-item.active:nth-child(4) .oxi-icon { color: #f0c800; }
-.nav-item.active:nth-child(5) i, .nav-item.active:nth-child(5) .oxi-icon { color: #e74c3c; }
+.nav-item.active:nth-child(5) i, .nav-item.active:nth-child(5) .oxi-icon { color: #e84393; }
+.nav-item.active:nth-child(6) i, .nav-item.active:nth-child(6) .oxi-icon { color: #e74c3c; }
 
 .nav-item:hover i,
 .nav-item:hover .oxi-icon {
