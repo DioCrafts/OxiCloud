@@ -30,8 +30,10 @@ pub const CSRF_HEADER: &str = "x-csrf-token";
 /// Resolution order:
 /// 1. `OXICLOUD_COOKIE_SECURE=true|false` — explicit override.
 /// 2. `OXICLOUD_BASE_URL` starts with `https` → `true`.
-/// 3. **Default: `true`** (safe-by-default).  Set `OXICLOUD_COOKIE_SECURE=false`
-///    explicitly for plain-HTTP development environments.
+/// 3. `OXICLOUD_BASE_URL` starts with `http` → `false`.
+/// 4. **Default: `false`** for compatibility with HTTP deployments
+///    (Docker, local development). Set `OXICLOUD_COOKIE_SECURE=true`
+///    explicitly for production HTTPS environments.
 fn cookie_secure() -> bool {
     if let Ok(v) = std::env::var("OXICLOUD_COOKIE_SECURE") {
         let secure = v == "true" || v == "1";
@@ -44,18 +46,25 @@ fn cookie_secure() -> bool {
         }
         return secure;
     }
-    // Auto-detect from base URL, defaulting to secure when unset
-    let secure = std::env::var("OXICLOUD_BASE_URL")
-        .map(|u| u.starts_with("https"))
-        .unwrap_or(true);
-    if !secure {
-        tracing::warn!(
-            "OXICLOUD_BASE_URL does not start with https — \
-             cookie Secure flag is OFF. Set OXICLOUD_COOKIE_SECURE=true \
-             to override if your proxy terminates TLS."
-        );
+    // Auto-detect from base URL, defaulting to insecure for compatibility
+    match std::env::var("OXICLOUD_BASE_URL") {
+        Ok(url) if url.starts_with("https") => true,
+        Ok(url) if url.starts_with("http://") => {
+            tracing::info!(
+                "OXICLOUD_BASE_URL is HTTP — cookie Secure flag is OFF. \
+                 Set OXICLOUD_COOKIE_SECURE=true to override if your proxy terminates TLS."
+            );
+            false
+        }
+        _ => {
+            // Default to false for compatibility with HTTP deployments
+            tracing::info!(
+                "OXICLOUD_BASE_URL not set — defaulting to non-secure cookies \
+                 for HTTP compatibility. Set OXICLOUD_COOKIE_SECURE=true for HTTPS deployments."
+            );
+            false
+        }
     }
-    secure
 }
 
 /// Build a `Set-Cookie` header value.
