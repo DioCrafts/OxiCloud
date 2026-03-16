@@ -91,6 +91,28 @@ NextCloud was too slow on my home server. So I built OxiCloud — a complete clo
 
 ---
 
+## Feature Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **File storage & upload** | ✅ Working | Chunked uploads, deduplication, thumbnails |
+| **WebDAV** | ✅ Working | Fully compatible with major clients |
+| **CalDAV (Thunderbird, iOS)** | ✅ Working | Calendar sync functional |
+| **CardDAV (Thunderbird, iOS)** | ✅ Working | Contacts sync functional |
+| **DAVx⁵ (Android)** | ⚠️ Partial | File sync works; calendar/contacts in progress |
+| **WOPI / Office editing** | ✅ Working | Collabora/OnlyOffice integration |
+| **OIDC / SSO** | ✅ Working | Keycloak, Authentik, Google, Azure AD |
+| **Trash / recycle bin** | ✅ Working | Soft-delete with restore |
+| **Full-text search** | ✅ Working | Recursive subtree search |
+| **Shared links** | ✅ Working | Optional password protection |
+| **Desktop sync client** | ❌ Planned | Not yet available |
+| **Android / iOS app** | ❌ Planned | Not yet available |
+| **End-to-end encryption** | ❌ Planned | Roadmap item |
+
+> **Note:** The DAVx⁵ Android app currently works for file sync via WebDAV, but calendar and contacts sync via CalDAV/CardDAV is still being refined. Use Thunderbird or iOS native clients for full CalDAV/CardDAV support.
+
+---
+
 ## Quick Start
 
 ### Docker (recommended)
