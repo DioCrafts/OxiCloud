@@ -416,15 +416,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     app = app
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("content-security-policy"),
-            // All inline scripts and styles have been migrated to external
-            // files, so 'unsafe-inline' is no longer needed.
+            // Note: 'unsafe-inline' is required for style-src because the
+            // frontend JavaScript dynamically sets inline styles (e.g.,
+            // element.style.display = 'none'). This is a common pattern
+            // for UI state management and cannot be easily migrated to
+            // external CSS classes without significant refactoring.
             // frame-src: '*' only matches network schemes, so 'blob:' must be
             // listed explicitly for inline PDF/document viewers.
             // media-src: needed for blob: video/audio playback.
             HeaderValue::from_static(
                 "default-src 'self'; \
                  script-src 'self'; \
-                 style-src 'self'; \
+                 style-src 'self' 'unsafe-inline'; \
                  img-src 'self' data: blob:; \
                  media-src 'self' blob:; \
                  connect-src 'self'; \
