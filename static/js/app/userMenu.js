@@ -52,24 +52,54 @@ function setupUserMenu() {
 
     if (themeBtn) {
         const pill = document.getElementById('theme-toggle-pill');
-        const isDark = localStorage.getItem('oxicloud_theme') === 'dark';
-        if (isDark) {
-            if (pill) pill.classList.add('active');
-            document.documentElement.setAttribute('data-theme', 'dark');
+
+        // Sync pill UI with current theme state
+        function syncThemePill() {
+            const isDark = localStorage.getItem('oxicloud_theme') === 'dark';
+            if (pill) {
+                if (isDark) {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            }
+            // Ensure document theme matches localStorage
+            if (isDark) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
         }
+
+        // Initialize pill state on load
+        syncThemePill();
 
         themeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (pill) {
-                pill.classList.toggle('active');
-                const dark = pill.classList.contains('active');
-                localStorage.setItem('oxicloud_theme', dark ? 'dark' : 'light');
-                document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-                window.ui.showNotification(
-                    dark ? '🌙' : '☀️',
-                    dark ? 'Dark mode enabled' : 'Light mode enabled'
-                );
+            // Toggle theme based on current state, not pill state
+            const currentIsDark = localStorage.getItem('oxicloud_theme') === 'dark';
+            const newIsDark = !currentIsDark;
+
+            localStorage.setItem('oxicloud_theme', newIsDark ? 'dark' : 'light');
+
+            if (newIsDark) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
             }
+
+            if (pill) {
+                if (newIsDark) {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            }
+
+            window.ui.showNotification(
+                newIsDark ? '🌙' : '☀️',
+                newIsDark ? 'Dark mode enabled' : 'Light mode enabled'
+            );
         });
     }
 

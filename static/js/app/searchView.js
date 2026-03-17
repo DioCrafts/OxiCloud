@@ -27,12 +27,16 @@ async function performSearch(query, sortBy) {
         };
 
         if (!app.isTrashView) {
-            options.folder_id = app.currentPath;
-
-            if (!options.folder_id || options.folder_id === '') {
+            // Ensure we have a valid folder_id before searching
+            if (!app.currentPath || app.currentPath === '') {
                 await window.resolveHomeFolder();
+            }
+
+            // Only set folder_id if we have a valid value
+            if (app.currentPath && app.currentPath !== '') {
                 options.folder_id = app.currentPath;
             }
+            // If still no valid folder_id, search will be global (without folder_id)
         }
 
         const searchResults = await window.search.searchFiles(query, options);
