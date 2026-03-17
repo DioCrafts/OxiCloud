@@ -18,10 +18,32 @@ jobs:
   test:
     name: Pre-publish Tests
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: oxicloud_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: "postgres://postgres:postgres@localhost/oxicloud_test"
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+
+      - name: Initialize test database
+        run: psql -h localhost -U postgres -d oxicloud_test -f migrations/20260307000000_initial_schema.sql
+        env:
+          PGPASSWORD: postgres
+
       - run: cargo test --workspace
 
   # Build and push multi-arch image in a single job
