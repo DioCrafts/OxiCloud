@@ -467,6 +467,7 @@ impl BatchOperationService {
                     result.stats.successful += 1;
                 }
                 Err(e) => {
+                    tracing::debug!("Failed to trash file {}: {}", file_id, e);
                     result.failed.push((file_id, e.to_string()));
                     result.stats.failed += 1;
                 }
@@ -530,6 +531,7 @@ impl BatchOperationService {
                     result.stats.successful += 1;
                 }
                 Err(e) => {
+                    tracing::debug!("Failed to trash folder {}: {}", folder_id, e);
                     result.failed.push((folder_id, e.to_string()));
                     result.stats.failed += 1;
                 }
