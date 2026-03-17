@@ -48,7 +48,7 @@ Enhancement suggestions are welcome! Please include:
    ```
 5. Commit your changes with a descriptive message
 6. Push to your branch
-7. Create a Pull Request to the `dev` branch
+7. Create a Pull Request to the `main` branch
 
 ### Development Guidelines
 
