@@ -27,6 +27,7 @@
     "upload_folder": "폴더 업로드",
     "upload.uploading": "업로드 중...",
     "upload.complete": "{count} / {total} 업로드 완료",
+    "upload.files": "파일",
     "rename": "이름 변경",
     "move": "이동...",
     "move_to": "이동 대상",

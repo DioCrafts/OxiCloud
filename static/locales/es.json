@@ -146,6 +146,7 @@
     "upload_folder": "Subir carpeta",
     "upload.uploading": "Subiendo...",
     "upload.complete": "{count} / {total} subidos",
+    "upload.files": "archivos",
     "rename": "Renombrar",
     "move": "Mover a...",
     "move_to": "Mover a",

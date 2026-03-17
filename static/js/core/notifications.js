@@ -143,11 +143,11 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
+        const t = window.i18n?.t || ((k) => k);
         const uploadingText = folderName
-            ? (locale.startsWith('es') ? `📁 Subiendo ${_esc(folderName)}…` : `📁 Uploading ${_esc(folderName)}…`)
-            : (locale.startsWith('es') ? 'Subiendo…' : 'Uploading…');
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+            ? `📁 ${t('upload.uploading')} ${_esc(folderName)}…`
+            : t('upload.uploading');
+        const filesLabel = t('upload.files');
 
         item.innerHTML = `
             <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
@@ -254,8 +254,8 @@ const notifications = (() => {
         const pctEl   = $(batchId + '-pct');
         const statsEl = $(batchId + '-stats');
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
+        const t = window.i18n?.t || ((k) => k);
+        const filesLabel = t('upload.files');
 
         if (fillEl)  fillEl.style.width = pctVal + '%';
         if (pctEl)   pctEl.textContent = pctVal + '%';
@@ -282,11 +282,9 @@ const notifications = (() => {
         const curEl = $(batchId + '-current');
         if (curEl) curEl.textContent = '';
 
-        const locale = window.i18n?.getCurrentLocale?.() || 'en';
-        const filesLabel = locale.startsWith('es') ? 'archivos' : 'files';
-        const completeText = locale.startsWith('es')
-            ? `✅ ${successCount} / ${totalFiles} ${filesLabel} subidos`
-            : `✅ ${successCount} / ${totalFiles} ${filesLabel} uploaded`;
+        const t = window.i18n?.t || ((k) => k);
+        const filesLabel = t('upload.files');
+        const completeText = t('upload.complete', { count: successCount, total: totalFiles });
         if (titleEl) titleEl.textContent = completeText;
 
         if (iconEl) {

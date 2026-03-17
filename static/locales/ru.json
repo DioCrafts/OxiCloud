@@ -27,6 +27,7 @@
     "upload_folder": "Загрузить папку",
     "upload.uploading": "Загрузка...",
     "upload.complete": "{count} / {total} загружено",
+    "upload.files": "файлов",
     "rename": "Переименовать",
     "move": "Переместить в...",
     "move_to": "Переместить в",

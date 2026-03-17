@@ -27,6 +27,7 @@
     "upload_folder": "Enviar pasta",
     "upload.uploading": "Enviando...",
     "upload.complete": "{count} / {total} enviados",
+    "upload.files": "arquivos",
     "rename": "Renomear",
     "move": "Mover para...",
     "move_to": "Mover para",
