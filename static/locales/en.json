@@ -229,6 +229,7 @@
     "confirm_delete_share": "Delete share link",
     "confirm_delete_share_msg": "Are you sure you want to delete this shared link?",
     "share_file": "Share File",
+    "share_folder": "Share Folder",
     "existing_shares": "Existing Shares",
     "share_options": "Share Options",
     "password": "Password",

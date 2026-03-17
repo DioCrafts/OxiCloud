@@ -229,6 +229,7 @@
     "confirm_delete_share": "शेयर लिंक हटाएँ",
     "confirm_delete_share_msg": "क्या आप वाकई इस शेयर लिंक को हटाना चाहते हैं?",
     "share_file": "फ़ाइल साझा करें",
+    "share_folder": "फ़ोल्डर साझा करें",
     "existing_shares": "मौजूदा शेयर",
     "share_options": "शेयर विकल्प",
     "password": "पासवर्ड",

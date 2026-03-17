@@ -229,6 +229,7 @@
     "confirm_delete_share": "Eliminar enlace compartido",
     "confirm_delete_share_msg": "¿Estás seguro de que quieres eliminar este enlace compartido?",
     "share_file": "Compartir Archivo",
+    "share_folder": "Compartir Carpeta",
     "existing_shares": "Compartidos Existentes",
     "share_options": "Opciones de Compartición",
     "password": "Contraseña",

@@ -226,6 +226,7 @@
     "confirm_delete_share": "Elimina link di condivisione",
     "confirm_delete_share_msg": "Sei sicuro di voler eliminare questo link di condivisione?",
     "share_file": "Condividi File",
+    "share_folder": "Condividi Cartella",
     "existing_shares": "Condivisioni Esistenti",
     "share_options": "Opzioni di Condivisione",
     "password": "Password",
