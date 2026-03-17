@@ -226,6 +226,7 @@
     "confirm_delete_share": "Deellink verwijderen",
     "confirm_delete_share_msg": "Weet je zeker dat je deze deellink wilt verwijderen?",
     "share_file": "Bestand delen",
+    "share_folder": "Map delen",
     "existing_shares": "Bestaande delingen",
     "share_options": "Deelopties",
     "password": "Wachtwoord",

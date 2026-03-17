@@ -226,6 +226,7 @@
     "confirm_delete_share": "Freigabelink löschen",
     "confirm_delete_share_msg": "Sind Sie sicher, dass Sie diesen Freigabelink löschen möchten?",
     "share_file": "Datei teilen",
+    "share_folder": "Ordner teilen",
     "existing_shares": "Bestehende Freigaben",
     "share_options": "Freigabeoptionen",
     "password": "Passwort",

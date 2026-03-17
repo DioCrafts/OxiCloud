@@ -226,6 +226,7 @@
     "confirm_delete_share": "Excluir link de compartilhamento",
     "confirm_delete_share_msg": "Tem certeza de que deseja excluir este link de compartilhamento?",
     "share_file": "Compartilhar arquivo",
+    "share_folder": "Compartilhar pasta",
     "existing_shares": "Compartilhamentos existentes",
     "share_options": "Opções de compartilhamento",
     "password": "Senha",

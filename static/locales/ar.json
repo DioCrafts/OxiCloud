@@ -229,6 +229,7 @@
     "confirm_delete_share": "حذف رابط المشاركة",
     "confirm_delete_share_msg": "هل أنت متأكد أنك تريد حذف رابط المشاركة هذا؟",
     "share_file": "مشاركة الملف",
+    "share_folder": "مشاركة المجلد",
     "existing_shares": "المشاركات الحالية",
     "share_options": "خيارات المشاركة",
     "password": "كلمة المرور",

@@ -229,6 +229,7 @@
     "confirm_delete_share": "共有リンクを削除",
     "confirm_delete_share_msg": "この共有リンクを削除しますか？",
     "share_file": "ファイルを共有",
+    "share_folder": "フォルダを共有",
     "existing_shares": "既存の共有",
     "share_options": "共有オプション",
     "password": "パスワード",
