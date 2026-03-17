@@ -27,6 +27,7 @@
     "upload_folder": "フォルダをアップロード",
     "upload.uploading": "アップロード中...",
     "upload.complete": "{count} / {total} アップロード完了",
+    "upload.files": "ファイル",
     "rename": "名前を変更",
     "move": "移動先...",
     "move_to": "移動先",

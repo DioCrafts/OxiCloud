@@ -27,6 +27,7 @@
     "upload_folder": "رفع مجلد",
     "upload.uploading": "جارٍ الرفع...",
     "upload.complete": "{count} / {total} تم رفعها",
+    "upload.files": "ملفات",
     "rename": "إعادة التسمية",
     "move": "نقل إلى...",
     "move_to": "نقل إلى",

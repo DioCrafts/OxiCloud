@@ -27,6 +27,7 @@
     "upload_folder": "Map uploaden",
     "upload.uploading": "Uploaden...",
     "upload.complete": "{count} / {total} geüpload",
+    "upload.files": "bestanden",
     "rename": "Hernoemen",
     "move": "Verplaatsen naar...",
     "move_to": "Verplaatsen naar",
