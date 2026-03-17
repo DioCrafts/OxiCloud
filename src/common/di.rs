@@ -261,6 +261,7 @@ impl AppServiceFactory {
             repos.file_write_repository.clone(),
             trash_service.clone(),
             Some(repos.file_read_repository.clone()),
+            Some(repos.folder_repository.clone()),
             Some(core.thumbnail_service.clone()),
         ));
 
