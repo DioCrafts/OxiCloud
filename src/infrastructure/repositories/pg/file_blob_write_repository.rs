@@ -257,7 +257,7 @@ impl FileWritePort for FileBlobWriteRepository {
                 {
                     return Err(DomainError::already_exists(
                         "File",
-                        format!("{name} already exists in folder"),
+                        format!("'{name}' already exists in this folder"),
                     ));
                 }
                 return Err(DomainError::internal_error(
@@ -382,7 +382,7 @@ impl FileWritePort for FileBlobWriteRepository {
             {
                 return DomainError::already_exists(
                     "File",
-                    "File with that name already exists in target folder".to_string(),
+                    "a file with this name already exists in the target folder",
                 );
             }
             DomainError::internal_error("FileBlobWrite", format!("copy: {e}"))
@@ -440,7 +440,7 @@ impl FileWritePort for FileBlobWriteRepository {
             if let sqlx::Error::Database(ref db_err) = e
                 && db_err.code().as_deref() == Some("23505")
             {
-                return DomainError::already_exists("File", format!("{new_name} already exists"));
+                return DomainError::already_exists("File", format!("'{new_name}' already exists"));
             }
             DomainError::internal_error("FileBlobWrite", format!("rename: {e}"))
         })?
@@ -632,7 +632,7 @@ impl FileWritePort for FileBlobWriteRepository {
                 if db_err.code().as_deref() == Some("23505") {
                     return DomainError::already_exists(
                         "Folder",
-                        "A folder with that name already exists in the target".to_string(),
+                        "a folder with this name already exists in the target location",
                     );
                 }
             }
