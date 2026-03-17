@@ -23,6 +23,7 @@ use crate::application::dtos::folder_dto::FolderDto;
 use crate::application::ports::file_ports::FileRetrievalUseCase;
 use crate::application::ports::file_ports::{FileManagementUseCase, FileUploadUseCase};
 use crate::application::ports::inbound::FolderUseCase;
+use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::application::services::file_retrieval_service::FileRetrievalService;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState;
@@ -919,6 +920,27 @@ async fn handle_put(
     drop(file);
 
     let hash = hasher.finalize().to_hex().to_string();
+
+    // ── Quota enforcement ────────────────────────────────────
+    if let Some(storage_svc) = state.storage_usage_service.as_ref() {
+        if let Err(err) = storage_svc
+            .check_storage_quota(user.id, total_bytes as u64)
+            .await
+        {
+            let _ = tokio::fs::remove_file(&temp_path).await;
+            tracing::warn!(
+                "⛔ WEBDAV PUT REJECTED (quota): user={}, file={}, size={}",
+                user.id,
+                path,
+                total_bytes
+            );
+            return Err(AppError::new(
+                StatusCode::INSUFFICIENT_STORAGE,
+                err.message,
+                "QuotaExceeded",
+            ));
+        }
+    }
 
     // ── Atomic store: temp file → dedup blob + DB metadata update ──
     let result = file_upload_service
