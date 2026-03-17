@@ -11,6 +11,12 @@ pub struct TrashedItemDto {
     pub original_path: String,
     pub trashed_at: DateTime<Utc>,
     pub days_until_deletion: i64,
+    /// Human-readable category (e.g., "Image", "Folder", "Document")
+    pub category: String,
+    /// FontAwesome icon class for the file type
+    pub icon_class: String,
+    /// Special CSS class for icon styling (e.g., "image-icon", "pdf-icon")
+    pub icon_special_class: String,
 }
 
 /// Request to move an item to trash

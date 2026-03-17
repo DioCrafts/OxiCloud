@@ -2,6 +2,9 @@ use std::sync::Arc;
 use tracing::{debug, error, info, instrument, warn};
 use uuid::Uuid;
 
+use crate::application::dtos::display_helpers::{
+    category_for, icon_class_for, icon_special_class_for,
+};
 use crate::application::dtos::trash_dto::TrashedItemDto;
 use crate::application::ports::storage_ports::{FileReadPort, FileWritePort};
 use crate::application::ports::trash_ports::TrashUseCase;
@@ -72,6 +75,23 @@ impl TrashService {
         // Calculate days_until_deletion before moving item fields
         let days_until_deletion = item.days_until_deletion();
 
+        // Determine display fields based on item type
+        let (category, icon_class, icon_special_class) = match item.item_type() {
+            TrashedItemType::Folder => (
+                "Folder".to_string(),
+                "fas fa-folder".to_string(),
+                "folder-icon".to_string(),
+            ),
+            TrashedItemType::File => {
+                let name = item.name();
+                // Use empty MIME type to leverage extension fallback
+                let category = category_for(name, "").to_string();
+                let icon_class = icon_class_for(name, "").to_string();
+                let icon_special_class = icon_special_class_for(name, "").to_string();
+                (category, icon_class, icon_special_class)
+            }
+        };
+
         TrashedItemDto {
             id: item.id().to_string(),
             original_id: item.original_id().to_string(),
@@ -83,6 +103,9 @@ impl TrashService {
             original_path: item.original_path().to_string(),
             trashed_at: item.trashed_at(),
             days_until_deletion,
+            category,
+            icon_class,
+            icon_special_class,
         }
     }
 
