@@ -1236,9 +1236,7 @@ async fn handle_move(
                 folder_service
                     .move_folder(&folder.id, move_dto, user.id)
                     .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!("Failed to move folder: {}", e))
-                    })?;
+                    .map_err(AppError::from)?;
 
                 if folder.name != dest_folder_name {
                     let rename_dto = crate::application::dtos::folder_dto::RenameFolderDto {
@@ -1247,9 +1245,7 @@ async fn handle_move(
                     folder_service
                         .rename_folder(&folder.id, rename_dto, user.id)
                         .await
-                        .map_err(|e| {
-                            AppError::internal_error(format!("Failed to rename folder: {}", e))
-                        })?;
+                        .map_err(AppError::from)?;
                 }
             }
             Ok(ResolvedResource::File(file)) => {
@@ -1283,17 +1279,13 @@ async fn handle_move(
                     file_management_service
                         .move_file(&file.id, Some(dest_parent_path.to_string()))
                         .await
-                        .map_err(|e| {
-                            AppError::internal_error(format!("Failed to move file: {}", e))
-                        })?;
+                        .map_err(AppError::from)?;
                 }
                 if file.name != dest_filename {
                     file_management_service
                         .rename_file(&file.id, dest_filename)
                         .await
-                        .map_err(|e| {
-                            AppError::internal_error(format!("Failed to rename file: {}", e))
-                        })?;
+                        .map_err(AppError::from)?;
                 }
             }
             Err(_) => {
@@ -1354,9 +1346,7 @@ async fn handle_move(
                 folder_service
                     .rename_folder(&folder.id, rename_dto, user.id)
                     .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!("Failed to rename folder: {}", e))
-                    })?;
+                    .map_err(AppError::from)?;
             }
         } else {
             let file = file_retrieval_service
@@ -1396,15 +1386,13 @@ async fn handle_move(
                 file_management_service
                     .move_file(&file.id, Some(dest_parent_path.to_string()))
                     .await
-                    .map_err(|e| AppError::internal_error(format!("Failed to move file: {}", e)))?;
+                    .map_err(AppError::from)?;
             }
             if file.name != dest_filename {
                 file_management_service
                     .rename_file(&file.id, dest_filename)
                     .await
-                    .map_err(|e| {
-                        AppError::internal_error(format!("Failed to rename file: {}", e))
-                    })?;
+                    .map_err(AppError::from)?;
             }
         }
     }
