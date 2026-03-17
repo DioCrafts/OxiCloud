@@ -8,6 +8,7 @@ use crate::application::services::trash_service::TrashService;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
+use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 use crate::infrastructure::services::thumbnail_service::ThumbnailService;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -21,6 +22,7 @@ use uuid::Uuid;
 pub struct FileManagementService {
     file_repository: Arc<FileBlobWriteRepository>,
     file_read: Option<Arc<FileBlobReadRepository>>,
+    folder_repo: Option<Arc<FolderDbRepository>>,
     trash_service: Option<Arc<TrashService>>,
     thumbnail_service: Option<Arc<ThumbnailService>>,
 }
@@ -31,21 +33,24 @@ impl FileManagementService {
         Self {
             file_repository,
             file_read: None,
+            folder_repo: None,
             trash_service: None,
             thumbnail_service: None,
         }
     }
 
-    /// Creates a FileManagementService with a trash service and read repo for ownership checks.
+    /// Creates a FileManagementService with a trash service, read repo, and folder repo for ownership checks.
     pub fn with_trash(
         file_repository: Arc<FileBlobWriteRepository>,
         trash_service: Option<Arc<TrashService>>,
         file_read: Option<Arc<FileBlobReadRepository>>,
+        folder_repo: Option<Arc<FolderDbRepository>>,
         thumbnail_service: Option<Arc<ThumbnailService>>,
     ) -> Self {
         Self {
             file_repository,
             file_read,
+            folder_repo,
             trash_service,
             thumbnail_service,
         }
@@ -60,6 +65,36 @@ impl FileManagementService {
             Err(DomainError::internal_error(
                 "FileManagement",
                 "Ownership verification unavailable",
+            ))
+        }
+    }
+
+    /// Verifies that the target folder is owned by the caller.
+    /// If folder_id is None (root), ownership is implicitly granted.
+    async fn verify_target_folder_owner(
+        &self,
+        folder_id: &Option<String>,
+        caller_id: Uuid,
+    ) -> Result<(), DomainError> {
+        let folder_id = match folder_id {
+            Some(id) => id,
+            None => return Ok(()), // Moving to root is always allowed
+        };
+
+        if let Some(folder_repo) = &self.folder_repo {
+            let folder_owner = folder_repo.get_folder_user_id(folder_id).await?;
+            if folder_owner != caller_id {
+                return Err(DomainError::not_found(
+                    "Folder",
+                    "Target folder not found or access denied",
+                ));
+            }
+            Ok(())
+        } else {
+            // Fallback: no folder repo injected — deny by default (fail-closed)
+            Err(DomainError::internal_error(
+                "FileManagement",
+                "Folder ownership verification unavailable",
             ))
         }
     }
@@ -101,7 +136,10 @@ impl FileManagementUseCase for FileManagementService {
         caller_id: Uuid,
         folder_id: Option<String>,
     ) -> Result<FileDto, DomainError> {
+        // Verify file ownership first
         self.verify_owner(file_id, caller_id).await?;
+        // Verify target folder ownership (prevents file from "disappearing")
+        self.verify_target_folder_owner(&folder_id, caller_id).await?;
         self.move_file(file_id, folder_id).await
     }
 
