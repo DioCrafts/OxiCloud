@@ -45,7 +45,7 @@ pub struct UpdateShareDto {
 /// Extension methods to convert between DTOs and domain entities
 impl ShareDto {
     pub fn from_entity(share: &Share, base_url: &str) -> Self {
-        let url = format!("{}/s/{}", base_url, share.token());
+        let url = format!("{}/api/s/{}", base_url, share.token());
 
         Self {
             id: share.id().to_string(),
