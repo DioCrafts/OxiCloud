@@ -62,11 +62,32 @@ where
     FoR: FolderRepository,
 {
     async fn get_trash_items(&self, user_id: Uuid) -> Result<Vec<TrashedItemDto>> {
+        use crate::application::dtos::display_helpers::{
+            category_for, icon_class_for, icon_special_class_for,
+        };
+
         let items = self.trash_repository.get_trash_items(&user_id).await?;
         Ok(items
             .into_iter()
             .map(|item| {
                 let days_until_deletion = item.days_until_deletion();
+
+                // Determine display fields based on item type
+                let (category, icon_class, icon_special_class) = match item.item_type() {
+                    TrashedItemType::Folder => (
+                        "Folder".to_string(),
+                        "fas fa-folder".to_string(),
+                        "folder-icon".to_string(),
+                    ),
+                    TrashedItemType::File => {
+                        let name = item.name();
+                        let category = category_for(name, "").to_string();
+                        let icon_class = icon_class_for(name, "").to_string();
+                        let icon_special_class = icon_special_class_for(name, "").to_string();
+                        (category, icon_class, icon_special_class)
+                    }
+                };
+
                 TrashedItemDto {
                     id: item.id().to_string(),
                     original_id: item.original_id().to_string(),
@@ -78,6 +99,9 @@ where
                     original_path: item.original_path().to_string(),
                     trashed_at: item.trashed_at(),
                     days_until_deletion,
+                    category,
+                    icon_class,
+                    icon_special_class,
                 }
             })
             .collect())
