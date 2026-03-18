@@ -251,13 +251,42 @@ class InlineViewer {
   async createBlobUrlViewer(file, type, container, loader) {
     try {
       console.log('Creating blob URL viewer for:', file.name, 'type:', type);
-      
+
+      // Update loader to show progress bar for large files
+      let progressBar = null;
+      let progressText = null;
+      if (loader && file.size > 10 * 1024 * 1024) { // Show progress for files > 10MB
+        loader.innerHTML = `
+          <div class="inline-viewer-progress">
+            <i class="fas fa-spinner fa-spin"></i>
+            <div class="inline-viewer-progress-bar">
+              <div class="inline-viewer-progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="inline-viewer-progress-text">0%</div>
+          </div>
+        `;
+        progressBar = loader.querySelector('.inline-viewer-progress-fill');
+        progressText = loader.querySelector('.inline-viewer-progress-text');
+      }
+
       // Use XMLHttpRequest instead of fetch to get better control over the response
       const xhr = new XMLHttpRequest();
       xhr.open('GET', `/api/files/${file.id}?inline=true`, true);
       xhr.responseType = 'blob';
       xhr.withCredentials = true;
-      
+
+      // Track download progress - use double precision for large file support (>2GB)
+      xhr.onprogress = (e) => {
+        if (e.lengthComputable && progressBar && progressText) {
+          // Use direct division to avoid 32-bit overflow issues
+          // e.loaded and e.total are JavaScript numbers (64-bit float)
+          const progress = e.loaded / e.total;
+          const pct = Math.round(progress * 100);
+          progressBar.style.width = pct + '%';
+          progressText.textContent = pct + '%';
+        }
+      };
+
       // Create a promise to handle the XHR
       const response = await new Promise((resolve, reject) => {
         xhr.onload = function() {
@@ -267,11 +296,11 @@ class InlineViewer {
             reject(new Error(`Error fetching file: ${this.status} ${this.statusText}`));
           }
         };
-        
+
         xhr.onerror = function() {
           reject(new Error('Network error'));
         };
-        
+
         xhr.send();
       });
       
