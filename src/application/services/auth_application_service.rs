@@ -736,14 +736,8 @@ impl AuthApplicationService {
             _ => UserRole::User,
         };
 
-        // Determine quota
-        let quota = dto.quota_bytes.unwrap_or_else(|| {
-            if role == UserRole::Admin {
-                107_374_182_400
-            } else {
-                1_073_741_824
-            }
-        });
+        // Determine quota, capped to available disk space
+        let quota = dto.quota_bytes.unwrap_or_else(|| self.capped_quota(&role));
 
         // Hash password
         let password_hash = self.password_hasher.hash_password(&dto.password).await?;
