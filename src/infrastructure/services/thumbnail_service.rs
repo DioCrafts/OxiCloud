@@ -347,8 +347,10 @@ impl ThumbnailService {
     /// Generate a thumbnail from an image file.
     ///
     /// Concurrency is bounded by `decode_semaphore` to prevent OOM when
-    /// many images are uploaded simultaneously.  Resolution is also
+    /// many images are uploaded simultaneously. Resolution is also
     /// capped at `MAX_DECODE_PIXELS` to reject pathologically large images.
+    /// After decoding, the encoded image buffer is explicitly dropped before
+    /// processing to minimize peak memory usage.
     async fn generate_thumbnail(
         &self,
         original_path: &Path,
@@ -395,6 +397,8 @@ impl ThumbnailService {
                 let orientation = ExifService::extract(&data)
                     .and_then(|m| m.orientation)
                     .unwrap_or(1);
+                // Free the encoded image data now that image is decoded and EXIF extracted
+                drop(data);
                 apply_orientation(img, orientation)
             };
 
@@ -436,9 +440,11 @@ impl ThumbnailService {
     /// Generate all thumbnail sizes for a file in the background.
     ///
     /// Loads the image **once** and produces all 3 sizes (Icon, Preview,
-    /// Large) inside a single `spawn_blocking` call.  This avoids 3×
+    /// Large) inside a single `spawn_blocking` call. This avoids 3×
     /// I/O reads and 3× JPEG/PNG decode — reducing CPU time by ~45%
     /// and peak RAM from ~540 MB to ~180 MB for concurrent uploads.
+    /// The encoded image buffer is explicitly dropped after decoding
+    /// to further reduce peak memory by the size of the original file.
     pub fn generate_all_sizes_background(self: Arc<Self>, file_id: String, original_path: PathBuf) {
         tokio::spawn(async move {
             tracing::info!("🖼️ Background thumbnail generation starting: {}", file_id);
@@ -488,6 +494,8 @@ impl ThumbnailService {
                     let orientation = ExifService::extract(&data)
                         .and_then(|m| m.orientation)
                         .unwrap_or(1);
+                    // Free the encoded image data now that image is decoded and EXIF extracted
+                    drop(data);
                     apply_orientation(img, orientation)
                 };
 
