@@ -12,11 +12,14 @@ use image::imageops::FilterType;
  * - JPEG output (lossy q=80) for compact thumbnails
  * - Lock-free moka cache with weight-based eviction
  * - Lazy generation on first request if not pre-generated
+ * - Timeout protection for large image processing
  */
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::fs;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 
 use crate::application::ports::thumbnail_ports::{
     ThumbnailPort, ThumbnailSize as PortThumbnailSize, ThumbnailStatsDto,
@@ -90,6 +93,9 @@ pub struct ThumbnailService {
     /// Without this, 50 simultaneous uploads would decode 50 bitmaps
     /// (~96 MB each for 6000×4000) = 4.8 GB peak.
     decode_semaphore: Arc<Semaphore>,
+    /// Timeout for thumbnail generation operations to prevent hanging on large images.
+    /// Defaults to 30 seconds.
+    generation_timeout: Duration,
 }
 
 impl ThumbnailService {
@@ -99,7 +105,13 @@ impl ThumbnailService {
     /// * `storage_root` - Root path of file storage
     /// * `max_cache_entries` - (ignored — moka uses weight-based eviction)
     /// * `max_cache_bytes` - Maximum total bytes to cache
-    pub fn new(storage_root: &Path, max_cache_entries: usize, max_cache_bytes: usize) -> Self {
+    /// * `generation_timeout` - Timeout for thumbnail generation operations
+    pub fn new(
+        storage_root: &Path,
+        max_cache_entries: usize,
+        max_cache_bytes: usize,
+        generation_timeout: Option<Duration>,
+    ) -> Self {
         let thumbnails_root = storage_root.join(".thumbnails");
 
         // Ignore max_cache_entries — weight-based eviction is more accurate
@@ -123,6 +135,7 @@ impl ThumbnailService {
             cache,
             max_cache_bytes: max_cache_bytes as u64,
             decode_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_CONCURRENT_DECODES)),
+            generation_timeout: generation_timeout.unwrap_or(Duration::from_secs(30)),
         }
     }
 
@@ -347,8 +360,9 @@ impl ThumbnailService {
     /// Generate a thumbnail from an image file.
     ///
     /// Concurrency is bounded by `decode_semaphore` to prevent OOM when
-    /// many images are uploaded simultaneously.  Resolution is also
+    /// many images are uploaded simultaneously. Resolution is also
     /// capped at `MAX_DECODE_PIXELS` to reject pathologically large images.
+    /// A timeout prevents the operation from hanging indefinitely on large images.
     async fn generate_thumbnail(
         &self,
         original_path: &Path,
@@ -356,6 +370,7 @@ impl ThumbnailService {
     ) -> Result<Bytes, ThumbnailError> {
         let path = original_path.to_path_buf();
         let max_dim = size.max_dimension();
+        let timeout_duration = self.generation_timeout;
 
         // Acquire semaphore permit — bounds peak RAM from concurrent decodes
         let _permit = self
@@ -364,8 +379,8 @@ impl ThumbnailService {
             .await
             .map_err(|_| ThumbnailError::TaskError("Decode semaphore closed".into()))?;
 
-        // Run image processing in blocking thread pool
-        let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
+        // Run image processing in blocking thread pool with timeout
+        let spawn_result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
             // Single read: load file once into memory, then work from the buffer
             let data =
                 std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
@@ -426,9 +441,16 @@ impl ThumbnailService {
                 .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
             Ok(buffer)
-        })
-        .await
-        .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
+        });
+
+        // Apply timeout to prevent hanging on large images
+        let result = timeout(timeout_duration, spawn_result)
+            .await
+            .map_err(|_| ThumbnailError::TaskError(format!(
+                "Thumbnail generation timed out after {:?}",
+                timeout_duration
+            )))?
+            .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
 
         result.map(Bytes::from)
     }

@@ -34,15 +34,18 @@ pub struct TimeoutConfig {
     pub lock_acquisition_ms: u64,
     /// Timeout for network operations (ms)
     pub network_operation_ms: u64,
+    /// Timeout for thumbnail generation (ms)
+    pub thumbnail_generation_ms: u64,
 }
 
 impl Default for TimeoutConfig {
     fn default() -> Self {
         Self {
-            file_operation_ms: 10000,    // 10 seconds
-            dir_operation_ms: 30000,     // 30 seconds
-            lock_acquisition_ms: 5000,   // 5 seconds
-            network_operation_ms: 15000, // 15 seconds
+            file_operation_ms: 10000,      // 10 seconds
+            dir_operation_ms: 30000,       // 30 seconds
+            lock_acquisition_ms: 5000,     // 5 seconds
+            network_operation_ms: 15000,   // 15 seconds
+            thumbnail_generation_ms: 30000, // 30 seconds
         }
     }
 }
@@ -81,6 +84,11 @@ impl TimeoutConfig {
     /// Gets a Duration for network operations
     pub fn network_timeout(&self) -> Duration {
         Duration::from_millis(self.network_operation_ms)
+    }
+
+    /// Gets a Duration for thumbnail generation operations
+    pub fn thumbnail_timeout(&self) -> Duration {
+        Duration::from_millis(self.thumbnail_generation_ms)
     }
 }
 
