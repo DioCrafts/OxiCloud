@@ -119,9 +119,8 @@ async function checkAuthentication() {
                     return;
                 }
             }
-
             await resolveHomeFolder();
-            window.loadFiles();
+            window.dispatchEvent(new Event('authenticationDone'));
         } else {
             // No cached user data — must verify session from server
             console.log('No cached user data, fetching from server');
