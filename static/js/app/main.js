@@ -3,6 +3,8 @@
  * This file contains the core functionality, initialization and state management
  */
 
+// @ts-check
+
 const app = window.app;
 const elements = window.appElements;
 
@@ -181,6 +183,24 @@ function setupActionsBarDelegation() {
 }
 
 /**
+ * @typedef {Object} OxiContext
+ * @property {string | null} path the uuid of the path
+ */
+
+/**
+ * Read the application hash
+ * @returns {OxiContext}
+ */
+function deserializeHash() {
+    let context = /** type {OxiContext} */ {};
+    let folder_lookup=window.location.hash.match(/#.*\/folder\/([^/]*)/);
+    if (folder_lookup) {
+        context.path = folder_lookup[1];
+    }
+    return context;
+}
+
+/**
  * Initialize the application
  */
 function initApp() {
@@ -233,6 +253,18 @@ function initApp() {
         window.multiSelect.init();
     }
     
+    window.addEventListener('authenticationDone', () => {
+        console.log("Auth done");
+        //TODO: POC only, this is not the correct location
+        let context = deserializeHash();
+        if (context.path) {
+            console.log(`init: reusing folder from hash URL: ${context.path}`);
+            // TODO: what if path does not exists ?
+            window.app.currentPath = context.path;
+        }
+        window.loadFiles();
+    });
+
     // Wait for translations to load before checking authentication
     if (window.i18n && window.i18n.isLoaded && window.i18n.isLoaded()) {
         // Translations already loaded, proceed with authentication
@@ -327,6 +359,23 @@ function setupEventListeners() {
     const SEARCH_DEBOUNCE_MS = 300;
     const SEARCH_MIN_CHARS = 3;
     
+    // handle history / url change
+    window.addEventListener("popstate", (e) => { 
+        if (e.state === null) {
+            // change is from user (url explicitely change, read information from hash)
+            let context = deserializeHash();
+            if (context.path) {
+                window.app.currentPath = context.path;
+                window.loadFiles({insertHistory: false});
+            }
+        }
+        else {
+            // change is from history
+            window.app.currentPath = e.state.id;
+            window.loadFiles({insertHistory: false});
+        }
+    });
+
     // Search input — Enter key
     elements.searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {

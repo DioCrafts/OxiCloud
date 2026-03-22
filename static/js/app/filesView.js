@@ -1,8 +1,56 @@
+// @ts-check
+
+// TODO move to features/files/fileOperations.js
 /**
- * Files view loading logic
+ * @typedef {Object} FolderInfo
+ * @property {string} category
+ * @property {number} created_at - timestamp
+ * @property {string} icon_class
+ * @property {string} icon_special_class
+ * @property {string} id the uniq id of the folder
+ * @property {boolean} is_root
+ * @property {number} modified_at
+ * @property {string} name
+ * @property {string} owner_id
+ * @property {string|null} parent_id the folder parent (null if is_root)
+ * @property {string} path the full path
  */
 
-async function loadFiles(options = {}) {
+/**
+ * getFolder information
+ * @param {string} id the id of the folder
+ * @returns {Promise<FolderInfo>}
+ */
+async function getFolder( id) {
+
+    const headers = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+    };
+    const requestOptions = {
+        headers,
+        credentials: 'same-origin',
+        cache: 'no-store'
+    };
+    
+    let folderInformations = await fetch( `/api/folders/${id}`, requestOptions);
+    if (folderInformations.ok) {
+        return folderInformations.json()
+    }
+    else {
+        console.warn(`Error fetching folder ${id}`);
+        return Promise.reject(null);
+    }
+}
+
+/**
+ * Files view loading logic
+ * 
+ * @param {Object} options
+ * @param {boolean} [options.insertHistory] add browser history (default true)
+ * @param {boolean} [options.forceRefresh] force refresh of content
+ */
+async function loadFiles(options = { insertHistory: true}) {
     const app = window.app;
     const elements = window.appElements;
 
@@ -30,6 +78,70 @@ async function loadFiles(options = {}) {
         }
 
         const timestamp = new Date().getTime();
+
+        /**
+         * @type {FolderInfo | null}
+         */
+        let currentFolderData = null;
+
+        // TODO: rebuild full breadcrumb POC only (to optimize, data may already be present)
+        window.app.breadcrumbPath = [];
+
+        /** @type {string | null} */
+        let currentId=app.currentPath;
+
+        while (currentId !== null) {
+            console.log(`fetching folder information for folder ${currentId}`);
+            try {
+                let data = await getFolder(currentId);
+            
+                if (currentFolderData === null) {
+                    currentFolderData = data;
+                }
+                console.debug(data);
+
+                // XXX do not enter root into bread crumb updateBreadcrumb() method always display it
+                if(!data.is_root) {    
+                    window.app.breadcrumbPath.unshift( {id: data.id, name: data.name});
+                }
+
+                // iterate to parent folder
+                currentId = data.parent_id;
+            }
+            catch( e) {
+                console.log(`Error loading information from folder ${app.currentPath}, fallback to ${window.app.userHomeFolderId}`);
+                // fallback of root
+                window.app.breadcrumbPath = [];
+                currentId = window.app.userHomeFolderId;
+                app.currentPath = currentId;
+            }
+        }
+       
+        // request a breadcrumb paint
+        window.ui.updateBreadcrumb();
+
+        if (currentFolderData !== null) {
+            if (options.insertHistory) {
+                console.log(`adding history with #/folder/${app.currentPath}`)
+                window.history.pushState({
+                    view: window.app.currentSection,
+                    id: currentFolderData.id,
+                    name: currentFolderData.name
+                }, "", `#/view=${window.app.currentSection}/folder/${app.currentPath}`);
+            }
+            else {
+                console.log(`replace history with #/folder/${app.currentPath}`)
+                window.history.replaceState({
+                    view: window.app.currentSection,
+                    id: currentFolderData.id,
+                    name: currentFolderData.name
+                }, "", `#/view=${window.app.currentSection}/folder/${app.currentPath}`);
+            }
+        }
+
+        // update title
+        document.title = `OxiCloud: ${currentFolderData.path}`;
+
         let url;
 
         if (!app.currentPath || app.currentPath === '') {
