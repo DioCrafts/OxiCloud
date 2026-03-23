@@ -139,7 +139,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &app_state.wopi_lock_service,
             &app_state.wopi_discovery_service,
         ) {
+            // WOPI_BASE_URL: the URL OnlyOffice/Collabora uses to call back into OxiCloud
+            // WOPI_PUBLIC_BASE_URL: the URL the browser uses to reach OxiCloud
+            // Both must be set for Docker/multi-host deployments. WOPI_BASE_URL takes
+            // precedence if both are set (supports the legacy single-URL pattern).
             let wopi_base_url = std::env::var("OXICLOUD_WOPI_BASE_URL")
+                .or_else(|_| std::env::var("OXICLOUD_WOPI_PUBLIC_BASE_URL"))
+                .map(|v| v.trim_end_matches('/').to_string())
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| config.base_url());
+
+            let public_base_url = std::env::var("OXICLOUD_WOPI_PUBLIC_BASE_URL")
+                .or_else(|_| std::env::var("OXICLOUD_WOPI_BASE_URL"))
                 .map(|v| v.trim_end_matches('/').to_string())
                 .ok()
                 .filter(|v| !v.is_empty())
@@ -150,7 +162,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 lock_service: lock_svc.clone(),
                 discovery_service: discovery_svc.clone(),
                 app_state: app_state.clone(),
-                public_base_url: config.base_url(),
+                public_base_url,
                 wopi_base_url,
             };
 
