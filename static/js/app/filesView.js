@@ -125,12 +125,16 @@ async function loadFiles(options = { insertHistory: true}) {
 
         window.isLoadingFiles = true;
 
-        elements.filesGrid.innerHTML = `
-            <div class="files-loading-spinner">
-                <div class="spinner"></div>
-                <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
-            </div>
-        `;
+        // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
+        let loadingFiles = setTimeout( () => {
+            // display loader after few delay (will be canceled if result take less time)
+            elements.filesGrid.innerHTML = `
+                <div class="files-loading-spinner">
+                    <div class="spinner"></div>
+                    <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
+                </div>
+            `;
+        }, 100);
 
         if (!app.userHomeFolderId) {
             await window.resolveHomeFolder();
@@ -185,6 +189,9 @@ async function loadFiles(options = { insertHistory: true}) {
 
         console.log(`Loading listing from ${url}`);
         const response = await fetch(url, requestOptions);
+
+        // not required anymore
+        clearTimeout( loadingFiles);
 
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");
