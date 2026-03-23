@@ -84,7 +84,7 @@ async function loadFiles(options = { insertHistory: true}) {
          */
         let currentFolderData = null;
 
-        // TODO: rebuild full breadcrumb POC only (to optimize, data may already be present)
+        // TODO: rebuild full breadcrumb POC only (to optimize, data may already be known)
         window.app.breadcrumbPath = [];
 
         /** @type {string | null} */
@@ -109,8 +109,12 @@ async function loadFiles(options = { insertHistory: true}) {
                 currentId = data.parent_id;
             }
             catch( e) {
-                console.log(`Error loading information from folder ${app.currentPath}, fallback to ${window.app.userHomeFolderId}`);
+                console.log(`Error loading information from folder ${app.currentPath}, falling back to ${window.app.userHomeFolderId}`);
                 // fallback of root
+                window.uiNotifications.show(
+                    'error: folder not found or permission denied', 
+                    'the given folder is not available or you do not have sufficient rights' 
+                );
                 window.app.breadcrumbPath = [];
                 currentId = window.app.userHomeFolderId;
                 app.currentPath = currentId;
@@ -121,6 +125,7 @@ async function loadFiles(options = { insertHistory: true}) {
         window.ui.updateBreadcrumb();
 
         if (currentFolderData !== null) {
+            // TODO move this part to a common library
             if (options.insertHistory) {
                 console.log(`adding history with #/folder/${app.currentPath}`)
                 window.history.pushState({

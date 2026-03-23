@@ -255,11 +255,10 @@ function initApp() {
     
     window.addEventListener('authenticationDone', () => {
         console.log("Auth done");
-        //TODO: POC only, this is not the correct location
+        // Check if a context was provided in the URL
         let context = deserializeHash();
         if (context.path) {
             console.log(`init: reusing folder from hash URL: ${context.path}`);
-            // TODO: what if path does not exists ?
             window.app.currentPath = context.path;
         }
         window.loadFiles();
