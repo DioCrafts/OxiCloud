@@ -83,34 +83,34 @@ async function loadFiles(options = { insertHistory: true}) {
 
         const timestamp = new Date().getTime();
 
-        /**
-         * @type {FolderInfo | null}
+        /** 
+         * Store the leaf (this is the current displayed folder)
+         * @type {FolderInfo | null} 
          */
-        let currentFolderData = null;
+        let currentFolderInfo = null;
 
         // TODO: rebuild full breadcrumb POC only (to optimize, data may already be known)
         window.app.breadcrumbPath = [];
 
         /** @type {string | null} */
-        let currentId=app.currentPath;
+        let id=app.currentPath;
 
-        while (currentId !== null) {
-            console.log(`fetching folder information for folder ${currentId}`);
+        while (id !== null) {
+            console.log(`fetching folder information for folder ${id}`);
             try {
-                let data = await getFolder(currentId);
+                let folderInfo = await getFolder(id);
             
-                if (currentFolderData === null) {
-                    currentFolderData = data;
+                if (currentFolderInfo === null) {
+                    currentFolderInfo = folderInfo;
                 }
-                console.debug(data);
 
                 // XXX do not enter root into bread crumb updateBreadcrumb() method always display it
-                if(!data.is_root) {    
-                    window.app.breadcrumbPath.unshift( {id: data.id, name: data.name});
+                if(!folderInfo.is_root) {
+                    window.app.breadcrumbPath.unshift( {id: folderInfo.id, name: folderInfo.name});
                 }
 
                 // iterate to parent folder
-                currentId = data.parent_id;
+                id = folderInfo.parent_id;
             }
             catch( e) {
                 console.log(`Error loading information from folder ${app.currentPath}, falling back to ${window.app.userHomeFolderId}`);
@@ -120,36 +120,34 @@ async function loadFiles(options = { insertHistory: true}) {
                     'the given folder is not available or you do not have sufficient rights' 
                 );
                 window.app.breadcrumbPath = [];
-                currentId = window.app.userHomeFolderId;
-                app.currentPath = currentId;
+                id = window.app.userHomeFolderId;
+                app.currentPath = id;
             }
         }
        
         // request a breadcrumb paint
         window.ui.updateBreadcrumb();
 
-        if (currentFolderData !== null) {
-            // TODO move this part to a common library
+        if (currentFolderInfo !== null) {
+            // TODO move this part to a common library ?
             if (options.insertHistory) {
-                console.log(`adding history with #/folder/${app.currentPath}`)
+                console.log(`adding history with #/files/folder/${app.currentPath}`)
                 window.history.pushState({
-                    view: window.app.currentSection,
-                    id: currentFolderData.id,
-                    name: currentFolderData.name
-                }, "", `#/view=${window.app.currentSection}/folder/${app.currentPath}`);
+                    section: window.app.currentSection,
+                    id: currentFolderInfo.id,
+                }, "", `#/files/folder/${app.currentPath}`);
             }
             else {
-                console.log(`replace history with #/folder/${app.currentPath}`)
+                console.log(`replace history with #/files/folder/${app.currentPath}`)
                 window.history.replaceState({
-                    view: window.app.currentSection,
-                    id: currentFolderData.id,
-                    name: currentFolderData.name
-                }, "", `#/view=${window.app.currentSection}/folder/${app.currentPath}`);
+                    section: window.app.currentSection,
+                    id: currentFolderInfo.id,
+                }, "", `#/files/folder/${app.currentPath}`);
             }
         }
 
         // update title
-        document.title = `OxiCloud: ${currentFolderData.path}`;
+        document.title = `OxiCloud: ${currentFolderInfo.path}`;
 
         let url;
 
