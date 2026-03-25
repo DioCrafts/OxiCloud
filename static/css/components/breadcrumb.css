@@ -12,12 +12,18 @@
 .breadcrumb-item {
 	padding: 2px 4px;
 	border-radius: 4px;
+	border: 2px solid transparent;
 	transition: background 0.15s, color 0.15s;
 }
 
 .breadcrumb-link {
 	cursor: pointer;
 	color: #5a6f8a;
+}
+
+.breadcrumb-link.drop-target {
+    background-color: rgba(255, 193, 7, 0.1);
+    border: 2px dashed #ffc107;
 }
 
 .breadcrumb-link:hover {
