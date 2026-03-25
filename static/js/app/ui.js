@@ -278,6 +278,12 @@ const ui = {
      * Set up drag and drop functionality
      */
     setupDragAndDrop() {
+        // prepare area to build dragged elements
+        this.dragPreview = document.createElement("div");
+        this.dragPreview.className="drag-preview";
+        document.body.appendChild(this.dragPreview);
+        this.draggedItems = null;
+
         const dropzone = document.getElementById('dropzone');
 
         const collectDroppedEntries = async (dataTransfer) => {
@@ -591,7 +597,6 @@ const ui = {
         });
     },
 
-
     // TODO: support multiple elements to move ? (API does)
     /**
      * proceed to the drag & drop
@@ -787,9 +792,9 @@ const ui = {
         const itemInfo = (card) => {
             if (!card) return null;
             const fileId = card.dataset.fileId;
-            if (fileId) return { type: 'file', id: fileId, data: self._items.get(fileId) };
+            if (fileId) return { type: 'file', id: fileId, name: card.dataset.fileName, data: self._items.get(fileId) };
             const folderId = card.dataset.folderId;
-            if (folderId) return { type: 'folder', id: folderId, data: self._items.get(folderId) };
+            if (folderId) return { type: 'folder', id: folderId, name: card.dataset.folderName, data: self._items.get(folderId) };
             return null;
         };
 
@@ -936,7 +941,7 @@ const ui = {
             container.addEventListener('dragstart', (e) => {
                 const card = e.target.closest(sel);
                 if (!card) { e.preventDefault(); return; }
-
+                
                 // Grid items must be selected to start dragging
                 if (container === grid &&
                     !card.classList.contains('selected')) {
@@ -947,18 +952,59 @@ const ui = {
                 const info = itemInfo(card);
                 if (!info) { e.preventDefault(); return; }
 
+                let selector = "data-file-id";
                 e.dataTransfer.setData('text/plain', info.id);
                 if (info.type === 'folder') {
+                    selector = "data-folder-id";
                     e.dataTransfer.setData(
                         'application/oxicloud-folder', 'true');
                 }
-                card.classList.add('dragging');
+                
+                self.draggedItems = document.createElement("div");
+                self.draggedItems.className = "dragged-item, file-item";
+                // lookup element from list view (will permit multiple items)
+                
+                //let cardFromList = list.querySelector(`div.file-item[${selector}='${info.id}'] > div.name-cell`);
+
+                // FIXME: are not selected if not list mode
+                let selectedCardFromList = list.querySelectorAll(`div.selected > div.name-cell`);
+                
+                let index = 0;
+
+                while (index < selectedCardFromList.length && index < 3) {
+                    self.draggedItems.appendChild( selectedCardFromList[index].cloneNode(true));
+                    index += 1;
+                }
+
+                // specify more than 3 elements
+                if (selectedCardFromList.length > 3) {
+                    let etcetera = document.createElement("div");
+                    etcetera.innerText= "...";
+                    self.draggedItems.appendChild(etcetera);
+                }
+
+                // if more than 1 item, display the badge
+                if (selectedCardFromList.length > 1) {
+                    let badge = document.createElement("span");
+                    badge.className="dragged-items-badge";
+                    badge.innerText=selectedCardFromList.length;
+                    self.draggedItems.appendChild( badge);
+                }
+                
+                //self.draggedItems.appendChild( cardFromList.cloneNode(true));
+                //self.draggedItems.innerHTML = `<span>${info.name} (1 element)</span>`; // XXX data should be escaped...
+                self.dragPreview.appendChild( self.draggedItems);
+                e.dataTransfer.setDragImage(self.draggedItems, -20, -20);
+            
             });
 
             // dragend
             container.addEventListener('dragend', (e) => {
-                const card = e.target.closest(sel);
-                if (card) card.classList.remove('dragging');
+                
+                self.dragPreview.removeChild( self.draggedItems);
+
+                //const card = e.target.closest(sel);
+                //if (card) card.classList.remove('dragging');
                 document.querySelectorAll('.drop-target')
                     .forEach(el => el.classList.remove('drop-target'));
             });
