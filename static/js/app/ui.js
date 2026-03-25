@@ -516,34 +516,15 @@ const ui = {
         }
         breadcrumb.appendChild(homeIcon);
 
-        // -- Root/Home folder name (if available) --
+        // -- Root/Home folder name (if available) is always the first element of the breadcrumb --
+        // TODO clarify the difference between homeIcon & this first element
         if (window.app.userHomeFolderName) {
-            const separator1 = document.createElement('span');
-            separator1.className = 'breadcrumb-separator';
-            separator1.textContent = '>';
-            breadcrumb.appendChild(separator1);
-
-            const rootFolderItem = document.createElement('span');
-            rootFolderItem.className = 'breadcrumb-item';
-            rootFolderItem.textContent = window.app.userHomeFolderName;
-
-            // If we're at the home folder level (no deeper navigation), show as current
-            if (path.length === 0) {
-                rootFolderItem.classList.add('breadcrumb-current');
-            } else {
-                // Otherwise clickable to go back to home
-                rootFolderItem.classList.add('breadcrumb-link');
-                rootFolderItem.addEventListener('click', () => {
-                    window.app.breadcrumbPath = [];
-                    window.app.currentPath = window.app.userHomeFolderId;
-                    self.updateBreadcrumb();
-                    window.loadFiles();
-                });
+            if (path.length === 0 || path[0].id !== window.app.userHomeFolderId) {
+                path.unshift({ name: window.app.userHomeFolderName, id: window.app.userHomeFolderId});
             }
-            breadcrumb.appendChild(rootFolderItem);
         }
 
-        // -- Intermediate + current segments --
+        // -- Root/Home + Intermediate + current segments --
         path.forEach((segment, index) => {
             const isLast = index === path.length - 1;
 
