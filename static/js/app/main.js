@@ -95,6 +95,12 @@ const ACTIONS_BAR_TEMPLATES = {
     `
 };
 
+/**
+ * 
+ * @param {string} mode 
+ * @param {boolean} [force=false] 
+ * @returns 
+ */
 function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
@@ -200,6 +206,7 @@ function setupActionsBarDelegation() {
  *
  * #/shared
  * #/recent
+ * ...
  *
  * special case of drive:
  *

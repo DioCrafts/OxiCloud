@@ -23,10 +23,13 @@
  */
 async function getFolder( id) {
 
+    /** @type {HeadersInit} */
     const headers = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache'
     };
+
+    /** @type {RequestInit} */
     const requestOptions = {
         headers,
         credentials: 'same-origin',
@@ -167,10 +170,13 @@ async function loadFiles(options = { insertHistory: true}) {
             console.log(`Loading subfolder content: ${app.currentPath}`);
         }
 
+        /** @type {HeadersInit} */
         const headers = {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
         };
+
+        /** @type {RequestInit} */
         const requestOptions = {
             headers,
             credentials: 'same-origin',
@@ -179,6 +185,7 @@ async function loadFiles(options = { insertHistory: true}) {
 
         if (forceRefresh) {
             url += `&force_refresh=true`;
+            // @ts-ignore
             requestOptions.headers['X-Force-Refresh'] = 'true';
             console.log('Forcing complete refresh ignoring cache');
         }
