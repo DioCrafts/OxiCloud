@@ -538,6 +538,7 @@ const ui = {
             const item = document.createElement('span');
             item.className = 'breadcrumb-item';
             item.textContent = segment.name;
+            item.dataset.folderId = segment.id;
 
             if (!isLast) {
                 // Intermediate segment: clickable – truncate path to this level
@@ -548,12 +549,72 @@ const ui = {
                     self.updateBreadcrumb();
                     window.loadFiles();
                 });
+
+                // can drag files on this folder
+                // dragover – only folders are valid drop targets
+                item.addEventListener('dragover', (e) => {
+                    const card = e.target.closest("span");
+                    if (!card || !card.dataset.folderId) return;
+                    e.preventDefault();
+                    card.classList.add('drop-target');
+                });
+
+                // dragleave
+                item.addEventListener('dragleave', (e) => {
+                    console.log( "dragleave ",e );
+                    const card = e.target.closest("span");
+                    if (!card || !card.dataset.folderId) return;
+                    card.classList.remove('drop-target');
+                });
+
+                // drop – only folders accept drops
+                item.addEventListener('drop', async (e) => {
+                    const card = e.target.closest("span");
+                    if (!card) return;
+                    const targetFolderId = card.dataset.folderId;
+                    if (!targetFolderId) return;
+
+                    e.preventDefault();
+                    card.classList.remove('drop-target');
+
+                    const id = e.dataTransfer.getData('text/plain');
+                    const isFolder =
+                        e.dataTransfer.getData('application/oxicloud-folder') === 'true';
+
+                    await self.move( id, isFolder, targetFolderId);
+                });
             } else {
                 // Last segment: current location, not clickable
                 item.classList.add('breadcrumb-current');
             }
             breadcrumb.appendChild(item);
         });
+    },
+
+
+    // TODO: support multiple elements to move ? (API does)
+    /**
+     * proceed to the drag & drop
+     * @param {string} sourceId to move (can be a uniq object or)
+     * @param {boolean} sourceIsAFolder 
+     * @param {string} targetFolderId 
+     */
+    async move(sourceId, sourceIsAFolder, targetFolderId) {
+        if (!sourceId) return;
+
+        console.log(`request move ${ sourceIsAFolder ? "folder": "file"} ${sourceId} to folder ${targetFolderId}`);
+
+        if (sourceIsAFolder) {
+            if (sourceId === targetFolderId) {
+                alert("You cannot move a folder to itself");
+                return;
+            }
+            // TODO: handle errors...
+            await fileOps.moveFolder(sourceId, targetFolderId);
+        } else {
+            // TODO: handle errors...
+            await fileOps.moveFile(sourceId, targetFolderId);
+        }
     },
 
     /**
@@ -932,17 +993,7 @@ const ui = {
                 const isFolder =
                     e.dataTransfer.getData('application/oxicloud-folder') === 'true';
 
-                if (id) {
-                    if (isFolder) {
-                        if (id === targetFolderId) {
-                            alert("You cannot move a folder to itself");
-                            return;
-                        }
-                        await fileOps.moveFolder(id, targetFolderId);
-                    } else {
-                        await fileOps.moveFile(id, targetFolderId);
-                    }
-                }
+                await self.move( id, isFolder, targetFolderId);
             });
         }
     },
