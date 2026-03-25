@@ -76,6 +76,61 @@ const multiSelect = {
         }
     },
 
+    /**
+     * @typedef {Object} ItemSelection
+     * @property {string[]} fileIds list of files' id
+     * @property {string[]} folderIds list of folders' id
+     */
+
+    /**
+     * get selection
+     * @param {string} [targtFolderId] an optional targget (will be removed from selected item)
+     * @return {ItemSelection}
+     */
+    getSelection(targtFolderId) {
+        let fileIds=[];
+        let folderIds=[];
+
+        // TODO optimize & check if _selected is a better use
+        document.querySelectorAll(`div.file-item.selected`).forEach( (item) => {
+            if (item.dataset.fileId) {
+                fileIds.push(item.dataset.fileId);
+            }
+            else {
+                // ignore selectedItem if this is the target
+                if (targtFolderId && targtFolderId !== item.dataset.folderId)
+                    folderIds.push(item.dataset.folderId);
+            }
+        });
+
+        return {
+            "fileIds": fileIds,
+            "folderIds": folderIds,
+        };
+    },
+
+    /**
+     * @param {string} action move|copy
+     * @param {BatchResult} result result of batch
+     */
+    showBatchResult(action, result) {
+        if (action === "copy") {
+            if (result.errors > 0) {
+                window.ui.showNotification('Batch copy', `${result.success} copied, ${result.errors} failed`);
+            } else {
+                window.ui.showNotification('Items copied',
+                    `${result.success} item${result.success !== 1 ? 's' : ''} copied successfully`);
+            }
+        } else {
+            if (result.errors > 0) {
+                window.ui.showNotification('Batch move', `${result.success} moved, ${result.errors} failed`);
+            } else {
+                window.ui.showNotification('Items moved',
+                    `${result.success} item${result.success !== 1 ? 's' : ''} moved successfully`);
+            }
+        }
+    },
+
     // ── DOM helpers ─────────────────────────────────────────
 
     _selectElement(el) {
@@ -94,13 +149,6 @@ const multiSelect = {
 
     _getAllVisibleItems() {
         return [...document.querySelectorAll('.file-item, .file-card')];
-        /*
-        const grid = document.getElementById('files-grid');
-        if (grid && grid.style.display !== 'none') {
-            return [...grid.querySelectorAll('.file-card')];
-        }
-        return [...document.querySelectorAll('#files-list-view .file-item')];
-        */
     },
 
     _extractInfo(el) {
@@ -192,6 +240,7 @@ const multiSelect = {
         const n = this._selected.size;
 
         const batchSelectionBar = document.getElementById('batch-selection-bar');
+        const actionsBar = document.getElementById('actions-bar');
 
         if (n > 0) {
             this._barVisible = true;
@@ -201,14 +250,18 @@ const multiSelect = {
                 : (this._t('batch.n_selected', { count: n }) || `${n} items selected`);
             document.getElementById("batch-bar-count").innerText = countText;
 
-            batchSelectionBar.classList.add('visible');
+            actionsBar.classList.add('hidden');
             
+            batchSelectionBar.classList.remove('hidden');
             
         } else {
             this._barVisible = false;
 
             // Hide grid bar
-            batchSelectionBar.classList.remove('visible');            
+            batchSelectionBar.classList.add('hidden'); 
+
+            if (actionsBar.dataset.mode !== "hidden")
+                actionsBar.classList.remove('hidden');           
         }
 
         // Sync individual item checkboxes
@@ -425,9 +478,6 @@ const multiSelect = {
         // Wire the initial select-all checkbox
         this._injectListHeaderCheckbox();
 
-        // Global deselect on empty-area click
-        this._hookGlobalDeselect();
-
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             if (e.target.closest('input, textarea, [contenteditable], .rename-dialog, .share-dialog, .confirm-dialog')) return;
@@ -459,13 +509,6 @@ const multiSelect = {
         cb.addEventListener('change', () => this.toggleAll());
     },
 
-    _hookGlobalDeselect() {
-        document.addEventListener('click', (e) => {
-            if (window.__rubberBandJustFinished) return;
-            if (e.target.closest('.file-card, .file-item, .context-menu, .batch-selection-bar, .list-header.selection-mode, .about-modal, .rename-dialog, .share-dialog, .confirm-dialog, .modal-overlay, input, button')) return;
-            if (this.hasSelection) this.clear();
-        });
-    }
 };
 
 // Expose globally

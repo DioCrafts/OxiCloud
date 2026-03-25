@@ -3,6 +3,8 @@
  * This file handles UI-related functions, view toggling, and interface interactions
  */
 
+// @ts-check
+
 // UI Module
 const ui = {
     /**
@@ -278,6 +280,12 @@ const ui = {
      * Set up drag and drop functionality
      */
     setupDragAndDrop() {
+        // prepare area to build dragged elements
+        this.dragPreview = document.createElement("div");
+        this.dragPreview.className="drag-preview";
+        document.body.appendChild(this.dragPreview);
+        this.draggedItems = null;
+
         const dropzone = document.getElementById('dropzone');
 
         const collectDroppedEntries = async (dataTransfer) => {
@@ -577,11 +585,8 @@ const ui = {
                     e.preventDefault();
                     card.classList.remove('drop-target');
 
-                    const id = e.dataTransfer.getData('text/plain');
-                    const isFolder =
-                        e.dataTransfer.getData('application/oxicloud-folder') === 'true';
-
-                    await self.move( id, isFolder, targetFolderId);
+                    const action = e.dataTransfer?.dropEffect;
+                    await self._dropToFolder( action, targetFolderId, e.dataTransfer );
                 });
             } else {
                 // Last segment: current location, not clickable
@@ -589,32 +594,6 @@ const ui = {
             }
             breadcrumb.appendChild(item);
         });
-    },
-
-
-    // TODO: support multiple elements to move ? (API does)
-    /**
-     * proceed to the drag & drop
-     * @param {string} sourceId to move (can be a uniq object or)
-     * @param {boolean} sourceIsAFolder 
-     * @param {string} targetFolderId 
-     */
-    async move(sourceId, sourceIsAFolder, targetFolderId) {
-        if (!sourceId) return;
-
-        console.log(`request move ${ sourceIsAFolder ? "folder": "file"} ${sourceId} to folder ${targetFolderId}`);
-
-        if (sourceIsAFolder) {
-            if (sourceId === targetFolderId) {
-                alert("You cannot move a folder to itself");
-                return;
-            }
-            // TODO: handle errors...
-            await fileOps.moveFolder(sourceId, targetFolderId);
-        } else {
-            // TODO: handle errors...
-            await fileOps.moveFile(sourceId, targetFolderId);
-        }
     },
 
     /**
@@ -742,6 +721,66 @@ const ui = {
         }
     },
 
+    /**
+     * handle the drop
+     * @param {string} action copy|move
+     * @param {string} targetFolderId the target
+     * @param {any} dataTransfer fallback if nothing is selected
+     */
+    async _dropToFolder(action, targetFolderId, dataTransfer) {
+        let selection = window.multiSelect.getSelection(targetFolderId);
+                
+        window.multiSelect.clear();
+
+        if (selection.fileIds.length == 0 && selection.folderIds.length == 0) {
+
+            // try to use dataTransfer (direct move without selection)
+            const id = dataTransfer.getData('text/plain');
+            const isFolder = dataTransfer.getData('application/oxicloud-folder') === 'true';
+
+            if (isFolder && id === targetFolderId) {
+                console.log("nothing to do");
+                return; //nothing to do
+            }
+            // append current item to selection
+            if (isFolder) {
+                console.log(`adding ${id} as folder`);
+                selection.folderIds.push(id);
+            }
+            else {
+                console.log(`adding ${id} as file`);
+                selection.fileIds.push(id);
+            }
+        }
+
+        console.log(`request ${action} of: `, selection);
+        /*
+        TODO do we prefer use atomic operation on 1 item ? like:
+            await fileOps.moveFolder(sourceId, targetFolderId);
+            await fileOps.moveFile(sourceId, targetFolderId);
+        */
+
+        let result;
+        switch (action) {
+            case "copy":
+                result = await window.fileOps.batchCopy(selection.fileIds, selection.folderIds, targetFolderId);
+                break;
+
+            case "move": 
+                result = await window.fileOps.batchMove(selection.fileIds, selection.folderIds, targetFolderId);
+                // redraw directory 
+                if (result.success > 0)
+                    window.loadFiles();
+                break;
+
+            default:
+                console.error(`drag and drop: action ${action} unknown`);    
+                return;    
+        }
+        window.multiSelect.showBatchResult(action, result);
+        console.log( result);
+    },
+    
     _hydrateViewIfNeeded(view) {
         // Only hydrate if there is at least one rendered item in the opposite/current DOM.
         // This prevents stale cache hydration in empty-state screens.
@@ -755,7 +794,6 @@ const ui = {
 
             this._renderFoldersToView(this._lastFolders, 'grid');
             this._renderFilesToView(this._lastFiles, 'grid');
-            return;
         }
 
         if (view === 'list') {
@@ -787,9 +825,9 @@ const ui = {
         const itemInfo = (card) => {
             if (!card) return null;
             const fileId = card.dataset.fileId;
-            if (fileId) return { type: 'file', id: fileId, data: self._items.get(fileId) };
+            if (fileId) return { type: 'file', id: fileId, name: card.dataset.fileName, data: self._items.get(fileId) };
             const folderId = card.dataset.folderId;
-            if (folderId) return { type: 'folder', id: folderId, data: self._items.get(folderId) };
+            if (folderId) return { type: 'folder', id: folderId, name: card.dataset.folderName, data: self._items.get(folderId) };
             return null;
         };
 
@@ -947,31 +985,75 @@ const ui = {
 
             // dragstart
             container.addEventListener('dragstart', (e) => {
-                const card = e.target.closest(sel);
+                let card = e.target.closest(sel);
                 if (!card) { e.preventDefault(); return; }
-
-                // Grid items must be selected to start dragging
-                if (container === grid &&
-                    !card.classList.contains('selected')) {
-                    e.preventDefault();
-                    return;
-                }
-
+                
                 const info = itemInfo(card);
                 if (!info) { e.preventDefault(); return; }
 
+                if (container === grid) {
+                    // pickup the equivalent item in list
+                    const selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
+                    card = list.querySelector(`div.file-item[${selector}="${info.id}"]`);
+                }
+
                 e.dataTransfer.setData('text/plain', info.id);
-                if (info.type === 'folder') {
+                if (info.type === 'folder') { 
                     e.dataTransfer.setData(
                         'application/oxicloud-folder', 'true');
                 }
-                card.classList.add('dragging');
+                // allow copy or move (handled by the browser)
+                e.dataTransfer.effectAllowed = "copyMove";
+                
+                self.draggedItems = document.createElement("div");
+                self.draggedItems.className = "dragged-items";
+                
+                // Fplease note that dragged elements are taken from list view (uniformisation)
+                let selectedCardFromList = list.querySelectorAll(`div.selected > div.name-cell`);
+                if (selectedCardFromList.length == 0) {
+                    // fallback to current element
+                    selectedCardFromList = card.querySelectorAll('div.name-cell');
+                }
+                
+                let index = 0;
+                const maxElements = 4;
+                let lastItemDiv = null;
+
+                while (index < selectedCardFromList.length && index < maxElements) {
+                    let div = document.createElement("div");
+                    div.className="file-item";
+                    let clone = selectedCardFromList[index].cloneNode(true);
+                    let star = clone.querySelector('.favorite-star-inline');
+                    clone.querySelectorAll('img').forEach((img) => { img.loading="eager"; } );
+                    if (star) clone.removeChild(star);
+                    div.appendChild(clone);
+                    self.draggedItems.appendChild( div);
+                    index += 1;
+                    lastItemDiv = div;
+                }
+
+                // if more than 1 item, display the badge
+                if (selectedCardFromList.length > 1) {
+                    let badge = document.createElement("span");
+                    badge.className="dragged-items-badge";
+                    badge.innerText=selectedCardFromList.length;
+                    self.draggedItems.appendChild( badge);
+                }
+
+                // if more than maxElements display the fading
+                if (selectedCardFromList.length > maxElements) {
+                    lastItemDiv.classList.add("fading");
+                }
+                
+                self.dragPreview.appendChild( self.draggedItems);
+                e.dataTransfer.setDragImage(self.draggedItems, -20, -20);
+            
             });
 
             // dragend
             container.addEventListener('dragend', (e) => {
-                const card = e.target.closest(sel);
-                if (card) card.classList.remove('dragging');
+                
+                self.dragPreview.removeChild( self.draggedItems);
                 document.querySelectorAll('.drop-target')
                     .forEach(el => el.classList.remove('drop-target'));
             });
@@ -1002,11 +1084,8 @@ const ui = {
                 e.preventDefault();
                 card.classList.remove('drop-target');
 
-                const id = e.dataTransfer.getData('text/plain');
-                const isFolder =
-                    e.dataTransfer.getData('application/oxicloud-folder') === 'true';
-
-                await self.move( id, isFolder, targetFolderId);
+                const action = e.dataTransfer.dropEffect;
+                await self._dropToFolder( action, targetFolderId, e.dataTransfer);
             });
         }
     },
@@ -1266,7 +1345,8 @@ const ui = {
             this._items.set(folder.id, folder);
         }
 
-        this._renderFoldersToView(safeFolders, this._getActiveView());
+        this._renderFoldersToView(safeFolders, 'grid');
+        this._renderFoldersToView(safeFolders, 'list');
     },
 
     /**
@@ -1282,7 +1362,8 @@ const ui = {
             this._items.set(file.id, file);
         }
 
-        this._renderFilesToView(safeFiles, this._getActiveView());
+        this._renderFilesToView(safeFiles, 'grid');
+        this._renderFilesToView(safeFiles, 'list');
     },
 
     /* ================================================================
@@ -1305,7 +1386,8 @@ const ui = {
 
         this._items.set(folder.id, folder);
         this._upsertById(this._lastFolders, folder);
-        this._renderFoldersToView([folder], this._getActiveView());
+        this._renderFoldersToView([folder], 'grid');
+        this._renderFoldersToView([folder], 'list');
     },
 
     /**
@@ -1324,7 +1406,8 @@ const ui = {
 
         this._items.set(file.id, file);
         this._upsertById(this._lastFiles, file);
-        this._renderFilesToView([file], this._getActiveView());
+        this._renderFilesToView([file], 'grid');
+        this._renderFilesToView([file], 'list');
     }
 };
 
@@ -1393,6 +1476,7 @@ function initRubberBandSelection() {
 
     let active = false;
     let startX = 0, startY = 0;
+    const list = document.getElementById('files-list-view');
 
     // We listen on the whole files-container (covers grid + empty space)
     const container = document.querySelector('.files-container') || document.getElementById('files-grid');
@@ -1454,9 +1538,16 @@ function initRubberBandSelection() {
 
             if (intersects) {
                 card.classList.add('selected');
+
                 // Sync with multiSelect module
                 if (window.multiSelect) {
                     const info = window.multiSelect._extractInfo(card);
+
+                    // select the equivalent list-item to activate it too
+                    let selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
+                    const fileItem = list?.querySelector(`div.file-item[${selector}="${info.id}"]`);
+                    fileItem?.classList.add('selected');
+
                     if (info) window.multiSelect.select(info.id, info.name, info.type, info.parentId);
                 }
             } else {
@@ -1464,6 +1555,12 @@ function initRubberBandSelection() {
                 // Deselect from multiSelect module
                 if (window.multiSelect) {
                     const info = window.multiSelect._extractInfo(card);
+
+                    // select the equivalent list-item to activate it too
+                    let selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
+                    const fileItem = list?.querySelector(`div.file-item[${selector}="${info.id}"]`);
+                    fileItem?.classList.remove('selected');
+
                     if (info) window.multiSelect.deselect(info.id);
                 }
             }

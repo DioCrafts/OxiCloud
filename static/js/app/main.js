@@ -105,8 +105,9 @@ function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
     if (mode === 'hidden') {
-        elements.actionsBar.style.display = 'none';
+        elements.actionsBar.classList.add("hidden");
         elements.actionsBar.dataset.mode = 'hidden';
+        console.log("......setup actions bar to hidden");
         return;
     }
 
@@ -118,7 +119,7 @@ function setActionsBarMode(mode, force = false) {
     if (!html) return;
 
     elements.actionsBar.innerHTML = html;
-    elements.actionsBar.style.display = 'flex';
+    elements.actionsBar.classList.remove("hidden");
     elements.actionsBar.dataset.mode = mode;
 
     // Refresh cached action elements after rebuild
@@ -414,7 +415,7 @@ function cacheElements() {
     elements.listViewBtn = document.getElementById('list-view-btn');
     elements.breadcrumb = document.querySelector('.breadcrumb');
     elements.pageTitle = document.querySelector('.page-title');
-    elements.actionsBar = document.querySelector('.actions-bar');
+    elements.actionsBar = document.getElementById('actions-bar');
     elements.navItems = document.querySelectorAll('.nav-item');
     elements.searchInput = document.querySelector('.search-container input');
 }
@@ -646,16 +647,6 @@ function setupEventListeners() {
         if (fileMenu && fileMenu.style.display === 'block' && 
             !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
-        }
-
-        // Deselect all cards when clicking empty area (not on a card, menu, or modal)
-        // Note: multiSelect._hookGlobalDeselect() handles clearing the internal
-        // selection state; this handler only covers the legacy CSS class removal.
-        // Skip if a rubber-band selection just finished — the click is a side-effect.
-        if (window.__rubberBandJustFinished) return;
-        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-selection-bar') && !e.target.closest('.list-header.selection-mode')) {
-            document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
-            document.querySelectorAll('.file-item.selected').forEach(c => c.classList.remove('selected'));
         }
     });
 }

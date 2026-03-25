@@ -288,40 +288,13 @@ const contextMenus = {
                 const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
                 const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
 
-                let success = 0, errors = 0;
-
-                try {
-                    // Batch copy files
-                    if (fileIds.length > 0) {
-                        const res = await fetch('/api/batch/files/copy', {
-                            method: 'POST',
-                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetId })
-                        });
-                        const data = await res.json();
-                        success += data.stats?.successful || 0;
-                        errors += data.stats?.failed || 0;
-                    }
-
-                    // Note: Folder copy is not yet implemented in batch API
-                    if (folderIds.length > 0) {
-                        window.ui.showNotification('Info', 'Folder copy is not yet supported in batch mode');
-                    }
-                } catch (err) {
-                    console.error('Batch copy error:', err);
-                    errors++;
-                }
-
+                let result = await window.fileOps.batchCopy( fileIds, folderIds, targetId);
+                
                 this.closeMoveDialog();
                 window.multiSelect.clear();
                 window.loadFiles();
 
-                if (errors > 0) {
-                    window.ui.showNotification('Batch copy', `${success} copied, ${errors} failed`);
-                } else {
-                    window.ui.showNotification('Items copied',
-                        `${success} item${success !== 1 ? 's' : ''} copied successfully`);
-                }
+                window.multiSelect.showBatchResult( "copy", result);
                 return;
             }
 
@@ -353,48 +326,14 @@ const contextMenus = {
 
                 const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
                 const folderIds = items.filter(i => i.type === 'folder' && i.id !== targetId).map(i => i.id);
-
-                let success = 0, errors = 0;
-
-                try {
-                    // Batch move files in a single request
-                    if (fileIds.length > 0) {
-                        const res = await fetch('/api/batch/files/move', {
-                            method: 'POST',
-                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetId })
-                        });
-                        const data = await res.json();
-                        success += data.stats?.successful || 0;
-                        errors += data.stats?.failed || 0;
-                    }
-
-                    // Batch move folders in a single request
-                    if (folderIds.length > 0) {
-                        const res = await fetch('/api/batch/folders/move', {
-                            method: 'POST',
-                            headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ folder_ids: folderIds, target_folder_id: targetId })
-                        });
-                        const data = await res.json();
-                        success += data.stats?.successful || 0;
-                        errors += data.stats?.failed || 0;
-                    }
-                } catch (err) {
-                    console.error('Batch move error:', err);
-                    errors++;
-                }
-
+                
+                let result = await window.fileOps.batchMove( fileIds, folderIds, targetId);
+                
                 this.closeMoveDialog();
                 window.multiSelect.clear();
                 window.loadFiles();
-
-                if (errors > 0) {
-                    window.ui.showNotification('Batch move', `${success} moved, ${errors} failed`);
-                } else {
-                    window.ui.showNotification('Items moved',
-                        `${success} item${success !== 1 ? 's' : ''} moved successfully`);
-                }
+                window.multiSelect.showBatchResult( "move", result);
+                
                 return;
             }
 

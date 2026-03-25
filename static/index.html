@@ -204,7 +204,7 @@
         <div class="content-area">
             <h1 class="page-title" data-i18n="nav.files">Files</h1>
 
-            <div class="actions-bar">
+            <div class="actions-bar" id="actions-bar">
                 <div class="action-buttons">
                     <div class="upload-dropdown" id="upload-dropdown">
                         <button class="btn btn-primary" id="upload-btn">
@@ -239,6 +239,8 @@
                 </div>
             </div>
 
+            <div id="batch-selection-bar" class="batch-selection-bar hidden"></div>
+
             <div class="dropzone" id="dropzone">
                 <i class="fas fa-cloud-upload-alt dropzone-icon"></i>
                 <p data-i18n="dropzone.drag_files">Drag files here or click to select</p>
@@ -254,8 +256,6 @@
             <div class="breadcrumb">
                 <span class="breadcrumb-item" data-i18n="breadcrumb.home">Home</span>
             </div>
-
-            <div id="batch-selection-bar" class="batch-selection-bar"></div>
 
             <!-- Files Container -->
             <div class="files-container">

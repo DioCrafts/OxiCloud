@@ -182,6 +182,8 @@ function switchToSharedSection() {
         window.sharedView.init();
         window.sharedView.show();
     }
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
 function switchToFilesSection() {
@@ -208,6 +210,7 @@ function switchToFilesSection() {
     window.app.currentPath = window.app.userHomeFolderId || '';
     window.app.breadcrumbPath = [];
     window.ui.updateBreadcrumb();
+    if (window.multiSelect) window.multiSelect.clear();
 
     window.loadFiles();
 }
@@ -246,6 +249,9 @@ function switchToFavoritesSection() {
             `;
         }
     }
+    
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
 function switchToRecentFilesSection() {
@@ -282,6 +288,7 @@ function switchToRecentFilesSection() {
             `;
         }
     }
+    if (window.multiSelect) window.multiSelect.clear();
 }
 
 function switchToPhotosSection() {
@@ -307,6 +314,8 @@ function switchToPhotosSection() {
     if (window.photosView) {
         window.photosView.show();
     }
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
 function switchToTrashSection() {
