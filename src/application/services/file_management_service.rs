@@ -139,7 +139,8 @@ impl FileManagementUseCase for FileManagementService {
         // Verify file ownership first
         self.verify_owner(file_id, caller_id).await?;
         // Verify target folder ownership (prevents file from "disappearing")
-        self.verify_target_folder_owner(&folder_id, caller_id).await?;
+        self.verify_target_folder_owner(&folder_id, caller_id)
+            .await?;
         self.move_file(file_id, folder_id).await
     }
 

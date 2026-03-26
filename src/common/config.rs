@@ -215,9 +215,9 @@ impl Default for StorageConfig {
         };
         Self {
             root_dir: "storage".to_string(),
-            chunk_size: 1024 * 1024,                  // 1 MB
-            parallel_threshold: 100 * 1024 * 1024,    // 100 MB
-            trash_retention_days: 30,                 // 30 days
+            chunk_size: 1024 * 1024,               // 1 MB
+            parallel_threshold: 100 * 1024 * 1024, // 100 MB
+            trash_retention_days: 30,              // 30 days
             max_upload_size: MAX_UPLOAD_SIZE,
         }
     }

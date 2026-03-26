@@ -15,14 +15,13 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
     // XXX do we prefer PROFILE or ENV ?
     let is_dev = std::env::var("PROFILE").is_ok_and(|profile| profile == "dev");
 
-    let assets_dir =
-        if is_dev {
-            // take directly the source (permits faster development)
-            "static"
-        } else {
-            // take the compiled assets
-            "static-dist"
-        };
+    let assets_dir = if is_dev {
+        // take directly the source (permits faster development)
+        "static"
+    } else {
+        // take the compiled assets
+        "static-dist"
+    };
 
     // In release builds, serve from static-dist/ (processed assets).
     // In debug builds, serve from the original static/ directory.
@@ -31,7 +30,7 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
             .static_path
             .parent()
             .unwrap_or(std::path::Path::new("."))
-            .join(assets_dir );
+            .join(assets_dir);
         if dist.exists() {
             dist
         } else {
@@ -48,12 +47,11 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
     let static_service = ServeDir::new(&static_path);
 
     // By default assets are cached in release/production environement and no cache in dev
-    let cache_control_value =
-        if is_dev {
-            "max-age=0, no-cache, no-store"
-        } else {
-            "public, max-age=604800, stale-while-revalidate=86400"
-        };
+    let cache_control_value = if is_dev {
+        "max-age=0, no-cache, no-store"
+    } else {
+        "public, max-age=604800, stale-while-revalidate=86400"
+    };
 
     Router::new()
         // Add specific routes for clean URLs (without .html)
@@ -66,7 +64,7 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
         .layer(CompressionLayer::new().br(true).gzip(true))
         .layer(SetResponseHeaderLayer::if_not_present(
             CACHE_CONTROL,
-            HeaderValue::from_static(cache_control_value), 
+            HeaderValue::from_static(cache_control_value),
         ))
 }
 

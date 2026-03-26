@@ -333,12 +333,7 @@ mod tests {
     #[test]
     fn test_init_bad_color_1() {
         let owner_id = Uuid::new_v4();
-        let res = Calendar::new(
-            "Name".to_string(),
-            owner_id,
-            None,
-            Some("foo".to_string()),
-        );
+        let res = Calendar::new("Name".to_string(), owner_id, None, Some("foo".to_string()));
         assert!(res.is_err());
     }
 
