@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use super::thumbnail_service::{ThumbnailService, ThumbnailSize};
 
@@ -29,7 +30,12 @@ async fn generate_thumbnail_from_blob_path() {
     let blob_path = blob_dir.join("ab1234567890.blob");
     std::fs::write(&blob_path, tiny_png()).expect("write test blob");
 
-    let svc = Arc::new(ThumbnailService::new(storage_root, 100, 10 * 1024 * 1024));
+    let svc = Arc::new(ThumbnailService::new(
+        storage_root,
+        100,
+        10 * 1024 * 1024,
+        Some(Duration::from_secs(30)),
+    ));
     svc.initialize().await.expect("init thumbnail dirs");
 
     // The key assertion: the service can read from a blob path (not a logical path)
@@ -51,7 +57,12 @@ async fn generate_thumbnail_from_blob_path() {
 #[tokio::test]
 async fn generate_thumbnail_nonexistent_path_returns_error() {
     let tmp = tempfile::tempdir().expect("create temp dir");
-    let svc = Arc::new(ThumbnailService::new(tmp.path(), 100, 10 * 1024 * 1024));
+    let svc = Arc::new(ThumbnailService::new(
+        tmp.path(),
+        100,
+        10 * 1024 * 1024,
+        Some(Duration::from_secs(30)),
+    ));
     svc.initialize().await.expect("init thumbnail dirs");
 
     let bad_path = tmp.path().join("does-not-exist.png");

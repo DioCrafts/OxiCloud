@@ -119,12 +119,13 @@ impl AppServiceFactory {
         }));
         tracing::info!("FileContentCache initialized: max 10MB/file, 512MB total, 10k entries");
 
-        // Thumbnail service for thumbnail generation
+        // Thumbnail service for thumbnail generation with timeout protection
         let thumbnail_service = Arc::new(
             crate::infrastructure::services::thumbnail_service::ThumbnailService::new(
                 &self.storage_path,
                 5000,              // max 5000 thumbnails in cache
                 100 * 1024 * 1024, // max 100MB cache
+                Some(self.config.timeouts.thumbnail_timeout()),
             ),
         );
         // Initialize thumbnail directories

@@ -12,11 +12,14 @@ use image::imageops::FilterType;
  * - JPEG output (lossy q=80) for compact thumbnails
  * - Lock-free moka cache with weight-based eviction
  * - Lazy generation on first request if not pre-generated
+ * - Timeout protection for large image processing
  */
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::fs;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 
 use crate::application::ports::thumbnail_ports::{
     ThumbnailPort, ThumbnailSize as PortThumbnailSize, ThumbnailStatsDto,
@@ -90,6 +93,9 @@ pub struct ThumbnailService {
     /// Without this, 50 simultaneous uploads would decode 50 bitmaps
     /// (~96 MB each for 6000×4000) = 4.8 GB peak.
     decode_semaphore: Arc<Semaphore>,
+    /// Timeout for thumbnail generation operations to prevent hanging on large images.
+    /// Defaults to 30 seconds.
+    generation_timeout: Duration,
 }
 
 impl ThumbnailService {
@@ -99,7 +105,13 @@ impl ThumbnailService {
     /// * `storage_root` - Root path of file storage
     /// * `max_cache_entries` - (ignored — moka uses weight-based eviction)
     /// * `max_cache_bytes` - Maximum total bytes to cache
-    pub fn new(storage_root: &Path, max_cache_entries: usize, max_cache_bytes: usize) -> Self {
+    /// * `generation_timeout` - Timeout for thumbnail generation operations
+    pub fn new(
+        storage_root: &Path,
+        max_cache_entries: usize,
+        max_cache_bytes: usize,
+        generation_timeout: Option<Duration>,
+    ) -> Self {
         let thumbnails_root = storage_root.join(".thumbnails");
 
         // Ignore max_cache_entries — weight-based eviction is more accurate
@@ -123,6 +135,7 @@ impl ThumbnailService {
             cache,
             max_cache_bytes: max_cache_bytes as u64,
             decode_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_CONCURRENT_DECODES)),
+            generation_timeout: generation_timeout.unwrap_or(Duration::from_secs(30)),
         }
     }
 
@@ -351,6 +364,7 @@ impl ThumbnailService {
     /// capped at `MAX_DECODE_PIXELS` to reject pathologically large images.
     /// After decoding, the encoded image buffer is explicitly dropped before
     /// processing to minimize peak memory usage.
+    /// A timeout prevents the operation from hanging indefinitely on large images.
     async fn generate_thumbnail(
         &self,
         original_path: &Path,
@@ -358,6 +372,7 @@ impl ThumbnailService {
     ) -> Result<Bytes, ThumbnailError> {
         let path = original_path.to_path_buf();
         let max_dim = size.max_dimension();
+        let timeout_duration = self.generation_timeout;
 
         // Acquire semaphore permit — bounds peak RAM from concurrent decodes
         let _permit = self
@@ -366,73 +381,83 @@ impl ThumbnailService {
             .await
             .map_err(|_| ThumbnailError::TaskError("Decode semaphore closed".into()))?;
 
-        // Run image processing in blocking thread pool
-        let result = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
-            // Single read: load file once into memory, then work from the buffer
-            let data =
-                std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+        // Run image processing in blocking thread pool with timeout
+        let spawn_result =
+            tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
+                // Single read: load file once into memory, then work from the buffer
+                let data =
+                    std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
-            // Safety check: read dimensions from in-memory buffer (no 2nd I/O)
-            let (w, h) = image::ImageReader::new(std::io::Cursor::new(&data))
-                .with_guessed_format()
-                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
-                .into_dimensions()
-                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
-            if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
-                return Err(ThumbnailError::ImageError(format!(
-                    "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
-                    w as u64 * h as u64 / 1_000_000
-                )));
-            }
+                // Safety check: read dimensions from in-memory buffer (no 2nd I/O)
+                let (w, h) = image::ImageReader::new(std::io::Cursor::new(&data))
+                    .with_guessed_format()
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
+                    .into_dimensions()
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+                if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
+                    return Err(ThumbnailError::ImageError(format!(
+                        "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
+                        w as u64 * h as u64 / 1_000_000
+                    )));
+                }
 
-            // Full decode from the same in-memory buffer (no 2nd disk read)
-            let img = image::load_from_memory(&data)
-                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+                // Full decode from the same in-memory buffer (no 2nd disk read)
+                let img = image::load_from_memory(&data)
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
-            // Apply EXIF orientation so thumbnails display correctly
-            let img = {
-                use crate::infrastructure::services::exif_service::{
-                    ExifService, apply_orientation,
+                // Apply EXIF orientation so thumbnails display correctly
+                let img = {
+                    use crate::infrastructure::services::exif_service::{
+                        ExifService, apply_orientation,
+                    };
+                    let orientation = ExifService::extract(&data)
+                        .and_then(|m| m.orientation)
+                        .unwrap_or(1);
+                    // Free the encoded image data now that image is decoded and EXIF extracted
+                    drop(data);
+                    apply_orientation(img, orientation)
                 };
-                let orientation = ExifService::extract(&data)
-                    .and_then(|m| m.orientation)
-                    .unwrap_or(1);
-                // Free the encoded image data now that image is decoded and EXIF extracted
-                drop(data);
-                apply_orientation(img, orientation)
-            };
 
-            // Calculate new dimensions preserving aspect ratio
-            let (orig_width, orig_height) = (img.width(), img.height());
-            let (new_width, new_height) = if orig_width > orig_height {
-                let ratio = max_dim as f32 / orig_width as f32;
-                (max_dim, (orig_height as f32 * ratio) as u32)
-            } else {
-                let ratio = max_dim as f32 / orig_height as f32;
-                ((orig_width as f32 * ratio) as u32, max_dim)
-            };
+                // Calculate new dimensions preserving aspect ratio
+                let (orig_width, orig_height) = (img.width(), img.height());
+                let (new_width, new_height) = if orig_width > orig_height {
+                    let ratio = max_dim as f32 / orig_width as f32;
+                    (max_dim, (orig_height as f32 * ratio) as u32)
+                } else {
+                    let ratio = max_dim as f32 / orig_height as f32;
+                    ((orig_width as f32 * ratio) as u32, max_dim)
+                };
 
-            // Adaptive filter: faster filters for smaller sizes where
-            // quality difference vs Lanczos3 is imperceptible
-            let filter = match size {
-                ThumbnailSize::Icon => FilterType::Triangle, // 150px — max speed
-                ThumbnailSize::Preview => FilterType::CatmullRom, // 400px — good balance
-                ThumbnailSize::Large => FilterType::CatmullRom, // 800px — sufficient quality
-            };
-            let thumbnail = img.resize(new_width, new_height, filter);
+                // Adaptive filter: faster filters for smaller sizes where
+                // quality difference vs Lanczos3 is imperceptible
+                let filter = match size {
+                    ThumbnailSize::Icon => FilterType::Triangle, // 150px — max speed
+                    ThumbnailSize::Preview => FilterType::CatmullRom, // 400px — good balance
+                    ThumbnailSize::Large => FilterType::CatmullRom, // 800px — sufficient quality
+                };
+                let thumbnail = img.resize(new_width, new_height, filter);
 
-            // Encode as JPEG (lossy q=80) — explicit quality control,
-            // ~2× smaller than image-webp's Rust encoder at same visual quality
-            let rgb = thumbnail.to_rgb8();
-            let mut buffer = Vec::new();
-            let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
-            rgb.write_with_encoder(encoder)
-                .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+                // Encode as JPEG (lossy q=80) — explicit quality control,
+                // ~2× smaller than image-webp's Rust encoder at same visual quality
+                let rgb = thumbnail.to_rgb8();
+                let mut buffer = Vec::new();
+                let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+                rgb.write_with_encoder(encoder)
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
 
-            Ok(buffer)
-        })
-        .await
-        .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
+                Ok(buffer)
+            });
+
+        // Apply timeout to prevent hanging on large images
+        let result = timeout(timeout_duration, spawn_result)
+            .await
+            .map_err(|_| {
+                ThumbnailError::TaskError(format!(
+                    "Thumbnail generation timed out after {:?}",
+                    timeout_duration
+                ))
+            })?
+            .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
 
         result.map(Bytes::from)
     }
