@@ -922,24 +922,23 @@ async fn handle_put(
     let hash = hasher.finalize().to_hex().to_string();
 
     // ── Quota enforcement ────────────────────────────────────
-    if let Some(storage_svc) = state.storage_usage_service.as_ref() {
-        if let Err(err) = storage_svc
+    if let Some(storage_svc) = state.storage_usage_service.as_ref()
+        && let Err(err) = storage_svc
             .check_storage_quota(user.id, total_bytes as u64)
             .await
-        {
-            let _ = tokio::fs::remove_file(&temp_path).await;
-            tracing::warn!(
-                "⛔ WEBDAV PUT REJECTED (quota): user={}, file={}, size={}",
-                user.id,
-                path,
-                total_bytes
-            );
-            return Err(AppError::new(
-                StatusCode::INSUFFICIENT_STORAGE,
-                err.message,
-                "QuotaExceeded",
-            ));
-        }
+    {
+        let _ = tokio::fs::remove_file(&temp_path).await;
+        tracing::warn!(
+            "⛔ WEBDAV PUT REJECTED (quota): user={}, file={}, size={}",
+            user.id,
+            path,
+            total_bytes
+        );
+        return Err(AppError::new(
+            StatusCode::INSUFFICIENT_STORAGE,
+            err.message,
+            "QuotaExceeded",
+        ));
     }
 
     // ── Atomic store: temp file → dedup blob + DB metadata update ──
