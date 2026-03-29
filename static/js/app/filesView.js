@@ -1,8 +1,59 @@
+// @ts-check
+
+// TODO move to features/files/fileOperations.js
 /**
- * Files view loading logic
+ * @typedef {Object} FolderInfo
+ * @property {string} category
+ * @property {number} created_at - timestamp
+ * @property {string} icon_class
+ * @property {string} icon_special_class
+ * @property {string} id the uniq id of the folder
+ * @property {boolean} is_root
+ * @property {number} modified_at
+ * @property {string} name
+ * @property {string} owner_id
+ * @property {string|null} parent_id the folder parent (null if is_root)
+ * @property {string} path the full path
  */
 
-async function loadFiles(options = {}) {
+/**
+ * getFolder information
+ * @param {string} id the id of the folder
+ * @returns {Promise<FolderInfo>}
+ */
+async function getFolder( id) {
+
+    /** @type {HeadersInit} */
+    const headers = {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+    };
+
+    /** @type {RequestInit} */
+    const requestOptions = {
+        headers,
+        credentials: 'same-origin',
+        cache: 'no-store'
+    };
+    
+    let folderInformations = await fetch( `/api/folders/${id}`, requestOptions);
+    if (folderInformations.ok) {
+        return folderInformations.json()
+    }
+    else {
+        console.warn(`Error fetching folder ${id}`);
+        return Promise.reject(null);
+    }
+}
+
+/**
+ * Files view loading logic
+ * 
+ * @param {Object} options
+ * @param {boolean} [options.insertHistory] add browser history (default true)
+ * @param {boolean} [options.forceRefresh] force refresh of content
+ */
+async function loadFiles(options = { insertHistory: true}) {
     const app = window.app;
     const elements = window.appElements;
 
@@ -18,18 +69,89 @@ async function loadFiles(options = {}) {
 
         window.isLoadingFiles = true;
 
-        elements.filesGrid.innerHTML = `
-            <div class="files-loading-spinner">
-                <div class="spinner"></div>
-                <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
-            </div>
-        `;
+        // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
+        let loadingFiles = setTimeout( () => {
+            // display loader after few delay (will be canceled if result take less time)
+            elements.filesGrid.innerHTML = `
+                <div class="files-loading-spinner">
+                    <div class="spinner"></div>
+                    <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
+                </div>
+            `;
+        }, 100);
 
         if (!app.userHomeFolderId) {
             await window.resolveHomeFolder();
         }
 
         const timestamp = new Date().getTime();
+
+        /** 
+         * Store the leaf (this is the current displayed folder)
+         * @type {FolderInfo | null} 
+         */
+        let currentFolderInfo = null;
+
+        // TODO: rebuild full breadcrumb POC only (to optimize, data may already be known)
+        window.app.breadcrumbPath = [];
+
+        /** @type {string | null} */
+        let id=app.currentPath;
+
+        while (id !== null) {
+            console.log(`fetching folder information for folder ${id}`);
+            try {
+                let folderInfo = await getFolder(id);
+            
+                if (currentFolderInfo === null) {
+                    currentFolderInfo = folderInfo;
+                }
+
+                // XXX do not enter root into bread crumb updateBreadcrumb() method always display it
+                if(!folderInfo.is_root) {
+                    window.app.breadcrumbPath.unshift( {id: folderInfo.id, name: folderInfo.name});
+                }
+
+                // iterate to parent folder
+                id = folderInfo.parent_id;
+            }
+            catch( e) {
+                console.log(`Error loading information from folder ${app.currentPath}, falling back to ${window.app.userHomeFolderId}`);
+                // fallback of root
+                window.uiNotifications.show(
+                    'error: folder not found or permission denied', 
+                    'the given folder is not available or you do not have sufficient rights' 
+                );
+                window.app.breadcrumbPath = [];
+                id = window.app.userHomeFolderId;
+                app.currentPath = id;
+            }
+        }
+       
+        // request a breadcrumb paint
+        window.ui.updateBreadcrumb();
+
+        if (currentFolderInfo !== null) {
+            // TODO move this part to a common library ?
+            if (options.insertHistory) {
+                console.log(`adding history with #/files/folder/${app.currentPath}`)
+                window.history.pushState({
+                    section: window.app.currentSection,
+                    id: currentFolderInfo.id,
+                }, "", `#/files/folder/${app.currentPath}`);
+            }
+            else {
+                console.log(`replace history with #/files/folder/${app.currentPath}`)
+                window.history.replaceState({
+                    section: window.app.currentSection,
+                    id: currentFolderInfo.id,
+                }, "", `#/files/folder/${app.currentPath}`);
+            }
+        }
+
+        // update title
+        document.title = `OxiCloud: ${currentFolderInfo.path}`;
+
         let url;
 
         if (!app.currentPath || app.currentPath === '') {
@@ -48,10 +170,13 @@ async function loadFiles(options = {}) {
             console.log(`Loading subfolder content: ${app.currentPath}`);
         }
 
+        /** @type {HeadersInit} */
         const headers = {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
             'Pragma': 'no-cache'
         };
+
+        /** @type {RequestInit} */
         const requestOptions = {
             headers,
             credentials: 'same-origin',
@@ -60,12 +185,16 @@ async function loadFiles(options = {}) {
 
         if (forceRefresh) {
             url += `&force_refresh=true`;
+            // @ts-ignore
             requestOptions.headers['X-Force-Refresh'] = 'true';
             console.log('Forcing complete refresh ignoring cache');
         }
 
         console.log(`Loading listing from ${url}`);
         const response = await fetch(url, requestOptions);
+
+        // not required anymore
+        clearTimeout( loadingFiles);
 
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");

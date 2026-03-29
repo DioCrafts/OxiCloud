@@ -3,11 +3,16 @@
  * This file contains the core functionality, initialization and state management
  */
 
+// @ts-check
+
 const app = window.app;
 const elements = window.appElements;
 
 // Upload dropdown listener state (prevents accumulated listeners)
+/** @type { function | null } */
 let uploadDropdownDocumentClickHandler = null;
+
+/** @type { AbortController | null } */
 let uploadDropdownBindingsController = null;
 let actionsBarDelegationBound = false;
 
@@ -90,6 +95,12 @@ const ACTIONS_BAR_TEMPLATES = {
     `
 };
 
+/**
+ * 
+ * @param {string} mode 
+ * @param {boolean} [force=false] 
+ * @returns 
+ */
 function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
@@ -181,6 +192,92 @@ function setupActionsBarDelegation() {
 }
 
 /**
+ * @typedef {Object} OxiContext
+ * @property {string | null} path the uuid of the path
+ * @property {string} section
+ */
+
+/**
+ * Read the application hash
+ *
+ * format: 
+ *
+ * #/<section>/
+ *
+ * #/shared
+ * #/recent
+ * ...
+ *
+ * special case of drive:
+ *
+ * #/files/folder/<folder ID>
+ *
+ * @returns {OxiContext}
+ */
+function deserializeHash() {
+    let hashContext = /** type {OxiContext} */ {};
+
+    // FIXME rename files into drive ?
+    hashContext.section = 'files';
+
+    let hash_elements = window.location.hash.split("/");
+
+    let section = hash_elements[1];
+
+    // FIXME: use navigation.VIEW_FLAGS
+    if (section && ['files', 'shared', 'recent', 'favorites', 'trash', 'photos'].includes(section)) {
+        hashContext.section = section;
+    }
+
+    if (hash_elements[1] == 'files' && hash_elements[2] == 'folder' && hash_elements[3] !== null) {
+        hashContext.path = hash_elements[3];
+    }
+
+    return hashContext;
+}
+
+/**
+ *
+ * @param {string} section
+ * @returns
+ */
+function switchSectionTo(section) {
+
+    if (window.app.currentSection === section)
+        // no change ...
+        return;
+
+    switch (section) {
+        case "files":
+            switchToFilesView();
+
+        case "shared":
+            switchToSharedView();
+            break;
+
+        case "recent":
+            switchToRecentFilesView();
+            break;
+
+        case "favorites":
+            switchToFavoritesView();
+            break;
+
+        case "photos":
+            switchToPhotosView();
+            break;
+
+        case "trash":
+            switchToTrashView();
+            break;
+
+        default:
+            console.warn(`context view ${section} unkonwn fallback to drive section`);
+            switchToFilesView();
+    }
+}
+
+/**
  * Initialize the application
  */
 function initApp() {
@@ -233,6 +330,24 @@ function initApp() {
         window.multiSelect.init();
     }
     
+    window.addEventListener('authenticationDone', () => {
+        console.log("Auth done");
+
+        // Check if a context was provided in the URL
+        let hashContext = deserializeHash();
+
+        switchSectionTo( hashContext.section);
+        
+        if (hashContext.section === "files") {
+            if (hashContext.path) {
+                console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
+                window.app.currentPath = hashContext.path;
+            }
+            window.loadFiles();
+        }
+
+    });
+
     // Wait for translations to load before checking authentication
     if (window.i18n && window.i18n.isLoaded && window.i18n.isLoaded()) {
         // Translations already loaded, proceed with authentication
@@ -271,7 +386,6 @@ function cacheElements() {
     elements.pageTitle = document.querySelector('.page-title');
     elements.actionsBar = document.querySelector('.actions-bar');
     elements.navItems = document.querySelectorAll('.nav-item');
-    elements.trashBtn = document.querySelector('.nav-item:nth-child(6)'); // The trash nav item (after Photos)
     elements.searchInput = document.querySelector('.search-container input');
 }
 
@@ -306,12 +420,14 @@ function setupUploadDropdown() {
     // Close dropdown when clicking outside
     // remove+add stable handler: guarantees exactly one global listener
     if (uploadDropdownDocumentClickHandler) {
+        // @ts-ignore
         document.removeEventListener('click', uploadDropdownDocumentClickHandler);
     }
     uploadDropdownDocumentClickHandler = (e) => {
         if (e.target.closest('#upload-dropdown')) return;
         document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
     };
+    // @ts-ignore
     document.addEventListener('click', uploadDropdownDocumentClickHandler);
 }
 
@@ -327,6 +443,26 @@ function setupEventListeners() {
     const SEARCH_DEBOUNCE_MS = 300;
     const SEARCH_MIN_CHARS = 3;
     
+    // handle history / url change
+    window.addEventListener("popstate", (e) => { 
+        if (e.state === null) {
+            // change is from user (url explicitely change, read information from hash)
+            let hashContext = deserializeHash();
+            console.log(hashContext);
+            switchSectionTo( hashContext.section);
+            if (hashContext.path) {
+                window.app.currentPath = hashContext.path;
+                window.loadFiles({insertHistory: false});
+            }
+        }
+        else {
+            // change is from history
+            switchSectionTo( e.state.section);
+            window.app.currentPath = e.state.id;
+            window.loadFiles({insertHistory: false});
+        }
+    });
+
     // Search input — Enter key
     elements.searchInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -415,55 +551,46 @@ function setupEventListeners() {
             
             // Add active class to clicked item
             item.classList.add('active');
-            
-            // Check if this is the shared item
-            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.shared') {
-                // Switch to shared view
-                switchToSharedView();
-                return;
+            let updateHistory = true;
+
+            let itemI18nKey=item.querySelector('span').getAttribute('data-i18n')
+            switch(itemI18nKey) {
+                case 'nav.shared': 
+                    // Switch to shared view
+                    switchToSharedView();
+                    break;
+
+                case 'nav.favorites':
+                    // Switch to favorites view
+                    switchToFavoritesView();
+                    break;
+
+                case 'nav.recent': 
+                    // Switch to recent files view
+                    switchToRecentFilesView();
+                    break;
+
+                case 'nav.photos':
+                    switchToPhotosView();
+                    break;
+
+                case 'nav.trash': 
+                    switchToTrashView();
+                    break;
+
+                default:
+                    // Use the proper switchToFilesView function which handles all UI restoration
+                    window.switchToFilesView();
+                    // FIXME: because fileview handles it: need to converge code
+                    updateHistory = false;     
             }
-            
-            // Check if this is the favorites item
-            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.favorites') {
-                // Switch to favorites view
-                switchToFavoritesView();
-                return;
-            }
-            
-            // Check if this is the recent files item
-            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.recent') {
-                // Switch to recent files view
-                switchToRecentFilesView();
-                return;
-            }
 
-            // Check if this is the photos item
-            if (item.querySelector('span').getAttribute('data-i18n') === 'nav.photos') {
-                switchToPhotosView();
-                return;
-            }
-
-            // Check if this is the trash item
-            if (item === elements.trashBtn) {
-                setCurrentSection('trash');
-
-                // Hide breadcrumb (only shown in Files view)
-                const breadcrumb = document.querySelector('.breadcrumb');
-                if (breadcrumb) breadcrumb.style.display = 'none';
-
-                // Show files containers (to be filled with trash)
-                const filesGrid = document.getElementById('files-grid');
-                const filesListView = document.getElementById('files-list-view');
-                if (filesGrid) { filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none'; filesGrid.classList.toggle('hidden', app.currentView !== 'grid'); }
-                if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
-
-                setActionsBarMode('trash');
-
-                // Load trash items
-                window.loadTrashItems();
-            } else {
-                // Use the proper switchToFilesView function which handles all UI restoration
-                window.switchToFilesView();
+            if (updateHistory) {
+                window.history.pushState({
+                        section: window.app.currentSection,
+                    }, "", `#/${window.app.currentSection}`
+                );
+                document.title = `OxiCloud: ${window.i18n.t(itemI18nKey)}`;
             }
         });
     });
