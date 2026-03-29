@@ -9,13 +9,17 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use utoipa::OpenApi;
 
-/// Returns the application version from Cargo.toml (compile-time constant)
 async fn get_version() -> AxumJson<serde_json::Value> {
     AxumJson(json!({
         "name": "OxiCloud",
         "version": env!("CARGO_PKG_VERSION")
     }))
+}
+
+async fn get_openapi_spec() -> AxumJson<utoipa::openapi::OpenApi> {
+    AxumJson(super::ApiDoc::openapi())
 }
 
 use crate::interfaces::api::handlers::admin_handler;
@@ -64,6 +68,7 @@ pub fn create_public_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppStat
 
     // Version endpoint — public, no auth required
     router = router.route("/version", get(get_version));
+    router = router.route("/openapi.json", get(get_openapi_spec));
 
     router
 }

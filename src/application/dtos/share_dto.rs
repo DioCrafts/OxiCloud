@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use crate::domain::entities::share::{Share, SharePermissions};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ShareDto {
     pub id: String,
     pub item_id: String,
@@ -18,14 +19,14 @@ pub struct ShareDto {
     pub access_count: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SharePermissionsDto {
     pub read: bool,
     pub write: bool,
     pub reshare: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct CreateShareDto {
     pub item_id: String,
     pub item_name: Option<String>,
@@ -35,7 +36,7 @@ pub struct CreateShareDto {
     pub permissions: Option<SharePermissionsDto>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpdateShareDto {
     pub password: Option<String>,
     pub expires_at: Option<u64>,

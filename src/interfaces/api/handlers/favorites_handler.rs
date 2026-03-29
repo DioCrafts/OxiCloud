@@ -7,25 +7,34 @@ use axum::{
 use serde::Deserialize;
 use std::sync::Arc;
 use tracing::{error, info};
+use utoipa::ToSchema;
 
 use crate::application::ports::favorites_ports::FavoritesUseCase;
 use crate::application::services::favorites_service::FavoritesService;
 use crate::interfaces::middleware::auth::AuthUser;
 
 /// Single item in a batch-add-favorites request.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct BatchFavoriteItem {
     pub item_id: String,
     pub item_type: String,
 }
 
 /// Request body for POST /api/favorites/batch
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct BatchFavoritesRequest {
     pub items: Vec<BatchFavoriteItem>,
 }
 
 /// Handler for favorite-related API endpoints
+#[utoipa::path(
+    get,
+    path = "/api/favorites",
+    responses(
+        (status = 200, description = "List of favorites", body = Vec<crate::application::dtos::favorites_dto::FavoriteItemDto>)
+    ),
+    tag = "favorites"
+)]
 pub async fn get_favorites(
     State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
@@ -51,6 +60,19 @@ pub async fn get_favorites(
 }
 
 /// Add an item to user's favorites
+#[utoipa::path(
+    post,
+    path = "/api/favorites/{item_type}/{item_id}",
+    params(
+        ("item_type" = String, Path, description = "Item type (file or folder)"),
+        ("item_id" = String, Path, description = "Item ID")
+    ),
+    responses(
+        (status = 201, description = "Item added to favorites"),
+        (status = 400, description = "Invalid item type")
+    ),
+    tag = "favorites"
+)]
 pub async fn add_favorite(
     State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
@@ -94,6 +116,19 @@ pub async fn add_favorite(
 }
 
 /// Remove an item from user's favorites
+#[utoipa::path(
+    delete,
+    path = "/api/favorites/{item_type}/{item_id}",
+    params(
+        ("item_type" = String, Path, description = "Item type (file or folder)"),
+        ("item_id" = String, Path, description = "Item ID")
+    ),
+    responses(
+        (status = 200, description = "Item removed from favorites"),
+        (status = 404, description = "Item not in favorites")
+    ),
+    tag = "favorites"
+)]
 pub async fn remove_favorite(
     State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,
@@ -138,6 +173,15 @@ pub async fn remove_favorite(
 
 /// Add multiple items to favourites in a single transaction.
 /// POST /api/favorites/batch
+#[utoipa::path(
+    post,
+    path = "/api/favorites/batch",
+    responses(
+        (status = 200, description = "Batch add result", body = crate::application::dtos::favorites_dto::BatchFavoritesResult),
+        (status = 400, description = "Invalid request")
+    ),
+    tag = "favorites"
+)]
 pub async fn batch_add_favorites(
     State(favorites_service): State<Arc<FavoritesService>>,
     auth_user: AuthUser,

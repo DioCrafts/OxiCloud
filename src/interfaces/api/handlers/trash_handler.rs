@@ -10,6 +10,15 @@ use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
 /// Gets all items in the trash for the current user
+#[utoipa::path(
+    get,
+    path = "/api/trash",
+    responses(
+        (status = 200, description = "List of trashed items"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn get_trash_items(
     State(state): State<Arc<AppState>>,
@@ -54,6 +63,16 @@ pub async fn get_trash_items(
 }
 
 /// Moves a file to the trash
+#[utoipa::path(
+    delete,
+    path = "/api/trash/files/{id}",
+    params(("id" = String, Path, description = "File ID")),
+    responses(
+        (status = 200, description = "File moved to trash"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn move_file_to_trash(
     State(state): State<Arc<AppState>>,
@@ -105,6 +124,16 @@ pub async fn move_file_to_trash(
 }
 
 /// Moves a folder to the trash
+#[utoipa::path(
+    delete,
+    path = "/api/trash/folders/{id}",
+    params(("id" = String, Path, description = "Folder ID")),
+    responses(
+        (status = 200, description = "Folder moved to trash"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn move_folder_to_trash(
     State(state): State<Arc<AppState>>,
@@ -158,6 +187,16 @@ pub async fn move_folder_to_trash(
 }
 
 /// Restores an item from the trash to its original location
+#[utoipa::path(
+    post,
+    path = "/api/trash/{id}/restore",
+    params(("id" = String, Path, description = "Trash item ID")),
+    responses(
+        (status = 200, description = "Item restored from trash"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn restore_from_trash(
     State(state): State<Arc<AppState>>,
@@ -219,6 +258,16 @@ pub async fn restore_from_trash(
 }
 
 /// Permanently deletes an item from the trash
+#[utoipa::path(
+    delete,
+    path = "/api/trash/{id}",
+    params(("id" = String, Path, description = "Trash item ID")),
+    responses(
+        (status = 200, description = "Item permanently deleted"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn delete_permanently(
     State(state): State<Arc<AppState>>,
@@ -282,6 +331,15 @@ pub async fn delete_permanently(
 }
 
 /// Empties the trash completely for the current user
+#[utoipa::path(
+    delete,
+    path = "/api/trash/empty",
+    responses(
+        (status = 200, description = "Trash emptied successfully"),
+        (status = 501, description = "Trash feature not enabled")
+    ),
+    tag = "trash"
+)]
 #[instrument(skip_all)]
 pub async fn empty_trash(
     State(state): State<Arc<AppState>>,

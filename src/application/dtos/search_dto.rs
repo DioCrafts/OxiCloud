@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /**
  * Data Transfer Object for file search criteria.
@@ -7,7 +8,7 @@ use serde::{Deserialize, Serialize};
  * to filter files and folders in the system. It supports various filter types
  * including name matching, file types, date ranges, and size constraints.
  */
-#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize, ToSchema)]
 pub struct SearchCriteriaDto {
     /// Optional text to search in file/folder names
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,7 +99,7 @@ impl Default for SearchCriteriaDto {
 }
 
 /// A file search result enriched with server-computed metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchFileResultDto {
     /// File ID
     pub id: String,
@@ -129,7 +130,7 @@ pub struct SearchFileResultDto {
 }
 
 /// A folder search result enriched with server-computed metadata
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchFolderResultDto {
     /// Folder ID
     pub id: String,
@@ -156,7 +157,7 @@ pub struct SearchFolderResultDto {
  * both files and folders that match the search criteria, along with pagination
  * information and server-computed metadata.
  */
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct SearchResultsDto {
     /// Files matching the search criteria (enriched with metadata)
     pub files: Vec<SearchFileResultDto>,
@@ -227,7 +228,7 @@ impl SearchResultsDto {
 }
 
 /// DTO for search suggestion results (quick prefix search)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchSuggestionsDto {
     /// Suggested file/folder names matching the query prefix
     pub suggestions: Vec<SearchSuggestionItem>,
@@ -236,7 +237,7 @@ pub struct SearchSuggestionsDto {
 }
 
 /// Individual search suggestion item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct SearchSuggestionItem {
     /// The suggested name
     pub name: String,
