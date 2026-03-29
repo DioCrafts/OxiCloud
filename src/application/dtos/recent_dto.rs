@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::display_helpers::{
     category_for, format_file_size, icon_class_for, icon_special_class_for,
@@ -7,7 +8,7 @@ use super::display_helpers::{
 
 /// DTO for recent items, enriched with item metadata via SQL JOIN
 /// so the frontend does not need N+1 requests to resolve names/sizes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct RecentItemDto {
     /// Unique identifier for the recent item
     pub id: String,

@@ -2,9 +2,10 @@ use std::sync::Arc;
 
 use crate::domain::entities::folder::Folder;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// DTO for folder creation requests
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateFolderDto {
     /// Name of the folder to create
     pub name: String,
@@ -14,21 +15,21 @@ pub struct CreateFolderDto {
 }
 
 /// DTO for folder rename requests
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RenameFolderDto {
     /// New name for the folder
     pub name: String,
 }
 
 /// DTO for folder move requests
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MoveFolderDto {
     /// New parent folder ID (None for root level)
     pub parent_id: Option<String>,
 }
 
 /// DTO for folder responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FolderDto {
     /// Folder ID
     pub id: String,
@@ -57,12 +58,15 @@ pub struct FolderDto {
 
     // ── Pre-computed display fields (Arc<str>: always identical values) ──
     /// FontAwesome icon CSS class (always "fas fa-folder")
+    #[schema(value_type = String)]
     pub icon_class: Arc<str>,
 
     /// Extra CSS class for icon styling (always "folder-icon")
+    #[schema(value_type = String)]
     pub icon_special_class: Arc<str>,
 
     /// Human-readable category (always "Folder")
+    #[schema(value_type = String)]
     pub category: Arc<str>,
 }
 

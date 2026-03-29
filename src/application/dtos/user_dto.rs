@@ -1,9 +1,10 @@
 use crate::domain::entities::user::User;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UserDto {
     pub id: String,
     pub username: String,
@@ -36,13 +37,13 @@ impl From<User> for UserDto {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct LoginDto {
     pub username: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct RegisterDto {
     pub username: String,
     pub email: String,
@@ -51,14 +52,14 @@ pub struct RegisterDto {
 
 /// DTO for the one-time initial admin setup endpoint (`/api/setup`).
 /// Available only when the system is not yet initialized (no admin exists).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct SetupAdminDto {
     pub username: String,
     pub email: String,
     pub password: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthResponseDto {
     pub user: UserDto,
     pub access_token: String,
@@ -67,19 +68,19 @@ pub struct AuthResponseDto {
     pub expires_in: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ChangePasswordDto {
     pub current_password: String,
     pub new_password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct RefreshTokenDto {
     pub refresh_token: String,
 }
 
 /// Authenticated current user data (for use in application services)
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct CurrentUser {
     pub id: Uuid,
     pub username: String,
@@ -91,19 +92,19 @@ pub struct CurrentUser {
 // App Password DTOs
 // ============================================================================
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAppPasswordDto {
     pub label: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AppPasswordCreatedDto {
     pub id: String,
     pub label: String,
     pub password: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct AppPasswordDto {
     pub id: String,
     pub label: String,
@@ -116,27 +117,27 @@ pub struct AppPasswordDto {
 // ============================================================================
 
 /// Response with the OIDC authorization URL for client redirect
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct OidcAuthorizeResponseDto {
     pub authorize_url: String,
     pub state: String,
 }
 
 /// Query parameters received on the OIDC callback
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct OidcCallbackQueryDto {
     pub code: String,
     pub state: String,
 }
 
 /// Request body for the OIDC one-time code exchange endpoint
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct OidcExchangeDto {
     pub code: String,
 }
 
 /// Information about available OIDC providers
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct OidcProviderInfoDto {
     pub enabled: bool,
     pub provider_name: String,
@@ -145,7 +146,7 @@ pub struct OidcProviderInfoDto {
 }
 
 /// Claims extracted from the validated OIDC ID token
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct OidcUserInfoDto {
     pub sub: String,
     pub preferred_username: Option<String>,

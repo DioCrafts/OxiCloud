@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
+use utoipa::{IntoParams, ToSchema};
 
 /// A DTO to represent pagination information
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaginationDto {
     /// Current page (starts at 0)
     pub page: usize,
@@ -18,7 +19,7 @@ pub struct PaginationDto {
 }
 
 /// A DTO to represent a pagination request
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, IntoParams)]
 pub struct PaginationRequestDto {
     /// Requested page (starts at 0)
     #[serde(default)]
@@ -29,7 +30,7 @@ pub struct PaginationRequestDto {
 }
 
 /// A DTO to represent a paginated response
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct PaginatedResponseDto<T> {
     /// Data on the current page
     pub items: Vec<T>,

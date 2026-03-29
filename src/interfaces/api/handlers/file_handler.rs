@@ -9,6 +9,7 @@ use bytes::Bytes;
 use http_range_header::parse_range_header;
 use serde::Deserialize;
 use std::collections::HashMap;
+use utoipa::ToSchema;
 
 use crate::application::ports::file_ports::OptimizedFileContent;
 use crate::application::ports::file_ports::{
@@ -1005,7 +1006,7 @@ impl FileHandler {
 }
 
 /// Payload for moving a file
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MoveFilePayload {
     /// Target folder ID (None means root)
     pub folder_id: Option<String>,
