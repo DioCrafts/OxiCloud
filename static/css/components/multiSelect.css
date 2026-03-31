@@ -34,7 +34,7 @@
 	min-width: 0;
 }
 
-.batch-action-bar {
+.batch-selection-bar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -51,7 +51,7 @@
 	pointer-events: none;
 }
 
-.batch-action-bar.visible {
+.batch-selection-bar.visible {
 	opacity: 1;
 	max-height: 60px;
 	transform: translateY(0);
@@ -140,7 +140,7 @@
 	accent-color: #ff5e3a;
 }
 
-[data-theme="dark"] .batch-action-bar {
+[data-theme="dark"] .batch-selection-bar {
 	background-color: #1e293b;
 	border-color: #334155;
 	color: #e2e8f0;

@@ -653,7 +653,7 @@ function setupEventListeners() {
         // selection state; this handler only covers the legacy CSS class removal.
         // Skip if a rubber-band selection just finished — the click is a side-effect.
         if (window.__rubberBandJustFinished) return;
-        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-action-bar') && !e.target.closest('.list-header.selection-mode')) {
+        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-selection-bar') && !e.target.closest('.list-header.selection-mode')) {
             document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
             document.querySelectorAll('.file-item.selected').forEach(c => c.classList.remove('selected'));
         }

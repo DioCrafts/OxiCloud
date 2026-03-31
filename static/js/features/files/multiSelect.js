@@ -6,6 +6,9 @@
  * provides batch delete / move / download / favorites operations.
  */
 
+// TODO: rename into selection-bar ? 
+// TODO: merge with photo part
+
 const multiSelect = {
     /** Currently selected items: Map<id, { id, name, type, parentId }> */
     _selected: new Map(),
@@ -15,9 +18,6 @@ const multiSelect = {
 
     /** Whether the selection bar is currently visible */
     _barVisible: false,
-
-    /** Saved original list-header HTML so we can restore it */
-    _savedHeaderHTML: '',
 
     // ── Public API ──────────────────────────────────────────
 
@@ -93,11 +93,14 @@ const multiSelect = {
     },
 
     _getAllVisibleItems() {
+        return [...document.querySelectorAll('.file-item, .file-card')];
+        /*
         const grid = document.getElementById('files-grid');
         if (grid && grid.style.display !== 'none') {
             return [...grid.querySelectorAll('.file-card')];
         }
         return [...document.querySelectorAll('#files-list-view .file-item')];
+        */
     },
 
     _extractInfo(el) {
@@ -151,146 +154,61 @@ const multiSelect = {
      * Build the inner HTML for the selection bar that replaces the
      * normal list-header columns (Name / Type / Size / Modified).
      */
-    _buildSelectionBarHTML(n) {
-        const countText = n === 1
-            ? (this._t('batch.one_selected') || '1 item selected')
-            : (this._t('batch.n_selected', { count: n }) || `${n} items selected`);
-
-        const favLabel   = this._t('batch.add_favorites') || 'Add to favorites';
-        const moveLabel  = this._t('batch.move_copy')     || 'Move or copy';
-        const dlLabel    = this._t('actions.download')    || 'Download';
-        const delLabel   = this._t('actions.delete')      || 'Delete';
+    _buildSelectionBarHTML() {
+        //FIXME: should support i18n lang change
 
         return `
-            <div class="list-header-checkbox">
-                <input type="checkbox" id="select-all-checkbox" title="Toggle all" checked>
+            <div x-class="batch-bar-left" class="list-header-checkbox">
+                <button class="batch-bar-close" id="batch-grid-close" title="Cancel selection">
+                     <i class="fas fa-times"></i>
+                </button>
+                <span class="batch-bar-count" id="batch-bar-count"></span>
             </div>
             <div class="batch-selection-info">
-                <span class="batch-bar-count">${countText}</span>
                 <div class="batch-bar-actions">
-                    <button class="batch-btn" id="batch-fav" title="${favLabel}">
+                    <button class="batch-btn" id="batch-fav" title="Add to favorites" data-i18n-title="batch.add_favorites">
                         <i class="fas fa-star"></i>
-                        <span>${favLabel}</span>
+                        <span data-i18n="batch.add_favorites">Add to favorites</span>
                     </button>
-                    <button class="batch-btn" id="batch-move" title="${moveLabel}">
+                    <button class="batch-btn" id="batch-move" title="Move or copy" data-i18n-title="batch.move_copy">
                         <i class="fas fa-arrows-alt"></i>
-                        <span>${moveLabel}</span>
+                        <span data-i18n="batch.move_copy">Move or copy</span>
                     </button>
-                    <button class="batch-btn" id="batch-download" title="${dlLabel}">
+                    <button class="batch-btn" id="batch-download" title="Download" data-i18n-title="actions.download">
                         <i class="fas fa-download"></i>
-                        <span>${dlLabel}</span>
+                        <span data-i18n="actions.download">Download</span>
                     </button>
-                    <button class="batch-btn batch-btn-danger" id="batch-delete" title="${delLabel}">
+                    <button class="batch-btn batch-btn-danger" id="batch-delete" title="Delete" data-i18-title="actions.delete">
                         <i class="fas fa-trash-alt"></i>
-                        <span>${delLabel}</span>
+                        <span data-i18n="actions.delete">Delete</span>
                     </button>
                 </div>
             </div>
         `;
     },
 
-    /** Ensure the grid-view batch bar exists (shown only when grid is visible) */
-    _ensureGridBar() {
-        if (document.getElementById('batch-grid-bar')) return;
-        const bar = document.createElement('div');
-        bar.id = 'batch-grid-bar';
-        bar.className = 'batch-action-bar';  // reuse same styles
-        const container = document.querySelector('.files-container');
-        if (container) {
-            container.insertBefore(bar, container.firstChild);
-        }
-    },
-
     /** Main UI sync — called after every selection change */
     _syncUI() {
-        const listHeader = document.querySelector('.list-header');
         const n = this._selected.size;
 
-        // ── Save original header HTML on first use ──
-        if (listHeader && !this._savedHeaderHTML) {
-            this._savedHeaderHTML = listHeader.innerHTML;
-        }
+        const batchSelectionBar = document.getElementById('batch-selection-bar');
 
         if (n > 0) {
             this._barVisible = true;
 
-            // ── List view: replace header with selection bar ──
-            if (listHeader) {
-                listHeader.classList.add('selection-mode');
-                listHeader.innerHTML = this._buildSelectionBarHTML(n);
+            const countText = n === 1
+                ? (this._t('batch.one_selected') || '1 item selected')
+                : (this._t('batch.n_selected', { count: n }) || `${n} items selected`);
+            document.getElementById("batch-bar-count").innerText = countText;
 
-                // Wire checkbox
-                const cb = document.getElementById('select-all-checkbox');
-                if (cb) cb.addEventListener('change', () => this.toggleAll());
-
-                // Wire action buttons
-                this._wireBarButtons();
-            }
-
-            // ── Grid view: show floating bar ──
-            this._ensureGridBar();
-            const gridBar = document.getElementById('batch-grid-bar');
-            if (gridBar) {
-                const grid = document.getElementById('files-grid');
-                const gridVisible = grid && grid.style.display !== 'none';
-                if (gridVisible) {
-                    gridBar.classList.add('visible');
-                    gridBar.innerHTML = `
-                        <div class="batch-bar-left">
-                            <button class="batch-bar-close" id="batch-grid-close" title="Cancel selection">
-                                <i class="fas fa-times"></i>
-                            </button>
-                            <span class="batch-bar-count">${
-                                n === 1
-                                    ? (this._t('batch.one_selected') || '1 item selected')
-                                    : (this._t('batch.n_selected', { count: n }) || `${n} items selected`)
-                            }</span>
-                        </div>
-                        <div class="batch-bar-actions">
-                            <button class="batch-btn" id="batch-fav" title="Add to favorites">
-                                <i class="fas fa-star"></i>
-                                <span>${this._t('batch.add_favorites') || 'Add to favorites'}</span>
-                            </button>
-                            <button class="batch-btn" id="batch-move" title="Move or copy">
-                                <i class="fas fa-arrows-alt"></i>
-                                <span>${this._t('batch.move_copy') || 'Move or copy'}</span>
-                            </button>
-                            <button class="batch-btn" id="batch-download" title="Download">
-                                <i class="fas fa-download"></i>
-                                <span>${this._t('actions.download') || 'Download'}</span>
-                            </button>
-                            <button class="batch-btn batch-btn-danger" id="batch-delete" title="Delete">
-                                <i class="fas fa-trash-alt"></i>
-                                <span>${this._t('actions.delete') || 'Delete'}</span>
-                            </button>
-                        </div>
-                    `;
-                    const closeBtn = document.getElementById('batch-grid-close');
-                    if (closeBtn) closeBtn.addEventListener('click', () => this.clear());
-                    this._wireBarButtons();
-                } else {
-                    gridBar.classList.remove('visible');
-                }
-            }
+            batchSelectionBar.classList.add('visible');
+            
+            
         } else {
             this._barVisible = false;
 
-            // Restore original list header
-            if (listHeader) {
-                listHeader.classList.remove('selection-mode');
-                if (this._savedHeaderHTML) {
-                    listHeader.innerHTML = this._savedHeaderHTML;
-                }
-                // Re-wire the select-all checkbox
-                const cb = document.getElementById('select-all-checkbox');
-                if (cb) cb.addEventListener('change', () => this.toggleAll());
-                // Translate restored header (scoped to list header)
-                if (window.i18n && window.i18n.translateElement) window.i18n.translateElement(listHeader);
-            }
-
             // Hide grid bar
-            const gridBar = document.getElementById('batch-grid-bar');
-            if (gridBar) gridBar.classList.remove('visible');
+            batchSelectionBar.classList.remove('visible');            
         }
 
         // Sync individual item checkboxes
@@ -301,14 +219,16 @@ const multiSelect = {
 
     /** Wire click handlers on batch action buttons (idempotent per render) */
     _wireBarButtons() {
-        const del  = document.getElementById('batch-delete');
-        const move = document.getElementById('batch-move');
-        const dl   = document.getElementById('batch-download');
-        const fav  = document.getElementById('batch-fav');
-        if (del)  del.onclick  = () => this.batchDelete();
-        if (move) move.onclick = () => this.batchMove();
-        if (dl)   dl.onclick   = () => this.batchDownload();
-        if (fav)  fav.onclick  = () => this.batchFavorites();
+        const del      = document.getElementById('batch-delete');
+        const move     = document.getElementById('batch-move');
+        const dl       = document.getElementById('batch-download');
+        const fav      = document.getElementById('batch-fav');
+        const closeBtn = document.getElementById('batch-grid-close');
+        if (del)  del.onclick          = () => this.batchDelete();
+        if (move) move.onclick         = () => this.batchMove();
+        if (dl)   dl.onclick           = () => this.batchDownload();
+        if (fav)  fav.onclick          = () => this.batchFavorites();
+        if (closeBtn) closeBtn.onclick = () => this.clear();
     },
 
     _syncItemCheckboxes() {
@@ -522,6 +442,15 @@ const multiSelect = {
             if (e.key === 'Escape' && this.hasSelection) this.clear();
             if (e.key === 'Delete' && this.hasSelection) this.batchDelete();
         });
+
+        const batchSelectionBar = document.getElementById('batch-selection-bar');
+        batchSelectionBar.innerHTML = this._buildSelectionBarHTML();
+            
+        if (window.i18n && window.i18n.translateElement) {
+            window.i18n.translateElement(batchSelectionBar);
+        }
+        this._wireBarButtons();
+
     },
 
     _injectListHeaderCheckbox() {
@@ -533,7 +462,7 @@ const multiSelect = {
     _hookGlobalDeselect() {
         document.addEventListener('click', (e) => {
             if (window.__rubberBandJustFinished) return;
-            if (e.target.closest('.file-card, .file-item, .context-menu, .batch-action-bar, .list-header.selection-mode, .about-modal, .rename-dialog, .share-dialog, .confirm-dialog, .modal-overlay, input, button')) return;
+            if (e.target.closest('.file-card, .file-item, .context-menu, .batch-selection-bar, .list-header.selection-mode, .about-modal, .rename-dialog, .share-dialog, .confirm-dialog, .modal-overlay, input, button')) return;
             if (this.hasSelection) this.clear();
         });
     }
