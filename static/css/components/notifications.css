@@ -123,15 +123,17 @@
 
 @keyframes bellRing {
 	0%, 100% { transform: rotate(0deg); }
-	15% { transform: rotate(14deg); }
-	30% { transform: rotate(-14deg); }
-	45% { transform: rotate(8deg); }
-	60% { transform: rotate(-8deg); }
-	75% { transform: rotate(3deg); }
+	13% { transform: rotate(22deg); }
+	26% { transform: rotate(-22deg); }
+	39% { transform: rotate(14deg); }
+	52% { transform: rotate(-14deg); }
+	65% { transform: rotate(8deg); }
+	78% { transform: rotate(-8deg); }
+	91% { transform: rotate(3deg); }
 }
 
-.notif-bell-btn.ring i {
-	animation: bellRing 0.6s ease;
+.notif-bell-btn.ring {
+	animation: bellRing 1s ease;
 }
 
 .notif-panel {
