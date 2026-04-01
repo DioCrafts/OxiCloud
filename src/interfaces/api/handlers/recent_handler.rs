@@ -20,6 +20,14 @@ pub struct GetRecentParams {
 }
 
 /// Get user's recent items
+#[utoipa::path(
+    get,
+    path = "/api/recent",
+    responses(
+        (status = 200, description = "List of recent items", body = Vec<crate::application::dtos::recent_dto::RecentItemDto>)
+    ),
+    tag = "recent"
+)]
 pub async fn get_recent_items(
     State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
@@ -46,6 +54,19 @@ pub async fn get_recent_items(
 }
 
 /// Record access to an item
+#[utoipa::path(
+    post,
+    path = "/api/recent/{item_type}/{item_id}",
+    params(
+        ("item_type" = String, Path, description = "Item type (file or folder)"),
+        ("item_id" = String, Path, description = "Item ID")
+    ),
+    responses(
+        (status = 200, description = "Access recorded"),
+        (status = 400, description = "Invalid item type")
+    ),
+    tag = "recent"
+)]
 pub async fn record_item_access(
     State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
@@ -92,6 +113,19 @@ pub async fn record_item_access(
 }
 
 /// Remove an item from recents
+#[utoipa::path(
+    delete,
+    path = "/api/recent/{item_type}/{item_id}",
+    params(
+        ("item_type" = String, Path, description = "Item type (file or folder)"),
+        ("item_id" = String, Path, description = "Item ID")
+    ),
+    responses(
+        (status = 200, description = "Item removed from recents"),
+        (status = 404, description = "Item not in recents")
+    ),
+    tag = "recent"
+)]
 pub async fn remove_from_recent(
     State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,
@@ -138,6 +172,14 @@ pub async fn remove_from_recent(
 }
 
 /// Clear all recent items
+#[utoipa::path(
+    delete,
+    path = "/api/recent/clear",
+    responses(
+        (status = 200, description = "Recent items cleared")
+    ),
+    tag = "recent"
+)]
 pub async fn clear_recent_items(
     State(recent_service): State<Arc<RecentService>>,
     auth_user: AuthUser,

@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use utoipa::ToSchema;
 
 use crate::application::services::share_service::ShareService;
 use crate::{
@@ -30,12 +31,22 @@ pub struct GetSharesQuery {
     pub item_type: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyPasswordRequest {
     pub password: String,
 }
 
 /// Create a new shared link
+#[utoipa::path(
+    post,
+    path = "/api/shares",
+    request_body = CreateShareDto,
+    responses(
+        (status = 201, description = "Share created", body = crate::application::dtos::share_dto::ShareDto),
+        (status = 400, description = "Bad request")
+    ),
+    tag = "shares"
+)]
 pub async fn create_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
     auth_user: AuthUser,
@@ -48,6 +59,16 @@ pub async fn create_shared_link(
 }
 
 /// Get information about a specific shared link by ID
+#[utoipa::path(
+    get,
+    path = "/api/shares/{id}",
+    params(("id" = String, Path, description = "Share ID")),
+    responses(
+        (status = 200, description = "Share details", body = crate::application::dtos::share_dto::ShareDto),
+        (status = 404, description = "Share not found")
+    ),
+    tag = "shares"
+)]
 pub async fn get_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
     auth_user: AuthUser,
@@ -65,6 +86,14 @@ pub async fn get_shared_link(
 
 /// Get all shared links created by the current user.
 /// Supports optional filtering by item_id + item_type query params.
+#[utoipa::path(
+    get,
+    path = "/api/shares",
+    responses(
+        (status = 200, description = "List of shares", body = Vec<crate::application::dtos::share_dto::ShareDto>)
+    ),
+    tag = "shares"
+)]
 pub async fn get_user_shares(
     State(share_use_case): State<Arc<ShareService>>,
     auth_user: AuthUser,
@@ -107,6 +136,17 @@ pub async fn get_user_shares(
 }
 
 /// Update a shared link's properties
+#[utoipa::path(
+    put,
+    path = "/api/shares/{id}",
+    params(("id" = String, Path, description = "Share ID")),
+    request_body = UpdateShareDto,
+    responses(
+        (status = 200, description = "Share updated", body = crate::application::dtos::share_dto::ShareDto),
+        (status = 404, description = "Share not found")
+    ),
+    tag = "shares"
+)]
 pub async fn update_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
     auth_user: AuthUser,
@@ -127,6 +167,16 @@ pub async fn update_shared_link(
 }
 
 /// Delete a shared link
+#[utoipa::path(
+    delete,
+    path = "/api/shares/{id}",
+    params(("id" = String, Path, description = "Share ID")),
+    responses(
+        (status = 204, description = "Share deleted"),
+        (status = 404, description = "Share not found")
+    ),
+    tag = "shares"
+)]
 pub async fn delete_shared_link(
     State(share_use_case): State<Arc<ShareService>>,
     auth_user: AuthUser,
@@ -143,6 +193,17 @@ pub async fn delete_shared_link(
 }
 
 /// Access a shared item via its token
+#[utoipa::path(
+    get,
+    path = "/api/s/{token}",
+    params(("token" = String, Path, description = "Share token")),
+    responses(
+        (status = 200, description = "Shared item details"),
+        (status = 401, description = "Password required"),
+        (status = 410, description = "Share expired")
+    ),
+    tag = "shares"
+)]
 pub async fn access_shared_item(
     State(share_use_case): State<Arc<ShareService>>,
     Path(token): Path<String>,
@@ -176,6 +237,17 @@ pub async fn access_shared_item(
 }
 
 /// Verify password for a password-protected shared item
+#[utoipa::path(
+    post,
+    path = "/api/s/{token}/verify",
+    params(("token" = String, Path, description = "Share token")),
+    responses(
+        (status = 200, description = "Password verified, item details returned"),
+        (status = 401, description = "Invalid password"),
+        (status = 410, description = "Share expired")
+    ),
+    tag = "shares"
+)]
 pub async fn verify_shared_item_password(
     State(share_use_case): State<Arc<ShareService>>,
     Path(token): Path<String>,

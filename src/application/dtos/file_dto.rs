@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use crate::domain::entities::file::File;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 use super::display_helpers::{
     category_for, format_file_size, icon_class_for, icon_special_class_for,
 };
 
 /// DTO for file responses
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct FileDto {
     /// File ID
     pub id: String,
@@ -24,6 +25,7 @@ pub struct FileDto {
 
     /// MIME type — `Arc<str>` because MIME values repeat across files
     /// and DTOs are cloned on every request (clone is O(1) atomic increment).
+    #[schema(value_type = String)]
     pub mime_type: Arc<str>,
 
     /// Parent folder ID
@@ -37,12 +39,15 @@ pub struct FileDto {
 
     // ── Pre-computed display fields (Arc<str>: values come from static tables) ──
     /// FontAwesome icon CSS class (e.g. "fas fa-file-image")
+    #[schema(value_type = String)]
     pub icon_class: Arc<str>,
 
     /// Extra CSS class for icon styling (e.g. "image-icon", "" when default)
+    #[schema(value_type = String)]
     pub icon_special_class: Arc<str>,
 
     /// Human-readable file category (e.g. "Image", "Document")
+    #[schema(value_type = String)]
     pub category: Arc<str>,
 
     /// Human-readable formatted size (e.g. "3.27 MB")

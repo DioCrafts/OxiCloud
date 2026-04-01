@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// DTO representing an item in the trash
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct TrashedItemDto {
     pub id: String,
     pub original_id: String,
@@ -20,20 +21,20 @@ pub struct TrashedItemDto {
 }
 
 /// Request to move an item to trash
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MoveToTrashRequest {
     pub item_id: String,
     pub item_type: String, // "file" o "folder"
 }
 
 /// Request to restore an item from trash
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RestoreFromTrashRequest {
     pub trash_id: String,
 }
 
 /// Request to permanently delete an item from trash
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct DeletePermanentlyRequest {
     pub trash_id: String,
 }

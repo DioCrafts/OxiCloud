@@ -54,6 +54,7 @@ async_zip = { version = "0.0.18", features = ["tokio", "deflate"] }
 dashmap = "6"
 socket2 = { version = "0.6.2", features = ["all"] }
 urlencoding = "2.1.3"
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
 
 [features]
 default = []
@@ -62,6 +63,10 @@ integration_tests = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(integration_tests)'] }
+
+[[bin]]
+name = "generate-openapi"
+path = "src/bin/generate-openapi.rs"
 
 [build-dependencies]
 oxc_allocator = "0.116"
