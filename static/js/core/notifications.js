@@ -47,8 +47,7 @@ const notifications = (() => {
         // Close on outside click
         document.addEventListener('click', (e) => {
             if (!wrapper.contains(e.target)) {
-                wrapper.classList.remove('open');
-                bellBtn.classList.remove('active');
+                close();
             }
         });
 
@@ -59,6 +58,13 @@ const notifications = (() => {
                 clear();
             });
         }
+    }
+
+    function close() {
+        const bellBtn  = $('notif-bell-btn');
+        const wrapper  = $('notif-wrapper');
+        wrapper.classList.remove('open');
+        bellBtn.classList.remove('active');
     }
 
     /* ── badge helpers ──────────────────────────────────────── */
@@ -73,12 +79,13 @@ const notifications = (() => {
     }
     function _renderBadge() {
         const badge = $('notif-badge');
+        console.log(`badge`, badge);
         if (!badge) return;
         if (_badgeCount > 0) {
-            badge.style.display = '';
+            badge.classList.remove("hidden");
             badge.textContent = _badgeCount > 99 ? '99+' : _badgeCount;
         } else {
-            badge.style.display = 'none';
+            badge.classList.add("hidden");
         }
     }
     function _ringBell() {
@@ -93,7 +100,7 @@ const notifications = (() => {
     /* ── empty state ────────────────────────────────────────── */
     function _showEmptyIfNeeded() {
         const body  = $('notif-panel-body');
-        const empty = $('notif-empty');
+        const empty = $('notif-empty');       
         if (!body || !empty) return;
         // Any real items?
         const hasItems = body.querySelector('.notif-item') !== null;
@@ -312,6 +319,11 @@ const notifications = (() => {
         body.querySelectorAll('.notif-item').forEach(el => el.remove());
         _clearBadge();
         _showEmptyIfNeeded();
+        // automatically close notification center on clear
+        setTimeout(
+            ()=> { close(); }, 
+            600
+        );
     }
 
     /* ── util ───────────────────────────────────────────────── */
