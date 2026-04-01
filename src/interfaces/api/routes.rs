@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use utoipa::OpenApi;
 
+/// Returns the application version from Cargo.toml (compile-time constant)
 async fn get_version() -> AxumJson<serde_json::Value> {
     AxumJson(json!({
         "name": "OxiCloud",

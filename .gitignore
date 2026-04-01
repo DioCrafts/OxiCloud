@@ -78,5 +78,8 @@ storage/
 *.swo
 nohup.out
 
+# Generated files (OpenAPI spec, etc.)
+resources/gen/
+
 # Helm chart dependencies
 charts/*/charts/*

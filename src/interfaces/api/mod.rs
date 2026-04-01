@@ -11,7 +11,9 @@ use crate::application::dtos::favorites_dto::{
     BatchFavoritesResult, BatchFavoritesStats, FavoriteItemDto,
 };
 use crate::application::dtos::file_dto::FileDto;
-use crate::application::dtos::folder_dto::{CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto};
+use crate::application::dtos::folder_dto::{
+    CreateFolderDto, FolderDto, MoveFolderDto, RenameFolderDto,
+};
 use crate::application::dtos::folder_listing_dto::FolderListingDto;
 use crate::application::dtos::pagination::{PaginationDto, PaginationRequestDto};
 use crate::application::dtos::recent_dto::RecentItemDto;
@@ -119,3 +121,59 @@ use crate::interfaces::api::handlers::file_handler::MoveFilePayload;
     )
 )]
 pub struct ApiDoc;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn openapi_spec_is_valid_and_has_expected_structure() {
+        let spec = ApiDoc::openapi();
+
+        assert_eq!(spec.info.title, "OxiCloud API");
+        assert!(!spec.info.version.is_empty());
+
+        let paths = &spec.paths;
+        assert!(
+            paths.paths.len() >= 10,
+            "expected at least 10 paths, got {}",
+            paths.paths.len()
+        );
+        assert!(paths.paths.contains_key("/api/trash"), "missing /api/trash");
+        assert!(
+            paths.paths.contains_key("/api/shares"),
+            "missing /api/shares"
+        );
+        assert!(
+            paths.paths.contains_key("/api/favorites"),
+            "missing /api/favorites"
+        );
+        assert!(
+            paths.paths.contains_key("/api/recent"),
+            "missing /api/recent"
+        );
+
+        let schemas = &spec
+            .components
+            .as_ref()
+            .expect("components missing")
+            .schemas;
+        assert!(
+            schemas.len() >= 25,
+            "expected at least 25 schemas, got {}",
+            schemas.len()
+        );
+        for name in [
+            "FileDto",
+            "FolderDto",
+            "ShareDto",
+            "TrashedItemDto",
+            "UserDto",
+        ] {
+            assert!(schemas.contains_key(name), "missing schema: {name}");
+        }
+
+        let json = serde_json::to_string(&spec).expect("spec should serialise to JSON");
+        assert!(json.len() > 1000, "spec JSON suspiciously small");
+    }
+}

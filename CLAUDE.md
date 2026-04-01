@@ -8,14 +8,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo build                          # Dev build
 cargo build --release                # Optimized release build
 cargo run                            # Run server (port 8086)
-cargo test --workspace               # Run all tests (~112)
+cargo test --workspace               # Run all tests (~208)
 cargo test <test_name>               # Run a single test by name
 cargo test --features test_utils     # Run tests that use mockall mocks
 cargo clippy -- -D warnings          # Lint (zero warnings policy)
 cargo fmt --all --check              # Format check
 cargo fmt --all                      # Auto-format
 RUST_LOG=debug cargo run             # Run with debug logging
+cargo run --bin generate-openapi     # Regenerate resources/gen/openapi.json
 ```
+
+A `justfile` is available for common tasks (`just --list` to see all). Key recipes: `just check` (fmt + clippy), `just test`, `just openapi`.
+
 
 Requires **Rust 1.93+** (edition 2024) and **PostgreSQL 13+** (with `pg_trgm` and `ltree` extensions).
 
