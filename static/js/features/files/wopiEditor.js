@@ -28,7 +28,7 @@ class WopiEditor {
     async openInModal(fileId, fileName, action) {
         action = action || 'edit';
         try {
-            var data = await this._getEditorUrl(fileId, action);
+            var data = await this._getEditorUrlWithFallback(fileId, fileName, action);
             this._showModal(data, fileName);
         } catch (error) {
             console.error('Failed to open WOPI editor:', error);
@@ -44,7 +44,7 @@ class WopiEditor {
     async openInTab(fileId, fileName, action) {
         action = action || 'edit';
         try {
-            var data = await this._getEditorUrl(fileId, action);
+            var data = await this._getEditorUrlWithFallback(fileId, fileName, action);
             var hostUrl = '/wopi/edit/' + encodeURIComponent(fileId)
                 + '?access_token=' + encodeURIComponent(data.access_token);
             window.open(hostUrl, '_blank');
@@ -69,6 +69,31 @@ class WopiEditor {
             throw new Error('Editor URL request failed: ' + response.status + ' ' + text);
         }
         return response.json();
+    }
+
+    /**
+     * Some WOPI file types, such as PDFs, are view-only.
+     * If an edit request returns 422, retry once in view mode.
+     */
+    async _getEditorUrlWithFallback(fileId, fileName, action) {
+        try {
+            return await this._getEditorUrl(fileId, action);
+        } catch (error) {
+            if (!this._shouldRetryInViewMode(fileName, action, error)) {
+                throw error;
+            }
+
+            return this._getEditorUrl(fileId, 'view');
+        }
+    }
+
+    _shouldRetryInViewMode(fileName, action, error) {
+        if (action !== 'edit' || !error || !error.message) {
+            return false;
+        }
+
+        var ext = fileName.split('.').pop().toLowerCase();
+        return ext === 'pdf' && error.message.indexOf('422') !== -1;
     }
 
     /**
