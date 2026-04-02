@@ -156,7 +156,7 @@ function setCurrentSection(section) {
     return true;
 }
 
-function switchToSharedView() {
+function switchToSharedSection() {
     
     if (!setCurrentSection('shared')) return;
 
@@ -181,7 +181,7 @@ function switchToSharedView() {
     }
 }
 
-function switchToFilesView() {
+function switchToFilesSection() {
     if (!setCurrentSection('files')) return;
 
     // Set actions bar mode
@@ -206,7 +206,7 @@ function switchToFilesView() {
     window.loadFiles();
 }
 
-function switchToFavoritesView() {
+function switchToFavoritesSection() {
     if (!setCurrentSection('favorites')) return;
 
     // Set actions bar mode
@@ -239,7 +239,7 @@ function switchToFavoritesView() {
     }
 }
 
-function switchToRecentFilesView() {
+function switchToRecentFilesSection() {
     if (!setCurrentSection('recent')) return;
 
     // Set actions bar mode
@@ -272,7 +272,7 @@ function switchToRecentFilesView() {
     }
 }
 
-function switchToPhotosView() {
+function switchToPhotosSection() {
     if (!setCurrentSection('photos')) return;
 
     // Hide breadcrumb
@@ -294,7 +294,7 @@ function switchToPhotosView() {
     }
 }
 
-function switchToTrashView() {
+function switchToTrashSection() {
     setCurrentSection('trash');
 
     // Hide breadcrumb (only shown in Files view)
@@ -311,11 +311,13 @@ function switchToTrashView() {
 
     // Load trash items
     window.loadTrashItems();
+
+    if (window.multiSelect) window.multiSelect.clear();
 }
 
-window.switchToFilesView = switchToFilesView;
-window.switchToSharedView = switchToSharedView;
-window.switchToFavoritesView = switchToFavoritesView;
-window.switchToRecentFilesView = switchToRecentFilesView;
-window.switchToPhotosView = switchToPhotosView;
-window.switchToTrashView = switchToTrashView;
+window.switchToFilesSection = switchToFilesSection;
+window.switchToSharedSection = switchToSharedSection;
+window.switchToFavoritesSection = switchToFavoritesSection;
+window.switchToRecentFilesSection = switchToRecentFilesSection;
+window.switchToPhotosSection = switchToPhotosSection;
+window.switchToTrashSection = switchToTrashSection;

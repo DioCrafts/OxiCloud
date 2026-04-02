@@ -188,8 +188,8 @@ const fileSharing = {
             const span = item.querySelector('span');
             if (span && span.getAttribute('data-i18n') === 'nav.shared') {
                 item.addEventListener('click', () => {
-                    if (window.switchToSharedView) {
-                        window.switchToSharedView();
+                    if (window.switchToSharedSection) {
+                        window.switchToSharedSection();
                     }
                 });
             }

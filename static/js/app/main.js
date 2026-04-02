@@ -283,31 +283,31 @@ function switchSectionTo(section) {
 
     switch (section) {
         case "files":
-            switchToFilesView();
+            switchToFilesSection();
 
         case "shared":
-            switchToSharedView();
+            switchToSharedSection();
             break;
 
         case "recent":
-            switchToRecentFilesView();
+            switchToRecentFilesSection();
             break;
 
         case "favorites":
-            switchToFavoritesView();
+            switchToFavoritesSection();
             break;
 
         case "photos":
-            switchToPhotosView();
+            switchToPhotosSection();
             break;
 
         case "trash":
-            switchToTrashView();
+            switchToTrashSection();
             break;
 
         default:
             console.warn(`context view ${section} unkonwn fallback to drive section`);
-            switchToFilesView();
+            switchToFilesSection();
     }
 }
 
@@ -586,30 +586,30 @@ function setupEventListeners() {
             switch(itemI18nKey) {
                 case 'nav.shared': 
                     // Switch to shared view
-                    switchToSharedView();
+                    switchToSharedSection();
                     break;
 
                 case 'nav.favorites':
                     // Switch to favorites view
-                    switchToFavoritesView();
+                    switchToFavoritesSection();
                     break;
 
                 case 'nav.recent': 
                     // Switch to recent files view
-                    switchToRecentFilesView();
+                    switchToRecentFilesSection();
                     break;
 
                 case 'nav.photos':
-                    switchToPhotosView();
+                    switchToPhotosSection();
                     break;
 
                 case 'nav.trash': 
-                    switchToTrashView();
+                    switchToTrashSection();
                     break;
 
                 default:
                     // Use the proper switchToFilesView function which handles all UI restoration
-                    window.switchToFilesView();
+                    window.switchToFilesSection();
                     // FIXME: because fileview handles it: need to converge code
                     _updateHistory = false;     
             }
