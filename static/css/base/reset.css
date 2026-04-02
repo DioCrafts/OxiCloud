@@ -21,4 +21,4 @@ html[dir='rtl'] .fa-sign-out-alt {
 	transform: rotate(180deg);
 }
 /* Utility: hide elements without inline style="" (CSP-safe) */
-.hidden { display: none; }
+.hidden { display: none !important; }

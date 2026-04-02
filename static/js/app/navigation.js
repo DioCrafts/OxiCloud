@@ -174,6 +174,9 @@ function switchToSharedSection() {
     if (filesGrid) filesGrid.classList.add('hidden');
     if (filesListView) filesListView.classList.add('hidden');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+    
     // Show shared view
     if (window.sharedView) {
         window.sharedView.init();
@@ -197,6 +200,9 @@ function switchToFilesSection() {
     if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+
+    //hide by default empty list
+    window.showEmptyList(false);
 
     // Reset to home folder and update breadcrumb
     window.app.currentPath = window.app.userHomeFolderId || '';
@@ -222,6 +228,9 @@ function switchToFavoritesSection() {
     if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+    
+    //hide by default empty list
+    window.showEmptyList(false);
 
     if (window.favorites) {
         window.favorites.displayFavorites();
@@ -256,6 +265,9 @@ function switchToRecentFilesSection() {
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     if (window.recent) {
         window.recent.displayRecentFiles();
     } else {
@@ -288,6 +300,9 @@ function switchToPhotosSection() {
     if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
     if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     // Show photos view
     if (window.photosView) {
         window.photosView.show();
@@ -308,6 +323,9 @@ function switchToTrashSection() {
     if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
 
     setActionsBarMode('trash');
+
+    //hide by default empty list
+    window.showEmptyList(false);
 
     // Load trash items
     window.loadTrashItems();

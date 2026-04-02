@@ -1493,10 +1493,21 @@ if (document.readyState === 'loading') {
     initRubberBandSelection();
 }
 
+/**
+ * 
+ * @param {boolean} show 
+ */
+function showEmptyList(show) {
+    const emptyArea=document.getElementById("empty-files-state");
+    emptyArea.classList.toggle("hidden", !show);
+}
+
 // Expose helpers globally
 window.toggleCardSelection = toggleCardSelection;
 window.showContextMenuAtElement = showContextMenuAtElement;
 window.initRubberBandSelection = initRubberBandSelection;
+window.showEmptyList = showEmptyList;
+
 
 /**
  * Show a modern confirm dialog (replaces native confirm())
