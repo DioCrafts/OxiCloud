@@ -890,6 +890,19 @@ const ui = {
             const card = e.target.closest('.file-item');
             if (!card) return;
 
+            if (e.target.closest('.file-more')) {
+                e.stopPropagation();
+                e.preventDefault();
+                const info = itemInfo(card);
+                if (!info) return;
+                setContextTarget(card, info);
+                const menuId = info.type === 'folder'
+                    ? 'folder-context-menu' : 'file-context-menu';
+                showContextMenuAtElement(
+                    e.target.closest('.file-more'), menuId);
+                return;
+            }
+
             if (e.target.closest('.list-item-checkbox') ||
                 e.target.closest('.item-checkbox')) {
                 toggleCardSelection(card, e);
@@ -1115,7 +1128,7 @@ const ui = {
                 <i class="fas fa-folder"></i>
             </div>
             <div class="file-name">${escapeHtml(folder.name)}</div>
-            <div class="file-info">Folder</div>
+            <div class="file-info">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
         `;
 
         if (window.app.currentPath !== "") {
@@ -1153,6 +1166,7 @@ const ui = {
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
+            <div class="action-cell"><button class="file-more"><i class="fas fa-ellipsis-v"></i></button></div>
         `;
         return el;
     },
@@ -1228,6 +1242,7 @@ const ui = {
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
+            <div class="action-cell"><button class="file-more"><i class="fas fa-ellipsis-v"></i></button></div>
         `;
         var thumb = el.querySelector('.file-thumb');
         if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });
