@@ -287,8 +287,28 @@ function switchToPhotosView() {
     }
 }
 
+function switchToTrashView() {
+    setCurrentSection('trash');
+
+    // Hide breadcrumb (only shown in Files view)
+    const breadcrumb = document.querySelector('.breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
+
+    // Show files containers (to be filled with trash)
+    const filesGrid = document.getElementById('files-grid');
+    const filesListView = document.getElementById('files-list-view');
+    if (filesGrid) { filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none'; filesGrid.classList.toggle('hidden', app.currentView !== 'grid'); }
+    if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
+
+    setActionsBarMode('trash');
+
+    // Load trash items
+    window.loadTrashItems();
+}
+
 window.switchToFilesView = switchToFilesView;
 window.switchToSharedView = switchToSharedView;
 window.switchToFavoritesView = switchToFavoritesView;
 window.switchToRecentFilesView = switchToRecentFilesView;
 window.switchToPhotosView = switchToPhotosView;
+window.switchToTrashView = switchToTrashView;

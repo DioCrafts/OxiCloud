@@ -7,6 +7,7 @@ window.app = {
     currentView: 'grid',
     currentPath: '',
     currentFolder: null,
+    currentFolderInfo: null,
     contextMenuTargetFolder: null,
     contextMenuTargetFile: null,
     selectedTargetFolderId: '',
