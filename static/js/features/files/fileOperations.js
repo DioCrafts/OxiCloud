@@ -772,6 +772,60 @@ const fileOps = {
     },
 
     /**
+    * @typedef {Object} BatchResult
+    * @property {number} success number of files|folders sucessfully updated
+    * @property {number} errors  number of files|folders in error
+    * /
+    
+    /**
+     * Move files & folders
+     * @param {string[]} fileIds - File IDs
+     * @param {string[]} folderIds - Folder IDs
+     * @param {string} targetFolderId - Target folder ID
+     * @returns {Promise<BatchResult>} - Success status
+     */
+    async batchMove(fileIds, folderIds, targetFolderId) {
+
+        // TODO ensure not moving a folder into itself
+        let success = 0, errors = 0;
+
+        try {
+            // Batch move files in a single request
+            if (fileIds.length > 0) {
+                const res = await fetch('/api/batch/files/move', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetFolderId })
+                });
+                const data = await res.json();
+                success += data.stats?.successful || 0;
+                errors += data.stats?.failed || 0;
+            }
+
+            // Batch move folders in a single request
+            if (folderIds.length > 0) {
+                const res = await fetch('/api/batch/folders/move', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folder_ids: folderIds, target_folder_id: targetFolderId })
+                });
+                const data = await res.json();
+                success += data.stats?.successful || 0;
+                errors += data.stats?.failed || 0;
+            }
+        } 
+        catch (err) {
+            console.error('Batch move error:', err);
+            errors++;
+        }
+
+        return {
+            success,
+            errors
+        };
+    },
+
+    /**
      * Copy a file to another folder
      * @param {string} fileId - File ID
      * @param {string} targetFolderId - Target folder ID
@@ -826,6 +880,47 @@ const fileOps = {
         // Folder copy is not yet implemented in the backend
         window.ui.showNotification('Not implemented', 'Folder copy is not yet supported');
         return false;
+    },
+
+    /**
+     * Copy files & folders
+     * @param {string[]} fileIds - File IDs
+     * @param {string[]} folderIds - Folder IDs
+     * @param {string} targetFolderId - Target folder ID
+     * @returns {Promise<boolean>} - Success status
+     */
+    async batchCopy(fileIds, folderIds, targetFolderId) {
+
+        // FIXME ensure not moving a folder into itself
+
+        let success = 0, errors = 0;
+        try {
+            // Batch copy files
+            if (fileIds.length > 0) {
+                const res = await fetch('/api/batch/files/copy', {
+                    method: 'POST',
+                    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetFolderId })
+                });
+                const data = await res.json();
+                success += data.stats?.successful || 0;
+                errors += data.stats?.failed || 0;
+            }
+
+            // Note: Folder copy is not yet implemented in batch API
+            if (folderIds.length > 0) {
+                window.ui.showNotification('Info', 'Folder copy is not yet supported in batch mode');
+                errors += folderIds.lenngth;
+            }
+        } catch (err) {
+            console.error('Batch copy error:', err);
+            errors++;
+        }
+
+        return {
+            success,
+            errors
+        };
     },
 
     /**

@@ -243,7 +243,7 @@ const sharedView = {
         const goToFilesBtn = document.getElementById('go-to-files-btn');
         if (goToFilesBtn) {
             goToFilesBtn.addEventListener('click', () => {
-                if (window.switchToFilesView) window.switchToFilesView();
+                if (window.switchToFilesSection) window.switchToFilesSection();
             });
         }
     },

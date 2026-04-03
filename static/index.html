@@ -204,7 +204,7 @@
         <div class="content-area">
             <h1 class="page-title" data-i18n="nav.files">Files</h1>
 
-            <div class="actions-bar">
+            <div class="actions-bar" id="actions-bar">
                 <div class="action-buttons">
                     <div class="upload-dropdown" id="upload-dropdown">
                         <button class="btn btn-primary" id="upload-btn">
@@ -238,6 +238,8 @@
                     </button>
                 </div>
             </div>
+
+            <div id="batch-selection-bar" class="batch-selection-bar hidden"></div>
 
             <div class="dropzone" id="dropzone">
                 <i class="fas fa-cloud-upload-alt dropzone-icon"></i>
@@ -273,6 +275,12 @@
                         <div></div><!-- actions -->
                     </div>
                     <!-- Files will be populated here in list view -->
+                </div>
+
+                <div class="empty-state hidden" id="empty-files-state">
+                    <i class="fas fa-folder-open empty-state-icon"></i>
+                    <p data-i18n="files.no_files"></p>
+                    <p data-i18n="files.empty_hint"></p>
                 </div>
             </div>
         </div>
@@ -332,5 +340,6 @@
 
     <!-- Upload Progress Toast (hidden – driven by notification bell) -->
     <div class="upload-toast hidden" id="upload-toast"></div>
+
 </body>
 </html>

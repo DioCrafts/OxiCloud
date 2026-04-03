@@ -79,7 +79,6 @@ const notifications = (() => {
     }
     function _renderBadge() {
         const badge = $('notif-badge');
-        console.log(`badge`, badge);
         if (!badge) return;
         if (_badgeCount > 0) {
             badge.classList.remove("hidden");

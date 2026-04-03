@@ -118,8 +118,12 @@ function getSectionFromNavItem(navItem) {
 /**
  * Set the current active section, updating all view flags and nav UI.
  * @param {string} section - The section to activate ('files', 'shared', 'recent', 'favorites', 'trash')
+ * @returns {boolean} true if the section changed
  */
 function setCurrentSection(section) {
+
+    if (window.app.currentSection == section) return false;
+
     // Set all view flags - true for active section, false for others
     Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {
         window.app[flag] = (key === section);
@@ -148,10 +152,13 @@ function setCurrentSection(section) {
     if (section !== 'photos' && window.photosView) {
         window.photosView.hide();
     }
+
+    return true;
 }
 
-function switchToSharedView() {
-    setCurrentSection('shared');
+function switchToSharedSection() {
+    
+    if (!setCurrentSection('shared')) return;
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
@@ -167,15 +174,20 @@ function switchToSharedView() {
     if (filesGrid) filesGrid.classList.add('hidden');
     if (filesListView) filesListView.classList.add('hidden');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+    
     // Show shared view
     if (window.sharedView) {
         window.sharedView.init();
         window.sharedView.show();
     }
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
-function switchToFilesView() {
-    setCurrentSection('files');
+function switchToFilesSection() {
+    if (!setCurrentSection('files')) return;
 
     // Set actions bar mode
     window.setActionsBarMode('files', true);
@@ -191,16 +203,20 @@ function switchToFilesView() {
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     // Reset to home folder and update breadcrumb
     window.app.currentPath = window.app.userHomeFolderId || '';
     window.app.breadcrumbPath = [];
     window.ui.updateBreadcrumb();
+    if (window.multiSelect) window.multiSelect.clear();
 
     window.loadFiles();
 }
 
-function switchToFavoritesView() {
-    setCurrentSection('favorites');
+function switchToFavoritesSection() {
+    if (!setCurrentSection('favorites')) return;
 
     // Set actions bar mode
     window.setActionsBarMode('favorites');
@@ -215,6 +231,9 @@ function switchToFavoritesView() {
     if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+    
+    //hide by default empty list
+    window.showEmptyList(false);
 
     if (window.favorites) {
         window.favorites.displayFavorites();
@@ -230,10 +249,13 @@ function switchToFavoritesView() {
             `;
         }
     }
+    
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
-function switchToRecentFilesView() {
-    setCurrentSection('recent');
+function switchToRecentFilesSection() {
+    if (!setCurrentSection('recent')) return;
 
     // Set actions bar mode
     window.setActionsBarMode('recent');
@@ -249,6 +271,9 @@ function switchToRecentFilesView() {
     if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
     if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     if (window.recent) {
         window.recent.displayRecentFiles();
     } else {
@@ -263,10 +288,11 @@ function switchToRecentFilesView() {
             `;
         }
     }
+    if (window.multiSelect) window.multiSelect.clear();
 }
 
-function switchToPhotosView() {
-    setCurrentSection('photos');
+function switchToPhotosSection() {
+    if (!setCurrentSection('photos')) return;
 
     // Hide breadcrumb
     const breadcrumb = document.querySelector('.breadcrumb');
@@ -281,13 +307,18 @@ function switchToPhotosView() {
     if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
     if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     // Show photos view
     if (window.photosView) {
         window.photosView.show();
     }
+    if (window.multiSelect) window.multiSelect.clear();
+
 }
 
-function switchToTrashView() {
+function switchToTrashSection() {
     setCurrentSection('trash');
 
     // Hide breadcrumb (only shown in Files view)
@@ -302,13 +333,18 @@ function switchToTrashView() {
 
     setActionsBarMode('trash');
 
+    //hide by default empty list
+    window.showEmptyList(false);
+
     // Load trash items
     window.loadTrashItems();
+
+    if (window.multiSelect) window.multiSelect.clear();
 }
 
-window.switchToFilesView = switchToFilesView;
-window.switchToSharedView = switchToSharedView;
-window.switchToFavoritesView = switchToFavoritesView;
-window.switchToRecentFilesView = switchToRecentFilesView;
-window.switchToPhotosView = switchToPhotosView;
-window.switchToTrashView = switchToTrashView;
+window.switchToFilesSection = switchToFilesSection;
+window.switchToSharedSection = switchToSharedSection;
+window.switchToFavoritesSection = switchToFavoritesSection;
+window.switchToRecentFilesSection = switchToRecentFilesSection;
+window.switchToPhotosSection = switchToPhotosSection;
+window.switchToTrashSection = switchToTrashSection;

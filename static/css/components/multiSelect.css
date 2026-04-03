@@ -34,7 +34,7 @@
 	min-width: 0;
 }
 
-.batch-action-bar {
+.batch-selection-bar {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
@@ -43,21 +43,11 @@
 	padding: 10px 20px;
 	border-radius: 12px;
 	margin: 0 0 12px;
-	opacity: 0;
-	max-height: 0;
+	height: 60px;
 	overflow: hidden;
 	transform: translateY(-8px);
 	transition: opacity 0.2s, max-height 0.25s, transform 0.2s, margin 0.2s, padding 0.2s;
-	pointer-events: none;
-}
-
-.batch-action-bar.visible {
-	opacity: 1;
-	max-height: 60px;
-	transform: translateY(0);
 	pointer-events: auto;
-	padding: 10px 20px;
-	margin: 0 0 12px;
 }
 
 .batch-bar-left {
@@ -140,7 +130,7 @@
 	accent-color: #ff5e3a;
 }
 
-[data-theme="dark"] .batch-action-bar {
+[data-theme="dark"] .batch-selection-bar {
 	background-color: #1e293b;
 	border-color: #334155;
 	color: #e2e8f0;

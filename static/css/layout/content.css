@@ -16,7 +16,9 @@
 .actions-bar {
 	display: flex;
 	justify-content: space-between;
-	margin-bottom: 20px;
+	margin: 0 0 12px;
+	height: 60px;
+	padding: 10px;
 }
 
 .action-buttons {
@@ -36,3 +38,51 @@
 	height: 300px;
 	grid-column: 1 / -1;
 }
+
+/* invisible element, permits building of drag element without altering display */
+.drag-preview {
+	position: absolute;
+	top: -9999px;
+	left: -9999px;
+  	pointer-events: none;
+	width: 360px;
+}
+
+.dragged-items > div {
+	position: relative;
+  	display: inline-block;
+	padding: 4px;
+	width: 360px;
+	background-color: white;
+	height: 46px;
+}
+
+.dragged-items > div.fading {
+	-webkit-mask-image: linear-gradient(to bottom, white 20%, transparent);
+	mask-image: linear-gradient(to bottom, white 20%, transparent);
+}
+
+.dragged-items-badge {
+	position: absolute;
+	top: 0;
+	right: 0;
+
+	transform: translate(50%, -50%);
+
+	background: red;
+	color: white;
+
+	border-radius: 50%;
+	min-width: 20px;
+	height: 20px;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	font-size: 12px;
+	font-weight: bold;
+
+	padding: 2px;
+}
+

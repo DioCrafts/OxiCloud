@@ -105,8 +105,9 @@ function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
     if (mode === 'hidden') {
-        elements.actionsBar.style.display = 'none';
+        elements.actionsBar.classList.add("hidden");
         elements.actionsBar.dataset.mode = 'hidden';
+        console.log("......setup actions bar to hidden");
         return;
     }
 
@@ -118,7 +119,7 @@ function setActionsBarMode(mode, force = false) {
     if (!html) return;
 
     elements.actionsBar.innerHTML = html;
-    elements.actionsBar.style.display = 'flex';
+    elements.actionsBar.classList.remove("hidden");
     elements.actionsBar.dataset.mode = mode;
 
     // Refresh cached action elements after rebuild
@@ -283,31 +284,31 @@ function switchSectionTo(section) {
 
     switch (section) {
         case "files":
-            switchToFilesView();
+            switchToFilesSection();
 
         case "shared":
-            switchToSharedView();
+            switchToSharedSection();
             break;
 
         case "recent":
-            switchToRecentFilesView();
+            switchToRecentFilesSection();
             break;
 
         case "favorites":
-            switchToFavoritesView();
+            switchToFavoritesSection();
             break;
 
         case "photos":
-            switchToPhotosView();
+            switchToPhotosSection();
             break;
 
         case "trash":
-            switchToTrashView();
+            switchToTrashSection();
             break;
 
         default:
             console.warn(`context view ${section} unkonwn fallback to drive section`);
-            switchToFilesView();
+            switchToFilesSection();
     }
 }
 
@@ -414,7 +415,7 @@ function cacheElements() {
     elements.listViewBtn = document.getElementById('list-view-btn');
     elements.breadcrumb = document.querySelector('.breadcrumb');
     elements.pageTitle = document.querySelector('.page-title');
-    elements.actionsBar = document.querySelector('.actions-bar');
+    elements.actionsBar = document.getElementById('actions-bar');
     elements.navItems = document.querySelectorAll('.nav-item');
     elements.searchInput = document.querySelector('.search-container input');
 }
@@ -586,30 +587,30 @@ function setupEventListeners() {
             switch(itemI18nKey) {
                 case 'nav.shared': 
                     // Switch to shared view
-                    switchToSharedView();
+                    switchToSharedSection();
                     break;
 
                 case 'nav.favorites':
                     // Switch to favorites view
-                    switchToFavoritesView();
+                    switchToFavoritesSection();
                     break;
 
                 case 'nav.recent': 
                     // Switch to recent files view
-                    switchToRecentFilesView();
+                    switchToRecentFilesSection();
                     break;
 
                 case 'nav.photos':
-                    switchToPhotosView();
+                    switchToPhotosSection();
                     break;
 
                 case 'nav.trash': 
-                    switchToTrashView();
+                    switchToTrashSection();
                     break;
 
                 default:
                     // Use the proper switchToFilesView function which handles all UI restoration
-                    window.switchToFilesView();
+                    window.switchToFilesSection();
                     // FIXME: because fileview handles it: need to converge code
                     _updateHistory = false;     
             }
@@ -646,16 +647,6 @@ function setupEventListeners() {
         if (fileMenu && fileMenu.style.display === 'block' && 
             !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
-        }
-
-        // Deselect all cards when clicking empty area (not on a card, menu, or modal)
-        // Note: multiSelect._hookGlobalDeselect() handles clearing the internal
-        // selection state; this handler only covers the legacy CSS class removal.
-        // Skip if a rubber-band selection just finished — the click is a side-effect.
-        if (window.__rubberBandJustFinished) return;
-        if (!e.target.closest('.file-card') && !e.target.closest('.file-item') && !e.target.closest('.context-menu') && !e.target.closest('.about-modal') && !e.target.closest('.batch-action-bar') && !e.target.closest('.list-header.selection-mode')) {
-            document.querySelectorAll('.file-card.selected').forEach(c => c.classList.remove('selected'));
-            document.querySelectorAll('.file-item.selected').forEach(c => c.classList.remove('selected'));
         }
     });
 }
