@@ -468,7 +468,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
 
     // Start server — tuned socket for low-latency responses
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8086));
+    let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
     tracing::info!("Starting OxiCloud server on http://{}", addr);
 
     let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))?;
