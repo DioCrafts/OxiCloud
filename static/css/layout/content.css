@@ -48,18 +48,76 @@
 	width: 360px;
 }
 
-.dragged-items > div {
-	position: relative;
-  	display: inline-block;
-	padding: 4px;
-	width: 360px;
+.dragged-items {
+	--dragged-files-list-columns: 36px minmax(200px, 1fr);
+	/*display: flex;*/
+	flex-direction: column;
+	/*width: 360px;*/
+	background-color: transparent;
+	overflow: hidden;
+	border-radius: 10px;
+	width: 100%;
+	/*box-shadow: 0 1px 3px rgba(0,0,0,0.05);*/
+}
+
+.dragged-items .file-item {
+	display: grid;
+	grid-template-columns: var(--dragged-files-list-columns);
+	column-gap: 12px;
+	padding: 12px 15px;
+	/*border-bottom: 1px solid #f0f0f0;*/
+	align-items: center;
 	background-color: white;
+}
+
+.dragged-items .file-item  {
+  	display: flex;
+	padding: 4px;
+	width: 336px;
 	height: 46px;
 }
 
-.dragged-items > div.fading {
-	-webkit-mask-image: linear-gradient(to bottom, white 20%, transparent);
-	mask-image: linear-gradient(to bottom, white 20%, transparent);
+/* file name, text is wrapped */
+.dragged-items .file-item div:nth-child(2) {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.dragged-items .file-item .file-icon {
+	background-color: #ffeaa7;
+	position: relative;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+}
+
+.dragged-items .file-item .file-icon.folder-icon {
+	background-color: #ffeaa7;
+	position: relative;
+	width: 36px;
+	height: 36px;
+	margin-bottom: 0;
+}
+.dragged-items .file-item .file-icon.folder-icon::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 8px;
+	background-color: #fdcb6e;
+	border-radius: 8px 8px 0 0;
+}
+
+.dragged-items .file-item .file-icon.folder-icon i,
+.dragged-items .file-item .file-icon.folder-icon svg {
+	display: none;
+}
+
+.dragged-items div.fading {
+	-webkit-mask-image: linear-gradient(to bottom, white 10%, transparent);
+	mask-image: linear-gradient(to bottom, white 10%, transparent);
 }
 
 .dragged-items-badge {

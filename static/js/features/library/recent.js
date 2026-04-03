@@ -86,32 +86,28 @@ const recent = {
 
             const recentItems = await response.json();
 
-            const filesGrid = document.getElementById('files-grid');
-            const filesListView = document.getElementById('files-list-view');
+            window.ui.resetFilesList(); // ensure also list visible & error hidden
+            const filesList = document.getElementById('files-list');
 
-            filesGrid.innerHTML = '';
-            filesListView.innerHTML = `
+            filesList.innerHTML = `
                 <div class="list-header">
                     <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                     <div data-i18n="files.name">Name</div>
                     <div data-i18n="files.type">Type</div>
                     <div data-i18n="files.size">Size</div>
                     <div data-i18n="recent.accessed">Accessed</div>
+                    <div></div>
                 </div>
             `;
 
             window.ui.updateBreadcrumb('');
 
             if (recentItems.length === 0) {
-                const emptyState = document.createElement('div');
-                emptyState.className = 'empty-state';
-                emptyState.innerHTML = `
+                window.ui.showError(`
                     <i class="fas fa-clock empty-state-icon"></i>
                     <p>${window.i18n ? window.i18n.t('recent.empty_state') : 'No recent files'}</p>
                     <p>${window.i18n ? window.i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
-                `;
-                filesGrid.appendChild(emptyState);
-                return;
+                `);
             }
 
             const folders = [];

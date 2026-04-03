@@ -259,29 +259,12 @@
 
             <!-- Files Container -->
             <div class="files-container">
-                <!-- Grid View -->
-                <div class="files-grid" id="files-grid">
-                    <!-- Files will be populated here -->
-                </div>
-
                 <!-- List View (hidden by default) -->
-                <div class="files-list-view hidden" id="files-list-view">
-                    <div class="list-header">
-                        <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                        <div data-i18n="files.name">Name</div>
-                        <div data-i18n="files.type">Type</div>
-                        <div data-i18n="files.size">Size</div>
-                        <div data-i18n="files.modified">Modified</div>
-                        <div></div><!-- actions -->
-                    </div>
+                <div class="files-list-view" id="files-list">
                     <!-- Files will be populated here in list view -->
                 </div>
 
-                <div class="empty-state hidden" id="empty-files-state">
-                    <i class="fas fa-folder-open empty-state-icon"></i>
-                    <p data-i18n="files.no_files"></p>
-                    <p data-i18n="files.empty_hint"></p>
-                </div>
+                <div class="empty-state hidden" id="files-container-error"></div>
             </div>
         </div>
     </div>
@@ -337,6 +320,8 @@
             <button class="about-close-btn" id="about-close-btn" data-i18n="actions.close">Close</button>
         </div>
     </div>
+
+    <div id="debug"></div>
 
     <!-- Upload Progress Toast (hidden – driven by notification bell) -->
     <div class="upload-toast hidden" id="upload-toast"></div>

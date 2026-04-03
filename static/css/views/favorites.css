@@ -37,7 +37,7 @@
 }
 
 /* Adjustments for grid view */
-.file-card.favorite-item {
+.file-item.favorite-item {
     border-left: 3px solid #ffc107;
 
     [dir='rtl'] & {
@@ -101,13 +101,13 @@
 /* ── Star badge on file/folder cards (normal view) ── */
 
 /* Grid view: keep interactive star button behavior from style.css */
-.file-card .favorite-star {
+.file-item .favorite-star {
     pointer-events: auto;
     z-index: 12;
 }
 
-.file-card .favorite-star.active i,
-.file-card .favorite-star.active svg {
+.file-item .favorite-star.active i,
+.file-item .favorite-star.active svg {
     animation: favorite-pulse 0.3s ease;
 }
 

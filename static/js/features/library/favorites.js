@@ -167,11 +167,10 @@ const favorites = {
                 await this._fetchFromServer();
             }
 
-            const filesGrid = document.getElementById('files-grid');
-            const filesListView = document.getElementById('files-list-view');
+            window.ui.resetFilesList(); // ensure also list visible & error hidden
+            const filesList = document.getElementById('files-list');
 
-            filesGrid.innerHTML = '';
-            filesListView.innerHTML = `
+            filesList.innerHTML = `
                 <div class="list-header">
                     <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                     <div data-i18n="files.name">Name</div>
@@ -184,14 +183,11 @@ const favorites = {
             window.ui.updateBreadcrumb('');
 
             if (this._cache.size === 0) {
-                const emptyState = document.createElement('div');
-                emptyState.className = 'empty-state';
-                emptyState.innerHTML = `
+                window.ui.showError( `
                     <i class="fas fa-star empty-state-icon"></i>
                     <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No favorite items'}</p>
                     <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
-                `;
-                filesGrid.appendChild(emptyState);
+                `);
                 return;
             }
 
