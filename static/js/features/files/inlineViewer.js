@@ -98,8 +98,12 @@ class InlineViewer {
     const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
     const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
     if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
-        window.wopiEditor.openInModal(file.id, file.name, 'edit');
-        return;
+        try {
+            window.wopiEditor.openInModal(file.id, file.name, 'edit');
+            return;
+        } catch (e) {
+            console.warn('WOPI editor failed, falling back to inline viewer:', e);
+        }
     }
 
     this.currentFile = file;
