@@ -84,8 +84,8 @@ async function init() {
     } catch (oidcErr) {
     }
 
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('main-content').style.display = 'block';
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('main-content').classList.remove('hidden');
   } catch (e) {
     console.error(e);
     showError();
@@ -93,8 +93,8 @@ async function init() {
 }
 
 function showError() {
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('auth-error').style.display = 'block';
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('auth-error').classList.remove('hidden');
 }
 
 async function changePassword(e) {

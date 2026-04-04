@@ -148,6 +148,12 @@ const ALL_LANGUAGES = [
     { code: 'gl', name: 'Galician',   nativeName: 'Galego',     flag: '🏴', popular: false },
 ];
 
+// --- Panel visibility helpers ---
+// The `.hidden` CSS class uses `display: none !important`, so inline
+// `style.display` can never override it.  Always toggle the class instead.
+function showPanel(el) { if (el) el.classList.remove('hidden'); }
+function hidePanel(el) { if (el) el.classList.add('hidden'); }
+
 // Check if this is a first run (no locale saved)
 function isFirstRun() {
     return !localStorage.getItem(LOCALE_KEY);
@@ -316,7 +322,7 @@ function initLanguageSelector() {
         }
         
         // Hide language panel
-        languagePanel.style.display = 'none';
+        hidePanel(languagePanel);
         
         // Check system status to determine which panel to show
         const systemStatus = await checkSystemStatus();
@@ -324,16 +330,16 @@ function initLanguageSelector() {
         
         if (!systemStatus.initialized) {
             console.log('No admin exists, showing admin setup panel');
-            document.getElementById('login-panel').style.display = 'none';
-            document.getElementById('register-panel').style.display = 'none';
-            document.getElementById('admin-setup-panel').style.display = 'block';
+            hidePanel(document.getElementById('login-panel'));
+            hidePanel(document.getElementById('register-panel'));
+            showPanel(document.getElementById('admin-setup-panel'));
             
             const backToLoginLink = document.getElementById('back-to-login');
             if (backToLoginLink) {
                 backToLoginLink.parentElement.style.display = 'none';
             }
         } else {
-            document.getElementById('login-panel').style.display = 'block';
+            showPanel(document.getElementById('login-panel'));
             // Configure OIDC login UI if SSO is enabled
             await configureOidcLoginUI();
         }
@@ -371,10 +377,10 @@ async function showInitialPanel() {
         // First run - show language selector first
         // After language is selected, the continue button handler will check system status
         console.log('First run - showing language selector');
-        languagePanel.style.display = 'block';
-        loginPanel.style.display = 'none';
-        registerPanel.style.display = 'none';
-        adminSetupPanel.style.display = 'none';
+        showPanel(languagePanel);
+        hidePanel(loginPanel);
+        hidePanel(registerPanel);
+        hidePanel(adminSetupPanel);
         return;
     }
     
@@ -385,10 +391,10 @@ async function showInitialPanel() {
     if (!systemStatus.initialized) {
         // No admin exists - this is a fresh install, show admin setup
         console.log('Fresh install detected - showing admin setup');
-        languagePanel.style.display = 'none';
-        loginPanel.style.display = 'none';
-        registerPanel.style.display = 'none';
-        adminSetupPanel.style.display = 'block';
+        hidePanel(languagePanel);
+        hidePanel(loginPanel);
+        hidePanel(registerPanel);
+        showPanel(adminSetupPanel);
         
         // Hide the "Already set up? Sign in" link since there's no admin yet
         const backToLoginLink = document.getElementById('back-to-login');
@@ -399,10 +405,10 @@ async function showInitialPanel() {
     }
     
     // System is initialized - show login panel
-    languagePanel.style.display = 'none';
-    loginPanel.style.display = 'block';
-    registerPanel.style.display = 'none';
-    adminSetupPanel.style.display = 'none';
+    hidePanel(languagePanel);
+    showPanel(loginPanel);
+    hidePanel(registerPanel);
+    hidePanel(adminSetupPanel);
     
     // Hide the admin setup link if admin already exists
     const showAdminSetupLink = document.getElementById('show-admin-setup');
@@ -450,10 +456,10 @@ async function configureOidcLoginUI() {
             if (loginForm) loginForm.style.display = 'none';
             if (authDivider) authDivider.style.display = 'none';
             if (showRegisterToggle) showRegisterToggle.parentElement.style.display = 'none';
-            oidcSection.style.display = 'block';
+            showPanel(oidcSection);
         } else {
             // Both password and OIDC enabled: show divider + SSO button
-            oidcSection.style.display = 'block';
+            showPanel(oidcSection);
         }
     } catch (err) {
         console.error('Failed to fetch OIDC provider info:', err);
@@ -492,27 +498,27 @@ function initLoginElements() {
 
     // Panel toggles
     document.getElementById('show-register').addEventListener('click', () => {
-        loginPanel.style.display = 'none';
-        registerPanel.style.display = 'block';
-        adminSetupPanel.style.display = 'none';
+        hidePanel(loginPanel);
+        showPanel(registerPanel);
+        hidePanel(adminSetupPanel);
     });
 
     document.getElementById('show-login').addEventListener('click', () => {
-        loginPanel.style.display = 'block';
-        registerPanel.style.display = 'none';
-        adminSetupPanel.style.display = 'none';
+        showPanel(loginPanel);
+        hidePanel(registerPanel);
+        hidePanel(adminSetupPanel);
     });
 
     document.getElementById('show-admin-setup').addEventListener('click', () => {
-        loginPanel.style.display = 'none';
-        registerPanel.style.display = 'none';
-        adminSetupPanel.style.display = 'block';
+        hidePanel(loginPanel);
+        hidePanel(registerPanel);
+        showPanel(adminSetupPanel);
     });
 
     document.getElementById('back-to-login').addEventListener('click', () => {
-        loginPanel.style.display = 'block';
-        registerPanel.style.display = 'none';
-        adminSetupPanel.style.display = 'none';
+        showPanel(loginPanel);
+        hidePanel(registerPanel);
+        hidePanel(adminSetupPanel);
     });
     
     return true;
@@ -660,9 +666,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Check if admin account exists (customize this as needed)
         const isFirstRun = await checkFirstRun();
         if (isFirstRun) {
-            loginPanel.style.display = 'none';
-            registerPanel.style.display = 'none';
-            adminSetupPanel.style.display = 'block';
+            hidePanel(loginPanel);
+            hidePanel(registerPanel);
+            showPanel(adminSetupPanel);
         }
     } catch (error) {
         console.error('Authentication check failed:', error);
@@ -740,8 +746,8 @@ if (isLoginPage && registerForm) {
         
         // Switch to login panel after 2 seconds
         setTimeout(() => {
-            loginPanel.style.display = 'block';
-            registerPanel.style.display = 'none';
+            showPanel(loginPanel);
+            hidePanel(registerPanel);
         }, 2000);
     } catch (error) {
         const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error registering account';
@@ -801,8 +807,8 @@ if (isLoginPage && adminSetupForm) {
         
         // Wait 2 seconds then switch to login panel
         setTimeout(() => {
-            loginPanel.style.display = 'block';
-            adminSetupPanel.style.display = 'none';
+            showPanel(loginPanel);
+            hidePanel(adminSetupPanel);
             if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
         }, 2000);
         

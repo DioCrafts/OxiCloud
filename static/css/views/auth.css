@@ -240,10 +240,7 @@
     display: none;
 }
 
-/* Admin setup panel styles */
-.admin-setup-panel {
-    display: none;
-}
+/* Admin setup panel styles — visibility controlled via .hidden class */
 
 .setup-steps {
     margin-bottom: 28px;

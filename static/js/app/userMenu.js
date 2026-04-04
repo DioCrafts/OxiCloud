@@ -31,9 +31,9 @@ function setupUserMenu() {
             const USER_DATA_KEY = 'oxicloud_user';
             const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
             const isAdmin = userData.role === 'admin';
-            if (adminBtn) adminBtn.style.display = isAdmin ? 'flex' : 'none';
-            if (adminDivider) adminDivider.style.display = isAdmin ? 'block' : 'none';
-            if (roleBadge) roleBadge.style.display = isAdmin ? 'block' : 'none';
+            if (adminBtn) { isAdmin ? adminBtn.classList.remove('hidden') : adminBtn.classList.add('hidden'); }
+            if (adminDivider) { isAdmin ? adminDivider.classList.remove('hidden') : adminDivider.classList.add('hidden'); }
+            if (roleBadge) { isAdmin ? roleBadge.classList.remove('hidden') : roleBadge.classList.add('hidden'); }
         }
     });
 
