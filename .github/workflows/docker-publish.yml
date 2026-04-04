@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version tag to publish (e.g. v0.3.0)'
+        description: 'Version tag to publish (e.g. v0.5.3)'
         required: true
 
 env:
@@ -35,7 +35,11 @@ jobs:
     env:
       DATABASE_URL: "postgres://postgres:postgres@localhost/oxicloud_test"
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # For workflow_dispatch, checkout the exact tag so we build the right code
+          ref: ${{ github.event.inputs.version || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -46,15 +50,18 @@ jobs:
 
       - run: cargo test --workspace
 
-  # Build and push multi-arch image in a single job
+  # Build and push multi-arch image
   build-and-push:
     name: Build & Push Multi-Arch
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     needs: test
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # For workflow_dispatch, checkout the exact tag so we build the right code
+          ref: ${{ github.event.inputs.version || github.ref }}
 
       - name: Set version tag
         id: version

@@ -8,8 +8,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY build.rs ./
 COPY static static
 # Create a minimal project to download and cache dependencies
-RUN mkdir -p src && \
+RUN mkdir -p src/bin && \
     echo 'fn main() { println!("Dummy build for caching dependencies"); }' > src/main.rs && \
+    echo 'fn main() {}' > src/bin/generate-openapi.rs && \
     cargo build --release && \
     rm -rf src static-dist target/release/deps/oxicloud* target/release/build/oxicloud-*
 # Stage 2: Build the application
