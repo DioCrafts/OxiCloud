@@ -7,6 +7,10 @@
 
 // UI Module
 const ui = {
+
+    /** @type {HTMLDListElement | null} */
+    //dragPreview,
+
     /**
      * Initialize context menus and dialogs
      */
@@ -450,42 +454,24 @@ const ui = {
      * Switch to grid view
      */
     switchToGridView() {
-        const filesGrid = document.getElementById('files-grid');
-        const filesListView = document.getElementById('files-list-view');
-        const gridViewBtn = document.getElementById('grid-view-btn');
-        const listViewBtn = document.getElementById('list-view-btn');
+        this._hydrateViewIfNeeded();
 
-        this._hydrateViewIfNeeded('grid');
-
-        filesGrid.style.display = 'grid';
-        filesGrid.classList.remove('hidden');
-        filesListView.style.display = 'none';
-        filesListView.classList.add('hidden');
-        gridViewBtn.classList.add('active');
-        listViewBtn.classList.remove('active');
         window.app.currentView = 'grid';
         localStorage.setItem('oxicloud-view', 'grid');
+
+        window.syncViewContainers();
     },
 
     /**
      * Switch to list view
      */
     switchToListView() {
-        const filesGrid = document.getElementById('files-grid');
-        const filesListView = document.getElementById('files-list-view');
-        const gridViewBtn = document.getElementById('grid-view-btn');
-        const listViewBtn = document.getElementById('list-view-btn');
+        this._hydrateViewIfNeeded();
 
-        this._hydrateViewIfNeeded('list');
-
-        filesGrid.style.display = 'none';
-        filesGrid.classList.add('hidden');
-        filesListView.style.display = 'flex';
-        filesListView.classList.remove('hidden');
-        gridViewBtn.classList.remove('active');
-        listViewBtn.classList.add('active');
         window.app.currentView = 'list';
         localStorage.setItem('oxicloud-view', 'list');
+
+        window.syncViewContainers();
     },
 
     /**
@@ -679,34 +665,36 @@ const ui = {
         return stored === 'list' ? 'list' : 'grid';
     },
 
-    _renderFoldersToView(folders, view) {
+    /**
+     * 
+     * @param {Object[]} folders 
+     * @returns 
+     */
+    _renderFoldersToView(folders) {
         if (!Array.isArray(folders) || folders.length === 0) return;
-        const target = view === 'list'
-            ? document.getElementById('files-list-view')
-            : document.getElementById('files-grid');
+        const target = document.getElementById('files-list')
         if (!target) return;
 
         const frag = document.createDocumentFragment();
         for (const folder of folders) {
-            frag.appendChild(view === 'list'
-                ? this._createFolderItem(folder)
-                : this._createFolderCard(folder));
+            frag.appendChild( this._createFolderItem(folder));
         }
         target.appendChild(frag);
     },
 
-    _renderFilesToView(files, view) {
+     /**
+     * 
+     * @param {Object[]} files 
+     * @returns 
+     */
+    _renderFilesToView(files) {
         if (!Array.isArray(files) || files.length === 0) return;
-        const target = view === 'list'
-            ? document.getElementById('files-list-view')
-            : document.getElementById('files-grid');
+        const target = document.getElementById('files-list')
         if (!target) return;
 
         const frag = document.createDocumentFragment();
         for (const file of files) {
-            frag.appendChild(view === 'list'
-                ? this._createFileItem(file)
-                : this._createFileCard(file));
+            frag.appendChild( this._createFileItem(file))
         }
         target.appendChild(frag);
     },
@@ -729,7 +717,7 @@ const ui = {
      */
     async _dropToFolder(action, targetFolderId, dataTransfer) {
         let selection = window.multiSelect.getSelection(targetFolderId);
-                
+
         window.multiSelect.clear();
 
         if (selection.fileIds.length == 0 && selection.folderIds.length == 0) {
@@ -766,57 +754,45 @@ const ui = {
                 result = await window.fileOps.batchCopy(selection.fileIds, selection.folderIds, targetFolderId);
                 break;
 
-            case "move": 
+            case "move":
                 result = await window.fileOps.batchMove(selection.fileIds, selection.folderIds, targetFolderId);
-                // redraw directory 
+                // redraw directory
                 if (result.success > 0)
                     window.loadFiles();
                 break;
 
             default:
-                console.error(`drag and drop: action ${action} unknown`);    
-                return;    
+                console.error(`drag and drop: action ${action} unknown`);
+                return;
         }
         window.multiSelect.showBatchResult(action, result);
         console.log( result);
     },
-    
-    _hydrateViewIfNeeded(view) {
+
+    _hydrateViewIfNeeded() {
         // Only hydrate if there is at least one rendered item in the opposite/current DOM.
         // This prevents stale cache hydration in empty-state screens.
-        const hasAnyRenderedItem = !!document.querySelector('#files-grid .file-card, #files-list-view .file-item');
+        const hasAnyRenderedItem = !!document.querySelector('#files-list .file-item');
         if (!hasAnyRenderedItem) return;
 
-        if (view === 'grid') {
-            const grid = document.getElementById('files-grid');
-            if (!grid) return;
-            if (grid.children.length > 0) return;
+        // FIXME: thre is the header...
+        const listView = document.getElementById('files-list');
+        if (!listView) return;
+        if (listView.children.length > 1) return;
 
-            this._renderFoldersToView(this._lastFolders, 'grid');
-            this._renderFilesToView(this._lastFiles, 'grid');
-        }
-
-        if (view === 'list') {
-            const list = document.getElementById('files-list-view');
-            if (!list) return;
-            // list view keeps a static header row as first child
-            if (list.querySelector('.file-item')) return;
-
-            this._renderFoldersToView(this._lastFolders, 'list');
-            this._renderFilesToView(this._lastFiles, 'list');
-        }
+        this._renderFoldersToView(this._lastFolders);
+        this._renderFilesToView(this._lastFiles);
     },
 
     /**
      * Attach a fixed set of delegated event listeners to the two
-     * container elements (files-grid, files-list-view).
+     * container elements (files-list).
      * Called once – idempotent.
      */
     initDelegation() {
         if (this._delegationReady) return;
-        const grid = document.getElementById('files-grid');
-        const list = document.getElementById('files-list-view');
-        if (!grid || !list) return;
+        const filesList = document.getElementById('files-list');
+        if (!filesList) return;
         this._delegationReady = true;
 
         const self = this;
@@ -878,12 +854,12 @@ const ui = {
             }
         };
 
-        // ── GRID: click (open / navigate; select only via checkbox) ──
-        grid.addEventListener('click', (e) => {
-            const card = e.target.closest('.file-card');
+        // ──  click (open / navigate; select only via checkbox) ──
+        filesList.addEventListener('click', (e) => {
+            const card = e.target.closest('.file-item');
             if (!card) return;
 
-            if (e.target.closest('.file-card-more')) {
+            if (e.target.closest('.file-actions')) {
                 e.stopPropagation();
                 e.preventDefault();
                 const info = itemInfo(card);
@@ -892,11 +868,11 @@ const ui = {
                 const menuId = info.type === 'folder'
                     ? 'folder-context-menu' : 'file-context-menu';
                 showContextMenuAtElement(
-                    e.target.closest('.file-card-more'), menuId);
+                    e.target.closest('.file-actions'), menuId);
                 return;
             }
 
-            if (e.target.closest('.file-card-checkbox')) {
+            if (e.target.closest('.checkbox-cell')) {
                 toggleCardSelection(card, e);
                 return;
             }
@@ -924,178 +900,144 @@ const ui = {
         });
 
         // ── GRID: dblclick (navigate / open) ──────────────────────
-        grid.addEventListener('dblclick', (e) => {
+        filesList.addEventListener('dblclick', (e) => {
             // Single-click already handles open/navigate.
             // Prevent duplicate actions on double-click.
             e.preventDefault();
         });
 
-        // ── LIST: click (navigate / open) ─────────────────────────
-        list.addEventListener('click', (e) => {
-            if (e.target.closest('.list-header')) return;
+        // ── shared events ──────────────────────
+        
+        filesList.addEventListener('contextmenu', (e) => {
             const card = e.target.closest('.file-item');
             if (!card) return;
-
-            if (e.target.closest('.file-more')) {
-                e.stopPropagation();
-                e.preventDefault();
-                const info = itemInfo(card);
-                if (!info) return;
-                setContextTarget(card, info);
-                const menuId = info.type === 'folder'
-                    ? 'folder-context-menu' : 'file-context-menu';
-                showContextMenuAtElement(
-                    e.target.closest('.file-more'), menuId);
-                return;
-            }
-
-            if (e.target.closest('.list-item-checkbox') ||
-                e.target.closest('.item-checkbox')) {
-                toggleCardSelection(card, e);
-                return;
-            }
-
+            e.preventDefault();
             const info = itemInfo(card);
             if (!info) return;
-
-            if (info.type === 'folder') {
-                navigateFolder(card);
-            } else {
-                openFile(info.data);
+            setContextTarget(card, info);
+            const menuId = info.type === 'folder'
+                ? 'folder-context-menu' : 'file-context-menu';
+            const menu = document.getElementById(menuId);
+            if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
+                window.contextMenus.syncFavoriteOptionLabels();
             }
+            if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
+                window.contextMenus.syncWopiOptionVisibility().catch(function(){});
+            }
+            menu.style.left = `${e.pageX}px`;
+            menu.style.top  = `${e.pageY}px`;
+            menu.style.display = 'block';
         });
 
-        // ── shared events on both containers ──────────────────────
-        for (const container of [grid, list]) {
-            const sel = container === grid ? '.file-card' : '.file-item';
-
-            // contextmenu
-            container.addEventListener('contextmenu', (e) => {
-                const card = e.target.closest(sel);
-                if (!card) return;
-                e.preventDefault();
-                const info = itemInfo(card);
-                if (!info) return;
-                setContextTarget(card, info);
-                const menuId = info.type === 'folder'
-                    ? 'folder-context-menu' : 'file-context-menu';
-                const menu = document.getElementById(menuId);
-                if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
-                    window.contextMenus.syncFavoriteOptionLabels();
-                }
-                if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
-                    window.contextMenus.syncWopiOptionVisibility().catch(function(){});
-                }
-                menu.style.left = `${e.pageX}px`;
-                menu.style.top  = `${e.pageY}px`;
-                menu.style.display = 'block';
-            });
-
-            // dragstart
-            container.addEventListener('dragstart', (e) => {
-                let card = e.target.closest(sel);
-                if (!card) { e.preventDefault(); return; }
-                
-                const info = itemInfo(card);
-                if (!info) { e.preventDefault(); return; }
-
-                if (container === grid) {
-                    // pickup the equivalent item in list
-                    const selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
-                    card = list.querySelector(`div.file-item[${selector}="${info.id}"]`);
-                }
-
-                e.dataTransfer.setData('text/plain', info.id);
-                if (info.type === 'folder') { 
-                    e.dataTransfer.setData(
-                        'application/oxicloud-folder', 'true');
-                }
-                // allow copy or move (handled by the browser)
-                e.dataTransfer.effectAllowed = "copyMove";
-                
-                self.draggedItems = document.createElement("div");
-                self.draggedItems.className = "dragged-items";
-                
-                // Fplease note that dragged elements are taken from list view (uniformisation)
-                let selectedCardFromList = list.querySelectorAll(`div.selected > div.name-cell`);
-                if (selectedCardFromList.length == 0) {
-                    // fallback to current element
-                    selectedCardFromList = card.querySelectorAll('div.name-cell');
-                }
-                
-                let index = 0;
-                const maxElements = 4;
-                let lastItemDiv = null;
-
-                while (index < selectedCardFromList.length && index < maxElements) {
-                    let div = document.createElement("div");
-                    div.className="file-item";
-                    let clone = selectedCardFromList[index].cloneNode(true);
-                    let star = clone.querySelector('.favorite-star-inline');
-                    clone.querySelectorAll('img').forEach((img) => { img.loading="eager"; } );
-                    if (star) clone.removeChild(star);
-                    div.appendChild(clone);
-                    self.draggedItems.appendChild( div);
-                    index += 1;
-                    lastItemDiv = div;
-                }
-
-                // if more than 1 item, display the badge
-                if (selectedCardFromList.length > 1) {
-                    let badge = document.createElement("span");
-                    badge.className="dragged-items-badge";
-                    badge.innerText=selectedCardFromList.length;
-                    self.draggedItems.appendChild( badge);
-                }
-
-                // if more than maxElements display the fading
-                if (selectedCardFromList.length > maxElements) {
-                    lastItemDiv.classList.add("fading");
-                }
-                
-                self.dragPreview.appendChild( self.draggedItems);
-                e.dataTransfer.setDragImage(self.draggedItems, -20, -20);
+        // dragstart
+        filesList.addEventListener('dragstart', (e) => {
+            let card = e.target.closest('.file-item');
+            if (!card) { e.preventDefault(); return; }
             
-            });
+            const info = itemInfo(card);
+            if (!info) { e.preventDefault(); return; }
 
-            // dragend
-            container.addEventListener('dragend', (e) => {
-                
-                self.dragPreview.removeChild( self.draggedItems);
-                document.querySelectorAll('.drop-target')
-                    .forEach(el => el.classList.remove('drop-target'));
-            });
+            e.dataTransfer.setData('text/plain', info.id);
+            if (info.type === 'folder') { 
+                e.dataTransfer.setData(
+                    'application/oxicloud-folder', 'true');
+            }
+            // allow copy or move (handled by the browser)
+            e.dataTransfer.effectAllowed = "copyMove";
+            
+            self.draggedItems = document.createElement("div");
+            self.draggedItems.className = "dragged-items";
+            
+            let selectedCardFromList = filesList.querySelectorAll(`div.selected > div.name-cell`);
+            if (selectedCardFromList.length == 0) {
+                // fallback to current element
+                selectedCardFromList = card.querySelectorAll('div.name-cell');
+            }
+            
+            let index = 0;
+            const maxElements = 4;
+            let lastItemDiv = null;
 
-            // dragover – only folders are valid drop targets
-            container.addEventListener('dragover', (e) => {
-                const card = e.target.closest(sel);
-                if (!card || card.dataset.fileId) return;
-                if (!card.dataset.folderId) return;
-                e.preventDefault();
-                card.classList.add('drop-target');
-            });
+            while (index < selectedCardFromList.length && index < maxElements) {
+                let iconCell = document.createElement("div");
+                let icon = selectedCardFromList[index].getElementsByClassName("file-icon").item(0)?.cloneNode(true);
+                if (icon) {
+                    iconCell.appendChild( icon);
+                    iconCell.querySelectorAll('img')?.forEach((img) => { img.loading="eager"; } );
+                }
 
-            // dragleave
-            container.addEventListener('dragleave', (e) => {
-                const card = e.target.closest(sel);
-                if (!card || card.dataset.fileId) return;
-                card.classList.remove('drop-target');
-            });
+                let nameCell = document.createElement("div");
+                let name = selectedCardFromList[index].getElementsByTagName("span").item(0)?.cloneNode(true);
+                if (name) {
+                    nameCell.appendChild(name);
+                }
 
-            // drop – only folders accept drops
-            container.addEventListener('drop', async (e) => {
-                const card = e.target.closest(sel);
-                if (!card || card.dataset.fileId) return;
-                const targetFolderId = card.dataset.folderId;
-                if (!targetFolderId) return;
+                let div = document.createElement("div");
+                div.className="file-item";
+                div.appendChild(iconCell);
+                div.appendChild(nameCell);
 
-                e.preventDefault();
-                card.classList.remove('drop-target');
+                self.draggedItems.appendChild( div);
+                index += 1;
+                lastItemDiv = div;
+            }
 
-                const action = e.dataTransfer.dropEffect;
-                await self._dropToFolder( action, targetFolderId, e.dataTransfer);
-            });
-        }
+            // if more than 1 item, display the badge
+            if (selectedCardFromList.length > 1) {
+                let badge = document.createElement("span");
+                badge.className="dragged-items-badge";
+                badge.innerText=`${selectedCardFromList.length}`;
+                self.draggedItems.appendChild( badge);
+            }
+
+            // if more than maxElements display the fading
+            if (selectedCardFromList.length > maxElements) {
+                lastItemDiv.classList.add("fading");
+            }
+            
+            self.dragPreview.appendChild( self.draggedItems);
+            e.dataTransfer.setDragImage(self.draggedItems, 0, 0);
+        
+        });
+
+        // dragend
+        filesList.addEventListener('dragend', (e) => {
+            
+            self.dragPreview.removeChild( self.draggedItems);
+            document.querySelectorAll('.drop-target')
+                .forEach(el => el.classList.remove('drop-target'));
+        });
+
+        // dragover – only folders are valid drop targets
+        filesList.addEventListener('dragover', (e) => {
+            const card = e.target.closest('.file-item');
+            if (!card || card.dataset.fileId) return;
+            if (!card.dataset.folderId) return;
+            e.preventDefault();
+            card.classList.add('drop-target');
+        });
+
+        // dragleave
+        filesList.addEventListener('dragleave', (e) => {
+            const card = e.target.closest('.file-item');
+            if (!card || card.dataset.fileId) return;
+            card.classList.remove('drop-target');
+        });
+
+        // drop – only folders accept drops
+        filesList.addEventListener('drop', async (e) => {
+            const card = e.target.closest('.file-item');
+            if (!card || card.dataset.fileId) return;
+            const targetFolderId = card.dataset.folderId;
+            if (!targetFolderId) return;
+
+            e.preventDefault();
+            card.classList.remove('drop-target');
+
+            const action = e.dataTransfer.dropEffect;
+            await self._dropToFolder( action, targetFolderId, e.dataTransfer);
+        });
+        
     },
 
     /* ================================================================
@@ -1138,15 +1080,11 @@ const ui = {
      * Sync favorite visuals for a file/folder across grid and list views.
      */
     setFavoriteVisualState(itemId, itemType, isFavorite) {
-        const cardSelector = itemType === 'folder'
-            ? `.file-card[data-folder-id="${itemId}"]`
-            : `.file-card[data-file-id="${itemId}"]`;
+        const selector = itemType === 'folder'
+            ? `#files-list .file-item[data-folder-id="${itemId}"]`
+            : `#files-list .file-item[data-file-id="${itemId}"]`;
 
-        const listSelector = itemType === 'folder'
-            ? `.file-item[data-folder-id="${itemId}"]`
-            : `.file-item[data-file-id="${itemId}"]`;
-
-        const card = document.querySelector(cardSelector);
+        const card = document.querySelector(selector);
         const starBtn = card ? card.querySelector('.favorite-star') : null;
 
         if (starBtn) {
@@ -1170,8 +1108,8 @@ const ui = {
                 i.classList.add(isFavorite ? 'fas' : 'far');
             }
         }
-
-        const listItem = document.querySelector(listSelector);
+ 
+        const listItem = document.querySelector(selector);
         if (listItem) {
             const nameCell = listItem.querySelector('.name-cell');
             if (nameCell) {
@@ -1194,37 +1132,6 @@ const ui = {
      *  Element-creation helpers
      * ================================================================ */
 
-    /** Create a grid card for a folder */
-    _createFolderCard(folder) {
-        const el = document.createElement('div');
-        el.className = 'file-card';
-        el.dataset.folderId  = folder.id;
-        el.dataset.folderName = folder.name;
-        el.dataset.parentId  = folder.parent_id || "";
-
-        const isFav = window.favorites &&
-            window.favorites.isFavorite(folder.id, 'folder');
-
-        el.innerHTML = `
-            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
-            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
-            <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
-                <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
-            </button>
-            <div class="file-icon folder-icon">
-                <i class="fas fa-folder"></i>
-            </div>
-            <div class="file-name">${escapeHtml(folder.name)}</div>
-            <div class="file-info">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
-        `;
-
-        if (window.app.currentPath !== "") {
-            el.setAttribute('draggable', 'true');
-        }
-        this._bindStarClick(el);
-        return el;
-    },
-
     /** Create a list row for a folder */
     _createFolderItem(folder) {
         const el = document.createElement('div');
@@ -1233,16 +1140,11 @@ const ui = {
         el.dataset.folderName = folder.name;
         el.dataset.parentId  = folder.parent_id || "";
 
-        const isFav = window.favorites &&
-            window.favorites.isFavorite(folder.id, 'folder');
+        const isFav = window.favorites && window.favorites.isFavorite(folder.id, 'folder');
         const formattedDate = window.formatDateTime(folder.modified_at);
 
-        if (window.app.currentPath !== "") {
-            el.setAttribute('draggable', 'true');
-        }
-
         el.innerHTML = `
-            <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
+            <div class="checkbox-cell"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon folder-icon">
                     <i class="fas fa-folder"></i>
@@ -1253,61 +1155,32 @@ const ui = {
             <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
-            <div class="action-cell"><button class="file-more"><i class="fas fa-ellipsis-v"></i></button></div>
-        `;
-        return el;
-    },
-
-    /** Create a grid card for a file */
-    _createFileCard(file) {
-        const iconClass = file.icon_class || this.getIconClass(file.name);
-        const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
-        const isFileFav = window.favorites &&
-            window.favorites.isFavorite(file.id, 'file');
-        const formattedDate = window.formatDateTime(file.modified_at);
-
-        const el = document.createElement('div');
-        el.className = 'file-card';
-        el.dataset.fileId   = file.id;
-        el.dataset.fileName = file.name;
-        el.dataset.folderId = file.folder_id || "";
-        el.setAttribute('draggable', 'true');
-
-        el.innerHTML = `
-            <div class="file-card-checkbox"><i class="fas fa-check"></i></div>
-            <button class="file-card-more"><i class="fas fa-ellipsis-v"></i></button>
-            <button class="favorite-star${isFileFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
-                <i class="${isFileFav ? 'fas' : 'far'} fa-star"></i>
-            </button>
-            <div class="file-icon ${iconSpecialClass}">
-                ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="">` : ''}
-                <i class="${iconClass}"></i>
+            <div class="action-cell">
+              <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
+                    <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
+              </button>
+              <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
             </div>
-            <div class="file-name">${escapeHtml(file.name)}</div>
-            <div class="file-info">Modified ${formattedDate.split(' ')[0]}</div>
         `;
-        var thumb = el.querySelector('.file-thumb');
-        if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });
+
+        if (window.app.currentPath !== "") {
+            el.setAttribute('draggable', 'true');
+        }
         this._bindStarClick(el);
         return el;
     },
 
-    /** Create a list row for a file */
+    /** Create a grid card for a file */
     _createFileItem(file) {
         const iconClass = file.icon_class || this.getIconClass(file.name);
         const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
         const cat = file.category || '';
         const typeLabel = cat
-            ? (window.i18n
-                ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat
-                : cat)
-            : (window.i18n
-                ? window.i18n.t('files.file_types.document')
-                : 'Document');
+            ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
+            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
         const fileSize = file.size_formatted || window.formatFileSize(file.size);
         const formattedDate = window.formatDateTime(file.modified_at);
-        const isFileFav = window.favorites &&
-            window.favorites.isFavorite(file.id, 'file');
+        const isFav = window.favorites && window.favorites.isFavorite(file.id, 'file');
 
         const el = document.createElement('div');
         el.className = 'file-item';
@@ -1317,28 +1190,84 @@ const ui = {
         el.setAttribute('draggable', 'true');
 
         el.innerHTML = `
-            <div class="list-item-checkbox"><input type="checkbox" class="item-checkbox"></div>
+            
+            <div class="checkbox-cell"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
                     ${iconSpecialClass === 'image-icon' ? `<img class="file-thumb" src="/api/files/${file.id}/thumbnail/icon" loading="lazy" alt="">` : ''}
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${escapeHtml(file.name)}</span>
-                ${isFileFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
-            <div class="action-cell"><button class="file-more"><i class="fas fa-ellipsis-v"></i></button></div>
+            <div class="action-cell">
+                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
+                    <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
+                </button>
+                <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
+            </div>
         `;
         var thumb = el.querySelector('.file-thumb');
         if (thumb) thumb.addEventListener('error', function() { this.style.display = 'none'; });
+        this._bindStarClick(el);
         return el;
     },
 
     /* ================================================================
      *  Batch rendering with DocumentFragment
      * ================================================================ */
+
+    resetFilesList() {
+        const filesList = document.getElementById('files-list');
+        const filesContainerError=document.getElementById("files-container-error");
+
+        if (!filesList) return;
+        filesList.innerHTML=`
+            <div class="list-header">
+                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
+                <div data-i18n="files.name">Name</div>
+                <div data-i18n="files.type">Type</div>
+                <div data-i18n="files.size">Size</div>
+                <div data-i18n="files.modified">Modified</div>
+                <div></div><!-- actions -->
+            </div>`;
+        
+        if (window.i18n && window.i18n.translateElement)
+            window.i18n.translateElement( filesList);
+
+        filesList.classList.remove("hidden");
+        filesContainerError?.classList.add("hidden");
+    },
+
+    showEmptyList() {
+        this.showError(`
+                <i class="fas fa-folder-open empty-state-icon"></i>
+                <p data-i18n="files.no_files"></p>
+                <p data-i18n="files.empty_hint"></p>
+            `
+        );
+    },
+
+    /**
+     *
+     * @param {string} content
+     *
+     */
+    showError(content) {
+        const filesContainerError=document.getElementById("files-container-error");
+        const filesList=document.getElementById("files-list");
+        if (filesContainerError)
+            filesContainerError.innerHTML=content;
+
+        if (window.i18n && window.i18n.translateElement)
+            window.i18n.translateElement( filesContainerError);
+
+        filesContainerError?.classList.remove("hidden");
+        filesList?.classList.add("hidden");
+    },
 
     /**
      * Render an array of folders into both grid and list views
@@ -1353,8 +1282,7 @@ const ui = {
             this._items.set(folder.id, folder);
         }
 
-        this._renderFoldersToView(safeFolders, 'grid');
-        this._renderFoldersToView(safeFolders, 'list');
+        this._renderFoldersToView(safeFolders);
     },
 
     /**
@@ -1370,8 +1298,7 @@ const ui = {
             this._items.set(file.id, file);
         }
 
-        this._renderFilesToView(safeFiles, 'grid');
-        this._renderFilesToView(safeFiles, 'list');
+        this._renderFilesToView(safeFiles);
     },
 
     /* ================================================================
@@ -1386,16 +1313,14 @@ const ui = {
         if (!this._delegationReady) this.initDelegation();
 
         // Duplicate guard
-        if (document.querySelector(`.file-card[data-folder-id="${folder.id}"]`) ||
-            document.querySelector(`.file-item[data-folder-id="${folder.id}"]`)) {
+        if (document.querySelector(`.file-item[data-folder-id="${folder.id}"]`)) {
             console.log(`Folder ${folder.name} (${folder.id}) already exists in the view, not duplicating`);
             return;
         }
 
         this._items.set(folder.id, folder);
         this._upsertById(this._lastFolders, folder);
-        this._renderFoldersToView([folder], 'grid');
-        this._renderFoldersToView([folder], 'list');
+        this._renderFoldersToView([folder]);
     },
 
     /**
@@ -1406,16 +1331,14 @@ const ui = {
         if (!this._delegationReady) this.initDelegation();
 
         // Duplicate guard
-        if (document.querySelector(`.file-card[data-file-id="${file.id}"]`) ||
-            document.querySelector(`.file-item[data-file-id="${file.id}"]`)) {
+        if (document.querySelector(`.file-item[data-file-id="${file.id}"]`)) {
             console.log(`File ${file.name} (${file.id}) already exists in the view, not duplicating`);
             return;
         }
 
         this._items.set(file.id, file);
         this._upsertById(this._lastFiles, file);
-        this._renderFilesToView([file], 'grid');
-        this._renderFilesToView([file], 'list');
+        this._renderFilesToView([file]);
     }
 };
 
@@ -1484,16 +1407,15 @@ function initRubberBandSelection() {
 
     let active = false;
     let startX = 0, startY = 0;
-    const list = document.getElementById('files-list-view');
 
     // We listen on the whole files-container (covers grid + empty space)
-    const container = document.querySelector('.files-container') || document.getElementById('files-grid');
+    const container = document.querySelector('.files-container') || document.getElementById('files-list');
     if (!container) return;
 
     container.addEventListener('mousedown', (e) => {
         // Only start if clicking empty area (not on a card, button, menu, input…)
         if (e.button !== 0) return; // left click only
-        if (e.target.closest('.file-card') || e.target.closest('.file-item') ||
+        if (e.target.closest('.file-item') ||
             e.target.closest('.context-menu') ||
             e.target.closest('.upload-dropdown') || e.target.closest('button') ||
             e.target.closest('input') || e.target.closest('.breadcrumb') ||
@@ -1536,7 +1458,7 @@ function initRubberBandSelection() {
         // Highlight cards that intersect with the rectangle
         const rectBounds = { left, top, right: left + width, bottom: top + height };
 
-        document.querySelectorAll('#files-grid .file-card').forEach(card => {
+        document.querySelectorAll('#files-list .file-item').forEach(card => {
             const cardRect = card.getBoundingClientRect();
             const intersects =
                 cardRect.left < rectBounds.right &&
@@ -1550,25 +1472,13 @@ function initRubberBandSelection() {
                 // Sync with multiSelect module
                 if (window.multiSelect) {
                     const info = window.multiSelect._extractInfo(card);
-
-                    // select the equivalent list-item to activate it too
-                    let selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
-                    const fileItem = list?.querySelector(`div.file-item[${selector}="${info.id}"]`);
-                    fileItem?.classList.add('selected');
-
                     if (info) window.multiSelect.select(info.id, info.name, info.type, info.parentId);
                 }
             } else {
                 card.classList.remove('selected');
                 // Deselect from multiSelect module
                 if (window.multiSelect) {
-                    const info = window.multiSelect._extractInfo(card);
-
-                    // select the equivalent list-item to activate it too
-                    let selector = (info.type === 'folder') ? "data-folder-id" : "data-file-id";
-                    const fileItem = list?.querySelector(`div.file-item[${selector}="${info.id}"]`);
-                    fileItem?.classList.remove('selected');
-
+                    const info = window.multiSelect._extractInfo(card)
                     if (info) window.multiSelect.deselect(info.id);
                 }
             }
@@ -1598,20 +1508,10 @@ if (document.readyState === 'loading') {
     initRubberBandSelection();
 }
 
-/**
- * 
- * @param {boolean} show 
- */
-function showEmptyList(show) {
-    const emptyArea=document.getElementById("empty-files-state");
-    emptyArea.classList.toggle("hidden", !show);
-}
-
 // Expose helpers globally
 window.toggleCardSelection = toggleCardSelection;
 window.showContextMenuAtElement = showContextMenuAtElement;
 window.initRubberBandSelection = initRubberBandSelection;
-window.showEmptyList = showEmptyList;
 
 
 /**

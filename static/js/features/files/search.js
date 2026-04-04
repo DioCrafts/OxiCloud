@@ -103,17 +103,18 @@ const search = {
      * @param {Object} results - Enriched search results from backend
      */
     displaySearchResults(results) {
-        const filesGrid = document.getElementById('files-grid');
-        const filesListView = document.getElementById('files-list-view');
+        window.ui.resetFilesList(); // ensure also list visible & error hidden
+        const filesList = document.getElementById('files-list');
 
-        filesGrid.innerHTML = '';
-        filesListView.innerHTML = `
+        // reset list
+        filesList.innerHTML = `
             <div class="list-header">
                 <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                 <div data-i18n="files.name">Name</div>
                 <div data-i18n="files.type">Type</div>
                 <div data-i18n="files.size">Size</div>
                 <div data-i18n="files.modified">Modified</div>
+                <div></div>
             </div>
         `;
 
@@ -142,7 +143,7 @@ const search = {
                 </button>
             </div>
         `;
-        filesGrid.appendChild(searchHeader);
+        filesList.appendChild(searchHeader);
 
         // Sort dropdown — re-searches with new sort order (server-side)
         const sortSelect = document.getElementById('search-sort-select');
@@ -172,13 +173,10 @@ const search = {
 
         // Empty state
         if (results.files.length === 0 && results.folders.length === 0) {
-            const emptyState = document.createElement('div');
-            emptyState.className = 'empty-state';
-            emptyState.innerHTML = `
+            window.ui.showError(`
                 <i class="fas fa-search empty-state-icon"></i>
                 <p class="search-empty-text">No results found for this search</p>
-            `;
-            filesGrid.appendChild(emptyState);
+            `);
             return;
         }
 

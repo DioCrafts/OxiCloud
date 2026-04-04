@@ -1,9 +1,14 @@
 /* Files grid */
-.files-grid {
+.files-grid-view {
 	display: grid;
 	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 	gap: 20px;
 	position: relative;
+}
+
+/* header not visible in grid mode */
+.files-grid-view .list-header {
+    display: none;
 }
 
 /* Rubber band / lasso selection rectangle */
@@ -17,7 +22,7 @@
 	display: none;
 }
 
-.file-card {
+.files-grid-view .file-item {
 	background-color: white;
 	border-radius: 12px;
 	border: 2px solid #e2e8f0;
@@ -27,65 +32,67 @@
 	align-items: center;
 	box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 	cursor: pointer;
-	transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 	width: 100%;
 	min-height: 160px;
 	position: relative;
 }
 
-.file-card:hover {
+.files-grid-view .file-item:hover {
 	transform: translateY(-2px);
 	box-shadow: 0 5px 15px rgba(0,0,0,0.08);
 	border-color: #cbd5e0;
 }
 
-.file-card.selected {
+.files-grid-view .file-item.selected {
 	border-color: #ff5e3a;
 	background: #fff8f6;
 	box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.15), 0 4px 12px rgba(255, 94, 58, 0.1);
 }
 
-.file-card.selected:hover {
+.files-grid-view .file-item.selected:hover {
 	border-color: #ff5e3a;
 	box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.2), 0 6px 18px rgba(255, 94, 58, 0.15);
 }
 
+/* element hidden on grid view */
+.files-grid-view .file-item .date-cell,
+.files-grid-view .file-item .size-cell {
+    display: none;
+}
 /* Selection checkbox */
-.file-card-checkbox {
+.files-grid-view .file-item .checkbox-cell {
 	position: absolute;
 	top: 10px;
 	left: 10px;
 	width: 22px;
 	height: 22px;
 	border-radius: 6px;
-	border: 2px solid #cbd5e0;
 	background: white;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	opacity: 0;
-	transition: opacity 0.15s, background 0.15s, border-color 0.15s;
 	z-index: 10;
 	cursor: pointer;
 }
 
-.file-card:hover .file-card-checkbox {
+.files-grid-view .file-item:hover .checkbox-cell {
 	opacity: 1;
 }
 
-.file-card.selected .file-card-checkbox {
+.files-grid-view .file-item.selected .checkbox-cell {
 	opacity: 1;
 	background: #ff5e3a;
 	border-color: #ff5e3a;
 }
 
-.file-card.selected .file-card-checkbox i {
+.files-grid-view .file-item.selected .checkbox-cell i {
 	color: white;
 	font-size: 11px;
 }
 
 /* More actions button (three dots) */
-.file-card-more {
+.files-grid-view .file-actions {
 	position: absolute;
 	top: 8px;
 	right: 8px;
@@ -98,24 +105,23 @@
 	align-items: center;
 	justify-content: center;
 	opacity: 0;
-	transition: opacity 0.15s, background 0.15s;
 	z-index: 10;
 	cursor: pointer;
 	color: #64748b;
 	font-size: 16px;
 }
 
-.file-card:hover .file-card-more {
+.files-grid-view .file-item:hover .file-actions {
 	opacity: 1;
 }
 
-.file-card-more:hover {
+.files-grid-view .file-actions:hover {
 	background: #f1f5f9;
 	color: #334155;
 }
 
-/* Favorite star (mirrors file-card-more button pattern) */
-button.favorite-star {
+/* Favorite star (mirrors file-actions button pattern) */
+.files-grid-view .file-item button.favorite-star {
 	position: absolute;
 	top: 8px;
 	right: 38px;
@@ -128,7 +134,6 @@ button.favorite-star {
 	align-items: center;
 	justify-content: center;
 	opacity: 0;
-	transition: opacity 0.15s, color 0.15s, background 0.15s;
 	z-index: 12;
 	cursor: pointer;
 	color: #cbd5e0;
@@ -137,40 +142,45 @@ button.favorite-star {
 	line-height: 1;
 }
 
-.file-card:hover .favorite-star {
+.files-grid-view .file-item:hover button.favorite-star {
 	opacity: 1;
 }
 
-.favorite-star:hover {
+.files-grid-view .file-item button.favorite-star:hover {
 	color: #fbbf24;
 }
 
-.favorite-star.active {
+.files-grid-view .file-item button.favorite-star.active {
 	opacity: 1;
 	color: #f59e0b;
 }
 
-.favorite-star.active:hover {
+.files-grid-view .file-item button.favorite-star.active:hover {
 	color: #d97706;
 }
 
-.file-card.dragging {
+.files-grid-view .file-item.dragging {
 	opacity: 0.5;
 	transform: scale(0.95);
 	box-shadow: none;
 }
 
-.file-card.drop-target {
+.files-grid-view .file-item.drop-target {
 	background-color: rgba(255, 193, 7, 0.1);
 	border: 2px dashed #ffc107;
+}
+
+/* ensure icon centered */
+.files-grid-view .file-item .name-cell .file-icon {
+    margin: auto;
 }
 
 /* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
    CSS shapes (::before / ::after) already convey the file type visually.
    Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
    List-view icons (.file-item .file-icon) are NOT affected. */
-.file-card .file-icon > i,
-.file-card .file-icon > svg {
+.files-grid-view .file-item .file-icon > i,
+.files-grid-view .file-item .file-icon > svg {
 	display: none !important;
 }
 
@@ -331,7 +341,7 @@ button.favorite-star {
 	object-fit: cover;
 	z-index: 1;
 }
-
+/*
 .file-icon.image-icon::before {
 	content: "";
 	position: absolute;
@@ -342,7 +352,7 @@ button.favorite-star {
 	background-color: #ffda79;
 	border-radius: 50%;
 }
-
+*/
 .file-icon.video-icon {
 	width: 100px;
 	height: 70px;
@@ -735,7 +745,7 @@ button.favorite-star {
 	opacity: 0.5;
 }
 
-.file-name {
+.files-grid-view .file-item .name-cell {
 	font-size: 14px;
 	font-weight: 500;
 	text-align: center;
@@ -745,51 +755,62 @@ button.favorite-star {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+    margin-top: 8px;
 }
 
-.file-info {
+.files-grid-view .file-item .name-cell span {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    display: block;
+}
+
+.files-grid-view .file-item .name-cell svg.favorite-star-inline {
+    display: none;
+}
+
+.files-grid-view .file-item .type-cell {
 	font-size: 12px;
 	color: #718096;
 	text-align: center;
 }
 
-[data-theme="dark"] .file-card {
+[data-theme="dark"] .files-grid-view .file-item {
 	background-color: #1e293b;
 	border-color: #334155;
 }
 
-[data-theme="dark"] .file-card:hover {
+[data-theme="dark"] .files-grid-view .file-item:hover {
 	border-color: #475569;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-[data-theme="dark"] .file-card.selected {
+[data-theme="dark"] .files-grid-view .file-item.selected {
 	border-color: #ff5e3a;
 	background: #1a1520;
 }
 
-[data-theme="dark"] .file-card-checkbox {
+[data-theme="dark"] .files-grid-view .file-item .checkbox-cell {
 	background: #1e293b;
 	border-color: #475569;
 }
 
-[data-theme="dark"] .file-card-more {
+[data-theme="dark"] .files-grid-view .file-actions {
 	color: #94a3b8;
 }
 
-[data-theme="dark"] .file-card-more:hover {
+[data-theme="dark"] .files-grid-view .file-actions:hover {
 	background: #334155;
 	color: #e2e8f0;
 }
 
-[data-theme="dark"] .file-name {
+[data-theme="dark"] .files-grid-view .file-item .name-cell {
 	color: #e2e8f0;
 }
 
-[data-theme="dark"] .file-info {
+[data-theme="dark"] .files-grid-view .file-item .type-cell {
 	color: #94a3b8;
 }
 
-[data-theme="dark"] .file-card.drop-target {
+[data-theme="dark"] .files-grid-view .file-item.drop-target {
 	background-color: rgba(255, 193, 7, 0.05);
 }

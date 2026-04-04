@@ -128,12 +128,12 @@ async function loadFiles(options = { insertHistory: true}) {
         // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
         let loadingFiles = setTimeout( () => {
             // display loader after few delay (will be canceled if result take less time)
-            elements.filesGrid.innerHTML = `
+            window.ui.showError(`
                 <div class="files-loading-spinner">
                     <div class="spinner"></div>
                     <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
                 </div>
-            `;
+            `)
         }, 100);
 
         if (!app.userHomeFolderId) {
@@ -195,16 +195,8 @@ async function loadFiles(options = { insertHistory: true}) {
 
         if (response.status === 401 || response.status === 403) {
             console.warn("Auth error when loading files, showing empty list");
-            elements.filesGrid.innerHTML = '<div class="empty-state"><p>Could not load files</p></div>';
-            elements.filesListView.innerHTML = `
-                <div class="list-header">
-                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                    <div>Name</div>
-                    <div>Type</div>
-                    <div>Size</div>
-                    <div>Modified</div>
-                </div>
-            `;
+            // FIXME: i18n
+            window.ui.showError(`<p>Could not load files</p>`);
             return;
         }
 
@@ -216,17 +208,17 @@ async function loadFiles(options = { insertHistory: true}) {
 
         if (window.multiSelect) window.multiSelect.clear();
         window.ui._items.clear();
-        elements.filesGrid.innerHTML = '';
+        
         const _t = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
-        elements.filesListView.innerHTML = `
+        window.ui.showError(`
             <div class="list-header">
                 <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
                 <div data-i18n="files.name">${_t('files.name')}</div>
                 <div data-i18n="files.type">${_t('files.type')}</div>
                 <div data-i18n="files.size">${_t('files.size')}</div>
                 <div data-i18n="files.modified">${_t('files.modified')}</div>
-            </div>
-        `;
+            </div>`
+        );
 
         const selectAllCb = document.getElementById('select-all-checkbox');
         if (selectAllCb && window.multiSelect) {
@@ -237,9 +229,9 @@ async function loadFiles(options = { insertHistory: true}) {
         const fileList = Array.isArray(listing.files) ? listing.files : [];
 
         if (folderList.length === 0 && fileList.length === 0) {
-            window.showEmptyList(true);
+            window.ui.showEmptyList();
         } else {
-            window.showEmptyList(false);
+            window.ui.resetFilesList();
             window.ui.renderFolders(folderList);
             window.ui.renderFiles(fileList);
         }

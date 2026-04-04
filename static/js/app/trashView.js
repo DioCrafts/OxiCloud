@@ -7,9 +7,9 @@ async function loadTrashItems() {
 
     try {
         if (window.multiSelect) window.multiSelect.clear();
-        elements.filesGrid.innerHTML = '';
+        window.ui.resetFilesList(); // ensure also list visible & error hidden
         const _tt = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
-        elements.filesListView.innerHTML = `
+        elements.filesList.innerHTML = `
             <div class="list-header trash-header">
                 <div data-i18n="files.name">${_tt('files.name')}</div>
                 <div data-i18n="files.type">${_tt('files.type')}</div>
@@ -24,13 +24,10 @@ async function loadTrashItems() {
         const trashItems = await window.fileOps.getTrashItems();
 
         if (trashItems.length === 0) {
-            const emptyState = document.createElement('div');
-            emptyState.className = 'empty-state';
-            emptyState.innerHTML = `
+            window.ui.showError(`
                 <i class="fas fa-trash empty-state-icon"></i>
                 <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'The trash is empty'}</p>
-            `;
-            elements.filesGrid.appendChild(emptyState);
+            `);
             return;
         }
 
@@ -74,43 +71,6 @@ function addTrashItemToView(item) {
         ? 'file-icon folder-icon'
         : `file-icon ${iconSpecialClass}`.trim();
 
-    const gridElement = document.createElement('div');
-    gridElement.className = 'file-card trash-item';
-    gridElement.dataset.trashId = item.id;
-    gridElement.dataset.originalId = item.original_id;
-    gridElement.dataset.itemType = item.item_type;
-    gridElement.innerHTML = `
-        <div class="${iconWrapClass}">
-            <i class="${iconClass}"></i>
-        </div>
-        <div class="file-name">${escapeHtml(item.name)}</div>
-        <div class="file-info">${escapeHtml(typeLabel)} - ${escapeHtml(formattedDate)}</div>
-        <div class="trash-actions">
-            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
-                <i class="fas fa-undo"></i>
-            </button>
-            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    `;
-
-    gridElement.querySelector('.btn-restore').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (await window.fileOps.restoreFromTrash(item.id)) {
-            window.loadTrashItems();
-        }
-    });
-
-    gridElement.querySelector('.btn-delete').addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (await window.fileOps.deletePermanently(item.id)) {
-            window.loadTrashItems();
-        }
-    });
-
-    elements.filesGrid.appendChild(gridElement);
-
     const listElement = document.createElement('div');
     listElement.className = 'file-item trash-item';
     listElement.dataset.trashId = item.id;
@@ -151,7 +111,7 @@ function addTrashItemToView(item) {
         }
     });
 
-    elements.filesListView.appendChild(listElement);
+    elements.filesList.appendChild(listElement);
 }
 
 window.loadTrashItems = loadTrashItems;

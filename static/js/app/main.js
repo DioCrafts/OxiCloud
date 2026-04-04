@@ -408,8 +408,7 @@ function cacheElements() {
     elements.uploadBtn = document.getElementById('upload-btn');
     elements.dropzone = document.getElementById('dropzone');
     elements.fileInput = document.getElementById('file-input');
-    elements.filesGrid = document.getElementById('files-grid');
-    elements.filesListView = document.getElementById('files-list-view');
+    elements.filesList = document.getElementById('files-list');
     elements.newFolderBtn = document.getElementById('new-folder-btn');
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');

@@ -8,27 +8,34 @@
  * based on the current view preference.
  */
 function syncViewContainers() {
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
+    const filesList = document.getElementById('files-list');
+    const gridViewBtn = document.getElementById('grid-view-btn');
+    const listViewBtn = document.getElementById('list-view-btn');
+
     const isGrid = window.app.currentView === 'grid';
-    if (filesGrid) {
-        filesGrid.style.display = isGrid ? 'grid' : 'none';
-        filesGrid.classList.toggle('hidden', !isGrid);
+    if (isGrid) {
+        filesList.classList.remove("files-list-view");
+        filesList.classList.add("files-grid-view");
+
+        gridViewBtn?.classList.add('active');
+        listViewBtn?.classList.remove('active');
     }
-    if (filesListView) {
-        filesListView.style.display = isGrid ? 'none' : 'flex';
-        filesListView.classList.toggle('hidden', isGrid);
+    else {
+        filesList.classList.add("files-list-view");
+        filesList.classList.remove("files-grid-view");
+
+        gridViewBtn?.classList.remove('active');
+        listViewBtn?.classList.add('active');
     }
 }
 
 /**
- * Hide both grid and list containers (used when switching to non-file views).
+ * Hide file containers (used when switching to non-file views).
+ * @param {boolean} show false to hide, true to show
  */
-function hideFileContainers() {
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
-    if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
+function toggleFileContainer(show) {
+    const filesList = document.getElementById('files-list');
+    filesList.classList.toggle('hidden', !show);
 }
 
 /**
@@ -162,20 +169,15 @@ function switchToSharedSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
+    breadcrumb?.classList.add("hidden");
 
     // Hide actions-bar for shared view
     window.setActionsBarMode('hidden');
 
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = 'none';
-    if (filesListView) filesListView.style.display = 'none';
-    if (filesGrid) filesGrid.classList.add('hidden');
-    if (filesListView) filesListView.classList.add('hidden');
+    toggleFileContainer(false);
 
-    //hide by default empty list
-    window.showEmptyList(false);
+    //reset files view + remove any error
+    window.ui.resetFilesList();
     
     // Show shared view
     if (window.sharedView) {
@@ -194,17 +196,16 @@ function switchToFilesSection() {
 
     // Show breadcrumb (only in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = '';
+    breadcrumb?.classList.remove("hidden");
 
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
-    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+    // show files container
+    toggleFileContainer(true);
 
-    //hide by default empty list
-    window.showEmptyList(false);
+    // ensure correct view
+    syncViewContainers();
+
+    //reset files view + remove any error
+    window.ui.resetFilesList();
 
     // Reset to home folder and update breadcrumb
     window.app.currentPath = window.app.userHomeFolderId || '';
@@ -223,31 +224,26 @@ function switchToFavoritesSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
+    breadcrumb?.classList.add("hidden");
 
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
-    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+    // show files container
+    toggleFileContainer(true);
+
+    // ensure correct view
+    syncViewContainers();
     
-    //hide by default empty list
-    window.showEmptyList(false);
+    //reset files view + remove any error
+    window.ui.resetFilesList();
 
     if (window.favorites) {
         window.favorites.displayFavorites();
     } else {
         console.error('Favorites module not loaded or initialized');
-        const filesGridError = document.getElementById('files-grid');
-        if (filesGridError) {
-            filesGridError.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-circle empty-state-icon error"></i>
-                    <p>Error loading the favorites module</p>
-                </div>
-            `;
-        }
+        window.ui.showError(`
+                <i class="fas fa-exclamation-circle empty-state-icon error"></i>
+                <p>Error loading the favorites module</p>
+            `
+        );
     }
     
     if (window.multiSelect) window.multiSelect.clear();
@@ -262,31 +258,26 @@ function switchToRecentFilesSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
+    breadcrumb?.classList.add("hidden");
 
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) filesGrid.style.display = window.app.currentView === 'grid' ? 'grid' : 'none';
-    if (filesGrid) filesGrid.classList.toggle('hidden', window.app.currentView !== 'grid');
-    if (filesListView) filesListView.style.display = window.app.currentView === 'list' ? 'flex' : 'none';
-    if (filesListView) filesListView.classList.toggle('hidden', window.app.currentView !== 'list');
+    // show files container
+    toggleFileContainer(true);
 
-    //hide by default empty list
-    window.showEmptyList(false);
+    // ensure correct view
+    syncViewContainers();
+
+    //reset files view + remove any error
+    window.ui.resetFilesList();
 
     if (window.recent) {
         window.recent.displayRecentFiles();
     } else {
         console.error('Recent files module not loaded or initialized');
-        const filesGridError = document.getElementById('files-grid');
-        if (filesGridError) {
-            filesGridError.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-exclamation-circle empty-state-icon error"></i>
-                    <p>Error loading the recent files module</p>
-                </div>
-            `;
-        }
+        window.ui.showError(`
+                <i class="fas fa-exclamation-circle empty-state-icon error"></i>
+                <p>Error loading the recent module</p>
+            `
+        );
     }
     if (window.multiSelect) window.multiSelect.clear();
 }
@@ -296,19 +287,16 @@ function switchToPhotosSection() {
 
     // Hide breadcrumb
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
+    breadcrumb?.classList.add("hidden");
+
+    // Hide file containers
+    toggleFileContainer(false);
 
     // Hide actions-bar (photos has its own upload via selection bar)
     window.setActionsBarMode('hidden');
 
-    // Hide file containers
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) { filesGrid.style.display = 'none'; filesGrid.classList.add('hidden'); }
-    if (filesListView) { filesListView.style.display = 'none'; filesListView.classList.add('hidden'); }
-
-    //hide by default empty list
-    window.showEmptyList(false);
+    //reset files view + remove any error
+    window.ui.resetFilesList();
 
     // Show photos view
     if (window.photosView) {
@@ -323,18 +311,19 @@ function switchToTrashSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
+    breadcrumb?.classList.add("hidden");
 
     // Show files containers (to be filled with trash)
-    const filesGrid = document.getElementById('files-grid');
-    const filesListView = document.getElementById('files-list-view');
-    if (filesGrid) { filesGrid.style.display = app.currentView === 'grid' ? 'grid' : 'none'; filesGrid.classList.toggle('hidden', app.currentView !== 'grid'); }
-    if (filesListView) { filesListView.style.display = app.currentView === 'list' ? 'flex' : 'none'; filesListView.classList.toggle('hidden', app.currentView !== 'list'); }
+    const filesList = document.getElementById('files-list');
+    filesList.classList.remove('hidden');
 
     setActionsBarMode('trash');
 
-    //hide by default empty list
-    window.showEmptyList(false);
+    //reset files view + remove any error
+    window.ui.resetFilesList();
+
+    //ensure buttons match the current view
+    syncViewContainers();
 
     // Load trash items
     window.loadTrashItems();
@@ -348,3 +337,4 @@ window.switchToFavoritesSection = switchToFavoritesSection;
 window.switchToRecentFilesSection = switchToRecentFilesSection;
 window.switchToPhotosSection = switchToPhotosSection;
 window.switchToTrashSection = switchToTrashSection;
+window.syncViewContainers = syncViewContainers;

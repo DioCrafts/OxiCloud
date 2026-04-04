@@ -55,15 +55,14 @@ const multiSelect = {
     clear() {
         this._selected.clear();
         this._lastClickedIndex = -1;
-        document.querySelectorAll('.file-card.selected, .file-item.selected')
+        document.querySelectorAll('.file-item.selected')
             .forEach(el => el.classList.remove('selected'));
         document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
         this._syncUI();
     },
 
     selectAll() {
-        this._selectAllInContainer('files-grid', '.file-card');
-        this._selectAllInContainer('files-list-view', '.file-item');
+        this._selectAllInContainer('files-list', '.file-item');
         this._syncUI();
     },
 
@@ -148,7 +147,7 @@ const multiSelect = {
     },
 
     _getAllVisibleItems() {
-        return [...document.querySelectorAll('.file-item, .file-card')];
+        return [...document.querySelectorAll('.file-item')];
     },
 
     _extractInfo(el) {
@@ -482,9 +481,10 @@ const multiSelect = {
         document.addEventListener('keydown', (e) => {
             if (e.target.closest('input, textarea, [contenteditable], .rename-dialog, .share-dialog, .confirm-dialog')) return;
 
+            // ctrl+a cmd+a
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                const grid = document.getElementById('files-grid');
-                if (grid && grid.closest('.files-container')) {
+                const filesList = document.getElementById('files-list');
+                if (filesList && filesList.closest('.files-container')) {
                     e.preventDefault();
                     this.selectAll();
                 }

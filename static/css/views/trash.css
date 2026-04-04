@@ -10,8 +10,8 @@
 	gap: 8px;
 }
 
-.file-card.trash-item:hover .trash-actions,
-.file-item.trash-item:hover .actions-cell {
+.files-grid-view .file-card.trash-item:hover .trash-actions,
+.files-list-view .file-item.trash-item:hover .actions-cell {
 	display: flex;
 }
 

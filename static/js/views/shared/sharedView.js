@@ -25,11 +25,13 @@ const sharedView = {
         this.displayUI();
         this.attachEventListeners();
         this.loadItems().then(() => this.filterAndSortItems());
+        const c = document.getElementById('shared-container');
+        if (c) c.classList.remove("hidden");
     },
 
     hide() {
         const c = document.getElementById('shared-container');
-        if (c) c.style.display = 'none';
+        if (c) c.classList.add("hidden");
     },
 
     // Load shared items from backend API
@@ -63,7 +65,6 @@ const sharedView = {
             if (contentArea) contentArea.appendChild(container);
         }
 
-        container.style.display = 'block';
         container.innerHTML = `
             <div class="shared-header">
                 <div class="shared-filters">
@@ -179,12 +180,6 @@ const sharedView = {
                 </div>
             </div>
         `;
-
-        // Hide other UI elements
-        const filesGrid = document.getElementById('files-grid');
-        const filesListView = document.getElementById('files-list-view');
-        if (filesGrid) filesGrid.style.display = 'none';
-        if (filesListView) filesListView.style.display = 'none';
 
         if (window.i18n && window.i18n.translateElement) {
             window.i18n.translateElement(container);
@@ -326,13 +321,14 @@ const sharedView = {
         sharedItemsList.innerHTML = '';
 
         if (this.filteredItems.length === 0) {
-            emptyState.style.display = 'flex';
-            listContainer.style.display = 'none';
+            emptyState.classList.remove("hidden");
+            listContainer.classList.add("hidden");
             return;
         }
 
-        emptyState.style.display = 'none';
-        listContainer.style.display = 'block';
+        emptyState.classList.add("hidden");
+        listContainer.classList.remove("hidden");
+        
 
         this.filteredItems.forEach(item => {
             const row = document.createElement('tr');

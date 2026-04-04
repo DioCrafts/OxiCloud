@@ -11,14 +11,10 @@ async function performSearch(query, sortBy) {
         app.isSearchMode = true;
         window.ui.updateBreadcrumb(`Search: "${query}"`);
 
-        const filesGrid = document.getElementById('files-grid');
-        if (filesGrid) {
-            filesGrid.innerHTML = `
-                <div class="search-results-header">
-                    <h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>
-                </div>
-            `;
-        }
+        window.ui.showError(
+            `<h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>`
+        );
+        
 
         const options = {
             recursive: true,

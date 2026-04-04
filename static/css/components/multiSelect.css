@@ -1,13 +1,13 @@
 /* Multi-Select – checkboxes & batch action bar */
 .list-header-checkbox,
-.list-item-checkbox {
+.file-item .checkbox-cell {
 	display: flex;
 	align-items: center;
 	justify-content: center;
 }
 
 .list-header-checkbox input[type="checkbox"],
-.list-item-checkbox input[type="checkbox"] {
+.file-item .checkbox-cell input[type="checkbox"] {
 	width: 17px;
 	height: 17px;
 	cursor: pointer;
@@ -125,8 +125,8 @@
 }
 
 [data-theme="dark"] .list-header-checkbox input,
-[data-theme="dark"] .list-item-checkbox input,
-[data-theme="dark"] .file-card-checkbox input {
+[data-theme="dark"] .file-item .checkbox-cell input,
+[data-theme="dark"] .file-item .checkbox-cell input {
 	accent-color: #ff5e3a;
 }
 
