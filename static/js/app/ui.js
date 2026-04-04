@@ -908,6 +908,14 @@ const ui = {
             const info = itemInfo(card);
             if (!info) return;
 
+            // use modifier key to select/deselect item
+            // note: shift key is used in multiselect
+            // note: on MacOS, ctrl Key is used to convert click into right click, which invoke the `contextmenu` event
+            if (e.metaKey || e.altKey || e.ctrlKey) {
+                toggleCardSelection(card, e);
+                return;
+            }
+
             if (info.type === 'folder') {
                 navigateFolder(card);
             } else {
