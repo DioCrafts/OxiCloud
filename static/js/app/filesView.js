@@ -206,23 +206,11 @@ async function loadFiles(options = { insertHistory: true}) {
 
         const listing = await response.json();
 
-        if (window.multiSelect) window.multiSelect.clear();
         window.ui._items.clear();
-        
-        const _t = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
-        window.ui.showError(`
-            <div class="list-header">
-                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                <div data-i18n="files.name">${_t('files.name')}</div>
-                <div data-i18n="files.type">${_t('files.type')}</div>
-                <div data-i18n="files.size">${_t('files.size')}</div>
-                <div data-i18n="files.modified">${_t('files.modified')}</div>
-            </div>`
-        );
-
-        const selectAllCb = document.getElementById('select-all-checkbox');
-        if (selectAllCb && window.multiSelect) {
-            selectAllCb.addEventListener('change', () => window.multiSelect.toggleAll());
+        window.ui.resetFilesList();
+        if (window.multiSelect) {
+            window.multiSelect.clear();
+            window.multiSelect.init(); // this will wire buttons & select-all-checkbox
         }
 
         const folderList = Array.isArray(listing.folders) ? listing.folders : [];
@@ -231,7 +219,6 @@ async function loadFiles(options = { insertHistory: true}) {
         if (folderList.length === 0 && fileList.length === 0) {
             window.ui.showEmptyList();
         } else {
-            window.ui.resetFilesList();
             window.ui.renderFolders(folderList);
             window.ui.renderFiles(fileList);
         }

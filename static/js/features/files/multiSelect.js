@@ -9,6 +9,8 @@
 // TODO: rename into selection-bar ? 
 // TODO: merge with photo part
 
+// @ts-check
+
 const multiSelect = {
     /** Currently selected items: Map<id, { id, name, type, parentId }> */
     _selected: new Map(),
@@ -162,16 +164,11 @@ const multiSelect = {
 
     // ── Click handler (shared by grid + list) ───────────────
 
-    handleItemClick(el, event) {
+    handleToggleItem(el, event) {
         const items = this._getAllVisibleItems();
         const index = items.indexOf(el);
         const info = this._extractInfo(el);
         if (!info) return;
-
-        const selectorOther = info.type === 'folder'
-            ? `[data-folder-id="${info.id}"]`
-            : `[data-file-id="${info.id}"]`;
-        const otherEl = [...document.querySelectorAll(selectorOther)].find(e => e !== el);
 
         if (event && event.shiftKey && this._lastClickedIndex >= 0 && index >= 0) {
             const start = Math.min(this._lastClickedIndex, index);
@@ -183,16 +180,24 @@ const multiSelect = {
                     const sel = iInfo.type === 'folder'
                         ? `[data-folder-id="${iInfo.id}"]`
                         : `[data-file-id="${iInfo.id}"]`;
-                    document.querySelectorAll(sel).forEach(e => e.classList.add('selected'));
+                    document.querySelectorAll(sel).forEach((e) => {
+                        e.classList.add('selected');
+                        let checkbox = e.querySelector('input[type="checkbox"]');
+                        if (checkbox)
+                            checkbox.checked = true;
+                    });
                 }
             }
         } else {
             const nowSelected = this.toggle(info.id, info.name, info.type, info.parentId);
             el.classList.toggle('selected', nowSelected);
-            if (otherEl) otherEl.classList.toggle('selected', nowSelected);
+            let checkbox = el.querySelector('input[type="checkbox"]');
+            if (checkbox)
+                checkbox.checked = nowSelected;
         }
         this._lastClickedIndex = index;
         this._syncUI();
+        this._syncSelectAllCheckbox();
     },
 
     // ── Selection bar (replaces list-header when items selected) ────
@@ -481,15 +486,19 @@ const multiSelect = {
         document.addEventListener('keydown', (e) => {
             if (e.target.closest('input, textarea, [contenteditable], .rename-dialog, .share-dialog, .confirm-dialog')) return;
 
+            const selectAllCheckbox = document.getElementById('select-all-checkbox');
             // ctrl+a cmd+a
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                const filesList = document.getElementById('files-list');
-                if (filesList && filesList.closest('.files-container')) {
-                    e.preventDefault();
-                    this.selectAll();
-                }
+                if (selectAllCheckbox) 
+                    selectAllCheckbox.checked = true;
+                this.selectAll();    
+                e.preventDefault();
             }
-            if (e.key === 'Escape' && this.hasSelection) this.clear();
+            if (e.key === 'Escape' && this.hasSelection) {
+                this.clear();
+                if (selectAllCheckbox)
+                    selectAllCheckbox.checked = false;
+            }
             if (e.key === 'Delete' && this.hasSelection) this.batchDelete();
         });
 
@@ -503,10 +512,12 @@ const multiSelect = {
 
     },
 
+    // FIXME: competition with _
     _injectListHeaderCheckbox() {
-        const cb = document.getElementById('select-all-checkbox');
-        if (!cb) return;
-        cb.addEventListener('change', () => this.toggleAll());
+        const self = this;
+        const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        if (!selectAllCheckbox) return;
+        selectAllCheckbox.addEventListener('change', () => self.toggleAll());
     },
 
 };
