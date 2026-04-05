@@ -892,6 +892,12 @@ const ui = {
                 return;
             }
 
+            // shiftkey is used to complete selection
+            if (e.shiftKey && window.multiSelect) {
+                window.multiSelect.handleToggleItem(card, e);
+                return;
+            }
+
             if (info.type === 'folder') {
                 navigateFolder(card);
             } else {
@@ -1225,6 +1231,7 @@ const ui = {
         const filesContainerError=document.getElementById("files-container-error");
 
         if (!filesList) return;
+
         filesList.innerHTML=`
             <div class="list-header">
                 <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
@@ -1350,7 +1357,7 @@ const ui = {
  */
 function toggleCardSelection(card, event) {
     if (window.multiSelect) {
-        window.multiSelect.handleItemClick(card, event);
+        window.multiSelect.handleToggleItem(card, event);
     } else {
         card.classList.toggle('selected');
     }

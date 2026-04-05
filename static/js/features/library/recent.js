@@ -100,6 +100,10 @@ const recent = {
                 </div>
             `;
 
+            if (window.multiSelect) {
+                window.multiSelect.clear();
+                window.multiSelect.init(); // this will wire buttons & select-all-checkbox
+            }
             window.ui.updateBreadcrumb('');
 
             if (recentItems.length === 0) {

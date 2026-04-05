@@ -168,18 +168,6 @@ const favorites = {
             }
 
             window.ui.resetFilesList(); // ensure also list visible & error hidden
-            const filesList = document.getElementById('files-list');
-
-            filesList.innerHTML = `
-                <div class="list-header">
-                    <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                    <div data-i18n="files.name">Name</div>
-                    <div data-i18n="files.type">Type</div>
-                    <div data-i18n="files.size">Size</div>
-                    <div data-i18n="files.modified">Modified</div>
-                </div>
-            `;
-
             window.ui.updateBreadcrumb('');
 
             if (this._cache.size === 0) {

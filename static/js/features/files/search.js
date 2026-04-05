@@ -106,18 +106,6 @@ const search = {
         window.ui.resetFilesList(); // ensure also list visible & error hidden
         const filesList = document.getElementById('files-list');
 
-        // reset list
-        filesList.innerHTML = `
-            <div class="list-header">
-                <div class="list-header-checkbox"><input type="checkbox" id="select-all-checkbox" title="Select all"></div>
-                <div data-i18n="files.name">Name</div>
-                <div data-i18n="files.type">Type</div>
-                <div data-i18n="files.size">Size</div>
-                <div data-i18n="files.modified">Modified</div>
-                <div></div>
-            </div>
-        `;
-
         // Search results header with query time and sort controls
         const totalCount = results.total_count || (results.files.length + results.folders.length);
         const queryTimeText = results.query_time_ms !== undefined
