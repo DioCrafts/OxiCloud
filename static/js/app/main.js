@@ -253,7 +253,7 @@ function updateHistory( insertHistory) {
 
     if (app.currentSection === 'files' && app.currentFolderInfo !== null) {
         historyData.id = app.currentFolder;
-        historyUrl = historyUrl.concat('/', app.currentFolderInfo.id);
+        historyUrl = historyUrl.concat('/folder/', app.currentFolderInfo.id);
 
         // update title
         document.title = `OxiCloud: ${app.currentFolderInfo.path}`;
