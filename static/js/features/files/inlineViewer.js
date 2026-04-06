@@ -510,7 +510,11 @@ class InlineViewer {
       URL.revokeObjectURL(this.currentBlobUrl);
       this.currentBlobUrl = null;
     }
-    
+
+    // clear
+    window.app.viewFile = null;
+    window.updateHistory(false);
+
     // Clear references
     this.currentFile = null;
   }

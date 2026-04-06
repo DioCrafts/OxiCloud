@@ -52,7 +52,6 @@ async function getFolder( id) {
 async function rebuildBreadCrumb() {
 
     const app = window.app;
-
     /** 
      * Store the leaf (this is the current displayed folder)
      * @type {FolderInfo | null} 
@@ -71,7 +70,7 @@ async function rebuildBreadCrumb() {
         console.log(`fetching folder information for folder ${id}`);
         try {
             let folderInfo = await getFolder(id);
-        
+
             // store the Leaf which is the current folder
             if (currentFolderInfo === null) {
                 currentFolderInfo = folderInfo;
@@ -97,7 +96,6 @@ async function rebuildBreadCrumb() {
             app.currentPath = id;
         }
     }
-    
     // store informations on the current folder 
     app.currentFolderInfo = currentFolderInfo;
 }
@@ -221,6 +219,32 @@ async function loadFiles(options = { insertHistory: true}) {
         } else {
             window.ui.renderFolders(folderList);
             window.ui.renderFiles(fileList);
+
+            // check if a file was provided
+            if (window.app.viewFile) {
+                let fileFound = null;
+
+                // lookup for the given fle
+                for( const file of fileList) {
+                    if (file.id === window.app.viewFile) {
+                        fileFound = file;
+                        break;
+                    }
+                }
+
+                if (fileFound) {
+                    console.log(`file ${window.app.viewFile} found, calling viewer`);
+                    await window.inlineViewer.openFile(fileFound);
+                }
+                else {
+                    // remove file
+                    console.log(`file ${window.app.viewFile} not found`);
+                    window.app.viewFile = null;
+
+                    // correct url/history as file is not found
+                    window.updateHistory( false);
+                }
+            }
         }
 
         console.log(`Loaded ${folderList.length} folders and ${fileList.length} files`);

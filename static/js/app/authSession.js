@@ -120,7 +120,7 @@ async function checkAuthentication() {
                 }
             }
             await resolveHomeFolder();
-            window.dispatchEvent(new Event('authenticationDone'));
+            window.dispatchEvent(new CustomEvent('authenticationDone'));
         } else {
             // No cached user data — must verify session from server
             console.log('No cached user data, fetching from server');
