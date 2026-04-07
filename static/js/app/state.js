@@ -25,7 +25,8 @@ window.app = {
     notificationShareUrl: null,
     userHomeFolderId: null,
     userHomeFolderName: null,
-    breadcrumbPath: [] // Array of {id, name} tracking folder navigation hierarchy
+    breadcrumbPath: [], // Array of {id, name} tracking folder navigation hierarchy
+    viewFile: null // current file in inline view
 };
 
 window.appElements = {

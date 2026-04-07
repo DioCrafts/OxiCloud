@@ -817,13 +817,26 @@ const ui = {
             const ext = (file.name || '').split('.').pop().toLowerCase();
             const imageExts = ['jpg','jpeg','png','gif','svg','webp','bmp','ico','heic','heif','avif','tiff'];
             const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
-            if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
-                window.wopiEditor.openInModal(file.id, file.name, 'edit');
-                return;
+            try {
+                if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
+                    await window.wopiEditor.openInModal(file.id, file.name, 'edit')
+                    return;
+                }
             }
+            catch (e) {
+                console.warn(`WOPI Editor failed, falling bck to classic view `, e);
+            }
+
             if (self.isViewableFile(file) || isImage) {
-                if (window.inlineViewer) window.inlineViewer.openFile(file);
-                else window.fileOps.downloadFile(file.id, file.name);
+                if (window.inlineViewer) {
+                    window.inlineViewer.openFile(file);
+                    // update history
+                    window.app.viewFile = file.id;
+                    window.updateHistory(false);
+                }
+                else {
+                    window.fileOps.downloadFile(file.id, file.name);
+                }
             } else {
                 window.fileOps.downloadFile(file.id, file.name);
             }

@@ -27,15 +27,9 @@ class WopiEditor {
      */
     async openInModal(fileId, fileName, action) {
         action = action || 'edit';
-        try {
-            var data = await this._getEditorUrlWithFallback(fileId, fileName, action);
-            this._showModal(data, fileName);
-        } catch (error) {
-            console.error('Failed to open WOPI editor:', error);
-            if (window.showNotification) {
-                window.showNotification('Could not open the document editor.', 'error');
-            }
-        }
+        // Error is thrown, caller can handle a classic view as fallback
+        var data = await this._getEditorUrlWithFallback(fileId, fileName, action);
+        this._showModal(data, fileName);
     }
 
     /**

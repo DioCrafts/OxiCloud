@@ -194,8 +194,9 @@ function setupActionsBarDelegation() {
 
 /**
  * @typedef {Object} OxiContext
- * @property {string | null} path the uuid of the path
  * @property {string} section
+ * @property {string | null} path the uuid of the path
+ * @property {string | null} file the uuid of file inline view
  */
 
 /**
@@ -232,6 +233,10 @@ function deserializeHash() {
 
     if (hash_elements[1] == 'files' && hash_elements[2] == 'folder' && hash_elements[3] !== null) {
         hashContext.path = hash_elements[3];
+        
+        if (hash_elements[4] == 'file' && hash_elements[5] !== null) {
+            hashContext.file = hash_elements[5];
+        }
     }
 
     return hashContext;
@@ -248,13 +253,18 @@ function updateHistory( insertHistory) {
     let historyData = {
         section: app.currentSection,
         id: app.currentFolder,
+        file: app.viewFile,
     };
+
     let historyUrl = `#/${app.currentSection}`;
 
     if (app.currentSection === 'files' && app.currentFolderInfo !== null) {
         historyData.id = app.currentFolder;
         historyUrl = historyUrl.concat('/folder/', app.currentFolderInfo.id);
 
+        if (window.app.viewFile) {
+            historyUrl = historyUrl.concat('/file/', window.app.viewFile);   
+        }
         // update title
         document.title = `OxiCloud: ${app.currentFolderInfo.path}`;
     }
@@ -373,6 +383,10 @@ function initApp() {
             if (hashContext.path) {
                 console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
                 window.app.currentPath = hashContext.path;
+            }
+            
+            if (hashContext.file !== null) {
+                window.app.viewFile = hashContext.file;
             }
             window.loadFiles();
         }
@@ -722,3 +736,4 @@ window.updateStorageUsageDisplay = updateStorageUsageDisplay;
 // Initialize app when DOM is ready
 window.initApp = initApp;
 window.updateHistory = updateHistory;
+window.deserializeHash = deserializeHash;
