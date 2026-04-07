@@ -26,12 +26,12 @@ const sharedView = {
         this.attachEventListeners();
         this.loadItems().then(() => this.filterAndSortItems());
         const c = document.getElementById('shared-container');
-        if (c) c.classList.remove("hidden");
+        if (c) c.classList.remove('hidden');
     },
 
     hide() {
         const c = document.getElementById('shared-container');
-        if (c) c.classList.add("hidden");
+        if (c) c.classList.add('hidden');
     },
 
     // Load shared items from backend API
@@ -181,7 +181,7 @@ const sharedView = {
             </div>
         `;
 
-        if (window.i18n && window.i18n.translateElement) {
+        if (window.i18n?.translateElement) {
             window.i18n.translateElement(container);
         }
     },
@@ -195,7 +195,7 @@ const sharedView = {
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
-            document.querySelectorAll('.shared-custom-select.open').forEach(sel => {
+            document.querySelectorAll('.shared-custom-select.open').forEach((sel) => {
                 if (!sel.contains(e.target)) sel.classList.remove('open');
             });
         });
@@ -209,16 +209,24 @@ const sharedView = {
             if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => this.copyShareLink());
             const enablePw = document.getElementById('sv-enable-password');
             const pwField = document.getElementById('sv-share-password');
-            if (enablePw) enablePw.addEventListener('change', () => {
-                if (pwField) { pwField.disabled = !enablePw.checked; if (enablePw.checked) pwField.focus(); }
-            });
+            if (enablePw)
+                enablePw.addEventListener('change', () => {
+                    if (pwField) {
+                        pwField.disabled = !enablePw.checked;
+                        if (enablePw.checked) pwField.focus();
+                    }
+                });
             const genPwBtn = document.getElementById('sv-generate-password');
             if (genPwBtn) genPwBtn.addEventListener('click', () => this.generatePassword());
             const enableExp = document.getElementById('sv-enable-expiration');
             const expField = document.getElementById('sv-share-expiration');
-            if (enableExp) enableExp.addEventListener('change', () => {
-                if (expField) { expField.disabled = !enableExp.checked; if (enableExp.checked) expField.focus(); }
-            });
+            if (enableExp)
+                enableExp.addEventListener('change', () => {
+                    if (expField) {
+                        expField.disabled = !enableExp.checked;
+                        if (enableExp.checked) expField.focus();
+                    }
+                });
             const updateBtn = document.getElementById('sv-update-share-btn');
             if (updateBtn) updateBtn.addEventListener('click', () => this.updateSharedItem());
             const removeBtn = document.getElementById('sv-remove-share-btn');
@@ -253,17 +261,19 @@ const sharedView = {
         toggle.addEventListener('click', (e) => {
             e.stopPropagation();
             // Close other open selects
-            document.querySelectorAll('.shared-custom-select.open').forEach(sel => {
+            document.querySelectorAll('.shared-custom-select.open').forEach((sel) => {
                 if (sel !== wrapper) sel.classList.remove('open');
             });
             wrapper.classList.toggle('open');
         });
 
-        dropdown.querySelectorAll('.shared-select-option').forEach(option => {
+        dropdown.querySelectorAll('.shared-select-option').forEach((option) => {
             option.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Update active state
-                dropdown.querySelectorAll('.shared-select-option').forEach(o => o.classList.remove('active'));
+                dropdown.querySelectorAll('.shared-select-option').forEach((o) => {
+                    o.classList.remove('active');
+                });
                 option.classList.add('active');
                 // Update label
                 const label = toggle.querySelector('.shared-select-label');
@@ -288,7 +298,7 @@ const sharedView = {
         const searchInput = document.getElementById('search-input');
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
-        this.filteredItems = this.items.filter(item => {
+        this.filteredItems = this.items.filter((item) => {
             if (type !== 'all' && item.item_type !== type) return false;
             const name = (item.item_name || item.item_id || '').toLowerCase();
             return name.includes(searchTerm);
@@ -321,16 +331,15 @@ const sharedView = {
         sharedItemsList.innerHTML = '';
 
         if (this.filteredItems.length === 0) {
-            emptyState.classList.remove("hidden");
-            listContainer.classList.add("hidden");
+            emptyState.classList.remove('hidden');
+            listContainer.classList.add('hidden');
             return;
         }
 
-        emptyState.classList.add("hidden");
-        listContainer.classList.remove("hidden");
-        
+        emptyState.classList.add('hidden');
+        listContainer.classList.remove('hidden');
 
-        this.filteredItems.forEach(item => {
+        this.filteredItems.forEach((item) => {
             const row = document.createElement('tr');
             const displayName = item.item_name || item.item_id || 'Unknown';
 
@@ -383,7 +392,8 @@ const sharedView = {
             copyBtn.innerHTML = '<span class="action-icon">📋</span>';
             copyBtn.title = this.translate('shared_copyLink', 'Copy Link');
             copyBtn.addEventListener('click', () => {
-                navigator.clipboard.writeText(item.url)
+                navigator.clipboard
+                    .writeText(item.url)
                     .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
                     .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
             });
@@ -392,7 +402,10 @@ const sharedView = {
             rmBtn.className = 'action-btn remove-btn';
             rmBtn.innerHTML = '<span class="action-icon">🗑️</span>';
             rmBtn.title = this.translate('shared_removeShare', 'Remove Share');
-            rmBtn.addEventListener('click', () => { this.currentItem = item; this.removeSharedItem(); });
+            rmBtn.addEventListener('click', () => {
+                this.currentItem = item;
+                this.removeSharedItem();
+            });
 
             actionsCell.append(editBtn, notifyBtn, copyBtn, rmBtn);
             row.append(nameCell, typeCell, dateCell, expCell, permCell, pwCell, actionsCell);
@@ -428,7 +441,10 @@ const sharedView = {
 
         if (enablePw) {
             enablePw.checked = item.has_password;
-            if (pwField) { pwField.disabled = !enablePw.checked; pwField.value = ''; }
+            if (pwField) {
+                pwField.disabled = !enablePw.checked;
+                pwField.value = '';
+            }
         }
         if (enableExp) {
             enableExp.checked = !!item.expires_at;
@@ -473,7 +489,8 @@ const sharedView = {
     copyShareLink() {
         const el = document.getElementById('sv-share-link-url');
         if (!el) return;
-        navigator.clipboard.writeText(el.value)
+        navigator.clipboard
+            .writeText(el.value)
             .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
             .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
     },
@@ -514,10 +531,8 @@ const sharedView = {
                 write: permWrite ? permWrite.checked : false,
                 reshare: permReshare ? permReshare.checked : false
             },
-            password: (enablePw && enablePw.checked && pwField && pwField.value) ? pwField.value : null,
-            expires_at: (enableExp && enableExp.checked && expField && expField.value)
-                ? Math.floor(new Date(expField.value).getTime() / 1000)
-                : null
+            password: enablePw?.checked && pwField?.value ? pwField.value : null,
+            expires_at: enableExp?.checked && expField?.value ? Math.floor(new Date(expField.value).getTime() / 1000) : null
         };
 
         try {
@@ -575,15 +590,19 @@ const sharedView = {
             return;
         }
 
-        if (window.fileSharing && window.fileSharing.sendShareNotification) {
-            window.fileSharing.sendShareNotification(this.currentItem.url, email, message)
-                .then(() => { this.closeNotificationDialog(); this.showNotification(this.translate('shared_notificationSent', 'Notification sent')); })
+        if (window.fileSharing?.sendShareNotification) {
+            window.fileSharing
+                .sendShareNotification(this.currentItem.url, email, message)
+                .then(() => {
+                    this.closeNotificationDialog();
+                    this.showNotification(this.translate('shared_notificationSent', 'Notification sent'));
+                })
                 .catch(() => this.showNotification(this.translate('shared_notificationFailed', 'Failed to send notification'), 'error'));
         }
     },
 
     showNotification(message, type = 'success') {
-        if (window.ui && window.ui.showNotification) {
+        if (window.ui?.showNotification) {
             window.ui.showNotification(message, type);
         } else {
             alert(message);
@@ -599,7 +618,7 @@ const sharedView = {
     },
 
     translate(key, defaultText) {
-        if (window.i18n && window.i18n.t) return window.i18n.t(key, defaultText);
+        if (window.i18n?.t) return window.i18n.t(key, defaultText);
         return defaultText;
     }
 };

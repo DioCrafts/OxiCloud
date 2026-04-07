@@ -11,10 +11,7 @@ async function performSearch(query, sortBy) {
         app.isSearchMode = true;
         window.ui.updateBreadcrumb(`Search: "${query}"`);
 
-        window.ui.showError(
-            `<h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>`
-        );
-        
+        window.ui.showError(`<h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>`);
 
         const options = {
             recursive: true,
@@ -37,7 +34,6 @@ async function performSearch(query, sortBy) {
 
         const searchResults = await window.search.searchFiles(query, options);
         window.search.displaySearchResults(searchResults);
-
     } catch (error) {
         console.error('Search error:', error);
         window.ui.showNotification('Error', 'Error performing search');
@@ -46,7 +42,7 @@ async function performSearch(query, sortBy) {
 
 document.addEventListener('search-resort', (e) => {
     const searchInput = document.querySelector('.search-container input');
-    if (searchInput && searchInput.value.trim()) {
+    if (searchInput?.value.trim()) {
         performSearch(searchInput.value.trim(), e.detail.sort_by);
     }
 });

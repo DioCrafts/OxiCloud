@@ -8,7 +8,7 @@ async function loadTrashItems() {
     try {
         if (window.multiSelect) window.multiSelect.clear();
         window.ui.resetFilesList(); // ensure also list visible & error hidden
-        const _tt = (window.i18n && window.i18n.t) ? window.i18n.t : k => k.split('.').pop();
+        const _tt = window.i18n?.t ? window.i18n.t : (k) => k.split('.').pop();
         elements.filesList.innerHTML = `
             <div class="list-header trash-header">
                 <div data-i18n="files.name">${_tt('files.name')}</div>
@@ -31,10 +31,9 @@ async function loadTrashItems() {
             return;
         }
 
-        trashItems.forEach(item => {
+        trashItems.forEach((item) => {
             addTrashItemToView(item);
         });
-
     } catch (error) {
         console.error('Error loading trash items:', error);
         window.ui.showNotification('Error', 'Error loading trash items');
@@ -54,22 +53,20 @@ function addTrashItemToView(item) {
         iconClass = item.icon_class || 'fas fa-folder';
         typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
     } else {
-        iconClass = item.icon_class || (window.ui && window.ui.getIconClass
-            ? window.ui.getIconClass(item.name)
-            : 'fas fa-file');
-        iconSpecialClass = (window.ui && window.ui.getIconSpecialClass)
-            ? window.ui.getIconSpecialClass(item.name)
-            : '';
+        iconClass = item.icon_class || (window.ui?.getIconClass ? window.ui.getIconClass(item.name) : 'fas fa-file');
+        iconSpecialClass = window.ui?.getIconSpecialClass ? window.ui.getIconSpecialClass(item.name) : '';
         const cat = item.category || '';
         typeLabel = cat
-            ? (window.i18n ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat)
-            : (window.i18n ? window.i18n.t('files.file_types.document') : 'Document');
+            ? window.i18n
+                ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat
+                : cat
+            : window.i18n
+              ? window.i18n.t('files.file_types.document')
+              : 'Document';
     }
 
     const isFolder = !isFile;
-    const iconWrapClass = isFolder
-        ? 'file-icon folder-icon'
-        : `file-icon ${iconSpecialClass}`.trim();
+    const iconWrapClass = isFolder ? 'file-icon folder-icon' : `file-icon ${iconSpecialClass}`.trim();
 
     const listElement = document.createElement('div');
     listElement.className = 'file-item trash-item';

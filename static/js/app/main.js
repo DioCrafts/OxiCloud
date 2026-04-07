@@ -3,8 +3,6 @@
  * This file contains the core functionality, initialization and state management
  */
 
-// @ts-check
-
 const app = window.app;
 const elements = window.appElements;
 
@@ -96,18 +94,18 @@ const ACTIONS_BAR_TEMPLATES = {
 };
 
 /**
- * 
- * @param {string} mode 
- * @param {boolean} [force=false] 
- * @returns 
+ *
+ * @param {string} mode
+ * @param {boolean} [force=false]
+ * @returns
  */
 function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
     if (mode === 'hidden') {
-        elements.actionsBar.classList.add("hidden");
+        elements.actionsBar.classList.add('hidden');
         elements.actionsBar.dataset.mode = 'hidden';
-        console.log("......setup actions bar to hidden");
+        console.log('......setup actions bar to hidden');
         return;
     }
 
@@ -119,7 +117,7 @@ function setActionsBarMode(mode, force = false) {
     if (!html) return;
 
     elements.actionsBar.innerHTML = html;
-    elements.actionsBar.classList.remove("hidden");
+    elements.actionsBar.classList.remove('hidden');
     elements.actionsBar.dataset.mode = mode;
 
     // Refresh cached action elements after rebuild
@@ -128,7 +126,7 @@ function setActionsBarMode(mode, force = false) {
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');
 
-    if (window.i18n && window.i18n.translateElement) {
+    if (window.i18n?.translateElement) {
         window.i18n.translateElement(elements.actionsBar);
     }
 
@@ -202,7 +200,7 @@ function setupActionsBarDelegation() {
 /**
  * Read the application hash
  *
- * format: 
+ * format:
  *
  * #/<section>/
  *
@@ -217,24 +215,24 @@ function setupActionsBarDelegation() {
  * @returns {OxiContext}
  */
 function deserializeHash() {
-    let hashContext = /** type {OxiContext} */ {};
+    const hashContext = /** type {OxiContext} */ {};
 
     // FIXME rename files into drive ?
     hashContext.section = 'files';
 
-    let hash_elements = window.location.hash.split("/");
+    const hash_elements = window.location.hash.split('/');
 
-    let section = hash_elements[1];
+    const section = hash_elements[1];
 
     // FIXME: use navigation.VIEW_FLAGS
     if (section && ['files', 'shared', 'recent', 'favorites', 'trash', 'photos'].includes(section)) {
         hashContext.section = section;
     }
 
-    if (hash_elements[1] == 'files' && hash_elements[2] == 'folder' && hash_elements[3] !== null) {
+    if (hash_elements[1] === 'files' && hash_elements[2] === 'folder' && hash_elements[3] !== null) {
         hashContext.path = hash_elements[3];
-        
-        if (hash_elements[4] == 'file' && hash_elements[5] !== null) {
+
+        if (hash_elements[4] === 'file' && hash_elements[5] !== null) {
             hashContext.file = hash_elements[5];
         }
     }
@@ -244,16 +242,16 @@ function deserializeHash() {
 
 /**
  * update borwser's url/history
- * 
+ *
  * @param {boolean} insertHistory true to change url and browser's history, false to change url only
  */
-function updateHistory( insertHistory) {
+function updateHistory(insertHistory) {
     const app = window.app;
 
-    let historyData = {
+    const historyData = {
         section: app.currentSection,
         id: app.currentFolder,
-        file: app.viewFile,
+        file: app.viewFile
     };
 
     let historyUrl = `#/${app.currentSection}`;
@@ -263,22 +261,19 @@ function updateHistory( insertHistory) {
         historyUrl = historyUrl.concat('/folder/', app.currentFolderInfo.id);
 
         if (window.app.viewFile) {
-            historyUrl = historyUrl.concat('/file/', window.app.viewFile);   
+            historyUrl = historyUrl.concat('/file/', window.app.viewFile);
         }
         // update title
         document.title = `OxiCloud: ${app.currentFolderInfo.path}`;
     }
 
     if (insertHistory) {
-        console.log(`adding history with ${historyUrl}`)
-        window.history.pushState(historyData, "", historyUrl);
+        console.log(`adding history with ${historyUrl}`);
+        window.history.pushState(historyData, '', historyUrl);
+    } else {
+        console.log(`replace history with ${historyUrl}`);
+        window.history.replaceState(historyData, '', historyUrl);
     }
-    else {
-        console.log(`replace history with ${historyUrl}`)
-        window.history.replaceState(historyData, "", historyUrl);
-    }
-
-    
 }
 
 /**
@@ -287,32 +282,32 @@ function updateHistory( insertHistory) {
  * @returns
  */
 function switchSectionTo(section) {
-
     if (window.app.currentSection === section)
         // no change ...
         return;
 
     switch (section) {
-        case "files":
+        case 'files':
             switchToFilesSection();
+            break;
 
-        case "shared":
+        case 'shared':
             switchToSharedSection();
             break;
 
-        case "recent":
+        case 'recent':
             switchToRecentFilesSection();
             break;
 
-        case "favorites":
+        case 'favorites':
             switchToFavoritesSection();
             break;
 
-        case "photos":
+        case 'photos':
             switchToPhotosSection();
             break;
 
-        case "trash":
+        case 'trash':
             switchToTrashSection();
             break;
 
@@ -328,22 +323,22 @@ function switchSectionTo(section) {
 function initApp() {
     // Cache DOM elements
     cacheElements();
-    
+
     // Initialize file sharing module first
-    if (window.fileSharing && window.fileSharing.init) {
+    if (window.fileSharing?.init) {
         window.fileSharing.init();
     } else {
         console.warn('fileSharing module not fully initialized');
     }
-    
+
     // Then create menus and dialogs after modules have initialized
     setTimeout(() => {
         ui.initializeContextMenus();
     }, 100);
-    
+
     // Setup event listeners
     setupEventListeners();
-    
+
     // Ensure inline viewer is initialized
     if (!window.inlineViewer && typeof InlineViewer !== 'undefined') {
         try {
@@ -352,49 +347,48 @@ function initApp() {
             console.error('Error initializing inline viewer:', e);
         }
     }
-    
+
     // Initialize favorites module if available
-    if (window.favorites && window.favorites.init) {
+    if (window.favorites?.init) {
         console.log('Initializing favorites module');
         window.favorites.init();
     } else {
         console.warn('Favorites module not available or not initializable');
     }
-    
+
     // Initialize recent files module if available
-    if (window.recent && window.recent.init) {
+    if (window.recent?.init) {
         console.log('Initializing recent files module');
         window.recent.init();
     } else {
         console.warn('Recent files module not available or not initializable');
     }
-    
+
     // Initialize multi-select / batch actions
-    if (window.multiSelect && window.multiSelect.init) {
+    if (window.multiSelect?.init) {
         console.log('Initializing multi-select module');
         window.multiSelect.init();
     }
-    
+
     window.addEventListener('authenticationDone', () => {
         // Check if a context was provided in the URL
-        let hashContext = deserializeHash();
-        switchSectionTo( hashContext.section);
-        if (hashContext.section === "files") {
+        const hashContext = deserializeHash();
+        switchSectionTo(hashContext.section);
+        if (hashContext.section === 'files') {
             if (hashContext.path) {
                 console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
                 window.app.currentPath = hashContext.path;
             }
-            
+
             if (hashContext.file !== null) {
                 window.app.viewFile = hashContext.file;
             }
             window.loadFiles();
         }
-
     });
 
     // Wait for translations to load before checking authentication
-    if (window.i18n && window.i18n.isLoaded && window.i18n.isLoaded()) {
+    if (window.i18n?.isLoaded?.()) {
         // Translations already loaded, proceed with authentication
         window.checkAuthentication();
     } else {
@@ -404,10 +398,10 @@ function initApp() {
             console.log('Translations loaded, proceeding with authentication');
             window.checkAuthentication();
         });
-        
+
         // Set a timeout as a fallback in case translations take too long
         setTimeout(() => {
-            if (!window.i18n || !window.i18n.isLoaded || !window.i18n.isLoaded()) {
+            if (!window.i18n?.isLoaded?.()) {
                 console.warn('Translations loading timeout, proceeding with authentication anyway');
                 window.checkAuthentication();
             }
@@ -440,7 +434,7 @@ function cacheElements() {
 function setupUploadDropdown() {
     const uploadBtn = document.getElementById('upload-btn');
     const menu = document.getElementById('upload-dropdown-menu');
-    
+
     if (!uploadBtn || !menu) return;
 
     // Abort any previous local bindings (safe across repeated/rebuilt UI)
@@ -449,29 +443,35 @@ function setupUploadDropdown() {
     }
     uploadDropdownBindingsController = new AbortController();
     const signal = uploadDropdownBindingsController.signal;
-    
+
     // Toggle dropdown on button click
-    uploadBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = menu.classList.contains('show');
-        // Close any other open dropdowns
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
-        if (!isOpen) {
-            menu.classList.add('show');
-        }
-    }, { signal });
+    uploadBtn.addEventListener(
+        'click',
+        (e) => {
+            e.stopPropagation();
+            const isOpen = menu.classList.contains('show');
+            // Close any other open dropdowns
+            document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
+                m.classList.remove('show');
+            });
+            if (!isOpen) {
+                menu.classList.add('show');
+            }
+        },
+        { signal }
+    );
 
     // Close dropdown when clicking outside
     // remove+add stable handler: guarantees exactly one global listener
     if (uploadDropdownDocumentClickHandler) {
-        // @ts-ignore
         document.removeEventListener('click', uploadDropdownDocumentClickHandler);
     }
     uploadDropdownDocumentClickHandler = (e) => {
         if (e.target.closest('#upload-dropdown')) return;
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+        document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
+            m.classList.remove('show');
+        });
     };
-    // @ts-ignore
     document.addEventListener('click', uploadDropdownDocumentClickHandler);
 }
 
@@ -481,28 +481,27 @@ function setupUploadDropdown() {
 function setupEventListeners() {
     // Set up drag and drop
     ui.setupDragAndDrop();
-    
+
     // Debounce timer for live search
     let searchDebounceTimer = null;
     const SEARCH_DEBOUNCE_MS = 300;
     const SEARCH_MIN_CHARS = 3;
-    
+
     // handle history / url change
-    window.addEventListener("popstate", (e) => { 
+    window.addEventListener('popstate', (e) => {
         if (e.state === null) {
             // change is from user (url explicitely change, read information from hash)
-            let hashContext = deserializeHash();
-            switchSectionTo( hashContext.section);
+            const hashContext = deserializeHash();
+            switchSectionTo(hashContext.section);
             if (hashContext.path) {
                 window.app.currentPath = hashContext.path;
-                window.loadFiles({insertHistory: false});
+                window.loadFiles({ insertHistory: false });
             }
-        }
-        else {
+        } else {
             // change is from history, data provided in event
-            switchSectionTo( e.state.section);
+            switchSectionTo(e.state.section);
             window.app.currentPath = e.state.id;
-            window.loadFiles({insertHistory: false});
+            window.loadFiles({ insertHistory: false });
         }
     });
 
@@ -512,13 +511,13 @@ function setupEventListeners() {
             // Cancel any pending debounce
             if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
             const query = elements.searchInput.value.trim();
-            
+
             // In shared view, filter locally
             if (app.isSharedView && window.sharedView) {
                 window.sharedView.filterAndSortItems();
                 return;
             }
-            
+
             if (query) {
                 window.performSearch(query);
             } else if (app.isSearchMode) {
@@ -530,12 +529,12 @@ function setupEventListeners() {
             }
         }
     });
-    
+
     // Search input — Live search (debounced, after 3+ chars)
     elements.searchInput.addEventListener('input', () => {
         if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
         const query = elements.searchInput.value.trim();
-        
+
         if (query.length >= SEARCH_MIN_CHARS) {
             searchDebounceTimer = setTimeout(() => {
                 window.performSearch(query);
@@ -550,7 +549,7 @@ function setupEventListeners() {
             }, SEARCH_DEBOUNCE_MS);
         }
     });
-    
+
     // Search button
     document.getElementById('search-button').addEventListener('click', () => {
         if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -559,14 +558,14 @@ function setupEventListeners() {
             window.performSearch(query);
         }
     });
-    
+
     // Upload dropdown
     setupUploadDropdown();
     setupActionsBarDelegation();
     if (elements.actionsBar) {
         elements.actionsBar.dataset.mode = 'files';
     }
-    
+
     // File input
     elements.fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
@@ -574,7 +573,7 @@ function setupEventListeners() {
             e.target.value = ''; // reset so same file can be re-uploaded
         }
     });
-    
+
     // Folder input
     const folderInput = document.getElementById('folder-input');
     if (folderInput) {
@@ -585,20 +584,22 @@ function setupEventListeners() {
             }
         });
     }
-    
+
     // Sidebar navigation
-    elements.navItems.forEach(item => {
+    elements.navItems.forEach((item) => {
         item.addEventListener('click', () => {
             // Remove active class from all nav items
-            elements.navItems.forEach(navItem => navItem.classList.remove('active'));
-            
+            elements.navItems.forEach((navItem) => {
+                navItem.classList.remove('active');
+            });
+
             // Add active class to clicked item
             item.classList.add('active');
             let _updateHistory = true;
 
-            let itemI18nKey=item.querySelector('span').getAttribute('data-i18n')
-            switch(itemI18nKey) {
-                case 'nav.shared': 
+            const itemI18nKey = item.querySelector('span').getAttribute('data-i18n');
+            switch (itemI18nKey) {
+                case 'nav.shared':
                     // Switch to shared view
                     switchToSharedSection();
                     break;
@@ -608,7 +609,7 @@ function setupEventListeners() {
                     switchToFavoritesSection();
                     break;
 
-                case 'nav.recent': 
+                case 'nav.recent':
                     // Switch to recent files view
                     switchToRecentFilesSection();
                     break;
@@ -617,7 +618,7 @@ function setupEventListeners() {
                     switchToPhotosSection();
                     break;
 
-                case 'nav.trash': 
+                case 'nav.trash':
                     switchToTrashSection();
                     break;
 
@@ -625,17 +626,17 @@ function setupEventListeners() {
                     // Use the proper switchToFilesView function which handles all UI restoration
                     window.switchToFilesSection();
                     // FIXME: because fileview handles it: need to converge code
-                    _updateHistory = false;     
+                    _updateHistory = false;
             }
 
             document.title = `OxiCloud: ${window.i18n.t(itemI18nKey)}`;
 
             if (_updateHistory) {
-                updateHistory( true);
+                updateHistory(true);
             }
         });
     });
-    
+
     // Load saved view preference
     const savedView = localStorage.getItem('oxicloud-view');
     if (savedView === 'list') {
@@ -643,22 +644,20 @@ function setupEventListeners() {
     } else {
         ui.switchToGridView();
     }
-    
+
     // User menu
     window.setupUserMenu();
-    
+
     // Global events to close context menus and deselect cards
     document.addEventListener('click', (e) => {
         const folderMenu = document.getElementById('folder-context-menu');
         const fileMenu = document.getElementById('file-context-menu');
-        
-        if (folderMenu && folderMenu.style.display === 'block' && 
-            !folderMenu.contains(e.target)) {
+
+        if (folderMenu && folderMenu.style.display === 'block' && !folderMenu.contains(e.target)) {
             ui.closeContextMenu();
         }
-        
-        if (fileMenu && fileMenu.style.display === 'block' && 
-            !fileMenu.contains(e.target)) {
+
+        if (fileMenu && fileMenu.style.display === 'block' && !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
         }
     });
@@ -693,7 +692,7 @@ function updateStorageUsageDisplay(userData) {
         usedBytes = userData.storage_used_bytes || 0;
         // Use == null to allow 0 (unlimited) to pass through; only default to DEFAULT_QUOTA when null/undefined
         quotaBytes = userData.storage_quota_bytes == null ? DEFAULT_QUOTA : userData.storage_quota_bytes;
-        
+
         // Calculate percentage (avoid division by zero)
         if (quotaBytes > 0) {
             usagePercentage = Math.min(Math.round((usedBytes / quotaBytes) * 100), 100);
@@ -707,17 +706,17 @@ function updateStorageUsageDisplay(userData) {
     // Update the storage display elements
     const storageFill = document.querySelector('.storage-fill');
     const storageInfo = document.querySelector('.storage-info');
-    
+
     if (storageFill) {
         storageFill.style.width = `${usagePercentage}%`;
     }
-    
+
     if (storageInfo) {
         // Remove data-i18n attribute to prevent i18n from overwriting our value
         storageInfo.removeAttribute('data-i18n');
-        
+
         // Use i18n if available
-        if (window.i18n && window.i18n.t) {
+        if (window.i18n?.t) {
             storageInfo.textContent = window.i18n.t('storage.used', {
                 percentage: usagePercentage,
                 used: usedFormatted,
@@ -727,7 +726,7 @@ function updateStorageUsageDisplay(userData) {
             storageInfo.textContent = `${usagePercentage}% used (${usedFormatted} / ${quotaFormatted})`;
         }
     }
-    
+
     console.log(`Updated storage display: ${usagePercentage}% (${usedFormatted} / ${quotaFormatted})`);
 }
 

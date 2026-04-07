@@ -6,22 +6,22 @@ if (!/^[0-9a-fA-F]+$/.test(token)) {
     document.body.innerHTML = '<p>Invalid session token.</p>';
     throw new Error('Invalid token format');
 }
-document.getElementById('login-flow-form').action = '/login/v2/flow/' + token;
+document.getElementById('login-flow-form').action = `/login/v2/flow/${token}`;
 
 // Check if OIDC is available and configure SSO button
-(async function() {
+(async () => {
     try {
-        var resp = await fetch('/api/auth/oidc/providers');
+        const resp = await fetch('/api/auth/oidc/providers');
         if (!resp.ok) return;
-        var info = await resp.json();
+        const info = await resp.json();
         if (!info.enabled) return;
 
         // Show OIDC section
         document.getElementById('oidc-section').classList.remove('hidden');
 
         // Update button text with provider name
-        var btn = document.getElementById('oidc-button');
-        btn.textContent = 'Sign in with ' + (info.provider_name || 'SSO');
+        const btn = document.getElementById('oidc-button');
+        btn.textContent = `Sign in with ${info.provider_name || 'SSO'}`;
 
         // If password login is disabled, hide the password form
         if (!info.password_login_enabled) {
@@ -29,10 +29,10 @@ document.getElementById('login-flow-form').action = '/login/v2/flow/' + token;
         }
 
         // SSO button redirects to the OIDC flow for this NC token
-        btn.addEventListener('click', function() {
-            window.location.href = '/login/v2/flow/' + token + '/oidc';
+        btn.addEventListener('click', () => {
+            window.location.href = `/login/v2/flow/${token}/oidc`;
         });
-    } catch(e) {
+    } catch (_e) {
         // OIDC not available — silently keep password-only mode
     }
 })();

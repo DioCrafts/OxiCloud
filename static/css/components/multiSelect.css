@@ -1,143 +1,150 @@
 /* Multi-Select – checkboxes & batch action bar */
 .list-header-checkbox,
 .file-item .checkbox-cell {
-	display: flex;
-	align-items: center;
-	justify-content: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .list-header-checkbox input[type="checkbox"],
 .file-item .checkbox-cell input[type="checkbox"] {
-	width: 17px;
-	height: 17px;
-	cursor: pointer;
-	accent-color: #ff5e3a;
-	border-radius: 4px;
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: #ff5e3a;
+    border-radius: 4px;
 }
 
 .list-header.selection-mode {
-	grid-template-columns: 36px 1fr;
-	background-color: #1e293b;
-	color: #fff;
-	border-bottom-color: #334155;
+    grid-template-columns: 36px 1fr;
+    background-color: #1e293b;
+    color: #fff;
+    border-bottom-color: #334155;
 }
 
 .list-header.selection-mode .list-header-checkbox input[type="checkbox"] {
-	accent-color: #ff5e3a;
+    accent-color: #ff5e3a;
 }
 
 .batch-selection-info {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 16px;
-	min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-width: 0;
 }
 
 .batch-selection-bar {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	background: #1e293b;
-	color: #fff;
-	padding: 10px 20px;
-	border-radius: 12px;
-	margin: 0 0 12px;
-	height: 60px;
-	overflow: hidden;
-	transform: translateY(-8px);
-	transition: opacity 0.2s, max-height 0.25s, transform 0.2s, margin 0.2s, padding 0.2s;
-	pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #1e293b;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 12px;
+    margin: 0 0 12px;
+    height: 60px;
+    overflow: hidden;
+    transform: translateY(-8px);
+    transition:
+        opacity 0.2s,
+        max-height 0.25s,
+        transform 0.2s,
+        margin 0.2s,
+        padding 0.2s;
+    pointer-events: auto;
 }
 
 .batch-bar-left {
-	display: flex;
-	align-items: center;
-	gap: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .batch-bar-close {
-	background: none;
-	border: none;
-	color: rgba(255,255,255,0.7);
-	cursor: pointer;
-	font-size: 14px;
-	padding: 4px 6px;
-	border-radius: 6px;
-	transition: background 0.15s, color 0.15s;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 
 .batch-bar-close:hover {
-	background: rgba(255,255,255,0.1);
-	color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
 }
 
 .batch-bar-count {
-	font-size: 14px;
-	font-weight: 600;
-	white-space: nowrap;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .batch-bar-actions {
-	display: flex;
-	align-items: center;
-	gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .batch-btn {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 7px 14px;
-	border: none;
-	border-radius: 8px;
-	background: rgba(255,255,255,0.1);
-	color: #fff;
-	font-size: 13px;
-	font-weight: 500;
-	cursor: pointer;
-	transition: background 0.15s;
-	white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
 }
 
 .batch-btn:hover {
-	background: rgba(255,255,255,0.2);
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .batch-btn-danger {
-	background: rgba(239,68,68,0.25);
-	color: #fca5a5;
+    background: rgba(239, 68, 68, 0.25);
+    color: #fca5a5;
 }
 
 .batch-btn-danger:hover {
-	background: rgba(239,68,68,0.4);
-	color: #fff;
+    background: rgba(239, 68, 68, 0.4);
+    color: #fff;
 }
 
 @media (max-width: 640px) {
-	.batch-btn span {
-		display: none;
-	}
+    .batch-btn span {
+        display: none;
+    }
 
-	.batch-btn {
-		padding: 7px 10px;
-	}
+    .batch-btn {
+        padding: 7px 10px;
+    }
 }
 
 [data-theme="dark"] .list-header-checkbox input,
 [data-theme="dark"] .file-item .checkbox-cell input,
 [data-theme="dark"] .file-item .checkbox-cell input {
-	accent-color: #ff5e3a;
+    accent-color: #ff5e3a;
 }
 
 [data-theme="dark"] .batch-selection-bar {
-	background-color: #1e293b;
-	border-color: #334155;
-	color: #e2e8f0;
+    background-color: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
 }
 
 [data-theme="dark"] .list-header.selection-mode {
-	background-color: #0f172a;
-	border-bottom-color: #334155;
-	color: #e2e8f0;
+    background-color: #0f172a;
+    border-bottom-color: #334155;
+    color: #e2e8f0;
 }

@@ -1,7 +1,7 @@
-document.getElementById('close-window-btn').addEventListener('click', function() {
+document.getElementById('close-window-btn').addEventListener('click', () => {
     window.close();
 });
 // Auto-close after 3 seconds
-setTimeout(function() {
+setTimeout(() => {
     window.close();
 }, 3000);

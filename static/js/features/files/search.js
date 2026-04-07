@@ -47,7 +47,7 @@ const search = {
                 try {
                     const errorJson = await response.json();
                     errorText = errorJson.error || response.statusText;
-                } catch (e) {
+                } catch (_e) {
                     errorText = response.statusText;
                 }
                 console.error(`Search error: ${errorText}`);
@@ -56,7 +56,13 @@ const search = {
         } catch (error) {
             console.error('Error performing search:', error);
             window.ui.showNotification('Error', 'Error performing search');
-            return { files: [], folders: [], total_count: 0, query_time_ms: 0, sort_by: 'relevance' };
+            return {
+                files: [],
+                folders: [],
+                total_count: 0,
+                query_time_ms: 0,
+                sort_by: 'relevance'
+            };
         }
     },
 
@@ -107,10 +113,8 @@ const search = {
         const filesList = document.getElementById('files-list');
 
         // Search results header with query time and sort controls
-        const totalCount = results.total_count || (results.files.length + results.folders.length);
-        const queryTimeText = results.query_time_ms !== undefined
-            ? ` <span class="search-time">(${results.query_time_ms}ms)</span>`
-            : '';
+        const totalCount = results.total_count || results.files.length + results.folders.length;
+        const queryTimeText = results.query_time_ms !== undefined ? ` <span class="search-time">(${results.query_time_ms}ms)</span>` : '';
 
         const searchHeader = document.createElement('div');
         searchHeader.className = 'search-results-header';
@@ -138,7 +142,7 @@ const search = {
         if (sortSelect) {
             sortSelect.addEventListener('change', () => {
                 const searchInput = document.querySelector('.search-container input');
-                if (searchInput && searchInput.value.trim()) {
+                if (searchInput?.value.trim()) {
                     const event = new CustomEvent('search-resort', {
                         detail: { sort_by: sortSelect.value }
                     });
@@ -169,12 +173,12 @@ const search = {
         }
 
         // Render folders (server-provided enriched data)
-        results.folders.forEach(folder => {
+        results.folders.forEach((folder) => {
             window.ui.addFolderToView(folder);
         });
 
         // Render files (server-provided enriched data)
-        results.files.forEach(file => {
+        results.files.forEach((file) => {
             window.ui.addFileToView(file);
         });
     },

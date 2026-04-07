@@ -79,8 +79,11 @@
     border: 2px solid #e2e8f0;
     cursor: pointer;
     background: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        border-color 0.2s ease;
 }
 
 .photo-tile img {
@@ -93,7 +96,7 @@
 
 .photo-tile:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
     border-color: #cbd5e0;
 }
 
@@ -134,7 +137,9 @@
 .photo-tile.selected {
     border-color: #ff5e3a;
     background: #fff8f6;
-    box-shadow: 0 0 0 1px rgba(255, 94, 58, 0.15), 0 4px 12px rgba(255, 94, 58, 0.1);
+    box-shadow:
+        0 0 0 1px rgba(255, 94, 58, 0.15),
+        0 4px 12px rgba(255, 94, 58, 0.1);
 }
 
 .photo-tile.selected img {
@@ -221,7 +226,9 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Selection bar */

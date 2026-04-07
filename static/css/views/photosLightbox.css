@@ -100,7 +100,7 @@
     left: 0;
     right: 0;
     padding: 16px 70px 16px 20px;
-    background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
     color: #fff;
     z-index: 10001;
 }
@@ -129,7 +129,7 @@
     left: 0;
     right: 0;
     padding: 16px 20px;
-    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
     display: flex;
     align-items: center;
     justify-content: center;

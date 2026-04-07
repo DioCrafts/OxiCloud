@@ -16,7 +16,13 @@ const uiNotifications = {
             } else if (normalizedTitle.includes('favorite') || normalizedTitle.includes('favorit') || normalizedTitle.includes('fav')) {
                 icon = 'fa-star';
                 iconClass = 'success';
-            } else if (normalizedTitle.includes('delete') || normalizedTitle.includes('removed') || normalizedTitle.includes('trash') || normalizedTitle.includes('rename') || normalizedTitle.includes('complete')) {
+            } else if (
+                normalizedTitle.includes('delete') ||
+                normalizedTitle.includes('removed') ||
+                normalizedTitle.includes('trash') ||
+                normalizedTitle.includes('rename') ||
+                normalizedTitle.includes('complete')
+            ) {
                 icon = 'fa-check-circle';
                 iconClass = 'success';
             }

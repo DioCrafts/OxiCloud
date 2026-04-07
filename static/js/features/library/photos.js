@@ -202,14 +202,12 @@ const photosView = {
             for (const file of files) tilesHtml += this._renderTile(file);
 
             // Does this date-group already exist in the DOM?
-            const existingHeader = this._container.querySelector(
-                `.photos-day-header[data-group="${CSS.escape(label)}"]`
-            );
+            const existingHeader = this._container.querySelector(`.photos-day-header[data-group="${CSS.escape(label)}"]`);
 
             if (existingHeader) {
                 // Append tiles to existing grid and update count badge
                 const grid = existingHeader.nextElementSibling;
-                if (grid && grid.classList.contains('photos-grid')) {
+                if (grid?.classList.contains('photos-grid')) {
                     grid.insertAdjacentHTML('beforeend', tilesHtml);
                     const countSpan = existingHeader.querySelector('.photos-day-count');
                     if (countSpan) countSpan.textContent = grid.children.length;
@@ -230,10 +228,9 @@ const photosView = {
 
     /** Generate HTML for a single photo/video tile */
     _renderTile(file) {
-        const isVideo = file.mime_type && file.mime_type.startsWith('video/');
+        const isVideo = file.mime_type?.startsWith('video/');
         const selected = this.selected.has(file.id) ? ' selected' : '';
-        const cachedThumb = isVideo && this._videoThumbCache.has(file.id)
-            ? this._videoThumbCache.get(file.id) : null;
+        const cachedThumb = isVideo && this._videoThumbCache.has(file.id) ? this._videoThumbCache.get(file.id) : null;
         const thumbUrl = cachedThumb || `/api/files/${file.id}/thumbnail/preview`;
         let h = `<div class="photo-tile${selected}" data-id="${this._escAttr(file.id)}" data-mime="${this._escAttr(file.mime_type)}">`;
         h += `<div class="photo-check"><i class="fas fa-check"></i></div>`;
@@ -248,9 +245,12 @@ const photosView = {
         this._destroyObserver();
         const sentinel = this._container?.querySelector('.photos-sentinel');
         if (sentinel && !this.exhausted) {
-            this._observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) this._loadPage();
-            }, { rootMargin: '400px' });
+            this._observer = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0].isIntersecting) this._loadPage();
+                },
+                { rootMargin: '400px' }
+            );
             this._observer.observe(sentinel);
         }
     },
@@ -266,9 +266,7 @@ const photosView = {
      *  for items[startIndex..] — avoids re-scanning the entire DOM. */
     _setupVideoThumbnails(startIndex = 0) {
         const tiles = this._container.querySelectorAll('.photo-tile[data-mime^="video/"]');
-        const newIds = startIndex > 0
-            ? new Set(this.items.slice(startIndex).map(f => f.id))
-            : null;
+        const newIds = startIndex > 0 ? new Set(this.items.slice(startIndex).map((f) => f.id)) : null;
 
         for (const tile of tiles) {
             const fileId = tile.dataset.id;
@@ -278,9 +276,13 @@ const photosView = {
             const img = tile.querySelector('img');
             if (!img) continue;
 
-            img.addEventListener('error', () => {
-                this._enqueueVideoThumbnail(tile, img);
-            }, { once: true });
+            img.addEventListener(
+                'error',
+                () => {
+                    this._enqueueVideoThumbnail(tile, img);
+                },
+                { once: true }
+            );
         }
     },
 
@@ -315,78 +317,96 @@ const photosView = {
         // Auth is handled via HttpOnly cookie — direct URL works
         video.src = `/api/files/${fileId}`;
 
-        video.addEventListener('loadeddata', () => {
-            // Seek to 25 % of duration, clamped between 0.5 s and 5 s
-            video.currentTime = Math.min(5, Math.max(0.5, video.duration * 0.25));
-        }, { once: true });
+        video.addEventListener(
+            'loadeddata',
+            () => {
+                // Seek to 25 % of duration, clamped between 0.5 s and 5 s
+                video.currentTime = Math.min(5, Math.max(0.5, video.duration * 0.25));
+            },
+            { once: true }
+        );
 
-        video.addEventListener('seeked', () => {
-            // Pre-scale to thumbnail size in the browser — saves ~22× RAM,
-            // ~15× bandwidth, and lets the server skip resize entirely.
-            const MAX_THUMB = 400; // must match ThumbnailSize::Preview
-            const scale = Math.min(MAX_THUMB / video.videoWidth,
-                                   MAX_THUMB / video.videoHeight, 1);
-            const canvas = document.createElement('canvas');
-            canvas.width  = Math.round(video.videoWidth  * scale);
-            canvas.height = Math.round(video.videoHeight * scale);
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        video.addEventListener(
+            'seeked',
+            () => {
+                // Pre-scale to thumbnail size in the browser — saves ~22× RAM,
+                // ~15× bandwidth, and lets the server skip resize entirely.
+                const MAX_THUMB = 400; // must match ThumbnailSize::Preview
+                const scale = Math.min(MAX_THUMB / video.videoWidth, MAX_THUMB / video.videoHeight, 1);
+                const canvas = document.createElement('canvas');
+                canvas.width = Math.round(video.videoWidth * scale);
+                canvas.height = Math.round(video.videoHeight * scale);
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // JPEG: explicit quality control, universally supported,
-            // and server stores as-is when dimensions fit (zero re-encode).
-            const mimeType = 'image/jpeg';
+                // JPEG: explicit quality control, universally supported,
+                // and server stores as-is when dimensions fit (zero re-encode).
+                const mimeType = 'image/jpeg';
 
-            canvas.toBlob((blob) => {
-                if (!blob) {
-                    this._drainDecodeQueue();
-                    return;
-                }
+                canvas.toBlob(
+                    (blob) => {
+                        if (!blob) {
+                            this._drainDecodeQueue();
+                            return;
+                        }
 
-                // Show immediately in the tile
-                const url = URL.createObjectURL(blob);
-                img.src = url;
-                // Cache locally so re-renders are instant
-                this._videoThumbCache.set(fileId, url);
+                        // Show immediately in the tile
+                        const url = URL.createObjectURL(blob);
+                        img.src = url;
+                        // Cache locally so re-renders are instant
+                        this._videoThumbCache.set(fileId, url);
 
-                // Upload to server for permanent caching
-                const token = localStorage.getItem('token')
-                    || sessionStorage.getItem('token');
-                const headers = { 'Content-Type': blob.type, ...getCsrfHeaders() };
-                if (token) headers['Authorization'] = `Bearer ${token}`;
+                        // Upload to server for permanent caching
+                        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+                        const headers = { 'Content-Type': blob.type, ...getCsrfHeaders() };
+                        if (token) headers.Authorization = `Bearer ${token}`;
 
-                fetch(`/api/files/${fileId}/thumbnail/preview`, {
-                    method: 'PUT',
-                    headers,
-                    credentials: 'same-origin',
-                    body: blob,
-                }).then((resp) => {
-                    if (resp.ok) {
-                        // Switch from blob URL to server URL so the blob
-                        // can be garbage-collected and future loads use
-                        // the permanently cached JPEG from the server.
-                        const serverUrl = `/api/files/${fileId}/thumbnail/preview?v=1`;
-                        this._videoThumbCache.set(fileId, serverUrl);
-                    }
-                }).catch(() => { /* best-effort */ });
+                        fetch(`/api/files/${fileId}/thumbnail/preview`, {
+                            method: 'PUT',
+                            headers,
+                            credentials: 'same-origin',
+                            body: blob
+                        })
+                            .then((resp) => {
+                                if (resp.ok) {
+                                    // Switch from blob URL to server URL so the blob
+                                    // can be garbage-collected and future loads use
+                                    // the permanently cached JPEG from the server.
+                                    const serverUrl = `/api/files/${fileId}/thumbnail/preview?v=1`;
+                                    this._videoThumbCache.set(fileId, serverUrl);
+                                }
+                            })
+                            .catch(() => {
+                                /* best-effort */
+                            });
 
-                // Release video resources
+                        // Release video resources
+                        video.src = '';
+                        video.load();
+                        this._drainDecodeQueue();
+                    },
+                    mimeType,
+                    0.8
+                );
+            },
+            { once: true }
+        );
+
+        // If the video can't be loaded at all, keep the generic play badge
+        video.addEventListener(
+            'error',
+            () => {
                 video.src = '';
                 video.load();
                 this._drainDecodeQueue();
-            }, mimeType, 0.80);
-        }, { once: true });
-
-        // If the video can't be loaded at all, keep the generic play badge
-        video.addEventListener('error', () => {
-            video.src = '';
-            video.load();
-            this._drainDecodeQueue();
-        }, { once: true });
+            },
+            { once: true }
+        );
     },
 
     /** Render the group mode toolbar */
     _renderToolbar() {
-        const t = (k, d) => window.i18n ? window.i18n.t(k) : d;
+        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
         const modes = [
             ['daily', t('photos.view_daily', 'Day')],
             ['monthly', t('photos.view_monthly', 'Month')],
@@ -403,7 +423,7 @@ const photosView = {
 
     /** Render empty state */
     _renderEmpty() {
-        const t = (k, d) => window.i18n ? window.i18n.t(k) : d;
+        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
         this._container.innerHTML = `
             <div class="photos-empty">
                 <i class="fas fa-images"></i>
@@ -422,10 +442,16 @@ const photosView = {
             if (this.groupMode === 'yearly') {
                 key = String(d.getFullYear());
             } else if (this.groupMode === 'monthly') {
-                key = d.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+                key = d.toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'long'
+                });
             } else {
                 key = d.toLocaleDateString(undefined, {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
                 });
             }
             if (!map.has(key)) map.set(key, []);
@@ -456,7 +482,7 @@ const photosView = {
         }
 
         // Otherwise open lightbox
-        const idx = this.items.findIndex(f => f.id === id);
+        const idx = this.items.findIndex((f) => f.id === id);
         if (idx >= 0 && window.photosLightbox) {
             window.photosLightbox.open(this.items, idx);
         }
@@ -490,7 +516,7 @@ const photosView = {
             document.body.appendChild(bar);
         }
 
-        const t = (k, d) => window.i18n ? window.i18n.t(k) : d;
+        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
         const count = this.selected.size;
         bar.innerHTML = `
             <span class="selection-count">${count} ${t('photos.items_selected', 'selected')}</span>
@@ -501,7 +527,9 @@ const photosView = {
 
         bar.querySelector('#photos-sel-clear').onclick = () => {
             this.selected.clear();
-            this._container.querySelectorAll('.photo-tile.selected').forEach(t => t.classList.remove('selected'));
+            this._container.querySelectorAll('.photo-tile.selected').forEach((t) => {
+                t.classList.remove('selected');
+            });
             this._hideSelectionBar();
         };
 
@@ -518,7 +546,7 @@ const photosView = {
                     console.error('Delete failed:', fid, err);
                 }
             }
-            this.items = this.items.filter(f => !this.selected.has(f.id));
+            this.items = this.items.filter((f) => !this.selected.has(f.id));
             this.selected.clear();
             this._hideSelectionBar();
             this._renderedCount = 0;
@@ -571,7 +599,9 @@ const photosView = {
     },
 
     _escAttr(s) {
-        return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        return String(s || '')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
     }
 };
 

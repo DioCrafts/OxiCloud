@@ -25,10 +25,12 @@ const fileSharing = {
             item_name: options.name || null,
             item_type: itemType,
             password: options.password || null,
-            expires_at: options.expirationDate
-                ? Math.floor(new Date(options.expirationDate).getTime() / 1000)
-                : null,
-            permissions: options.permissions || { read: true, write: false, reshare: false }
+            expires_at: options.expirationDate ? Math.floor(new Date(options.expirationDate).getTime() / 1000) : null,
+            permissions: options.permissions || {
+                read: true,
+                write: false,
+                reshare: false
+            }
         };
 
         const res = await fetch('/api/shares', {
@@ -71,13 +73,16 @@ const fileSharing = {
      */
     async getSharedLinksForItem(itemId, itemType) {
         try {
-            const params = new URLSearchParams({ item_id: itemId, item_type: itemType });
+            const params = new URLSearchParams({
+                item_id: itemId,
+                item_type: itemType
+            });
             const res = await fetch(`/api/shares?${params}`, {
                 headers: this._headers(false)
             });
             if (!res.ok) return [];
             const data = await res.json();
-            return Array.isArray(data) ? data : (data.items || []);
+            return Array.isArray(data) ? data : data.items || [];
         } catch (error) {
             console.error('Error getting shared links for item:', error);
             return [];
@@ -184,7 +189,7 @@ const fileSharing = {
      */
     init() {
         console.log('File sharing module initialized (API-backed)');
-        document.querySelectorAll('.nav-item').forEach(item => {
+        document.querySelectorAll('.nav-item').forEach((item) => {
             const span = item.querySelector('span');
             if (span && span.getAttribute('data-i18n') === 'nav.shared') {
                 item.addEventListener('click', () => {

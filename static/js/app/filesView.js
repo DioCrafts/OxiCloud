@@ -21,12 +21,11 @@
  * @param {string} id the id of the folder
  * @returns {Promise<FolderInfo>}
  */
-async function getFolder( id) {
-
+async function getFolder(id) {
     /** @type {HeadersInit} */
     const headers = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+        Pragma: 'no-cache'
     };
 
     /** @type {RequestInit} */
@@ -35,12 +34,11 @@ async function getFolder( id) {
         credentials: 'same-origin',
         cache: 'no-store'
     };
-    
-    let folderInformations = await fetch( `/api/folders/${id}`, requestOptions);
+
+    const folderInformations = await fetch(`/api/folders/${id}`, requestOptions);
     if (folderInformations.ok) {
-        return folderInformations.json()
-    }
-    else {
+        return folderInformations.json();
+    } else {
         console.warn(`Error fetching folder ${id}`);
         return Promise.reject(null);
     }
@@ -50,15 +48,15 @@ async function getFolder( id) {
  * rebuild breadcrumb from selected folder (iterate up to root)
  */
 async function rebuildBreadCrumb() {
-
     const app = window.app;
-    /** 
+
+    /**
      * Store the leaf (this is the current displayed folder)
-     * @type {FolderInfo | null} 
+     * @type {FolderInfo | null}
      */
     let currentFolderInfo = null;
 
-    // rebuild full breadcrumb, 
+    // rebuild full breadcrumb,
     // TODO: to optimize, data may already be known / or ETAG could be interesting to reduce load
     app.breadcrumbPath = [];
 
@@ -69,7 +67,7 @@ async function rebuildBreadCrumb() {
     while (id !== null) {
         console.log(`fetching folder information for folder ${id}`);
         try {
-            let folderInfo = await getFolder(id);
+            const folderInfo = await getFolder(id);
 
             // store the Leaf which is the current folder
             if (currentFolderInfo === null) {
@@ -77,75 +75,77 @@ async function rebuildBreadCrumb() {
             }
 
             // XXX do not enter root into bread crumb updateBreadcrumb() method always display it
-            if(!folderInfo.is_root) {
-                app.breadcrumbPath.unshift( {id: folderInfo.id, name: folderInfo.name});
+            if (!folderInfo.is_root) {
+                app.breadcrumbPath.unshift({
+                    id: folderInfo.id,
+                    name: folderInfo.name
+                });
             }
 
             // iterate to parent folder
             id = folderInfo.parent_id;
-        }
-        catch( e) {
+        } catch (_e) {
             console.log(`Error loading information from folder ${app.currentPath}, falling back to ${app.userHomeFolderId}`);
             // fallback of root
             window.uiNotifications.show(
-                'error: folder not found or permission denied', 
-                'the given folder is not available or you do not have sufficient rights' 
+                'error: folder not found or permission denied',
+                'the given folder is not available or you do not have sufficient rights'
             );
             app.breadcrumbPath = [];
             id = app.userHomeFolderId;
             app.currentPath = id;
         }
     }
-    // store informations on the current folder 
+
+    // store informations on the current folder
     app.currentFolderInfo = currentFolderInfo;
 }
 
 /**
  * Files view loading logic
- * 
+ *
  * @param {Object} options
  * @param {boolean} [options.insertHistory] add browser history (default true)
  * @param {boolean} [options.forceRefresh] force refresh of content
  */
-async function loadFiles(options = { insertHistory: true}) {
+async function loadFiles(options = { insertHistory: true }) {
     const app = window.app;
-    const elements = window.appElements;
 
     try {
-        console.log("Starting loadFiles() - loading files...", options);
+        console.log('Starting loadFiles() - loading files...', options);
 
         const forceRefresh = options.forceRefresh || false;
 
         if (window.isLoadingFiles) {
-            console.log("A file load is already in progress, ignoring request");
+            console.log('A file load is already in progress, ignoring request');
             return;
         }
 
         window.isLoadingFiles = true;
 
         // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
-        let loadingFiles = setTimeout( () => {
+        const loadingFiles = setTimeout(() => {
             // display loader after few delay (will be canceled if result take less time)
             window.ui.showError(`
                 <div class="files-loading-spinner">
                     <div class="spinner"></div>
                     <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
                 </div>
-            `)
+            `);
         }, 100);
 
         if (!app.userHomeFolderId) {
             await window.resolveHomeFolder();
         }
 
-        const timestamp = new Date().getTime();
+        const timestamp = Math.floor(Date.now() / 1000);
 
         await rebuildBreadCrumb();
 
         // request a breadcrumb paint
         window.ui.updateBreadcrumb();
 
-        window.updateHistory( options.insertHistory || false);
+        window.updateHistory(options.insertHistory || false);
 
         let url;
 
@@ -158,7 +158,7 @@ async function loadFiles(options = { insertHistory: true}) {
                 console.log(`Loading user folder: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
             } else {
                 url = `/api/folders?t=${timestamp}`;
-                console.warn("Emergency fallback to root folder - this should not normally happen");
+                console.warn('Emergency fallback to root folder - this should not normally happen');
             }
         } else {
             url = `/api/folders/${app.currentPath}/listing?t=${timestamp}`;
@@ -168,7 +168,7 @@ async function loadFiles(options = { insertHistory: true}) {
         /** @type {HeadersInit} */
         const headers = {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
+            Pragma: 'no-cache'
         };
 
         /** @type {RequestInit} */
@@ -180,7 +180,6 @@ async function loadFiles(options = { insertHistory: true}) {
 
         if (forceRefresh) {
             url += `&force_refresh=true`;
-            // @ts-ignore
             requestOptions.headers['X-Force-Refresh'] = 'true';
             console.log('Forcing complete refresh ignoring cache');
         }
@@ -189,10 +188,10 @@ async function loadFiles(options = { insertHistory: true}) {
         const response = await fetch(url, requestOptions);
 
         // not required anymore
-        clearTimeout( loadingFiles);
+        clearTimeout(loadingFiles);
 
         if (response.status === 401 || response.status === 403) {
-            console.warn("Auth error when loading files, showing empty list");
+            console.warn('Auth error when loading files, showing empty list');
             // FIXME: i18n
             window.ui.showError(`<p>Could not load files</p>`);
             return;
@@ -225,7 +224,7 @@ async function loadFiles(options = { insertHistory: true}) {
                 let fileFound = null;
 
                 // lookup for the given fle
-                for( const file of fileList) {
+                for (const file of fileList) {
                     if (file.id === window.app.viewFile) {
                         fileFound = file;
                         break;
@@ -235,14 +234,13 @@ async function loadFiles(options = { insertHistory: true}) {
                 if (fileFound) {
                     console.log(`file ${window.app.viewFile} found, calling viewer`);
                     await window.inlineViewer.openFile(fileFound);
-                }
-                else {
+                } else {
                     // remove file
                     console.log(`file ${window.app.viewFile} not found`);
                     window.app.viewFile = null;
 
                     // correct url/history as file is not found
-                    window.updateHistory( false);
+                    window.updateHistory(false);
                 }
             }
         }
