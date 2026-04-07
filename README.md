@@ -214,6 +214,8 @@ Full reference: [`example.env`](example.env) · [Deployment guide](doc/deploymen
 
 ## Development
 
+### Server side
+
 ```bash
 cargo build                 # Dev build
 cargo run                   # Run locally
@@ -222,6 +224,16 @@ cargo clippy -- -D warnings # Lint (zero warnings policy)
 cargo fmt --all --check     # Format check
 RUST_LOG=debug cargo run    # Debug logging
 ```
+
+### Client side
+
+Run server in dev profile:
+
+```bash
+PROFILE=dev cargo run
+```
+
+CSS & JS linter is `biome` (can be installed via `cargo install biome-cli` or on MacOS: `brew install biome`)
 
 ### Project stats
 

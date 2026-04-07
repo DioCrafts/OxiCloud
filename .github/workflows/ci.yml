@@ -2,7 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [ "main", "dev" ]
+    branches:
+        - main
+        - dev
+        - "feat/**"
+        - "fix/**"
   pull_request:
     branches: [ "main", "dev" ]
 
@@ -12,8 +16,46 @@ env:
   DATABASE_URL: "postgres://postgres:postgres@localhost/oxicloud_test"
 
 jobs:
-  fmt:
+
+  # Detect which parts of the codebase changed
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'static/**'
+              - 'biome.json'
+              - 'jsconfig.json'
+            backend:
+              - 'src/**'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+
+  frontend-linter:
+    name: Frontend — Biome
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Biome
+        uses: biomejs/setup-biome@v2
+
+      - name: Run Biome check
+        run: biome ci static/
+
+  rust-fmt:
     name: Rustfmt
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -22,8 +64,10 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all --check
 
-  clippy:
+  rust-clippy:
     name: Clippy
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -33,8 +77,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --all-features -- -D warnings
 
-  test:
+  rust-test:
     name: Tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -65,8 +111,10 @@ jobs:
         env:
           DATABASE_URL: "postgres://postgres:postgres@localhost/oxicloud_test"
 
-  audit:
+  rust-audit:
     name: Security Audit
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -81,7 +129,7 @@ jobs:
   build:
     name: Build Check
     runs-on: ubuntu-latest
-    needs: [fmt, clippy, test]
+    needs: [frontend-linter, rust-fmt, rust-clippy, rust-test]
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
