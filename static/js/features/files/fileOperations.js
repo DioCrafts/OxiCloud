@@ -14,18 +14,15 @@ function getAuthHeaders() {
 
 // File Operations Module
 const fileOps = {
-
     // ========================================================================
     // Upload progress — notification bell integration
     // ========================================================================
     _currentBatchId: null,
-    _isUploading: false,  // Guard against concurrent upload calls
+    _isUploading: false, // Guard against concurrent upload calls
 
     /** Start a new upload batch in the notification bell */
     _initUploadToast(totalFiles, folderName) {
-        this._currentBatchId = window.notifications
-            ? window.notifications.addUploadBatch(totalFiles, folderName)
-            : null;
+        this._currentBatchId = window.notifications ? window.notifications.addUploadBatch(totalFiles, folderName) : null;
     },
 
     /** Finalise the batch in the notification bell */
@@ -100,7 +97,9 @@ const fileOps = {
             const resetStallTimer = () => {
                 if (stallTimer) clearTimeout(stallTimer);
                 stallTimer = setTimeout(() => {
-                    try { xhr.abort(); } catch (_) {}
+                    try {
+                        xhr.abort();
+                    } catch (_) {}
                     safeUpdateFile(0, 'error');
                     finalize({
                         ok: false,
@@ -112,7 +111,9 @@ const fileOps = {
 
             resetStallTimer();
             hardTimer = setTimeout(() => {
-                try { xhr.abort(); } catch (_) {}
+                try {
+                    xhr.abort();
+                } catch (_) {}
                 safeUpdateFile(0, 'error');
                 finalize({
                     ok: false,
@@ -144,7 +145,9 @@ const fileOps = {
                 if (xhr.status >= 200 && xhr.status < 300) {
                     safeUpdateFile(100, 'done');
                     let data = null;
-                    try { data = JSON.parse(xhr.responseText); } catch (_) {}
+                    try {
+                        data = JSON.parse(xhr.responseText);
+                    } catch (_) {}
                     finalize({ ok: true, data });
                 } else {
                     safeUpdateFile(0, 'error');
@@ -167,12 +170,20 @@ const fileOps = {
 
             xhr.addEventListener('abort', () => {
                 safeUpdateFile(0, 'error');
-                finalize({ ok: false, isTimeout: true, errorMsg: `Upload aborted/stalled: ${fileName}` });
+                finalize({
+                    ok: false,
+                    isTimeout: true,
+                    errorMsg: `Upload aborted/stalled: ${fileName}`
+                });
             });
 
             xhr.addEventListener('timeout', () => {
                 safeUpdateFile(0, 'error');
-                finalize({ ok: false, isTimeout: true, errorMsg: `Timeout after ${Math.round(timeoutMs / 1000)}s` });
+                finalize({
+                    ok: false,
+                    isTimeout: true,
+                    errorMsg: `Timeout after ${Math.round(timeoutMs / 1000)}s`
+                });
             });
 
             xhr.open('POST', '/api/files/upload');
@@ -218,18 +229,20 @@ const fileOps = {
 
             // Read body as text first (always consume the response fully)
             let rawText = '';
-            try { rawText = await response.text(); } catch (_) {}
+            try {
+                rawText = await response.text();
+            } catch (_) {}
 
             let body = null;
-            try { body = JSON.parse(rawText); } catch (_) {}
+            try {
+                body = JSON.parse(rawText);
+            } catch (_) {}
 
             if (response.ok) {
                 return { ok: true, data: body };
             }
 
-            const errorMsg = body && typeof body === 'object'
-                ? (body.error || null)
-                : (rawText || null);
+            const errorMsg = body && typeof body === 'object' ? body.error || null : rawText || null;
             const isQuotaError = (body && typeof body === 'object' && body.error_type === 'QuotaExceeded') || response.status === 507;
             return { ok: false, errorMsg, isQuotaError };
         } catch (e) {
@@ -237,9 +250,7 @@ const fileOps = {
             return {
                 ok: false,
                 isTimeout,
-                errorMsg: isTimeout
-                    ? `Timeout after ${Math.round(timeoutMs / 1000)}s`
-                    : `Fetch upload failed: ${e?.message || 'network error'}`
+                errorMsg: isTimeout ? `Timeout after ${Math.round(timeoutMs / 1000)}s` : `Fetch upload failed: ${e?.message || 'network error'}`
             };
         } finally {
             clearTimeout(timeoutId);
@@ -269,8 +280,12 @@ const fileOps = {
             // Legacy progress bar (inside dropzone) — keep working for drag-drop
             const progressBar = document.querySelector('.progress-fill');
             const uploadProgressDiv = document.querySelector('.upload-progress');
-            if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
-            if (progressBar) { progressBar.style.width = '0%'; }
+            if (uploadProgressDiv) {
+                uploadProgressDiv.style.display = 'block';
+            }
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
 
             // Filter out unreadable entries (typically dropped folders/placeholders)
             const readableFiles = [];
@@ -321,7 +336,8 @@ const fileOps = {
                 formData.append('file', file);
 
                 console.log(`Uploading file to folder: ${targetFolderId || 'root'}`, {
-                    file: file.name, size: file.size
+                    file: file.name,
+                    size: file.size
                 });
 
                 // Scale stall timeout with file size:
@@ -334,7 +350,7 @@ const fileOps = {
 
                 // Legacy dropzone bar
                 if (progressBar) {
-                    progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
+                    progressBar.style.width = (uploadedCount / totalFiles) * 100 + '%';
                 }
                 // Notify bell of per-file completion
                 if (window.notifications && batchId) {
@@ -378,7 +394,9 @@ const fileOps = {
 
             // Refresh storage usage display
             if (typeof window.refreshUserData === 'function') {
-                try { await window.refreshUserData(); } catch (_) {}
+                try {
+                    await window.refreshUserData();
+                } catch (_) {}
             }
 
             try {
@@ -425,8 +443,12 @@ const fileOps = {
 
         const progressBar = document.querySelector('.progress-fill');
         const uploadProgressDiv = document.querySelector('.upload-progress');
-        if (uploadProgressDiv) { uploadProgressDiv.style.display = 'block'; }
-        if (progressBar) { progressBar.style.width = '0%'; }
+        if (uploadProgressDiv) {
+            uploadProgressDiv.style.display = 'block';
+        }
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
 
         try {
             // Filter unreadable entries
@@ -460,9 +482,7 @@ const fileOps = {
                 }
             }
 
-            const sortedPaths = [...folderPaths].sort((a, b) =>
-                a.split('/').length - b.split('/').length
-            );
+            const sortedPaths = [...folderPaths].sort((a, b) => a.split('/').length - b.split('/').length);
 
             // Create folders first
             for (const folderPath of sortedPaths) {
@@ -498,16 +518,23 @@ const fileOps = {
             }
 
             // Detect root folder(s) from entry paths
-            const rootFolderNames = [...new Set(validEntries.map((entry) => {
-                const rel = entry.relativePath || entry.file.name;
-                return rel.split('/')[0] || '';
-            }).filter(Boolean))];
+            const rootFolderNames = [
+                ...new Set(
+                    validEntries
+                        .map((entry) => {
+                            const rel = entry.relativePath || entry.file.name;
+                            return rel.split('/')[0] || '';
+                        })
+                        .filter(Boolean)
+                )
+            ];
             const locale = window.i18n?.getCurrentLocale?.() || 'en';
-            const rootFolderLabel = rootFolderNames.length <= 1
-                ? (rootFolderNames[0] || '')
-                : (locale.startsWith('es')
-                    ? `${rootFolderNames.length} carpetas`
-                    : `${rootFolderNames.length} folders`);
+            const rootFolderLabel =
+                rootFolderNames.length <= 1
+                    ? rootFolderNames[0] || ''
+                    : locale.startsWith('es')
+                      ? `${rootFolderNames.length} carpetas`
+                      : `${rootFolderNames.length} folders`;
 
             // Upload files — pass folder name for folder-level progress display
             this._initUploadToast(totalFiles, rootFolderLabel);
@@ -522,8 +549,8 @@ const fileOps = {
             // so all files reaching fetch() are regular. Keep-alive
             // reuses TCP connections across workers for speed.
             const CONCURRENCY = 10;
-            const TIMEOUT_MS = 10000;       // 10s for normal files
-            const TIMEOUT_MS_ZERO = 3000;   // 3s for 0-byte files
+            const TIMEOUT_MS = 10000; // 10s for normal files
+            const TIMEOUT_MS_ZERO = 3000; // 3s for 0-byte files
 
             const uploadOneFile = async (idx) => {
                 if (quotaStop) return;
@@ -542,13 +569,12 @@ const fileOps = {
                     // but block on open(). Pre-read only 0-byte files into
                     // memory; files with size>0 are always regular files and
                     // go straight to FormData (zero extra memory copy).
-                    let uploadFile = file;          // default: use original File
+                    let uploadFile = file; // default: use original File
                     if (file.size === 0) {
                         try {
                             const buf = await Promise.race([
                                 file.arrayBuffer(),
-                                new Promise((_, rej) =>
-                                    setTimeout(() => rej(new Error('read-timeout')), 2000))
+                                new Promise((_, rej) => setTimeout(() => rej(new Error('read-timeout')), 2000))
                             ]);
                             uploadFile = new Blob([buf], {
                                 type: file.type || 'application/octet-stream'
@@ -558,7 +584,9 @@ const fileOps = {
                             uploadedCount++;
                             successCount++;
                             if (window.notifications && batchId) {
-                                try { window.notifications.fileCompleted(batchId, true); } catch (_) {}
+                                try {
+                                    window.notifications.fileCompleted(batchId, true);
+                                } catch (_) {}
                             }
                             return;
                         }
@@ -585,10 +613,12 @@ const fileOps = {
                 uploadedCount++;
 
                 if (window.notifications && batchId) {
-                    try { window.notifications.fileCompleted(batchId, result.ok); } catch (_) {}
+                    try {
+                        window.notifications.fileCompleted(batchId, result.ok);
+                    } catch (_) {}
                 }
                 if (progressBar && uploadedCount % 10 === 0) {
-                    progressBar.style.width = ((uploadedCount / totalFiles) * 100) + '%';
+                    progressBar.style.width = (uploadedCount / totalFiles) * 100 + '%';
                 }
                 if (uploadedCount % 50 === 0 || uploadedCount === totalFiles) {
                     console.log(`Progress: ${uploadedCount}/${totalFiles} (${successCount} ok)`);
@@ -627,7 +657,9 @@ const fileOps = {
             this._finishUploadToast(successCount, totalFiles);
 
             if (typeof window.refreshUserData === 'function') {
-                try { await window.refreshUserData(); } catch (_) {}
+                try {
+                    await window.refreshUserData();
+                } catch (_) {}
             }
 
             try {
@@ -651,7 +683,7 @@ const fileOps = {
     async createFolder(name) {
         try {
             console.log('Creating folder with name:', name);
-            
+
             // Send the actual request to the backend to create the folder
             const response = await fetch('/api/folders', {
                 method: 'POST',
@@ -670,11 +702,11 @@ const fileOps = {
                 // Get the created folder from the backend
                 const folder = await response.json();
                 console.log('Folder created successfully:', folder);
-                
+
                 // Optimistic UI: add folder card directly from server response
                 // — no reload needed since the backend already confirmed creation.
                 window.ui.addFolderToView(folder);
-                
+
                 window.ui.showNotification('Folder created', `"${name}" created successfully`);
             } else {
                 const errorData = await response.text();
@@ -702,7 +734,7 @@ const fileOps = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    folder_id: targetFolderId === "" ? null : targetFolderId
+                    folder_id: targetFolderId === '' ? null : targetFolderId
                 })
             });
 
@@ -744,7 +776,7 @@ const fileOps = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    parent_id: targetFolderId === "" ? null : targetFolderId
+                    parent_id: targetFolderId === '' ? null : targetFolderId
                 })
             });
 
@@ -785,9 +817,9 @@ const fileOps = {
      * @returns {Promise<BatchResult>} - Success status
      */
     async batchMove(fileIds, folderIds, targetFolderId) {
-
         // TODO ensure not moving a folder into itself
-        let success = 0, errors = 0;
+        let success = 0,
+            errors = 0;
 
         try {
             // Batch move files in a single request
@@ -795,7 +827,10 @@ const fileOps = {
                 const res = await fetch('/api/batch/files/move', {
                     method: 'POST',
                     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetFolderId })
+                    body: JSON.stringify({
+                        file_ids: fileIds,
+                        target_folder_id: targetFolderId
+                    })
                 });
                 const data = await res.json();
                 success += data.stats?.successful || 0;
@@ -807,14 +842,16 @@ const fileOps = {
                 const res = await fetch('/api/batch/folders/move', {
                     method: 'POST',
                     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ folder_ids: folderIds, target_folder_id: targetFolderId })
+                    body: JSON.stringify({
+                        folder_ids: folderIds,
+                        target_folder_id: targetFolderId
+                    })
                 });
                 const data = await res.json();
                 success += data.stats?.successful || 0;
                 errors += data.stats?.failed || 0;
             }
-        } 
-        catch (err) {
+        } catch (err) {
             console.error('Batch move error:', err);
             errors++;
         }
@@ -841,7 +878,7 @@ const fileOps = {
                 },
                 body: JSON.stringify({
                     file_ids: [fileId],
-                    target_folder_id: targetFolderId === "" ? null : targetFolderId
+                    target_folder_id: targetFolderId === '' ? null : targetFolderId
                 })
             });
 
@@ -890,17 +927,20 @@ const fileOps = {
      * @returns {Promise<boolean>} - Success status
      */
     async batchCopy(fileIds, folderIds, targetFolderId) {
-
         // FIXME ensure not moving a folder into itself
 
-        let success = 0, errors = 0;
+        let success = 0,
+            errors = 0;
         try {
             // Batch copy files
             if (fileIds.length > 0) {
                 const res = await fetch('/api/batch/files/copy', {
                     method: 'POST',
                     headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_ids: fileIds, target_folder_id: targetFolderId })
+                    body: JSON.stringify({
+                        file_ids: fileIds,
+                        target_folder_id: targetFolderId
+                    })
                 });
                 const data = await res.json();
                 success += data.stats?.successful || 0;
@@ -1027,11 +1067,13 @@ const fileOps = {
     async deleteFile(fileId, fileName) {
         const confirmed = await showConfirmDialog({
             title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `Are you sure you want to move the file "${fileName}" to trash?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
+            message: window.i18n
+                ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName })
+                : `Are you sure you want to move the file "${fileName}" to trash?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
         });
         if (!confirmed) return false;
-        
+
         try {
             // Use the trash API endpoint
             const response = await fetch(`/api/trash/files/${fileId}`, {
@@ -1049,7 +1091,7 @@ const fileOps = {
                     method: 'DELETE',
                     headers: getAuthHeaders()
                 });
-                
+
                 if (fallbackResponse.ok) {
                     window.loadFiles();
                     window.ui.showNotification('File deleted', `"${fileName}" deleted successfully`);
@@ -1075,11 +1117,13 @@ const fileOps = {
     async deleteFolder(folderId, folderName) {
         const confirmed = await showConfirmDialog({
             title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName }) : `Are you sure you want to move the folder "${folderName}" and all its contents to trash?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
+            message: window.i18n
+                ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName })
+                : `Are you sure you want to move the folder "${folderName}" and all its contents to trash?`,
+            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
         });
         if (!confirmed) return false;
-        
+
         try {
             // Use the trash API endpoint
             const response = await fetch(`/api/trash/folders/${folderId}`, {
@@ -1102,7 +1146,7 @@ const fileOps = {
                     method: 'DELETE',
                     headers: getAuthHeaders()
                 });
-                
+
                 if (fallbackResponse.ok) {
                     // If we're inside the folder we just deleted, go back up
                     if (window.app.currentPath === folderId) {
@@ -1123,7 +1167,7 @@ const fileOps = {
             return false;
         }
     },
-    
+
     /**
      * Get trash items
      * @returns {Promise<Array>} - List of trash items
@@ -1133,7 +1177,7 @@ const fileOps = {
             const response = await fetch('/api/trash', {
                 headers: getAuthHeaders()
             });
-            
+
             if (response.ok) {
                 return await response.json();
             } else {
@@ -1145,7 +1189,7 @@ const fileOps = {
             return [];
         }
     },
-    
+
     /**
      * Restore an item from trash
      * @param {string} trashId - Trash item ID
@@ -1161,7 +1205,7 @@ const fileOps = {
                 },
                 body: JSON.stringify({})
             });
-            
+
             if (response.ok) {
                 window.ui.showNotification('Item restored', 'Item restored successfully');
                 return true;
@@ -1175,7 +1219,7 @@ const fileOps = {
             return false;
         }
     },
-    
+
     /**
      * Permanently delete a trash item
      * @param {string} trashId - Trash item ID
@@ -1184,17 +1228,19 @@ const fileOps = {
     async deletePermanently(trashId) {
         const confirmed = await showConfirmDialog({
             title: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete') : 'Delete permanently',
-            message: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete_msg') : 'Are you sure you want to permanently delete this item? This action cannot be undone.',
-            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Delete permanently',
+            message: window.i18n
+                ? window.i18n.t('dialogs.confirm_permanent_delete_msg')
+                : 'Are you sure you want to permanently delete this item? This action cannot be undone.',
+            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Delete permanently'
         });
         if (!confirmed) return false;
-        
+
         try {
             const response = await fetch(`/api/trash/${trashId}`, {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
-            
+
             if (response.ok) {
                 window.ui.showNotification('Item deleted', 'Item permanently deleted');
                 return true;
@@ -1208,7 +1254,7 @@ const fileOps = {
             return false;
         }
     },
-    
+
     /**
      * Empty the trash
      * @returns {Promise<boolean>} - Operation success
@@ -1216,17 +1262,19 @@ const fileOps = {
     async emptyTrash() {
         const confirmed = await showConfirmDialog({
             title: window.i18n ? window.i18n.t('dialogs.confirm_empty_trash') : 'Empty trash',
-            message: window.i18n ? window.i18n.t('trash.empty_confirm') : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
-            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Empty trash',
+            message: window.i18n
+                ? window.i18n.t('trash.empty_confirm')
+                : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
+            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Empty trash'
         });
         if (!confirmed) return false;
-        
+
         try {
             const response = await fetch('/api/trash/empty', {
                 method: 'DELETE',
                 headers: getAuthHeaders()
             });
-            
+
             if (response.ok) {
                 window.ui.showNotification('Trash emptied', 'The trash has been emptied successfully');
                 return true;
@@ -1240,7 +1288,7 @@ const fileOps = {
             return false;
         }
     },
-    
+
     /**
      * Download a file
      * @param {string} fileId - File ID
@@ -1269,7 +1317,7 @@ const fileOps = {
             window.ui.showNotification('Error', 'Error downloading the file');
         }
     },
-    
+
     /**
      * Download a folder as ZIP
      * @param {string} folderId - Folder ID
@@ -1279,7 +1327,7 @@ const fileOps = {
         try {
             // Show notification to user
             window.ui.showNotification('Preparing download', 'Preparing the folder for download...');
-            
+
             const response = await fetch(`/api/folders/${folderId}/download?format=zip`, {
                 headers: getAuthHeaders()
             });

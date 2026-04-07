@@ -1,15 +1,12 @@
 /**
  * OxiCloud Internationalization (i18n) Module
- * 
+ *
  * This module provides functionality for internationalization of the OxiCloud web interface.
  * It loads translations from the server and provides functions to translate keys.
  */
 
 // Current locale code (default to browser locale if available, fallback to English)
-let currentLocale = 
-    (navigator.language && navigator.language.substring(0, 2)) || 
-    (navigator.userLanguage && navigator.userLanguage.substring(0, 2)) || 
-    'en';
+let currentLocale = (navigator.language && navigator.language.substring(0, 2)) || (navigator.userLanguage && navigator.userLanguage.substring(0, 2)) || 'en';
 
 // Supported locales (languages that have locale files on the server)
 // When a locale file is not found, the system gracefully falls back to English
@@ -33,19 +30,19 @@ async function loadTranslations(locale) {
     if (translations[locale]) {
         return translations[locale];
     }
-    
+
     try {
         // Load directly from local JSON file
         const localeData = await fetch(`/locales/${locale}.json`);
         if (!localeData.ok) {
             throw new Error(`Failed to load locale file for ${locale}`);
         }
-        
+
         translations[locale] = await localeData.json();
         return translations[locale];
     } catch (error) {
         console.error('Error loading translations:', error);
-        
+
         // Return empty object as last resort
         translations[locale] = {};
         return translations[locale];
@@ -62,13 +59,13 @@ function getNestedValue(obj, path) {
     // Try direct key match first
     if (obj && typeof obj === 'object' && path in obj) {
         const value = obj[path];
-        return (typeof value === 'string') ? value : null;
+        return typeof value === 'string' ? value : null;
     }
-    
+
     // Try standard dot notation for nested values
     const keys = path.split('.');
     let current = obj;
-    
+
     for (const key of keys) {
         if (current && typeof current === 'object' && key in current) {
             current = current[key];
@@ -78,7 +75,7 @@ function getNestedValue(obj, path) {
             if (path.includes('_') && !path.includes('.')) {
                 const [prefix, ...parts] = path.split('_');
                 const suffix = parts.join('_');
-                
+
                 if (obj[prefix] && typeof obj[prefix] === 'object' && suffix in obj[prefix]) {
                     return obj[prefix][suffix];
                 }
@@ -86,8 +83,8 @@ function getNestedValue(obj, path) {
             return null;
         }
     }
-    
-    return (typeof current === 'string') ? current : null;
+
+    return typeof current === 'string' ? current : null;
 }
 
 /**
@@ -104,17 +101,17 @@ function t(key, params = {}) {
         console.warn(`Translations for ${currentLocale} not loaded yet`);
         return key;
     }
-    
+
     // Special handling for shared_ and share_ prefixed keys
     if (key.startsWith('shared_') || key.startsWith('share_')) {
         const unprefixedKey = key.replace(/^(shared|share)_/, '');
         const prefixObj = key.startsWith('shared_') ? localeData.shared : localeData.share;
-        
+
         if (prefixObj && typeof prefixObj === 'object' && unprefixedKey in prefixObj) {
             return interpolate(prefixObj[unprefixedKey], params);
         }
     }
-    
+
     // Get the translation value
     let value = getNestedValue(localeData, key);
 
@@ -154,12 +151,12 @@ function t(key, params = {}) {
                 return interpolate(fallbackValue, params);
             }
         }
-        
+
         // Key not found, return key
         console.warn(`Translation key not found: ${key}`);
         return key;
     }
-    
+
     // Replace parameters
     return interpolate(value, params);
 }
@@ -186,24 +183,24 @@ async function setLocale(locale) {
         console.error(`Locale not supported: ${locale}`);
         return false;
     }
-    
+
     // Load translations if not loaded yet
     if (!translations[locale]) {
         await loadTranslations(locale);
     }
-    
+
     // Update current locale
     currentLocale = locale;
-    
+
     // Save locale preference
     localStorage.setItem('oxicloud-locale', locale);
-    
+
     // Trigger an event for components to update
     window.dispatchEvent(new CustomEvent('localeChanged', { detail: { locale } }));
-    
+
     // Update all elements with data-i18n attribute
     translatePage();
-    
+
     return true;
 }
 
@@ -217,10 +214,10 @@ async function initI18n() {
     if (savedLocale && supportedLocales.includes(savedLocale)) {
         currentLocale = savedLocale;
     }
-    
+
     // Load translations for current locale
     await loadTranslations(currentLocale);
-    
+
     // Preload English translations as fallback
     if (currentLocale !== 'en') {
         await loadTranslations('en');
@@ -228,10 +225,10 @@ async function initI18n() {
 
     // Mark loaded BEFORE translatePage so safeT resolves properly
     translationsLoaded = true;
-    
+
     // Translate the page
     translatePage();
-    
+
     console.log(`I18n initialized with locale: ${currentLocale}`);
 }
 
@@ -252,17 +249,17 @@ function translateElement(root) {
     // (e.g. admin.js) shadow the global t() function.
     const resolve = safeT;
     const el = root || document;
-    el.querySelectorAll('[data-i18n]').forEach(element => {
+    el.querySelectorAll('[data-i18n]').forEach((element) => {
         const key = element.getAttribute('data-i18n');
         element.textContent = resolve(key);
     });
-    
-    el.querySelectorAll('[data-i18n-placeholder]').forEach(element => {
+
+    el.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
         const key = element.getAttribute('data-i18n-placeholder');
         element.placeholder = resolve(key);
     });
-    
-    el.querySelectorAll('[data-i18n-title]').forEach(element => {
+
+    el.querySelectorAll('[data-i18n-title]').forEach((element) => {
         const key = element.getAttribute('data-i18n-title');
         element.title = resolve(key);
     });

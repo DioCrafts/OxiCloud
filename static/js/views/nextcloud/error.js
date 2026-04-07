@@ -6,28 +6,36 @@ var errorTitle = document.getElementById('error-title');
 var errorMessage = document.getElementById('error-message');
 var errorAction = document.getElementById('error-action');
 
-switch(errorType) {
+switch (errorType) {
     case 'invalid-credentials':
         errorTitle.textContent = 'Login Failed';
         errorMessage.textContent = 'Invalid username or password. Please check your credentials and try again.';
         errorAction.textContent = 'Try Again';
-        errorAction.addEventListener('click', function() { history.back(); });
+        errorAction.addEventListener('click', function () {
+            history.back();
+        });
         break;
     case 'session-expired':
         errorTitle.textContent = 'Session Expired';
         errorMessage.textContent = 'Your session has expired. Please try again.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function() { window.close(); });
+        errorAction.addEventListener('click', function () {
+            window.close();
+        });
         break;
     case 'not-found':
         errorTitle.textContent = 'Not Found';
         errorMessage.textContent = 'The requested page was not found.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function() { window.close(); });
+        errorAction.addEventListener('click', function () {
+            window.close();
+        });
         break;
     default:
         errorTitle.textContent = 'Error';
         errorMessage.textContent = 'An unexpected error occurred. Please try again.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function() { window.close(); });
+        errorAction.addEventListener('click', function () {
+            window.close();
+        });
 }

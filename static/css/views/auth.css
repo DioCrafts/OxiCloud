@@ -66,7 +66,7 @@
     width: 100%;
     text-align: left;
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         text-align: right;
     }
 }
@@ -148,8 +148,14 @@
     filter: none;
 }
 
-.auth-subtitle { margin: 20px 0; color: var(--color-text-muted); font-size: 14px; }
-.auth-action-wrap { margin-top: 20px; }
+.auth-subtitle {
+    margin: 20px 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
+.auth-action-wrap {
+    margin-top: 20px;
+}
 
 /* SSO / OIDC button */
 .auth-button-oidc {
@@ -188,7 +194,7 @@
 
 .auth-divider::before,
 .auth-divider::after {
-    content: '';
+    content: "";
     flex: 1;
     height: 1px;
     background: var(--color-border);
@@ -379,8 +385,14 @@
 }
 
 @keyframes langPickerSlideDown {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 /* Search inside dropdown */

@@ -103,9 +103,9 @@ function setActionsBarMode(mode, force = false) {
     if (!elements.actionsBar) return;
 
     if (mode === 'hidden') {
-        elements.actionsBar.classList.add("hidden");
+        elements.actionsBar.classList.add('hidden');
         elements.actionsBar.dataset.mode = 'hidden';
-        console.log("......setup actions bar to hidden");
+        console.log('......setup actions bar to hidden');
         return;
     }
 
@@ -117,7 +117,7 @@ function setActionsBarMode(mode, force = false) {
     if (!html) return;
 
     elements.actionsBar.innerHTML = html;
-    elements.actionsBar.classList.remove("hidden");
+    elements.actionsBar.classList.remove('hidden');
     elements.actionsBar.dataset.mode = mode;
 
     // Refresh cached action elements after rebuild
@@ -220,7 +220,7 @@ function deserializeHash() {
     // FIXME rename files into drive ?
     hashContext.section = 'files';
 
-    const hash_elements = window.location.hash.split("/");
+    const hash_elements = window.location.hash.split('/');
 
     const section = hash_elements[1];
 
@@ -245,13 +245,13 @@ function deserializeHash() {
  *
  * @param {boolean} insertHistory true to change url and browser's history, false to change url only
  */
-function updateHistory( insertHistory) {
+function updateHistory(insertHistory) {
     const app = window.app;
 
     let historyData = {
         section: app.currentSection,
         id: app.currentFolder,
-        file: app.viewFile,
+        file: app.viewFile
     };
 
     let historyUrl = `#/${app.currentSection}`;
@@ -268,12 +268,11 @@ function updateHistory( insertHistory) {
     }
 
     if (insertHistory) {
-        console.log(`adding history with ${historyUrl}`)
-        window.history.pushState(historyData, "", historyUrl);
-    }
-    else {
-        console.log(`replace history with ${historyUrl}`)
-        window.history.replaceState(historyData, "", historyUrl);
+        console.log(`adding history with ${historyUrl}`);
+        window.history.pushState(historyData, '', historyUrl);
+    } else {
+        console.log(`replace history with ${historyUrl}`);
+        window.history.replaceState(historyData, '', historyUrl);
     }
 }
 
@@ -283,33 +282,32 @@ function updateHistory( insertHistory) {
  * @returns
  */
 function switchSectionTo(section) {
-
     if (window.app.currentSection === section)
         // no change ...
         return;
 
     switch (section) {
-        case "files":
+        case 'files':
             switchToFilesSection();
             break;
 
-        case "shared":
+        case 'shared':
             switchToSharedSection();
             break;
 
-        case "recent":
+        case 'recent':
             switchToRecentFilesSection();
             break;
 
-        case "favorites":
+        case 'favorites':
             switchToFavoritesSection();
             break;
 
-        case "photos":
+        case 'photos':
             switchToPhotosSection();
             break;
 
-        case "trash":
+        case 'trash':
             switchToTrashSection();
             break;
 
@@ -375,8 +373,8 @@ function initApp() {
     window.addEventListener('authenticationDone', () => {
         // Check if a context was provided in the URL
         let hashContext = deserializeHash();
-        switchSectionTo( hashContext.section);
-        if (hashContext.section === "files") {
+        switchSectionTo(hashContext.section);
+        if (hashContext.section === 'files') {
             if (hashContext.path) {
                 console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
                 window.app.currentPath = hashContext.path;
@@ -387,7 +385,6 @@ function initApp() {
             }
             window.loadFiles();
         }
-
     });
 
     // Wait for translations to load before checking authentication
@@ -448,15 +445,19 @@ function setupUploadDropdown() {
     const signal = uploadDropdownBindingsController.signal;
 
     // Toggle dropdown on button click
-    uploadBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = menu.classList.contains('show');
-        // Close any other open dropdowns
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
-        if (!isOpen) {
-            menu.classList.add('show');
-        }
-    }, { signal });
+    uploadBtn.addEventListener(
+        'click',
+        (e) => {
+            e.stopPropagation();
+            const isOpen = menu.classList.contains('show');
+            // Close any other open dropdowns
+            document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => m.classList.remove('show'));
+            if (!isOpen) {
+                menu.classList.add('show');
+            }
+        },
+        { signal }
+    );
 
     // Close dropdown when clicking outside
     // remove+add stable handler: guarantees exactly one global listener
@@ -466,7 +467,7 @@ function setupUploadDropdown() {
     }
     uploadDropdownDocumentClickHandler = (e) => {
         if (e.target.closest('#upload-dropdown')) return;
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+        document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => m.classList.remove('show'));
     };
     // @ts-ignore
     document.addEventListener('click', uploadDropdownDocumentClickHandler);
@@ -485,21 +486,20 @@ function setupEventListeners() {
     const SEARCH_MIN_CHARS = 3;
 
     // handle history / url change
-    window.addEventListener("popstate", (e) => {
+    window.addEventListener('popstate', (e) => {
         if (e.state === null) {
             // change is from user (url explicitely change, read information from hash)
-            let hashContext = deserializeHash();
-            switchSectionTo( hashContext.section);
+            const hashContext = deserializeHash();
+            switchSectionTo(hashContext.section);
             if (hashContext.path) {
                 window.app.currentPath = hashContext.path;
-                window.loadFiles({insertHistory: false});
+                window.loadFiles({ insertHistory: false });
             }
-        }
-        else {
+        } else {
             // change is from history, data provided in event
-            switchSectionTo( e.state.section);
+            switchSectionTo(e.state.section);
             window.app.currentPath = e.state.id;
-            window.loadFiles({insertHistory: false});
+            window.loadFiles({ insertHistory: false });
         }
     });
 
@@ -584,17 +584,17 @@ function setupEventListeners() {
     }
 
     // Sidebar navigation
-    elements.navItems.forEach(item => {
+    elements.navItems.forEach((item) => {
         item.addEventListener('click', () => {
             // Remove active class from all nav items
-            elements.navItems.forEach(navItem => navItem.classList.remove('active'));
+            elements.navItems.forEach((navItem) => navItem.classList.remove('active'));
 
             // Add active class to clicked item
             item.classList.add('active');
             let _updateHistory = true;
 
-            let itemI18nKey=item.querySelector('span').getAttribute('data-i18n')
-            switch(itemI18nKey) {
+            let itemI18nKey = item.querySelector('span').getAttribute('data-i18n');
+            switch (itemI18nKey) {
                 case 'nav.shared':
                     // Switch to shared view
                     switchToSharedSection();
@@ -628,7 +628,7 @@ function setupEventListeners() {
             document.title = `OxiCloud: ${window.i18n.t(itemI18nKey)}`;
 
             if (_updateHistory) {
-                updateHistory( true);
+                updateHistory(true);
             }
         });
     });
@@ -649,13 +649,11 @@ function setupEventListeners() {
         const folderMenu = document.getElementById('folder-context-menu');
         const fileMenu = document.getElementById('file-context-menu');
 
-        if (folderMenu && folderMenu.style.display === 'block' &&
-            !folderMenu.contains(e.target)) {
+        if (folderMenu && folderMenu.style.display === 'block' && !folderMenu.contains(e.target)) {
             ui.closeContextMenu();
         }
 
-        if (fileMenu && fileMenu.style.display === 'block' &&
-            !fileMenu.contains(e.target)) {
+        if (fileMenu && fileMenu.style.display === 'block' && !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
         }
     });

@@ -29,5 +29,4 @@ window.app = {
     viewFile: null // current file in inline view
 };
 
-window.appElements = {
-};
+window.appElements = {};

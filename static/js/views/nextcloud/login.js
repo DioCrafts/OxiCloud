@@ -9,7 +9,7 @@ if (!/^[0-9a-fA-F]+$/.test(token)) {
 document.getElementById('login-flow-form').action = '/login/v2/flow/' + token;
 
 // Check if OIDC is available and configure SSO button
-(async function() {
+(async function () {
     try {
         var resp = await fetch('/api/auth/oidc/providers');
         if (!resp.ok) return;
@@ -29,10 +29,10 @@ document.getElementById('login-flow-form').action = '/login/v2/flow/' + token;
         }
 
         // SSO button redirects to the OIDC flow for this NC token
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             window.location.href = '/login/v2/flow/' + token + '/oidc';
         });
-    } catch(e) {
+    } catch (e) {
         // OIDC not available — silently keep password-only mode
     }
 })();

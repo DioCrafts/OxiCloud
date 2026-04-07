@@ -171,7 +171,7 @@ const favorites = {
             window.ui.updateBreadcrumb('');
 
             if (this._cache.size === 0) {
-                window.ui.showError( `
+                window.ui.showError(`
                     <i class="fas fa-star empty-state-icon"></i>
                     <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No favorite items'}</p>
                     <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>

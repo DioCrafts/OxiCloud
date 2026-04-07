@@ -39,8 +39,7 @@ class WopiEditor {
         action = action || 'edit';
         try {
             var data = await this._getEditorUrlWithFallback(fileId, fileName, action);
-            var hostUrl = '/wopi/edit/' + encodeURIComponent(fileId)
-                + '?access_token=' + encodeURIComponent(data.access_token);
+            var hostUrl = '/wopi/edit/' + encodeURIComponent(fileId) + '?access_token=' + encodeURIComponent(data.access_token);
             window.open(hostUrl, '_blank');
         } catch (error) {
             console.error('Failed to open WOPI editor in tab:', error);
@@ -54,10 +53,9 @@ class WopiEditor {
      * Fetch editor URL and WOPI token from the backend.
      */
     async _getEditorUrl(fileId, action) {
-        var response = await fetch(
-            '/api/wopi/editor-url?file_id=' + encodeURIComponent(fileId) + '&action=' + encodeURIComponent(action),
-            { credentials: 'same-origin' }
-        );
+        var response = await fetch('/api/wopi/editor-url?file_id=' + encodeURIComponent(fileId) + '&action=' + encodeURIComponent(action), {
+            credentials: 'same-origin'
+        });
         if (!response.ok) {
             var text = await response.text();
             throw new Error('Editor URL request failed: ' + response.status + ' ' + text);
@@ -101,7 +99,8 @@ class WopiEditor {
         modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:10000;background:#fff;';
 
         var header = document.createElement('div');
-        header.style.cssText = 'height:40px;background:#333;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:sans-serif;font-size:14px;';
+        header.style.cssText =
+            'height:40px;background:#333;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 16px;font-family:sans-serif;font-size:14px;';
 
         var title = document.createElement('span');
         title.textContent = fileName;
@@ -138,7 +137,8 @@ class WopiEditor {
         // Loading spinner (removed once the editor signals ready)
         var spinner = document.createElement('div');
         spinner.id = 'wopi-loading-spinner';
-        spinner.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;z-index:1;';
+        spinner.style.cssText =
+            'position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;z-index:1;';
         spinner.innerHTML = '<i class="fas fa-spinner fa-spin empty-state-icon spinner"></i>';
         frameHolder.appendChild(spinner);
 
@@ -149,8 +149,7 @@ class WopiEditor {
         iframe.setAttribute('allowfullscreen', 'true');
         // Fix 9: allow clipboard access for copy/paste inside the editor
         iframe.setAttribute('allow', 'clipboard-read; clipboard-write');
-        iframe.setAttribute('sandbox',
-            'allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation allow-popups-to-escape-sandbox');
+        iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups allow-top-navigation allow-popups-to-escape-sandbox');
         frameHolder.appendChild(iframe);
 
         modal.appendChild(header);
@@ -159,13 +158,13 @@ class WopiEditor {
         document.body.appendChild(modal);
 
         // ESC key handler
-        this._escHandler = function(e) {
+        this._escHandler = function (e) {
             if (e.key === 'Escape') this.closeEditor();
         }.bind(this);
         document.addEventListener('keydown', this._escHandler);
 
         // Fix 7: Listen for postMessage from the editor iframe
-        this._messageHandler = function(e) {
+        this._messageHandler = function (e) {
             var data;
             try {
                 data = JSON.parse(e.data);
@@ -238,11 +237,7 @@ class WopiEditor {
             // Ignore — fall through to hardcoded list
         }
         // Fallback hardcoded list
-        this._supportedExtensions = [
-            'docx', 'doc', 'odt', 'rtf', 'txt',
-            'xlsx', 'xls', 'ods', 'csv',
-            'pptx', 'ppt', 'odp',
-        ];
+        this._supportedExtensions = ['docx', 'doc', 'odt', 'rtf', 'txt', 'xlsx', 'xls', 'ods', 'csv', 'pptx', 'ppt', 'odp'];
         return this._supportedExtensions;
     }
 }

@@ -122,8 +122,11 @@ const photosLightbox = {
         // Format date
         const ts = (item.sort_date || item.created_at) * 1000;
         const dateStr = new Date(ts).toLocaleDateString(undefined, {
-            year: 'numeric', month: 'short', day: 'numeric',
-            hour: '2-digit', minute: '2-digit'
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
         });
         meta.textContent = `${dateStr} · ${item.size_formatted || ''}`;
 
@@ -233,7 +236,7 @@ const photosLightbox = {
             });
             // Remove from photosView items too
             if (window.photosView) {
-                window.photosView.items = window.photosView.items.filter(f => f.id !== item.id);
+                window.photosView.items = window.photosView.items.filter((f) => f.id !== item.id);
             }
             this.items.splice(this.index, 1);
             if (this.items.length === 0) {
@@ -274,7 +277,9 @@ const photosLightbox = {
     },
 
     _escAttr(s) {
-        return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        return String(s || '')
+            .replace(/"/g, '&quot;')
+            .replace(/</g, '&lt;');
     }
 };
 

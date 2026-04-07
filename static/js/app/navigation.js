@@ -14,15 +14,14 @@ function syncViewContainers() {
 
     const isGrid = window.app.currentView === 'grid';
     if (isGrid) {
-        filesList.classList.remove("files-list-view");
-        filesList.classList.add("files-grid-view");
+        filesList.classList.remove('files-list-view');
+        filesList.classList.add('files-grid-view');
 
         gridViewBtn?.classList.add('active');
         listViewBtn?.classList.remove('active');
-    }
-    else {
-        filesList.classList.add("files-list-view");
-        filesList.classList.remove("files-grid-view");
+    } else {
+        filesList.classList.add('files-list-view');
+        filesList.classList.remove('files-grid-view');
 
         gridViewBtn?.classList.remove('active');
         listViewBtn?.classList.add('active');
@@ -42,61 +41,61 @@ function toggleFileContainer(show) {
  * Mobile sidebar toggle functionality
  */
 function initSidebarToggle() {
-	const sidebarToggle = document.getElementById('sidebar-toggle');
-	const sidebar = document.getElementById('sidebar');
-	const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
 
-	if (!sidebarToggle || !sidebar || !sidebarOverlay) return;
+    if (!sidebarToggle || !sidebar || !sidebarOverlay) return;
 
-	function openSidebar() {
-		sidebar.classList.add('open');
-		sidebarOverlay.classList.add('active');
-		document.body.style.overflow = 'hidden';
-	}
+    function openSidebar() {
+        sidebar.classList.add('open');
+        sidebarOverlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
 
-	function closeSidebar() {
-		sidebar.classList.remove('open');
-		sidebarOverlay.classList.remove('active');
-		document.body.style.overflow = '';
-	}
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 
-	function toggleSidebar() {
-		if (sidebar.classList.contains('open')) {
-			closeSidebar();
-		} else {
-			openSidebar();
-		}
-	}
+    function toggleSidebar() {
+        if (sidebar.classList.contains('open')) {
+            closeSidebar();
+        } else {
+            openSidebar();
+        }
+    }
 
-	// Toggle button click
-	sidebarToggle.addEventListener('click', toggleSidebar);
+    // Toggle button click
+    sidebarToggle.addEventListener('click', toggleSidebar);
 
-	// Close sidebar when clicking overlay
-	sidebarOverlay.addEventListener('click', closeSidebar);
+    // Close sidebar when clicking overlay
+    sidebarOverlay.addEventListener('click', closeSidebar);
 
-	// Close sidebar on escape key
-	document.addEventListener('keydown', (e) => {
-		if (e.key === 'Escape' && sidebar.classList.contains('open')) {
-			closeSidebar();
-		}
-	});
+    // Close sidebar on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+            closeSidebar();
+        }
+    });
 
-	// Close sidebar when navigating (nav item click on mobile)
-	const navItems = sidebar.querySelectorAll('.nav-item');
-	navItems.forEach(item => {
-		item.addEventListener('click', () => {
-			if (window.innerWidth <= 768) {
-				closeSidebar();
-			}
-		});
-	});
+    // Close sidebar when navigating (nav item click on mobile)
+    const navItems = sidebar.querySelectorAll('.nav-item');
+    navItems.forEach((item) => {
+        item.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                closeSidebar();
+            }
+        });
+    });
 
-	// Expose functions globally
-	window.sidebarToggle = {
-		open: openSidebar,
-		close: closeSidebar,
-		toggle: toggleSidebar
-	};
+    // Expose functions globally
+    window.sidebarToggle = {
+        open: openSidebar,
+        close: closeSidebar,
+        toggle: toggleSidebar
+    };
 }
 
 // Initialize sidebar toggle when DOM is ready
@@ -104,12 +103,12 @@ document.addEventListener('DOMContentLoaded', initSidebarToggle);
 
 // Mapping of section names to their corresponding view flags
 const VIEW_FLAGS = {
-    'files': 'isFilesView',
-    'shared': 'isSharedView',
-    'recent': 'isRecentView',
-    'favorites': 'isFavoritesView',
-    'trash': 'isTrashView',
-    'photos': 'isPhotosView'
+    files: 'isFilesView',
+    shared: 'isSharedView',
+    recent: 'isRecentView',
+    favorites: 'isFavoritesView',
+    trash: 'isTrashView',
+    photos: 'isPhotosView'
 };
 
 /**
@@ -128,18 +127,17 @@ function getSectionFromNavItem(navItem) {
  * @returns {boolean} true if the section changed
  */
 function setCurrentSection(section) {
-
     if (window.app.currentSection == section) return false;
 
     // Set all view flags - true for active section, false for others
     Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {
-        window.app[flag] = (key === section);
+        window.app[flag] = key === section;
     });
 
     window.app.currentSection = section;
 
     // Update nav item active classes by finding matching item from DOM
-    window.appElements.navItems.forEach(item => {
+    window.appElements.navItems.forEach((item) => {
         const itemSection = getSectionFromNavItem(item);
         item.classList.toggle('active', itemSection === section);
     });
@@ -164,12 +162,11 @@ function setCurrentSection(section) {
 }
 
 function switchToSharedSection() {
-    
     if (!setCurrentSection('shared')) return;
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // Hide actions-bar for shared view
     window.setActionsBarMode('hidden');
@@ -178,14 +175,13 @@ function switchToSharedSection() {
 
     //reset files view + remove any error
     window.ui.resetFilesList();
-    
+
     // Show shared view
     if (window.sharedView) {
         window.sharedView.init();
         window.sharedView.show();
     }
     if (window.multiSelect) window.multiSelect.clear();
-
 }
 
 function switchToFilesSection() {
@@ -196,7 +192,7 @@ function switchToFilesSection() {
 
     // Show breadcrumb (only in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.remove("hidden");
+    breadcrumb?.classList.remove('hidden');
 
     // show files container
     toggleFileContainer(true);
@@ -224,14 +220,14 @@ function switchToFavoritesSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // show files container
     toggleFileContainer(true);
 
     // ensure correct view
     syncViewContainers();
-    
+
     //reset files view + remove any error
     window.ui.resetFilesList();
 
@@ -242,12 +238,10 @@ function switchToFavoritesSection() {
         window.ui.showError(`
                 <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                 <p>Error loading the favorites module</p>
-            `
-        );
+            `);
     }
-    
-    if (window.multiSelect) window.multiSelect.clear();
 
+    if (window.multiSelect) window.multiSelect.clear();
 }
 
 function switchToRecentFilesSection() {
@@ -258,7 +252,7 @@ function switchToRecentFilesSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // show files container
     toggleFileContainer(true);
@@ -276,8 +270,7 @@ function switchToRecentFilesSection() {
         window.ui.showError(`
                 <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                 <p>Error loading the recent module</p>
-            `
-        );
+            `);
     }
     if (window.multiSelect) window.multiSelect.clear();
 }
@@ -287,7 +280,7 @@ function switchToPhotosSection() {
 
     // Hide breadcrumb
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // Hide file containers
     toggleFileContainer(false);
@@ -303,7 +296,6 @@ function switchToPhotosSection() {
         window.photosView.show();
     }
     if (window.multiSelect) window.multiSelect.clear();
-
 }
 
 function switchToTrashSection() {
@@ -311,7 +303,7 @@ function switchToTrashSection() {
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // Show files containers (to be filled with trash)
     const filesList = document.getElementById('files-list');

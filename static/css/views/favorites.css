@@ -16,7 +16,7 @@
     z-index: 5;
     transition: all 0.2s ease;
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         left: 10px;
         right: unset;
     }
@@ -40,7 +40,7 @@
 .file-item.favorite-item {
     border-left: 3px solid #ffc107;
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         border-right: 3px solid #ffc107;
         border-left: unset;
     }
@@ -89,9 +89,15 @@
 
 /* Animation for the favorite star */
 @keyframes favorite-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.2); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(1);
+    }
 }
 
 .favorite-indicator.active {
@@ -119,7 +125,7 @@
     vertical-align: middle;
     filter: drop-shadow(0 0 1px rgba(255, 193, 7, 0.4));
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         margin-left: 0;
         margin-right: 6px;
     }

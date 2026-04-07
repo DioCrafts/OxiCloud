@@ -31,9 +31,15 @@ function setupUserMenu() {
             const USER_DATA_KEY = 'oxicloud_user';
             const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
             const isAdmin = userData.role === 'admin';
-            if (adminBtn) { isAdmin ? adminBtn.classList.remove('hidden') : adminBtn.classList.add('hidden'); }
-            if (adminDivider) { isAdmin ? adminDivider.classList.remove('hidden') : adminDivider.classList.add('hidden'); }
-            if (roleBadge) { isAdmin ? roleBadge.classList.remove('hidden') : roleBadge.classList.add('hidden'); }
+            if (adminBtn) {
+                isAdmin ? adminBtn.classList.remove('hidden') : adminBtn.classList.add('hidden');
+            }
+            if (adminDivider) {
+                isAdmin ? adminDivider.classList.remove('hidden') : adminDivider.classList.add('hidden');
+            }
+            if (roleBadge) {
+                isAdmin ? roleBadge.classList.remove('hidden') : roleBadge.classList.add('hidden');
+            }
         }
     });
 
@@ -96,10 +102,7 @@ function setupUserMenu() {
                 }
             }
 
-            window.ui.showNotification(
-                newIsDark ? '🌙' : '☀️',
-                newIsDark ? 'Dark mode enabled' : 'Light mode enabled'
-            );
+            window.ui.showNotification(newIsDark ? '🌙' : '☀️', newIsDark ? 'Dark mode enabled' : 'Light mode enabled');
         });
     }
 
@@ -165,7 +168,7 @@ function updateUserMenuData() {
     }
 
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes == null ? (10 * 1024 * 1024 * 1024) : userData.storage_quota_bytes;
+    const quotaBytes = userData.storage_quota_bytes == null ? 10 * 1024 * 1024 * 1024 : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
 
     if (storageFill) storageFill.style.width = percentage + '%';
@@ -199,11 +202,11 @@ function showUserProfileModal() {
     const role = userData.role || 'user';
     const initials = username.substring(0, 2).toUpperCase();
     const usedBytes = userData.storage_used_bytes || 0;
-    const quotaBytes = userData.storage_quota_bytes == null ? (10 * 1024 * 1024 * 1024) : userData.storage_quota_bytes;
+    const quotaBytes = userData.storage_quota_bytes == null ? 10 * 1024 * 1024 * 1024 : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-    const t = (key, fallback) => (window.i18n && window.i18n.t) ? window.i18n.t(key) || fallback : fallback;
+    const t = (key, fallback) => (window.i18n && window.i18n.t ? window.i18n.t(key) || fallback : fallback);
 
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();
@@ -268,7 +271,11 @@ async function logout() {
     // cleared before redirecting, otherwise the login page's session probe
     // will refresh the token and redirect back to the app).
     try {
-        await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: getCsrfHeaders() });
+        await fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: getCsrfHeaders()
+        });
     } catch (_) {
         // Best-effort
     }

@@ -14,7 +14,7 @@
     color: #6c757d;
     z-index: 5;
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         left: 10px;
         right: unset;
     }
@@ -29,7 +29,7 @@
 .files-grid-view .file-item.recent-item {
     border-left: 3px solid #6c757d;
 
-    [dir='rtl'] & {
+    [dir="rtl"] & {
         border-right: 3px solid #6c757d;
         border-left: unset;
     }
@@ -87,6 +87,12 @@
 }
 
 @keyframes recent-fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

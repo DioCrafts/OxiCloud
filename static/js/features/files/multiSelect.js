@@ -6,7 +6,7 @@
  * provides batch delete / move / download / favorites operations.
  */
 
-// TODO: rename into selection-bar ? 
+// TODO: rename into selection-bar ?
 // TODO: merge with photo part
 
 // @ts-check
@@ -23,11 +23,21 @@ const multiSelect = {
 
     // ── Public API ──────────────────────────────────────────
 
-    get count()        { return this._selected.size; },
-    get items()        { return Array.from(this._selected.values()); },
-    get hasSelection() { return this._selected.size > 0; },
-    get files()        { return this.items.filter(i => i.type === 'file'); },
-    get folders()      { return this.items.filter(i => i.type === 'folder'); },
+    get count() {
+        return this._selected.size;
+    },
+    get items() {
+        return Array.from(this._selected.values());
+    },
+    get hasSelection() {
+        return this._selected.size > 0;
+    },
+    get files() {
+        return this.items.filter((i) => i.type === 'file');
+    },
+    get folders() {
+        return this.items.filter((i) => i.type === 'folder');
+    },
 
     // ── Helpers for i18n ────────────────────────────────────
 
@@ -43,7 +53,10 @@ const multiSelect = {
     // ── Selection state management ──────────────────────────
 
     toggle(id, name, type, parentId) {
-        if (this._selected.has(id)) { this._selected.delete(id); return false; }
+        if (this._selected.has(id)) {
+            this._selected.delete(id);
+            return false;
+        }
         this._selected.set(id, { id, name, type, parentId });
         return true;
     },
@@ -52,14 +65,15 @@ const multiSelect = {
         this._selected.set(id, { id, name, type, parentId });
     },
 
-    deselect(id) { this._selected.delete(id); },
+    deselect(id) {
+        this._selected.delete(id);
+    },
 
     clear() {
         this._selected.clear();
         this._lastClickedIndex = -1;
-        document.querySelectorAll('.file-item.selected')
-            .forEach(el => el.classList.remove('selected'));
-        document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
+        document.querySelectorAll('.file-item.selected').forEach((el) => el.classList.remove('selected'));
+        document.querySelectorAll('.item-checkbox').forEach((cb) => (cb.checked = false));
         this._syncUI();
     },
 
@@ -89,24 +103,22 @@ const multiSelect = {
      * @return {ItemSelection}
      */
     getSelection(targtFolderId) {
-        let fileIds=[];
-        let folderIds=[];
+        let fileIds = [];
+        let folderIds = [];
 
         // TODO optimize & check if _selected is a better use
-        document.querySelectorAll(`div.file-item.selected`).forEach( (item) => {
+        document.querySelectorAll(`div.file-item.selected`).forEach((item) => {
             if (item.dataset.fileId) {
                 fileIds.push(item.dataset.fileId);
-            }
-            else {
+            } else {
                 // ignore selectedItem if this is the target
-                if (targtFolderId && targtFolderId !== item.dataset.folderId)
-                    folderIds.push(item.dataset.folderId);
+                if (targtFolderId && targtFolderId !== item.dataset.folderId) folderIds.push(item.dataset.folderId);
             }
         });
 
         return {
-            "fileIds": fileIds,
-            "folderIds": folderIds,
+            fileIds: fileIds,
+            folderIds: folderIds
         };
     },
 
@@ -115,19 +127,17 @@ const multiSelect = {
      * @param {BatchResult} result result of batch
      */
     showBatchResult(action, result) {
-        if (action === "copy") {
+        if (action === 'copy') {
             if (result.errors > 0) {
                 window.ui.showNotification('Batch copy', `${result.success} copied, ${result.errors} failed`);
             } else {
-                window.ui.showNotification('Items copied',
-                    `${result.success} item${result.success !== 1 ? 's' : ''} copied successfully`);
+                window.ui.showNotification('Items copied', `${result.success} item${result.success !== 1 ? 's' : ''} copied successfully`);
             }
         } else {
             if (result.errors > 0) {
                 window.ui.showNotification('Batch move', `${result.success} moved, ${result.errors} failed`);
             } else {
-                window.ui.showNotification('Items moved',
-                    `${result.success} item${result.success !== 1 ? 's' : ''} moved successfully`);
+                window.ui.showNotification('Items moved', `${result.success} item${result.success !== 1 ? 's' : ''} moved successfully`);
             }
         }
     },
@@ -145,7 +155,7 @@ const multiSelect = {
     _selectAllInContainer(containerId, selector) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        container.querySelectorAll(selector).forEach(el => this._selectElement(el));
+        container.querySelectorAll(selector).forEach((el) => this._selectElement(el));
     },
 
     _getAllVisibleItems() {
@@ -154,10 +164,20 @@ const multiSelect = {
 
     _extractInfo(el) {
         if (el.dataset.folderId && el.dataset.folderName !== undefined) {
-            return { id: el.dataset.folderId, name: el.dataset.folderName, type: 'folder', parentId: el.dataset.parentId || '' };
+            return {
+                id: el.dataset.folderId,
+                name: el.dataset.folderName,
+                type: 'folder',
+                parentId: el.dataset.parentId || ''
+            };
         }
         if (el.dataset.fileId) {
-            return { id: el.dataset.fileId, name: el.dataset.fileName, type: 'file', parentId: el.dataset.folderId || '' };
+            return {
+                id: el.dataset.fileId,
+                name: el.dataset.fileName,
+                type: 'file',
+                parentId: el.dataset.folderId || ''
+            };
         }
         return null;
     },
@@ -172,19 +192,16 @@ const multiSelect = {
 
         if (event && event.shiftKey && this._lastClickedIndex >= 0 && index >= 0) {
             const start = Math.min(this._lastClickedIndex, index);
-            const end   = Math.max(this._lastClickedIndex, index);
+            const end = Math.max(this._lastClickedIndex, index);
             for (let i = start; i <= end; i++) {
                 this._selectElement(items[i]);
                 const iInfo = this._extractInfo(items[i]);
                 if (iInfo) {
-                    const sel = iInfo.type === 'folder'
-                        ? `[data-folder-id="${iInfo.id}"]`
-                        : `[data-file-id="${iInfo.id}"]`;
+                    const sel = iInfo.type === 'folder' ? `[data-folder-id="${iInfo.id}"]` : `[data-file-id="${iInfo.id}"]`;
                     document.querySelectorAll(sel).forEach((e) => {
                         e.classList.add('selected');
                         let checkbox = e.querySelector('input[type="checkbox"]');
-                        if (checkbox)
-                            checkbox.checked = true;
+                        if (checkbox) checkbox.checked = true;
                     });
                 }
             }
@@ -192,8 +209,7 @@ const multiSelect = {
             const nowSelected = this.toggle(info.id, info.name, info.type, info.parentId);
             el.classList.toggle('selected', nowSelected);
             let checkbox = el.querySelector('input[type="checkbox"]');
-            if (checkbox)
-                checkbox.checked = nowSelected;
+            if (checkbox) checkbox.checked = nowSelected;
         }
         this._lastClickedIndex = index;
         this._syncUI();
@@ -249,23 +265,19 @@ const multiSelect = {
         if (n > 0) {
             this._barVisible = true;
 
-            const countText = n === 1
-                ? (this._t('batch.one_selected') || '1 item selected')
-                : (this._t('batch.n_selected', { count: n }) || `${n} items selected`);
-            document.getElementById("batch-bar-count").innerText = countText;
+            const countText = n === 1 ? this._t('batch.one_selected') || '1 item selected' : this._t('batch.n_selected', { count: n }) || `${n} items selected`;
+            document.getElementById('batch-bar-count').innerText = countText;
 
             actionsBar.classList.add('hidden');
-            
+
             batchSelectionBar.classList.remove('hidden');
-            
         } else {
             this._barVisible = false;
 
             // Hide grid bar
-            batchSelectionBar.classList.add('hidden'); 
+            batchSelectionBar.classList.add('hidden');
 
-            if (actionsBar.dataset.mode !== "hidden")
-                actionsBar.classList.remove('hidden');           
+            if (actionsBar.dataset.mode !== 'hidden') actionsBar.classList.remove('hidden');
         }
 
         // Sync individual item checkboxes
@@ -276,20 +288,20 @@ const multiSelect = {
 
     /** Wire click handlers on batch action buttons (idempotent per render) */
     _wireBarButtons() {
-        const del      = document.getElementById('batch-delete');
-        const move     = document.getElementById('batch-move');
-        const dl       = document.getElementById('batch-download');
-        const fav      = document.getElementById('batch-fav');
+        const del = document.getElementById('batch-delete');
+        const move = document.getElementById('batch-move');
+        const dl = document.getElementById('batch-download');
+        const fav = document.getElementById('batch-fav');
         const closeBtn = document.getElementById('batch-grid-close');
-        if (del)  del.onclick          = () => this.batchDelete();
-        if (move) move.onclick         = () => this.batchMove();
-        if (dl)   dl.onclick           = () => this.batchDownload();
-        if (fav)  fav.onclick          = () => this.batchFavorites();
+        if (del) del.onclick = () => this.batchDelete();
+        if (move) move.onclick = () => this.batchMove();
+        if (dl) dl.onclick = () => this.batchDownload();
+        if (fav) fav.onclick = () => this.batchFavorites();
         if (closeBtn) closeBtn.onclick = () => this.clear();
     },
 
     _syncItemCheckboxes() {
-        document.querySelectorAll('.file-item').forEach(el => {
+        document.querySelectorAll('.file-item').forEach((el) => {
             const cb = el.querySelector('.item-checkbox');
             if (cb) cb.checked = el.classList.contains('selected');
         });
@@ -322,21 +334,20 @@ const multiSelect = {
         if (items.length === 0) return;
 
         const n = items.length;
-        const msg = n === 1
-            ? (this._t('dialogs.confirm_delete_file', { name: items[0].name })
-                || `Are you sure you want to move "${items[0].name}" to trash?`)
-            : (this._t('batch.confirm_delete', { count: n })
-                || `Are you sure you want to move ${n} items to trash?`);
+        const msg =
+            n === 1
+                ? this._t('dialogs.confirm_delete_file', { name: items[0].name }) || `Are you sure you want to move "${items[0].name}" to trash?`
+                : this._t('batch.confirm_delete', { count: n }) || `Are you sure you want to move ${n} items to trash?`;
 
         const confirmed = await showConfirmDialog({
             title: this._t('dialogs.confirm_delete') || 'Move to trash',
             message: msg,
-            confirmText: this._t('actions.delete') || 'Delete',
+            confirmText: this._t('actions.delete') || 'Delete'
         });
         if (!confirmed) return;
 
-        const fileIds   = items.filter(i => i.type === 'file').map(i => i.id);
-        const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
+        const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
+        const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
 
         try {
             const response = await fetch('/api/batch/trash', {
@@ -346,7 +357,7 @@ const multiSelect = {
             });
             const data = await response.json();
             const success = data.stats?.successful || 0;
-            const errors  = data.stats?.failed || 0;
+            const errors = data.stats?.failed || 0;
 
             this.clear();
             window.loadFiles();
@@ -371,16 +382,15 @@ const multiSelect = {
 
         window.app.moveDialogMode = 'batch';
         window.app.batchMoveItems = items;
-        window.app.selectedTargetFolderId = "";
+        window.app.selectedTargetFolderId = '';
 
         const dialog = document.getElementById('move-file-dialog');
         const dialogHeader = dialog.querySelector('.rename-dialog-header');
         const n = items.length;
-        const titleText = this._t('batch.move_title', { count: n })
-            || `Move ${n} item${n !== 1 ? 's' : ''}`;
+        const titleText = this._t('batch.move_title', { count: n }) || `Move ${n} item${n !== 1 ? 's' : ''}`;
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
-        const excludeIds = items.filter(i => i.type === 'folder').map(i => i.id);
+        const excludeIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
         await contextMenus.loadAllFolders(excludeIds[0] || null, 'batch');
         dialog.style.display = 'flex';
     },
@@ -393,8 +403,8 @@ const multiSelect = {
         window.ui.showNotification('Preparing download', 'Creating ZIP archive...');
 
         try {
-            const fileIds   = items.filter(i => i.type === 'file').map(i => i.id);
-            const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
+            const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
+            const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
 
             const response = await fetch('/api/batch/download', {
                 method: 'POST',
@@ -405,7 +415,7 @@ const multiSelect = {
             if (!response.ok) throw new Error(`Server returned ${response.status}`);
 
             const blob = await response.blob();
-            const url  = URL.createObjectURL(blob);
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
             link.download = `oxicloud-download-${Date.now()}.zip`;
@@ -425,13 +435,10 @@ const multiSelect = {
         if (items.length === 0 || !window.favorites) return;
 
         // Filter out items already in favourites
-        const toAdd = items.filter(i => !window.favorites.isFavorite(i.id, i.type));
+        const toAdd = items.filter((i) => !window.favorites.isFavorite(i.id, i.type));
         if (toAdd.length === 0) {
             this.clear();
-            window.ui.showNotification(
-                this._t('favorites.add') || 'Favorites',
-                'All selected items are already favorites'
-            );
+            window.ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
             return;
         }
 
@@ -440,7 +447,7 @@ const multiSelect = {
                 method: 'POST',
                 headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    items: toAdd.map(i => ({ item_id: i.id, item_type: i.type }))
+                    items: toAdd.map((i) => ({ item_id: i.id, item_type: i.type }))
                 })
             });
 
@@ -460,15 +467,9 @@ const multiSelect = {
             if (typeof window.loadFiles === 'function') window.loadFiles();
 
             if (inserted > 0) {
-                window.ui.showNotification(
-                    this._t('favorites.add') || 'Added to favorites',
-                    `${inserted} item${inserted !== 1 ? 's' : ''} added to favorites`
-                );
+                window.ui.showNotification(this._t('favorites.add') || 'Added to favorites', `${inserted} item${inserted !== 1 ? 's' : ''} added to favorites`);
             } else {
-                window.ui.showNotification(
-                    this._t('favorites.add') || 'Favorites',
-                    'All selected items are already favorites'
-                );
+                window.ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
             }
         } catch (e) {
             console.error('Batch favorites error:', e);
@@ -489,27 +490,24 @@ const multiSelect = {
             const selectAllCheckbox = document.getElementById('select-all-checkbox');
             // ctrl+a cmd+a
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
-                if (selectAllCheckbox) 
-                    selectAllCheckbox.checked = true;
-                this.selectAll();    
+                if (selectAllCheckbox) selectAllCheckbox.checked = true;
+                this.selectAll();
                 e.preventDefault();
             }
             if (e.key === 'Escape' && this.hasSelection) {
                 this.clear();
-                if (selectAllCheckbox)
-                    selectAllCheckbox.checked = false;
+                if (selectAllCheckbox) selectAllCheckbox.checked = false;
             }
             if (e.key === 'Delete' && this.hasSelection) this.batchDelete();
         });
 
         const batchSelectionBar = document.getElementById('batch-selection-bar');
         batchSelectionBar.innerHTML = this._buildSelectionBarHTML();
-            
+
         if (window.i18n && window.i18n.translateElement) {
             window.i18n.translateElement(batchSelectionBar);
         }
         this._wireBarButtons();
-
     },
 
     // FIXME: competition with _
@@ -518,8 +516,7 @@ const multiSelect = {
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
         if (!selectAllCheckbox) return;
         selectAllCheckbox.addEventListener('change', () => self.toggleAll());
-    },
-
+    }
 };
 
 // Expose globally

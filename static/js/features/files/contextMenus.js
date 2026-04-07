@@ -12,7 +12,9 @@ const contextMenus = {
         if (!label) return;
         label.textContent = window.i18n
             ? window.i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite')
-            : (isFavorite ? 'Remove from favorites' : 'Add to favorites');
+            : isFavorite
+              ? 'Remove from favorites'
+              : 'Add to favorites';
     },
 
     /**
@@ -26,10 +28,7 @@ const contextMenus = {
         const targetFile = window.app && window.app.contextMenuTargetFile;
         // Don't show WOPI editor for image files - they should use inline preview
         const isImage = targetFile && targetFile.mime_type && targetFile.mime_type.startsWith('image/');
-        const show = targetFile &&
-            !isImage &&
-            window.wopiEditor &&
-            await window.wopiEditor.canEdit(targetFile.name);
+        const show = targetFile && !isImage && window.wopiEditor && (await window.wopiEditor.canEdit(targetFile.name));
 
         wopiEdit.classList.toggle('hidden', !show);
         wopiEditTab.classList.toggle('hidden', !show);
@@ -59,10 +58,7 @@ const contextMenus = {
         // Folder context menu options
         document.getElementById('download-folder-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFolder) {
-                window.fileOps.downloadFolder(
-                    window.app.contextMenuTargetFolder.id,
-                    window.app.contextMenuTargetFolder.name
-                );
+                window.fileOps.downloadFolder(window.app.contextMenuTargetFolder.id, window.app.contextMenuTargetFolder.name);
             }
             window.ui.closeContextMenu();
         });
@@ -80,12 +76,7 @@ const contextMenus = {
                     }
                 } else {
                     // Add to favorites
-                    const ok = await window.favorites.addToFavorites(
-                        folder.id,
-                        folder.name,
-                        'folder',
-                        folder.parent_id
-                    );
+                    const ok = await window.favorites.addToFavorites(folder.id, folder.name, 'folder', folder.parent_id);
                     if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
                         window.ui.setFavoriteVisualState(folder.id, 'folder', true);
                     }
@@ -130,9 +121,11 @@ const contextMenus = {
             if (window.app.contextMenuTargetFile) {
                 // Capture reference before context menu cleanup nullifies it
                 const file = window.app.contextMenuTargetFile;
-                fetch(`/api/files/${file.id}?metadata=true`, { credentials: 'same-origin' })
-                    .then(response => response.json())
-                    .then(fileDetails => {
+                fetch(`/api/files/${file.id}?metadata=true`, {
+                    credentials: 'same-origin'
+                })
+                    .then((response) => response.json())
+                    .then((fileDetails) => {
                         // Check if viewable file type (images, PDFs, text files)
                         if (window.ui && window.ui.isViewableFile(fileDetails)) {
                             // Open with inline viewer
@@ -147,7 +140,7 @@ const contextMenus = {
                             window.fileOps.downloadFile(file.id, file.name);
                         }
                     })
-                    .catch(error => {
+                    .catch((error) => {
                         console.error('Error fetching file details:', error);
                         // On error, fallback to download
                         window.fileOps.downloadFile(file.id, file.name);
@@ -174,10 +167,7 @@ const contextMenus = {
 
         document.getElementById('download-file-option').addEventListener('click', () => {
             if (window.app.contextMenuTargetFile) {
-                window.fileOps.downloadFile(
-                    window.app.contextMenuTargetFile.id,
-                    window.app.contextMenuTargetFile.name
-                );
+                window.fileOps.downloadFile(window.app.contextMenuTargetFile.id, window.app.contextMenuTargetFile.name);
             }
             window.ui.closeFileContextMenu();
         });
@@ -195,12 +185,7 @@ const contextMenus = {
                     }
                 } else {
                     // Add to favorites
-                    const ok = await window.favorites.addToFavorites(
-                        file.id,
-                        file.name,
-                        'file',
-                        file.folder_id
-                    );
+                    const ok = await window.favorites.addToFavorites(file.id, file.name, 'file', file.folder_id);
                     if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
                         window.ui.setFavoriteVisualState(file.id, 'file', true);
                     }
@@ -285,33 +270,27 @@ const contextMenus = {
                 const targetId = window.app.selectedTargetFolderId;
                 const items = window.app.batchMoveItems || [];
 
-                const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
-                const folderIds = items.filter(i => i.type === 'folder').map(i => i.id);
+                const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
+                const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
 
-                let result = await window.fileOps.batchCopy( fileIds, folderIds, targetId);
-                
+                let result = await window.fileOps.batchCopy(fileIds, folderIds, targetId);
+
                 this.closeMoveDialog();
                 window.multiSelect.clear();
                 window.loadFiles();
 
-                window.multiSelect.showBatchResult( "copy", result);
+                window.multiSelect.showBatchResult('copy', result);
                 return;
             }
 
             // Single item copy
             if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
-                const success = await window.fileOps.copyFile(
-                    window.app.contextMenuTargetFile.id,
-                    window.app.selectedTargetFolderId
-                );
+                const success = await window.fileOps.copyFile(window.app.contextMenuTargetFile.id, window.app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
             } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
-                const success = await window.fileOps.copyFolder(
-                    window.app.contextMenuTargetFolder.id,
-                    window.app.selectedTargetFolderId
-                );
+                const success = await window.fileOps.copyFolder(window.app.contextMenuTargetFolder.id, window.app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
@@ -324,32 +303,26 @@ const contextMenus = {
                 const targetId = window.app.selectedTargetFolderId;
                 const items = window.app.batchMoveItems || [];
 
-                const fileIds = items.filter(i => i.type === 'file').map(i => i.id);
-                const folderIds = items.filter(i => i.type === 'folder' && i.id !== targetId).map(i => i.id);
-                
-                let result = await window.fileOps.batchMove( fileIds, folderIds, targetId);
-                
+                const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
+                const folderIds = items.filter((i) => i.type === 'folder' && i.id !== targetId).map((i) => i.id);
+
+                let result = await window.fileOps.batchMove(fileIds, folderIds, targetId);
+
                 this.closeMoveDialog();
                 window.multiSelect.clear();
                 window.loadFiles();
-                window.multiSelect.showBatchResult( "move", result);
-                
+                window.multiSelect.showBatchResult('move', result);
+
                 return;
             }
 
             if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
-                const success = await window.fileOps.moveFile(
-                    window.app.contextMenuTargetFile.id,
-                    window.app.selectedTargetFolderId
-                );
+                const success = await window.fileOps.moveFile(window.app.contextMenuTargetFile.id, window.app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
             } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
-                const success = await window.fileOps.moveFolder(
-                    window.app.contextMenuTargetFolder.id,
-                    window.app.selectedTargetFolderId
-                );
+                const success = await window.fileOps.moveFolder(window.app.contextMenuTargetFolder.id, window.app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
@@ -416,7 +389,7 @@ const contextMenus = {
         window.app.moveDialogMode = mode;
 
         // Reset selection
-        window.app.selectedTargetFolderId = "";
+        window.app.selectedTargetFolderId = '';
 
         // Ensure we have the home folder ID BEFORE calculating startFolderId
         if (!window.app.userHomeFolderId) {
@@ -442,7 +415,16 @@ const contextMenus = {
             startFolderId = window.app.userHomeFolderId || null;
         }
 
-        console.log('[Move Dialog] showMoveDialog - item:', item, 'mode:', mode, 'startFolderId:', startFolderId, 'userHomeFolderId:', window.app.userHomeFolderId);
+        console.log(
+            '[Move Dialog] showMoveDialog - item:',
+            item,
+            'mode:',
+            mode,
+            'startFolderId:',
+            startFolderId,
+            'userHomeFolderId:',
+            window.app.userHomeFolderId
+        );
 
         // Store the item being moved and navigation state
         window.app.moveDialogItemId = item.id;
@@ -460,9 +442,14 @@ const contextMenus = {
 
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
-        const titleText = mode === 'file' ?
-            (window.i18n ? window.i18n.t('dialogs.move_file') : 'Move file') :
-            (window.i18n ? window.i18n.t('dialogs.move_folder') : 'Move folder');
+        const titleText =
+            mode === 'file'
+                ? window.i18n
+                    ? window.i18n.t('dialogs.move_file')
+                    : 'Move file'
+                : window.i18n
+                  ? window.i18n.t('dialogs.move_folder')
+                  : 'Move folder';
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
         // Load folders for the starting location
@@ -525,7 +512,6 @@ const contextMenus = {
      */
     async loadMoveDialogFolders(parentFolderId) {
         try {
-
             // Ensure we have the home folder ID before proceeding
             if (!window.app.userHomeFolderId) {
                 await window.resolveHomeFolder();
@@ -555,7 +541,7 @@ const contextMenus = {
 
             // The contents endpoint returns an array of child folders
             // The fallback /api/folders returns root folders (home folder itself)
-            const folders = Array.isArray(data) ? data : (data.folders || []);
+            const folders = Array.isArray(data) ? data : data.folders || [];
             console.log('[Move Dialog] Loaded folders:', folders.length, 'folders:', folders);
 
             const folderSelectContainer = document.getElementById('folder-select-container');
@@ -582,7 +568,7 @@ const contextMenus = {
                     <span>${window.i18n ? window.i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
                 `;
                 currentFolderOption.addEventListener('click', () => {
-                    document.querySelectorAll('.folder-select-item').forEach(item => {
+                    document.querySelectorAll('.folder-select-item').forEach((item) => {
                         item.classList.remove('selected');
                     });
                     currentFolderOption.classList.add('selected');
@@ -606,9 +592,7 @@ const contextMenus = {
                     if (currentBreadcrumb.length > 0) {
                         // Remove current folder from breadcrumb
                         currentBreadcrumb.pop();
-                        const parentFolder = currentBreadcrumb.length > 0
-                            ? currentBreadcrumb[currentBreadcrumb.length - 1]
-                            : null;
+                        const parentFolder = currentBreadcrumb.length > 0 ? currentBreadcrumb[currentBreadcrumb.length - 1] : null;
                         window.app.moveDialogBreadcrumb = currentBreadcrumb;
                         window.app.moveDialogCurrentFolderId = parentFolder ? parentFolder.id : null;
                         this.loadMoveDialogFolders(parentFolder ? parentFolder.id : null);
@@ -623,7 +607,7 @@ const contextMenus = {
             }
 
             // Add subfolders (clicking navigates INTO the folder)
-            folders.forEach(folder => {
+            folders.forEach((folder) => {
                 // Skip the item being moved (to prevent moving a folder into itself)
                 if (mode === 'folder' && folder.id === itemId) {
                     return;
@@ -661,11 +645,11 @@ const contextMenus = {
                     <span>${window.i18n ? window.i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
                 `;
                 homeOption.addEventListener('click', () => {
-                    document.querySelectorAll('.folder-select-item').forEach(item => {
+                    document.querySelectorAll('.folder-select-item').forEach((item) => {
                         item.classList.remove('selected');
                     });
                     homeOption.classList.add('selected');
-                    window.app.selectedTargetFolderId = '';  // Empty means root/home
+                    window.app.selectedTargetFolderId = ''; // Empty means root/home
                 });
                 folderSelectContainer.appendChild(homeOption);
             } else if (folders.length === 0) {
@@ -780,147 +764,150 @@ const contextMenus = {
      */
     async showShareDialog(item, itemType) {
         try {
-        const shareDialog = document.getElementById('share-dialog');
-        if (!shareDialog) {
-            console.error('Share dialog element not found in DOM');
-            window.ui.showNotification('Error', 'Share dialog not available');
-            return;
-        }
-
-        // Update dialog title — use the <span> inside header to preserve <i> icon
-        const dialogHeader = shareDialog.querySelector('.share-dialog-header');
-        if (dialogHeader) {
-            const headerSpan = dialogHeader.querySelector('span');
-            const titleText = itemType === 'file' ?
-                (window.i18n ? window.i18n.t('dialogs.share_file') : 'Share file') :
-                (window.i18n ? window.i18n.t('dialogs.share_folder') : 'Share folder');
-            if (headerSpan) {
-                headerSpan.textContent = titleText;
-            } else {
-                dialogHeader.textContent = titleText;
+            const shareDialog = document.getElementById('share-dialog');
+            if (!shareDialog) {
+                console.error('Share dialog element not found in DOM');
+                window.ui.showNotification('Error', 'Share dialog not available');
+                return;
             }
-        }
 
-        const itemName = document.getElementById('shared-item-name');
-        if (itemName) itemName.textContent = item.name;
-
-        // Reset form
-        const pwField = document.getElementById('share-password');
-        const expField = document.getElementById('share-expiration');
-        if (pwField) pwField.value = '';
-        if (expField) expField.value = '';
-        const permRead = document.getElementById('share-permission-read');
-        const permWrite = document.getElementById('share-permission-write');
-        const permReshare = document.getElementById('share-permission-reshare');
-        if (permRead) permRead.checked = true;
-        if (permWrite) permWrite.checked = false;
-        if (permReshare) permReshare.checked = false;
-
-        // Store the current item and type for use when creating the share
-        window.app.shareDialogItem = item;
-        window.app.shareDialogItemType = itemType;
-
-        // Check if item already has shares (async API call)
-        const existingShares = await window.fileSharing.getSharedLinksForItem(item.id, itemType);
-        const existingSharesContainer = document.getElementById('existing-shares-container');
-
-        // Clear existing shares container
-        existingSharesContainer.innerHTML = '';
-
-        if (existingShares.length > 0) {
-            document.getElementById('existing-shares-section').classList.remove('hidden');
-
-            // Create elements for each existing share
-            existingShares.forEach(share => {
-                const shareEl = document.createElement('div');
-                shareEl.className = 'existing-share-item';
-
-                const expiresText = share.expires_at ?
-                    `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` :
-                    'No expiration';
-
-                // Share URL
-                const urlDiv = document.createElement('div');
-                urlDiv.className = 'share-url';
-                urlDiv.textContent = share.url;
-                shareEl.appendChild(urlDiv);
-
-                // Share info
-                const infoDiv = document.createElement('div');
-                infoDiv.className = 'share-info';
-                if (share.has_password) {
-                    const protectedSpan = document.createElement('span');
-                    protectedSpan.className = 'share-protected';
-                    protectedSpan.innerHTML = '<i class="fas fa-lock"></i> Password protected';
-                    infoDiv.appendChild(protectedSpan);
+            // Update dialog title — use the <span> inside header to preserve <i> icon
+            const dialogHeader = shareDialog.querySelector('.share-dialog-header');
+            if (dialogHeader) {
+                const headerSpan = dialogHeader.querySelector('span');
+                const titleText =
+                    itemType === 'file'
+                        ? window.i18n
+                            ? window.i18n.t('dialogs.share_file')
+                            : 'Share file'
+                        : window.i18n
+                          ? window.i18n.t('dialogs.share_folder')
+                          : 'Share folder';
+                if (headerSpan) {
+                    headerSpan.textContent = titleText;
+                } else {
+                    dialogHeader.textContent = titleText;
                 }
-                const expirationSpan = document.createElement('span');
-                expirationSpan.className = 'share-expiration';
-                expirationSpan.textContent = expiresText;
-                infoDiv.appendChild(expirationSpan);
-                shareEl.appendChild(infoDiv);
+            }
 
-                // Share actions
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'share-actions';
+            const itemName = document.getElementById('shared-item-name');
+            if (itemName) itemName.textContent = item.name;
 
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'btn btn-small copy-link-btn';
-                copyBtn.dataset.shareUrl = share.url;
-                copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
-                actionsDiv.appendChild(copyBtn);
+            // Reset form
+            const pwField = document.getElementById('share-password');
+            const expField = document.getElementById('share-expiration');
+            if (pwField) pwField.value = '';
+            if (expField) expField.value = '';
+            const permRead = document.getElementById('share-permission-read');
+            const permWrite = document.getElementById('share-permission-write');
+            const permReshare = document.getElementById('share-permission-reshare');
+            if (permRead) permRead.checked = true;
+            if (permWrite) permWrite.checked = false;
+            if (permReshare) permReshare.checked = false;
 
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'btn btn-small btn-danger delete-link-btn';
-                deleteBtn.dataset.shareId = share.id;
-                deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
-                actionsDiv.appendChild(deleteBtn);
+            // Store the current item and type for use when creating the share
+            window.app.shareDialogItem = item;
+            window.app.shareDialogItemType = itemType;
 
-                shareEl.appendChild(actionsDiv);
+            // Check if item already has shares (async API call)
+            const existingShares = await window.fileSharing.getSharedLinksForItem(item.id, itemType);
+            const existingSharesContainer = document.getElementById('existing-shares-container');
 
-                existingSharesContainer.appendChild(shareEl);
-            });
+            // Clear existing shares container
+            existingSharesContainer.innerHTML = '';
 
-            // Add event listeners for copy and delete buttons
-            document.querySelectorAll('.copy-link-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const url = btn.getAttribute('data-share-url');
-                    window.fileSharing.copyLinkToClipboard(url);
+            if (existingShares.length > 0) {
+                document.getElementById('existing-shares-section').classList.remove('hidden');
+
+                // Create elements for each existing share
+                existingShares.forEach((share) => {
+                    const shareEl = document.createElement('div');
+                    shareEl.className = 'existing-share-item';
+
+                    const expiresText = share.expires_at ? `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 'No expiration';
+
+                    // Share URL
+                    const urlDiv = document.createElement('div');
+                    urlDiv.className = 'share-url';
+                    urlDiv.textContent = share.url;
+                    shareEl.appendChild(urlDiv);
+
+                    // Share info
+                    const infoDiv = document.createElement('div');
+                    infoDiv.className = 'share-info';
+                    if (share.has_password) {
+                        const protectedSpan = document.createElement('span');
+                        protectedSpan.className = 'share-protected';
+                        protectedSpan.innerHTML = '<i class="fas fa-lock"></i> Password protected';
+                        infoDiv.appendChild(protectedSpan);
+                    }
+                    const expirationSpan = document.createElement('span');
+                    expirationSpan.className = 'share-expiration';
+                    expirationSpan.textContent = expiresText;
+                    infoDiv.appendChild(expirationSpan);
+                    shareEl.appendChild(infoDiv);
+
+                    // Share actions
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'share-actions';
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'btn btn-small copy-link-btn';
+                    copyBtn.dataset.shareUrl = share.url;
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copy';
+                    actionsDiv.appendChild(copyBtn);
+
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'btn btn-small btn-danger delete-link-btn';
+                    deleteBtn.dataset.shareId = share.id;
+                    deleteBtn.innerHTML = '<i class="fas fa-trash"></i> Delete';
+                    actionsDiv.appendChild(deleteBtn);
+
+                    shareEl.appendChild(actionsDiv);
+
+                    existingSharesContainer.appendChild(shareEl);
                 });
-            });
 
-            document.querySelectorAll('.delete-link-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const shareId = btn.getAttribute('data-share-id');
-
-                    showConfirmDialog({
-                        title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
-                        message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
-                        confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete',
-                    }).then(async (confirmed) => {
-                        if (confirmed) {
-                            await window.fileSharing.removeSharedLink(shareId);
-                            btn.closest('.existing-share-item').remove();
-                            if (existingSharesContainer.children.length === 0) {
-                                document.getElementById('existing-shares-section').classList.add('hidden');
-                            }
-                        }
+                // Add event listeners for copy and delete buttons
+                document.querySelectorAll('.copy-link-btn').forEach((btn) => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const url = btn.getAttribute('data-share-url');
+                        window.fileSharing.copyLinkToClipboard(url);
                     });
                 });
-            });
-        } else {
-            document.getElementById('existing-shares-section').classList.add('hidden');
-        }
 
-        // Hide new-share section from previous use
-        const newShareSection = document.getElementById('new-share-section');
-        if (newShareSection) newShareSection.classList.add('hidden');
+                document.querySelectorAll('.delete-link-btn').forEach((btn) => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const shareId = btn.getAttribute('data-share-id');
 
-        // Show dialog
-        shareDialog.style.display = 'flex';
-        console.log('Share dialog opened for', itemType, item.name);
+                        showConfirmDialog({
+                            title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
+                            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
+                            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
+                        }).then(async (confirmed) => {
+                            if (confirmed) {
+                                await window.fileSharing.removeSharedLink(shareId);
+                                btn.closest('.existing-share-item').remove();
+                                if (existingSharesContainer.children.length === 0) {
+                                    document.getElementById('existing-shares-section').classList.add('hidden');
+                                }
+                            }
+                        });
+                    });
+                });
+            } else {
+                document.getElementById('existing-shares-section').classList.add('hidden');
+            }
+
+            // Hide new-share section from previous use
+            const newShareSection = document.getElementById('new-share-section');
+            if (newShareSection) newShareSection.classList.add('hidden');
+
+            // Show dialog
+            shareDialog.style.display = 'flex';
+            console.log('Share dialog opened for', itemType, item.name);
         } catch (error) {
             console.error('Error opening share dialog:', error);
             window.ui.showNotification('Error', 'Could not open share dialog');
@@ -961,7 +948,10 @@ const contextMenus = {
         };
 
         try {
-            const headers = { 'Content-Type': 'application/json', ...getCsrfHeaders() };
+            const headers = {
+                'Content-Type': 'application/json',
+                ...getCsrfHeaders()
+            };
 
             const response = await fetch('/api/shares', {
                 method: 'POST',
@@ -990,7 +980,6 @@ const contextMenus = {
                 window.i18n ? window.i18n.t('notifications.link_created') : 'Link created',
                 window.i18n ? window.i18n.t('notifications.share_success') : 'Shared link created successfully'
             );
-
         } catch (error) {
             console.error('Error creating shared link:', error);
             window.ui.showNotification('Error', error.message || 'Could not create shared link');

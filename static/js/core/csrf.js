@@ -15,9 +15,7 @@
 
 // eslint-disable-next-line no-unused-vars
 function getCsrfToken() {
-    const match = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('oxicloud_csrf='));
+    const match = document.cookie.split('; ').find((row) => row.startsWith('oxicloud_csrf='));
     return match ? match.split('=')[1] : '';
 }
 

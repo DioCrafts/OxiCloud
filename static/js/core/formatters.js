@@ -5,12 +5,7 @@
 
 function escapeHtml(str) {
     if (typeof str !== 'string') return '';
-    return str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function formatFileSize(bytes) {
@@ -40,24 +35,32 @@ function formatDateTime(value) {
         dateValue = new Date(value);
     }
     if (isNaN(dateValue.getTime())) return String(value);
-    return dateValue.toLocaleDateString() + ' ' +
-        dateValue.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return dateValue.toLocaleDateString() + ' ' + dateValue.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDateShort(value) {
     if (!value) return 'N/A';
     const dateValue = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
     if (isNaN(dateValue.getTime())) return String(value);
-    return dateValue.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    return dateValue.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+    });
 }
 
 function isTextViewable(mimeType) {
     if (!mimeType) return false;
     if (mimeType.startsWith('text/')) return true;
     const textTypes = [
-        'application/json', 'application/xml', 'application/javascript',
-        'application/x-sh', 'application/x-yaml', 'application/toml',
-        'application/x-toml', 'application/sql',
+        'application/json',
+        'application/xml',
+        'application/javascript',
+        'application/x-sh',
+        'application/x-yaml',
+        'application/toml',
+        'application/x-toml',
+        'application/sql'
     ];
     return textTypes.includes(mimeType);
 }

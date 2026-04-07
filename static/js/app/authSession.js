@@ -25,7 +25,6 @@ async function refreshUserData() {
 
         localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
         window.updateStorageUsageDisplay(userData);
-
         return userData;
     } catch (error) {
         console.error('Error refreshing user data:', error);
@@ -82,7 +81,7 @@ async function checkAuthentication() {
         if (userData.username) {
             // We have cached user data — render immediately, refresh in background
             const userInitials = userData.username.substring(0, 2).toUpperCase();
-            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => {
+            document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach((el) => {
                 el.textContent = userInitials;
             });
             const menuName = document.getElementById('user-menu-name');
@@ -103,7 +102,10 @@ async function checkAuthentication() {
                     const r = await fetch('/api/auth/refresh', {
                         method: 'POST',
                         credentials: 'same-origin',
-                        headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...getCsrfHeaders()
+                        },
                         body: '{}'
                     });
                     if (r.ok) {
@@ -128,7 +130,7 @@ async function checkAuthentication() {
                 const freshData = await refreshUserData();
                 if (freshData && freshData.username) {
                     const userInitials = freshData.username.substring(0, 2).toUpperCase();
-                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach(el => el.textContent = userInitials);
+                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach((el) => (el.textContent = userInitials));
                     window.updateStorageUsageDisplay(freshData);
                     resolveHomeFolder().then(() => window.loadFiles());
                 } else {
@@ -154,7 +156,9 @@ async function resolveHomeFolder() {
 
     if (app.userHomeFolderId) return;
     try {
-        const response = await fetch('/api/folders', { credentials: 'same-origin' });
+        const response = await fetch('/api/folders', {
+            credentials: 'same-origin'
+        });
         if (!response.ok) {
             console.warn(`Could not fetch home folder: ${response.status}`);
             return;
