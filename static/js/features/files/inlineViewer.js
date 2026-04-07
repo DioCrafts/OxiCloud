@@ -96,7 +96,7 @@ class InlineViewer {
         // Detect images by mime type OR extension (uploads via WebDAV may lack correct mime)
         const ext = (file.name || '').split('.').pop().toLowerCase();
         const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'heic', 'heif', 'avif', 'tiff'];
-        const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
+        const isImage = file.mime_type?.startsWith('image/') || imageExts.includes(ext);
         if (!isImage && window.wopiEditor && (await window.wopiEditor.canEdit(file.name))) {
             try {
                 window.wopiEditor.openInModal(file.id, file.name, 'edit');
@@ -159,7 +159,7 @@ class InlineViewer {
 
             // Create text viewer using authenticated fetch
             this.createTextViewer(file, container, loader);
-        } else if (file.mime_type && file.mime_type.startsWith('audio/')) {
+        } else if (file.mime_type?.startsWith('audio/')) {
             // Hide zoom controls for audio
             controls.style.display = 'none';
 
@@ -171,7 +171,7 @@ class InlineViewer {
 
             // Create audio player
             this.createMediaViewer(file, 'audio', container, loader);
-        } else if (file.mime_type && file.mime_type.startsWith('video/')) {
+        } else if (file.mime_type?.startsWith('video/')) {
             // Hide zoom controls for video
             controls.style.display = 'none';
 
@@ -225,7 +225,7 @@ class InlineViewer {
             const text = await response.text();
 
             // Remove loader
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -240,7 +240,7 @@ class InlineViewer {
             console.error('Error creating text viewer:', error);
 
             // Remove loader
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -284,8 +284,8 @@ class InlineViewer {
                     // e.loaded and e.total are JavaScript numbers (64-bit float)
                     const progress = e.loaded / e.total;
                     const pct = Math.round(progress * 100);
-                    progressBar.style.width = pct + '%';
-                    progressText.textContent = pct + '%';
+                    progressBar.style.width = `${pct}%`;
+                    progressText.textContent = `${pct}%`;
                 }
             };
 
@@ -299,7 +299,7 @@ class InlineViewer {
                     }
                 };
 
-                xhr.onerror = function () {
+                xhr.onerror = () => {
                     reject(new Error('Network error'));
                 };
 
@@ -310,10 +310,10 @@ class InlineViewer {
             const blob = response;
             const blobUrl = URL.createObjectURL(blob);
 
-            console.log('Created blob URL:', blobUrl.substring(0, 30) + '...');
+            console.log('Created blob URL:', `${blobUrl.substring(0, 30)}...`);
 
             // Remove loader
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -369,7 +369,7 @@ class InlineViewer {
             console.error('Error creating blob URL viewer:', error);
 
             // Remove loader
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -395,7 +395,7 @@ class InlineViewer {
             const blobUrl = URL.createObjectURL(blob);
 
             // Remove loader
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -472,7 +472,7 @@ class InlineViewer {
         } catch (error) {
             console.error(`Error creating ${mediaType} viewer:`, error);
 
-            if (loader && loader.parentNode) {
+            if (loader?.parentNode) {
                 loader.parentNode.removeChild(loader);
             }
 
@@ -492,85 +492,85 @@ class InlineViewer {
         <p>Try downloading it directly.</p>
       </div>
     `;
-    container.appendChild(message);
-  }
-  
-  closeViewer() {
-    // Get modal
-    const modal = document.getElementById('inline-viewer-modal');
-    
-    // stops audio/video before closing viewver
-    const media = modal.querySelector('audio, video');
-    if (media && !media.paused) media.pause();
-
-    // Hide modal
-    modal.classList.remove('active');
-    
-    // Clean up blob URL if exists
-    if (this.currentBlobUrl) {
-      URL.revokeObjectURL(this.currentBlobUrl);
-      this.currentBlobUrl = null;
+        container.appendChild(message);
     }
 
-    // clear
-    window.app.viewFile = null;
-    window.updateHistory(false);
+    closeViewer() {
+        // Get modal
+        const modal = document.getElementById('inline-viewer-modal');
 
-    // Clear references
-    this.currentFile = null;
-  }
-  
-  downloadFile(file) {
-    fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
-      .then(res => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = file.name;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      })
-      .catch(err => console.error('Download error:', err));
-  }
-  
-  zoomImage(factor) {
-    const container = document.querySelector('.inline-viewer-container');
-    const img = container.querySelector('.inline-viewer-image');
-    
-    if (!img) return;
-    
-    // Get current scale
-    let scale = img.dataset.scale ? parseFloat(img.dataset.scale) : 1.0;
-    
-    // Apply zoom factor
-    scale *= factor;
-    
-    // Limit scale
-    scale = Math.max(0.1, Math.min(5.0, scale));
-    
-    // Save scale
-    img.dataset.scale = scale;
-    
-    // Apply scale
-    img.style.transform = `scale(${scale})`;
-  }
-  
-  resetZoom() {
-    const container = document.querySelector('.inline-viewer-container');
-    const img = container.querySelector('.inline-viewer-image');
-    
-    if (!img) return;
-    
-    // Reset scale
-    img.dataset.scale = 1.0;
-    img.style.transform = 'scale(1.0)';
-  }
+        // stops audio/video before closing viewver
+        const media = modal.querySelector('audio, video');
+        if (media && !media.paused) media.pause();
+
+        // Hide modal
+        modal.classList.remove('active');
+
+        // Clean up blob URL if exists
+        if (this.currentBlobUrl) {
+            URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = null;
+        }
+
+        // clear
+        window.app.viewFile = null;
+        window.updateHistory(false);
+
+        // Clear references
+        this.currentFile = null;
+    }
+
+    downloadFile(file) {
+        fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
+            .then((res) => {
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.blob();
+            })
+            .then((blob) => {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = file.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            })
+            .catch((err) => console.error('Download error:', err));
+    }
+
+    zoomImage(factor) {
+        const container = document.querySelector('.inline-viewer-container');
+        const img = container.querySelector('.inline-viewer-image');
+
+        if (!img) return;
+
+        // Get current scale
+        let scale = img.dataset.scale ? parseFloat(img.dataset.scale) : 1.0;
+
+        // Apply zoom factor
+        scale *= factor;
+
+        // Limit scale
+        scale = Math.max(0.1, Math.min(5.0, scale));
+
+        // Save scale
+        img.dataset.scale = scale;
+
+        // Apply scale
+        img.style.transform = `scale(${scale})`;
+    }
+
+    resetZoom() {
+        const container = document.querySelector('.inline-viewer-container');
+        const img = container.querySelector('.inline-viewer-image');
+
+        if (!img) return;
+
+        // Reset scale
+        img.dataset.scale = 1.0;
+        img.style.transform = 'scale(1.0)';
+    }
 }
 
 // Initialize viewer when document is ready

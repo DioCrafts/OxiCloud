@@ -104,7 +104,7 @@ const favorites = {
             await this._fetchFromServer();
 
             // Notify user
-            if (window.ui && window.ui.showNotification) {
+            if (window.ui?.showNotification) {
                 window.ui.showNotification(
                     window.i18n ? window.i18n.t('favorites.added_title') : 'Added to favorites',
                     `"${name}" ${window.i18n ? window.i18n.t('favorites.added_msg') : 'added to favorites'}`
@@ -139,7 +139,7 @@ const favorites = {
             // Remove from local cache
             this._cache.delete(this._cacheKey(id, type));
 
-            if (window.ui && window.ui.showNotification) {
+            if (window.ui?.showNotification) {
                 window.ui.showNotification(
                     window.i18n ? window.i18n.t('favorites.removed_title') : 'Removed from favorites',
                     `"${itemName}" ${window.i18n ? window.i18n.t('favorites.removed_msg') : 'removed from favorites'}`
@@ -208,7 +208,7 @@ const favorites = {
             if (files.length) window.ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying favorites:', error);
-            if (window.ui && window.ui.showNotification) {
+            if (window.ui?.showNotification) {
                 window.ui.showNotification('Error', 'Error loading favorite items');
             }
         }

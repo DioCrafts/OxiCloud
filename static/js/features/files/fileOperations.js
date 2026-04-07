@@ -350,7 +350,7 @@ const fileOps = {
 
                 // Legacy dropzone bar
                 if (progressBar) {
-                    progressBar.style.width = (uploadedCount / totalFiles) * 100 + '%';
+                    progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
                 }
                 // Notify bell of per-file completion
                 if (window.notifications && batchId) {
@@ -601,7 +601,7 @@ const fileOps = {
 
                     result = await this._uploadFileFetch(formData, thisTimeout);
 
-                    console.log(`[UPLOAD END]   #${idx} ${rel} ok=${result.ok}${result.errorMsg ? ' err=' + result.errorMsg : ''}`);
+                    console.log(`[UPLOAD END]   #${idx} ${rel} ok=${result.ok}${result.errorMsg ? ` err=${result.errorMsg}` : ''}`);
                 } catch (e) {
                     result = {
                         ok: false,
@@ -618,7 +618,7 @@ const fileOps = {
                     } catch (_) {}
                 }
                 if (progressBar && uploadedCount % 10 === 0) {
-                    progressBar.style.width = (uploadedCount / totalFiles) * 100 + '%';
+                    progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
                 }
                 if (uploadedCount % 50 === 0 || uploadedCount === totalFiles) {
                     console.log(`Progress: ${uploadedCount}/${totalFiles} (${successCount} ok)`);
@@ -748,7 +748,7 @@ const fileOps = {
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || 'Unknown error';
-                } catch (e) {
+                } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
                 window.ui.showNotification('Error', `Error moving the file: ${errorMessage}`);
@@ -790,7 +790,7 @@ const fileOps = {
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || 'Unknown error';
-                } catch (e) {
+                } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
                 window.ui.showNotification('Error', `Error moving the folder: ${errorMessage}`);
@@ -808,7 +808,7 @@ const fileOps = {
     * @property {number} success number of files|folders sucessfully updated
     * @property {number} errors  number of files|folders in error
     * /
-    
+
     /**
      * Move files & folders
      * @param {string[]} fileIds - File IDs
@@ -883,7 +883,7 @@ const fileOps = {
             });
 
             if (response.ok) {
-                const result = await response.json();
+                await response.json();
                 // Reload files after copying
                 await window.loadFiles();
                 window.ui.showNotification('File copied', 'File copied successfully');
@@ -893,7 +893,7 @@ const fileOps = {
                 try {
                     const errorData = await response.json();
                     errorMessage = errorData.error || 'Unknown error';
-                } catch (e) {
+                } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
                 window.ui.showNotification('Error', `Error copying the file: ${errorMessage}`);
@@ -997,7 +997,7 @@ const fileOps = {
                 try {
                     const errorData = JSON.parse(errorText);
                     errorMessage = errorData.error || response.statusText;
-                } catch (e) {
+                } catch (_e) {
                     errorMessage = errorText || response.statusText;
                 }
                 window.ui.showNotification('Error', `Error renaming the file: ${errorMessage}`);
@@ -1043,7 +1043,7 @@ const fileOps = {
                     // Try to parse as JSON
                     const errorData = JSON.parse(errorText);
                     errorMessage = errorData.error || response.statusText;
-                } catch (e) {
+                } catch (_e) {
                     // If not JSON, use text as is
                     errorMessage = errorText || response.statusText;
                 }

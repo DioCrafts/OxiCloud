@@ -72,8 +72,12 @@ const multiSelect = {
     clear() {
         this._selected.clear();
         this._lastClickedIndex = -1;
-        document.querySelectorAll('.file-item.selected').forEach((el) => el.classList.remove('selected'));
-        document.querySelectorAll('.item-checkbox').forEach((cb) => (cb.checked = false));
+        document.querySelectorAll('.file-item.selected').forEach((el) => {
+            el.classList.remove('selected');
+        });
+        document.querySelectorAll('.item-checkbox').forEach((cb) => {
+            cb.checked = false;
+        });
         this._syncUI();
     },
 
@@ -103,8 +107,8 @@ const multiSelect = {
      * @return {ItemSelection}
      */
     getSelection(targtFolderId) {
-        let fileIds = [];
-        let folderIds = [];
+        const fileIds = [];
+        const folderIds = [];
 
         // TODO optimize & check if _selected is a better use
         document.querySelectorAll(`div.file-item.selected`).forEach((item) => {
@@ -155,7 +159,9 @@ const multiSelect = {
     _selectAllInContainer(containerId, selector) {
         const container = document.getElementById(containerId);
         if (!container) return;
-        container.querySelectorAll(selector).forEach((el) => this._selectElement(el));
+        container.querySelectorAll(selector).forEach((el) => {
+            this._selectElement(el);
+        });
     },
 
     _getAllVisibleItems() {
@@ -190,7 +196,7 @@ const multiSelect = {
         const info = this._extractInfo(el);
         if (!info) return;
 
-        if (event && event.shiftKey && this._lastClickedIndex >= 0 && index >= 0) {
+        if (event?.shiftKey && this._lastClickedIndex >= 0 && index >= 0) {
             const start = Math.min(this._lastClickedIndex, index);
             const end = Math.max(this._lastClickedIndex, index);
             for (let i = start; i <= end; i++) {
@@ -200,7 +206,7 @@ const multiSelect = {
                     const sel = iInfo.type === 'folder' ? `[data-folder-id="${iInfo.id}"]` : `[data-file-id="${iInfo.id}"]`;
                     document.querySelectorAll(sel).forEach((e) => {
                         e.classList.add('selected');
-                        let checkbox = e.querySelector('input[type="checkbox"]');
+                        const checkbox = e.querySelector('input[type="checkbox"]');
                         if (checkbox) checkbox.checked = true;
                     });
                 }
@@ -208,7 +214,7 @@ const multiSelect = {
         } else {
             const nowSelected = this.toggle(info.id, info.name, info.type, info.parentId);
             el.classList.toggle('selected', nowSelected);
-            let checkbox = el.querySelector('input[type="checkbox"]');
+            const checkbox = el.querySelector('input[type="checkbox"]');
             if (checkbox) checkbox.checked = nowSelected;
         }
         this._lastClickedIndex = index;
@@ -504,7 +510,7 @@ const multiSelect = {
         const batchSelectionBar = document.getElementById('batch-selection-bar');
         batchSelectionBar.innerHTML = this._buildSelectionBarHTML();
 
-        if (window.i18n && window.i18n.translateElement) {
+        if (window.i18n?.translateElement) {
             window.i18n.translateElement(batchSelectionBar);
         }
         this._wireBarButtons();
@@ -512,10 +518,9 @@ const multiSelect = {
 
     // FIXME: competition with _
     _injectListHeaderCheckbox() {
-        const self = this;
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
         if (!selectAllCheckbox) return;
-        selectAllCheckbox.addEventListener('change', () => self.toggleAll());
+        selectAllCheckbox.addEventListener('change', () => this.toggleAll());
     }
 };
 

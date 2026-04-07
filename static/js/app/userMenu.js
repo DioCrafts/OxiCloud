@@ -171,7 +171,7 @@ function updateUserMenuData() {
     const quotaBytes = userData.storage_quota_bytes == null ? 10 * 1024 * 1024 * 1024 : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
 
-    if (storageFill) storageFill.style.width = percentage + '%';
+    if (storageFill) storageFill.style.width = `${percentage}%`;
     if (storageText) {
         const used = window.formatFileSize(usedBytes);
         const total = window.formatQuotaSize(quotaBytes);
@@ -206,7 +206,7 @@ function showUserProfileModal() {
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-    const t = (key, fallback) => (window.i18n && window.i18n.t ? window.i18n.t(key) || fallback : fallback);
+    const t = (key, fallback) => (window.i18n?.t ? window.i18n.t(key) || fallback : fallback);
 
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();
@@ -220,7 +220,7 @@ function showUserProfileModal() {
                 <div class="about-modal-avatar">${initials}</div>
                 <h3 class="about-modal-username">${username}</h3>
                 <p class="about-modal-email">${email}</p>
-                <span class="about-modal-role ${role === 'admin' ? 'about-modal-role-admin' : 'about-modal-role-user'}">${role === 'admin' ? '🛡️ Admin' : '👤 ' + t('user_menu.role_user', 'User')}</span>
+                <span class="about-modal-role ${role === 'admin' ? 'about-modal-role-admin' : 'about-modal-role-user'}">${role === 'admin' ? '🛡️ Admin' : `👤 ${t('user_menu.role_user', 'User')}`}</span>
             </div>
             <div class="about-modal-storage">
                 <div class="about-modal-storage-label">
@@ -240,7 +240,7 @@ function showUserProfileModal() {
     // Set dynamic bar width and color via JS property (CSP-safe)
     const barFill = overlay.querySelector('#about-bar-fill');
     if (barFill) {
-        barFill.style.width = percentage + '%';
+        barFill.style.width = `${percentage}%`;
         barFill.style.background = barColor;
     }
 

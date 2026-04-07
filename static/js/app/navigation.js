@@ -127,7 +127,7 @@ function getSectionFromNavItem(navItem) {
  * @returns {boolean} true if the section changed
  */
 function setCurrentSection(section) {
-    if (window.app.currentSection == section) return false;
+    if (window.app.currentSection === section) return false;
 
     // Set all view flags - true for active section, false for others
     Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {

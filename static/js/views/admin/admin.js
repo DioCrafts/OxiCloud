@@ -14,8 +14,8 @@ function t(key, params) {
 /** Escape a string for safe embedding inside a JS string literal within an HTML attribute. */
 function _escJs(s) {
     if (typeof s !== 'string') return '';
-    return s.replace(/[^\w .\-]/g, function (c) {
-        return '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0');
+    return s.replace(/[^\w .-]/g, (c) => {
+        return `\\x${c.charCodeAt(0).toString(16).padStart(2, '0')}`;
     });
 }
 
@@ -46,7 +46,7 @@ function formatBytes(bytes) {
     const k = 1024,
         sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
 function timeAgo(dateStr) {
@@ -63,11 +63,11 @@ function timeAgo(dateStr) {
 
 /* ── Custom confirm modal ── */
 function showConfirm(message) {
-    return new Promise(function (resolve) {
-        var overlay = document.getElementById('confirm-modal');
-        var msgEl = document.getElementById('confirm-message');
-        var yesBtn = document.getElementById('confirm-yes');
-        var noBtn = document.getElementById('confirm-cancel');
+    return new Promise((resolve) => {
+        const overlay = document.getElementById('confirm-modal');
+        const msgEl = document.getElementById('confirm-message');
+        const yesBtn = document.getElementById('confirm-yes');
+        const noBtn = document.getElementById('confirm-cancel');
         msgEl.textContent = message;
         overlay.classList.remove('hidden');
         overlay.classList.add('show-flex');
@@ -100,10 +100,10 @@ let activeTabName = 'dashboard';
 
 function switchTab(name, el) {
     if (name === activeTabName) return;
-    var oldTab = document.getElementById('tab-' + activeTabName);
-    var newTab = document.getElementById('tab-' + name);
+    var oldTab = document.getElementById(`tab-${activeTabName}`);
+    var newTab = document.getElementById(`tab-${name}`);
 
-    document.querySelectorAll('.admin-tab').forEach(function (b) {
+    document.querySelectorAll('.admin-tab').forEach((b) => {
         b.classList.remove('active');
     });
     if (el) el.classList.add('active');
@@ -138,7 +138,7 @@ function switchTab(name, el) {
 
 async function loadDashboard() {
     try {
-        const resp = await fetch(API + '/admin/dashboard', {
+        const resp = await fetch(`${API}/admin/dashboard`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -147,13 +147,13 @@ async function loadDashboard() {
         document.getElementById('ds-total-users').textContent = d.total_users;
         document.getElementById('ds-active-users').textContent = d.active_users;
         document.getElementById('ds-admin-users').textContent = d.admin_users;
-        document.getElementById('ds-version').textContent = 'v' + d.server_version;
+        document.getElementById('ds-version').textContent = `v${d.server_version}`;
         document.getElementById('ds-used').textContent = formatBytes(d.total_used_bytes);
         document.getElementById('ds-quota').textContent = formatBytes(d.total_quota_bytes);
-        document.getElementById('ds-usage-pct').textContent = d.storage_usage_percent.toFixed(1) + '%';
+        document.getElementById('ds-usage-pct').textContent = `${d.storage_usage_percent.toFixed(1)}%`;
         const bar = document.getElementById('ds-bar');
-        bar.style.width = Math.min(d.storage_usage_percent, 100) + '%';
-        bar.className = 'progress-fill ' + (d.storage_usage_percent > 90 ? 'red' : d.storage_usage_percent > 70 ? 'orange' : 'green');
+        bar.style.width = `${Math.min(d.storage_usage_percent, 100)}%`;
+        bar.className = `progress-fill ${d.storage_usage_percent > 90 ? 'red' : d.storage_usage_percent > 70 ? 'orange' : 'green'}`;
         document.getElementById('ds-auth').textContent = d.auth_enabled ? t('admin.enabled') : t('admin.disabled');
         document.getElementById('ds-oidc').textContent = d.oidc_configured ? t('admin.active') : t('admin.off');
         document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? t('admin.enabled') : t('admin.disabled');
@@ -179,10 +179,9 @@ async function loadDashboard() {
 
 async function loadUsers() {
     const tbody = document.getElementById('users-tbody');
-    tbody.innerHTML =
-        '<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.loading_users')) + '</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.loading_users'))}</td></tr>`;
     try {
-        const resp = await fetch(API + '/admin/users?limit=' + PAGE_SIZE + '&offset=' + usersPage * PAGE_SIZE, {
+        const resp = await fetch(`${API}/admin/users?limit=${PAGE_SIZE}&offset=${usersPage * PAGE_SIZE}`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -197,7 +196,7 @@ async function loadUsers() {
         totalUsers = data.total;
         const users = data.users;
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="table-status-empty">' + escapeHtml(t('admin.no_users_found')) + '</td></tr>';
+            tbody.innerHTML = `<tr><td colspan="7" class="table-status-empty">${escapeHtml(t('admin.no_users_found'))}</td></tr>`;
             return;
         }
 
@@ -207,8 +206,8 @@ async function loadUsers() {
                 const quotaColor = quotaPct > 90 ? 'red' : quotaPct > 70 ? 'orange' : 'green';
                 const quotaText =
                     u.storage_quota_bytes > 0
-                        ? formatBytes(u.storage_used_bytes) + ' / ' + formatBytes(u.storage_quota_bytes)
-                        : formatBytes(u.storage_used_bytes) + ' / ∞';
+                        ? `${formatBytes(u.storage_used_bytes)} / ${formatBytes(u.storage_quota_bytes)}`
+                        : `${formatBytes(u.storage_used_bytes)} / ∞`;
                 const isSelf = u.id === currentAdminId;
                 const isOidc = u.auth_provider && u.auth_provider !== 'local';
                 const authBadge = isOidc
@@ -217,12 +216,12 @@ async function loadUsers() {
                       '"><i class="fas fa-key badge-admin-icon-small"></i> ' +
                       escapeHtml(u.auth_provider) +
                       '</span>'
-                    : '<span class="badge badge-local">' + escapeHtml(t('admin.local')) + '</span>';
+                    : `<span class="badge badge-local">${escapeHtml(t('admin.local'))}</span>`;
                 return (
                     '<tr>' +
                     '<td><div class="user-info"><span class="user-name">' +
                     escapeHtml(u.username) +
-                    (isSelf ? ' <span class="user-self-badge">' + escapeHtml(t('admin.you_badge')) + '</span>' : '') +
+                    (isSelf ? ` <span class="user-self-badge">${escapeHtml(t('admin.you_badge'))}</span>` : '') +
                     '</span><span class="user-email">' +
                     escapeHtml(u.email) +
                     '</span></div></td>' +
@@ -308,15 +307,15 @@ async function loadUsers() {
             .join('');
 
         // Set dynamic progress bar widths (CSP-safe via JS property)
-        document.querySelectorAll('.progress-fill[data-width]').forEach(function (el) {
-            el.style.width = el.dataset.width + '%';
+        document.querySelectorAll('.progress-fill[data-width]').forEach((el) => {
+            el.style.width = `${el.dataset.width}%`;
             el.removeAttribute('data-width');
         });
 
         // Wire up admin action buttons (replaces inline onclick handlers)
-        document.querySelectorAll('.admin-action-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var action = btn.dataset.action;
+        document.querySelectorAll('.admin-action-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const action = btn.dataset.action;
                 if (action === 'quota') openQuotaModal(btn.dataset.uid, btn.dataset.uname, Number(btn.dataset.quota));
                 else if (action === 'reset-pw') openResetPasswordModal(btn.dataset.uid, btn.dataset.uname);
                 else if (action === 'toggle-role') toggleRole(btn.dataset.uid, btn.dataset.role);
@@ -356,7 +355,7 @@ async function toggleRole(userId, currentRole) {
     const ok = await showConfirm(t('admin.confirm_role_change', { role: newRole }));
     if (!ok) return;
     try {
-        const resp = await fetch(API + '/admin/users/' + userId + '/role', {
+        const resp = await fetch(`${API}/admin/users/${userId}/role`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -377,7 +376,7 @@ async function toggleActive(userId, currentActive) {
     const ok = await showConfirm(msg);
     if (!ok) return;
     try {
-        const resp = await fetch(API + '/admin/users/' + userId + '/active', {
+        const resp = await fetch(`${API}/admin/users/${userId}/active`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -397,7 +396,7 @@ async function deleteUser(userId, username) {
     const ok = await showConfirm(t('admin.confirm_delete_user', { name: username }));
     if (!ok) return;
     try {
-        const resp = await fetch(API + '/admin/users/' + userId, {
+        const resp = await fetch(`${API}/admin/users/${userId}`, {
             method: 'DELETE',
             headers: headers(),
             credentials: 'same-origin'
@@ -429,10 +428,10 @@ function closeQuotaModal() {
 
 async function saveQuota() {
     const val = parseFloat(document.getElementById('qm-value').value) || 0;
-    const unit = parseInt(document.getElementById('qm-unit').value);
+    const unit = parseInt(document.getElementById('qm-unit').value, 10);
     const bytes = Math.round(val * unit);
     try {
-        const resp = await fetch(API + '/admin/users/' + quotaUserId + '/quota', {
+        const resp = await fetch(`${API}/admin/users/${quotaUserId}/quota`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -473,7 +472,7 @@ async function submitCreateUser() {
     const email = document.getElementById('cu-email').value.trim() || null;
     const role = document.getElementById('cu-role').value;
     const quotaVal = parseFloat(document.getElementById('cu-quota-value').value) || 0;
-    const quotaUnit = parseInt(document.getElementById('cu-quota-unit').value);
+    const quotaUnit = parseInt(document.getElementById('cu-quota-unit').value, 10);
     const quotaBytes = Math.round(quotaVal * quotaUnit);
 
     const errorEl = document.getElementById('cu-error');
@@ -490,9 +489,9 @@ async function submitCreateUser() {
 
     const btn = document.getElementById('cu-submit');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.creating'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.creating'))}`;
     try {
-        const resp = await fetch(API + '/admin/users', {
+        const resp = await fetch(`${API}/admin/users`, {
             method: 'POST',
             headers: headers(),
             credentials: 'same-origin',
@@ -518,7 +517,7 @@ async function submitCreateUser() {
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-user-plus"></i> ' + escapeHtml(t('admin.create_user'));
+    btn.innerHTML = `<i class="fas fa-user-plus"></i> ${escapeHtml(t('admin.create_user'))}`;
 }
 
 let resetPwUserId = '';
@@ -546,9 +545,9 @@ async function submitResetPassword() {
 
     const btn = document.getElementById('rp-submit');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.resetting'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.resetting'))}`;
     try {
-        const resp = await fetch(API + '/admin/users/' + resetPwUserId + '/password', {
+        const resp = await fetch(`${API}/admin/users/${resetPwUserId}/password`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -566,14 +565,14 @@ async function submitResetPassword() {
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('admin.reset_btn'));
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.reset_btn'))}`;
 }
 
 async function toggleRegistration(enabled) {
     if (enabled) hideElement('registration-warning');
     else showElement('registration-warning', 'flex');
     try {
-        const resp = await fetch(API + '/admin/settings/registration', {
+        const resp = await fetch(`${API}/admin/settings/registration`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -606,7 +605,7 @@ document.getElementById('disable-password').addEventListener('change', function 
 function showOidcStatus(msg, type) {
     const el = document.getElementById('oidc-status');
     el.textContent = msg;
-    el.className = 'alert alert-' + type;
+    el.className = `alert alert-${type}`;
 }
 
 function copyCallback() {
@@ -622,10 +621,10 @@ async function testConnection() {
     }
     const btn = document.getElementById('discover-btn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.discovering'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.discovering'))}`;
     const resultDiv = document.getElementById('discovery-result');
     try {
-        const resp = await fetch(API + '/admin/settings/oidc/test', {
+        const resp = await fetch(`${API}/admin/settings/oidc/test`, {
             method: 'POST',
             headers: headers(),
             credentials: 'same-origin',
@@ -644,19 +643,19 @@ async function testConnection() {
             if (!document.getElementById('provider-name').value && r.provider_name_suggestion)
                 document.getElementById('provider-name').value = r.provider_name_suggestion;
         } else {
-            resultDiv.innerHTML = '<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ' + escapeHtml(r.message) + '</strong></div>';
+            resultDiv.innerHTML = `<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ${escapeHtml(r.message)}</strong></div>`;
         }
     } catch (e) {
-        resultDiv.innerHTML = '<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ' + escapeHtml(e.message) + '</div>';
+        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
     }
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-search"></i> ' + escapeHtml(t('admin.auto_discover'));
+    btn.innerHTML = `<i class="fas fa-search"></i> ${escapeHtml(t('admin.auto_discover'))}`;
 }
 
 async function saveOidcSettings() {
     const btn = document.getElementById('save-btn');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('admin.saving'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.saving'))}`;
     const body = {
         enabled: document.getElementById('oidc-enabled').checked,
         issuer_url: document.getElementById('issuer-url').value.trim(),
@@ -669,7 +668,7 @@ async function saveOidcSettings() {
         provider_name: document.getElementById('provider-name').value.trim() || null
     };
     try {
-        const resp = await fetch(API + '/admin/settings/oidc', {
+        const resp = await fetch(`${API}/admin/settings/oidc`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -681,18 +680,18 @@ async function saveOidcSettings() {
             loadDashboard();
         } else {
             const e = await resp.json().catch(() => ({}));
-            showOidcStatus('Error: ' + (e.message || resp.statusText), 'error');
+            showOidcStatus(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
         showOidcStatus(t('admin.error_network', { message: e.message }), 'error');
     }
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('admin.save_btn'));
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.save_btn'))}`;
 }
 
 async function init() {
     try {
-        const me = await fetch(API + '/auth/me', {
+        const me = await fetch(`${API}/auth/me`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -707,7 +706,7 @@ async function init() {
         }
         currentAdminId = user.id;
 
-        const oidcResp = await fetch(API + '/admin/settings/oidc', {
+        const oidcResp = await fetch(`${API}/admin/settings/oidc`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -728,7 +727,7 @@ async function init() {
             document.getElementById('callback-url').textContent = s.callback_url;
             if (s.client_secret_set) showElement('secret-hint');
             (s.env_overrides || []).forEach((field) => {
-                const badge = document.getElementById('badge-' + field);
+                const badge = document.getElementById(`badge-${field}`);
                 if (badge) badge.innerHTML = '<span class="badge badge-env">ENV</span>';
             });
         }
@@ -748,14 +747,14 @@ function showAccessDenied() {
 }
 
 /* ── Apply i18n when translations load / change ── */
-document.addEventListener('translationsLoaded', function () {
-    if (window.i18n && window.i18n.translatePage) window.i18n.translatePage();
+document.addEventListener('translationsLoaded', () => {
+    if (window.i18n?.translatePage) window.i18n.translatePage();
     // Re-render dynamic content that uses t()
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });
-document.addEventListener('localeChanged', function () {
-    if (window.i18n && window.i18n.translatePage) window.i18n.translatePage();
+document.addEventListener('localeChanged', () => {
+    if (window.i18n?.translatePage) window.i18n.translatePage();
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });

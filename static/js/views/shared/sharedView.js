@@ -181,7 +181,7 @@ const sharedView = {
             </div>
         `;
 
-        if (window.i18n && window.i18n.translateElement) {
+        if (window.i18n?.translateElement) {
             window.i18n.translateElement(container);
         }
     },
@@ -271,7 +271,9 @@ const sharedView = {
             option.addEventListener('click', (e) => {
                 e.stopPropagation();
                 // Update active state
-                dropdown.querySelectorAll('.shared-select-option').forEach((o) => o.classList.remove('active'));
+                dropdown.querySelectorAll('.shared-select-option').forEach((o) => {
+                    o.classList.remove('active');
+                });
                 option.classList.add('active');
                 // Update label
                 const label = toggle.querySelector('.shared-select-label');
@@ -529,8 +531,8 @@ const sharedView = {
                 write: permWrite ? permWrite.checked : false,
                 reshare: permReshare ? permReshare.checked : false
             },
-            password: enablePw && enablePw.checked && pwField && pwField.value ? pwField.value : null,
-            expires_at: enableExp && enableExp.checked && expField && expField.value ? Math.floor(new Date(expField.value).getTime() / 1000) : null
+            password: enablePw?.checked && pwField?.value ? pwField.value : null,
+            expires_at: enableExp?.checked && expField?.value ? Math.floor(new Date(expField.value).getTime() / 1000) : null
         };
 
         try {
@@ -588,7 +590,7 @@ const sharedView = {
             return;
         }
 
-        if (window.fileSharing && window.fileSharing.sendShareNotification) {
+        if (window.fileSharing?.sendShareNotification) {
             window.fileSharing
                 .sendShareNotification(this.currentItem.url, email, message)
                 .then(() => {
@@ -600,7 +602,7 @@ const sharedView = {
     },
 
     showNotification(message, type = 'success') {
-        if (window.ui && window.ui.showNotification) {
+        if (window.ui?.showNotification) {
             window.ui.showNotification(message, type);
         } else {
             alert(message);
@@ -616,7 +618,7 @@ const sharedView = {
     },
 
     translate(key, defaultText) {
-        if (window.i18n && window.i18n.t) return window.i18n.t(key, defaultText);
+        if (window.i18n?.t) return window.i18n.t(key, defaultText);
         return defaultText;
     }
 };

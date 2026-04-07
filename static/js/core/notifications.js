@@ -14,8 +14,6 @@
  */
 
 const notifications = (() => {
-    'use strict';
-
     /* ── state ──────────────────────────────────────────────── */
     let _badgeCount = 0;
     let _batchSeq = 0;
@@ -126,7 +124,7 @@ const notifications = (() => {
 
         // If panel is closed, bump badge
         const wrapper = $('notif-wrapper');
-        if (!wrapper || !wrapper.classList.contains('open')) {
+        if (!wrapper?.classList.contains('open')) {
             _incrementBadge();
         }
         _showEmptyIfNeeded();
@@ -141,7 +139,7 @@ const notifications = (() => {
      * @param {string} [folderName]  root folder name (for folder uploads)
      */
     function addUploadBatch(totalFiles, folderName) {
-        const batchId = 'batch-' + ++_batchSeq;
+        const batchId = `batch-${++_batchSeq}`;
         const body = $('notif-panel-body');
         if (!body) return batchId;
 
@@ -217,9 +215,9 @@ const notifications = (() => {
             if (!shouldUpdate) return;
 
             // Show just the file name being uploaded (truncate long paths)
-            const curEl = $(batchId + '-current');
+            const curEl = $(`${batchId}-current`);
             if (curEl) {
-                const shortName = fileName.length > 50 ? '…' + fileName.slice(-49) : fileName;
+                const shortName = fileName.length > 50 ? `…${fileName.slice(-49)}` : fileName;
                 curEl.textContent = shortName;
             }
             batch.lastLabelFile = fileName;
@@ -228,10 +226,10 @@ const notifications = (() => {
             // Update progress bar with per-file granularity:
             // overall% = (completed_files + current_file_fraction) / total_files
             const overallPct = Math.round(((batch.completed + pct / 100) / batch.totalFiles) * 100);
-            const fillEl = $(batchId + '-fill');
-            const pctEl = $(batchId + '-pct');
-            if (fillEl) fillEl.style.width = overallPct + '%';
-            if (pctEl) pctEl.textContent = overallPct + '%';
+            const fillEl = $(`${batchId}-fill`);
+            const pctEl = $(`${batchId}-pct`);
+            if (fillEl) fillEl.style.width = `${overallPct}%`;
+            if (pctEl) pctEl.textContent = `${overallPct}%`;
         }
     }
 
@@ -250,15 +248,15 @@ const notifications = (() => {
         if (!isLast && batch.completed % 5 !== 0) return;
 
         const pctVal = Math.round((batch.completed / batch.totalFiles) * 100);
-        const fillEl = $(batchId + '-fill');
-        const pctEl = $(batchId + '-pct');
-        const statsEl = $(batchId + '-stats');
+        const fillEl = $(`${batchId}-fill`);
+        const pctEl = $(`${batchId}-pct`);
+        const statsEl = $(`${batchId}-stats`);
 
         const t = window.i18n?.t || ((k) => k);
         const filesLabel = t('upload.files');
 
-        if (fillEl) fillEl.style.width = pctVal + '%';
-        if (pctEl) pctEl.textContent = pctVal + '%';
+        if (fillEl) fillEl.style.width = `${pctVal}%`;
+        if (pctEl) pctEl.textContent = `${pctVal}%`;
         if (statsEl) statsEl.textContent = `${batch.completed} / ${batch.totalFiles} ${filesLabel}`;
     }
 
@@ -269,7 +267,7 @@ const notifications = (() => {
         const batch = _batches[batchId];
         if (!batch) return;
 
-        const fillEl = $(batchId + '-fill');
+        const fillEl = $(`${batchId}-fill`);
         if (fillEl) {
             fillEl.style.width = '100%';
             fillEl.classList.add(successCount === totalFiles ? 'done' : 'error');
@@ -279,11 +277,10 @@ const notifications = (() => {
         const iconEl = batch.el.querySelector('.notif-item-icon');
 
         // Clear the current-file label
-        const curEl = $(batchId + '-current');
+        const curEl = $(`${batchId}-current`);
         if (curEl) curEl.textContent = '';
 
         const t = window.i18n?.t || ((k) => k);
-        const filesLabel = t('upload.files');
         const completeText = t('upload.complete', {
             count: successCount,
             total: totalFiles
@@ -302,7 +299,7 @@ const notifications = (() => {
 
         // If the panel is closed, bump badge
         const wrapper = $('notif-wrapper');
-        if (!wrapper || !wrapper.classList.contains('open')) {
+        if (!wrapper?.classList.contains('open')) {
             _incrementBadge();
         }
     }
@@ -312,7 +309,9 @@ const notifications = (() => {
         const body = $('notif-panel-body');
         if (!body) return;
         // Remove all notif-items
-        body.querySelectorAll('.notif-item').forEach((el) => el.remove());
+        body.querySelectorAll('.notif-item').forEach((el) => {
+            el.remove();
+        });
         _clearBadge();
         _showEmptyIfNeeded();
         // automatically close notification center on clear

@@ -35,7 +35,7 @@ async function getFolder(id) {
         cache: 'no-store'
     };
 
-    let folderInformations = await fetch(`/api/folders/${id}`, requestOptions);
+    const folderInformations = await fetch(`/api/folders/${id}`, requestOptions);
     if (folderInformations.ok) {
         return folderInformations.json();
     } else {
@@ -67,7 +67,7 @@ async function rebuildBreadCrumb() {
     while (id !== null) {
         console.log(`fetching folder information for folder ${id}`);
         try {
-            let folderInfo = await getFolder(id);
+            const folderInfo = await getFolder(id);
 
             // store the Leaf which is the current folder
             if (currentFolderInfo === null) {
@@ -84,7 +84,7 @@ async function rebuildBreadCrumb() {
 
             // iterate to parent folder
             id = folderInfo.parent_id;
-        } catch (e) {
+        } catch (_e) {
             console.log(`Error loading information from folder ${app.currentPath}, falling back to ${app.userHomeFolderId}`);
             // fallback of root
             window.uiNotifications.show(
@@ -110,7 +110,6 @@ async function rebuildBreadCrumb() {
  */
 async function loadFiles(options = { insertHistory: true }) {
     const app = window.app;
-    const elements = window.appElements;
 
     try {
         console.log('Starting loadFiles() - loading files...', options);
@@ -125,7 +124,7 @@ async function loadFiles(options = { insertHistory: true }) {
         window.isLoadingFiles = true;
 
         // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
-        let loadingFiles = setTimeout(() => {
+        const loadingFiles = setTimeout(() => {
             // display loader after few delay (will be canceled if result take less time)
             window.ui.showError(`
                 <div class="files-loading-spinner">
@@ -139,7 +138,7 @@ async function loadFiles(options = { insertHistory: true }) {
             await window.resolveHomeFolder();
         }
 
-        const timestamp = new Date().getTime();
+        const timestamp = Math.floor(Date.now() / 1000);
 
         await rebuildBreadCrumb();
 
@@ -181,7 +180,6 @@ async function loadFiles(options = { insertHistory: true }) {
 
         if (forceRefresh) {
             url += `&force_refresh=true`;
-            // @ts-ignore
             requestOptions.headers['X-Force-Refresh'] = 'true';
             console.log('Forcing complete refresh ignoring cache');
         }
@@ -226,7 +224,7 @@ async function loadFiles(options = { insertHistory: true }) {
                 let fileFound = null;
 
                 // lookup for the given fle
-                for( const file of fileList) {
+                for (const file of fileList) {
                     if (file.id === window.app.viewFile) {
                         fileFound = file;
                         break;
@@ -236,14 +234,13 @@ async function loadFiles(options = { insertHistory: true }) {
                 if (fileFound) {
                     console.log(`file ${window.app.viewFile} found, calling viewer`);
                     await window.inlineViewer.openFile(fileFound);
-                }
-                else {
+                } else {
                     // remove file
                     console.log(`file ${window.app.viewFile} not found`);
                     window.app.viewFile = null;
 
                     // correct url/history as file is not found
-                    window.updateHistory( false);
+                    window.updateHistory(false);
                 }
             }
         }

@@ -5,7 +5,7 @@
 
 function escapeHtml(str) {
     if (typeof str !== 'string') return '';
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
 
 function formatFileSize(bytes) {
@@ -15,7 +15,7 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
 }
 
 /// Formats a byte count for quota display. When bytes is 0, returns "∞" (unlimited).
@@ -34,14 +34,14 @@ function formatDateTime(value) {
     } else {
         dateValue = new Date(value);
     }
-    if (isNaN(dateValue.getTime())) return String(value);
-    return dateValue.toLocaleDateString() + ' ' + dateValue.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (Number.isNaN(dateValue.getTime())) return String(value);
+    return `${dateValue.toLocaleDateString()} ${dateValue.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 function formatDateShort(value) {
     if (!value) return 'N/A';
     const dateValue = typeof value === 'number' ? new Date(value * 1000) : new Date(value);
-    if (isNaN(dateValue.getTime())) return String(value);
+    if (Number.isNaN(dateValue.getTime())) return String(value);
     return dateValue.toLocaleDateString(undefined, {
         year: 'numeric',
         month: 'short',

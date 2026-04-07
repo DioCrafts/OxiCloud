@@ -139,7 +139,7 @@ const photosLightbox = {
         content.innerHTML = '<div class="photos-loading"><i class="fas fa-spinner"></i></div>';
 
         try {
-            const isVideo = item.mime_type && item.mime_type.startsWith('video/');
+            const isVideo = item.mime_type?.startsWith('video/');
             const res = await fetch(`/api/files/${item.id}`, {
                 credentials: 'include',
                 headers: this._headers()
@@ -172,7 +172,7 @@ const photosLightbox = {
             });
             if (res.ok) {
                 const data = await res.json();
-                let parts = [dateStr];
+                const parts = [dateStr];
                 if (sizeStr) parts.push(sizeStr);
                 if (data.camera_make || data.camera_model) {
                     parts.push([data.camera_make, data.camera_model].filter(Boolean).join(' '));
@@ -182,7 +182,7 @@ const photosLightbox = {
                 }
                 metaEl.textContent = parts.join(' · ');
             }
-        } catch (err) {
+        } catch (_err) {
             // Non-critical, keep existing meta
         }
     },

@@ -6,7 +6,7 @@
  */
 
 // Current locale code (default to browser locale if available, fallback to English)
-let currentLocale = (navigator.language && navigator.language.substring(0, 2)) || (navigator.userLanguage && navigator.userLanguage.substring(0, 2)) || 'en';
+let currentLocale = navigator.language?.substring(0, 2) || navigator.userLanguage?.substring(0, 2) || 'en';
 
 // Supported locales (languages that have locale files on the server)
 // When a locale file is not found, the system gracefully falls back to English
@@ -93,6 +93,8 @@ function getNestedValue(obj, path) {
  * @param {object} params - Parameters to replace in the translation (e.g., {name: 'John'})
  * @returns {string} - The translated string or the key itself if not found
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: global function
 function t(key, params = {}) {
     // Get translation from cache
     const localeData = translations[currentLocale];
@@ -131,8 +133,8 @@ function t(key, params = {}) {
 
     if (!value) {
         // Try fallback to English
-        if (currentLocale !== 'en' && translations['en']) {
-            let fallbackValue = getNestedValue(translations['en'], key);
+        if (currentLocale !== 'en' && translations.en) {
+            let fallbackValue = getNestedValue(translations.en, key);
 
             if (!fallbackValue) {
                 const aliasMap = {
@@ -143,7 +145,7 @@ function t(key, params = {}) {
                 };
                 const aliasKey = aliasMap[key];
                 if (aliasKey) {
-                    fallbackValue = getNestedValue(translations['en'], aliasKey);
+                    fallbackValue = getNestedValue(translations.en, aliasKey);
                 }
             }
 
@@ -304,8 +306,8 @@ function safeT(key, params = {}) {
     let value = getNestedValue(localeData, key);
 
     // Fallback to English
-    if (!value && currentLocale !== 'en' && translations['en']) {
-        value = getNestedValue(translations['en'], key);
+    if (!value && currentLocale !== 'en' && translations.en) {
+        value = getNestedValue(translations.en, key);
     }
 
     if (!value) return key;

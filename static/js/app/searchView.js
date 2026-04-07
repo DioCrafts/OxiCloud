@@ -42,7 +42,7 @@ async function performSearch(query, sortBy) {
 
 document.addEventListener('search-resort', (e) => {
     const searchInput = document.querySelector('.search-container input');
-    if (searchInput && searchInput.value.trim()) {
+    if (searchInput?.value.trim()) {
         performSearch(searchInput.value.trim(), e.detail.sort_by);
     }
 });

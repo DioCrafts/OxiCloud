@@ -47,7 +47,7 @@ const search = {
                 try {
                     const errorJson = await response.json();
                     errorText = errorJson.error || response.statusText;
-                } catch (e) {
+                } catch (_e) {
                     errorText = response.statusText;
                 }
                 console.error(`Search error: ${errorText}`);
@@ -142,7 +142,7 @@ const search = {
         if (sortSelect) {
             sortSelect.addEventListener('change', () => {
                 const searchInput = document.querySelector('.search-container input');
-                if (searchInput && searchInput.value.trim()) {
+                if (searchInput?.value.trim()) {
                     const event = new CustomEvent('search-resort', {
                         detail: { sort_by: sortSelect.value }
                     });

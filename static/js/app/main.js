@@ -126,7 +126,7 @@ function setActionsBarMode(mode, force = false) {
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');
 
-    if (window.i18n && window.i18n.translateElement) {
+    if (window.i18n?.translateElement) {
         window.i18n.translateElement(elements.actionsBar);
     }
 
@@ -231,8 +231,8 @@ function deserializeHash() {
 
     if (hash_elements[1] === 'files' && hash_elements[2] === 'folder' && hash_elements[3] !== null) {
         hashContext.path = hash_elements[3];
-        
-        if (hash_elements[4] == 'file' && hash_elements[5] !== null) {
+
+        if (hash_elements[4] === 'file' && hash_elements[5] !== null) {
             hashContext.file = hash_elements[5];
         }
     }
@@ -248,7 +248,7 @@ function deserializeHash() {
 function updateHistory(insertHistory) {
     const app = window.app;
 
-    let historyData = {
+    const historyData = {
         section: app.currentSection,
         id: app.currentFolder,
         file: app.viewFile
@@ -261,7 +261,7 @@ function updateHistory(insertHistory) {
         historyUrl = historyUrl.concat('/folder/', app.currentFolderInfo.id);
 
         if (window.app.viewFile) {
-            historyUrl = historyUrl.concat('/file/', window.app.viewFile);   
+            historyUrl = historyUrl.concat('/file/', window.app.viewFile);
         }
         // update title
         document.title = `OxiCloud: ${app.currentFolderInfo.path}`;
@@ -325,7 +325,7 @@ function initApp() {
     cacheElements();
 
     // Initialize file sharing module first
-    if (window.fileSharing && window.fileSharing.init) {
+    if (window.fileSharing?.init) {
         window.fileSharing.init();
     } else {
         console.warn('fileSharing module not fully initialized');
@@ -349,7 +349,7 @@ function initApp() {
     }
 
     // Initialize favorites module if available
-    if (window.favorites && window.favorites.init) {
+    if (window.favorites?.init) {
         console.log('Initializing favorites module');
         window.favorites.init();
     } else {
@@ -357,7 +357,7 @@ function initApp() {
     }
 
     // Initialize recent files module if available
-    if (window.recent && window.recent.init) {
+    if (window.recent?.init) {
         console.log('Initializing recent files module');
         window.recent.init();
     } else {
@@ -365,21 +365,21 @@ function initApp() {
     }
 
     // Initialize multi-select / batch actions
-    if (window.multiSelect && window.multiSelect.init) {
+    if (window.multiSelect?.init) {
         console.log('Initializing multi-select module');
         window.multiSelect.init();
     }
 
     window.addEventListener('authenticationDone', () => {
         // Check if a context was provided in the URL
-        let hashContext = deserializeHash();
+        const hashContext = deserializeHash();
         switchSectionTo(hashContext.section);
         if (hashContext.section === 'files') {
             if (hashContext.path) {
                 console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
                 window.app.currentPath = hashContext.path;
             }
-            
+
             if (hashContext.file !== null) {
                 window.app.viewFile = hashContext.file;
             }
@@ -388,7 +388,7 @@ function initApp() {
     });
 
     // Wait for translations to load before checking authentication
-    if (window.i18n && window.i18n.isLoaded && window.i18n.isLoaded()) {
+    if (window.i18n?.isLoaded?.()) {
         // Translations already loaded, proceed with authentication
         window.checkAuthentication();
     } else {
@@ -401,7 +401,7 @@ function initApp() {
 
         // Set a timeout as a fallback in case translations take too long
         setTimeout(() => {
-            if (!window.i18n || !window.i18n.isLoaded || !window.i18n.isLoaded()) {
+            if (!window.i18n?.isLoaded?.()) {
                 console.warn('Translations loading timeout, proceeding with authentication anyway');
                 window.checkAuthentication();
             }
@@ -451,7 +451,9 @@ function setupUploadDropdown() {
             e.stopPropagation();
             const isOpen = menu.classList.contains('show');
             // Close any other open dropdowns
-            document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => m.classList.remove('show'));
+            document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
+                m.classList.remove('show');
+            });
             if (!isOpen) {
                 menu.classList.add('show');
             }
@@ -462,14 +464,14 @@ function setupUploadDropdown() {
     // Close dropdown when clicking outside
     // remove+add stable handler: guarantees exactly one global listener
     if (uploadDropdownDocumentClickHandler) {
-        // @ts-ignore
         document.removeEventListener('click', uploadDropdownDocumentClickHandler);
     }
     uploadDropdownDocumentClickHandler = (e) => {
         if (e.target.closest('#upload-dropdown')) return;
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => m.classList.remove('show'));
+        document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
+            m.classList.remove('show');
+        });
     };
-    // @ts-ignore
     document.addEventListener('click', uploadDropdownDocumentClickHandler);
 }
 
@@ -587,13 +589,15 @@ function setupEventListeners() {
     elements.navItems.forEach((item) => {
         item.addEventListener('click', () => {
             // Remove active class from all nav items
-            elements.navItems.forEach((navItem) => navItem.classList.remove('active'));
+            elements.navItems.forEach((navItem) => {
+                navItem.classList.remove('active');
+            });
 
             // Add active class to clicked item
             item.classList.add('active');
             let _updateHistory = true;
 
-            let itemI18nKey = item.querySelector('span').getAttribute('data-i18n');
+            const itemI18nKey = item.querySelector('span').getAttribute('data-i18n');
             switch (itemI18nKey) {
                 case 'nav.shared':
                     // Switch to shared view
@@ -712,7 +716,7 @@ function updateStorageUsageDisplay(userData) {
         storageInfo.removeAttribute('data-i18n');
 
         // Use i18n if available
-        if (window.i18n && window.i18n.t) {
+        if (window.i18n?.t) {
             storageInfo.textContent = window.i18n.t('storage.used', {
                 percentage: usagePercentage,
                 used: usedFormatted,

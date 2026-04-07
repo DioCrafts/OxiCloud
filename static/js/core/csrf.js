@@ -19,7 +19,7 @@ function getCsrfToken() {
     return match ? match.split('=')[1] : '';
 }
 
-// eslint-disable-next-line no-unused-vars
+// biome-ignore lint/correctness/noUnusedVariables: global function
 function getCsrfHeaders() {
     const token = getCsrfToken();
     return token ? { 'X-CSRF-Token': token } : {};

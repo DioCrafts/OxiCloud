@@ -11,7 +11,7 @@ switch (errorType) {
         errorTitle.textContent = 'Login Failed';
         errorMessage.textContent = 'Invalid username or password. Please check your credentials and try again.';
         errorAction.textContent = 'Try Again';
-        errorAction.addEventListener('click', function () {
+        errorAction.addEventListener('click', () => {
             history.back();
         });
         break;
@@ -19,7 +19,7 @@ switch (errorType) {
         errorTitle.textContent = 'Session Expired';
         errorMessage.textContent = 'Your session has expired. Please try again.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function () {
+        errorAction.addEventListener('click', () => {
             window.close();
         });
         break;
@@ -27,7 +27,7 @@ switch (errorType) {
         errorTitle.textContent = 'Not Found';
         errorMessage.textContent = 'The requested page was not found.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function () {
+        errorAction.addEventListener('click', () => {
             window.close();
         });
         break;
@@ -35,7 +35,7 @@ switch (errorType) {
         errorTitle.textContent = 'Error';
         errorMessage.textContent = 'An unexpected error occurred. Please try again.';
         errorAction.textContent = 'Close Window';
-        errorAction.addEventListener('click', function () {
+        errorAction.addEventListener('click', () => {
             window.close();
         });
 }

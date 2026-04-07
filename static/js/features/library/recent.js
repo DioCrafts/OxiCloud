@@ -32,7 +32,7 @@ const recent = {
      */
     setupEventListeners() {
         document.addEventListener('file-accessed', (event) => {
-            if (event.detail && event.detail.file) {
+            if (event.detail?.file) {
                 const file = event.detail.file;
                 const itemType = file.item_type || 'file';
                 this._recordAccess(file.id, itemType);
@@ -144,7 +144,7 @@ const recent = {
             if (files.length) window.ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying recent files:', error);
-            if (window.ui && window.ui.showNotification) {
+            if (window.ui?.showNotification) {
                 window.ui.showNotification('Error', 'Error loading recent files');
             }
         }

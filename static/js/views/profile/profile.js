@@ -15,7 +15,7 @@ function formatBytes(bytes) {
     const k = 1024,
         sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
 function timeAgo(dateStr) {
@@ -32,7 +32,7 @@ function timeAgo(dateStr) {
 
 async function init() {
     try {
-        const resp = await fetch(API + '/auth/me', {
+        const resp = await fetch(`${API}/auth/me`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -50,10 +50,10 @@ async function init() {
         const badge = document.getElementById('p-role-badge');
         if (user.role === 'admin') {
             badge.className = 'role-badge role-badge-admin';
-            badge.innerHTML = '<i class="fas fa-shield-alt"></i> ' + t('profile.role_admin');
+            badge.innerHTML = `<i class="fas fa-shield-alt"></i> ${t('profile.role_admin')}`;
         } else {
             badge.className = 'role-badge role-badge-user';
-            badge.innerHTML = '<i class="fas fa-user"></i> ' + t('profile.role_user');
+            badge.innerHTML = `<i class="fas fa-user"></i> ${t('profile.role_user')}`;
         }
 
         document.getElementById('p-detail-username').textContent = user.username;
@@ -67,12 +67,12 @@ async function init() {
 
         document.getElementById('p-storage-used').textContent = formatBytes(used);
         document.getElementById('p-storage-quota').textContent = quota > 0 ? formatBytes(quota) : '∞';
-        document.getElementById('p-storage-pct').textContent = quota > 0 ? pct + '%' : '—';
+        document.getElementById('p-storage-pct').textContent = quota > 0 ? `${pct}%` : '—';
 
         const bar = document.getElementById('p-storage-bar');
-        bar.style.width = pct + '%';
-        bar.className = 'storage-fill ' + (pct > 90 ? 'red' : pct > 70 ? 'orange' : 'green');
-        document.getElementById('p-storage-text').textContent = formatBytes(used) + ' / ' + (quota > 0 ? formatBytes(quota) : t('profile.unlimited'));
+        bar.style.width = `${pct}%`;
+        bar.className = `storage-fill ${pct > 90 ? 'red' : pct > 70 ? 'orange' : 'green'}`;
+        document.getElementById('p-storage-text').textContent = `${formatBytes(used)} / ${quota > 0 ? formatBytes(quota) : t('profile.unlimited')}`;
 
         if (user.auth_provider && user.auth_provider !== 'local') {
             document.getElementById('password-section').classList.add('hidden');
@@ -81,7 +81,7 @@ async function init() {
         loadAppPasswords();
 
         try {
-            const oidcResp = await fetch(API + '/auth/oidc/providers', {
+            const oidcResp = await fetch(`${API}/auth/oidc/providers`, {
                 credentials: 'same-origin'
             });
             if (oidcResp.ok) {
@@ -90,7 +90,7 @@ async function init() {
                     document.getElementById('password-section').classList.add('hidden');
                 }
             }
-        } catch (oidcErr) {}
+        } catch (_oidcErr) {}
 
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('main-content').classList.remove('hidden');
@@ -113,23 +113,21 @@ async function changePassword(e) {
     const statusEl = document.getElementById('pw-status');
 
     if (newPw !== confirmPw) {
-        statusEl.innerHTML =
-            '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.passwords_no_match')) + '</div>';
+        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${escapeHtml(t('profile.passwords_no_match'))}</div>`;
         return false;
     }
 
     if (newPw.length < 8) {
-        statusEl.innerHTML =
-            '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.password_too_short')) + '</div>';
+        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${escapeHtml(t('profile.password_too_short'))}</div>`;
         return false;
     }
 
     const btn = document.getElementById('pw-submit');
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('profile.updating'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('profile.updating'))}`;
 
     try {
-        const resp = await fetch(API + '/auth/change-password', {
+        const resp = await fetch(`${API}/auth/change-password`, {
             method: 'PUT',
             headers: headers(),
             credentials: 'same-origin',
@@ -140,7 +138,7 @@ async function changePassword(e) {
         });
 
         if (resp.ok) {
-            statusEl.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> ' + escapeHtml(t('profile.password_updated')) + '</div>';
+            statusEl.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle"></i> ${escapeHtml(t('profile.password_updated'))}</div>`;
             document.getElementById('password-form').reset();
         } else {
             const err = await resp.json().catch(() => ({}));
@@ -157,7 +155,7 @@ async function changePassword(e) {
     }
 
     btn.disabled = false;
-    btn.innerHTML = '<i class="fas fa-save"></i> ' + escapeHtml(t('profile.update_password'));
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('profile.update_password'))}`;
     return false;
 }
 
@@ -193,7 +191,7 @@ function renderPwRow(pw) {
         btn.className = 'btn btn-danger-sm';
         btn.innerHTML = '<i class="fas fa-trash"></i>';
         btn.title = t('profile.revoke_title');
-        btn.addEventListener('click', function () {
+        btn.addEventListener('click', () => {
             revokeAppPassword(pw.id, pw.label);
         });
         actions.appendChild(btn);
@@ -204,7 +202,7 @@ function renderPwRow(pw) {
 
 async function loadAppPasswords() {
     try {
-        const resp = await fetch(API + '/auth/app-passwords', {
+        const resp = await fetch(`${API}/auth/app-passwords`, {
             headers: headers(),
             credentials: 'same-origin'
         });
@@ -214,7 +212,7 @@ async function loadAppPasswords() {
         }
         const data = await resp.json();
         const passwords = data.app_passwords || data;
-        const userPws = passwords.filter(function (pw) {
+        const userPws = passwords.filter((pw) => {
             return !isAutoPassword(pw);
         });
         const autoPws = passwords.filter(isAutoPassword);
@@ -264,17 +262,16 @@ async function createAppPassword() {
     const btn = document.getElementById('app-pw-generate');
 
     if (!label) {
-        statusEl.innerHTML =
-            '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + escapeHtml(t('profile.error_label_required')) + '</div>';
+        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${escapeHtml(t('profile.error_label_required'))}</div>`;
         return;
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + escapeHtml(t('profile.generating'));
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('profile.generating'))}`;
     statusEl.innerHTML = '';
 
     try {
-        const resp = await fetch(API + '/auth/app-passwords', {
+        const resp = await fetch(`${API}/auth/app-passwords`, {
             method: 'POST',
             headers: headers(),
             credentials: 'same-origin',
@@ -295,19 +292,19 @@ async function createAppPassword() {
         labelInput.value = '';
         loadAppPasswords();
     } catch (err) {
-        statusEl.innerHTML = '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' + err.message + '</div>';
+        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
     } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-plus"></i> ' + escapeHtml(t('profile.generate'));
+        btn.innerHTML = `<i class="fas fa-plus"></i> ${escapeHtml(t('profile.generate'))}`;
     }
 }
 
 function copyAppPassword() {
     const pw = document.getElementById('app-pw-created-password').textContent;
-    navigator.clipboard.writeText(pw).then(function () {
+    navigator.clipboard.writeText(pw).then(() => {
         const btn = document.getElementById('app-pw-copy-btn');
         btn.innerHTML = '<i class="fas fa-check"></i>';
-        setTimeout(function () {
+        setTimeout(() => {
             btn.innerHTML = '<i class="fas fa-copy"></i>';
         }, 1500);
     });
@@ -316,7 +313,7 @@ function copyAppPassword() {
 async function revokeAppPassword(id, label) {
     if (!confirm(t('profile.confirm_revoke', { label: label }))) return;
     try {
-        const resp = await fetch(API + '/auth/app-passwords/' + encodeURIComponent(id), {
+        const resp = await fetch(`${API}/auth/app-passwords/${encodeURIComponent(id)}`, {
             method: 'DELETE',
             headers: headers(),
             credentials: 'same-origin'
@@ -348,9 +345,9 @@ document.getElementById('app-pw-copy-btn').addEventListener('click', copyAppPass
 document.getElementById('app-pw-auto-toggle').addEventListener('click', toggleAutoPasswords);
 
 /* Re-render when language changes */
-window.addEventListener('translationsLoaded', function () {
+window.addEventListener('translationsLoaded', () => {
     init();
 });
-window.addEventListener('localeChanged', function () {
+window.addEventListener('localeChanged', () => {
     init();
 });

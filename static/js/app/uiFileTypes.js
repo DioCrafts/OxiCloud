@@ -6,7 +6,7 @@
 const uiFileTypes = {
     // TODO: 'd better to use a canViw() method in inlineViewer
     isViewableFile(file) {
-        if (!file || !file.mime_type) return false;
+        if (!file?.mime_type) return false;
         if (file.mime_type.startsWith('image/')) return true;
         if (file.mime_type === 'application/pdf') return true;
         if (file.mime_type.startsWith('audio/')) return true;

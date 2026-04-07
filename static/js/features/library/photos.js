@@ -207,7 +207,7 @@ const photosView = {
             if (existingHeader) {
                 // Append tiles to existing grid and update count badge
                 const grid = existingHeader.nextElementSibling;
-                if (grid && grid.classList.contains('photos-grid')) {
+                if (grid?.classList.contains('photos-grid')) {
                     grid.insertAdjacentHTML('beforeend', tilesHtml);
                     const countSpan = existingHeader.querySelector('.photos-day-count');
                     if (countSpan) countSpan.textContent = grid.children.length;
@@ -228,7 +228,7 @@ const photosView = {
 
     /** Generate HTML for a single photo/video tile */
     _renderTile(file) {
-        const isVideo = file.mime_type && file.mime_type.startsWith('video/');
+        const isVideo = file.mime_type?.startsWith('video/');
         const selected = this.selected.has(file.id) ? ' selected' : '';
         const cachedThumb = isVideo && this._videoThumbCache.has(file.id) ? this._videoThumbCache.get(file.id) : null;
         const thumbUrl = cachedThumb || `/api/files/${file.id}/thumbnail/preview`;
@@ -359,7 +359,7 @@ const photosView = {
                         // Upload to server for permanent caching
                         const token = localStorage.getItem('token') || sessionStorage.getItem('token');
                         const headers = { 'Content-Type': blob.type, ...getCsrfHeaders() };
-                        if (token) headers['Authorization'] = `Bearer ${token}`;
+                        if (token) headers.Authorization = `Bearer ${token}`;
 
                         fetch(`/api/files/${fileId}/thumbnail/preview`, {
                             method: 'PUT',
@@ -527,7 +527,9 @@ const photosView = {
 
         bar.querySelector('#photos-sel-clear').onclick = () => {
             this.selected.clear();
-            this._container.querySelectorAll('.photo-tile.selected').forEach((t) => t.classList.remove('selected'));
+            this._container.querySelectorAll('.photo-tile.selected').forEach((t) => {
+                t.classList.remove('selected');
+            });
             this._hideSelectionBar();
         };
 

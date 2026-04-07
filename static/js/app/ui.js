@@ -359,7 +359,7 @@ const ui = {
                 // First try directory-aware extraction (Finder folder drag & drop)
                 const droppedEntries = await collectDroppedEntries(e.dataTransfer);
                 if (droppedEntries && droppedEntries.length > 0) {
-                    const hasFolderStructure = droppedEntries.some((x) => x.relativePath && x.relativePath.includes('/'));
+                    const hasFolderStructure = droppedEntries.some((x) => x.relativePath?.includes('/'));
                     if (hasFolderStructure) {
                         fileOps.uploadFolderEntries(droppedEntries);
                     } else {
@@ -372,7 +372,7 @@ const ui = {
                 }
 
                 // Detect folder drops: files from folder drops have webkitRelativePath set
-                const hasRelativePaths = Array.from(e.dataTransfer.files).some((f) => f.webkitRelativePath && f.webkitRelativePath.includes('/'));
+                const hasRelativePaths = Array.from(e.dataTransfer.files).some((f) => f.webkitRelativePath?.includes('/'));
                 if (hasRelativePaths) {
                     fileOps.uploadFolderFiles(e.dataTransfer.files);
                 } else {
@@ -415,7 +415,7 @@ const ui = {
                 // First try directory-aware extraction (Finder folder drag & drop)
                 const droppedEntries = await collectDroppedEntries(e.dataTransfer);
                 if (droppedEntries && droppedEntries.length > 0) {
-                    const hasFolderStructure = droppedEntries.some((x) => x.relativePath && x.relativePath.includes('/'));
+                    const hasFolderStructure = droppedEntries.some((x) => x.relativePath?.includes('/'));
                     if (hasFolderStructure) {
                         fileOps.uploadFolderEntries(droppedEntries);
                     } else {
@@ -428,7 +428,7 @@ const ui = {
                 }
 
                 // Detect folder drops: files from folder drops have webkitRelativePath set
-                const hasRelativePaths = Array.from(e.dataTransfer.files).some((f) => f.webkitRelativePath && f.webkitRelativePath.includes('/'));
+                const hasRelativePaths = Array.from(e.dataTransfer.files).some((f) => f.webkitRelativePath?.includes('/'));
                 if (hasRelativePaths) {
                     fileOps.uploadFolderFiles(e.dataTransfer.files);
                 } else {
@@ -474,13 +474,11 @@ const ui = {
     updateBreadcrumb() {
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = '';
-
-        const self = this;
         const path = window.app.breadcrumbPath; // [{id, name}, ...]
 
         // Helper function to safely get translation text
         const getTranslatedText = (key, defaultValue) => {
-            if (!window.i18n || !window.i18n.t) return defaultValue;
+            if (!window.i18n?.t) return defaultValue;
             return window.i18n.t(key);
         };
 
@@ -496,7 +494,7 @@ const ui = {
             homeIcon.addEventListener('click', () => {
                 window.app.breadcrumbPath = [];
                 window.app.currentPath = window.app.userHomeFolderId;
-                self.updateBreadcrumb();
+                this.updateBreadcrumb();
                 window.loadFiles();
             });
         }
@@ -535,7 +533,7 @@ const ui = {
                 item.addEventListener('click', () => {
                     window.app.breadcrumbPath = path.slice(0, index + 1);
                     window.app.currentPath = segment.id;
-                    self.updateBreadcrumb();
+                    this.updateBreadcrumb();
                     window.loadFiles();
                 });
 
@@ -543,7 +541,7 @@ const ui = {
                 // dragover – only folders are valid drop targets
                 item.addEventListener('dragover', (e) => {
                     const card = e.target.closest('span');
-                    if (!card || !card.dataset.folderId) return;
+                    if (!card?.dataset.folderId) return;
                     e.preventDefault();
                     card.classList.add('drop-target');
                 });
@@ -552,7 +550,7 @@ const ui = {
                 item.addEventListener('dragleave', (e) => {
                     console.log('dragleave ', e);
                     const card = e.target.closest('span');
-                    if (!card || !card.dataset.folderId) return;
+                    if (!card?.dataset.folderId) return;
                     card.classList.remove('drop-target');
                 });
 
@@ -567,7 +565,7 @@ const ui = {
                     card.classList.remove('drop-target');
 
                     const action = e.dataTransfer?.dropEffect;
-                    await self._dropToFolder(action, targetFolderId, e.dataTransfer);
+                    await this._dropToFolder(action, targetFolderId, e.dataTransfer);
                 });
             } else {
                 // Last segment: current location, not clickable
@@ -693,7 +691,7 @@ const ui = {
     },
 
     _upsertById(arr, item) {
-        if (!Array.isArray(arr) || !item || !item.id) return;
+        if (!Array.isArray(arr) || !item?.id) return;
         const idx = arr.findIndex((x) => x && x.id === item.id);
         if (idx >= 0) {
             arr[idx] = item;
@@ -709,11 +707,11 @@ const ui = {
      * @param {any} dataTransfer fallback if nothing is selected
      */
     async _dropToFolder(action, targetFolderId, dataTransfer) {
-        let selection = window.multiSelect.getSelection(targetFolderId);
+        const selection = window.multiSelect.getSelection(targetFolderId);
 
         window.multiSelect.clear();
 
-        if (selection.fileIds.length == 0 && selection.folderIds.length == 0) {
+        if (selection.fileIds.length === 0 && selection.folderIds.length === 0) {
             // try to use dataTransfer (direct move without selection)
             const id = dataTransfer.getData('text/plain');
             const isFolder = dataTransfer.getData('application/oxicloud-folder') === 'true';
@@ -785,8 +783,6 @@ const ui = {
         if (!filesList) return;
         this._delegationReady = true;
 
-        const self = this;
-
         // ── helpers ────────────────────────────────────────────────
         const itemInfo = (card) => {
             if (!card) return null;
@@ -796,7 +792,7 @@ const ui = {
                     type: 'file',
                     id: fileId,
                     name: card.dataset.fileName,
-                    data: self._items.get(fileId)
+                    data: this._items.get(fileId)
                 };
             const folderId = card.dataset.folderId;
             if (folderId)
@@ -804,7 +800,7 @@ const ui = {
                     type: 'folder',
                     id: folderId,
                     name: card.dataset.folderName,
-                    data: self._items.get(folderId)
+                    data: this._items.get(folderId)
                 };
             return null;
         };
@@ -818,25 +814,23 @@ const ui = {
             // But NOT image files - those should be previewed in the inline viewer
             const ext = (file.name || '').split('.').pop().toLowerCase();
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'heic', 'heif', 'avif', 'tiff'];
-            const isImage = (file.mime_type && file.mime_type.startsWith('image/')) || imageExts.includes(ext);
+            const isImage = file.mime_type?.startsWith('image/') || imageExts.includes(ext);
             try {
-                if (!isImage && window.wopiEditor && await window.wopiEditor.canEdit(file.name)) {
-                    await window.wopiEditor.openInModal(file.id, file.name, 'edit')
+                if (!isImage && window.wopiEditor && (await window.wopiEditor.canEdit(file.name))) {
+                    await window.wopiEditor.openInModal(file.id, file.name, 'edit');
                     return;
                 }
-            }
-            catch (e) {
+            } catch (e) {
                 console.warn(`WOPI Editor failed, falling bck to classic view `, e);
             }
 
-            if (self.isViewableFile(file) || isImage) {
+            if (this.isViewableFile(file) || isImage) {
                 if (window.inlineViewer) {
                     window.inlineViewer.openFile(file);
                     // update history
                     window.app.viewFile = file.id;
                     window.updateHistory(false);
-                }
-                else {
+                } else {
                     window.fileOps.downloadFile(file.id, file.name);
                 }
             } else {
@@ -849,7 +843,7 @@ const ui = {
             const folderName = card.dataset.folderName;
             window.app.breadcrumbPath.push({ id: folderId, name: folderName });
             window.app.currentPath = folderId;
-            self.updateBreadcrumb();
+            this.updateBreadcrumb();
             window.loadFiles();
         };
 
@@ -940,7 +934,7 @@ const ui = {
                 window.contextMenus.syncFavoriteOptionLabels();
             }
             if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
-                window.contextMenus.syncWopiOptionVisibility().catch(function () {});
+                window.contextMenus.syncWopiOptionVisibility().catch(() => {});
             }
             menu.style.left = `${e.pageX}px`;
             menu.style.top = `${e.pageY}px`;
@@ -949,7 +943,7 @@ const ui = {
 
         // dragstart
         filesList.addEventListener('dragstart', (e) => {
-            let card = e.target.closest('.file-item');
+            const card = e.target.closest('.file-item');
             if (!card) {
                 e.preventDefault();
                 return;
@@ -968,11 +962,11 @@ const ui = {
             // allow copy or move (handled by the browser)
             e.dataTransfer.effectAllowed = 'copyMove';
 
-            self.draggedItems = document.createElement('div');
-            self.draggedItems.className = 'dragged-items';
+            this.draggedItems = document.createElement('div');
+            this.draggedItems.className = 'dragged-items';
 
             let selectedCardFromList = filesList.querySelectorAll(`div.selected > div.name-cell`);
-            if (selectedCardFromList.length == 0) {
+            if (selectedCardFromList.length === 0) {
                 // fallback to current element
                 selectedCardFromList = card.querySelectorAll('div.name-cell');
             }
@@ -982,8 +976,8 @@ const ui = {
             let lastItemDiv = null;
 
             while (index < selectedCardFromList.length && index < maxElements) {
-                let iconCell = document.createElement('div');
-                let icon = selectedCardFromList[index].getElementsByClassName('file-icon').item(0)?.cloneNode(true);
+                const iconCell = document.createElement('div');
+                const icon = selectedCardFromList[index].getElementsByClassName('file-icon').item(0)?.cloneNode(true);
                 if (icon) {
                     iconCell.appendChild(icon);
                     iconCell.querySelectorAll('img')?.forEach((img) => {
@@ -991,28 +985,28 @@ const ui = {
                     });
                 }
 
-                let nameCell = document.createElement('div');
-                let name = selectedCardFromList[index].getElementsByTagName('span').item(0)?.cloneNode(true);
+                const nameCell = document.createElement('div');
+                const name = selectedCardFromList[index].getElementsByTagName('span').item(0)?.cloneNode(true);
                 if (name) {
                     nameCell.appendChild(name);
                 }
 
-                let div = document.createElement('div');
+                const div = document.createElement('div');
                 div.className = 'file-item';
                 div.appendChild(iconCell);
                 div.appendChild(nameCell);
 
-                self.draggedItems.appendChild(div);
+                this.draggedItems.appendChild(div);
                 index += 1;
                 lastItemDiv = div;
             }
 
             // if more than 1 item, display the badge
             if (selectedCardFromList.length > 1) {
-                let badge = document.createElement('span');
+                const badge = document.createElement('span');
                 badge.className = 'dragged-items-badge';
                 badge.innerText = `${selectedCardFromList.length}`;
-                self.draggedItems.appendChild(badge);
+                this.draggedItems.appendChild(badge);
             }
 
             // if more than maxElements display the fading
@@ -1020,14 +1014,16 @@ const ui = {
                 lastItemDiv.classList.add('fading');
             }
 
-            self.dragPreview.appendChild(self.draggedItems);
-            e.dataTransfer.setDragImage(self.draggedItems, 0, 0);
+            this.dragPreview.appendChild(this.draggedItems);
+            e.dataTransfer.setDragImage(this.draggedItems, 0, 0);
         });
 
         // dragend
-        filesList.addEventListener('dragend', (e) => {
-            self.dragPreview.removeChild(self.draggedItems);
-            document.querySelectorAll('.drop-target').forEach((el) => el.classList.remove('drop-target'));
+        filesList.addEventListener('dragend', (_e) => {
+            this.dragPreview.removeChild(this.draggedItems);
+            document.querySelectorAll('.drop-target').forEach((el) => {
+                el.classList.remove('drop-target');
+            });
         });
 
         // dragover – only folders are valid drop targets
@@ -1057,7 +1053,7 @@ const ui = {
             card.classList.remove('drop-target');
 
             const action = e.dataTransfer.dropEffect;
-            await self._dropToFolder(action, targetFolderId, e.dataTransfer);
+            await this._dropToFolder(action, targetFolderId, e.dataTransfer);
         });
     },
 
@@ -1111,8 +1107,8 @@ const ui = {
 
             // SVG icon path (after icons.js replacement)
             const svg = starBtn.querySelector('svg');
-            const filledPath = window.OxiIcons && window.OxiIcons['star'];
-            const outlinePath = window.OxiIcons && window.OxiIcons['star-outline'];
+            const filledPath = window.OxiIcons?.star;
+            const outlinePath = window.OxiIcons?.['star-outline'];
             const targetPath = isFavorite ? filledPath : outlinePath;
             if (svg && targetPath) {
                 const p = svg.querySelector('path');
@@ -1159,7 +1155,7 @@ const ui = {
         el.dataset.folderName = folder.name;
         el.dataset.parentId = folder.parent_id || '';
 
-        const isFav = window.favorites && window.favorites.isFavorite(folder.id, 'folder');
+        const isFav = window.favorites?.isFavorite(folder.id, 'folder');
         const formattedDate = window.formatDateTime(folder.modified_at);
 
         el.innerHTML = `
@@ -1203,7 +1199,7 @@ const ui = {
               : 'Document';
         const fileSize = file.size_formatted || window.formatFileSize(file.size);
         const formattedDate = window.formatDateTime(file.modified_at);
-        const isFav = window.favorites && window.favorites.isFavorite(file.id, 'file');
+        const isFav = window.favorites?.isFavorite(file.id, 'file');
 
         const el = document.createElement('div');
         el.className = 'file-item';
@@ -1213,7 +1209,7 @@ const ui = {
         el.setAttribute('draggable', 'true');
 
         el.innerHTML = `
-            
+
             <div class="checkbox-cell"><input type="checkbox" class="item-checkbox"></div>
             <div class="name-cell">
                 <div class="file-icon ${iconSpecialClass}">
@@ -1262,7 +1258,7 @@ const ui = {
                 <div></div><!-- actions -->
             </div>`;
 
-        if (window.i18n && window.i18n.translateElement) window.i18n.translateElement(filesList);
+        if (window.i18n?.translateElement) window.i18n.translateElement(filesList);
 
         filesList.classList.remove('hidden');
         filesContainerError?.classList.add('hidden');
@@ -1286,7 +1282,7 @@ const ui = {
         const filesList = document.getElementById('files-list');
         if (filesContainerError) filesContainerError.innerHTML = content;
 
-        if (window.i18n && window.i18n.translateElement) window.i18n.translateElement(filesContainerError);
+        if (window.i18n?.translateElement) window.i18n.translateElement(filesContainerError);
 
         filesContainerError?.classList.remove('hidden');
         filesList?.classList.add('hidden');
@@ -1384,7 +1380,9 @@ function toggleCardSelection(card, event) {
  */
 function showContextMenuAtElement(triggerElement, menuId) {
     // Hide any open menus first
-    document.querySelectorAll('.context-menu').forEach((m) => (m.style.display = 'none'));
+    document.querySelectorAll('.context-menu').forEach((m) => {
+        m.style.display = 'none';
+    });
 
     const menu = document.getElementById(menuId);
     if (!menu) return;
@@ -1406,7 +1404,7 @@ function showContextMenuAtElement(triggerElement, menuId) {
         window.contextMenus.syncFavoriteOptionLabels();
     }
     if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
-        window.contextMenus.syncWopiOptionVisibility().catch(function () {});
+        window.contextMenus.syncWopiOptionVisibility().catch(() => {});
     }
 
     menu.style.left = `${left}px`;

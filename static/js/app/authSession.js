@@ -115,7 +115,7 @@ async function checkAuthentication() {
                         window.location.href = '/login?source=session_expired';
                         return;
                     }
-                } catch (err) {
+                } catch (_err) {
                     localStorage.removeItem(USER_DATA_KEY);
                     window.location.href = '/login?source=session_expired';
                     return;
@@ -128,9 +128,11 @@ async function checkAuthentication() {
             console.log('No cached user data, fetching from server');
             try {
                 const freshData = await refreshUserData();
-                if (freshData && freshData.username) {
+                if (freshData?.username) {
                     const userInitials = freshData.username.substring(0, 2).toUpperCase();
-                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach((el) => (el.textContent = userInitials));
+                    document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach((el) => {
+                        el.textContent = userInitials;
+                    });
                     window.updateStorageUsageDisplay(freshData);
                     resolveHomeFolder().then(() => window.loadFiles());
                 } else {

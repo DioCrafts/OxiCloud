@@ -8,7 +8,7 @@ async function loadTrashItems() {
     try {
         if (window.multiSelect) window.multiSelect.clear();
         window.ui.resetFilesList(); // ensure also list visible & error hidden
-        const _tt = window.i18n && window.i18n.t ? window.i18n.t : (k) => k.split('.').pop();
+        const _tt = window.i18n?.t ? window.i18n.t : (k) => k.split('.').pop();
         elements.filesList.innerHTML = `
             <div class="list-header trash-header">
                 <div data-i18n="files.name">${_tt('files.name')}</div>
@@ -53,8 +53,8 @@ function addTrashItemToView(item) {
         iconClass = item.icon_class || 'fas fa-folder';
         typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
     } else {
-        iconClass = item.icon_class || (window.ui && window.ui.getIconClass ? window.ui.getIconClass(item.name) : 'fas fa-file');
-        iconSpecialClass = window.ui && window.ui.getIconSpecialClass ? window.ui.getIconSpecialClass(item.name) : '';
+        iconClass = item.icon_class || (window.ui?.getIconClass ? window.ui.getIconClass(item.name) : 'fas fa-file');
+        iconSpecialClass = window.ui?.getIconSpecialClass ? window.ui.getIconSpecialClass(item.name) : '';
         const cat = item.category || '';
         typeLabel = cat
             ? window.i18n

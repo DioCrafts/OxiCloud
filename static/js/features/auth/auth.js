@@ -378,7 +378,7 @@ function detectBrowserLanguage() {
 // Build a language option element (card style)
 function buildLanguageCard(lang, isSelected) {
     const item = document.createElement('div');
-    item.className = 'lang-picker-item' + (isSelected ? ' selected' : '');
+    item.className = `lang-picker-item${isSelected ? ' selected' : ''}`;
     item.setAttribute('data-lang', lang.code);
     item.setAttribute('role', 'option');
     item.setAttribute('aria-selected', isSelected);
@@ -397,7 +397,6 @@ function initLanguageSelector() {
     const continueBtn = document.getElementById('language-continue');
     const picker = document.getElementById('lang-picker');
     const pickerSelected = document.getElementById('lang-picker-selected');
-    const pickerDropdown = document.getElementById('lang-picker-dropdown');
     const pickerList = document.getElementById('lang-picker-list');
     const pickerFlag = document.getElementById('lang-picker-flag');
     const pickerName = document.getElementById('lang-picker-name');
@@ -510,7 +509,7 @@ function initLanguageSelector() {
         localStorage.setItem(FIRST_RUN_KEY, 'true');
 
         // Update i18n if available
-        if (window.i18n && window.i18n.setLocale) {
+        if (window.i18n?.setLocale) {
             await window.i18n.setLocale(selectedLanguage);
         }
 
@@ -633,7 +632,7 @@ async function configureOidcLoginUI() {
         // Update button text with provider name
         const btnTextEl = oidcBtn.querySelector('span');
         if (btnTextEl && oidcInfo.provider_name) {
-            const template = window.i18n && window.i18n.t ? window.i18n.t('auth.sso_login_provider') : 'Sign in with {{provider}}';
+            const template = window.i18n?.t ? window.i18n.t('auth.sso_login_provider') : 'Sign in with {{provider}}';
             btnTextEl.textContent = template.replace('{{provider}}', oidcInfo.provider_name);
         }
 
@@ -658,7 +657,7 @@ async function configureOidcLoginUI() {
 }
 
 // DOM elements
-let loginPanel, registerPanel, adminSetupPanel, languagePanel;
+let loginPanel, registerPanel, adminSetupPanel;
 let loginForm, registerForm, adminSetupForm;
 let loginError, registerError, registerSuccess, adminSetupError;
 
@@ -725,7 +724,7 @@ let authInitialized = false;
 // and clear auth data to break the loop
 (() => {
     // Check if we're being redirected in a loop
-    const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0');
+    const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0', 10);
     const redirectSource = new URLSearchParams(window.location.search).get('source');
 
     // Case 1: High refresh attempts
@@ -749,7 +748,7 @@ let authInitialized = false;
     }
 
     // Case 3: Multiple redirects in short time
-    const lastCleanup = parseInt(localStorage.getItem('last_emergency_clean') || '0');
+    const lastCleanup = parseInt(localStorage.getItem('last_emergency_clean') || '0', 10);
     const timeSinceCleanup = Date.now() - lastCleanup;
 
     if (lastCleanup > 0 && timeSinceCleanup < 10000) {
@@ -931,7 +930,7 @@ if (isLoginPage && registerForm) {
         }
 
         try {
-            const data = await register(username, email, password);
+            await register(username, email, password);
 
             // Show success message
             const successMsg = window.i18n ? window.i18n.t('auth.account_success') : 'Account created successfully! You can now log in.';
@@ -992,7 +991,7 @@ if (isLoginPage && adminSetupForm) {
                 const err = await response.json().catch(() => ({}));
                 throw new Error(err.message || 'Setup failed');
             }
-            const data = await response.json();
+            await response.json();
 
             // Show success message in the GUI instead of alert
             const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
@@ -1048,7 +1047,7 @@ async function login(username, password) {
             try {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Authentication failed');
-            } catch (jsonError) {
+            } catch (_jsonError) {
                 // If the error response is not valid JSON
                 throw new Error(`Authentication error (${response.status}): ${response.statusText}`);
             }
@@ -1092,7 +1091,7 @@ async function register(username, email, password, role = 'user') {
             try {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Registration error');
-            } catch (jsonError) {
+            } catch (_jsonError) {
                 // If the error response is not valid JSON
                 throw new Error(`Registration error (${response.status}): ${response.statusText}`);
             }
@@ -1116,6 +1115,8 @@ async function register(username, email, password, role = 'user') {
 /**
  * Fetch current user data — relies on HttpOnly cookie (auto-sent).
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: global function
 async function fetchUserData() {
     try {
         const response = await fetch(ME_ENDPOINT, {
@@ -1142,7 +1143,7 @@ async function fetchUserData() {
 async function refreshAuthToken() {
     try {
         // Loop-breaker
-        const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0');
+        const refreshAttempts = parseInt(localStorage.getItem('refresh_attempts') || '0', 10);
         localStorage.setItem('refresh_attempts', (refreshAttempts + 1).toString());
 
         if (refreshAttempts > 3) {
@@ -1232,6 +1233,8 @@ function redirectToMainApp() {
 /**
  * Logout — tell the server to clear HttpOnly cookies, then redirect.
  */
+
+// biome-ignore lint/correctness/noUnusedVariables: global function
 async function logout() {
     try {
         await fetch('/api/auth/logout', {

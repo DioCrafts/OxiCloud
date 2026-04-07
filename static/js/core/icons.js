@@ -10,8 +10,6 @@
  * https://fontawesome.com/license/free
  */
 
-'use strict';
-
 // ── Icon registry ──────────────────────────────────────────────
 // Each entry: [viewBox-width, svg-path-d]
 // All icons use viewBox="0 0 {width} 512" and fill="currentColor".
@@ -379,7 +377,7 @@ function oxiIcon(name, extraClass) {
     const entry = _ICONS[name];
     if (!entry) return '';
     const [w, d] = entry;
-    const cls = extraClass ? 'oxi-icon ' + extraClass : 'oxi-icon';
+    const cls = extraClass ? `oxi-icon ${extraClass}` : 'oxi-icon';
     return `<svg class="${cls}" viewBox="0 0 ${w} 512" aria-hidden="true"><path fill="currentColor" d="${d}"/></svg>`;
 }
 
@@ -423,8 +421,8 @@ function replaceIconsInElement(container) {
         }
 
         // Use outline variant if available and element uses "far"
-        if (isRegular && _ICONS[iconName + '-outline']) {
-            iconName = iconName + '-outline';
+        if (isRegular && _ICONS[`${iconName}-outline`]) {
+            iconName = `${iconName}-outline`;
         }
 
         if (!iconName || !_ICONS[iconName]) continue;
@@ -433,12 +431,12 @@ function replaceIconsInElement(container) {
 
         // Build SVG element
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('viewBox', '0 0 ' + w + ' 512');
+        svg.setAttribute('viewBox', `0 0 ${w} 512`);
         svg.setAttribute('aria-hidden', 'true');
 
         let svgClass = 'oxi-icon';
         if (isSpin) svgClass += ' oxi-icon-spin';
-        if (extraClasses.length) svgClass += ' ' + extraClasses.join(' ');
+        if (extraClasses.length) svgClass += ` ${extraClasses.join(' ')}`;
         svg.setAttribute('class', svgClass);
 
         // Copy inline style if present
@@ -479,7 +477,7 @@ window.OxiIcons = _ICONS;
     }
 
     // Observe future mutations (dynamic renders, modals, etc.)
-    new MutationObserver(function (mutations) {
+    new MutationObserver((mutations) => {
         if (raf) return;
         for (let i = 0; i < mutations.length; i++) {
             if (mutations[i].addedNodes.length) {

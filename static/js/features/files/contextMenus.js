@@ -25,9 +25,9 @@ const contextMenus = {
         const wopiEditTab = document.getElementById('wopi-edit-file-tab-option');
         if (!wopiEdit || !wopiEditTab) return;
 
-        const targetFile = window.app && window.app.contextMenuTargetFile;
+        const targetFile = window.app?.contextMenuTargetFile;
         // Don't show WOPI editor for image files - they should use inline preview
-        const isImage = targetFile && targetFile.mime_type && targetFile.mime_type.startsWith('image/');
+        const isImage = targetFile?.mime_type?.startsWith('image/');
         const show = targetFile && !isImage && window.wopiEditor && (await window.wopiEditor.canEdit(targetFile.name));
 
         wopiEdit.classList.toggle('hidden', !show);
@@ -37,8 +37,8 @@ const contextMenus = {
     syncFavoriteOptionLabels() {
         if (!window.favorites) return;
 
-        const targetFile = window.app && window.app.contextMenuTargetFile;
-        const targetFolder = window.app && window.app.contextMenuTargetFolder;
+        const targetFile = window.app?.contextMenuTargetFile;
+        const targetFolder = window.app?.contextMenuTargetFolder;
 
         if (targetFile) {
             const isFav = window.favorites.isFavorite(targetFile.id, 'file');
@@ -68,7 +68,7 @@ const contextMenus = {
                 const folder = window.app.contextMenuTargetFolder;
 
                 // Check if folder is already in favorites to toggle
-                if (window.favorites && window.favorites.isFavorite(folder.id, 'folder')) {
+                if (window.favorites?.isFavorite(folder.id, 'folder')) {
                     // Remove from favorites
                     const ok = await window.favorites.removeFromFavorites(folder.id, 'folder');
                     if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
@@ -127,7 +127,7 @@ const contextMenus = {
                     .then((response) => response.json())
                     .then((fileDetails) => {
                         // Check if viewable file type (images, PDFs, text files)
-                        if (window.ui && window.ui.isViewableFile(fileDetails)) {
+                        if (window.ui?.isViewableFile(fileDetails)) {
                             // Open with inline viewer
                             if (window.inlineViewer) {
                                 window.inlineViewer.openFile(fileDetails);
@@ -177,7 +177,7 @@ const contextMenus = {
                 const file = window.app.contextMenuTargetFile;
 
                 // Check if file is already in favorites to toggle
-                if (window.favorites && window.favorites.isFavorite(file.id, 'file')) {
+                if (window.favorites?.isFavorite(file.id, 'file')) {
                     // Remove from favorites
                     const ok = await window.favorites.removeFromFavorites(file.id, 'file');
                     if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
@@ -273,7 +273,7 @@ const contextMenus = {
                 const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
                 const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
 
-                let result = await window.fileOps.batchCopy(fileIds, folderIds, targetId);
+                const result = await window.fileOps.batchCopy(fileIds, folderIds, targetId);
 
                 this.closeMoveDialog();
                 window.multiSelect.clear();
@@ -306,7 +306,7 @@ const contextMenus = {
                 const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
                 const folderIds = items.filter((i) => i.type === 'folder' && i.id !== targetId).map((i) => i.id);
 
-                let result = await window.fileOps.batchMove(fileIds, folderIds, targetId);
+                const result = await window.fileOps.batchMove(fileIds, folderIds, targetId);
 
                 this.closeMoveDialog();
                 window.multiSelect.clear();
@@ -664,7 +664,7 @@ const contextMenus = {
             window.app.selectedTargetFolderId = parentFolderId || '';
 
             // Translate new elements
-            if (window.i18n && window.i18n.translateElement) {
+            if (window.i18n?.translateElement) {
                 window.i18n.translateElement(folderSelectContainer);
             }
         } catch (error) {
@@ -675,7 +675,7 @@ const contextMenus = {
     /**
      * Render breadcrumb navigation for move dialog
      */
-    _renderMoveDialogBreadcrumb(container, breadcrumb, currentFolderId) {
+    _renderMoveDialogBreadcrumb(container, breadcrumb, _currentFolderId) {
         if (!container) return;
         container.innerHTML = '';
 
@@ -757,6 +757,7 @@ const contextMenus = {
         // Use loadMoveDialogFolders which uses /api/folders/{id}/contents
         await this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
     },
+
     /**
      * Show share dialog for files or folders
      * @param {Object} item - File or folder object
