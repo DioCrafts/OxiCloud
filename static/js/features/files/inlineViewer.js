@@ -502,6 +502,10 @@ class InlineViewer {
     // Get modal
     const modal = document.getElementById('inline-viewer-modal');
     
+    // stops audio/video before closing viewver
+    const media = modal.querySelector('audio, video');
+    if (media && !media.paused) media.pause();
+
     // Hide modal
     modal.classList.remove('active');
     
