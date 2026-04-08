@@ -51,10 +51,10 @@
 }
 
 .danger {
-    background-color: var( --color-danger-bg);
-    color: var( --color-danger-text);
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger-text);
 }
 
 .danger:hover {
-    background-color: var( --color-danger-hover);
+    background-color: var(--color-danger-hover);
 }

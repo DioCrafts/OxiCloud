@@ -729,7 +729,13 @@
     left: 45px;
     width: 10px;
     height: 46px;
-    background: repeating-linear-gradient(to bottom, var(--color-neutral-warm-text) 0px, var(--color-neutral-warm-text) 5px, var(--color-neutral-warm-bg) 5px, var(--color-neutral-warm-bg) 10px);
+    background: repeating-linear-gradient(
+        to bottom,
+        var(--color-neutral-warm-text) 0px,
+        var(--color-neutral-warm-text) 5px,
+        var(--color-neutral-warm-bg) 5px,
+        var(--color-neutral-warm-bg) 10px
+    );
     opacity: 0.5;
 }
 

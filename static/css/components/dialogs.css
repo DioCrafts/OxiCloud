@@ -499,9 +499,9 @@
 
 /* Playlist track count in selector */
 .playlist-track-count {
-	margin-left: auto;
-	font-size: 12px;
-	color: #718096;
+    margin-left: auto;
+    font-size: 12px;
+    color: #718096;
 }
 
 /* Custom confirm dialog */
@@ -542,7 +542,7 @@
 
 .confirm-dialog-icon i {
     font-size: 40px;
-    color: var( --color-danger-bg);
+    color: var(--color-danger-bg);
 }
 
 .confirm-dialog-title {

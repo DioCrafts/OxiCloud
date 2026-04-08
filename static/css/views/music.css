@@ -426,7 +426,9 @@
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Dark theme */
@@ -916,7 +918,7 @@
 }
 
 .player-btn.repeat-one i::after {
-    content: '1';
+    content: "1";
     font-size: 8px;
     position: absolute;
     top: 0;
