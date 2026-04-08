@@ -69,6 +69,9 @@ const ui = {
                 <div class="context-menu-item" id="share-file-option">
                     <i class="fas fa-share-alt"></i> <span data-i18n="actions.share">Share</span>
                 </div>
+                <div class="context-menu-item hidden" id="add-to-playlist-option">
+                    <i class="fas fa-compact-disc"></i> <span data-i18n="music.add_to_playlist">Add to Playlist</span>
+                </div>
                 <div class="context-menu-separator"></div>
                 <div class="context-menu-item" id="rename-file-option">
                     <i class="fas fa-pen"></i> <span data-i18n="actions.rename">Rename</span>
@@ -268,6 +271,33 @@ const ui = {
 
             document.getElementById('notification-send-btn').addEventListener('click', () => {
                 contextMenus.sendShareNotification();
+            });
+        }
+
+        // Playlist selection dialog
+        if (!document.getElementById('playlist-dialog')) {
+            const playlistDialog = document.createElement('div');
+            playlistDialog.className = 'share-dialog';
+            playlistDialog.id = 'playlist-dialog';
+            playlistDialog.innerHTML = `
+                <div class="share-dialog-content">
+                    <div class="share-dialog-header">
+                        <i class="fas fa-music dialog-header-icon"></i>
+                        <span data-i18n="music.add_to_playlist">Add to Playlist</span>
+                    </div>
+                    <div id="playlist-dialog-files-info" class="shared-item-info"></div>
+                    <div id="playlist-select-container" class="folder-select-container">
+                    </div>
+                    <div class="rename-dialog-buttons">
+                        <button class="btn btn-secondary" id="playlist-cancel-btn" data-i18n="actions.cancel">Cancel</button>
+                        <button class="btn btn-primary" id="playlist-add-btn" data-i18n="music.add">Add</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(playlistDialog);
+
+            document.getElementById('playlist-cancel-btn').addEventListener('click', () => {
+                if (window.contextMenus) window.contextMenus.closePlaylistDialog();
             });
         }
 
@@ -855,10 +885,12 @@ const ui = {
                     parent_id: card.dataset.parentId || ''
                 };
             } else {
+                const fileData = info.data || self._items.get(info.id);
                 window.app.contextMenuTargetFile = {
                     id: info.id,
                     name: card.dataset.fileName,
-                    folder_id: card.dataset.folderId || ''
+                    folder_id: card.dataset.folderId || '',
+                    mime_type: fileData?.mime_type || null
                 };
             }
         };
@@ -935,6 +967,9 @@ const ui = {
             }
             if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
                 window.contextMenus.syncWopiOptionVisibility().catch(() => {});
+            }
+            if (window.contextMenus && typeof window.contextMenus.syncAddToPlaylistOption === 'function') {
+                window.contextMenus.syncAddToPlaylistOption();
             }
             menu.style.left = `${e.pageX}px`;
             menu.style.top = `${e.pageY}px`;
@@ -1405,6 +1440,9 @@ function showContextMenuAtElement(triggerElement, menuId) {
     }
     if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
         window.contextMenus.syncWopiOptionVisibility().catch(() => {});
+    }
+    if (window.contextMenus && typeof window.contextMenus.syncAddToPlaylistOption === 'function') {
+        window.contextMenus.syncAddToPlaylistOption();
     }
 
     menu.style.left = `${left}px`;

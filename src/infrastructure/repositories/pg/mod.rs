@@ -9,6 +9,7 @@ mod device_code_pg_repository;
 mod favorites_pg_repository;
 pub mod file_metadata_repository;
 mod nextcloud_object_id_repository;
+pub mod playlist_pg_repository;
 mod recent_items_pg_repository;
 mod session_pg_repository;
 mod settings_pg_repository;
@@ -36,6 +37,9 @@ pub use file_blob_write_repository::FileBlobWriteRepository;
 pub use file_metadata_repository::FileMetadataRepository;
 pub use folder_db_repository::FolderDbRepository;
 pub use nextcloud_object_id_repository::NextcloudObjectIdRepository;
+pub use playlist_pg_repository::{
+    AudioMetadataPgRepository, PlaylistItemPgRepository, PlaylistPgRepository,
+};
 pub use recent_items_pg_repository::RecentItemsPgRepository;
 pub use session_pg_repository::SessionPgRepository;
 pub use settings_pg_repository::SettingsPgRepository;

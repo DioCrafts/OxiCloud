@@ -39,6 +39,8 @@ pub fn admin_routes() -> Router<Arc<AppState>> {
         // Registration control
         .route("/settings/registration", get(get_registration_setting))
         .route("/settings/registration", put(set_registration_setting))
+        // Audio metadata
+        .route("/audio/metadata/reextract", post(reextract_audio_metadata))
 }
 
 /// Validate JWT and require admin role. Returns (user_id, role).
@@ -586,4 +588,31 @@ async fn set_registration_setting(
             "registration_enabled": enabled,
         })),
     ))
+}
+
+async fn reextract_audio_metadata(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let audio_service = state
+        .applications
+        .audio_metadata_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Audio metadata service not available"))?;
+
+    let result = audio_service
+        .reextract_all_audio_metadata()
+        .await
+        .map_err(|e| {
+            AppError::internal_error(format!("Failed to re-extract audio metadata: {}", e))
+        })?;
+
+    Ok(Json(serde_json::json!({
+        "message": "Audio metadata extraction complete",
+        "total": result.total,
+        "processed": result.processed,
+        "failed": result.failed,
+    })))
 }

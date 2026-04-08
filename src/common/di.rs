@@ -38,6 +38,7 @@ use crate::infrastructure::services::trash_cleanup_service::TrashCleanupService;
 use crate::application::services::app_password_service::AppPasswordService;
 use crate::application::services::calendar_service::CalendarService;
 use crate::application::services::device_auth_service::DeviceAuthService;
+use crate::application::services::music_service::MusicService;
 use crate::application::services::storage_usage_service::StorageUsageService;
 use crate::application::services::wopi_lock_service::WopiLockService;
 use crate::application::services::wopi_token_service::WopiTokenService;
@@ -45,9 +46,11 @@ use crate::infrastructure::adapters::contact_storage_adapter::ContactStorageAdap
 use crate::infrastructure::repositories::AppPasswordPgRepository;
 use crate::infrastructure::repositories::DeviceCodePgRepository;
 use crate::infrastructure::repositories::pg::{
-    AddressBookPgRepository, CalendarEventPgRepository, CalendarPgRepository,
-    ContactGroupPgRepository, ContactPgRepository, SessionPgRepository, UserPgRepository,
+    AddressBookPgRepository, AudioMetadataPgRepository, CalendarEventPgRepository,
+    CalendarPgRepository, ContactGroupPgRepository, ContactPgRepository, PlaylistItemPgRepository,
+    PlaylistPgRepository, SessionPgRepository, UserPgRepository,
 };
+use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::infrastructure::services::chunked_upload_service::ChunkedUploadService;
 use crate::infrastructure::services::dedup_service::DedupService;
 use crate::infrastructure::services::image_transcode_service::ImageTranscodeService;
@@ -240,6 +243,7 @@ impl AppServiceFactory {
         core: &CoreServices,
         repos: &RepositoryServices,
         trash_service: Option<Arc<TrashService>>,
+        db_pool: &Arc<PgPool>,
     ) -> ApplicationServices {
         // Main services
         let folder_service = Arc::new(FolderService::new(repos.folder_repository.clone()));
@@ -298,7 +302,24 @@ impl AppServiceFactory {
             share_service: None,     // Configured later with create_share_service
             favorites_service: None, // Configured later with create_favorites_service
             recent_service: None,    // Configured later with create_recent_service
+            audio_metadata_service: self.create_audio_metadata_service(db_pool),
         }
+    }
+
+    /// Creates the audio metadata service (extracts ID3 tags from audio files)
+    pub fn create_audio_metadata_service(
+        &self,
+        db_pool: &Arc<PgPool>,
+    ) -> Option<Arc<AudioMetadataService>> {
+        if !self.config.features.enable_music {
+            tracing::info!("Audio metadata service is disabled (music feature disabled)");
+            return None;
+        }
+        let blob_root = self.storage_path.join(".blobs");
+        Some(Arc::new(AudioMetadataService::new(
+            db_pool.clone(),
+            blob_root,
+        )))
     }
 
     /// Creates the trash service
@@ -465,7 +486,8 @@ impl AppServiceFactory {
         let trash_service = self.create_trash_service(&repos, &core).await;
 
         // 4. Application services (with trash already wired)
-        let mut apps = self.create_application_services(&core, &repos, trash_service.clone());
+        let mut apps =
+            self.create_application_services(&core, &repos, trash_service.clone(), &pool);
 
         // 5. Share service
         let share_service = self.create_share_service(&repos, &pool);
@@ -614,6 +636,7 @@ impl AppServiceFactory {
             calendar_use_case: None,
             addressbook_use_case: None,
             contact_use_case: None,
+            music_service: None,
             wopi_token_service: None,
             wopi_lock_service: None,
             wopi_discovery_service: None,
@@ -765,6 +788,26 @@ impl AppServiceFactory {
             tracing::info!("CalDAV and CardDAV services initialized with PostgreSQL repositories");
         }
 
+        // Music service
+        {
+            let playlist_repo: Arc<PlaylistPgRepository> =
+                Arc::new(PlaylistPgRepository::new(pool.clone()));
+            let item_repo: Arc<PlaylistItemPgRepository> =
+                Arc::new(PlaylistItemPgRepository::new(pool.clone()));
+            let audio_metadata_repo: Arc<AudioMetadataPgRepository> =
+                Arc::new(AudioMetadataPgRepository::new(pool.clone()));
+            let music_storage = Arc::new(
+                crate::infrastructure::adapters::music_storage_adapter::MusicStorageAdapter::new(
+                    playlist_repo,
+                    item_repo,
+                    audio_metadata_repo,
+                ),
+            );
+            let music_svc = Arc::new(MusicService::new(music_storage));
+            app_state.music_service = Some(music_svc);
+            tracing::info!("Music service initialized");
+        }
+
         // 11. Wire WOPI services if enabled
         if self.config.wopi.enabled {
             let discovery_url = &self.config.wopi.discovery_url;
@@ -847,6 +890,7 @@ pub struct ApplicationServices {
     pub share_service: Option<Arc<ShareService>>,
     pub favorites_service: Option<Arc<FavoritesService>>,
     pub recent_service: Option<Arc<RecentService>>,
+    pub audio_metadata_service: Option<Arc<AudioMetadataService>>,
 }
 
 /// Container for authentication services
@@ -889,6 +933,7 @@ pub struct AppState {
     pub calendar_use_case: Option<Arc<CalendarService>>,
     pub addressbook_use_case: Option<Arc<ContactStorageAdapter>>,
     pub contact_use_case: Option<Arc<ContactStorageAdapter>>,
+    pub music_service: Option<Arc<MusicService>>,
     pub wopi_token_service:
         Option<Arc<crate::application::services::wopi_token_service::WopiTokenService>>,
     pub wopi_lock_service:

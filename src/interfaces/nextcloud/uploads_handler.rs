@@ -8,6 +8,7 @@ use std::sync::Arc;
 use crate::application::ports::file_ports::{FileRetrievalUseCase, FileUploadUseCase};
 use crate::common::di::AppState;
 use crate::common::mime_detect::{filename_from_path, refine_content_type_from_file};
+use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 
@@ -184,6 +185,20 @@ async fn handle_assemble(
             .create_file(parent_internal, filename, &assembled, &content_type)
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to create file: {}", e)))?;
+
+        // Extract audio metadata for supported audio files in background.
+        if let Some(ref audio_service) = state.applications.audio_metadata_service
+            && AudioMetadataService::is_audio_file(&dto.mime_type)
+            && let Ok(file_id) = uuid::Uuid::parse_str(&dto.id)
+        {
+            let file_path = state.core.dedup_service.blob_path(&dto.etag);
+            AudioMetadataService::spawn_extraction_background(
+                audio_service.clone(),
+                file_id,
+                file_path,
+            );
+        }
+
         Some(dto.etag)
     };
 

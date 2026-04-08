@@ -21,6 +21,7 @@ use crate::application::ports::inbound::FolderUseCase;
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
 use crate::common::mime_detect::{filename_from_path, refine_content_type};
+use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
 
@@ -551,6 +552,22 @@ async fn handle_put(
             .await
             .map_err(|e| AppError::internal_error(format!("Failed to update file: {}", e)))?;
 
+        // Update audio metadata for supported audio files.
+        if let Some(ref audio_service) = state.applications.audio_metadata_service
+            && let Ok(file_id) = uuid::Uuid::parse_str(&updated.id)
+        {
+            let file_path = state.core.dedup_service.blob_path(&updated.etag);
+            let is_audio = AudioMetadataService::is_audio_file(&content_type);
+
+            if is_audio {
+                AudioMetadataService::spawn_extraction_with_delete_background(
+                    audio_service.clone(),
+                    file_id,
+                    file_path,
+                );
+            }
+        }
+
         return Ok(Response::builder()
             .status(StatusCode::NO_CONTENT)
             .header(header::ETAG, format!("\"{}\"", updated.etag))
@@ -571,6 +588,19 @@ async fn handle_put(
         .create_file(&parent_internal, filename, &body_bytes, &content_type)
         .await
         .map_err(|e| AppError::internal_error(format!("Failed to create file: {}", e)))?;
+
+    // Extract audio metadata for supported audio files in background.
+    if let Some(ref audio_service) = state.applications.audio_metadata_service
+        && AudioMetadataService::is_audio_file(&file_dto.mime_type)
+        && let Ok(file_id) = uuid::Uuid::parse_str(&file_dto.id)
+    {
+        let file_path = state.core.dedup_service.blob_path(&file_dto.etag);
+        AudioMetadataService::spawn_extraction_background(
+            audio_service.clone(),
+            file_id,
+            file_path,
+        );
+    }
 
     let builder = Response::builder()
         .status(StatusCode::CREATED)

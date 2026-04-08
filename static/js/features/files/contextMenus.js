@@ -51,6 +51,19 @@ const contextMenus = {
         }
     },
 
+    syncAddToPlaylistOption() {
+        const option = document.getElementById('add-to-playlist-option');
+        if (!option) return;
+
+        const targetFile = window.app && window.app.contextMenuTargetFile;
+        if (targetFile) {
+            const isAudio = targetFile.mime_type && targetFile.mime_type.startsWith('audio/');
+            option.classList.toggle('hidden', !isAudio);
+        } else {
+            option.classList.add('hidden');
+        }
+    },
+
     /**
      * Assign events to menu items and dialogs
      */
@@ -215,6 +228,18 @@ const contextMenus = {
                 this.showShareDialog(file, 'file');
             }
             window.ui.closeFileContextMenu();
+        });
+
+        document.getElementById('add-to-playlist-option').addEventListener('click', () => {
+            const file = window.app.contextMenuTargetFile;
+            if (file) {
+                this.showPlaylistDialog(file);
+            }
+            window.ui.closeFileContextMenu();
+        });
+
+        document.getElementById('playlist-add-btn').addEventListener('click', () => {
+            this.addSelectedFilesToPlaylist();
         });
 
         document.getElementById('delete-file-option').addEventListener('click', async () => {
@@ -1049,6 +1074,147 @@ const contextMenus = {
     closeNotificationDialog() {
         document.getElementById('notification-dialog').style.display = 'none';
         window.app.notificationShareUrl = null;
+    },
+
+    _selectedPlaylistId: null,
+
+    async showPlaylistDialog(file) {
+        const dialog = document.getElementById('playlist-dialog');
+        const container = document.getElementById('playlist-select-container');
+        const filesInfo = document.getElementById('playlist-dialog-files-info');
+        
+        if (!dialog || !container) {
+            console.error('Playlist dialog elements not found');
+            return;
+        }
+
+        // Store the file(s) to add
+        window.app.playlistDialogFiles = [file];
+
+        // Update files info
+        if (filesInfo) {
+            filesInfo.innerHTML = `<strong>${window.i18n ? window.i18n.t('music.selected_files', 'Selected:') : 'Selected:'} </strong>${file.name}`;
+        }
+
+        // Reset selection
+        this._selectedPlaylistId = null;
+        container.innerHTML = '<div class="folder-select-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+        
+        // Reset add button state
+        const addBtn = document.getElementById('playlist-add-btn');
+        if (addBtn) addBtn.disabled = true;
+
+        // Show dialog
+        dialog.style.display = 'flex';
+        requestAnimationFrame(() => dialog.classList.add('active'));
+
+        // Load playlists
+        try {
+            const resp = await fetch('/api/playlists', { credentials: 'include' });
+            if (!resp.ok) throw new Error('Failed to load playlists');
+            
+            const playlists = await resp.json();
+            this._renderPlaylistSelect(container, playlists);
+        } catch (err) {
+            console.error('Error loading playlists:', err);
+            container.innerHTML = `<div class="folder-select-empty">${window.i18n ? window.i18n.t('music.load_error', 'Error loading playlists') : 'Error loading playlists'}</div>`;
+        }
+    },
+
+    _renderPlaylistSelect(container, playlists) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key, fallback) : fallback;
+        
+        container.innerHTML = '';
+        
+        if (playlists.length === 0) {
+            container.innerHTML = `<div class="folder-select-empty">${t('music.no_playlists', 'No playlists yet. Create one first!')}</div>`;
+            return;
+        }
+
+        playlists.forEach(playlist => {
+            const item = document.createElement('div');
+            item.className = 'folder-select-item';
+            item.dataset.id = playlist.id;
+            item.innerHTML = `
+                <i class="fas fa-list"></i>
+                <span>${this._escapeHtml(playlist.name)}</span>
+                <span class="playlist-track-count">${playlist.track_count || 0} ${t('music.tracks', 'tracks')}</span>
+            `;
+            
+            item.addEventListener('click', () => {
+                container.querySelectorAll('.folder-select-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+                this._selectedPlaylistId = playlist.id;
+                const addBtn = document.getElementById('playlist-add-btn');
+                if (addBtn) addBtn.disabled = false;
+            });
+            
+            container.appendChild(item);
+        });
+    },
+
+    async addSelectedFilesToPlaylist() {
+        const playlistId = this._selectedPlaylistId;
+        const files = window.app.playlistDialogFiles || [];
+        
+        if (!playlistId || files.length === 0) return;
+
+        const addBtn = document.getElementById('playlist-add-btn');
+        if (addBtn) addBtn.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/playlists/${playlistId}/tracks`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getCsrfHeaders()
+                },
+                body: JSON.stringify({ file_ids: files.map(f => f.id) })
+            });
+
+            if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to add tracks');
+            }
+
+            const result = await resp.json();
+            window.ui.showNotification(
+                window.i18n ? window.i18n.t('music.added', 'Added!') : 'Added!',
+                `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${window.i18n ? window.i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
+            );
+
+            this.closePlaylistDialog();
+
+            // Refresh music view if open
+            if (window.musicView && window.musicView.playlists) {
+                window.musicView._loadPlaylists();
+            }
+        } catch (err) {
+            console.error('Error adding to playlist:', err);
+            window.ui.showNotification(
+                window.i18n ? window.i18n.t('music.error', 'Error') : 'Error',
+                err.message || window.i18n.t('music.add_error', 'Could not add tracks to playlist')
+            );
+            if (addBtn) addBtn.disabled = false;
+        }
+    },
+
+    closePlaylistDialog() {
+        const dialog = document.getElementById('playlist-dialog');
+        if (dialog) {
+            dialog.classList.remove('active');
+            setTimeout(() => {
+                dialog.style.display = 'none';
+            }, 200);
+        }
+        window.app.playlistDialogFiles = null;
+        this._selectedPlaylistId = null;
+    },
+
+    _escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 };
 

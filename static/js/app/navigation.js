@@ -108,7 +108,8 @@ const VIEW_FLAGS = {
     recent: 'isRecentView',
     favorites: 'isFavoritesView',
     trash: 'isTrashView',
-    photos: 'isPhotosView'
+    photos: 'isPhotosView',
+    music: 'isMusicView'
 };
 
 /**
@@ -156,6 +157,11 @@ function setCurrentSection(section) {
     // Hide photosView when switching to any other section
     if (section !== 'photos' && window.photosView) {
         window.photosView.hide();
+    }
+
+    // Hide musicView when switching to any other section
+    if (section !== 'music' && window.musicView) {
+        window.musicView.hide();
     }
 
     return true;
@@ -323,10 +329,38 @@ function switchToTrashSection() {
     if (window.multiSelect) window.multiSelect.clear();
 }
 
+function switchToMusicSection() {
+    if (!setCurrentSection('music')) return;
+
+    // Hide breadcrumb
+    const breadcrumb = document.querySelector('.breadcrumb');
+    breadcrumb?.classList.add("hidden");
+
+    // Hide file containers
+    toggleFileContainer(false);
+
+    // Hide actions-bar
+    window.setActionsBarMode('hidden');
+
+    // Reset files view + remove any error
+    window.ui.resetFilesList();
+
+    // Hide list header (created by resetFilesList)
+    const listHeader = document.querySelector('.list-header');
+    listHeader?.classList.add('hidden');
+
+    // Show music view
+    if (window.musicView) {
+        window.musicView.show();
+    }
+    if (window.multiSelect) window.multiSelect.clear();
+}
+
 window.switchToFilesSection = switchToFilesSection;
 window.switchToSharedSection = switchToSharedSection;
 window.switchToFavoritesSection = switchToFavoritesSection;
 window.switchToRecentFilesSection = switchToRecentFilesSection;
 window.switchToPhotosSection = switchToPhotosSection;
 window.switchToTrashSection = switchToTrashSection;
+window.switchToMusicSection = switchToMusicSection;
 window.syncViewContainers = syncViewContainers;

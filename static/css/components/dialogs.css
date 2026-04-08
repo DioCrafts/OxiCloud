@@ -497,6 +497,13 @@
     font-size: 20px;
 }
 
+/* Playlist track count in selector */
+.playlist-track-count {
+	margin-left: auto;
+	font-size: 12px;
+	color: #718096;
+}
+
 /* Custom confirm dialog */
 .confirm-dialog {
     position: fixed;

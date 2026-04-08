@@ -6,6 +6,7 @@ pub mod device_code;
 pub mod entity_errors;
 pub mod file;
 pub mod folder;
+pub mod playlist;
 pub mod session;
 pub mod share;
 pub mod trashed_item;

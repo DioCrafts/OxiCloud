@@ -490,6 +490,7 @@ pub struct FeaturesConfig {
     pub enable_file_sharing: bool,
     pub enable_trash: bool,
     pub enable_search: bool,
+    pub enable_music: bool,
 }
 
 impl Default for FeaturesConfig {
@@ -500,6 +501,7 @@ impl Default for FeaturesConfig {
             enable_file_sharing: true, // Enable file sharing by default
             enable_trash: true,        // Enable trash feature
             enable_search: true,       // Enable search feature
+            enable_music: true,        // Enable music feature
         }
     }
 }
@@ -811,6 +813,12 @@ impl AppConfig {
             && let Ok(val) = enable_search
         {
             config.features.enable_search = val;
+        }
+
+        if let Ok(enable_music) = env::var("OXICLOUD_ENABLE_MUSIC").map(|v| v.parse::<bool>())
+            && let Ok(val) = enable_music
+        {
+            config.features.enable_music = val;
         }
 
         // Storage limits

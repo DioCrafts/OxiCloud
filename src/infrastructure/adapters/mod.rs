@@ -10,7 +10,9 @@
 pub mod calendar_storage_adapter;
 pub mod contact_storage_adapter;
 pub mod error_adapters;
+pub mod music_storage_adapter;
 
 pub use calendar_storage_adapter::CalendarStorageAdapter;
 pub use contact_storage_adapter::ContactStorageAdapter;
 pub use error_adapters::IntoDomainError;
+pub use music_storage_adapter::MusicStorageAdapter;
