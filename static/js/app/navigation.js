@@ -282,14 +282,14 @@ function switchToPhotosSection() {
     const breadcrumb = document.querySelector('.breadcrumb');
     breadcrumb?.classList.add('hidden');
 
-    // Hide file containers
-    toggleFileContainer(false);
-
     // Hide actions-bar (photos has its own upload via selection bar)
     window.setActionsBarMode('hidden');
 
     //reset files view + remove any error
     window.ui.resetFilesList();
+
+    // Hide file containers
+    toggleFileContainer(false);
 
     // Show photos view
     if (window.photosView) {
@@ -306,8 +306,8 @@ function switchToTrashSection() {
     breadcrumb?.classList.add('hidden');
 
     // Show files containers (to be filled with trash)
-    const filesList = document.getElementById('files-list');
-    filesList.classList.remove('hidden');
+    // Hide file containers
+    toggleFileContainer(true);
 
     setActionsBarMode('trash');
 

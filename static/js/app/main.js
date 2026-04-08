@@ -105,7 +105,6 @@ function setActionsBarMode(mode, force = false) {
     if (mode === 'hidden') {
         elements.actionsBar.classList.add('hidden');
         elements.actionsBar.dataset.mode = 'hidden';
-        console.log('......setup actions bar to hidden');
         return;
     }
 
