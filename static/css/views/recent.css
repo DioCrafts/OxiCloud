@@ -11,7 +11,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    color: #6c757d;
+    color: var(--color-recent-muted);
     z-index: 5;
 
     [dir="rtl"] & {
@@ -27,10 +27,10 @@
 
 /* Adjustments for grid view */
 .files-grid-view .file-item.recent-item {
-    border-left: 3px solid #6c757d;
+    border-left: 3px solid var(--color-recent-border);
 
     [dir="rtl"] & {
-        border-right: 3px solid #6c757d;
+        border-right: 3px solid var(--color-recent-border);
         border-left: unset;
     }
 }
@@ -61,12 +61,12 @@
     justify-content: center;
     padding: 50px 20px;
     text-align: center;
-    color: #6c757d;
+    color: var(--color-recent-muted);
 }
 
 .recents-empty-state i {
     font-size: 48px;
-    color: #6c757d;
+    color: var(--color-recent-muted);
     margin-bottom: 20px;
     opacity: 0.6;
 }

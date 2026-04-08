@@ -17,8 +17,8 @@
 
 .trash-actions button,
 .actions-cell button {
-    background: #fff;
-    border: 1px solid #ddd;
+    background: var(--color-trash-surface);
+    border: 1px solid var(--color-trash-border);
     border-radius: 4px;
     padding: 4px 8px;
     cursor: pointer;
@@ -32,15 +32,15 @@
 
 .trash-actions button:hover,
 .actions-cell button:hover {
-    background: #f0f0f0;
+    background: var(--color-trash-empty-bg);
 }
 
 .btn-restore {
-    color: #4caf50;
+    color: var(--color-trash-restore);
 }
 
 .btn-delete {
-    color: #f44336;
+    color: var(--color-trash-delete);
 }
 
 .actions-cell {
@@ -51,18 +51,6 @@
 }
 
 .btn-danger {
-    background-color: #f44336;
-    color: white;
-}
-
-[data-theme="dark"] .trash-actions button,
-[data-theme="dark"] .actions-cell button {
-    background: #1e293b;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .trash-actions button:hover,
-[data-theme="dark"] .actions-cell button:hover {
-    background: #334155;
+    background-color: var(--color-trash-delete);
+    color: var(--color-danger-text);
 }

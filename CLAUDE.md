@@ -146,6 +146,7 @@ async function updateUser(user, role = 'viewer') { … }
 - **All colors must use `var(--*)` — no raw hex, rgb, or named colors anywhere except in `:root` declarations**
 - Mobile-first: media queries expand, they don't restrict
 - One CSS file per logical component in `/static/css/`
+- [data-theme="dark"] is permitted only in /static/css/themes/dark.css
 
 # What Claude must NOT do
 - Edit `Cargo.lock` directly

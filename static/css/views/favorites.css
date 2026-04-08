@@ -11,7 +11,7 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    color: #ccc;
+    color: var(--color-device-verify-dim);
     cursor: pointer;
     z-index: 5;
     transition: all 0.2s ease;
@@ -27,8 +27,8 @@
 }
 
 .favorite-indicator.active {
-    color: #ffc107;
-    text-shadow: 0 0 5px rgba(255, 193, 7, 0.5);
+    color: var(--color-warning-text);
+    text-shadow: 0 0 5px var(--color-warning-shadow);
 }
 
 /* Styles for the favorites view items */
@@ -38,10 +38,10 @@
 
 /* Adjustments for grid view */
 .file-item.favorite-item {
-    border-left: 3px solid #ffc107;
+    border-left: 3px solid var(--color-warning-border);
 
     [dir="rtl"] & {
-        border-right: 3px solid #ffc107;
+        border-right: 3px solid var(--color-warning-border);
         border-left: unset;
     }
 }
@@ -72,12 +72,12 @@
     justify-content: center;
     padding: 50px 20px;
     text-align: center;
-    color: #6c757d;
+    color: var(--color-text-gray);
 }
 
 .favorites-empty-state i {
     font-size: 48px;
-    color: #ffc107;
+    color: var(--color-warning-text);
     margin-bottom: 20px;
     opacity: 0.6;
 }
@@ -119,11 +119,11 @@
 
 /* List view: small star next to the name */
 .favorite-star-inline {
-    color: #ffc107;
+    color: var(--color-warning-text);
     font-size: 11px;
     margin-left: 6px;
     vertical-align: middle;
-    filter: drop-shadow(0 0 1px rgba(255, 193, 7, 0.4));
+    filter: drop-shadow(0 0 1px var(--color-device-verify-drop-shadow));
 
     [dir="rtl"] & {
         margin-left: 0;

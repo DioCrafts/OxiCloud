@@ -12,8 +12,8 @@
 .files-loading-spinner .spinner {
     width: 36px;
     height: 36px;
-    border: 3px solid #e2e8f0;
-    border-top-color: #ff5e3a;
+    border: 3px solid var(--color-border);
+    border-top-color: var(--color-accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
 }
@@ -26,17 +26,17 @@
 
 .files-loading-spinner span {
     font-size: 14px;
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
     font-weight: 500;
 }
 
 .dropzone {
-    border: 2px dashed #ddd;
+    border: 2px dashed var(--color-border-ddd);
     border-radius: 8px;
     padding: 20px;
     text-align: center;
     margin: 20px 0;
-    color: #666;
+    color: var(--color-text-medium);
     display: none;
 }
 
@@ -46,8 +46,8 @@
 }
 
 .dropzone.active {
-    border-color: #ff5e3a;
-    background-color: rgba(255, 94, 58, 0.05);
+    border-color: var(--color-accent);
+    background-color: var(--color-accent-ring-xs);
 }
 
 .upload-progress {
@@ -57,7 +57,7 @@
 }
 
 .progress-bar {
-    background-color: #f0f0f0;
+    background-color: var(--color-bg-empty);
     height: 6px;
     border-radius: 3px;
     overflow: hidden;
@@ -65,17 +65,7 @@
 
 .progress-fill {
     height: 100%;
-    background-color: #ff5e3a;
+    background-color: var(--color-accent);
     width: 0%;
     transition: width 0.3s;
-}
-
-[data-theme="dark"] .dropzone {
-    border-color: #475569;
-    color: #94a3b8;
-    background-color: #0f172a;
-}
-
-[data-theme="dark"] .progress-bar {
-    background-color: #334155;
 }
