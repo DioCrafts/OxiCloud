@@ -1,3 +1,4 @@
+pub mod audio_metadata_service;
 pub mod chunked_upload_service;
 pub mod compression_service;
 pub mod dedup_service;

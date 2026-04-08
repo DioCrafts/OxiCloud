@@ -148,6 +148,7 @@
 }
 
 .nav-item i,
+.nav-item .nav-icon,
 .nav-item .oxi-icon {
     margin-right: 14px;
     width: 20px;

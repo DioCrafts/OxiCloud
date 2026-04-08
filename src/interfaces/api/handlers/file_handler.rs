@@ -18,6 +18,7 @@ use crate::application::ports::file_ports::{
 use crate::application::ports::storage_ports::{FileReadPort, StorageUsagePort};
 use crate::application::ports::thumbnail_ports::ThumbnailPort;
 use crate::common::di::AppState;
+use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
@@ -746,6 +747,19 @@ impl FileHandler {
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
                 thumbnail_service.generate_all_sizes_background(file_id, file_path);
             });
+        }
+
+        // Extract audio metadata for supported audio files in background.
+        if let Some(ref audio_service) = state.applications.audio_metadata_service
+            && AudioMetadataService::is_audio_file(&file.mime_type)
+            && let Ok(file_id) = uuid::Uuid::parse_str(&file.id)
+        {
+            let file_path = state.core.dedup_service.blob_path(&blob_hash);
+            AudioMetadataService::spawn_extraction_background(
+                audio_service.clone(),
+                file_id,
+                file_path,
+            );
         }
 
         Self::created_json_response(&file).into_response()

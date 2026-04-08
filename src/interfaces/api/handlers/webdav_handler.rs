@@ -27,6 +27,7 @@ use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::application::services::file_retrieval_service::FileRetrievalService;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState;
+use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::infrastructure::services::path_resolver_service::ResolvedResource;
 use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::{AuthUser, CurrentUser};
@@ -957,10 +958,25 @@ async fn handle_put(
     let _ = tokio::fs::remove_file(&temp_path).await;
 
     match result {
-        Ok(_) => Ok(Response::builder()
-            .status(StatusCode::NO_CONTENT)
-            .body(Body::empty())
-            .unwrap()),
+        Ok(file_dto) => {
+            // Extract audio metadata for supported audio files in background.
+            if let Some(ref audio_service) = state.applications.audio_metadata_service
+                && AudioMetadataService::is_audio_file(&file_dto.mime_type)
+                && let Ok(file_id) = Uuid::parse_str(&file_dto.id)
+            {
+                let file_path = state.core.dedup_service.blob_path(&file_dto.etag);
+                AudioMetadataService::spawn_extraction_background(
+                    audio_service.clone(),
+                    file_id,
+                    file_path,
+                );
+            }
+
+            Ok(Response::builder()
+                .status(StatusCode::NO_CONTENT)
+                .body(Body::empty())
+                .unwrap())
+        }
         Err(e) => Err(AppError::internal_error(format!(
             "Failed to put file: {}",
             e

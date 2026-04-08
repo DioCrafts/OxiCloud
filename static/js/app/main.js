@@ -618,7 +618,11 @@ function setupEventListeners() {
                     switchToPhotosSection();
                     break;
 
-                case 'nav.trash':
+                case 'nav.music':
+                    switchToMusicSection();
+                    break;
+
+                case 'nav.trash': 
                     switchToTrashSection();
                     break;
 

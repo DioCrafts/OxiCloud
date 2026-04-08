@@ -354,6 +354,44 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
         tracing::warn!("Trash service not available - trash view will not work");
     }
 
+    // Music/Playlist routes
+    if let Some(ref music_svc) = app_state.music_service {
+        use crate::interfaces::api::handlers::music_handler;
+
+        let music_router = Router::new()
+            .route("/", post(music_handler::create_playlist))
+            .route("/", get(music_handler::list_playlists))
+            .route("/{playlist_id}", get(music_handler::get_playlist))
+            .route("/{playlist_id}", put(music_handler::update_playlist))
+            .route(
+                "/{playlist_id}",
+                axum::routing::delete(music_handler::delete_playlist),
+            )
+            .route(
+                "/{playlist_id}/tracks",
+                get(music_handler::list_playlist_tracks),
+            )
+            .route("/{playlist_id}/tracks", post(music_handler::add_tracks))
+            .route(
+                "/{playlist_id}/tracks/{file_id}",
+                axum::routing::delete(music_handler::remove_track),
+            )
+            .route("/{playlist_id}/reorder", put(music_handler::reorder_tracks))
+            .route("/{playlist_id}/share", post(music_handler::share_playlist))
+            .route(
+                "/{playlist_id}/share/{user_id}",
+                axum::routing::delete(music_handler::remove_share),
+            )
+            .route(
+                "/{playlist_id}/shares",
+                get(music_handler::get_playlist_shares),
+            )
+            .with_state(music_svc.clone());
+
+        router = router.nest("/playlists", music_router);
+        tracing::info!("Music routes initialized");
+    }
+
     // NOTE: WebDAV routes are mounted at top-level (/webdav) in main.rs
     // for client compatibility, NOT under /api.
 
