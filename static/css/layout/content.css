@@ -13,6 +13,15 @@
     color: #2d3748;
 }
 
+.page-sticky-header {
+    position: sticky;
+    margin: 0px;
+    padding: 10px 0px;
+    top: -20px; /* due to padding top of content-area */
+    background-color: var(--color-bg-page);
+    z-index: 100; /* ensure header is above image preview */
+}
+
 .actions-bar {
     display: flex;
     justify-content: space-between;
