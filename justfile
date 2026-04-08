@@ -45,3 +45,13 @@ db:
 
 db-down:
     docker compose down
+
+# start OxiCloud with static assets in no-cache mode
+front-dev:
+    PROFILE=dev cargo run
+
+front-fmt:
+    biome format static/
+
+front-lint:
+    biome lint static/

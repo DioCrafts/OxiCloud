@@ -1,0 +1,28 @@
+# .claudeignore
+node_modules/
+target/
+coverage/
+storage/
+
+# Secrets
+.env
+.env.local
+.env.production
+.jwt_secret
+*.pem
+*.key
+secrets.json
+
+# Logs
+*.log
+logs/
+
+
+# scm
+.git/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
