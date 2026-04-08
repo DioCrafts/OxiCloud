@@ -2,7 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Build & Dev Commands
+# Architecture
+
+This project is split into two parts:
+- `/src` — OxiCloud Backend server in **Rust**
+- `/static` — Oxicloud Frontend in **vanilla CSS & vanilla JavaScript**
+
+# Backend part
+
+## Backend Build & Dev Commands
 
 ```bash
 cargo build                          # Dev build
@@ -20,12 +28,11 @@ cargo run --bin generate-openapi     # Regenerate resources/gen/openapi.json
 
 A `justfile` is available for common tasks (`just --list` to see all). Key recipes: `just check` (fmt + clippy), `just test`, `just openapi`.
 
-
 Requires **Rust 1.93+** (edition 2024) and **PostgreSQL 13+** (with `pg_trgm` and `ltree` extensions).
 
 Database setup: `docker compose up -d postgres` — schema is applied automatically via sqlx migrations on app startup. Migration files live in `migrations/`. For local dev, set `DATABASE_URL` in `.env` (see `example.env`).
 
-## Pre-commit checks
+## Backend Pre-commit checks
 
 Always run these before committing, in this order:
 
@@ -36,7 +43,7 @@ cargo clippy -- -D warnings          # Lint (must pass with zero warnings)
 
 CI enforces both — commits that fail either check will not merge.
 
-## Architecture
+## Backend Architecture
 
 Hexagonal / Clean Architecture with four layers. Dependencies point inward only.
 
@@ -104,3 +111,46 @@ The server exposes multiple protocol interfaces simultaneously:
 ### Test organization
 
 Tests are primarily `#[cfg(test)]` modules within source files (~36 files have inline tests). Dedicated test files exist at `*_test.rs` alongside their source. The `test_utils` feature flag enables `mockall` mock generation for trait-heavy testing. No separate `tests/` directory.
+
+# Frontend part
+
+## Code conventions
+
+### Javascript
+
+- ES Modules (import/export), no CommonJS
+- No frameworks — vanilla JS only
+- Naming: `camelCase` for variables/functions, `PascalCase` for classes
+- No `var` — use `const`/`let` only
+- **JSDoc required** on all public functions — `jsconfig.json` enables `checkJs` globally (equivalent to `@ts-check` on every file)
+- Type parameters, return types, and complex types via `@typedef`:
+
+```js
+/**
+ * @typedef {Object} User
+ * @property {number} id
+ * @property {string} name
+ */
+
+/**
+ * @param {User} user
+ * @param {string} [role="viewer"]
+ * @returns {Promise}
+ */
+async function updateUser(user, role = 'viewer') { … }
+```
+
+### CSS
+- BEM methodology for class names (`.block__element--modifier`)
+- CSS custom properties in `:root` for colors and spacing
+- **All colors must use `var(--*)` — no raw hex, rgb, or named colors anywhere except in `:root` declarations**
+- Mobile-first: media queries expand, they don't restrict
+- One CSS file per logical component in `/static/css/`
+
+# What Claude must NOT do
+- Edit `Cargo.lock` directly
+- Use npm dependencies not listed in this file
+- Introduce a JS framework (React, Vue, etc.) without explicit approval
+- Leave debug `console.log` statements in code
+- Use raw color values in CSS — always use CSS custom properties
+- Commit without passing all linters
