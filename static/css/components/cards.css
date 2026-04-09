@@ -178,30 +178,33 @@
     border: 2px dashed var(--color-warning-border);
 }
 
-/* ensure icon centered */
-.files-grid-view .file-item .name-cell .file-icon {
-    margin: auto;
+.file-icon {
+    width: 100px;
+    height: 70px;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
 }
 
+.files-grid-view .file-icon {
+    margin: auto;
+    margin-bottom: 10px;
+}
 /* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
    CSS shapes (::before / ::after) already convey the file type visually.
    Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
    List-view icons (.file-item .file-icon) are NOT affected. */
 .files-grid-view .file-item .file-icon > i,
 .files-grid-view .file-item .file-icon > svg {
+    /* biome-ignore lint/complexity/noImportantStyles: <explanation> */
     display: none !important;
 }
 
 .file-icon.folder-icon {
-    width: 100px;
-    height: 70px;
-    background-color: var(--color-warning-bg);
-    border-radius: 8px;
-    position: relative;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background-color: var(--color-ft-folder-bg);
 }
 
 .file-icon.folder-icon::before {
@@ -211,21 +214,13 @@
     left: 0;
     right: 0;
     height: 20px;
-    background-color: var(--color-warning-bg-dark);
+    background-color: var(--color-ft-folder-tab);
     border-radius: 8px 8px 0 0;
 }
 
 .file-icon.pdf-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-error-bg);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-danger-text-alt);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.pdf-icon::after {
@@ -238,14 +233,8 @@
 }
 
 .file-icon.doc-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-info-bg);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-info-border);
-    overflow: hidden;
 }
 
 .file-icon.doc-icon::before {
@@ -273,16 +262,8 @@
 }
 
 .file-icon.script-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-success-bg-green);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-success-text-green);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.script-icon::after {
@@ -295,14 +276,9 @@
 }
 
 .file-icon.config-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-neutral-bg);
-    border-radius: 4px;
-    position: relative;
     margin-bottom: 10px;
     border-top: 3px solid var(--color-text-muted);
-    overflow: hidden;
 }
 
 .file-icon.config-icon::before {
@@ -330,13 +306,7 @@
 }
 
 .file-icon.image-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-cal-2);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    overflow: hidden;
 }
 
 /* Thumbnail image inside file-icon (grid and list views) */
@@ -349,31 +319,24 @@
     object-fit: cover;
     z-index: 1;
 }
-/*
+
 .file-icon.image-icon::before {
-	content: "";
-	position: absolute;
-	top: 10px;
-	left: 15px;
-	width: 20px;
-	height: 20px;
-	background-color: var(--color-cal-4);
-	border-radius: 50%;
+    content: "";
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    width: 20px;
+    height: 20px;
+    background-color: var(--color-cal-4);
+    border-radius: 50%;
 }
-*/
+
 .file-icon.video-icon {
-    width: 100px;
-    height: 70px;
     background: var(--color-purple-bg-gradient);
-    border-radius: 10px;
-    position: relative;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     border: 1px solid var(--color-purple-border-light);
 }
 
+/* circle */
 .file-icon.video-icon::before {
     content: "";
     width: 36px;
@@ -384,6 +347,7 @@
     box-shadow: 0 3px 10px var(--color-purple-shadow);
 }
 
+/* triangle */
 .file-icon.video-icon::after {
     content: "";
     width: 0;
@@ -396,14 +360,8 @@
 }
 
 .file-icon.code-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-border);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-ft-generic-blue);
-    overflow: hidden;
 }
 
 .file-icon.code-icon::before,
@@ -622,17 +580,8 @@
 }
 
 .file-icon.spreadsheet-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-success-bg-alt);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-success-text-alt);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.spreadsheet-icon::before {
@@ -649,17 +598,8 @@
 }
 
 .file-icon.presentation-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-warning-bg-orange);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-warning-text-orange);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.presentation-icon::before {
@@ -688,17 +628,8 @@
 }
 
 .file-icon.audio-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-warning-orange-bg);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-warning-orange-text);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.audio-icon::before {
@@ -709,17 +640,8 @@
 }
 
 .file-icon.archive-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-neutral-warm-bg);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-neutral-warm-text);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.archive-icon::before {
@@ -740,17 +662,8 @@
 }
 
 .file-icon.installer-icon {
-    width: 100px;
-    height: 70px;
     background-color: var(--color-purple-bg);
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
     border-top: 3px solid var(--color-purple-text);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .file-icon.installer-icon::before {

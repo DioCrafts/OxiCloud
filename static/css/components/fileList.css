@@ -64,12 +64,14 @@
     text-align: right;
 }
 
-.files-list-view .file-item .name-cell {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    overflow: hidden;
+.files-list-view {
+    & .file-item .name-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        overflow: hidden;
+    }
 }
 
 .files-list-view .file-item .name-cell span {
