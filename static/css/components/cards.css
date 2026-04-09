@@ -22,6 +22,10 @@
     display: none;
 }
 
+.files-container {
+    padding-top: 3px; /* due to cards animation on mouse hover and page-sticky-header with a positive z-index */
+}
+
 .files-grid-view .file-item {
     background-color: white;
     border-radius: 12px;
