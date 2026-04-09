@@ -37,8 +37,8 @@
 }
 
 .sidebar-toggle:hover {
-    background-color: var(--color-bg-alt);
-    color: var(--color-accent);
+    background-color: var(--color-border);
+    border-color: var(--color-border-medium);
 }
 
 .sidebar-toggle i {

@@ -78,16 +78,6 @@
     --color-sidebar-bg-to: #0c1322;
 }
 
-/* Dark theme for mobile sidebar toggle */
-[data-theme="dark"] .sidebar-toggle {
-    color: #cbd5e1;
-}
-
-[data-theme="dark"] .sidebar-toggle:hover {
-    background-color: #334155;
-    color: #ff5e3a;
-}
-
 /* ------------ */
 
 [data-theme="dark"] ::-webkit-scrollbar-thumb {
@@ -115,34 +105,6 @@
 [data-theme="dark"] select:focus {
     border-color: #ff5e3a;
     background-color: #1e293b;
-}
-
-[data-theme="dark"] .search-container input {
-    background-color: #1e293b;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .search-container input:hover {
-    background-color: #1e293b;
-    border-color: #475569;
-}
-
-[data-theme="dark"] .search-container input:focus {
-    background-color: #1e293b;
-    border-color: #ff5e3a;
-}
-
-[data-theme="dark"] .search-container input::placeholder {
-    color: #64748b;
-}
-
-[data-theme="dark"] .search-icon {
-    color: #64748b;
-}
-
-[data-theme="dark"] .page-title {
-    color: #f1f5f9;
 }
 
 [data-theme="dark"] .breadcrumb {
