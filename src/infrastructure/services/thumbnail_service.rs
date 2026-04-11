@@ -77,9 +77,16 @@ struct ThumbnailCacheKey {
 /// Images above this are silently skipped — protects against single-image OOM.
 const MAX_DECODE_PIXELS: u64 = 50_000_000;
 
-/// Default max concurrent thumbnail decode operations.
-/// 4 × 96 MB (6000×4000 RGBA) = 384 MB worst-case peak.
-const DEFAULT_MAX_CONCURRENT_DECODES: usize = 4;
+/// Compute max concurrent thumbnail decode operations at runtime.
+/// Uses half the available CPUs (min 2) to scale with hardware while
+/// bounding peak RAM.  `available_parallelism()` respects cgroup limits
+/// (Docker/K8s) and CPU affinity masks.
+fn max_concurrent_decodes() -> usize {
+    let cpus = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4);
+    (cpus / 2).max(2)
+}
 
 /// Thumbnail service for generating and caching image thumbnails
 pub struct ThumbnailService {
@@ -134,7 +141,7 @@ impl ThumbnailService {
             thumbnails_root,
             cache,
             max_cache_bytes: max_cache_bytes as u64,
-            decode_semaphore: Arc::new(Semaphore::new(DEFAULT_MAX_CONCURRENT_DECODES)),
+            decode_semaphore: Arc::new(Semaphore::new(max_concurrent_decodes())),
             generation_timeout: generation_timeout.unwrap_or(Duration::from_secs(30)),
         }
     }
