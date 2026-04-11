@@ -386,6 +386,10 @@ pub fn create_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppState>> {
                 "/{playlist_id}/shares",
                 get(music_handler::get_playlist_shares),
             )
+            .route(
+                "/audio-metadata/{file_id}",
+                get(music_handler::get_audio_metadata),
+            )
             .with_state(music_svc.clone());
 
         router = router.nest("/playlists", music_router);

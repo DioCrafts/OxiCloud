@@ -35,6 +35,7 @@ const INDEX_VIEW_CSS: &[&str] = &[
     "views/trash.css",
     "views/photos.css",
     "views/photosLightbox.css",
+    "views/music.css",
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -82,26 +82,39 @@ const musicView = {
             return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
         };
 
+        // Empty state: no playlists at all — show full-width centered onboarding
+        if (this.playlists.length === 0) {
+            this._container.innerHTML = `
+                <div class="music-empty-state">
+                    <div class="music-empty-state-icon">
+                        <i class="fas fa-music"></i>
+                    </div>
+                    <h3 class="music-empty-state-title">${t('music.no_playlists', 'No playlists yet')}</h3>
+                    <p class="music-empty-state-desc">${t('music.empty_hint', 'Create your first playlist to start organizing your music')}</p>
+                    <button class="btn btn-primary" id="music-create-playlist-btn">
+                        <i class="fas fa-plus"></i>
+                        <span>${t('music.create_playlist', 'Create Playlist')}</span>
+                    </button>
+                </div>
+            `;
+            const createBtn = document.getElementById('music-create-playlist-btn');
+            if (createBtn) {
+                createBtn.addEventListener('click', () => this._showCreatePlaylistDialog());
+            }
+            return;
+        }
+
+        // Normal layout: sidebar + main
         this._container.innerHTML = `
-            <div class="music-toolbar">
-                <button class="btn btn-primary" id="music-create-playlist-btn">
-                    <i class="fas fa-plus"></i>
-                    <span>${t('music.create_playlist', 'Create Playlist')}</span>
-                </button>
-            </div>
             <div class="music-content">
                 <div class="music-sidebar">
                     <div class="music-sidebar-header">
                         <h3>${t('music.playlists', 'Playlists')}</h3>
+                        <button class="music-sidebar-add-btn" id="music-create-playlist-btn" title="${t('music.create_playlist', 'Create Playlist')}">
+                            <i class="fas fa-plus"></i>
+                        </button>
                     </div>
-                    <div class="music-playlist-list" id="music-playlist-list">
-                        ${this.playlists.length === 0 ? `
-                            <div class="music-empty">
-                                <i class="fas fa-music"></i>
-                                <p>${t('music.no_playlists', 'No playlists yet')}</p>
-                            </div>
-                        ` : ''}
-                    </div>
+                    <div class="music-playlist-list" id="music-playlist-list"></div>
                 </div>
                 <div class="music-main">
                     <div class="music-welcome">
@@ -111,12 +124,15 @@ const musicView = {
                     </div>
                     <div class="music-playlist-detail hidden" id="music-playlist-detail">
                         <div class="music-playlist-header">
-                            <div class="music-playlist-cover">
+                            <div class="music-playlist-cover" id="music-playlist-cover" title="${t('music.set_cover', 'Set cover')}">
                                 <i class="fas fa-music"></i>
                             </div>
                             <div class="music-playlist-info">
                                 <h2 id="music-playlist-name"></h2>
                                 <p id="music-playlist-meta"></p>
+                                <span class="music-public-badge hidden" id="music-public-badge">
+                                    <i class="fas fa-globe"></i> <span id="music-public-text">${t('music.public', 'Public')}</span>
+                                </span>
                             </div>
                         </div>
                         <div class="music-playlist-actions">
@@ -131,11 +147,17 @@ const musicView = {
                                 <i class="fas fa-plus"></i>
                                 <span>${t('music.add_tracks', 'Add Tracks')}</span>
                             </button>
-                            <button class="btn btn-secondary" id="music-edit-playlist-btn">
-                                <i class="fas fa-edit"></i>
+                            <button class="btn btn-secondary" id="music-edit-playlist-btn" title="${t('music.edit', 'Edit')}">
+                                <i class="fas fa-pen"></i>
                             </button>
-                            <button class="btn btn-secondary" id="music-share-playlist-btn">
-                                <i class="fas fa-share"></i>
+                            <button class="btn btn-secondary" id="music-share-playlist-btn" title="${t('music.share', 'Share')}">
+                                <i class="fas fa-share-alt"></i>
+                            </button>
+                            <button class="btn btn-secondary" id="music-manage-shares-btn" title="${t('music.manage_shares', 'Manage Shares')}">
+                                <i class="fas fa-users"></i>
+                            </button>
+                            <button class="btn btn-secondary" id="music-toggle-public-btn" title="${t('music.toggle_public', 'Toggle public')}">
+                                <i class="fas fa-globe"></i>
                             </button>
                             <button class="btn btn-secondary" id="music-delete-playlist-btn">
                                 <i class="fas fa-trash"></i>
@@ -155,24 +177,24 @@ const musicView = {
         const listEl = document.getElementById('music-playlist-list');
         if (!listEl) return;
 
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+
         if (this.playlists.length === 0) {
             listEl.innerHTML = `
                 <div class="music-empty">
                     <i class="fas fa-music"></i>
-                    <p>No playlists yet</p>
+                    <p>${t('music.no_playlists', 'No playlists yet')}</p>
                 </div>
             `;
             return;
         }
 
-        const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
-        };
-
         listEl.innerHTML = this.playlists.map(p => `
             <div class="music-playlist-item" data-id="${p.id}">
                 <div class="music-playlist-icon">
-                    <i class="fas fa-list"></i>
+                    <i class="fas fa-music"></i>
                 </div>
                 <div class="music-playlist-item-info">
                     <span class="music-playlist-item-name">${this._escapeHtml(p.name)}</span>
@@ -209,6 +231,36 @@ const musicView = {
         if (deleteBtn) {
             deleteBtn.addEventListener('click', () => this._deletePlaylist());
         }
+
+        const editBtn = document.getElementById('music-edit-playlist-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', () => this._showEditPlaylistDialog());
+        }
+
+        const shareBtn = document.getElementById('music-share-playlist-btn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => this._showSharePlaylistDialog());
+        }
+
+        const addTracksBtn = document.getElementById('music-add-tracks-btn');
+        if (addTracksBtn) {
+            addTracksBtn.addEventListener('click', () => this._showAddTracksDialog());
+        }
+
+        const manageSharesBtn = document.getElementById('music-manage-shares-btn');
+        if (manageSharesBtn) {
+            manageSharesBtn.addEventListener('click', () => this._showManageSharesDialog());
+        }
+
+        const togglePublicBtn = document.getElementById('music-toggle-public-btn');
+        if (togglePublicBtn) {
+            togglePublicBtn.addEventListener('click', () => this._togglePublic());
+        }
+
+        const coverEl = document.getElementById('music-playlist-cover');
+        if (coverEl) {
+            coverEl.addEventListener('click', () => this._showCoverPicker());
+        }
     },
 
     async _selectPlaylist(playlistId) {
@@ -226,7 +278,32 @@ const musicView = {
         if (detailEl) detailEl.classList.remove('hidden');
         if (nameEl) nameEl.textContent = playlist.name;
         if (metaEl) {
-            metaEl.textContent = `${playlist.track_count || 0} tracks`;
+            const t = (key, fallback = '') => {
+                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            };
+            metaEl.textContent = `${playlist.track_count || 0} ${t('music.tracks', 'tracks')}`;
+        }
+
+        // Cover art
+        const coverEl = document.getElementById('music-playlist-cover');
+        if (coverEl) {
+            if (playlist.cover_file_id) {
+                coverEl.innerHTML = `<img src="/api/files/${encodeURIComponent(playlist.cover_file_id)}" alt="" class="music-cover-img"><div class="music-cover-overlay"><i class="fas fa-camera"></i></div>`;
+            } else {
+                coverEl.innerHTML = `<i class="fas fa-music"></i><div class="music-cover-overlay"><i class="fas fa-camera"></i></div>`;
+            }
+        }
+
+        // Public badge
+        const publicBadge = document.getElementById('music-public-badge');
+        if (publicBadge) {
+            publicBadge.classList.toggle('hidden', !playlist.is_public);
+        }
+        const togglePublicBtn = document.getElementById('music-toggle-public-btn');
+        if (togglePublicBtn) {
+            const t2 = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            togglePublicBtn.title = playlist.is_public ? t2('music.make_private', 'Make private') : t2('music.make_public', 'Make public');
+            togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
 
         document.querySelectorAll('.music-playlist-item').forEach(item => {
@@ -278,14 +355,17 @@ const musicView = {
 
         trackListEl.innerHTML = `
             <div class="music-track-header">
+                <span class="music-track-col music-track-drag"></span>
                 <span class="music-track-col music-track-num">#</span>
                 <span class="music-track-col music-track-title">${t('music.title', 'Title')}</span>
                 <span class="music-track-col music-track-artist">${t('music.artist', 'Artist')}</span>
                 <span class="music-track-col music-track-album">${t('music.album', 'Album')}</span>
                 <span class="music-track-col music-track-duration"><i class="far fa-clock"></i></span>
+                <span class="music-track-col music-track-actions"></span>
             </div>
             ${this.currentTracks.map((track, idx) => `
-                <div class="music-track ${musicPlayer.currentTrack?.id === track.id ? 'playing' : ''}" data-idx="${idx}" data-id="${track.id}" data-file-id="${track.file_id}">
+                <div class="music-track ${musicPlayer.currentTrack?.id === track.id ? 'playing' : ''}" data-idx="${idx}" data-id="${track.id}" data-file-id="${track.file_id}" draggable="true">
+                    <span class="music-track-col music-track-drag"><i class="fas fa-grip-vertical"></i></span>
                     <span class="music-track-col music-track-num">
                         <span class="track-num-text">${idx + 1}</span>
                         <i class="fas fa-play track-play-icon hidden"></i>
@@ -297,6 +377,9 @@ const musicView = {
                     <span class="music-track-col music-track-artist">${this._escapeHtml(track.artist || t('music.unknown_artist', 'Unknown Artist'))}</span>
                     <span class="music-track-col music-track-album">${this._escapeHtml(track.album || '-')}</span>
                     <span class="music-track-col music-track-duration">${this._formatDuration(track.duration_secs)}</span>
+                    <span class="music-track-col music-track-actions">
+                        <button class="music-track-remove-btn" title="${t('music.remove', 'Remove')}"><i class="fas fa-times"></i></button>
+                    </span>
                 </div>
             `).join('')}
         `;
@@ -305,20 +388,72 @@ const musicView = {
         trackListEl.querySelectorAll('.music-track').forEach(row => {
             row.addEventListener('click', () => {
                 const idx = parseInt(row.dataset.idx);
-                self._playTrack(idx);
+                // Toggle selection
+                trackListEl.querySelectorAll('.music-track').forEach(r => {
+                    if (r !== row) r.classList.remove('selected');
+                });
+                row.classList.toggle('selected');
+                self.selected.clear();
+                if (row.classList.contains('selected')) {
+                    self.selected.add(idx);
+                }
             });
-            
-            row.addEventListener('dblclick', () => {
+
+            row.addEventListener('dblclick', (e) => {
+                e.preventDefault();
                 const idx = parseInt(row.dataset.idx);
                 self._playTrack(idx);
             });
+
+            // Drag & drop
+            row.addEventListener('dragstart', (e) => {
+                row.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', row.dataset.idx);
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                trackListEl.querySelectorAll('.music-track').forEach(r => r.classList.remove('drag-over'));
+            });
+            row.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                const dragging = trackListEl.querySelector('.dragging');
+                if (dragging && dragging !== row) {
+                    row.classList.add('drag-over');
+                }
+            });
+            row.addEventListener('dragleave', () => {
+                row.classList.remove('drag-over');
+            });
+            row.addEventListener('drop', (e) => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIdx = parseInt(row.dataset.idx);
+                if (fromIdx !== toIdx) {
+                    self._reorderTrack(fromIdx, toIdx);
+                }
+            });
+
+            // Remove track button
+            const removeBtn = row.querySelector('.music-track-remove-btn');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    self._removeTrackFromPlaylist(row.dataset.id, row.dataset.fileId);
+                });
+            }
         });
     },
 
     _playTrack(idx) {
         if (!this.currentTracks[idx]) return;
-        
-        musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || 'Playlist');
+
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+        musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || t('music.playlists', 'Playlist'));
         musicPlayer.playTrack(idx);
     },
 
@@ -330,24 +465,43 @@ const musicView = {
 
     _shufflePlay() {
         if (this.currentTracks.length > 0) {
-            const shuffled = [...this.currentTracks].sort(() => Math.random() - 0.5);
-            musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || 'Shuffle');
+            const shuffled = [...this.currentTracks];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            const t = (key, fallback = '') => {
+                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            };
+            musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || t('music.shuffle', 'Shuffle'));
             musicPlayer.playTrack(0);
         }
     },
 
-    _showCreatePlaylistDialog() {
+    async _showCreatePlaylistDialog() {
         const t = (key, fallback = '') => {
             return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
         };
 
-        const name = prompt(t('music.playlist_name', 'Playlist name:'));
+        if (!window.Modal) return;
+        const name = await window.Modal.prompt({
+            title: t('music.create_playlist', 'Create Playlist'),
+            label: t('music.playlist_name', 'Playlist name'),
+            placeholder: t('music.playlist_name', 'Playlist name'),
+            icon: 'fa-music',
+            confirmText: t('music.create', 'Create')
+        });
         if (!name || !name.trim()) return;
 
         this._createPlaylist(name.trim());
     },
 
     async _createPlaylist(name) {
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+        const createBtn = document.getElementById('music-create-playlist-btn');
+        if (createBtn) createBtn.disabled = true;
         try {
             const resp = await fetch('/api/playlists', {
                 method: 'POST',
@@ -360,11 +514,18 @@ const musicView = {
 
             const playlist = await resp.json();
             this.playlists.unshift(playlist);
-            this._renderPlaylistList();
+            this._renderPlaylists();
             this._selectPlaylist(playlist.id);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.create_playlist', 'Create Playlist'), text: name });
+            }
         } catch (err) {
             console.error('Create playlist error:', err);
-            alert('Failed to create playlist: ' + err.message);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        } finally {
+            if (createBtn) createBtn.disabled = false;
         }
     },
 
@@ -374,8 +535,22 @@ const musicView = {
         };
 
         if (!this.currentPlaylist) return;
-        if (!confirm(t('music.confirm_delete', 'Delete this playlist?'))) return;
 
+        const confirmed = await new Promise(resolve => {
+            if (!window.Modal) { resolve(confirm(t('music.confirm_delete', 'Delete this playlist?'))); return; }
+            window.Modal.prompt({
+                title: t('music.delete', 'Delete'),
+                label: t('music.confirm_delete', 'Delete this playlist?'),
+                placeholder: '',
+                value: this.currentPlaylist.name,
+                icon: 'fa-trash',
+                confirmText: t('music.delete', 'Delete')
+            }).then(val => resolve(val !== null));
+        });
+        if (!confirmed) return;
+
+        const deleteBtn = document.getElementById('music-delete-playlist-btn');
+        if (deleteBtn) deleteBtn.disabled = true;
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
                 method: 'DELETE',
@@ -385,13 +560,21 @@ const musicView = {
 
             if (!resp.ok) throw new Error('Failed to delete playlist');
 
+            const deletedName = this.currentPlaylist.name;
             this.playlists = this.playlists.filter(p => p.id !== this.currentPlaylist.id);
             this.currentPlaylist = null;
             this.currentTracks = [];
             this._renderPlaylists();
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.delete', 'Delete'), text: deletedName });
+            }
         } catch (err) {
             console.error('Delete playlist error:', err);
-            alert('Failed to delete playlist: ' + err.message);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        } finally {
+            if (deleteBtn) deleteBtn.disabled = false;
         }
     },
 
@@ -427,6 +610,451 @@ const musicView = {
                 <p>${this._escapeHtml(message)}</p>
             </div>
         `;
+    },
+
+    async _showEditPlaylistDialog() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+
+        if (!window.Modal) return;
+        const newName = await window.Modal.prompt({
+            title: t('music.edit', 'Edit'),
+            label: t('music.playlist_name', 'Playlist name'),
+            placeholder: t('music.playlist_name', 'Playlist name'),
+            value: this.currentPlaylist.name,
+            icon: 'fa-pen',
+            confirmText: t('actions.confirm', 'Save')
+        });
+        if (!newName || !newName.trim() || newName.trim() === this.currentPlaylist.name) return;
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: this._headers(true),
+                body: JSON.stringify({ name: newName.trim() })
+            });
+
+            if (!resp.ok) throw new Error('Failed to update playlist');
+
+            this.currentPlaylist.name = newName.trim();
+            const idx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+            if (idx !== -1) this.playlists[idx].name = newName.trim();
+
+            const nameEl = document.getElementById('music-playlist-name');
+            if (nameEl) nameEl.textContent = newName.trim();
+            this._renderPlaylistList();
+        } catch (err) {
+            console.error('Edit playlist error:', err);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        }
+    },
+
+    async _showSharePlaylistDialog() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+
+        if (!window.Modal) return;
+        const userId = await window.Modal.prompt({
+            title: t('music.share', 'Share'),
+            label: t('music.share_with_user', 'User ID or email'),
+            placeholder: t('music.share_with_user', 'User ID or email'),
+            icon: 'fa-share-alt',
+            confirmText: t('music.share', 'Share')
+        });
+        if (!userId || !userId.trim()) return;
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: this._headers(true),
+                body: JSON.stringify({ user_id: userId.trim(), can_write: false })
+            });
+
+            if (!resp.ok) throw new Error('Failed to share playlist');
+
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.share', 'Share'), text: t('music.added', 'Added!') });
+            }
+        } catch (err) {
+            console.error('Share playlist error:', err);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        }
+    },
+
+    async _showAddTracksDialog() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+
+        // Create a file picker input for audio files
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'audio/*';
+        input.multiple = true;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            const files = Array.from(input.files);
+            input.remove();
+            if (files.length === 0) return;
+
+            // Upload each file first, then add to playlist
+            const fileIds = [];
+            for (const file of files) {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const folderId = window.app?.currentPath || window.app?.userHomeFolderId || '';
+                    formData.append('folder_id', folderId);
+
+                    const uploadResp = await fetch('/api/files/upload', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: typeof getCsrfHeaders === 'function' ? getCsrfHeaders() : {},
+                        body: formData
+                    });
+
+                    if (!uploadResp.ok) throw new Error(`Upload failed: ${file.name}`);
+                    const uploaded = await uploadResp.json();
+                    if (uploaded.id) fileIds.push(uploaded.id);
+                } catch (err) {
+                    console.error('Upload error:', err);
+                }
+            }
+
+            if (fileIds.length === 0) return;
+
+            try {
+                const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: this._headers(true),
+                    body: JSON.stringify({ file_ids: fileIds })
+                });
+
+                if (!resp.ok) throw new Error('Failed to add tracks');
+
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.add_tracks', 'Add Tracks'), text: `${fileIds.length} ${t('music.added_to_playlist', 'added to playlist')}` });
+                }
+
+                await this._loadPlaylistTracks(this.currentPlaylist.id);
+                // Update track count
+                const playlist = this.playlists.find(p => p.id === this.currentPlaylist.id);
+                if (playlist) {
+                    playlist.track_count = (playlist.track_count || 0) + fileIds.length;
+                    this.currentPlaylist.track_count = playlist.track_count;
+                    this._renderPlaylistList();
+                    const metaEl = document.getElementById('music-playlist-meta');
+                    if (metaEl) metaEl.textContent = `${playlist.track_count} ${t('music.tracks', 'tracks')}`;
+                }
+            } catch (err) {
+                console.error('Add tracks error:', err);
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: t('music.add_error', 'Could not add tracks to playlist') });
+                }
+            }
+        });
+
+        input.click();
+    },
+
+    async _removeTrackFromPlaylist(trackId, fileId) {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks/${encodeURIComponent(fileId)}`, {
+                method: 'DELETE',
+                credentials: 'include',
+                headers: this._headers()
+            });
+            if (!resp.ok) throw new Error('Failed to remove track');
+
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.remove', 'Remove'), text: t('music.track_removed', 'Track removed') });
+            }
+            await this._loadPlaylistTracks(this.currentPlaylist.id);
+            const playlist = this.playlists.find(p => p.id === this.currentPlaylist.id);
+            if (playlist) {
+                playlist.track_count = Math.max(0, (playlist.track_count || 1) - 1);
+                this.currentPlaylist.track_count = playlist.track_count;
+                this._renderPlaylistList();
+                const metaEl = document.getElementById('music-playlist-meta');
+                if (metaEl) metaEl.textContent = `${playlist.track_count} ${t('music.tracks', 'tracks')}`;
+            }
+        } catch (err) {
+            console.error('Remove track error:', err);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        }
+    },
+
+    async _reorderTrack(fromIdx, toIdx) {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+
+        const tracks = [...this.currentTracks];
+        const [moved] = tracks.splice(fromIdx, 1);
+        tracks.splice(toIdx, 0, moved);
+        this.currentTracks = tracks;
+        this._renderTracks();
+
+        const itemIds = tracks.map(tr => tr.id);
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/reorder`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: this._headers(true),
+                body: JSON.stringify({ item_ids: itemIds })
+            });
+            if (!resp.ok) throw new Error('Failed to reorder tracks');
+        } catch (err) {
+            console.error('Reorder error:', err);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+            await this._loadPlaylistTracks(this.currentPlaylist.id);
+        }
+    },
+
+    async _showManageSharesDialog() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+
+        const existing = document.getElementById('music-shares-dialog');
+        if (existing) existing.remove();
+
+        const dialog = document.createElement('div');
+        dialog.id = 'music-shares-dialog';
+        dialog.className = 'music-shares-overlay';
+        dialog.innerHTML = `
+            <div class="music-shares-panel">
+                <div class="music-shares-header">
+                    <h3><i class="fas fa-users"></i> ${t('music.manage_shares', 'Manage Shares')}</h3>
+                    <button class="music-shares-close-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="music-shares-body">
+                    <div class="music-shares-loading"><i class="fas fa-spinner fa-spin"></i></div>
+                </div>
+                <div class="music-shares-add">
+                    <input type="text" id="music-share-user-input" placeholder="${t('music.share_with_user', 'User ID or email')}" class="music-shares-input">
+                    <label class="music-shares-write-label">
+                        <input type="checkbox" id="music-share-write-input"> ${t('music.can_write', 'Can edit')}
+                    </label>
+                    <button class="btn btn-primary btn-sm" id="music-share-add-btn">
+                        <i class="fas fa-plus"></i> ${t('music.share', 'Share')}
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
+
+        dialog.querySelector('.music-shares-close-btn').addEventListener('click', () => dialog.remove());
+        dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.remove(); });
+
+        dialog.querySelector('#music-share-add-btn').addEventListener('click', async () => {
+            const userInput = dialog.querySelector('#music-share-user-input');
+            const writeInput = dialog.querySelector('#music-share-write-input');
+            const userId = userInput.value.trim();
+            if (!userId) return;
+
+            try {
+                const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: this._headers(true),
+                    body: JSON.stringify({ user_id: userId, can_write: writeInput.checked })
+                });
+                if (!resp.ok) throw new Error('Failed to share');
+                userInput.value = '';
+                writeInput.checked = false;
+                this._loadSharesList(dialog);
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.share', 'Share'), text: t('music.added', 'Added!') });
+                }
+            } catch (err) {
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                }
+            }
+        });
+
+        this._loadSharesList(dialog);
+    },
+
+    async _loadSharesList(dialog) {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const body = dialog.querySelector('.music-shares-body');
+        if (!body) return;
+
+        body.innerHTML = '<div class="music-shares-loading"><i class="fas fa-spinner fa-spin"></i></div>';
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/shares`, {
+                credentials: 'include',
+                headers: this._headers()
+            });
+            if (!resp.ok) throw new Error('Failed to load shares');
+            const shares = await resp.json();
+
+            if (shares.length === 0) {
+                body.innerHTML = `<p class="music-shares-empty">${t('music.no_shares', 'No shares yet')}</p>`;
+                return;
+            }
+
+            body.innerHTML = shares.map(s => `
+                <div class="music-share-item" data-user-id="${this._escapeHtml(s.user_id)}">
+                    <span class="music-share-user"><i class="fas fa-user"></i> ${this._escapeHtml(s.user_id)}</span>
+                    <span class="music-share-perm">${s.can_write ? t('music.can_write', 'Can edit') : t('music.read_only', 'Read only')}</span>
+                    <button class="music-share-remove-btn" title="${t('music.remove_share', 'Remove share')}"><i class="fas fa-times"></i></button>
+                </div>
+            `).join('');
+
+            body.querySelectorAll('.music-share-remove-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const item = btn.closest('.music-share-item');
+                    const userId = item.dataset.userId;
+                    await this._removeShare(userId, dialog);
+                });
+            });
+        } catch (err) {
+            body.innerHTML = `<p class="music-shares-empty">${this._escapeHtml(err.message)}</p>`;
+        }
+    },
+
+    async _removeShare(userId, dialog) {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share/${encodeURIComponent(userId)}`, {
+                method: 'DELETE',
+                credentials: 'include',
+                headers: this._headers()
+            });
+            if (!resp.ok) throw new Error('Failed to remove share');
+            this._loadSharesList(dialog);
+        } catch (err) {
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        }
+    },
+
+    async _togglePublic() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const newValue = !this.currentPlaylist.is_public;
+
+        try {
+            const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: this._headers(true),
+                body: JSON.stringify({ is_public: newValue })
+            });
+            if (!resp.ok) throw new Error('Failed to update playlist');
+
+            this.currentPlaylist.is_public = newValue;
+            const idx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+            if (idx !== -1) this.playlists[idx].is_public = newValue;
+
+            const badge = document.getElementById('music-public-badge');
+            if (badge) badge.classList.toggle('hidden', !newValue);
+
+            const btn = document.getElementById('music-toggle-public-btn');
+            if (btn) {
+                btn.title = newValue ? t('music.make_private', 'Make private') : t('music.make_public', 'Make public');
+                btn.classList.toggle('active', newValue);
+            }
+
+            if (window.notifications) {
+                const status = newValue ? t('music.public', 'Public') : t('music.private', 'Private');
+                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.toggle_public', 'Visibility'), text: status });
+            }
+        } catch (err) {
+            console.error('Toggle public error:', err);
+            if (window.notifications) {
+                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+            }
+        }
+    },
+
+    async _showCoverPicker() {
+        if (!this.currentPlaylist) return;
+        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            const file = input.files[0];
+            input.remove();
+            if (!file) return;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const folderId = window.app?.currentPath || window.app?.userHomeFolderId || '';
+                formData.append('folder_id', folderId);
+
+                const uploadResp = await fetch('/api/files/upload', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: typeof getCsrfHeaders === 'function' ? getCsrfHeaders() : {},
+                    body: formData
+                });
+                if (!uploadResp.ok) throw new Error('Upload failed');
+                const uploaded = await uploadResp.json();
+                if (!uploaded.id) throw new Error('No file ID returned');
+
+                const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: this._headers(true),
+                    body: JSON.stringify({ cover_file_id: uploaded.id })
+                });
+                if (!resp.ok) throw new Error('Failed to set cover');
+
+                this.currentPlaylist.cover_file_id = uploaded.id;
+                const plIdx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+                if (plIdx !== -1) this.playlists[plIdx].cover_file_id = uploaded.id;
+
+                const coverEl = document.getElementById('music-playlist-cover');
+                if (coverEl) {
+                    coverEl.innerHTML = `<img src="/api/files/${encodeURIComponent(uploaded.id)}" alt="" class="music-cover-img"><div class="music-cover-overlay"><i class="fas fa-camera"></i></div>`;
+                }
+
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.set_cover', 'Set cover'), text: t('music.cover_updated', 'Cover updated') });
+                }
+            } catch (err) {
+                console.error('Cover upload error:', err);
+                if (window.notifications) {
+                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                }
+            }
+        });
+
+        input.click();
     }
 };
 
@@ -514,11 +1142,14 @@ const musicPlayer = {
                     <i class="fas fa-list"></i>
                 </button>
                 <button class="player-btn player-btn-small" id="player-vol-btn" title="${i18n?.t('music.volume', 'Volume') || 'Volume'}">
-                    <i class="fas fa-volume"></i>
+                    <i class="fas fa-volume-up"></i>
                 </button>
                 <div class="player-volume-slider" id="player-volume-slider">
                     <input type="range" min="0" max="100" value="70" id="player-volume-input">
                 </div>
+                <button class="player-btn player-btn-small player-close-btn" id="player-close-btn" title="${i18n?.t('actions.close', 'Close') || 'Close'}">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="player-queue hidden" id="player-queue">
                 <div class="player-queue-header">
@@ -595,6 +1226,24 @@ const musicPlayer = {
                 }
             });
         }
+
+        const closeBtn = document.getElementById('player-close-btn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closePlayer());
+        }
+    },
+
+    closePlayer() {
+        this.audio.pause();
+        this.audio.src = '';
+        this.isPlaying = false;
+        this.currentTrack = null;
+        this.currentIndex = -1;
+        this.queue = [];
+        this._updateUI();
+        this._updateQueueUI();
+        this._toggleQueue(false);
+        document.body.classList.remove('music-player-active');
     },
 
     setQueue(tracks, playlistName = '') {
@@ -816,6 +1465,13 @@ const musicPlayer = {
         console.error('Audio error:', e);
         this.isPlaying = false;
         this._updateUI();
+        const t = (key, fallback = '') => {
+            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        };
+        if (window.notifications) {
+            const trackName = this.currentTrack?.title || this.currentTrack?.file_name || t('music.unknown_title', 'Unknown');
+            window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: `${t('music.playback_error', 'Playback failed')}: ${trackName}` });
+        }
     },
 
     _updateUI() {
@@ -837,9 +1493,12 @@ const musicPlayer = {
         }
 
         if (trackName) {
+            const t = (key, fallback = '') => {
+                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            };
             trackName.textContent = this.currentTrack 
-                ? (this.currentTrack.title || this.currentTrack.file_name || 'Unknown')
-                : (i18n?.t('music.not_playing', 'Not playing') || 'Not playing');
+                ? (this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown'))
+                : t('music.not_playing', 'Not playing');
         }
 
         if (trackArtist) {
@@ -874,7 +1533,14 @@ const musicPlayer = {
 
         const player = document.getElementById('music-player');
         if (player) {
-            player.classList.toggle('has-track', !!this.currentTrack);
+            const hadTrack = player.classList.contains('has-track');
+            const hasTrack = !!this.currentTrack;
+            player.classList.toggle('has-track', hasTrack);
+            if (hasTrack && !hadTrack) {
+                document.body.classList.add('music-player-active');
+            } else if (!hasTrack && hadTrack) {
+                document.body.classList.remove('music-player-active');
+            }
         }
     },
 
@@ -931,15 +1597,24 @@ const musicPlayer = {
         if (idx === this.currentIndex) {
             if (this.queue.length === 1) {
                 this.audio.pause();
+                this.queue.splice(idx, 1);
                 this.currentTrack = null;
                 this.currentIndex = -1;
             } else {
-                this.next();
+                this.queue.splice(idx, 1);
+                if (idx >= this.queue.length) {
+                    this.currentIndex = 0;
+                } else {
+                    this.currentIndex = idx;
+                }
+                this.currentTrack = this.queue[this.currentIndex];
+                this._loadAndPlay();
             }
-        }
-        this.queue.splice(idx, 1);
-        if (idx < this.currentIndex) {
-            this.currentIndex--;
+        } else {
+            this.queue.splice(idx, 1);
+            if (idx < this.currentIndex) {
+                this.currentIndex--;
+            }
         }
         this._updateQueueUI();
         this._updateUI();
@@ -972,9 +1647,5 @@ const musicPlayer = {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 };
-
-document.addEventListener('DOMContentLoaded', () => {
-    musicPlayer.init();
-});
 
 window.musicView = musicView;
