@@ -280,7 +280,19 @@ impl ThumbnailService {
             return Some(bytes);
         }
 
-        // 2. Check disk (needs blob_hash to locate the shared file)
+        // 2. Check disk for external (video-frame) thumbnails stored by file_id.
+        //    These don't require blob_hash since they use ext-{file_id}.jpg paths.
+        let ext_path = self
+            .thumbnails_root
+            .join(size.dir_name())
+            .join(format!("ext-{}.jpg", file_id));
+        if let Ok(data) = fs::read(&ext_path).await {
+            let bytes = Bytes::from(data);
+            self.cache.insert(cache_key.clone(), bytes.clone()).await;
+            return Some(bytes);
+        }
+
+        // 3. Check disk for blob-hash thumbnails (needs blob_hash to locate)
         let hash = blob_hash?;
         let thumb_path = self.get_thumbnail_path(hash, size);
         if let Ok(data) = fs::read(&thumb_path).await {
