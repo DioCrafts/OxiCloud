@@ -55,15 +55,15 @@ const musicView = {
         if (this.loading) return;
         this.loading = true;
         this._showLoading(true);
-        
+
         try {
             const resp = await fetch('/api/playlists', {
                 credentials: 'include',
                 headers: this._headers()
             });
-            
+
             if (!resp.ok) throw new Error('Failed to load playlists');
-            
+
             this.playlists = await resp.json();
             this._renderPlaylists();
         } catch (err) {
@@ -77,7 +77,7 @@ const musicView = {
 
     _renderPlaylists() {
         if (!this._container) return;
-        
+
         const t = (key, fallback = '') => {
             return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
         };
@@ -191,7 +191,9 @@ const musicView = {
             return;
         }
 
-        listEl.innerHTML = this.playlists.map(p => `
+        listEl.innerHTML = this.playlists
+            .map(
+                (p) => `
             <div class="music-playlist-item" data-id="${p.id}">
                 <div class="music-playlist-icon">
                     <i class="fas fa-music"></i>
@@ -201,9 +203,11 @@ const musicView = {
                     <span class="music-playlist-item-count">${p.track_count || 0} ${t('music.tracks', 'tracks')}</span>
                 </div>
             </div>
-        `).join('');
+        `
+            )
+            .join('');
 
-        listEl.querySelectorAll('.music-playlist-item').forEach(item => {
+        listEl.querySelectorAll('.music-playlist-item').forEach((item) => {
             item.addEventListener('click', () => {
                 const id = item.dataset.id;
                 this._selectPlaylist(id);
@@ -264,11 +268,11 @@ const musicView = {
     },
 
     async _selectPlaylist(playlistId) {
-        const playlist = this.playlists.find(p => p.id === playlistId);
+        const playlist = this.playlists.find((p) => p.id === playlistId);
         if (!playlist) return;
 
         this.currentPlaylist = playlist;
-        
+
         const detailEl = document.getElementById('music-playlist-detail');
         const welcomeEl = this._container.querySelector('.music-welcome');
         const nameEl = document.getElementById('music-playlist-name');
@@ -301,12 +305,12 @@ const musicView = {
         }
         const togglePublicBtn = document.getElementById('music-toggle-public-btn');
         if (togglePublicBtn) {
-            const t2 = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            const t2 = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
             togglePublicBtn.title = playlist.is_public ? t2('music.make_private', 'Make private') : t2('music.make_public', 'Make public');
             togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
 
-        document.querySelectorAll('.music-playlist-item').forEach(item => {
+        document.querySelectorAll('.music-playlist-item').forEach((item) => {
             item.classList.toggle('active', item.dataset.id === playlistId);
         });
 
@@ -363,7 +367,9 @@ const musicView = {
                 <span class="music-track-col music-track-duration"><i class="far fa-clock"></i></span>
                 <span class="music-track-col music-track-actions"></span>
             </div>
-            ${this.currentTracks.map((track, idx) => `
+            ${this.currentTracks
+                .map(
+                    (track, idx) => `
                 <div class="music-track ${musicPlayer.currentTrack?.id === track.id ? 'playing' : ''}" data-idx="${idx}" data-id="${track.id}" data-file-id="${track.file_id}" draggable="true">
                     <span class="music-track-col music-track-drag"><i class="fas fa-grip-vertical"></i></span>
                     <span class="music-track-col music-track-num">
@@ -381,15 +387,17 @@ const musicView = {
                         <button class="music-track-remove-btn" title="${t('music.remove', 'Remove')}"><i class="fas fa-times"></i></button>
                     </span>
                 </div>
-            `).join('')}
+            `
+                )
+                .join('')}
         `;
 
         const self = this;
-        trackListEl.querySelectorAll('.music-track').forEach(row => {
+        trackListEl.querySelectorAll('.music-track').forEach((row) => {
             row.addEventListener('click', () => {
                 const idx = parseInt(row.dataset.idx);
                 // Toggle selection
-                trackListEl.querySelectorAll('.music-track').forEach(r => {
+                trackListEl.querySelectorAll('.music-track').forEach((r) => {
                     if (r !== row) r.classList.remove('selected');
                 });
                 row.classList.toggle('selected');
@@ -413,7 +421,7 @@ const musicView = {
             });
             row.addEventListener('dragend', () => {
                 row.classList.remove('dragging');
-                trackListEl.querySelectorAll('.music-track').forEach(r => r.classList.remove('drag-over'));
+                trackListEl.querySelectorAll('.music-track').forEach((r) => r.classList.remove('drag-over'));
             });
             row.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -517,12 +525,22 @@ const musicView = {
             this._renderPlaylists();
             this._selectPlaylist(playlist.id);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.create_playlist', 'Create Playlist'), text: name });
+                window.notifications.addNotification({
+                    icon: 'fa-check-circle',
+                    iconClass: 'upload',
+                    title: t('music.create_playlist', 'Create Playlist'),
+                    text: name
+                });
             }
         } catch (err) {
             console.error('Create playlist error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         } finally {
             if (createBtn) createBtn.disabled = false;
@@ -536,8 +554,11 @@ const musicView = {
 
         if (!this.currentPlaylist) return;
 
-        const confirmed = await new Promise(resolve => {
-            if (!window.Modal) { resolve(confirm(t('music.confirm_delete', 'Delete this playlist?'))); return; }
+        const confirmed = await new Promise((resolve) => {
+            if (!window.Modal) {
+                resolve(confirm(t('music.confirm_delete', 'Delete this playlist?')));
+                return;
+            }
             window.Modal.prompt({
                 title: t('music.delete', 'Delete'),
                 label: t('music.confirm_delete', 'Delete this playlist?'),
@@ -545,7 +566,7 @@ const musicView = {
                 value: this.currentPlaylist.name,
                 icon: 'fa-trash',
                 confirmText: t('music.delete', 'Delete')
-            }).then(val => resolve(val !== null));
+            }).then((val) => resolve(val !== null));
         });
         if (!confirmed) return;
 
@@ -561,7 +582,7 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to delete playlist');
 
             const deletedName = this.currentPlaylist.name;
-            this.playlists = this.playlists.filter(p => p.id !== this.currentPlaylist.id);
+            this.playlists = this.playlists.filter((p) => p.id !== this.currentPlaylist.id);
             this.currentPlaylist = null;
             this.currentTracks = [];
             this._renderPlaylists();
@@ -571,7 +592,12 @@ const musicView = {
         } catch (err) {
             console.error('Delete playlist error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         } finally {
             if (deleteBtn) deleteBtn.disabled = false;
@@ -640,7 +666,7 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to update playlist');
 
             this.currentPlaylist.name = newName.trim();
-            const idx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+            const idx = this.playlists.findIndex((p) => p.id === this.currentPlaylist.id);
             if (idx !== -1) this.playlists[idx].name = newName.trim();
 
             const nameEl = document.getElementById('music-playlist-name');
@@ -649,7 +675,12 @@ const musicView = {
         } catch (err) {
             console.error('Edit playlist error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         }
     },
@@ -681,12 +712,22 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to share playlist');
 
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.share', 'Share'), text: t('music.added', 'Added!') });
+                window.notifications.addNotification({
+                    icon: 'fa-check-circle',
+                    iconClass: 'upload',
+                    title: t('music.share', 'Share'),
+                    text: t('music.added', 'Added!')
+                });
             }
         } catch (err) {
             console.error('Share playlist error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         }
     },
@@ -747,12 +788,17 @@ const musicView = {
                 if (!resp.ok) throw new Error('Failed to add tracks');
 
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.add_tracks', 'Add Tracks'), text: `${fileIds.length} ${t('music.added_to_playlist', 'added to playlist')}` });
+                    window.notifications.addNotification({
+                        icon: 'fa-check-circle',
+                        iconClass: 'upload',
+                        title: t('music.add_tracks', 'Add Tracks'),
+                        text: `${fileIds.length} ${t('music.added_to_playlist', 'added to playlist')}`
+                    });
                 }
 
                 await this._loadPlaylistTracks(this.currentPlaylist.id);
                 // Update track count
-                const playlist = this.playlists.find(p => p.id === this.currentPlaylist.id);
+                const playlist = this.playlists.find((p) => p.id === this.currentPlaylist.id);
                 if (playlist) {
                     playlist.track_count = (playlist.track_count || 0) + fileIds.length;
                     this.currentPlaylist.track_count = playlist.track_count;
@@ -763,7 +809,12 @@ const musicView = {
             } catch (err) {
                 console.error('Add tracks error:', err);
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: t('music.add_error', 'Could not add tracks to playlist') });
+                    window.notifications.addNotification({
+                        icon: 'fa-exclamation-circle',
+                        iconClass: 'error',
+                        title: t('music.error', 'Error'),
+                        text: t('music.add_error', 'Could not add tracks to playlist')
+                    });
                 }
             }
         });
@@ -773,7 +824,7 @@ const musicView = {
 
     async _removeTrackFromPlaylist(trackId, fileId) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks/${encodeURIComponent(fileId)}`, {
@@ -784,10 +835,15 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to remove track');
 
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.remove', 'Remove'), text: t('music.track_removed', 'Track removed') });
+                window.notifications.addNotification({
+                    icon: 'fa-check-circle',
+                    iconClass: 'upload',
+                    title: t('music.remove', 'Remove'),
+                    text: t('music.track_removed', 'Track removed')
+                });
             }
             await this._loadPlaylistTracks(this.currentPlaylist.id);
-            const playlist = this.playlists.find(p => p.id === this.currentPlaylist.id);
+            const playlist = this.playlists.find((p) => p.id === this.currentPlaylist.id);
             if (playlist) {
                 playlist.track_count = Math.max(0, (playlist.track_count || 1) - 1);
                 this.currentPlaylist.track_count = playlist.track_count;
@@ -798,14 +854,19 @@ const musicView = {
         } catch (err) {
             console.error('Remove track error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         }
     },
 
     async _reorderTrack(fromIdx, toIdx) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 
         const tracks = [...this.currentTracks];
         const [moved] = tracks.splice(fromIdx, 1);
@@ -813,7 +874,7 @@ const musicView = {
         this.currentTracks = tracks;
         this._renderTracks();
 
-        const itemIds = tracks.map(tr => tr.id);
+        const itemIds = tracks.map((tr) => tr.id);
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/reorder`, {
                 method: 'PUT',
@@ -825,7 +886,12 @@ const musicView = {
         } catch (err) {
             console.error('Reorder error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
             await this._loadPlaylistTracks(this.currentPlaylist.id);
         }
@@ -833,7 +899,7 @@ const musicView = {
 
     async _showManageSharesDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 
         const existing = document.getElementById('music-shares-dialog');
         if (existing) existing.remove();
@@ -864,7 +930,9 @@ const musicView = {
         document.body.appendChild(dialog);
 
         dialog.querySelector('.music-shares-close-btn').addEventListener('click', () => dialog.remove());
-        dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.remove(); });
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) dialog.remove();
+        });
 
         dialog.querySelector('#music-share-add-btn').addEventListener('click', async () => {
             const userInput = dialog.querySelector('#music-share-user-input');
@@ -884,11 +952,21 @@ const musicView = {
                 writeInput.checked = false;
                 this._loadSharesList(dialog);
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.share', 'Share'), text: t('music.added', 'Added!') });
+                    window.notifications.addNotification({
+                        icon: 'fa-check-circle',
+                        iconClass: 'upload',
+                        title: t('music.share', 'Share'),
+                        text: t('music.added', 'Added!')
+                    });
                 }
             } catch (err) {
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                    window.notifications.addNotification({
+                        icon: 'fa-exclamation-circle',
+                        iconClass: 'error',
+                        title: t('music.error', 'Error'),
+                        text: err.message
+                    });
                 }
             }
         });
@@ -898,7 +976,7 @@ const musicView = {
 
     async _loadSharesList(dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
         const body = dialog.querySelector('.music-shares-body');
         if (!body) return;
 
@@ -917,15 +995,19 @@ const musicView = {
                 return;
             }
 
-            body.innerHTML = shares.map(s => `
+            body.innerHTML = shares
+                .map(
+                    (s) => `
                 <div class="music-share-item" data-user-id="${this._escapeHtml(s.user_id)}">
                     <span class="music-share-user"><i class="fas fa-user"></i> ${this._escapeHtml(s.user_id)}</span>
                     <span class="music-share-perm">${s.can_write ? t('music.can_write', 'Can edit') : t('music.read_only', 'Read only')}</span>
                     <button class="music-share-remove-btn" title="${t('music.remove_share', 'Remove share')}"><i class="fas fa-times"></i></button>
                 </div>
-            `).join('');
+            `
+                )
+                .join('');
 
-            body.querySelectorAll('.music-share-remove-btn').forEach(btn => {
+            body.querySelectorAll('.music-share-remove-btn').forEach((btn) => {
                 btn.addEventListener('click', async () => {
                     const item = btn.closest('.music-share-item');
                     const userId = item.dataset.userId;
@@ -939,7 +1021,7 @@ const musicView = {
 
     async _removeShare(userId, dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share/${encodeURIComponent(userId)}`, {
@@ -951,14 +1033,19 @@ const musicView = {
             this._loadSharesList(dialog);
         } catch (err) {
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         }
     },
 
     async _togglePublic() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
         const newValue = !this.currentPlaylist.is_public;
 
         try {
@@ -971,7 +1058,7 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to update playlist');
 
             this.currentPlaylist.is_public = newValue;
-            const idx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+            const idx = this.playlists.findIndex((p) => p.id === this.currentPlaylist.id);
             if (idx !== -1) this.playlists[idx].is_public = newValue;
 
             const badge = document.getElementById('music-public-badge');
@@ -985,19 +1072,29 @@ const musicView = {
 
             if (window.notifications) {
                 const status = newValue ? t('music.public', 'Public') : t('music.private', 'Private');
-                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.toggle_public', 'Visibility'), text: status });
+                window.notifications.addNotification({
+                    icon: 'fa-check-circle',
+                    iconClass: 'upload',
+                    title: t('music.toggle_public', 'Visibility'),
+                    text: status
+                });
             }
         } catch (err) {
             console.error('Toggle public error:', err);
             if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                window.notifications.addNotification({
+                    icon: 'fa-exclamation-circle',
+                    iconClass: 'error',
+                    title: t('music.error', 'Error'),
+                    text: err.message
+                });
             }
         }
     },
 
     async _showCoverPicker() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 
         const input = document.createElement('input');
         input.type = 'file';
@@ -1035,7 +1132,7 @@ const musicView = {
                 if (!resp.ok) throw new Error('Failed to set cover');
 
                 this.currentPlaylist.cover_file_id = uploaded.id;
-                const plIdx = this.playlists.findIndex(p => p.id === this.currentPlaylist.id);
+                const plIdx = this.playlists.findIndex((p) => p.id === this.currentPlaylist.id);
                 if (plIdx !== -1) this.playlists[plIdx].cover_file_id = uploaded.id;
 
                 const coverEl = document.getElementById('music-playlist-cover');
@@ -1044,12 +1141,22 @@ const musicView = {
                 }
 
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.set_cover', 'Set cover'), text: t('music.cover_updated', 'Cover updated') });
+                    window.notifications.addNotification({
+                        icon: 'fa-check-circle',
+                        iconClass: 'upload',
+                        title: t('music.set_cover', 'Set cover'),
+                        text: t('music.cover_updated', 'Cover updated')
+                    });
                 }
             } catch (err) {
                 console.error('Cover upload error:', err);
                 if (window.notifications) {
-                    window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: err.message });
+                    window.notifications.addNotification({
+                        icon: 'fa-exclamation-circle',
+                        iconClass: 'error',
+                        title: t('music.error', 'Error'),
+                        text: err.message
+                    });
                 }
             }
         });
@@ -1077,10 +1184,10 @@ const musicPlayer = {
 
     init() {
         if (this._initialized) return;
-        
+
         this.audio = new Audio();
         this.audio.volume = this.volume;
-        
+
         this.audio.addEventListener('ended', () => this._onEnded());
         this.audio.addEventListener('timeupdate', () => this._onTimeUpdate());
         this.audio.addEventListener('loadedmetadata', () => this._onLoadedMetadata());
@@ -1254,7 +1361,7 @@ const musicPlayer = {
 
     playTrack(index) {
         if (index < 0 || index >= this.queue.length) return;
-        
+
         this.currentIndex = index;
         this.currentTrack = this.queue[index];
         this._loadAndPlay();
@@ -1265,7 +1372,7 @@ const musicPlayer = {
 
         const fileId = this.currentTrack.file_id;
         this.audio.src = `/api/files/${fileId}`;
-        this.audio.play().catch(err => {
+        this.audio.play().catch((err) => {
             console.error('Playback error:', err);
         });
         this.isPlaying = true;
@@ -1301,7 +1408,7 @@ const musicPlayer = {
 
     next() {
         if (this.queue.length === 0) return;
-        
+
         let nextIndex;
         if (this.shuffle) {
             nextIndex = Math.floor(Math.random() * this.queue.length);
@@ -1341,7 +1448,7 @@ const musicPlayer = {
         const modes = ['none', 'all', 'one'];
         const currentIdx = modes.indexOf(this.repeat);
         this.repeat = modes[(currentIdx + 1) % modes.length];
-        
+
         const btn = document.getElementById('player-repeat-btn');
         if (btn) {
             btn.classList.remove('active', 'repeat-one');
@@ -1358,7 +1465,7 @@ const musicPlayer = {
         this.audio.volume = this.volume;
         this.isMuted = this.volume === 0;
         this._updateVolumeIcon();
-        
+
         const input = document.getElementById('player-volume-input');
         if (input) {
             input.value = this.volume * 100;
@@ -1431,15 +1538,15 @@ const musicPlayer = {
         if (totalTimeEl) {
             totalTimeEl.textContent = this._formatTime(this.audio.duration);
         }
-        
+
         if (this.currentTrack && this.audio.duration) {
             this.currentTrack.duration_secs = Math.round(this.audio.duration);
-            
+
             const trackDurationEl = document.querySelector(`.music-track[data-idx="${this.currentIndex}"] .music-track-duration`);
             if (trackDurationEl) {
                 trackDurationEl.textContent = this._formatDuration(this.audio.duration);
             }
-            
+
             const queueDurationEl = document.querySelector(`.queue-item[data-idx="${this.currentIndex}"] .queue-item-duration`);
             if (queueDurationEl) {
                 queueDurationEl.textContent = this._formatDuration(this.audio.duration);
@@ -1470,7 +1577,12 @@ const musicPlayer = {
         };
         if (window.notifications) {
             const trackName = this.currentTrack?.title || this.currentTrack?.file_name || t('music.unknown_title', 'Unknown');
-            window.notifications.addNotification({ icon: 'fa-exclamation-circle', iconClass: 'error', title: t('music.error', 'Error'), text: `${t('music.playback_error', 'Playback failed')}: ${trackName}` });
+            window.notifications.addNotification({
+                icon: 'fa-exclamation-circle',
+                iconClass: 'error',
+                title: t('music.error', 'Error'),
+                text: `${t('music.playback_error', 'Playback failed')}: ${trackName}`
+            });
         }
     },
 
@@ -1496,8 +1608,8 @@ const musicPlayer = {
             const t = (key, fallback = '') => {
                 return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
             };
-            trackName.textContent = this.currentTrack 
-                ? (this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown'))
+            trackName.textContent = this.currentTrack
+                ? this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown')
                 : t('music.not_playing', 'Not playing');
         }
 
@@ -1506,13 +1618,13 @@ const musicPlayer = {
         }
 
         if (musicView.currentTracks.length > 0) {
-            document.querySelectorAll('.music-track').forEach(row => {
+            document.querySelectorAll('.music-track').forEach((row) => {
                 const idx = parseInt(row.dataset.idx);
                 row.classList.toggle('playing', idx === this.currentIndex && this.isPlaying);
-                
+
                 const numText = row.querySelector('.track-num-text');
                 const playIcon = row.querySelector('.track-play-icon');
-                
+
                 if (idx === this.currentIndex) {
                     if (numText) numText.classList.add('hidden');
                     if (playIcon) playIcon.classList.remove('hidden');
@@ -1562,7 +1674,9 @@ const musicPlayer = {
             return;
         }
 
-        queueList.innerHTML = this.queue.map((track, idx) => `
+        queueList.innerHTML = this.queue
+            .map(
+                (track, idx) => `
             <div class="player-queue-item ${idx === this.currentIndex ? 'active' : ''}" data-idx="${idx}">
                 <span class="queue-item-num">${idx + 1}</span>
                 <span class="queue-item-info">
@@ -1574,9 +1688,11 @@ const musicPlayer = {
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-        `).join('');
+        `
+            )
+            .join('');
 
-        queueList.querySelectorAll('.player-queue-item').forEach(item => {
+        queueList.querySelectorAll('.player-queue-item').forEach((item) => {
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.queue-item-remove')) return;
                 const idx = parseInt(item.dataset.idx);
@@ -1584,7 +1700,7 @@ const musicPlayer = {
             });
         });
 
-        queueList.querySelectorAll('.queue-item-remove').forEach(btn => {
+        queueList.querySelectorAll('.queue-item-remove').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const idx = parseInt(btn.dataset.idx);

@@ -334,7 +334,7 @@ function switchToMusicSection() {
 
     // Hide breadcrumb
     const breadcrumb = document.querySelector('.breadcrumb');
-    breadcrumb?.classList.add("hidden");
+    breadcrumb?.classList.add('hidden');
 
     // Hide file containers
     toggleFileContainer(false);
