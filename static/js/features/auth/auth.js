@@ -898,7 +898,21 @@ if (isLoginPage && loginForm) {
                 localStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
             }
 
-            // Redirect to main app
+            // Redirect to main app — but first verify the browser accepted
+            // the auth cookies.  The CSRF cookie (oxicloud_csrf) is non-HttpOnly
+            // so JS can read it.  If it's missing the browser rejected the
+            // Set-Cookie (usually because of Secure flag over plain HTTP).
+            const csrfStored = document.cookie.split('; ').some(c => c.startsWith('oxicloud_csrf='));
+            if (!csrfStored) {
+                console.error('Auth cookies were NOT stored by the browser. '
+                    + 'This usually means OXICLOUD_COOKIE_SECURE=true (or OXICLOUD_BASE_URL=https://...) '
+                    + 'is set but you are accessing via plain HTTP.');
+                loginError.textContent = 'Login succeeded but the browser rejected the session cookie. '
+                    + 'If you are accessing via HTTP, set OXICLOUD_COOKIE_SECURE=false in your .env file '
+                    + 'or access via HTTPS through a reverse proxy.';
+                loginError.style.display = 'block';
+                return;
+            }
             redirectToMainApp();
         } catch (error) {
             loginError.textContent = error.message || 'Error logging in';
@@ -1030,6 +1044,7 @@ async function login(username, password) {
 
         const response = await fetch(LOGIN_ENDPOINT, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
                 ...getCsrfHeaders()

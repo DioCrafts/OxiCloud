@@ -121,6 +121,7 @@ async fn register(
 
 async fn login(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(dto): Json<LoginDto>,
 ) -> Result<Response, AppError> {
     // Add detailed logging for debugging
@@ -204,6 +205,25 @@ async fn login(
                 state.core.config.auth.refresh_token_expiry_secs,
             );
             cookie_auth::append_csrf_cookie(response.headers_mut(), auth_response.expires_in);
+
+            // Diagnostic: warn when Secure cookies are set but the request
+            // arrived over plain HTTP — the browser will reject them (#241).
+            if cookie_auth::is_cookie_secure() {
+                let is_tls = headers
+                    .get("x-forwarded-proto")
+                    .and_then(|v| v.to_str().ok())
+                    .is_some_and(|p| p.eq_ignore_ascii_case("https"));
+                if !is_tls {
+                    tracing::warn!(
+                        "Login for '{}': Secure cookies are enabled but the request \
+                         does not appear to be over HTTPS (no X-Forwarded-Proto: https). \
+                         The browser may reject the cookies. Set OXICLOUD_COOKIE_SECURE=false \
+                         in .env if you access OxiCloud via plain HTTP.",
+                        dto.username,
+                    );
+                }
+            }
+
             Ok(response)
         }
         Err(err) => {

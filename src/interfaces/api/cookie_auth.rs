@@ -34,6 +34,10 @@ pub const CSRF_HEADER: &str = "x-csrf-token";
 /// 4. **Default: `false`** for compatibility with HTTP deployments
 ///    (Docker, local development). Set `OXICLOUD_COOKIE_SECURE=true`
 ///    explicitly for production HTTPS environments.
+pub fn is_cookie_secure() -> bool {
+    cookie_secure()
+}
+
 fn cookie_secure() -> bool {
     if let Ok(v) = std::env::var("OXICLOUD_COOKIE_SECURE") {
         let secure = v == "true" || v == "1";
