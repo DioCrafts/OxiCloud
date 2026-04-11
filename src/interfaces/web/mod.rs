@@ -59,6 +59,7 @@ pub fn create_web_routes() -> Router<Arc<AppState>> {
         .route("/profile", get(serve_profile_page))
         .route("/admin", get(serve_admin_page))
         .route("/device", get(serve_device_verify_page))
+        .route("/s/{token}", get(serve_share_page))
         // Serve static files with compression + cache headers
         .fallback_service(static_service)
         .layer(CompressionLayer::new().br(true).gzip(true))
@@ -89,4 +90,9 @@ async fn serve_device_verify_page() -> Html<&'static str> {
         env!("OUT_DIR"),
         "/device-verify.html"
     )))
+}
+
+/// Serve the public share page (unauthenticated)
+async fn serve_share_page() -> Html<&'static str> {
+    Html(include_str!(concat!(env!("OUT_DIR"), "/share.html")))
 }

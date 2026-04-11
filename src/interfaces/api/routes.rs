@@ -51,6 +51,12 @@ pub fn create_public_api_routes(app_state: &Arc<AppState>) -> Router<Arc<AppStat
             .with_state(share_service);
 
         router = router.nest("/s", public_share_router);
+
+        // Download endpoint uses full AppState (needs FileRetrievalService)
+        router = router.route(
+            "/s/{token}/download",
+            get(share_handler::download_shared_file),
+        );
     }
 
     // i18n routes — no auth required (localization should be available before login)

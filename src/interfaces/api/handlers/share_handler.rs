@@ -3,9 +3,10 @@ use uuid::Uuid;
 
 use axum::{
     Json,
+    body::Body,
     extract::{Path, Query, State},
-    http::StatusCode,
-    response::IntoResponse,
+    http::{StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -15,9 +16,9 @@ use crate::application::services::share_service::ShareService;
 use crate::{
     application::{
         dtos::share_dto::{CreateShareDto, UpdateShareDto},
-        ports::share_ports::ShareUseCase,
+        ports::{file_ports::{FileRetrievalUseCase, OptimizedFileContent}, share_ports::ShareUseCase},
     },
-    common::errors::ErrorKind,
+    common::{di::AppState, errors::ErrorKind},
     domain::entities::share::ShareItemType,
     interfaces::errors::AppError,
     interfaces::middleware::auth::AuthUser,
@@ -269,5 +270,98 @@ pub async fn verify_shared_item_password(
             }
             AppError::from(err).into_response()
         }
+    }
+}
+
+/// Download the actual file content for a shared file via its token.
+///
+/// Validates the share token, checks it refers to a file (not folder),
+/// then streams the file content to the caller.
+pub async fn download_shared_file(
+    State(state): State<Arc<AppState>>,
+    Path(token): Path<String>,
+) -> impl IntoResponse {
+    // 1. Resolve share service
+    let share_service = match &state.share_service {
+        Some(s) => s.clone(),
+        None => {
+            return AppError::new(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Sharing is disabled",
+                "Disabled",
+            )
+            .into_response()
+        }
+    };
+
+    // 2. Validate the share token (handles expiry + password checks)
+    let share_dto = match share_service.get_shared_link_by_token(&token).await {
+        Ok(dto) => dto,
+        Err(err) => {
+            if err.kind == ErrorKind::AccessDenied {
+                if err.message.contains("password") {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({
+                            "error": "Password required",
+                            "requiresPassword": true
+                        })),
+                    )
+                        .into_response();
+                }
+                if err.message.contains("expired") {
+                    return AppError::new(StatusCode::GONE, err.message, "Expired").into_response();
+                }
+            }
+            return AppError::from(err).into_response();
+        }
+    };
+
+    // 3. Only file shares support direct download
+    if share_dto.item_type != "file" {
+        return AppError::bad_request("Download is only supported for file shares").into_response();
+    }
+
+    // 4. Retrieve file content via the internal (no-ownership-check) API
+    let retrieval = &state.applications.file_retrieval_service;
+    let file_id = &share_dto.item_id;
+
+    match retrieval.get_file_optimized(file_id, false, true).await {
+        Ok((file_dto, content)) => {
+            let file_name = share_dto.item_name.as_deref().unwrap_or(&file_dto.name);
+            let disposition = format!(
+                "attachment; filename=\"{}\"",
+                file_name.replace('"', "\\\"")
+            );
+            let mime = file_dto.mime_type.clone();
+
+            match content {
+                OptimizedFileContent::Bytes { data, .. } => Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &*mime)
+                    .header(header::CONTENT_DISPOSITION, &disposition)
+                    .header(header::CONTENT_LENGTH, data.len())
+                    .body(Body::from(data))
+                    .unwrap()
+                    .into_response(),
+                OptimizedFileContent::Mmap(mmap_data) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &*mime)
+                    .header(header::CONTENT_DISPOSITION, &disposition)
+                    .header(header::CONTENT_LENGTH, mmap_data.len())
+                    .body(Body::from(mmap_data))
+                    .unwrap()
+                    .into_response(),
+                OptimizedFileContent::Stream(stream) => Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, &*mime)
+                    .header(header::CONTENT_DISPOSITION, &disposition)
+                    .header(header::CONTENT_LENGTH, file_dto.size)
+                    .body(Body::from_stream(stream))
+                    .unwrap()
+                    .into_response(),
+            }
+        }
+        Err(err) => AppError::from(err).into_response(),
     }
 }

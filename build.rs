@@ -24,6 +24,7 @@ const HTML_INCLUDE: &[&str] = &[
     "admin.html",
     "device-verify.html",
     "nextcloud-login.html",
+    "share.html",
 ];
 
 // ─── View CSS files linked directly in index.html (not via @import) ──────────

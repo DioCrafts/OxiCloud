@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OxiCloud — Shared</title>
+  <script src="/js/core/theme-init.js"></script>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/views/share-public.css">
+</head>
+<body>
+  <div class="share-card" id="share-card">
+
+    <div class="share-logo">
+      <h1><span>Oxi</span>Cloud</h1>
+    </div>
+
+    <!-- Loading state -->
+    <div id="share-loading" class="share-state">
+      <div class="spinner"></div>
+      <p>Loading shared content&hellip;</p>
+    </div>
+
+    <!-- Password prompt -->
+    <div id="share-password" class="share-state hidden">
+      <h2>Password Required</h2>
+      <p class="subtitle">This shared content is protected. Enter the password to continue.</p>
+      <form id="password-form" autocomplete="off">
+        <input type="password" id="password-input" placeholder="Password" required />
+        <div id="password-error" class="error-text hidden"></div>
+        <button type="submit" class="btn-primary">Unlock</button>
+      </form>
+    </div>
+
+    <!-- Expired / error -->
+    <div id="share-expired" class="share-state hidden">
+      <div class="share-icon expired-icon">&#128683;</div>
+      <h2>Link Unavailable</h2>
+      <p class="subtitle" id="expired-message">This share link has expired or is no longer available.</p>
+    </div>
+
+    <!-- File share view -->
+    <div id="share-file" class="share-state hidden">
+      <div class="share-icon file-icon" id="file-type-icon">&#128196;</div>
+      <h2 id="file-name"></h2>
+      <p class="subtitle" id="file-meta"></p>
+      <a id="file-download" class="btn-primary" download>
+        Download
+      </a>
+    </div>
+
+    <!-- Folder share view -->
+    <div id="share-folder" class="share-state hidden">
+      <h2 id="folder-name"></h2>
+      <p class="subtitle" id="folder-meta">Shared folder</p>
+      <div id="folder-contents" class="folder-list">
+        <p class="subtitle">Folder browsing is not yet available. Use a WebDAV client for full access.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/js/views/public/publicShare.js"></script>
+</body>
+</html>
