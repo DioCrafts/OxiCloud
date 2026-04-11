@@ -621,7 +621,7 @@ function setupEventListeners() {
                     switchToMusicSection();
                     break;
 
-                case 'nav.trash': 
+                case 'nav.trash':
                     switchToTrashSection();
                     break;
 

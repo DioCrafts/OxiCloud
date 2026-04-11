@@ -55,9 +55,9 @@ const contextMenus = {
         const option = document.getElementById('add-to-playlist-option');
         if (!option) return;
 
-        const targetFile = window.app && window.app.contextMenuTargetFile;
+        const targetFile = window.app?.contextMenuTargetFile;
         if (targetFile) {
-            const isAudio = targetFile.mime_type && targetFile.mime_type.startsWith('audio/');
+            const isAudio = targetFile.mime_type?.startsWith('audio/');
             option.classList.toggle('hidden', !isAudio);
         } else {
             option.classList.add('hidden');
@@ -1082,7 +1082,7 @@ const contextMenus = {
         const dialog = document.getElementById('playlist-dialog');
         const container = document.getElementById('playlist-select-container');
         const filesInfo = document.getElementById('playlist-dialog-files-info');
-        
+
         if (!dialog || !container) {
             console.error('Playlist dialog elements not found');
             return;
@@ -1099,7 +1099,7 @@ const contextMenus = {
         // Reset selection
         this._selectedPlaylistId = null;
         container.innerHTML = '<div class="folder-select-loading"><i class="fas fa-spinner fa-spin"></i></div>';
-        
+
         // Reset add button state
         const addBtn = document.getElementById('playlist-add-btn');
         if (addBtn) addBtn.disabled = true;
@@ -1112,7 +1112,7 @@ const contextMenus = {
         try {
             const resp = await fetch('/api/playlists', { credentials: 'include' });
             if (!resp.ok) throw new Error('Failed to load playlists');
-            
+
             const playlists = await resp.json();
             this._renderPlaylistSelect(container, playlists);
         } catch (err) {
@@ -1122,16 +1122,16 @@ const contextMenus = {
     },
 
     _renderPlaylistSelect(container, playlists) {
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key, fallback) : fallback;
-        
+        const t = (key, fallback) => (window.i18n ? window.i18n.t(key, fallback) : fallback);
+
         container.innerHTML = '';
-        
+
         if (playlists.length === 0) {
             container.innerHTML = `<div class="folder-select-empty">${t('music.no_playlists', 'No playlists yet. Create one first!')}</div>`;
             return;
         }
 
-        playlists.forEach(playlist => {
+        playlists.forEach((playlist) => {
             const item = document.createElement('div');
             item.className = 'folder-select-item';
             item.dataset.id = playlist.id;
@@ -1140,15 +1140,17 @@ const contextMenus = {
                 <span>${this._escapeHtml(playlist.name)}</span>
                 <span class="playlist-track-count">${playlist.track_count || 0} ${t('music.tracks', 'tracks')}</span>
             `;
-            
+
             item.addEventListener('click', () => {
-                container.querySelectorAll('.folder-select-item').forEach(el => el.classList.remove('selected'));
+                container.querySelectorAll('.folder-select-item').forEach((el) => {
+                    el.classList.remove('selected');
+                });
                 item.classList.add('selected');
                 this._selectedPlaylistId = playlist.id;
                 const addBtn = document.getElementById('playlist-add-btn');
                 if (addBtn) addBtn.disabled = false;
             });
-            
+
             container.appendChild(item);
         });
     },
@@ -1156,7 +1158,7 @@ const contextMenus = {
     async addSelectedFilesToPlaylist() {
         const playlistId = this._selectedPlaylistId;
         const files = window.app.playlistDialogFiles || [];
-        
+
         if (!playlistId || files.length === 0) return;
 
         const addBtn = document.getElementById('playlist-add-btn');
@@ -1170,7 +1172,7 @@ const contextMenus = {
                     'Content-Type': 'application/json',
                     ...getCsrfHeaders()
                 },
-                body: JSON.stringify({ file_ids: files.map(f => f.id) })
+                body: JSON.stringify({ file_ids: files.map((f) => f.id) })
             });
 
             if (!resp.ok) {
@@ -1178,7 +1180,7 @@ const contextMenus = {
                 throw new Error(err.message || 'Failed to add tracks');
             }
 
-            const result = await resp.json();
+            await resp.json();
             window.ui.showNotification(
                 window.i18n ? window.i18n.t('music.added', 'Added!') : 'Added!',
                 `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${window.i18n ? window.i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
@@ -1187,7 +1189,7 @@ const contextMenus = {
             this.closePlaylistDialog();
 
             // Refresh music view if open
-            if (window.musicView && window.musicView.playlists) {
+            if (window.musicView?.playlists) {
                 window.musicView._loadPlaylists();
             }
         } catch (err) {
