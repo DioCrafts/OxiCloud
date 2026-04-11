@@ -146,7 +146,7 @@ pub async fn handle_preview(
     match state
         .core
         .thumbnail_service
-        .get_thumbnail(&object_id, thumb_size.into(), &blob_path)
+        .get_thumbnail(&object_id, &blob_hash, thumb_size.into(), &blob_path)
         .await
     {
         Ok(data) => {

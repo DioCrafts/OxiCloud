@@ -68,18 +68,27 @@ pub trait ThumbnailPort: Send + Sync + 'static {
 
     /// Get a thumbnail, generating it on-demand if needed.
     ///
-    /// Returns the thumbnail bytes in WebP format.
+    /// `blob_hash` is the content hash used as the disk storage key
+    /// (dedup: identical blobs share one set of thumbnails).
     async fn get_thumbnail(
         &self,
         file_id: &str,
+        blob_hash: &str,
         size: ThumbnailSize,
         original_path: &Path,
     ) -> Result<Bytes, DomainError>;
 
     /// Generate all thumbnail sizes for a file in the background.
     ///
-    /// Called after file upload to pre-generate thumbnails.
-    fn generate_all_sizes_background(self: Arc<Self>, file_id: String, original_path: PathBuf);
+    /// `blob_hash` is the content hash used as the disk storage key.
+    /// If thumbnails already exist for this hash, only the moka cache
+    /// is populated (zero CPU for image processing).
+    fn generate_all_sizes_background(
+        self: Arc<Self>,
+        file_id: String,
+        blob_hash: String,
+        original_path: PathBuf,
+    );
 
     /// Delete all thumbnails for a file.
     async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError>;
@@ -87,9 +96,14 @@ pub trait ThumbnailPort: Send + Sync + 'static {
     /// Try to get a cached thumbnail without generating one.
     ///
     /// Returns `None` if no cached thumbnail exists on disk or in memory.
-    /// Used for non-image file types (videos) where thumbnails are
-    /// generated client-side and uploaded.
-    async fn get_cached_thumbnail(&self, file_id: &str, size: ThumbnailSize) -> Option<Bytes>;
+    /// `blob_hash` is used to locate the file on disk. If `None`, only
+    /// the in-memory moka cache is checked.
+    async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        blob_hash: Option<&str>,
+        size: ThumbnailSize,
+    ) -> Option<Bytes>;
 
     /// Store an externally-generated thumbnail (e.g. client-side video frame).
     ///

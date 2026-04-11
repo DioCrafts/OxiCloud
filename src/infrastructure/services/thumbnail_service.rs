@@ -168,17 +168,18 @@ impl ThumbnailService {
         )
     }
 
-    /// Get the path where a thumbnail would be stored
-    fn get_thumbnail_path(&self, file_id: &str, size: ThumbnailSize) -> PathBuf {
+    /// Get the path where a thumbnail would be stored (keyed by blob hash for dedup).
+    fn get_thumbnail_path(&self, blob_hash: &str, size: ThumbnailSize) -> PathBuf {
         self.thumbnails_root
             .join(size.dir_name())
-            .join(format!("{}.jpg", file_id))
+            .join(format!("{}.jpg", blob_hash))
     }
 
     /// Get a thumbnail, generating it if needed.
     ///
     /// # Arguments
-    /// * `file_id` - ID of the original file
+    /// * `file_id` - ID of the original file (used as moka cache key)
+    /// * `blob_hash` - Content hash of the file (used as disk key for dedup)
     /// * `size` - Desired thumbnail size
     /// * `original_path` - Path to the original image file
     ///
@@ -187,6 +188,7 @@ impl ThumbnailService {
     pub async fn get_thumbnail(
         &self,
         file_id: &str,
+        blob_hash: &str,
         size: ThumbnailSize,
         original_path: &Path,
     ) -> Result<Bytes, ThumbnailError> {
@@ -195,7 +197,7 @@ impl ThumbnailService {
             size,
         };
 
-        let thumb_path = self.get_thumbnail_path(file_id, size);
+        let thumb_path = self.get_thumbnail_path(blob_hash, size);
         let original_owned = original_path.to_path_buf();
         let file_id_owned = file_id.to_string();
 
@@ -257,7 +259,16 @@ impl ThumbnailService {
     /// Unlike `get_thumbnail`, this does **not** generate a new thumbnail.
     /// Useful for non-image file types (videos) where a client-generated
     /// thumbnail may have been uploaded previously.
-    pub async fn get_cached_thumbnail(&self, file_id: &str, size: ThumbnailSize) -> Option<Bytes> {
+    ///
+    /// `blob_hash` is used to locate the file on disk (dedup-aware).
+    /// If `None`, only the in-memory cache is checked (used for video
+    /// thumbnails where blob_hash is not yet resolved).
+    pub async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        blob_hash: Option<&str>,
+        size: ThumbnailSize,
+    ) -> Option<Bytes> {
         // 1. Check in-memory cache
         let cache_key = ThumbnailCacheKey {
             file_id: file_id.to_string(),
@@ -269,8 +280,9 @@ impl ThumbnailService {
             return Some(bytes);
         }
 
-        // 2. Check disk
-        let thumb_path = self.get_thumbnail_path(file_id, size);
+        // 2. Check disk (needs blob_hash to locate the shared file)
+        let hash = blob_hash?;
+        let thumb_path = self.get_thumbnail_path(hash, size);
         if let Ok(data) = fs::read(&thumb_path).await {
             let bytes = Bytes::from(data);
             // Populate in-memory cache for next hit
@@ -290,6 +302,9 @@ impl ThumbnailService {
     ///
     /// **Slow path**: decode → optional resize → re-encode to JPEG q=80.
     /// Only triggered when a client sends an oversized or non-JPEG image.
+    ///
+    /// External thumbnails (video frames) are stored by `file_id` since
+    /// they are client-generated and not dedup-able.
     pub async fn store_external_thumbnail(
         &self,
         file_id: &str,
@@ -345,8 +360,11 @@ impl ThumbnailService {
 
         let bytes = Bytes::from(jpeg_bytes);
 
-        // Save to disk
-        let thumb_path = self.get_thumbnail_path(file_id, size);
+        // External thumbnails are stored by file_id (not dedup-able)
+        let thumb_path = self
+            .thumbnails_root
+            .join(size.dir_name())
+            .join(format!("ext-{}.jpg", file_id));
         if let Some(parent) = thumb_path.parent() {
             let _ = fs::create_dir_all(parent).await;
         }
@@ -472,15 +490,59 @@ impl ThumbnailService {
 
     /// Generate all thumbnail sizes for a file in the background.
     ///
+    /// Thumbnails are stored on disk keyed by `blob_hash`, so duplicate
+    /// uploads with the same content share a single set of thumbnails.
+    /// If thumbnails already exist for this `blob_hash`, only the moka
+    /// cache is populated (zero CPU for image processing).
+    ///
     /// Loads the image **once** and produces all 3 sizes (Icon, Preview,
     /// Large) inside a single `spawn_blocking` call. This avoids 3×
     /// I/O reads and 3× JPEG/PNG decode — reducing CPU time by ~45%
     /// and peak RAM from ~540 MB to ~180 MB for concurrent uploads.
     /// The encoded image buffer is explicitly dropped after decoding
     /// to further reduce peak memory by the size of the original file.
-    pub fn generate_all_sizes_background(self: Arc<Self>, file_id: String, original_path: PathBuf) {
+    pub fn generate_all_sizes_background(
+        self: Arc<Self>,
+        file_id: String,
+        blob_hash: String,
+        original_path: PathBuf,
+    ) {
         tokio::spawn(async move {
             tracing::info!("🖼️ Background thumbnail generation starting: {}", file_id);
+
+            // ── Fast path: blob-hash thumbnails already exist on disk ────
+            // If another file with the same content was already uploaded,
+            // the thumbnails exist. Just populate the moka cache for this
+            // file_id and skip image processing entirely.
+            let all_exist = {
+                let mut ok = true;
+                for size in ThumbnailSize::all() {
+                    let thumb_path = self.get_thumbnail_path(&blob_hash, *size);
+                    if fs::metadata(&thumb_path).await.is_err() {
+                        ok = false;
+                        break;
+                    }
+                }
+                ok
+            };
+            if all_exist {
+                for size in ThumbnailSize::all() {
+                    let thumb_path = self.get_thumbnail_path(&blob_hash, *size);
+                    if let Ok(data) = fs::read(&thumb_path).await {
+                        let cache_key = ThumbnailCacheKey {
+                            file_id: file_id.clone(),
+                            size: *size,
+                        };
+                        self.cache.insert(cache_key, Bytes::from(data)).await;
+                    }
+                }
+                tracing::info!(
+                    "🖼️ Thumbnail dedup hit for {} (blob {}): skipped generation",
+                    file_id,
+                    &blob_hash[..12]
+                );
+                return;
+            }
 
             // Acquire semaphore permit — bounds peak RAM from concurrent decodes
             let _permit = match self.decode_semaphore.acquire().await {
@@ -579,10 +641,10 @@ impl ThumbnailService {
                 }
             };
 
-            // Save each size to disk AND populate moka so the very first
-            // GET after upload is served from RAM (zero disk I/O).
+            // Save each size to disk (keyed by blob_hash for dedup)
+            // AND populate moka (keyed by file_id for fast serving).
             for (size, bytes) in thumbnails {
-                let thumb_path = self.get_thumbnail_path(&file_id, size);
+                let thumb_path = self.get_thumbnail_path(&blob_hash, size);
                 if let Some(parent) = thumb_path.parent() {
                     let _ = fs::create_dir_all(parent).await;
                 }
@@ -603,26 +665,51 @@ impl ThumbnailService {
         });
     }
 
-    /// Delete all thumbnails for a file
+    /// Delete thumbnails for a file.
+    ///
+    /// Only invalidates the in-memory moka cache (keyed by file_id).
+    /// Disk thumbnails are keyed by blob_hash and may be shared by
+    /// other files with the same content — they are cleaned up via
+    /// `delete_blob_thumbnails` when the blob is garbage-collected.
+    /// Also removes any external (video-frame) thumbnails stored by file_id.
     pub async fn delete_thumbnails(&self, file_id: &str) -> Result<(), ThumbnailError> {
         for size in ThumbnailSize::all() {
-            let path = self.get_thumbnail_path(file_id, *size);
-            if fs::metadata(&path).await.is_ok() {
-                fs::remove_file(&path)
-                    .await
-                    .map_err(|e| ThumbnailError::IoError(e.to_string()))?;
-            }
-
-            // Remove from cache (lock-free invalidation)
+            // Remove from moka cache (lock-free invalidation)
             let cache_key = ThumbnailCacheKey {
                 file_id: file_id.to_string(),
                 size: *size,
             };
             self.cache.invalidate(&cache_key).await;
+
+            // Remove external (video-frame) thumbnails stored by file_id
+            let ext_path = self
+                .thumbnails_root
+                .join(size.dir_name())
+                .join(format!("ext-{}.jpg", file_id));
+            if fs::metadata(&ext_path).await.is_ok() {
+                let _ = fs::remove_file(&ext_path).await;
+            }
         }
 
-        tracing::debug!("🗑️ Deleted thumbnails for: {}", file_id);
+        tracing::debug!("🗑️ Invalidated thumbnail cache for: {}", file_id);
         Ok(())
+    }
+
+    /// Remove orphaned blob-hash thumbnails whose blob no longer exists.
+    ///
+    /// Call during blob garbage collection: pass the hash of the blob
+    /// being deleted and the corresponding thumbnails are removed from disk.
+    pub async fn delete_blob_thumbnails(&self, blob_hash: &str) {
+        for size in ThumbnailSize::all() {
+            let path = self.get_thumbnail_path(blob_hash, *size);
+            if fs::metadata(&path).await.is_ok() {
+                let _ = fs::remove_file(&path).await;
+            }
+        }
+        tracing::debug!(
+            "🗑️ Deleted blob thumbnails for hash: {}…",
+            &blob_hash[..blob_hash.len().min(12)]
+        );
     }
 
     /// Get cache statistics
@@ -656,16 +743,22 @@ impl ThumbnailPort for ThumbnailService {
     async fn get_thumbnail(
         &self,
         file_id: &str,
+        blob_hash: &str,
         size: PortThumbnailSize,
         original_path: &Path,
     ) -> Result<Bytes, DomainError> {
-        self.get_thumbnail(file_id, size.into(), original_path)
+        self.get_thumbnail(file_id, blob_hash, size.into(), original_path)
             .await
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
     }
 
-    fn generate_all_sizes_background(self: Arc<Self>, file_id: String, original_path: PathBuf) {
-        ThumbnailService::generate_all_sizes_background(self, file_id, original_path)
+    fn generate_all_sizes_background(
+        self: Arc<Self>,
+        file_id: String,
+        blob_hash: String,
+        original_path: PathBuf,
+    ) {
+        ThumbnailService::generate_all_sizes_background(self, file_id, blob_hash, original_path)
     }
 
     async fn delete_thumbnails(&self, file_id: &str) -> Result<(), DomainError> {
@@ -674,8 +767,14 @@ impl ThumbnailPort for ThumbnailService {
             .map_err(|e| DomainError::new(ErrorKind::InternalError, "Thumbnail", e.to_string()))
     }
 
-    async fn get_cached_thumbnail(&self, file_id: &str, size: PortThumbnailSize) -> Option<Bytes> {
-        self.get_cached_thumbnail(file_id, size.into()).await
+    async fn get_cached_thumbnail(
+        &self,
+        file_id: &str,
+        blob_hash: Option<&str>,
+        size: PortThumbnailSize,
+    ) -> Option<Bytes> {
+        self.get_cached_thumbnail(file_id, blob_hash, size.into())
+            .await
     }
 
     async fn store_external_thumbnail(

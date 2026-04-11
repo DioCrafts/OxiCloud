@@ -359,7 +359,7 @@ impl FileHandler {
         // Try moka (RAM) → disk before touching the database.
         // If the thumbnail exists it was authorized at creation time.
         if let Some(data) = thumbnail_service
-            .get_cached_thumbnail(&id, thumb_size.into())
+            .get_cached_thumbnail(&id, None, thumb_size.into())
             .await
         {
             return Response::builder()
@@ -411,7 +411,7 @@ impl FileHandler {
         let file_path = state.core.dedup_service.blob_path(&blob_hash);
 
         match thumbnail_service
-            .get_thumbnail(&id, thumb_size.into(), &file_path)
+            .get_thumbnail(&id, &blob_hash, thumb_size.into(), &file_path)
             .await
         {
             Ok(data) => Response::builder()
@@ -742,10 +742,11 @@ impl FileHandler {
             let file_id = file.id.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();
             let file_path = state.core.dedup_service.blob_path(&blob_hash);
+            let blob_hash_owned = blob_hash.clone();
 
             tokio::spawn(async move {
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                thumbnail_service.generate_all_sizes_background(file_id, file_path);
+                thumbnail_service.generate_all_sizes_background(file_id, blob_hash_owned, file_path);
             });
         }
 
