@@ -1039,7 +1039,7 @@ services:
     networks:
       - oxicloud
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/
       - ./db/schema.sql:/docker-entrypoint-initdb.d/10-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
