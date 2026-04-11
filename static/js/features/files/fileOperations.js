@@ -549,7 +549,9 @@ const fileOps = {
             // so all files reaching fetch() are regular. Keep-alive
             // reuses TCP connections across workers for speed.
             const CONCURRENCY = 10;
-            const TIMEOUT_MS = 10000; // 10s for normal files
+            const TIMEOUT_BASE_MS = 30000; // 30s base for normal files
+            const TIMEOUT_PER_MB_MS = 2000; // +2s per MB (supports ≥4 Mbps)
+            const TIMEOUT_MIN_MS = 10000; // floor for tiny files
             const TIMEOUT_MS_ZERO = 3000; // 3s for 0-byte files
 
             const uploadOneFile = async (idx) => {
@@ -596,7 +598,9 @@ const fileOps = {
                     formData.append('folder_id', targetFolderId);
                     formData.append('file', uploadFile, file.name);
 
-                    const thisTimeout = file.size === 0 ? TIMEOUT_MS_ZERO : TIMEOUT_MS;
+                    const thisTimeout = file.size === 0
+                        ? TIMEOUT_MS_ZERO
+                        : Math.max(TIMEOUT_MIN_MS, TIMEOUT_BASE_MS + Math.ceil(file.size / (1024 * 1024)) * TIMEOUT_PER_MB_MS);
                     console.log(`[UPLOAD START] #${idx} ${rel} (${file.size} bytes, timeout=${thisTimeout}ms)`);
 
                     result = await this._uploadFileFetch(formData, thisTimeout);
