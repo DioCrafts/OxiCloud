@@ -16,6 +16,7 @@ use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlob
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
 use crate::infrastructure::repositories::pg::trash_db_repository::TrashDbRepository;
+use crate::infrastructure::services::file_content_cache::FileContentCache;
 use crate::infrastructure::services::thumbnail_service::ThumbnailService;
 
 /**
@@ -47,6 +48,9 @@ pub struct TrashService {
     /// Thumbnail service for cleaning up thumbnails on permanent delete
     thumbnail_service: Option<Arc<ThumbnailService>>,
 
+    /// Content cache — invalidated when files are permanently deleted from trash.
+    content_cache: Option<Arc<FileContentCache>>,
+
     /// Number of days items should be kept in trash before automatic cleanup
     retention_days: u32,
 }
@@ -59,6 +63,7 @@ impl TrashService {
         folder_storage_port: Arc<FolderDbRepository>,
         retention_days: u32,
         thumbnail_service: Option<Arc<ThumbnailService>>,
+        content_cache: Option<Arc<FileContentCache>>,
     ) -> Self {
         Self {
             trash_repository,
@@ -66,6 +71,7 @@ impl TrashService {
             file_write_port,
             folder_storage_port,
             thumbnail_service,
+            content_cache,
             retention_days,
         }
     }
@@ -563,6 +569,10 @@ impl TrashUseCase for TrashService {
                         match self.file_write_port.delete_file_permanently(&file_id).await {
                             Ok(_) => {
                                 info!("Successfully deleted file permanently: {}", file_id);
+                                // Invalidate content cache for the deleted file.
+                                if let Some(cc) = &self.content_cache {
+                                    cc.invalidate(&file_id).await;
+                                }
                             }
                             Err(e) => {
                                 // Check if the file is not found - in that case, we can continue
@@ -714,6 +724,13 @@ impl TrashUseCase for TrashService {
         //
         // Finally it clears the trash_items index for the user.
         self.trash_repository.clear_trash(&user_id).await?;
+
+        // Invalidate content cache for all permanently deleted files.
+        if let Some(cc) = &self.content_cache {
+            for file_id in &trashed_file_ids {
+                cc.invalidate(file_id).await;
+            }
+        }
 
         // Best-effort thumbnail cleanup for all deleted files
         if let Some(thumb) = &self.thumbnail_service {

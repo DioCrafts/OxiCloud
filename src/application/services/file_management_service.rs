@@ -9,6 +9,7 @@ use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::file_blob_read_repository::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::file_blob_write_repository::FileBlobWriteRepository;
 use crate::infrastructure::repositories::pg::folder_db_repository::FolderDbRepository;
+use crate::infrastructure::services::file_content_cache::FileContentCache;
 use crate::infrastructure::services::thumbnail_service::ThumbnailService;
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -25,6 +26,7 @@ pub struct FileManagementService {
     folder_repo: Option<Arc<FolderDbRepository>>,
     trash_service: Option<Arc<TrashService>>,
     thumbnail_service: Option<Arc<ThumbnailService>>,
+    content_cache: Option<Arc<FileContentCache>>,
 }
 
 impl FileManagementService {
@@ -36,6 +38,7 @@ impl FileManagementService {
             folder_repo: None,
             trash_service: None,
             thumbnail_service: None,
+            content_cache: None,
         }
     }
 
@@ -46,6 +49,7 @@ impl FileManagementService {
         file_read: Option<Arc<FileBlobReadRepository>>,
         folder_repo: Option<Arc<FolderDbRepository>>,
         thumbnail_service: Option<Arc<ThumbnailService>>,
+        content_cache: Option<Arc<FileContentCache>>,
     ) -> Self {
         Self {
             file_repository,
@@ -53,6 +57,7 @@ impl FileManagementService {
             folder_repo,
             trash_service,
             thumbnail_service,
+            content_cache,
         }
     }
 
@@ -216,6 +221,10 @@ impl FileManagementUseCase for FileManagementService {
 
     async fn delete_file(&self, id: &str) -> Result<(), DomainError> {
         self.file_repository.delete_file(id).await?;
+        // Invalidate content cache — file no longer exists.
+        if let Some(cc) = &self.content_cache {
+            cc.invalidate(id).await;
+        }
         // Best-effort thumbnail cleanup
         if let Some(thumb) = &self.thumbnail_service
             && let Err(e) = thumb.delete_thumbnails(id).await
@@ -243,6 +252,10 @@ impl FileManagementUseCase for FileManagementService {
             match trash.move_to_trash(id, "file", user_id).await {
                 Ok(_) => {
                     info!("File successfully moved to trash: {}", id);
+                    // Invalidate content cache — trashed files must not be served.
+                    if let Some(cc) = &self.content_cache {
+                        cc.invalidate(id).await;
+                    }
                     // Do NOT decrement blob ref here — the file row still exists
                     // (is_trashed = TRUE). The trigger will decrement when the
                     // row is actually DELETEd during trash emptying.
@@ -261,6 +274,10 @@ impl FileManagementUseCase for FileManagementService {
         // Step 2: Permanent delete — trigger handles blob ref_count
         warn!("Permanently deleting file: {}", id);
         self.file_repository.delete_file(id).await?;
+        // Invalidate content cache — file permanently removed.
+        if let Some(cc) = &self.content_cache {
+            cc.invalidate(id).await;
+        }
         // Best-effort thumbnail cleanup
         if let Some(thumb) = &self.thumbnail_service
             && let Err(e) = thumb.delete_thumbnails(id).await

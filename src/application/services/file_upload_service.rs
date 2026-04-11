@@ -8,6 +8,7 @@ use crate::application::services::storage_usage_service::StorageUsageService;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::FileBlobWriteRepository;
+use crate::infrastructure::services::file_content_cache::FileContentCache;
 use tracing::{debug, info, warn};
 
 /// Helper function to extract username from folder path string.
@@ -48,6 +49,8 @@ pub struct FileUploadService {
     file_read: Option<Arc<FileBlobReadRepository>>,
     /// Optional storage usage tracking
     storage_usage_service: Option<Arc<StorageUsageService>>,
+    /// Content cache — invalidated on file update so stale content is never served.
+    content_cache: Option<Arc<FileContentCache>>,
 }
 
 impl FileUploadService {
@@ -57,6 +60,7 @@ impl FileUploadService {
             file_write: file_repository,
             file_read: None,
             storage_usage_service: None,
+            content_cache: None,
         }
     }
 
@@ -69,7 +73,14 @@ impl FileUploadService {
             file_write,
             file_read: Some(file_read),
             storage_usage_service: None,
+            content_cache: None,
         }
+    }
+
+    /// Configures the content cache for invalidation on file updates.
+    pub fn with_content_cache(mut self, cache: Arc<FileContentCache>) -> Self {
+        self.content_cache = Some(cache);
+        self
     }
 
     /// Configures the storage usage service
@@ -279,6 +290,10 @@ impl FileUploadUseCase for FileUploadService {
                     modified_at,
                 )
                 .await?;
+            // Invalidate content cache — file content has changed.
+            if let Some(cc) = &self.content_cache {
+                cc.invalidate(&file_id).await;
+            }
             // Re-read to get fresh DTO with updated etag and timestamps.
             let updated = file_read.get_file(&file_id).await?;
             return Ok(FileDto::from(updated));

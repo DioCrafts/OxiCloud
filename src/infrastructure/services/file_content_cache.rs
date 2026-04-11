@@ -2,6 +2,7 @@ use bytes::Bytes;
 use moka::future::Cache;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
 use tracing::{debug, info};
 
 /// Configuration for the file content cache
@@ -73,6 +74,8 @@ impl FileContentCache {
                 // of weights exceeds max_capacity.
                 value.content.len().min(u32::MAX as usize) as u32
             })
+            .time_to_live(Duration::from_secs(3600))
+            .time_to_idle(Duration::from_secs(300))
             .build();
 
         Self {

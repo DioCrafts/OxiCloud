@@ -250,10 +250,13 @@ impl AppServiceFactory {
 
         // Refactored services with all infrastructure ports
         // In blob model, dedup is handled by the repository — no separate write-behind needed
-        let file_upload_service = Arc::new(FileUploadService::new_with_read(
-            repos.file_write_repository.clone(),
-            repos.file_read_repository.clone(),
-        ));
+        let file_upload_service = Arc::new(
+            FileUploadService::new_with_read(
+                repos.file_write_repository.clone(),
+                repos.file_read_repository.clone(),
+            )
+            .with_content_cache(core.file_content_cache.clone()),
+        );
 
         let file_retrieval_service = Arc::new(FileRetrievalService::new_with_cache(
             repos.file_read_repository.clone(),
@@ -268,6 +271,7 @@ impl AppServiceFactory {
             Some(repos.file_read_repository.clone()),
             Some(repos.folder_repository.clone()),
             Some(core.thumbnail_service.clone()),
+            Some(core.file_content_cache.clone()),
         ));
 
         let file_use_case_factory = Arc::new(AppFileUseCaseFactory::new(
@@ -343,6 +347,7 @@ impl AppServiceFactory {
             repos.folder_repository.clone(),
             self.config.storage.trash_retention_days,
             Some(core.thumbnail_service.clone()),
+            Some(core.file_content_cache.clone()),
         ));
 
         // Initialize cleanup service (bulk-deletes expired items in 2 SQL queries)
