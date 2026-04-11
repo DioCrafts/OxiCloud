@@ -14,7 +14,7 @@ body {
     min-height: 100vh;
     padding: 1rem;
 }
-.card {
+.dag-card {
     background: var(--color-bg-surface);
     border-radius: var(--radius, 12px);
     box-shadow: 0 4px 24px var(--color-shadow-sm);
@@ -22,15 +22,15 @@ body {
     max-width: 440px;
     width: 100%;
 }
-.logo {
+.dag-logo {
     text-align: center;
     margin-bottom: 1.5rem;
 }
-.logo h1 {
+.dag-logo h1 {
     font-size: 1.5rem;
     font-weight: 700;
 }
-.logo span {
+.dag-logo span {
     color: var(--color-primary);
 }
 h2 {
