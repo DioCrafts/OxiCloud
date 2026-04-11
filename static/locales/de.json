@@ -62,7 +62,13 @@
         "add_error": "Tracks konnten nicht hinzugefügt werden",
         "no_playlists_yet": "Noch keine Playlists. Erstellen Sie zuerst eine!",
         "selected_files": "Ausgewählt:",
-        "error": "Fehler"
+        "error": "Fehler",
+        "search_audio": "Audiodateien suchen…",
+        "no_audio_files": "Keine Audiodateien gefunden",
+        "selected": "ausgewählt",
+        "loading": "Wird geladen…",
+        "search_error": "Audiodateien konnten nicht geladen werden",
+        "adding": "Wird hinzugefügt…"
     },
     "actions": {
         "search": "Dateien suchen...",

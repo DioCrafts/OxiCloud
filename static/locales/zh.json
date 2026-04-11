@@ -62,7 +62,13 @@
         "add_error": "无法将曲目添加到播放列表",
         "no_playlists_yet": "暂无播放列表。请先创建一个！",
         "selected_files": "已选择：",
-        "error": "错误"
+        "error": "错误",
+        "search_audio": "搜索音频文件…",
+        "no_audio_files": "未找到音频文件",
+        "selected": "已选择",
+        "loading": "加载中…",
+        "search_error": "无法加载音频文件",
+        "adding": "添加中…"
     },
     "actions": {
         "search": "搜索文件...",

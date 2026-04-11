@@ -62,7 +62,13 @@
         "add_error": "曲を追加できませんでした",
         "no_playlists_yet": "プレイリストがありません。最初に作成してください！",
         "selected_files": "選択中：",
-        "error": "エラー"
+        "error": "エラー",
+        "search_audio": "オーディオファイルを検索…",
+        "no_audio_files": "オーディオファイルが見つかりません",
+        "selected": "件選択中",
+        "loading": "読み込み中…",
+        "search_error": "オーディオファイルを読み込めませんでした",
+        "adding": "追加中…"
     },
     "actions": {
         "search": "ファイルを検索...",

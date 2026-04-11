@@ -15,9 +15,11 @@
   [![GitHub Issues](https://img.shields.io/github/issues/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/issues)
   [![Last Commit](https://img.shields.io/github/last-commit/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/commits/main)
 
-</div>
+[**Documentation**](https://diocrafts.github.io/OxiCloud/) | [**Quick Start**](#-quick-start)
+<br>
+**English** | [Español](docs/es/)
 
-<br/>
+</div>
 
 NextCloud was too slow on my home server. So I built OxiCloud — a complete cloud platform written in Rust that runs on minimal hardware and stays out of your way.
 
@@ -86,8 +88,8 @@ NextCloud was too slow on my home server. So I built OxiCloud — a complete clo
 - **Dual DB pool** — dedicated maintenance pool so background tasks never starve user queries
 - **LTO-optimised release** — fat LTO, 1 codegen-unit, `opt-level = 3`, stripped
 - **Write-behind caching** (moka) — sub-millisecond hot reads
-- **112 automated tests** — `cargo test` on every push (CI)
-- **9 languages** — EN, ES, DE, FR, IT, PT, NL, ZH, FA
+- **222+ automated tests** — `cargo test` on every push (CI)
+- **14 languages** — EN, ES, DE, FR, IT, PT, NL, ZH, JA, KO, AR, HI, FA, RU
 
 ---
 
@@ -105,6 +107,8 @@ NextCloud was too slow on my home server. So I built OxiCloud — a complete clo
 | **Trash / recycle bin** | ✅ Working | Soft-delete with restore |
 | **Full-text search** | ✅ Working | Recursive subtree search |
 | **Shared links** | ✅ Working | Optional password protection |
+| **Music library & playlists** | ✅ Working | Streaming player, drag-and-drop reorder |
+| **Photo gallery** | ✅ Working | Day/month/year views, multi-select |
 | **Desktop sync client** | ❌ Planned | Not yet available |
 | **Android / iOS app** | ❌ Planned | Not yet available |
 | **End-to-end encryption** | ❌ Planned | Roadmap item |
@@ -208,7 +212,7 @@ All config via environment variables (see [`example.env`](example.env)):
 | `OXICLOUD_ENABLE_AUTH` | `true` | Toggle authentication |
 | `OXICLOUD_ENABLE_TRASH` | `true` | Toggle trash / recycle bin |
 
-Full reference: [`example.env`](example.env) · [Deployment guide](doc/deployment.md) · [OIDC examples](doc/oidc-config-examples.md)
+Full reference: [`example.env`](example.env) · [Deployment guide](https://diocrafts.github.io/OxiCloud/config/deployment) · [OIDC setup](https://diocrafts.github.io/OxiCloud/config/oidc)
 
 ---
 
@@ -241,30 +245,24 @@ CSS & JS linter is `biome` (can be installed via `cargo install biome-cli` or on
 |--------|-------|
 | Rust source files | 170 |
 | Lines of code | ~50 000 |
-| Automated tests | 112 |
-| Documentation pages | 35 |
+| Automated tests | 222+ |
+| Documentation pages | 35+ |
 
 ---
 
 ## Documentation
 
-Extensive docs live in [`doc/`](doc/):
+📖 **Full documentation:** [**diocrafts.github.io/OxiCloud**](https://diocrafts.github.io/OxiCloud/)
 
-| Topic | Link |
-|-------|------|
-| Deployment & Docker | [deployment.md](doc/deployment.md) |
-| WebDAV integration | [webdav-integration-guide.md](doc/webdav-integration-guide.md) |
-| CalDAV / CardDAV | [caldav-technical-spec.md](doc/caldav-technical-spec.md) · [carddav-technical-spec.md](doc/carddav-technical-spec.md) |
-| OIDC / SSO setup | [oidc-integration.md](doc/oidc-integration.md) · [oidc-config-examples.md](doc/oidc-config-examples.md) |
-| WOPI (Office editing) | [wopi-integration.md](doc/wopi-integration.md) |
-| Chunked uploads | [chunked-uploads.md](doc/chunked-uploads.md) |
-| Deduplication | [deduplication.md](doc/deduplication.md) |
-| Search | [search.md](doc/search.md) |
-| Caching architecture | [caching-architecture.md](doc/caching-architecture.md) |
-| Storage quotas | [storage-quotas.md](doc/storage-quotas.md) |
-| Trash / recycle bin | [trash-feature-summary.md](doc/trash-feature-summary.md) |
-| Internationalisation | [i18n.md](doc/i18n.md) |
-| Internal architecture | [internal-architecture.md](doc/internal-architecture.md) |
+| Topic | Online | Source |
+|-------|--------|--------|
+| Quick Start | [Guide](https://diocrafts.github.io/OxiCloud/guide/installation) | [doc/deployment.md](doc/deployment.md) |
+| WebDAV | [Guide](https://diocrafts.github.io/OxiCloud/guide/webdav) | [doc/webdav-integration-guide.md](doc/webdav-integration-guide.md) |
+| CalDAV / CardDAV | [Guide](https://diocrafts.github.io/OxiCloud/guide/caldav-carddav) | [doc/caldav-technical-spec.md](doc/caldav-technical-spec.md) |
+| OIDC / SSO | [Guide](https://diocrafts.github.io/OxiCloud/config/oidc) | [doc/oidc-integration.md](doc/oidc-integration.md) |
+| WOPI (Office) | [Guide](https://diocrafts.github.io/OxiCloud/config/wopi) | [doc/wopi-integration.md](doc/wopi-integration.md) |
+| Architecture | [Guide](https://diocrafts.github.io/OxiCloud/architecture/) | [doc/internal-architecture.md](doc/internal-architecture.md) |
+| All env variables | [Reference](https://diocrafts.github.io/OxiCloud/config/env) | [`example.env`](example.env) |
 
 ---
 

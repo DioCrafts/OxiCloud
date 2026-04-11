@@ -62,7 +62,13 @@
         "add_error": "Impossibile aggiungere le tracce",
         "no_playlists_yet": "Nessuna playlist ancora. Creane una prima!",
         "selected_files": "Selezionati:",
-        "error": "Errore"
+        "error": "Errore",
+        "search_audio": "Cerca file audio…",
+        "no_audio_files": "Nessun file audio trovato",
+        "selected": "selezionati",
+        "loading": "Caricamento…",
+        "search_error": "Impossibile caricare i file audio",
+        "adding": "Aggiunta in corso…"
     },
     "actions": {
         "search": "Cerca file...",

@@ -62,7 +62,13 @@
         "add_error": "Não foi possível adicionar as faixas",
         "no_playlists_yet": "Nenhuma playlist ainda. Crie uma primeiro!",
         "selected_files": "Selecionados:",
-        "error": "Erro"
+        "error": "Erro",
+        "search_audio": "Pesquisar ficheiros de áudio…",
+        "no_audio_files": "Nenhum ficheiro de áudio encontrado",
+        "selected": "selecionados",
+        "loading": "A carregar…",
+        "search_error": "Não foi possível carregar os ficheiros de áudio",
+        "adding": "A adicionar…"
     },
     "actions": {
         "search": "Pesquisar arquivos...",

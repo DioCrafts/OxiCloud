@@ -79,7 +79,13 @@
         "make_public": "Hacer pública",
         "make_private": "Hacer privada",
         "set_cover": "Establecer portada",
-        "cover_updated": "Portada actualizada"
+        "cover_updated": "Portada actualizada",
+        "search_audio": "Buscar archivos de audio…",
+        "no_audio_files": "No se encontraron archivos de audio",
+        "selected": "seleccionados",
+        "loading": "Cargando…",
+        "search_error": "No se pudieron cargar los archivos de audio",
+        "adding": "Añadiendo…"
     },
     "share": {
         "dialogTitle": "Compartir Enlace",

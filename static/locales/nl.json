@@ -62,7 +62,13 @@
         "add_error": "Kon tracks niet toevoegen aan playlist",
         "no_playlists_yet": "Nog geen playlists. Maak er eerst een!",
         "selected_files": "Geselecteerd:",
-        "error": "Fout"
+        "error": "Fout",
+        "search_audio": "Audiobestanden zoeken…",
+        "no_audio_files": "Geen audiobestanden gevonden",
+        "selected": "geselecteerd",
+        "loading": "Laden…",
+        "search_error": "Kan audiobestanden niet laden",
+        "adding": "Toevoegen…"
     },
     "actions": {
         "search": "Zoek bestanden...",

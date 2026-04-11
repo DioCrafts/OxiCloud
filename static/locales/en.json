@@ -79,7 +79,13 @@
         "make_public": "Make public",
         "make_private": "Make private",
         "set_cover": "Set cover",
-        "cover_updated": "Cover updated"
+        "cover_updated": "Cover updated",
+        "search_audio": "Search audio files…",
+        "no_audio_files": "No audio files found",
+        "selected": "selected",
+        "loading": "Loading…",
+        "search_error": "Could not load audio files",
+        "adding": "Adding…"
     },
     "actions": {
         "search": "Search files...",

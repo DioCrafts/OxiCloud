@@ -1288,3 +1288,186 @@
 [data-theme="dark"] .music-empty-state-desc {
     color: var(--color-text-muted, #888);
 }
+
+/* ═══════════════ Audio file picker modal ═══════════════ */
+
+.music-picker-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.music-picker-overlay.active {
+    opacity: 1;
+}
+
+.music-picker-modal {
+    display: flex;
+    flex-direction: column;
+    width: min(560px, 94vw);
+    max-height: min(620px, 85vh);
+    background: var(--bg-primary, #fff);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    transform: translateY(12px);
+    transition: transform 0.2s ease;
+}
+.music-picker-overlay.active .music-picker-modal {
+    transform: translateY(0);
+}
+
+/* ── header ── */
+.music-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.music-picker-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-text, #2d3748);
+}
+.music-picker-header h3 i { margin-right: 8px; color: var(--color-primary, #667eea); }
+.music-picker-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    color: var(--color-text-muted, #718096);
+    padding: 0 4px;
+    line-height: 1;
+}
+.music-picker-close:hover { color: var(--color-text, #2d3748); }
+
+/* ── search bar ── */
+.music-picker-search {
+    position: relative;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+.music-picker-search i {
+    position: absolute;
+    left: 32px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted, #a0aec0);
+    font-size: 13px;
+}
+.music-picker-search input {
+    width: 100%;
+    padding: 8px 12px 8px 32px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--bg-secondary, #f7fafc);
+    color: var(--color-text, #2d3748);
+    outline: none;
+}
+.music-picker-search input:focus {
+    border-color: var(--color-primary, #667eea);
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+}
+
+/* ── file list ── */
+.music-picker-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+    min-height: 200px;
+}
+.music-picker-loading,
+.music-picker-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 40px 20px;
+    color: var(--color-text-muted, #718096);
+    font-size: 13px;
+}
+
+.music-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 20px;
+    cursor: pointer;
+    transition: background 0.1s;
+    font-size: 13px;
+    color: var(--color-text, #2d3748);
+}
+.music-picker-item:hover { background: var(--bg-hover, #edf2f7); }
+.music-picker-item.selected { background: rgba(102, 126, 234, 0.08); }
+
+.music-picker-item input[type="checkbox"] {
+    accent-color: var(--color-primary, #667eea);
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+.music-picker-item i.fa-file-audio {
+    color: var(--color-primary, #667eea);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+.music-picker-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.music-picker-size {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--color-text-muted, #a0aec0);
+}
+
+/* ── footer ── */
+.music-picker-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+}
+.music-picker-selected-count {
+    font-size: 12px;
+    color: var(--color-text-muted, #718096);
+    font-weight: 500;
+}
+.music-picker-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── dark theme ── */
+[data-theme="dark"] .music-picker-modal {
+    background: var(--bg-primary, #1a202c);
+}
+[data-theme="dark"] .music-picker-header h3 {
+    color: var(--color-text, #e0e0e0);
+}
+[data-theme="dark"] .music-picker-search input {
+    background: var(--bg-secondary, #2d3748);
+    border-color: var(--border-color, #4a5568);
+    color: var(--color-text, #e0e0e0);
+}
+[data-theme="dark"] .music-picker-item {
+    color: var(--color-text, #e0e0e0);
+}
+[data-theme="dark"] .music-picker-item:hover {
+    background: var(--bg-hover, #2d3748);
+}
+[data-theme="dark"] .music-picker-item.selected {
+    background: rgba(102, 126, 234, 0.12);
+}

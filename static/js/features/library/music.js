@@ -738,53 +738,117 @@ const musicView = {
             return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
         };
 
-        // Create a file picker input for audio files
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'audio/*';
-        input.multiple = true;
-        input.style.display = 'none';
-        document.body.appendChild(input);
+        // ── Build modal overlay ──
+        const overlay = document.createElement('div');
+        overlay.className = 'music-picker-overlay';
+        overlay.innerHTML = `
+            <div class="music-picker-modal">
+                <div class="music-picker-header">
+                    <h3><i class="fas fa-music"></i> ${t('music.add_tracks', 'Add Tracks')}</h3>
+                    <button class="music-picker-close" title="${t('common.close', 'Close')}">&times;</button>
+                </div>
+                <div class="music-picker-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="music-picker-query"
+                           placeholder="${t('music.search_audio', 'Search audio files…')}" autocomplete="off">
+                </div>
+                <div class="music-picker-list" id="music-picker-list">
+                    <div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${t('music.loading', 'Loading…')}</div>
+                </div>
+                <div class="music-picker-footer">
+                    <span class="music-picker-selected-count" id="music-picker-count">0 ${t('music.selected', 'selected')}</span>
+                    <div class="music-picker-actions">
+                        <button class="btn btn-secondary music-picker-cancel">${t('common.cancel', 'Cancel')}</button>
+                        <button class="btn btn-primary music-picker-add" id="music-picker-add-btn" disabled>
+                            <i class="fas fa-plus"></i> ${t('music.add', 'Add')}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('active'));
 
-        input.addEventListener('change', async () => {
-            const files = Array.from(input.files);
-            input.remove();
-            if (files.length === 0) return;
+        const listEl = document.getElementById('music-picker-list');
+        const queryInput = document.getElementById('music-picker-query');
+        const addBtn = document.getElementById('music-picker-add-btn');
+        const countEl = document.getElementById('music-picker-count');
+        const selectedIds = new Set();
 
-            // Upload each file first, then add to playlist
-            const fileIds = [];
-            for (const file of files) {
-                try {
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    const folderId = window.app?.currentPath || window.app?.userHomeFolderId || '';
-                    formData.append('folder_id', folderId);
+        // ── Close helpers ──
+        const close = () => {
+            overlay.classList.remove('active');
+            setTimeout(() => overlay.remove(), 200);
+        };
+        overlay.querySelector('.music-picker-close').addEventListener('click', close);
+        overlay.querySelector('.music-picker-cancel').addEventListener('click', close);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
-                    const uploadResp = await fetch('/api/files/upload', {
-                        method: 'POST',
-                        credentials: 'include',
-                        headers: typeof getCsrfHeaders === 'function' ? getCsrfHeaders() : {},
-                        body: formData
-                    });
+        // ── Fetch & render audio files ──
+        const AUDIO_EXTENSIONS = 'mp3,ogg,flac,wav,aac,m4a,wma,opus,webm';
 
-                    if (!uploadResp.ok) throw new Error(`Upload failed: ${file.name}`);
-                    const uploaded = await uploadResp.json();
-                    if (uploaded.id) fileIds.push(uploaded.id);
-                } catch (err) {
-                    console.error('Upload error:', err);
-                }
+        const fetchAudioFiles = async (query = '') => {
+            listEl.innerHTML = `<div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${t('music.loading', 'Loading…')}</div>`;
+            try {
+                const params = new URLSearchParams({ type_filter: AUDIO_EXTENSIONS, limit: '200', recursive: 'true' });
+                if (query.trim()) params.set('query', query.trim());
+                const resp = await fetch(`/api/search?${params}`, { credentials: 'include' });
+                if (!resp.ok) throw new Error('Search failed');
+                const data = await resp.json();
+                renderFiles(data.files || []);
+            } catch (err) {
+                console.error('Audio search error:', err);
+                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-exclamation-triangle"></i> ${t('music.search_error', 'Could not load audio files')}</div>`;
             }
+        };
 
-            if (fileIds.length === 0) return;
+        const renderFiles = (files) => {
+            if (files.length === 0) {
+                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-folder-open"></i> ${t('music.no_audio_files', 'No audio files found')}</div>`;
+                return;
+            }
+            listEl.innerHTML = '';
+            for (const file of files) {
+                const row = document.createElement('label');
+                row.className = 'music-picker-item' + (selectedIds.has(file.id) ? ' selected' : '');
+                const sizeStr = file.size != null && window.formatFileSize ? window.formatFileSize(file.size) : '';
+                row.innerHTML = `
+                    <input type="checkbox" value="${file.id}" ${selectedIds.has(file.id) ? 'checked' : ''}>
+                    <i class="fas fa-file-audio"></i>
+                    <span class="music-picker-name" title="${this._escapeHtml(file.name)}">${this._escapeHtml(file.name)}</span>
+                    <span class="music-picker-size">${sizeStr}</span>
+                `;
+                const cb = row.querySelector('input');
+                cb.addEventListener('change', () => {
+                    if (cb.checked) { selectedIds.add(file.id); row.classList.add('selected'); }
+                    else { selectedIds.delete(file.id); row.classList.remove('selected'); }
+                    countEl.textContent = `${selectedIds.size} ${t('music.selected', 'selected')}`;
+                    addBtn.disabled = selectedIds.size === 0;
+                });
+                listEl.appendChild(row);
+            }
+        };
+
+        // ── Debounced search ──
+        let searchTimer = null;
+        queryInput.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => fetchAudioFiles(queryInput.value), 300);
+        });
+
+        // ── Add button ──
+        addBtn.addEventListener('click', async () => {
+            if (selectedIds.size === 0) return;
+            addBtn.disabled = true;
+            addBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('music.adding', 'Adding…')}`;
 
             try {
                 const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: this._headers(true),
-                    body: JSON.stringify({ file_ids: fileIds })
+                    body: JSON.stringify({ file_ids: [...selectedIds] })
                 });
-
                 if (!resp.ok) throw new Error('Failed to add tracks');
 
                 if (window.notifications) {
@@ -792,15 +856,14 @@ const musicView = {
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
                         title: t('music.add_tracks', 'Add Tracks'),
-                        text: `${fileIds.length} ${t('music.added_to_playlist', 'added to playlist')}`
+                        text: `${selectedIds.size} ${t('music.added_to_playlist', 'added to playlist')}`
                     });
                 }
-
+                close();
                 await this._loadPlaylistTracks(this.currentPlaylist.id);
-                // Update track count
                 const playlist = this.playlists.find((p) => p.id === this.currentPlaylist.id);
                 if (playlist) {
-                    playlist.track_count = (playlist.track_count || 0) + fileIds.length;
+                    playlist.track_count = (playlist.track_count || 0) + selectedIds.size;
                     this.currentPlaylist.track_count = playlist.track_count;
                     this._renderPlaylistList();
                     const metaEl = document.getElementById('music-playlist-meta');
@@ -816,10 +879,14 @@ const musicView = {
                         text: t('music.add_error', 'Could not add tracks to playlist')
                     });
                 }
+                addBtn.disabled = false;
+                addBtn.innerHTML = `<i class="fas fa-plus"></i> ${t('music.add', 'Add')}`;
             }
         });
 
-        input.click();
+        // ── Initial load (all audio files) ──
+        queryInput.focus();
+        fetchAudioFiles();
     },
 
     async _removeTrackFromPlaylist(trackId, fileId) {
