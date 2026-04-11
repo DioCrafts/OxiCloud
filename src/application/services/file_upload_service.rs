@@ -8,6 +8,7 @@ use crate::application::services::storage_usage_service::StorageUsageService;
 use crate::common::errors::DomainError;
 use crate::infrastructure::repositories::pg::FileBlobReadRepository;
 use crate::infrastructure::repositories::pg::FileBlobWriteRepository;
+use crate::infrastructure::services::dedup_service::DedupService;
 use crate::infrastructure::services::file_content_cache::FileContentCache;
 use tracing::{debug, info, warn};
 
@@ -211,7 +212,9 @@ impl FileUploadUseCase for FileUploadService {
         tokio::fs::write(temp.path(), content)
             .await
             .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
-        let hash = blake3::hash(content).to_hex().to_string();
+        let hash = DedupService::hash_file(temp.path())
+            .await
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("hash: {e}")))?;
 
         let file = self
             .file_write
@@ -246,7 +249,9 @@ impl FileUploadUseCase for FileUploadService {
         tokio::fs::write(temp.path(), content)
             .await
             .map_err(|e| DomainError::internal_error("FileUpload", format!("write temp: {e}")))?;
-        let hash = blake3::hash(content).to_hex().to_string();
+        let hash = DedupService::hash_file(temp.path())
+            .await
+            .map_err(|e| DomainError::internal_error("FileUpload", format!("hash: {e}")))?;
 
         self.update_file_streaming(
             path,

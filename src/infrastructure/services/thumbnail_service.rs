@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use image::codecs::jpeg::JpegEncoder;
 use image::imageops::FilterType;
+use rayon::prelude::*;
 /**
  * Thumbnail Generation Service
  *
@@ -534,7 +535,7 @@ impl ThumbnailService {
                 let (orig_w, orig_h) = (img.width(), img.height());
 
                 ThumbnailSize::all()
-                    .iter()
+                    .par_iter()
                     .map(|&size| {
                         let max_dim = size.max_dimension();
 
