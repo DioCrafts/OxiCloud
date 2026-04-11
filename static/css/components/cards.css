@@ -208,13 +208,14 @@
     /* display: none !important;*/
 }
 
-.file-icon.folder-icon {
-    background-color: var(--color-ft-folder-bg);
-}
-
+/* don't use FontAwesome / svg for folders and prefer CSS trick */
 .file-icon.folder-icon > i,
 .file-icon.folder-icon > svg {
     display: none !important;
+}
+
+.file-icon.folder-icon {
+    background-color: var(--color-ft-folder-bg);
 }
 
 .file-icon.folder-icon::before {
@@ -223,7 +224,7 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 20px;
+    height: 22%;
     background-color: var(--color-ft-folder-tab);
     border-radius: 8px 8px 0 0;
 }

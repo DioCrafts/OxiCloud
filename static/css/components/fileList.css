@@ -92,36 +92,6 @@
     flex-shrink: 0;
 }
 
-.files-list-view .file-item .file-icon.folder-icon {
-    background-color: var(--color-ft-folder-bg);
-    position: relative;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-}
-
-.files-list-view .file-item .file-icon.folder-icon::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 8px;
-    background-color: var(--color-ft-folder-tab);
-    border-radius: 8px 8px 0 0;
-}
-
-.files-list-view .file-item .file-icon.folder-icon i,
-.files-list-view .file-item .file-icon.folder-icon svg {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.image-icon {
-    position: relative;
-    overflow: hidden;
-    border-radius: 4px;
-}
-
 /* ------------- */
 
 .list-header > div:nth-child(5),
