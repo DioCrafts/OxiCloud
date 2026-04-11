@@ -180,9 +180,10 @@ impl DedupHandler {
                             Ok(Some(chunk)) => {
                                 total_size += chunk.len() as u64;
                                 hasher.update(&chunk);
-                                writer.write_all(&chunk).await.map_err(|e| {
-                                    format!("Failed to write chunk: {}", e)
-                                })?;
+                                writer
+                                    .write_all(&chunk)
+                                    .await
+                                    .map_err(|e| format!("Failed to write chunk: {}", e))?;
                             }
                             Ok(None) => break,
                             Err(e) => {
@@ -208,10 +209,7 @@ impl DedupHandler {
                     return Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .header(header::CONTENT_TYPE, "application/json")
-                        .body(Body::from(format!(
-                            r#"{{"error": "{}"}}"#,
-                            msg
-                        )))
+                        .body(Body::from(format!(r#"{{"error": "{}"}}"#, msg)))
                         .unwrap()
                         .into_response();
                 }
