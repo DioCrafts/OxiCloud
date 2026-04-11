@@ -15,7 +15,7 @@
 //! The dedup index lives in PostgreSQL (`storage.blobs`) — no in-memory
 //! HashMap, no JSON file, no WAL.
 //!
-//! **Write-first strategy** (store_bytes / store_from_file):
+//! **Write-first strategy** (store_from_file):
 //!   1. Write/move the blob file to disk *before* touching PostgreSQL.
 //!   2. Single `INSERT … ON CONFLICT … RETURNING ref_count` upsert
 //!      (~2-4 ms) — no explicit transaction, no `SELECT FOR UPDATE`.
@@ -58,7 +58,7 @@ pub struct DedupService {
     /// Root directory for temporary files during upload
     temp_root: PathBuf,
     /// PostgreSQL connection pool (dedup index in `storage.blobs`) — primary,
-    /// used by request-path operations (store_bytes, store_from_file, etc.).
+    /// used by request-path operations (store_from_file, etc.).
     pool: Arc<PgPool>,
     /// Isolated maintenance pool for long-running operations
     /// (verify_integrity, garbage_collect) that must never starve the primary.
@@ -168,20 +168,6 @@ impl DedupService {
 
     // ── Hash helpers ─────────────────────────────────────────────
 
-    /// Calculate BLAKE3 hash of in-memory content (~5× faster than SHA-256).
-    ///
-    /// For buffers larger than 128 KB the computation is parallelised across
-    /// all available cores via `update_rayon()`.
-    pub fn hash_bytes(content: &[u8]) -> String {
-        if content.len() > 128 * 1024 {
-            let mut hasher = blake3::Hasher::new();
-            hasher.update_rayon(content);
-            hasher.finalize().to_hex().to_string()
-        } else {
-            blake3::hash(content).to_hex().to_string()
-        }
-    }
-
     /// Calculate BLAKE3 hash of a file (~5× faster than SHA-256).
     ///
     /// Runs entirely on `spawn_blocking` with synchronous I/O so the Tokio
@@ -204,108 +190,6 @@ impl DedupService {
     }
 
     // ── Core store operations ────────────────────────────────────
-
-    /// Maximum payload accepted by `store_bytes`.  Anything larger
-    /// should use `store_from_file` (streaming — constant RAM).
-    const MAX_STORE_BYTES: usize = 10 * 1024 * 1024; // 10 MB
-
-    /// Store content with deduplication (from bytes).
-    ///
-    /// **Write-first strategy**: the blob file is written to disk *before*
-    /// touching PostgreSQL, so the PG connection is never held during I/O.
-    /// The database operation is a single `INSERT … ON CONFLICT` upsert
-    /// (~2-4 ms) instead of `SELECT FOR UPDATE` + write + commit.
-    ///
-    /// **Guard**: rejects payloads >10 MB.  Large content must go through
-    /// `store_from_file` which streams from disk with constant RAM.
-    pub async fn store_bytes(
-        &self,
-        content: &[u8],
-        content_type: Option<String>,
-    ) -> Result<DedupResultDto, DomainError> {
-        if content.len() > Self::MAX_STORE_BYTES {
-            return Err(DomainError::internal_error(
-                "Dedup",
-                format!(
-                    "store_bytes called with {} bytes (max {}). Use store_from_file for large content.",
-                    content.len(),
-                    Self::MAX_STORE_BYTES
-                ),
-            ));
-        }
-
-        let size = content.len() as u64;
-        let hash = Self::hash_bytes(content);
-        let blob_path = self.blob_path(&hash);
-
-        // ── Phase 1: Write blob to disk (NO PG connection held) ─────
-        //
-        // Content-addressable: if two writers race for the same hash,
-        // both produce identical files.  The rename is atomic on the
-        // same filesystem; if it fails because the other writer won,
-        // we just discard our temp file — the blob is already there.
-        if !fs::try_exists(&blob_path).await.unwrap_or(false) {
-            // Parent directory (xx/) guaranteed to exist — created by initialize()
-            let temp_path = self.temp_root.join(format!("{}.tmp", uuid::Uuid::new_v4()));
-            fs::write(&temp_path, content).await.map_err(|e| {
-                DomainError::internal_error("Dedup", format!("Failed to write temp blob: {}", e))
-            })?;
-
-            if let Err(e) = fs::rename(&temp_path, &blob_path).await {
-                if e.raw_os_error() == Some(18) {
-                    // EXDEV: cross-device link — fall back to copy+delete
-                    fs::copy(&temp_path, &blob_path).await.map_err(|ce| {
-                        DomainError::internal_error(
-                            "Dedup",
-                            format!("Failed to copy temp blob cross-device: {}", ce),
-                        )
-                    })?;
-                    let _ = fs::remove_file(&temp_path).await;
-                } else {
-                    // Another writer already placed the blob — discard ours
-                    let _ = fs::remove_file(&temp_path).await;
-                    tracing::debug!("Blob file already placed by concurrent writer: {}", e);
-                }
-            }
-        }
-
-        // ── Phase 2: Single atomic upsert (~2-4 ms, no explicit TX) ─
-        //
-        // `INSERT … ON CONFLICT` is executed as a single implicit
-        // transaction by PostgreSQL.  RETURNING ref_count tells us
-        // whether this was a new blob (ref_count = 1) or a dedup hit.
-        let ref_count: i32 = sqlx::query_scalar(
-            "INSERT INTO storage.blobs (hash, size, ref_count, content_type)
-             VALUES ($1, $2, 1, $3)
-             ON CONFLICT (hash) DO UPDATE SET ref_count = storage.blobs.ref_count + 1
-             RETURNING ref_count",
-        )
-        .bind(&hash)
-        .bind(size as i64)
-        .bind(&content_type)
-        .fetch_one(self.pool.as_ref())
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("Dedup", format!("Failed to upsert blob: {}", e))
-        })?;
-
-        if ref_count > 1 {
-            tracing::info!("DEDUP HIT: {} ({} bytes saved)", &hash[..12], size);
-            Ok(DedupResultDto::ExistingBlob {
-                hash,
-                size,
-                blob_path,
-                saved_bytes: size,
-            })
-        } else {
-            tracing::info!("NEW BLOB: {} ({} bytes)", &hash[..12], size);
-            Ok(DedupResultDto::NewBlob {
-                hash,
-                size,
-                blob_path,
-            })
-        }
-    }
 
     /// Store content with deduplication (streaming from file).
     ///
@@ -494,7 +378,7 @@ impl DedupService {
             DomainError::internal_error("Dedup", format!("Failed to begin transaction: {}", e))
         })?;
 
-        // Lock the row exclusively — prevents concurrent store_bytes from
+        // Lock the row exclusively — prevents concurrent store_from_file from
         // incrementing ref_count while we might be deleting
         let row = sqlx::query_as::<_, (i32, i64)>(
             "SELECT ref_count, size FROM storage.blobs WHERE hash = $1 FOR UPDATE",
@@ -532,7 +416,7 @@ impl DedupService {
             })?;
 
             // Delete blob file AFTER committing PG — the row is gone, so no
-            // concurrent store_bytes can resurrect a reference to this hash.
+            // concurrent store_from_file can resurrect a reference to this hash.
             let blob_path = self.blob_path(hash);
             if let Err(e) = fs::remove_file(&blob_path).await {
                 tracing::warn!("Failed to delete blob file {}: {}", hash, e);
@@ -854,14 +738,6 @@ impl DedupService {
 // ─── Port implementation ─────────────────────────────────────────────────────
 
 impl DedupPort for DedupService {
-    async fn store_bytes(
-        &self,
-        content: &[u8],
-        content_type: Option<String>,
-    ) -> Result<DedupResultDto, DomainError> {
-        self.store_bytes(content, content_type).await
-    }
-
     async fn store_from_file(
         &self,
         source_path: &Path,

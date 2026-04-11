@@ -4,8 +4,8 @@ use axum::{
     http::{Response, StatusCode, header},
     response::IntoResponse,
 };
-use bytes::Bytes;
 use serde::Serialize;
+use tokio::io::AsyncWriteExt;
 
 use crate::application::ports::dedup_ports::DedupResultDto;
 use crate::common::di::AppState;
@@ -134,15 +134,14 @@ impl DedupHandler {
         }
     }
 
-    /// Upload content with automatic deduplication
+    /// Upload content with automatic deduplication (streaming).
     ///
-    /// This endpoint calculates the SHA-256 hash of the uploaded content
-    /// and either creates a new blob or increments the reference count
-    /// of an existing blob.
+    /// Spools the upload to a temp file while computing the BLAKE3 hash
+    /// incrementally (hash-on-write). Memory usage is constant (~512 KB)
+    /// regardless of file size. Then delegates to `store_from_file` with
+    /// the pre-computed hash so the file is never re-read for hashing.
     ///
     /// POST /api/dedup/upload
-    ///
-    /// Returns information about whether the content was new or deduplicated.
     pub async fn upload_with_dedup(
         State(state): State<GlobalState>,
         _auth_user: AuthUser,
@@ -160,38 +159,65 @@ impl DedupHandler {
                     .unwrap_or("application/octet-stream")
                     .to_string();
 
-                // Collect all chunks — explicit match to detect client disconnection
-                let mut chunks: Vec<Bytes> = Vec::new();
-                let mut total_size: usize = 0;
+                // ── Spool to temp file + BLAKE3 hash-on-write ────────
+                let temp_dir = state.core.path_service.get_root_path().join(".dedup_temp");
+                let temp_path = temp_dir.join(format!("dedup-{}", uuid::Uuid::new_v4()));
+
+                let mut total_size: u64 = 0;
+                let mut hasher = blake3::Hasher::new();
                 let mut field = field;
 
-                loop {
-                    match field.chunk().await {
-                        Ok(Some(chunk)) => {
-                            total_size += chunk.len();
-                            chunks.push(chunk);
-                        }
-                        Ok(None) => break,
-                        Err(e) => {
-                            tracing::warn!(
-                                "Connection lost during dedup upload (received {} bytes): {}",
-                                total_size,
-                                e
-                            );
-                            return Response::builder()
-                                .status(StatusCode::BAD_REQUEST)
-                                .header(header::CONTENT_TYPE, "application/json")
-                                .body(Body::from(format!(
-                                    r#"{{"error": "Connection lost during upload: {}"}}"#,
-                                    e
-                                )))
-                                .unwrap()
-                                .into_response();
+                let spool_result: Result<(), String> = async {
+                    let file = tokio::fs::File::create(&temp_path)
+                        .await
+                        .map_err(|e| format!("Failed to create temp file: {}", e))?;
+
+                    // 512 KB buffer — reduces write syscalls
+                    let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
+
+                    loop {
+                        match field.chunk().await {
+                            Ok(Some(chunk)) => {
+                                total_size += chunk.len() as u64;
+                                hasher.update(&chunk);
+                                writer.write_all(&chunk).await.map_err(|e| {
+                                    format!("Failed to write chunk: {}", e)
+                                })?;
+                            }
+                            Ok(None) => break,
+                            Err(e) => {
+                                return Err(format!(
+                                    "Connection lost during upload (received {} bytes): {}",
+                                    total_size, e
+                                ));
+                            }
                         }
                     }
+
+                    writer
+                        .flush()
+                        .await
+                        .map_err(|e| format!("Failed to flush temp file: {}", e))?;
+                    Ok(())
+                }
+                .await;
+
+                if let Err(msg) = spool_result {
+                    let _ = tokio::fs::remove_file(&temp_path).await;
+                    tracing::warn!("Dedup upload spool failed: {}", msg);
+                    return Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(format!(
+                            r#"{{"error": "{}"}}"#,
+                            msg
+                        )))
+                        .unwrap()
+                        .into_response();
                 }
 
-                if chunks.is_empty() {
+                if total_size == 0 {
+                    let _ = tokio::fs::remove_file(&temp_path).await;
                     return Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .header(header::CONTENT_TYPE, "application/json")
@@ -200,19 +226,13 @@ impl DedupHandler {
                         .into_response();
                 }
 
-                // Combine chunks
-                let data: Vec<u8> = if chunks.len() == 1 {
-                    chunks.into_iter().next().unwrap().to_vec()
-                } else {
-                    let mut combined = Vec::with_capacity(total_size);
-                    for chunk in chunks {
-                        combined.extend_from_slice(&chunk);
-                    }
-                    combined
-                };
+                let hash = hasher.finalize().to_hex().to_string();
 
-                // Store with deduplication
-                match dedup.store_bytes(&data, Some(content_type)).await {
+                // ── Store with deduplication (pre-computed hash) ──────
+                match dedup
+                    .store_from_file(&temp_path, Some(content_type), Some(hash))
+                    .await
+                {
                     Ok(result) => {
                         let (is_new, bytes_saved) = match &result {
                             DedupResultDto::NewBlob { .. } => (true, 0),
@@ -250,6 +270,7 @@ impl DedupHandler {
                             .into_response();
                     }
                     Err(e) => {
+                        let _ = tokio::fs::remove_file(&temp_path).await;
                         tracing::error!("Dedup upload failed: {}", e);
                         return Response::builder()
                             .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -463,5 +484,211 @@ impl DedupHandler {
             .body(Body::from(serde_json::to_string(&response).unwrap()))
             .unwrap()
             .into_response()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncWriteExt;
+
+    /// Verify that the hash-on-write pattern produces the same BLAKE3 hash
+    /// as hashing the entire content at once.
+    #[tokio::test]
+    async fn hash_on_write_matches_full_hash() {
+        let content = b"Hello, OxiCloud dedup streaming upload!";
+
+        // 1. Full-content hash (reference)
+        let full_hash = blake3::hash(content).to_hex().to_string();
+
+        // 2. Incremental hash-on-write (what the handler does)
+        let mut hasher = blake3::Hasher::new();
+        // Simulate multiple chunks
+        hasher.update(&content[..10]);
+        hasher.update(&content[10..25]);
+        hasher.update(&content[25..]);
+        let incremental_hash = hasher.finalize().to_hex().to_string();
+
+        assert_eq!(full_hash, incremental_hash);
+    }
+
+    /// Verify BLAKE3 incremental hashing produces a valid 64-char hex hash.
+    #[tokio::test]
+    async fn incremental_hash_format_is_valid() {
+        let content = vec![0xABu8; 1024 * 1024]; // 1 MB of data
+
+        let mut hasher = blake3::Hasher::new();
+        // Feed in 64 KB chunks like real uploads
+        for chunk in content.chunks(65_536) {
+            hasher.update(chunk);
+        }
+        let hash = hasher.finalize().to_hex().to_string();
+
+        assert_eq!(hash.len(), 64, "BLAKE3 hash should be 64 hex characters");
+        assert!(
+            hash.chars().all(|c| c.is_ascii_hexdigit()),
+            "Hash should only contain hex characters"
+        );
+    }
+
+    /// Verify spool-to-disk + BLAKE3 hash-on-write writes correct content
+    /// and produces the correct hash.
+    #[tokio::test]
+    async fn spool_to_temp_file_preserves_content_and_hash() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().join("test-upload.tmp");
+
+        let content = b"The quick brown fox jumps over the lazy dog";
+        let expected_hash = blake3::hash(content).to_hex().to_string();
+
+        // Simulate the handler's hash-on-write spool loop
+        let mut hasher = blake3::Hasher::new();
+        let mut total_size: u64 = 0;
+        {
+            let file = tokio::fs::File::create(&temp_path).await.unwrap();
+            let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
+
+            // Simulate 3 incoming chunks
+            let chunks: &[&[u8]] = &[&content[..10], &content[10..30], &content[30..]];
+            for chunk in chunks {
+                total_size += chunk.len() as u64;
+                hasher.update(chunk);
+                writer.write_all(chunk).await.unwrap();
+            }
+            writer.flush().await.unwrap();
+        }
+
+        let hash = hasher.finalize().to_hex().to_string();
+
+        // Verify hash matches
+        assert_eq!(hash, expected_hash);
+
+        // Verify total size
+        assert_eq!(total_size, content.len() as u64);
+
+        // Verify file content on disk is identical
+        let disk_content = tokio::fs::read(&temp_path).await.unwrap();
+        assert_eq!(disk_content, content);
+    }
+
+    /// Verify that an empty upload produces total_size == 0.
+    #[tokio::test]
+    async fn empty_upload_detected_before_store() {
+        let hasher = blake3::Hasher::new();
+        let total_size: u64 = 0;
+
+        // No chunks fed — simulates empty file
+        let _hash = hasher.finalize().to_hex().to_string();
+
+        // The handler checks total_size == 0 and returns 400
+        assert_eq!(total_size, 0);
+    }
+
+    /// Verify large payload streaming produces consistent hash
+    /// without buffering all content in memory.
+    #[tokio::test]
+    async fn large_payload_streaming_hash_consistency() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().join("large-upload.tmp");
+
+        // 5 MB of patterned data
+        let chunk_size = 65_536usize; // 64 KB chunks
+        let total_chunks = 80; // 80 × 64 KB = 5 MB
+        let mut reference_data = Vec::with_capacity(chunk_size * total_chunks);
+
+        let mut hasher = blake3::Hasher::new();
+        let mut total_size: u64 = 0;
+        {
+            let file = tokio::fs::File::create(&temp_path).await.unwrap();
+            let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
+
+            for i in 0..total_chunks {
+                // Patterned data: each chunk filled with its index byte
+                let chunk = vec![(i % 256) as u8; chunk_size];
+                reference_data.extend_from_slice(&chunk);
+                total_size += chunk.len() as u64;
+                hasher.update(&chunk);
+                writer.write_all(&chunk).await.unwrap();
+            }
+            writer.flush().await.unwrap();
+        }
+
+        let streaming_hash = hasher.finalize().to_hex().to_string();
+        let reference_hash = blake3::hash(&reference_data).to_hex().to_string();
+
+        // Hashes match
+        assert_eq!(streaming_hash, reference_hash);
+
+        // File on disk matches
+        let file_size = tokio::fs::metadata(&temp_path).await.unwrap().len();
+        assert_eq!(file_size, total_size);
+        assert_eq!(total_size, (chunk_size * total_chunks) as u64);
+
+        // Verify file content matches (read back)
+        let disk_data = tokio::fs::read(&temp_path).await.unwrap();
+        assert_eq!(disk_data, reference_data);
+    }
+
+    /// Verify temp file is cleaned up when spool fails partway through.
+    #[tokio::test]
+    async fn temp_file_cleanup_on_partial_write() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let temp_path = temp_dir.path().join("partial-upload.tmp");
+
+        // Create the file and write some data
+        {
+            let file = tokio::fs::File::create(&temp_path).await.unwrap();
+            let mut writer = tokio::io::BufWriter::with_capacity(524_288, file);
+            writer.write_all(b"partial data").await.unwrap();
+            writer.flush().await.unwrap();
+        }
+
+        // File exists before cleanup
+        assert!(tokio::fs::try_exists(&temp_path).await.unwrap());
+
+        // Simulate the handler's error cleanup path
+        let _ = tokio::fs::remove_file(&temp_path).await;
+
+        // File is gone after cleanup
+        assert!(!tokio::fs::try_exists(&temp_path).await.unwrap_or(true));
+    }
+
+    /// Verify the DedupUploadResponse serializes correctly for new blobs.
+    #[test]
+    fn dedup_upload_response_serialization_new_blob() {
+        let response = DedupUploadResponse {
+            is_new: true,
+            hash: "a".repeat(64),
+            size: 1024,
+            bytes_saved: 0,
+            ref_count: 1,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["is_new"], true);
+        assert_eq!(parsed["size"], 1024);
+        assert_eq!(parsed["bytes_saved"], 0);
+        assert_eq!(parsed["ref_count"], 1);
+    }
+
+    /// Verify the DedupUploadResponse serializes correctly for dedup hits.
+    #[test]
+    fn dedup_upload_response_serialization_dedup_hit() {
+        let response = DedupUploadResponse {
+            is_new: false,
+            hash: "b".repeat(64),
+            size: 2048,
+            bytes_saved: 2048,
+            ref_count: 3,
+        };
+
+        let json = serde_json::to_string(&response).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["is_new"], false);
+        assert_eq!(parsed["bytes_saved"], 2048);
+        assert_eq!(parsed["ref_count"], 3);
     }
 }

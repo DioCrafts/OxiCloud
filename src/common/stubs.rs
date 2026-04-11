@@ -716,17 +716,6 @@ use crate::application::ports::dedup_ports::{
 pub struct StubDedupPort;
 
 impl DedupPort for StubDedupPort {
-    async fn store_bytes(
-        &self,
-        _content: &[u8],
-        _content_type: Option<String>,
-    ) -> Result<DedupResultDto, DomainError> {
-        Err(DomainError::internal_error(
-            "DedupService",
-            "DedupService not initialized",
-        ))
-    }
-
     async fn store_from_file(
         &self,
         _source_path: &Path,
