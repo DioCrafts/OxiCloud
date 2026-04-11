@@ -55,9 +55,9 @@ const contextMenus = {
         const option = document.getElementById('add-to-playlist-option');
         if (!option) return;
 
-        const targetFile = window.app && window.app.contextMenuTargetFile;
+        const targetFile = window.app?.contextMenuTargetFile;
         if (targetFile) {
-            const isAudio = targetFile.mime_type && targetFile.mime_type.startsWith('audio/');
+            const isAudio = targetFile.mime_type?.startsWith('audio/');
             option.classList.toggle('hidden', !isAudio);
         } else {
             option.classList.add('hidden');
@@ -1142,7 +1142,9 @@ const contextMenus = {
             `;
 
             item.addEventListener('click', () => {
-                container.querySelectorAll('.folder-select-item').forEach((el) => el.classList.remove('selected'));
+                container.querySelectorAll('.folder-select-item').forEach((el) => {
+                    el.classList.remove('selected');
+                });
                 item.classList.add('selected');
                 this._selectedPlaylistId = playlist.id;
                 const addBtn = document.getElementById('playlist-add-btn');
@@ -1178,7 +1180,7 @@ const contextMenus = {
                 throw new Error(err.message || 'Failed to add tracks');
             }
 
-            const result = await resp.json();
+            await resp.json();
             window.ui.showNotification(
                 window.i18n ? window.i18n.t('music.added', 'Added!') : 'Added!',
                 `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${window.i18n ? window.i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
@@ -1187,7 +1189,7 @@ const contextMenus = {
             this.closePlaylistDialog();
 
             // Refresh music view if open
-            if (window.musicView && window.musicView.playlists) {
+            if (window.musicView?.playlists) {
                 window.musicView._loadPlaylists();
             }
         } catch (err) {

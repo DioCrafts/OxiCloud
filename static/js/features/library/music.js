@@ -391,26 +391,24 @@ const musicView = {
                 )
                 .join('')}
         `;
-
-        const self = this;
         trackListEl.querySelectorAll('.music-track').forEach((row) => {
             row.addEventListener('click', () => {
-                const idx = parseInt(row.dataset.idx);
+                const idx = parseInt(row.dataset.idx, 10);
                 // Toggle selection
                 trackListEl.querySelectorAll('.music-track').forEach((r) => {
                     if (r !== row) r.classList.remove('selected');
                 });
                 row.classList.toggle('selected');
-                self.selected.clear();
+                this.selected.clear();
                 if (row.classList.contains('selected')) {
-                    self.selected.add(idx);
+                    this.selected.add(idx);
                 }
             });
 
             row.addEventListener('dblclick', (e) => {
                 e.preventDefault();
-                const idx = parseInt(row.dataset.idx);
-                self._playTrack(idx);
+                const idx = parseInt(row.dataset.idx, 10);
+                this._playTrack(idx);
             });
 
             // Drag & drop
@@ -421,7 +419,9 @@ const musicView = {
             });
             row.addEventListener('dragend', () => {
                 row.classList.remove('dragging');
-                trackListEl.querySelectorAll('.music-track').forEach((r) => r.classList.remove('drag-over'));
+                trackListEl.querySelectorAll('.music-track').forEach((r) => {
+                    r.classList.remove('drag-over');
+                });
             });
             row.addEventListener('dragover', (e) => {
                 e.preventDefault();
@@ -437,10 +437,10 @@ const musicView = {
             row.addEventListener('drop', (e) => {
                 e.preventDefault();
                 row.classList.remove('drag-over');
-                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-                const toIdx = parseInt(row.dataset.idx);
+                const fromIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+                const toIdx = parseInt(row.dataset.idx, 10);
                 if (fromIdx !== toIdx) {
-                    self._reorderTrack(fromIdx, toIdx);
+                    this._reorderTrack(fromIdx, toIdx);
                 }
             });
 
@@ -449,7 +449,7 @@ const musicView = {
             if (removeBtn) {
                 removeBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    self._removeTrackFromPlaylist(row.dataset.id, row.dataset.fileId);
+                    this._removeTrackFromPlaylist(row.dataset.id, row.dataset.fileId);
                 });
             }
         });
@@ -499,7 +499,7 @@ const musicView = {
             icon: 'fa-music',
             confirmText: t('music.create', 'Create')
         });
-        if (!name || !name.trim()) return;
+        if (!name?.trim()) return;
 
         this._createPlaylist(name.trim());
     },
@@ -653,7 +653,7 @@ const musicView = {
             icon: 'fa-pen',
             confirmText: t('actions.confirm', 'Save')
         });
-        if (!newName || !newName.trim() || newName.trim() === this.currentPlaylist.name) return;
+        if (!newName?.trim() || newName.trim() === this.currentPlaylist.name) return;
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
@@ -699,7 +699,7 @@ const musicView = {
             icon: 'fa-share-alt',
             confirmText: t('music.share', 'Share')
         });
-        if (!userId || !userId.trim()) return;
+        if (!userId?.trim()) return;
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share`, {
@@ -1619,7 +1619,7 @@ const musicPlayer = {
 
         if (musicView.currentTracks.length > 0) {
             document.querySelectorAll('.music-track').forEach((row) => {
-                const idx = parseInt(row.dataset.idx);
+                const idx = parseInt(row.dataset.idx, 10);
                 row.classList.toggle('playing', idx === this.currentIndex && this.isPlaying);
 
                 const numText = row.querySelector('.track-num-text');
@@ -1695,7 +1695,7 @@ const musicPlayer = {
         queueList.querySelectorAll('.player-queue-item').forEach((item) => {
             item.addEventListener('click', (e) => {
                 if (e.target.closest('.queue-item-remove')) return;
-                const idx = parseInt(item.dataset.idx);
+                const idx = parseInt(item.dataset.idx, 10);
                 this.playTrack(idx);
             });
         });
@@ -1703,7 +1703,7 @@ const musicPlayer = {
         queueList.querySelectorAll('.queue-item-remove').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const idx = parseInt(btn.dataset.idx);
+                const idx = parseInt(btn.dataset.idx, 10);
                 this._removeFromQueue(idx);
             });
         });
@@ -1748,7 +1748,7 @@ const musicPlayer = {
     },
 
     _formatTime(secs) {
-        if (!secs || isNaN(secs)) return '0:00';
+        if (!secs || Number.isNaN(secs)) return '0:00';
         const mins = Math.floor(secs / 60);
         const s = Math.floor(secs % 60);
         return `${mins}:${s.toString().padStart(2, '0')}`;
