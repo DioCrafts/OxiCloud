@@ -5,7 +5,7 @@
     flex-wrap: wrap;
     margin-bottom: 15px;
     font-size: 14px;
-    color: #666;
+    color: var(--color-text-medium);
     gap: 2px;
 }
 
@@ -20,29 +20,29 @@
 
 .breadcrumb-link {
     cursor: pointer;
-    color: #5a6f8a;
+    color: var(--color-text-muted);
 }
 
 .breadcrumb-link.drop-target {
-    background-color: rgba(255, 193, 7, 0.1);
-    border: 2px dashed #ffc107;
+    background-color: var(--color-warning-ring);
+    border: 2px dashed var(--color-warning-border);
 }
 
 .breadcrumb-link:hover {
     text-decoration: underline;
-    color: #ff5e3a;
-    background: rgba(255, 94, 58, 0.06);
+    color: var(--color-accent);
+    background: var(--color-accent-bg);
 }
 
 .breadcrumb-current {
     font-weight: 600;
-    color: #333;
+    color: var(--color-text-black);
     cursor: default;
 }
 
 .breadcrumb-separator {
     margin: 0 4px;
-    color: #adb5bd;
+    color: var(--color-text-faint);
     font-size: 12px;
     user-select: none;
 }
@@ -61,5 +61,5 @@
 }
 
 .breadcrumb-home.breadcrumb-link:hover {
-    background: rgba(255, 94, 58, 0.1);
+    background: var(--color-accent-ring);
 }

@@ -1,13 +1,13 @@
 /* Sidebar */
 .sidebar {
     width: 250px;
-    background: linear-gradient(180deg, #2a3042 0%, #232838 100%);
-    color: #fff;
+    background: linear-gradient(180deg, var(--color-sidebar-bg-from) 0%, var(--color-sidebar-bg-to) 100%);
+    color: var(--color-sidebar-text-active);
     display: flex;
     flex-direction: column;
     height: 100%;
     flex-shrink: 0;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 2px 0 12px var(--color-shadow-md);
     transition: transform 0.3s ease;
 }
 
@@ -19,7 +19,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--color-sidebar-overlay);
     z-index: 998;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -59,7 +59,7 @@
     padding: 22px 20px;
     display: flex;
     align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid var(--color-sidebar-separator);
     margin-bottom: 8px;
     text-decoration: none;
     color: inherit;
@@ -68,13 +68,13 @@
 .logo {
     width: 40px;
     height: 40px;
-    background: linear-gradient(135deg, #ff5e3a 0%, #ff8a5c 100%);
+    background: var(--color-sidebar-logo-gradient);
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 12px;
-    box-shadow: 0 3px 10px rgba(255, 94, 58, 0.35);
+    box-shadow: 0 3px 10px var(--color-sidebar-shadow);
     transition:
         transform 0.2s,
         box-shadow 0.2s;
@@ -87,19 +87,19 @@
 
 .logo:hover {
     transform: scale(1.05);
-    box-shadow: 0 4px 14px rgba(255, 94, 58, 0.45);
+    box-shadow: 0 4px 14px var(--color-sidebar-shadow-lg);
 }
 
 .logo svg {
     width: 22px;
     height: 22px;
-    fill: white;
+    fill: var(--color-sidebar-text-active);
 }
 
 .app-name {
     font-size: 19px;
     font-weight: 700;
-    color: white;
+    color: var(--color-sidebar-text-active);
     letter-spacing: 0.3px;
 }
 
@@ -117,7 +117,7 @@
     padding: 11px 14px;
     border-radius: 10px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.65);
+    color: var(--color-sidebar-text);
     font-size: 14.5px;
     font-weight: 500;
     transition: all 0.2s ease;
@@ -131,19 +131,19 @@
 }
 
 .nav-item:hover {
-    background-color: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.9);
+    background-color: var(--color-sidebar-hover-bg);
+    color: var(--color-sidebar-text-hover);
 }
 
 .nav-item.active {
-    background-color: rgba(255, 94, 58, 0.12);
-    color: #fff;
-    border-left-color: #ff5e3a;
+    background-color: var(--color-sidebar-active-bg);
+    color: var(--color-sidebar-text-active);
+    border-left-color: var(--color-accent);
     font-weight: 600;
 
     [dir="rtl"] & {
         border-left-color: transparent;
-        border-right-color: #ff5e3a;
+        border-right-color: var(--color-accent);
     }
 }
 
@@ -169,52 +169,52 @@
 /* Colored icons per section */
 .nav-item:nth-child(1) i,
 .nav-item:nth-child(1) .oxi-icon {
-    color: #ffa94d;
+    color: var(--color-cal-1);
 } /* Files - orange */
 .nav-item:nth-child(2) i,
 .nav-item:nth-child(2) .oxi-icon {
-    color: #74b9ff;
+    color: var(--color-cal-2);
 } /* Shared - blue */
 .nav-item:nth-child(3) i,
 .nav-item:nth-child(3) .oxi-icon {
-    color: #81ecec;
+    color: var(--color-cal-3);
 } /* Recent - teal */
 .nav-item:nth-child(4) i,
 .nav-item:nth-child(4) .oxi-icon {
-    color: #ffd43b;
+    color: var(--color-cal-4);
 } /* Favorites - gold */
 .nav-item:nth-child(5) i,
 .nav-item:nth-child(5) .oxi-icon {
-    color: #ff6b9d;
+    color: var(--color-cal-5);
 } /* Photos - pink */
 .nav-item:nth-child(6) i,
 .nav-item:nth-child(6) .oxi-icon {
-    color: #ff7675;
+    color: var(--color-cal-6);
 } /* Trash - red */
 
 .nav-item.active:nth-child(1) i,
 .nav-item.active:nth-child(1) .oxi-icon {
-    color: #ff5e3a;
+    color: var(--color-accent);
 }
 .nav-item.active:nth-child(2) i,
 .nav-item.active:nth-child(2) .oxi-icon {
-    color: #0984e3;
+    color: var(--color-cal-7);
 }
 .nav-item.active:nth-child(3) i,
 .nav-item.active:nth-child(3) .oxi-icon {
-    color: #00cec9;
+    color: var(--color-cal-8);
 }
 .nav-item.active:nth-child(4) i,
 .nav-item.active:nth-child(4) .oxi-icon {
-    color: #f0c800;
+    color: var(--color-cal-9);
 }
 .nav-item.active:nth-child(5) i,
 .nav-item.active:nth-child(5) .oxi-icon {
-    color: #e84393;
+    color: var(--color-cal-10);
 }
 .nav-item.active:nth-child(6) i,
 .nav-item.active:nth-child(6) .oxi-icon {
-    color: #e74c3c;
+    color: var(--color-cal-11);
 }
 
 .nav-item:hover i,
@@ -225,8 +225,8 @@
 /* Storage indicator */
 .storage-container {
     margin: auto 12px 16px 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: var(--color-sidebar-storage-bg);
+    border: 1px solid var(--color-sidebar-storage-border);
     border-radius: 12px;
     padding: 16px;
 }
@@ -239,13 +239,13 @@
     margin-bottom: 12px;
     font-size: 13px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--color-sidebar-storage-text);
     letter-spacing: 0.3px;
 }
 
 .storage-bar {
     height: 6px;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--color-sidebar-storage-bar);
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 10px;
@@ -253,7 +253,7 @@
 
 .storage-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ff5e3a 0%, #ff8a5c 100%);
+    background: var(--color-sidebar-progress);
     border-radius: 3px;
     width: 0%;
     transition: width 0.8s ease;
@@ -262,6 +262,6 @@
 .storage-info {
     text-align: center;
     font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-sidebar-storage-faint);
     font-weight: 400;
 }

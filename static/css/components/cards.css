@@ -14,8 +14,8 @@
 /* Rubber band / lasso selection rectangle */
 .selection-rect {
     position: fixed;
-    border: 1.5px solid var(--primary-color, #e67e22);
-    background-color: rgba(230, 126, 34, 0.08);
+    border: 1.5px solid var(--primary-color, var(--color-card-drop-border));
+    background-color: var(--color-card-drop-tint);
     pointer-events: none;
     z-index: 1000;
     border-radius: 3px;
@@ -27,14 +27,14 @@
 }
 
 .files-grid-view .file-item {
-    background-color: white;
+    background-color: var(--color-bg-surface);
     border-radius: 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     padding: 16px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 3px var(--color-shadow-xs);
     cursor: pointer;
     width: 100%;
     min-height: 160px;
@@ -43,23 +43,23 @@
 
 .files-grid-view .file-item:hover {
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
-    border-color: #cbd5e0;
+    box-shadow: 0 5px 15px var(--color-shadow-sm);
+    border-color: var(--color-border-medium);
 }
 
 .files-grid-view .file-item.selected {
-    border-color: #ff5e3a;
-    background: #fff8f6;
+    border-color: var(--color-accent);
+    background: var(--color-item-selected);
     box-shadow:
-        0 0 0 1px rgba(255, 94, 58, 0.15),
-        0 4px 12px rgba(255, 94, 58, 0.1);
+        0 0 0 1px var(--color-accent-ring-dark),
+        0 4px 12px var(--color-accent-ring);
 }
 
 .files-grid-view .file-item.selected:hover {
-    border-color: #ff5e3a;
+    border-color: var(--color-accent);
     box-shadow:
-        0 0 0 1px rgba(255, 94, 58, 0.2),
-        0 6px 18px rgba(255, 94, 58, 0.15);
+        0 0 0 1px var(--color-accent-ring-strong),
+        0 6px 18px var(--color-accent-ring-dark);
 }
 
 /* element hidden on grid view */
@@ -75,7 +75,7 @@
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: white;
+    background: var(--color-bg-surface);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -90,12 +90,12 @@
 
 .files-grid-view .file-item.selected .checkbox-cell {
     opacity: 1;
-    background: #ff5e3a;
-    border-color: #ff5e3a;
+    background: var(--color-accent);
+    border-color: var(--color-accent);
 }
 
 .files-grid-view .file-item.selected .checkbox-cell i {
-    color: white;
+    color: var(--color-danger-text);
     font-size: 11px;
 }
 
@@ -115,7 +115,7 @@
     opacity: 0;
     z-index: 10;
     cursor: pointer;
-    color: #64748b;
+    color: var(--color-text-subtle);
     font-size: 16px;
 }
 
@@ -124,8 +124,8 @@
 }
 
 .files-grid-view .file-actions:hover {
-    background: #f1f5f9;
-    color: #334155;
+    background: var(--color-border-light);
+    color: var(--color-text-dark);
 }
 
 /* Favorite star (mirrors file-actions button pattern) */
@@ -144,7 +144,7 @@
     opacity: 0;
     z-index: 12;
     cursor: pointer;
-    color: #cbd5e0;
+    color: var(--color-border-medium);
     font-size: 15px;
     padding: 0;
     line-height: 1;
@@ -155,16 +155,16 @@
 }
 
 .files-grid-view .file-item button.favorite-star:hover {
-    color: #fbbf24;
+    color: var(--color-star-text);
 }
 
 .files-grid-view .file-item button.favorite-star.active {
     opacity: 1;
-    color: #f59e0b;
+    color: var(--color-star-text-hover);
 }
 
 .files-grid-view .file-item button.favorite-star.active:hover {
-    color: #d97706;
+    color: var(--color-star-active);
 }
 
 .files-grid-view .file-item.dragging {
@@ -174,34 +174,48 @@
 }
 
 .files-grid-view .file-item.drop-target {
-    background-color: rgba(255, 193, 7, 0.1);
-    border: 2px dashed #ffc107;
+    background-color: var(--color-warning-ring);
+    border: 2px dashed var(--color-warning-border);
 }
 
-/* ensure icon centered */
-.files-grid-view .file-item .name-cell .file-icon {
-    margin: auto;
-}
-
-/* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
-   CSS shapes (::before / ::after) already convey the file type visually.
-   Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
-   List-view icons (.file-item .file-icon) are NOT affected. */
-.files-grid-view .file-item .file-icon > i,
-.files-grid-view .file-item .file-icon > svg {
-    display: none !important;
-}
-
-.file-icon.folder-icon {
+.file-icon {
     width: 100px;
     height: 70px;
-    background-color: #ffeaa7;
     border-radius: 8px;
     position: relative;
-    margin-bottom: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
+    overflow: hidden;
+}
+
+/* -------------------------------------------------------------------- */
+
+.files-grid-view .file-icon {
+    margin: auto;
+    margin-bottom: 10px;
+}
+
+.files-grid-view .file-item .file-icon > i,
+.files-grid-view .file-item .file-icon > svg {
+    /* biome-ignore lint/complexity/noImportantStyles: <explanation> */
+    position: absolute;
+    top: 5px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* display: none !important;*/
+}
+
+.file-icon.folder-icon {
+    background-color: var(--color-ft-folder-bg);
+}
+
+.file-icon.folder-icon > i,
+.file-icon.folder-icon > svg {
+    display: none !important;
 }
 
 .file-icon.folder-icon::before {
@@ -211,132 +225,33 @@
     left: 0;
     right: 0;
     height: 20px;
-    background-color: #fdcb6e;
+    background-color: var(--color-ft-folder-tab);
     border-radius: 8px 8px 0 0;
 }
 
 .file-icon.pdf-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #fee2e2;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #e53e3e;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.pdf-icon::after {
-    content: "PDF";
-    font-size: 16px;
-    font-weight: 700;
-    color: #e53e3e;
-    opacity: 0.65;
-    letter-spacing: 1px;
+    background-color: var(--color-ft-pdf-bg);
+    color: var(--color-ft-pdf-text);
 }
 
 .file-icon.doc-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #ebf5fb;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #2b6cb0;
-    overflow: hidden;
-}
-
-.file-icon.doc-icon::before {
-    content: "";
-    position: absolute;
-    top: 18px;
-    left: 18px;
-    right: 18px;
-    height: 3px;
-    background-color: #2b6cb0;
-    opacity: 0.3;
-    border-radius: 2px;
-}
-
-.file-icon.doc-icon::after {
-    content: "";
-    position: absolute;
-    top: 28px;
-    left: 18px;
-    right: 28px;
-    height: 3px;
-    background-color: #2b6cb0;
-    opacity: 0.25;
-    border-radius: 2px;
+    background-color: var(--color-ft-doc-bg);
+    color: var(--color-ft-doc-text);
 }
 
 .file-icon.script-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #e8f5e9;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #4eaa25;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.script-icon::after {
-    content: ">_";
-    font-size: 18px;
-    font-weight: 700;
-    font-family: monospace;
-    color: #4eaa25;
-    opacity: 0.55;
+    background-color: var(--color-ft-script-bg);
+    color: var(--color-ft-script-text);
 }
 
 .file-icon.config-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #f1f3f5;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #718096;
-    overflow: hidden;
-}
-
-.file-icon.config-icon::before {
-    content: "";
-    position: absolute;
-    top: 15px;
-    left: 16px;
-    width: 10px;
-    height: 10px;
-    border: 2px solid #718096;
-    border-radius: 50%;
-    opacity: 0.4;
-}
-
-.file-icon.config-icon::after {
-    content: "";
-    position: absolute;
-    top: 19px;
-    left: 34px;
-    right: 16px;
-    height: 3px;
-    background-color: #718096;
-    opacity: 0.3;
-    border-radius: 2px;
+    background-color: var(--color-ft-config-bg);
+    color: var(--color-ft-config-text);
 }
 
 .file-icon.image-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #74b9ff;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    overflow: hidden;
+    background-color: var(--color-ft-image-bg);
+    color: var(--color-ft-image-text);
 }
 
 /* Thumbnail image inside file-icon (grid and list views) */
@@ -349,417 +264,126 @@
     object-fit: cover;
     z-index: 1;
 }
-/*
-.file-icon.image-icon::before {
-	content: "";
-	position: absolute;
-	top: 10px;
-	left: 15px;
-	width: 20px;
-	height: 20px;
-	background-color: #ffda79;
-	border-radius: 50%;
-}
-*/
+
 .file-icon.video-icon {
-    width: 100px;
-    height: 70px;
-    background: linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #fce7f3 100%);
-    border-radius: 10px;
-    position: relative;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(139, 92, 246, 0.15);
-}
-
-.file-icon.video-icon::before {
-    content: "";
-    width: 36px;
-    height: 36px;
-    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
-    border-radius: 50%;
-    position: absolute;
-    box-shadow: 0 3px 10px rgba(139, 92, 246, 0.35);
-}
-
-.file-icon.video-icon::after {
-    content: "";
-    width: 0;
-    height: 0;
-    border-top: 7px solid transparent;
-    border-bottom: 7px solid transparent;
-    border-left: 11px solid white;
-    position: absolute;
-    margin-left: 3px;
+    background: linear-gradient(135deg, var(--color-ft-video-bg-from), var(--color-ft-video-bg-to));
+    color: var(--color-ft-video-text);
 }
 
 .file-icon.code-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #e2e8f0;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #556ee6;
-    overflow: hidden;
-}
-
-.file-icon.code-icon::before,
-.file-icon.code-icon::after {
-    content: "";
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    height: 2px;
-    background-color: #556ee6;
-}
-
-.file-icon.code-icon::before {
-    top: 15px;
-    width: 80%;
-}
-
-.file-icon.code-icon::after {
-    top: 25px;
-    width: 60%;
-}
-
-.file-icon.code-icon .code-line-1,
-.file-icon.code-icon .code-line-2,
-.file-icon.code-icon .code-line-3 {
-    position: absolute;
-    left: 10px;
-    height: 2px;
-    background-color: #a0aec0;
-}
-
-.file-icon.code-icon .code-line-1 {
-    top: 35px;
-    width: 70%;
-}
-
-.file-icon.code-icon .code-line-2 {
-    top: 45px;
-    width: 85%;
-}
-
-.file-icon.code-icon .code-line-3 {
-    top: 55px;
-    width: 50%;
+    background-color: var(--color-border);
 }
 
 .file-icon.json-icon {
-    border-top-color: #ffb86c;
-}
-
-.file-icon.json-icon::before,
-.file-icon.json-icon::after {
-    background-color: #ffb86c;
+    border-top-color: var(--color-ft-orange-light);
 }
 
 .file-icon.js-icon {
-    border-top-color: #ffd43b;
-}
-
-.file-icon.js-icon::before,
-.file-icon.js-icon::after {
-    background-color: #ffd43b;
+    border-top-color: var(--color-ft-yellow);
 }
 
 .file-icon.html-icon {
-    border-top-color: #e34c26;
-}
-
-.file-icon.html-icon::before,
-.file-icon.html-icon::after {
-    background-color: #e34c26;
+    border-top-color: var(--color-ft-html);
 }
 
 .file-icon.css-icon {
-    border-top-color: #2965f1;
-}
-
-.file-icon.css-icon::before,
-.file-icon.css-icon::after {
-    background-color: #2965f1;
+    border-top-color: var(--color-ft-js);
 }
 
 .file-icon.py-icon {
-    border-top-color: #3776ab;
-}
-
-.file-icon.py-icon::before,
-.file-icon.py-icon::after {
-    background-color: #3776ab;
+    border-top-color: var(--color-ft-python);
 }
 
 .file-icon.ts-icon {
-    border-top-color: #3178c6;
-}
-
-.file-icon.ts-icon::before,
-.file-icon.ts-icon::after {
-    background-color: #3178c6;
+    border-top-color: var(--color-ft-typescript);
 }
 
 .file-icon.rust-icon {
-    border-top-color: #dea584;
-}
-
-.file-icon.rust-icon::before,
-.file-icon.rust-icon::after {
-    background-color: #dea584;
+    border-top-color: var(--color-ft-rust);
 }
 
 .file-icon.go-icon {
-    border-top-color: #00add8;
-}
-
-.file-icon.go-icon::before,
-.file-icon.go-icon::after {
-    background-color: #00add8;
+    border-top-color: var(--color-ft-go);
 }
 
 .file-icon.java-icon {
-    border-top-color: #e76f00;
-}
-
-.file-icon.java-icon::before,
-.file-icon.java-icon::after {
-    background-color: #e76f00;
+    border-top-color: var(--color-ft-java);
 }
 
 .file-icon.c-icon {
-    border-top-color: #555;
-}
-
-.file-icon.c-icon::before,
-.file-icon.c-icon::after {
-    background-color: #555;
+    border-top-color: var(--color-ft-shell);
 }
 
 .file-icon.cs-icon {
-    border-top-color: #68217a;
-}
-
-.file-icon.cs-icon::before,
-.file-icon.cs-icon::after {
-    background-color: #68217a;
+    border-top-color: var(--color-ft-csharp);
 }
 
 .file-icon.php-icon {
-    border-top-color: #8892be;
-}
-
-.file-icon.php-icon::before,
-.file-icon.php-icon::after {
-    background-color: #8892be;
+    border-top-color: var(--color-ft-php);
 }
 
 .file-icon.ruby-icon {
-    border-top-color: #cc342d;
-}
-
-.file-icon.ruby-icon::before,
-.file-icon.ruby-icon::after {
-    background-color: #cc342d;
+    border-top-color: var(--color-ft-ruby);
 }
 
 .file-icon.swift-icon {
-    border-top-color: #fa7343;
-}
-
-.file-icon.swift-icon::before,
-.file-icon.swift-icon::after {
-    background-color: #fa7343;
+    border-top-color: var(--color-ft-swift);
 }
 
 .file-icon.kotlin-icon {
-    border-top-color: #7f52ff;
-}
-
-.file-icon.kotlin-icon::before,
-.file-icon.kotlin-icon::after {
-    background-color: #7f52ff;
+    border-top-color: var(--color-ft-kotlin);
 }
 
 .file-icon.sql-icon {
-    border-top-color: #e38c00;
-}
-
-.file-icon.sql-icon::before,
-.file-icon.sql-icon::after {
-    background-color: #e38c00;
+    border-top-color: var(--color-ft-scala);
 }
 
 .file-icon.yaml-icon {
-    border-top-color: #cb171e;
-}
-
-.file-icon.yaml-icon::before,
-.file-icon.yaml-icon::after {
-    background-color: #cb171e;
+    border-top-color: var(--color-ft-angular);
 }
 
 .file-icon.toml-icon {
-    border-top-color: #9c4221;
-}
-
-.file-icon.toml-icon::before,
-.file-icon.toml-icon::after {
-    background-color: #9c4221;
+    border-top-color: var(--color-ft-cpp);
 }
 
 .file-icon.md-icon {
-    border-top-color: #083fa1;
-}
-
-.file-icon.md-icon::before,
-.file-icon.md-icon::after {
-    background-color: #083fa1;
+    border-top-color: var(--color-ft-docker);
 }
 
 .file-icon.spreadsheet-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #e6f4ea;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #0d904f;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.spreadsheet-icon::before {
-    content: "";
-    position: absolute;
-    top: 12px;
-    left: 18px;
-    width: 64px;
-    height: 44px;
-    background:
-        repeating-linear-gradient(to bottom, #0d904f 0px, #0d904f 1px, transparent 1px, transparent 11px),
-        repeating-linear-gradient(to right, #0d904f 0px, #0d904f 1px, transparent 1px, transparent 22px);
-    opacity: 0.35;
+    background-color: var(--color-ft-spreadsheet-bg);
+    color: var(--color-ft-spreadsheet-text);
 }
 
 .file-icon.presentation-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #fef3e2;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #d04423;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.presentation-icon::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    left: 22px;
-    width: 56px;
-    height: 38px;
-    border: 2px solid #d04423;
-    border-radius: 4px;
-    opacity: 0.4;
-}
-
-.file-icon.presentation-icon::after {
-    content: "";
-    position: absolute;
-    top: 24px;
-    left: 38px;
-    width: 0;
-    height: 0;
-    border-top: 10px solid transparent;
-    border-bottom: 10px solid transparent;
-    border-left: 14px solid #d04423;
-    opacity: 0.5;
+    background-color: var(--color-ft-presentation-bg);
+    color: var(--color-ft-presentation-text);
 }
 
 .file-icon.audio-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #fff3e0;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #f57c00;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.audio-icon::before {
-    content: "♪";
-    font-size: 28px;
-    color: #f57c00;
-    opacity: 0.6;
+    /* background-color: var(--color-ft-audio-alt-bg);*/
+    background-color: var(--color-ft-audio-bg);
+    color: var(--color-ft-audio-text);
 }
 
 .file-icon.archive-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #f5f0eb;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #8d6e63;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.file-icon.archive-icon::before {
-    content: "";
-    position: absolute;
-    top: 10px;
-    left: 45px;
-    width: 10px;
-    height: 46px;
-    background: repeating-linear-gradient(to bottom, #8d6e63 0px, #8d6e63 5px, #f5f0eb 5px, #f5f0eb 10px);
-    opacity: 0.5;
+    background-color: var(--color-ft-archive-bg);
+    color: var(--color-ft-archive-text);
 }
 
 .file-icon.installer-icon {
-    width: 100px;
-    height: 70px;
-    background-color: #f3e8ff;
-    border-radius: 4px;
-    position: relative;
-    margin-bottom: 10px;
-    border-top: 3px solid #7c3aed;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background-color: var(--color-ft-installer-bg);
+    color: var(--color-ft-installer-text);
 }
 
-.file-icon.installer-icon::before {
-    content: "⬇";
-    font-size: 24px;
-    color: #7c3aed;
-    opacity: 0.5;
-}
+/* -------------------------------------------------------------------- */
 
 .files-grid-view .file-item .name-cell {
     font-size: 14px;
     font-weight: 500;
     text-align: center;
     margin-bottom: 5px;
-    color: #2d3748;
+    color: var(--color-text);
     max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
@@ -779,47 +403,6 @@
 
 .files-grid-view .file-item .type-cell {
     font-size: 12px;
-    color: #718096;
+    color: var(--color-text-muted);
     text-align: center;
-}
-
-[data-theme="dark"] .files-grid-view .file-item {
-    background-color: #1e293b;
-    border-color: #334155;
-}
-
-[data-theme="dark"] .files-grid-view .file-item:hover {
-    border-color: #475569;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .files-grid-view .file-item.selected {
-    border-color: #ff5e3a;
-    background: #1a1520;
-}
-
-[data-theme="dark"] .files-grid-view .file-item .checkbox-cell {
-    background: #1e293b;
-    border-color: #475569;
-}
-
-[data-theme="dark"] .files-grid-view .file-actions {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .files-grid-view .file-actions:hover {
-    background: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .files-grid-view .file-item .name-cell {
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .files-grid-view .file-item .type-cell {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .files-grid-view .file-item.drop-target {
-    background-color: rgba(255, 193, 7, 0.05);
 }

@@ -17,53 +17,53 @@
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
-    color: white;
-    box-shadow: 0 4px 15px rgba(255, 94, 58, 0.3);
+    background: var(--color-accent-gradient);
+    color: var(--color-danger-text);
+    box-shadow: 0 4px 15px var(--color-accent-shadow);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(255, 94, 58, 0.4);
+    box-shadow: 0 6px 20px var(--color-accent-shadow-lg);
 }
 
 .btn-primary:active {
     transform: translateY(0);
-    box-shadow: 0 2px 10px rgba(255, 94, 58, 0.3);
+    box-shadow: 0 2px 10px var(--color-accent-shadow);
 }
 
 .btn-secondary {
-    background-color: #f8fafc;
-    color: #4a5568;
-    border: 2px solid #e2e8f0;
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-secondary);
+    border: 2px solid var(--color-border);
 }
 
 .btn-secondary:hover {
-    background-color: #edf2f7;
-    border-color: #cbd5e0;
+    background-color: var(--color-bg-input-alt);
+    border-color: var(--color-border-medium);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px var(--color-shadow-sm);
 }
 
 .btn-secondary:active {
     transform: translateY(0);
-    background-color: #e2e8f0;
+    background-color: var(--color-border);
 }
 
 .btn-danger {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
-    box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+    background: var(--color-danger-gradient);
+    color: var(--color-danger-text);
+    box-shadow: 0 4px 15px var(--color-danger-ring);
 }
 
 .btn-danger:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 6px 20px var(--color-danger-ring-lg);
 }
 
 .btn-danger:active {
     transform: translateY(0);
-    box-shadow: 0 2px 10px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 2px 10px var(--color-danger-ring);
 }
 
 /* View Toggle Buttons */
@@ -71,9 +71,9 @@
     display: flex;
     gap: 2px;
     padding: 3px;
-    background-color: #f0f3f7;
+    background-color: var(--color-bg-muted);
     border-radius: 10px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--color-border);
 }
 
 .toggle-btn {
@@ -86,20 +86,20 @@
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    color: #94a3b8;
+    color: var(--color-text-faint);
     font-size: 14px;
     transition: all 0.2s ease;
 }
 
 .toggle-btn:hover {
-    background-color: #e2e8f0;
-    color: #64748b;
+    background-color: var(--color-border);
+    color: var(--color-text-subtle);
 }
 
 .toggle-btn.active {
-    background-color: white;
-    color: #ff5e3a;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    background-color: var(--color-bg-surface);
+    color: var(--color-accent);
+    box-shadow: 0 1px 3px var(--color-shadow);
 }
 
 .toggle-btn i {

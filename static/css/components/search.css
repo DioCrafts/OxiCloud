@@ -5,7 +5,7 @@
     align-items: center;
     padding: 10px 0;
     margin-bottom: 15px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--color-bg-empty);
     width: 100%;
     flex-wrap: wrap;
     gap: 8px;
@@ -14,13 +14,13 @@
 .search-results-header h3 {
     margin: 0;
     font-size: 16px;
-    color: #555;
+    color: var(--color-text-dim);
 }
 
 .search-results-header .search-time {
     font-size: 12px;
     font-weight: normal;
-    color: #999;
+    color: var(--color-text-light);
 }
 
 .search-controls {
@@ -31,15 +31,15 @@
 
 .search-sort-select {
     padding: 4px 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--color-border-ddd);
     border-radius: 4px;
     font-size: 13px;
-    background: #fff;
-    color: #333;
+    background: var(--color-bg-surface);
+    color: var(--color-text-black);
     cursor: pointer;
     outline: none;
 }
 
 .search-sort-select:focus {
-    border-color: var(--primary-color, #4a90d9);
+    border-color: var(--primary-color, var(--color-accent));
 }

@@ -4,16 +4,36 @@
     --color-bg-surface: #ffffff;
     --color-bg-input: #f9fafb;
     --color-bg-hover: #f8fafc;
+    --color-bg-muted: #f0f3f7;
+    --color-bg-subtle: #f8f9fa;
+    --color-bg-alt: #f7fafc;
+    --color-bg-input-alt: #edf2f7;
+    --color-bg-empty: #f0f0f0;
 
     /* Borders */
     --color-border: #e2e8f0;
     --color-border-light: #f1f5f9;
+    --color-border-medium: #cbd5e0;
+    --color-border-faint: #e0e6ed;
+    --color-border-subtle: #e0e5e8;
+    --color-border-xfaint: #f0f0f0;
+    --color-border-ddd: #ddd;
 
     /* Text */
     --color-text: #2d3748;
     --color-text-heading: #1e293b;
     --color-text-muted: #718096;
     --color-text-faint: #94a3b8;
+    --color-text-secondary: #4a5568;
+    --color-text-subtle: #64748b;
+    --color-text-dark: #334155;
+    --color-text-placeholder: #a0aec0;
+    --color-text-gray: #6c757d;
+    --color-text-medium: #666;
+    --color-text-faint2: #888;
+    --color-text-light: #999;
+    --color-text-black: #333;
+    --color-text-dim: #555;
 
     /* Accent */
     --color-accent: #ff5e3a;
@@ -22,14 +42,383 @@
     --color-accent-shadow: rgba(255, 94, 58, 0.3);
     --color-accent-ring: rgba(255, 94, 58, 0.1);
     --color-accent-tint: #fff5f3;
+    --color-accent-mid: #ff8a5c;
+    --color-accent-shadow-lg: rgba(255, 94, 58, 0.4);
+    --color-accent-bg: rgba(255, 94, 58, 0.06);
+    --color-accent-bg-sm: rgba(255, 94, 58, 0.08);
+    --color-accent-ring-dark: rgba(255, 94, 58, 0.15);
+    --color-accent-ring-strong: rgba(255, 94, 58, 0.2);
+    --color-accent-ring-xl: rgba(255, 94, 58, 0.4);
+    --color-accent-ring-xs: rgba(255, 94, 58, 0.05);
 
     /* Feedback */
     --color-error-bg: #fee2e2;
     --color-error-text: #b91c1c;
     --color-success-bg: #dcfce7;
     --color-success-text: #15803d;
+    --color-success-border: #48bb78;
+    --color-success-alt: #34c759;
+    --color-success-bg-alt: #e6f4ea;
+    --color-success-text-alt: #0d904f;
+    --color-success-bg-green: #e8f5e9;
+    --color-success-text-green: #4eaa25;
+
+    /* Dangerous actions */
+    --color-danger-bg: #f56565;
+    --color-danger-text: white;
+    --color-danger-bg-hover: #e53e3e;
+    --color-danger-alt: #ef4444;
+    --color-danger-ring: rgba(239, 68, 68, 0.3);
+    --color-danger-ring-lg: rgba(239, 68, 68, 0.4);
+    --color-danger-light-bg: #fef2f2;
+    --color-danger-lighter: #fef2f2;
+    --color-danger-text-alt: #e53e3e;
+    --color-danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+
+    /* Warning/feedback */
+    --color-warning-bg: #ffeaa7;
+    --color-warning-bg-dark: #fdcb6e;
+    --color-warning-text: #ffc107;
+    --color-warning-border: #ffc107;
+    --color-warning-ring: rgba(255, 193, 7, 0.1);
+    --color-warning-shadow: rgba(255, 193, 7, 0.5);
+    --color-warning-orange-bg: #fff3e0;
+    --color-warning-orange-border: #f57c00;
+    --color-warning-orange-text: #f57c00;
+    --color-warning-bg-light: #fef3c7;
+    --color-warning-text-amber: #f59e0b;
+    --color-warning-bg-orange: #fef3e2;
+    --color-warning-text-orange: #d04423;
+
+    /* Info */
+    --color-info-bg: #ebf5fb;
+    --color-info-border: #2b6cb0;
+    --color-info-text: #2b6cb0;
+    --color-info-bg-alt: #e0ecff;
+    --color-info-text-alt: #3171d8;
+    --color-info-surface: #e0e7ff;
+    --color-info-blue: #3b82f6;
 
     /* Shadows */
     --color-shadow: rgba(0, 0, 0, 0.1);
     --color-shadow-lg: rgba(0, 0, 0, 0.12);
+    --color-shadow-xs: rgba(0, 0, 0, 0.05);
+    --color-shadow-sm: rgba(0, 0, 0, 0.08);
+    --color-shadow-md: rgba(0, 0, 0, 0.15);
+    --color-shadow-xl: rgba(0, 0, 0, 0.2);
+    --color-shadow-2xl: rgba(0, 0, 0, 0.25);
+    --color-shadow-3xl: rgba(0, 0, 0, 0.3);
+    --color-shadow-4xl: rgba(0, 0, 0, 0.4);
+    --color-shadow-5xl: rgba(0, 0, 0, 0.5);
+
+    /* Overlays */
+    --color-overlay: rgba(0, 0, 0, 0.5);
+    --color-overlay-light: rgba(0, 0, 0, 0.45);
+    --color-overlay-heavy: rgba(0, 0, 0, 0.85);
+    --color-overlay-darkest: rgba(0, 0, 0, 0.92);
+
+    /* Items */
+    --color-item-selected: #fff8f6;
+    --color-item-hover-accent: #fff0ec;
+    --color-item-hover-blue: #f0f8ff;
+    --color-item-hover-sky: #e0f2fe;
+
+    /* Sidebar — always dark */
+    --color-sidebar-bg-from: #2a3042;
+    --color-sidebar-bg-to: #232838;
+    --color-sidebar-text: rgba(255, 255, 255, 0.65);
+    --color-sidebar-text-hover: rgba(255, 255, 255, 0.9);
+    --color-sidebar-text-active: #ffffff;
+    --color-sidebar-active-bg: rgba(255, 94, 58, 0.12);
+    --color-sidebar-hover-bg: rgba(255, 255, 255, 0.06);
+    --color-sidebar-separator: rgba(255, 255, 255, 0.07);
+    --color-sidebar-overlay: rgba(0, 0, 0, 0.5);
+    --color-sidebar-storage-bg: rgba(255, 255, 255, 0.05);
+    --color-sidebar-storage-border: rgba(255, 255, 255, 0.07);
+    --color-sidebar-storage-text: rgba(255, 255, 255, 0.8);
+    --color-sidebar-storage-bar: rgba(255, 255, 255, 0.1);
+    --color-sidebar-storage-faint: rgba(255, 255, 255, 0.5);
+    --color-sidebar-logo-gradient: linear-gradient(135deg, #ff5e3a 0%, #ff8a5c 100%);
+    --color-sidebar-progress: linear-gradient(90deg, #ff5e3a 0%, #ff8a5c 100%);
+    --color-sidebar-shadow: rgba(255, 94, 58, 0.35);
+    --color-sidebar-shadow-lg: rgba(255, 94, 58, 0.45);
+
+    /* Calendar dot colors */
+    --color-cal-1: #ffa94d;
+    --color-cal-2: #74b9ff;
+    --color-cal-3: #81ecec;
+    --color-cal-4: #ffd43b;
+    --color-cal-5: #ff6b9d;
+    --color-cal-6: #ff7675;
+    --color-cal-7: #0984e3;
+    --color-cal-8: #00cec9;
+    --color-cal-9: #f0c800;
+    --color-cal-10: #e84393;
+    --color-cal-11: #e74c3c;
+
+    /* File type badge colors */
+    --color-ft-html: #e34c26;
+    --color-ft-js: #2965f1;
+    --color-ft-python: #3776ab;
+    --color-ft-typescript: #3178c6;
+    --color-ft-rust: #dea584;
+    --color-ft-go: #00add8;
+    --color-ft-java: #e76f00;
+    --color-ft-shell: #555555;
+    --color-ft-csharp: #68217a;
+    --color-ft-php: #8892be;
+    --color-ft-ruby: #cc342d;
+    --color-ft-swift: #fa7343;
+    --color-ft-kotlin: #7f52ff;
+    --color-ft-scala: #e38c00;
+    --color-ft-angular: #cb171e;
+    --color-ft-cpp: #9c4221;
+    --color-ft-docker: #083fa1;
+    --color-ft-generic-blue: #556ee6;
+    --color-ft-generic-green: #4eaa25;
+    --color-ft-generic-gray: #a0aec0;
+    --color-ft-orange-light: #ffb86c;
+    --color-ft-yellow: #ffd43b;
+    --color-ft-orange-alt: #e34c26;
+    --color-ft-coffeescript: #9c4221;
+
+    /* File type icon background/text pairs */
+    --color-ft-folder-bg: #ffeaa7;
+    --color-ft-folder-tab: #fdcb6e;
+    --color-ft-doc-bg: #e0ecff;
+    --color-ft-doc-text: #3171d8;
+    --color-ft-pdf-bg: #fee2e2;
+    --color-ft-pdf-text: #e53e3e;
+    --color-ft-image-bg: #e0f2fe;
+    --color-ft-image-text: #3b82f6;
+    --color-ft-video-bg-from: #ede9fe;
+    --color-ft-video-bg-to: #fce7f3;
+    --color-ft-video-text: #8b5cf6;
+    --color-ft-audio-bg: #fef3c7;
+    --color-ft-audio-text: #f59e0b;
+    --color-ft-audio-alt-bg: #fff3e0;
+    --color-ft-spreadsheet-bg: #e6f4ea;
+    --color-ft-spreadsheet-text: #0d904f;
+    --color-ft-presentation-bg: #fef3e2;
+    --color-ft-presentation-text: #d04423;
+    --color-ft-archive-bg: #f5f0eb;
+    --color-ft-archive-text: #8d6e63;
+    --color-ft-installer-bg: #f3e8ff;
+    --color-ft-installer-text: #7c3aed;
+    --color-ft-script-bg: #e8f5e9;
+    --color-ft-script-text: #4eaa25;
+    --color-ft-config-bg: #f1f3f5;
+    --color-ft-config-text: #718096;
+
+    /* Multiselect bar — always dark */
+    --color-multiselect-bg: #1e293b;
+    --color-multiselect-border: #334155;
+    --color-multiselect-text: #ffffff;
+    --color-multiselect-text-faint: rgba(255, 255, 255, 0.7);
+    --color-multiselect-hover-bg: rgba(255, 255, 255, 0.1);
+    --color-multiselect-action-text: #ffffff;
+    --color-multiselect-action-hover: rgba(255, 255, 255, 0.2);
+    --color-multiselect-danger-bg: rgba(239, 68, 68, 0.25);
+    --color-multiselect-danger-text: #fca5a5;
+    --color-multiselect-danger-active: rgba(239, 68, 68, 0.4);
+    --color-multiselect-danger-text-active: #ffffff;
+
+    /* Notification */
+    --color-notification-bg: #ffffff;
+    --color-notification-badge: #ff3b30;
+    --color-notification-success: #34c759;
+    --color-notification-error: #ff3b30;
+
+    /* Photos lightbox — always dark overlay */
+    --color-lightbox-overlay: rgba(0, 0, 0, 0.92);
+    --color-lightbox-btn-bg: rgba(255, 255, 255, 0.12);
+    --color-lightbox-btn-text: #ffffff;
+    --color-lightbox-btn-hover: rgba(255, 255, 255, 0.25);
+    --color-lightbox-gradient-top: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+    --color-lightbox-gradient-bottom: linear-gradient(to top, rgba(0, 0, 0, 0.6), transparent);
+    --color-lightbox-text-faint: rgba(255, 255, 255, 0.5);
+    --color-lightbox-text-muted: rgba(255, 255, 255, 0.7);
+
+    /* Purple/special */
+    --color-purple-bg: #f3e8ff;
+    --color-purple-border: #7c3aed;
+    --color-purple-text: #7c3aed;
+    --color-purple-bg-gradient: linear-gradient(135deg, #e0e7ff 0%, #ede9fe 50%, #fce7f3 100%);
+    --color-purple-gradient: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    --color-purple-shadow: rgba(139, 92, 246, 0.35);
+    --color-purple-border-light: rgba(139, 92, 246, 0.15);
+
+    /* OIDC / auth */
+    --color-oidc-bg: #4f46e5;
+    --color-oidc-shadow: rgba(79, 70, 229, 0.3);
+    --color-oidc-shadow-lg: rgba(79, 70, 229, 0.4);
+
+    /* Device verify */
+    --color-device-verify-text: #ffc107;
+    --color-device-verify-shadow: rgba(255, 193, 7, 0.5);
+    --color-device-verify-drop-shadow: rgba(255, 193, 7, 0.4);
+    --color-device-verify-border: #ffc107;
+    --color-device-verify-muted: #6c757d;
+    --color-device-verify-dim: #ccc;
+
+    /* Content area */
+    --color-content-muted: #888;
+    --color-content-bg-warn: #ffeaa7;
+    --color-content-bg-warn-dark: #fdcb6e;
+    --color-content-debug-bg: red;
+    --color-content-debug-text: white;
+
+    /* User menu */
+    --color-user-menu-header-bg: linear-gradient(135deg, #fef5f3 0%, #fdf2f8 100%);
+    --color-user-menu-header-border: #fce7e1;
+
+    /* Share dialog */
+    --color-share-link-text: #1565c0;
+    --color-share-link-hover: #1565c0;
+    --color-share-remove-text: #b71c1c;
+    --color-share-owner-text: #757575;
+
+    /* Trash view */
+    --color-trash-surface: #ffffff;
+    --color-trash-border: #ddd;
+    --color-trash-restore: #4caf50;
+    --color-trash-delete: #f44336;
+    --color-trash-empty-bg: #f0f0f0;
+
+    /* Primary (style.css) */
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+
+    /* Recent view */
+    --color-recent-muted: #6c757d;
+    --color-recent-border: #6c757d;
+
+    /* Star colors */
+    --color-star-text: #fbbf24;
+    --color-star-text-hover: #f59e0b;
+    --color-star-active: #d97706;
+
+    /* Card drop target */
+    --color-card-drop-tint: rgba(230, 126, 34, 0.08);
+    --color-card-drop-border: #e67e22;
+
+    /* Neutral backgrounds */
+    --color-neutral-warm-bg: #f5f0eb;
+    --color-neutral-warm-text: #8d6e63;
+    --color-neutral-bg: #f1f3f5;
+
+    /* Admin/profile blue accent */
+    --color-admin-blue: #60a5fa;
+    --color-admin-blue-bg: rgba(59, 130, 246, 0.1);
+    --color-admin-blue-bg-sm: rgba(59, 130, 246, 0.15);
+
+    /* Danger hover bg (for logout etc.) */
+    --color-danger-hover-bg: rgba(239, 68, 68, 0.1);
+
+    /* Additional success rings */
+    --color-success-ring: rgba(72, 187, 120, 0.1);
+    --color-success-ring-dark: rgba(72, 187, 120, 0.15);
+    --color-success-text-strong: #2f855a;
+    --color-success-ring-vivid: rgba(74, 222, 128, 0.1);
+    --color-success-text-vivid: #86efac;
+    --color-success-ring-vivid-lg: rgba(74, 222, 128, 0.15);
+    --color-success-icon-vivid: #4ade80;
+    --color-secret-green: #059669;
+
+    /* Additional overlays */
+    --color-overlay-mid: rgba(0, 0, 0, 0.6);
+    --color-overlay-video: rgba(0, 0, 0, 0.55);
+
+    /* Progress overlays */
+    --color-progress-overlay: rgba(255, 255, 255, 0.95);
+    --color-progress-overlay-dark: rgba(30, 41, 59, 0.95);
+
+    /* Misc */
+    --color-black: #000000;
+    --color-info-border-light: #90cdf4;
+    --color-notification-error-ring: rgba(255, 59, 48, 0.1);
+    --color-accent-second: #ff2d55;
+    --color-warning-ring-xs: rgba(255, 193, 7, 0.05);
+
+    /* Avatar / profile */
+    --color-avatar-gradient: linear-gradient(135deg, #3b82f6, #6366f1);
+    --color-text-navy: #1a1a2e;
+    --color-role-admin-bg: #dbeafe;
+    --color-role-admin-text: #1d4ed8;
+    --color-dark-mid: #475569;
+    --color-role-admin-dark-bg: #1e3a5f;
+
+    /* Photo tile */
+    --color-photo-check-border: rgba(255, 255, 255, 0.8);
+
+    /* Dark-mode selected card */
+    --color-item-selected-dark: #1a1520;
+
+    /* Accent shadow (smaller) */
+    --color-accent-shadow-sm: rgba(255, 94, 58, 0.25);
+
+    /* Warning faint background */
+    --color-warning-bg-faint: #fffbeb;
+
+    /* Storage progress fill gradients */
+    --color-storage-fill-green: linear-gradient(90deg, #059669, #10b981);
+    --color-storage-fill-orange: linear-gradient(90deg, #d97706, #f59e0b);
+    --color-storage-fill-red: linear-gradient(90deg, #dc2626, #ef4444);
+
+    /* Error text (dark shade) */
+    --color-error-text-dark: #991b1b;
+
+    /* Stat warning border */
+    --color-stat-warn-border: #fbbf24;
+
+    /* Status badge — light mode (success/emerald) */
+    --color-badge-success-bg: #ecfdf5;
+    --color-badge-success-bg-medium: #d1fae5;
+    --color-badge-success-text: #065f46;
+    --color-badge-success-border: #a7f3d0;
+    --color-badge-success-fill: #047857;
+    --color-badge-success-fill-dark: #064e27;
+    --color-badge-success-fill-faint: #f0fdf4;
+
+    /* Status badge — light mode (error/red) */
+    --color-badge-error-border: #fecaca;
+
+    /* Status badge — light mode (warning/amber) */
+    --color-badge-warning-text: #92400e;
+    --color-badge-warning-border: #fde68a;
+
+    /* Status badge — light mode (indigo/purple) */
+    --color-badge-indigo-bg: #ede9fe;
+    --color-badge-indigo-text: #6d28d9;
+
+    /* Status badge — light mode (blue) */
+    --color-badge-blue-bg: #eff6ff;
+    --color-badge-blue-text: #1e40af;
+    --color-badge-blue-border: #bfdbfe;
+
+    /* Status badge — light mode (gray/disabled) */
+    --color-badge-gray: #d1d5db;
+
+    /* Status badge — dark mode */
+    --color-badge-success-dark-bg: #052e16;
+    --color-badge-success-dark-border: #065f46;
+    --color-badge-error-dark-bg: #3b1111;
+    --color-badge-error-dark-bg-hover: #4a1515;
+    --color-badge-error-dark-text: #fca5a5;
+    --color-badge-warning-dark-bg: #422006;
+    --color-badge-warning-dark-border: #92400e;
+    --color-badge-indigo-dark-bg: #2e1065;
+    --color-badge-indigo-dark-text: #c4b5fd;
+    --color-badge-blue-dark-bg: #0c2d48;
+    --color-badge-blue-dark-text: #93c5fd;
+
+    /* Dark structural */
+    --color-dark-footer: #162032;
+    --color-scrollbar-dark: rgba(255, 255, 255, 0.15);
+    --color-border-dark-faint: rgba(255, 255, 255, 0.03);
+
+    /* Misc */
+    --color-bg-off-white: #fafbfd;
+    --color-danger-shadow: rgba(220, 38, 38, 0.2);
+    --color-danger-shadow-lg: rgba(220, 38, 38, 0.3);
 }

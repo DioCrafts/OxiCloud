@@ -16,27 +16,27 @@
 }
 
 .user-avatar-btn:hover {
-    border-color: rgba(255, 94, 58, 0.4);
+    border-color: var(--color-accent-ring-xl);
     transform: scale(1.05);
 }
 
 .user-avatar-btn:hover .user-avatar {
-    box-shadow: 0 0 0 2px rgba(255, 94, 58, 0.2);
+    box-shadow: 0 0 0 2px var(--color-accent-ring-strong);
 }
 
 .user-menu-wrapper.open .user-avatar-btn {
-    border-color: #ff5e3a;
+    border-color: var(--color-accent);
 }
 
 .user-avatar {
     width: 38px;
     height: 38px;
-    background: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
+    background: var(--color-accent-gradient);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--color-danger-text);
     font-weight: 700;
     font-size: 14px;
     letter-spacing: 0.5px;
@@ -49,11 +49,11 @@
     top: calc(100% + 10px);
     right: 0;
     width: 300px;
-    background: white;
+    background: var(--color-bg-surface);
     border-radius: 16px;
     box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.15),
-        0 0 0 1px rgba(0, 0, 0, 0.05);
+        0 12px 40px var(--color-shadow-md),
+        0 0 0 1px var(--color-shadow-xs);
     z-index: 2000;
     overflow: hidden;
     animation: userMenuIn 0.2s ease-out;
@@ -79,24 +79,24 @@
     align-items: center;
     gap: 14px;
     padding: 20px 20px 16px;
-    background: linear-gradient(135deg, #fef5f3 0%, #fdf2f8 100%);
-    border-bottom: 1px solid #fce7e1;
+    background: var(--color-user-menu-header-bg);
+    border-bottom: 1px solid var(--color-user-menu-header-border);
 }
 
 .user-menu-avatar {
     width: 48px;
     height: 48px;
     min-width: 48px;
-    background: linear-gradient(135deg, #ff5e3a 0%, #ff2d55 100%);
+    background: var(--color-accent-gradient);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
+    color: var(--color-danger-text);
     font-weight: 700;
     font-size: 17px;
     letter-spacing: 0.5px;
-    box-shadow: 0 4px 12px rgba(255, 94, 58, 0.3);
+    box-shadow: 0 4px 12px var(--color-accent-shadow);
 }
 
 .user-menu-info {
@@ -106,7 +106,7 @@
 .user-menu-name {
     font-weight: 600;
     font-size: 15px;
-    color: #1e293b;
+    color: var(--color-text-heading);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -114,7 +114,7 @@
 
 .user-menu-email {
     font-size: 12.5px;
-    color: #94a3b8;
+    color: var(--color-text-faint);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -131,7 +131,7 @@
     gap: 8px;
     font-size: 12px;
     font-weight: 600;
-    color: #64748b;
+    color: var(--color-text-subtle);
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
@@ -139,12 +139,12 @@
 
 .user-menu-storage-label i {
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--color-text-faint);
 }
 
 .user-menu-storage-bar {
     height: 6px;
-    background: #f1f5f9;
+    background: var(--color-border-light);
     border-radius: 3px;
     overflow: hidden;
     margin-bottom: 6px;
@@ -152,7 +152,7 @@
 
 .user-menu-storage-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ff5e3a, #ff2d55);
+    background: linear-gradient(90deg, var(--color-accent), var(--color-accent-second));
     border-radius: 3px;
     width: 0%;
     transition: width 0.5s ease;
@@ -160,12 +160,12 @@
 
 .user-menu-storage-text {
     font-size: 11.5px;
-    color: #94a3b8;
+    color: var(--color-text-faint);
 }
 
 .user-menu-divider {
     height: 1px;
-    background: #f1f5f9;
+    background: var(--color-border-light);
     margin: 4px 0;
 }
 
@@ -177,7 +177,7 @@
     padding: 12px 20px;
     border: none;
     background: none;
-    color: #334155;
+    color: var(--color-text-dark);
     font-size: 14px;
     cursor: pointer;
     transition: background 0.15s ease;
@@ -185,40 +185,40 @@
 }
 
 .user-menu-item:hover {
-    background: #f8fafc;
+    background: var(--color-bg-hover);
 }
 
 .user-menu-item i {
     width: 20px;
     text-align: center;
     font-size: 15px;
-    color: #64748b;
+    color: var(--color-text-subtle);
 }
 
 .user-menu-item .theme-toggle-pill {
     margin-left: auto;
     width: 40px;
     height: 22px;
-    background: #e2e8f0;
+    background: var(--color-border);
     border-radius: 11px;
     position: relative;
     transition: background 0.3s ease;
 }
 
 .user-menu-item .theme-toggle-pill.active {
-    background: #ff5e3a;
+    background: var(--color-accent);
 }
 
 .user-menu-item .theme-toggle-knob {
     width: 18px;
     height: 18px;
-    background: white;
+    background: var(--color-danger-text);
     border-radius: 50%;
     position: absolute;
     top: 2px;
     left: 2px;
     transition: transform 0.3s ease;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 1px 4px var(--color-shadow-md);
 }
 
 .user-menu-item .theme-toggle-pill.active .theme-toggle-knob {
@@ -226,15 +226,15 @@
 }
 
 .user-menu-admin {
-    color: #1d4ed8;
+    color: var(--color-primary-hover);
 }
 
 .user-menu-admin i {
-    color: #3b82f6;
+    color: var(--color-info-blue);
 }
 
 .user-menu-admin:hover {
-    background: #eff6ff;
+    background: var(--color-info-bg-alt);
 }
 
 .user-menu-role-badge {
@@ -252,8 +252,8 @@
 }
 
 .role-badge-admin {
-    background: #dbeafe;
-    color: #1d4ed8;
+    background: var(--color-info-surface);
+    color: var(--color-primary-hover);
 }
 
 .role-badge i {
@@ -261,82 +261,14 @@
 }
 
 .user-menu-logout {
-    color: #ef4444;
+    color: var(--color-danger-alt);
     margin-bottom: 4px;
 }
 
 .user-menu-logout i {
-    color: #ef4444;
+    color: var(--color-danger-alt);
 }
 
 .user-menu-logout:hover {
-    background: #fef2f2;
-}
-
-[data-theme="dark"] .user-menu {
-    background: #1e293b;
-    border-color: #334155;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="dark"] .user-menu-header {
-    background: linear-gradient(135deg, #1a2332 0%, #1e2940 100%);
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .user-menu-name {
-    color: #f1f5f9;
-}
-
-[data-theme="dark"] .user-menu-email {
-    color: #64748b;
-}
-
-[data-theme="dark"] .user-menu-storage-label {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .user-menu-storage-bar {
-    background: #334155;
-}
-
-[data-theme="dark"] .user-menu-storage-text {
-    color: #64748b;
-}
-
-[data-theme="dark"] .user-menu-divider {
-    background: #334155;
-}
-
-[data-theme="dark"] .user-menu-item {
-    color: #cbd5e1;
-}
-
-[data-theme="dark"] .user-menu-item:hover {
-    background: #334155;
-}
-
-[data-theme="dark"] .user-menu-item i {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .theme-toggle-pill {
-    background: #475569;
-}
-
-[data-theme="dark"] .user-menu-admin {
-    color: #60a5fa;
-}
-
-[data-theme="dark"] .user-menu-admin:hover {
-    background: rgba(59, 130, 246, 0.1);
-}
-
-[data-theme="dark"] .role-badge-admin {
-    background: rgba(59, 130, 246, 0.15);
-    color: #60a5fa;
-}
-
-[data-theme="dark"] .user-menu-logout:hover {
-    background: rgba(239, 68, 68, 0.1);
+    background: var(--color-danger-lighter);
 }

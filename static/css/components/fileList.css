@@ -6,8 +6,8 @@
     width: 100%;
     border-radius: 10px;
     overflow: hidden;
-    background-color: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    background-color: var(--color-bg-surface);
+    box-shadow: 0 1px 3px var(--color-shadow-xs);
 }
 
 .list-header {
@@ -16,9 +16,9 @@
     column-gap: 12px;
     padding: 15px;
     font-weight: 600;
-    color: #2d3748;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e0e6ed;
+    color: var(--color-text);
+    background-color: var(--color-bg-subtle);
+    border-bottom: 1px solid var(--color-border-faint);
     align-items: center;
 }
 
@@ -27,18 +27,18 @@
     grid-template-columns: var(--files-list-columns);
     column-gap: 12px;
     padding: 12px 15px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--color-border-xfaint);
     align-items: center;
     cursor: pointer;
-    background-color: white;
+    background-color: var(--color-bg-surface);
 }
 
 .files-list-view .file-item.selected {
-    background-color: #fff8f6;
+    background-color: var(--color-item-selected);
 }
 
 .files-list-view .file-item.selected:hover {
-    background-color: #fff0ec;
+    background-color: var(--color-item-hover-accent);
 }
 
 .list-header.trash-header {
@@ -50,7 +50,7 @@
 }
 
 .files-list-view .file-item:hover {
-    background-color: #f0f8ff;
+    background-color: var(--color-item-hover-blue);
 }
 
 .list-header > div,
@@ -64,12 +64,14 @@
     text-align: right;
 }
 
-.files-list-view .file-item .name-cell {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 0;
-    overflow: hidden;
+.files-list-view {
+    & .file-item .name-cell {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+        overflow: hidden;
+    }
 }
 
 .files-list-view .file-item .name-cell span {
@@ -91,7 +93,7 @@
 }
 
 .files-list-view .file-item .file-icon.folder-icon {
-    background-color: #ffeaa7;
+    background-color: var(--color-ft-folder-bg);
     position: relative;
     width: 36px;
     height: 36px;
@@ -105,7 +107,7 @@
     left: 0;
     right: 0;
     height: 8px;
-    background-color: #fdcb6e;
+    background-color: var(--color-ft-folder-tab);
     border-radius: 8px 8px 0 0;
 }
 
@@ -114,197 +116,13 @@
     display: none;
 }
 
-.files-list-view .file-item .file-icon.doc-icon {
-    background-color: #e0ecff;
-}
-
-.files-list-view .file-item .file-icon.doc-icon i,
-.files-list-view .file-item .file-icon.doc-icon svg {
-    color: #3171d8;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.doc-icon::before,
-.files-list-view .file-item .file-icon.doc-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.pdf-icon {
-    background-color: #fee2e2;
-}
-
-.files-list-view .file-item .file-icon.pdf-icon i,
-.files-list-view .file-item .file-icon.pdf-icon svg {
-    color: #e53e3e;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.pdf-icon::before,
-.files-list-view .file-item .file-icon.pdf-icon::after {
-    display: none;
-}
-
 .files-list-view .file-item .file-icon.image-icon {
-    background-color: #e0f2fe;
     position: relative;
     overflow: hidden;
     border-radius: 4px;
 }
 
-.files-list-view .file-item .file-icon.image-icon i,
-.files-list-view .file-item .file-icon.image-icon svg {
-    color: #3b82f6;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.image-icon::before,
-.files-list-view .file-item .file-icon.image-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.video-icon {
-    background: linear-gradient(135deg, #ede9fe, #fce7f3);
-}
-
-.files-list-view .file-item .file-icon.video-icon i,
-.files-list-view .file-item .file-icon.video-icon svg {
-    color: #8b5cf6;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.video-icon::before,
-.files-list-view .file-item .file-icon.video-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.audio-icon {
-    background-color: #fef3c7;
-}
-
-.files-list-view .file-item .file-icon.audio-icon i,
-.files-list-view .file-item .file-icon.audio-icon svg {
-    color: #f59e0b;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.audio-icon::before,
-.files-list-view .file-item .file-icon.audio-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.spreadsheet-icon {
-    background-color: #e6f4ea;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-    border-top: none;
-}
-
-.files-list-view .file-item .file-icon.spreadsheet-icon i,
-.files-list-view .file-item .file-icon.spreadsheet-icon svg {
-    color: #0d904f;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.spreadsheet-icon::before,
-.files-list-view .file-item .file-icon.spreadsheet-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.presentation-icon {
-    background-color: #fef3e2;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-    border-top: none;
-}
-
-.files-list-view .file-item .file-icon.presentation-icon i,
-.files-list-view .file-item .file-icon.presentation-icon svg {
-    color: #d04423;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.presentation-icon::before,
-.files-list-view .file-item .file-icon.presentation-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.audio-icon {
-    background-color: #fff3e0;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-    border-top: none;
-}
-
-.files-list-view .file-item .file-icon.archive-icon {
-    background-color: #f5f0eb;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-    border-top: none;
-}
-
-.files-list-view .file-item .file-icon.archive-icon i,
-.files-list-view .file-item .file-icon.archive-icon svg {
-    color: #8d6e63;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.archive-icon::before,
-.files-list-view .file-item .file-icon.archive-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.installer-icon {
-    background-color: #f3e8ff;
-    width: 36px;
-    height: 36px;
-    margin-bottom: 0;
-    border-top: none;
-}
-
-.files-list-view .file-item .file-icon.installer-icon i,
-.files-list-view .file-item .file-icon.installer-icon svg {
-    color: #7c3aed;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.installer-icon::before,
-.files-list-view .file-item .file-icon.installer-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.script-icon {
-    background-color: #e8f5e9;
-}
-
-.files-list-view .file-item .file-icon.script-icon i,
-.files-list-view .file-item .file-icon.script-icon svg {
-    color: #4eaa25;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.script-icon::before,
-.files-list-view .file-item .file-icon.script-icon::after {
-    display: none;
-}
-
-.files-list-view .file-item .file-icon.config-icon {
-    background-color: #f1f3f5;
-}
-
-.files-list-view .file-item .file-icon.config-icon i,
-.files-list-view .file-item .file-icon.config-icon svg {
-    color: #718096;
-    display: flex !important;
-}
-
-.files-list-view .file-item .file-icon.config-icon::before,
-.files-list-view .file-item .file-icon.config-icon::after {
-    display: none;
-}
+/* ------------- */
 
 .list-header > div:nth-child(5),
 .files-list-view .file-item .date-cell {
@@ -312,31 +130,31 @@
     text-align: center;
 }
 .files-list-view .file-item .date-cell {
-    color: #718096;
+    color: var(--color-text-muted);
     font-size: 14px;
 }
 
 .files-list-view .file-item .size-cell {
-    color: #718096;
+    color: var(--color-text-muted);
     font-size: 14px;
     text-align: right;
     font-variant-numeric: tabular-nums;
 }
 
 .files-list-view .file-item .type-cell {
-    color: #4b5563;
+    color: var(--color-text-secondary);
     font-weight: 500;
     font-size: 14px;
 }
 
 .files-list-view .file-item.dragging {
     opacity: 0.5;
-    background-color: #f9fafb;
+    background-color: var(--color-bg-input);
 }
 
 .files-list-view .file-item.drop-target {
-    background-color: rgba(255, 193, 7, 0.1);
-    border: 2px dashed #ffc107;
+    background-color: var(--color-warning-ring);
+    border: 2px dashed var(--color-warning-border);
 }
 
 .files-list-view .file-item .action-cell {
@@ -354,13 +172,13 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #64748b;
+    color: var(--color-text-subtle);
     font-size: 16px;
 }
 
 .files-list-view .file-item .action-cell button:hover {
-    background: #e0e5e8;
-    color: #334155;
+    background: var(--color-border-subtle);
+    color: var(--color-text-dark);
 }
 
 /* could be visible if we want */
@@ -371,62 +189,4 @@
 
 .files-list-view .file-item:hover .action-cell button.favorite-star {
     display: inline;
-}
-
-[data-theme="dark"] .files-list-view {
-    background-color: #1e293b;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="dark"] .list-header {
-    background-color: #162032;
-    color: #94a3b8;
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .files-list-view .file-item {
-    background-color: #1e293b;
-    border-bottom-color: #293548;
-}
-
-[data-theme="dark"] .files-list-view .file-item:hover {
-    background-color: #253345;
-}
-
-[data-theme="dark"] .files-list-view .file-item.selected {
-    background-color: #1a1520;
-}
-
-[data-theme="dark"] .files-list-view .file-item.selected:hover {
-    background-color: #231a2a;
-}
-
-[data-theme="dark"] .files-list-view .file-item .name-cell {
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .files-list-view .file-item .date-cell,
-[data-theme="dark"] .files-list-view .file-item .size-cell {
-    color: #64748b;
-}
-
-[data-theme="dark"] .files-list-view .file-item .type-cell {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .files-list-view .file-item.dragging {
-    background-color: #334155;
-}
-
-[data-theme="dark"] .files-list-view .file-item.drop-target {
-    background-color: rgba(255, 193, 7, 0.05);
-}
-
-[data-theme="dark"] .files-list-view .file-actions {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .files-list-view .file-actions:hover {
-    background: #334155;
-    color: #e2e8f0;
 }

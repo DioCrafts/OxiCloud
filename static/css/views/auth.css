@@ -46,7 +46,7 @@
 .auth-logo-icon svg {
     width: 30px;
     height: 30px;
-    fill: white;
+    fill: var(--color-danger-text);
 }
 
 .auth-logo-text {
@@ -120,7 +120,7 @@
     padding: 14px 18px;
     border-radius: 12px;
     background: var(--color-accent-gradient);
-    color: white;
+    color: var(--color-danger-text);
     font-weight: 700;
     border: none;
     cursor: pointer;
@@ -132,7 +132,7 @@
 
 .auth-button:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(255, 94, 58, 0.4);
+    box-shadow: 0 6px 20px var(--color-accent-shadow-lg);
     filter: brightness(1.05);
 }
 
@@ -159,8 +159,8 @@
 
 /* SSO / OIDC button */
 .auth-button-oidc {
-    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-    box-shadow: 0 4px 12px rgba(45, 55, 72, 0.3);
+    background: linear-gradient(135deg, var(--color-text) 0%, var(--color-text-secondary) 100%);
+    box-shadow: 0 4px 12px var(--color-shadow-3xl);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -168,15 +168,15 @@
 }
 
 .auth-button-oidc:hover {
-    box-shadow: 0 6px 20px rgba(45, 55, 72, 0.4);
+    box-shadow: 0 6px 20px var(--color-shadow-4xl);
 }
 
 .auth-button-sso {
-    background: #4f46e5;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    background: var(--color-oidc-bg);
+    box-shadow: 0 4px 12px var(--color-oidc-shadow);
 }
 .auth-button-sso:hover {
-    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+    box-shadow: 0 6px 20px var(--color-oidc-shadow-lg);
 }
 
 .auth-button-oidc i {
@@ -280,7 +280,7 @@
 .step-number.active {
     background: var(--color-accent-gradient);
     border-color: transparent;
-    color: white;
+    color: var(--color-danger-text);
     box-shadow: 0 2px 8px var(--color-accent-shadow);
 }
 

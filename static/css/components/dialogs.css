@@ -26,7 +26,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: var(--color-overlay-light);
     display: none;
     align-items: center;
     justify-content: center;
@@ -36,11 +36,11 @@
 }
 
 .rename-dialog-content {
-    background-color: white;
+    background-color: var(--color-bg-surface);
     border-radius: 16px;
     width: 420px;
     max-width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 20px 60px var(--color-shadow-2xl);
     overflow: hidden;
     animation: modalSlideIn 0.25s ease;
 }
@@ -48,9 +48,9 @@
 .rename-dialog-header {
     font-size: 17px;
     font-weight: 600;
-    color: #1a202c;
+    color: var(--color-text-heading);
     padding: 20px 24px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -63,19 +63,19 @@
 .rename-dialog input {
     width: 100%;
     padding: 12px 16px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 15px;
-    background: #f8fafc;
-    color: #1a202c;
+    background: var(--color-bg-hover);
+    color: var(--color-text-heading);
     transition: all 0.15s ease;
     outline: none;
 }
 
 .rename-dialog input:focus {
-    border-color: #ff5e3a;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(255, 94, 58, 0.1);
+    border-color: var(--color-accent);
+    background: var(--color-bg-surface);
+    box-shadow: 0 0 0 3px var(--color-accent-ring);
 }
 
 .rename-dialog-buttons {
@@ -83,19 +83,19 @@
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
+    background: var(--color-bg-hover);
+    border-top: 1px solid var(--color-border);
 }
 
 .rename-dialog-buttons .btn-outline {
     background: transparent;
-    color: #4a5568;
-    border: 1px solid #cbd5e0;
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border-medium);
 }
 
 .rename-dialog-buttons .btn-outline:hover {
-    background: #f7fafc;
-    border-color: #a0aec0;
+    background: var(--color-bg-alt);
+    border-color: var(--color-text-placeholder);
 }
 
 /* Share Dialog — Modern Style */
@@ -105,7 +105,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: var(--color-overlay-light);
     display: none;
     justify-content: center;
     align-items: center;
@@ -115,11 +115,11 @@
 }
 
 .share-dialog-content {
-    background-color: white;
+    background-color: var(--color-bg-surface);
     border-radius: 16px;
     width: 480px;
     max-width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 20px 60px var(--color-shadow-2xl);
     overflow: hidden;
     animation: modalSlideIn 0.25s ease;
     max-height: 85vh;
@@ -129,9 +129,9 @@
 .share-dialog-header {
     font-size: 17px;
     font-weight: 600;
-    color: #1a202c;
+    color: var(--color-text-heading);
     padding: 20px 24px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -141,20 +141,20 @@
 .share-dialog textarea {
     width: 100%;
     padding: 10px 14px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 14px;
-    background: #f8fafc;
-    color: #1a202c;
+    background: var(--color-bg-hover);
+    color: var(--color-text-heading);
     transition: all 0.15s ease;
     outline: none;
 }
 
 .share-dialog input:focus,
 .share-dialog textarea:focus {
-    border-color: #ff5e3a;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(255, 94, 58, 0.1);
+    border-color: var(--color-accent);
+    background: var(--color-bg-surface);
+    box-shadow: 0 0 0 3px var(--color-accent-ring);
 }
 
 .share-dialog-buttons {
@@ -162,14 +162,14 @@
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
+    background: var(--color-bg-hover);
+    border-top: 1px solid var(--color-border);
 }
 
 .shared-item-info {
     padding: 12px 24px;
-    background: #f8fafc;
-    border-bottom: 1px solid #e2e8f0;
+    background: var(--color-bg-hover);
+    border-bottom: 1px solid var(--color-border);
     font-size: 14px;
 }
 
@@ -183,7 +183,7 @@
     font-size: 13px;
     font-weight: 600;
     margin-bottom: 10px;
-    color: #4a5568;
+    color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
@@ -204,7 +204,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: var(--color-overlay-light);
     display: none;
     justify-content: center;
     align-items: center;
@@ -218,11 +218,11 @@
 }
 
 .shared-dialog-content {
-    background-color: white;
+    background-color: var(--color-bg-surface);
     border-radius: 16px;
     width: 480px;
     max-width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 20px 60px var(--color-shadow-2xl);
     overflow: hidden;
     animation: modalSlideIn 0.25s ease;
     max-height: 85vh;
@@ -233,9 +233,9 @@
 .shared-dialog-header {
     font-size: 17px;
     font-weight: 600;
-    color: #1a202c;
+    color: var(--color-text-heading);
     padding: 20px 24px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     gap: 12px;
@@ -247,15 +247,15 @@
     border: none;
     font-size: 22px;
     cursor: pointer;
-    color: #718096;
+    color: var(--color-text-muted);
     padding: 4px 8px;
     border-radius: 6px;
     transition: all 0.15s;
 }
 
 .shared-dialog-header .close-dialog-btn:hover {
-    background: #f0f0f0;
-    color: #1a202c;
+    background: var(--color-bg-empty);
+    color: var(--color-text-heading);
 }
 
 .shared-dialog .share-link-section,
@@ -272,7 +272,7 @@
     display: block;
     font-weight: 600;
     margin-bottom: 8px;
-    color: #2d3748;
+    color: var(--color-text);
     font-size: 14px;
 }
 
@@ -284,11 +284,11 @@
 .shared-dialog .share-link-input input {
     flex: 1;
     padding: 8px 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
-    background: #f8fafc;
-    color: #1a202c;
+    background: var(--color-bg-hover);
+    color: var(--color-text-heading);
 }
 
 .shared-dialog .share-permissions-section label,
@@ -299,7 +299,7 @@
     gap: 8px;
     margin-bottom: 8px;
     font-size: 14px;
-    color: #4a5568;
+    color: var(--color-text-secondary);
 }
 
 .shared-dialog .password-input-group {
@@ -311,18 +311,18 @@
 .shared-dialog .password-input-group input {
     flex: 1;
     padding: 8px 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
-    background: #f8fafc;
+    background: var(--color-bg-hover);
 }
 
 .shared-dialog .share-expiration-section input[type="date"] {
     padding: 8px 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 8px;
     font-size: 13px;
-    background: #f8fafc;
+    background: var(--color-bg-hover);
     margin-top: 8px;
 }
 
@@ -332,19 +332,19 @@
     justify-content: flex-end;
     gap: 12px;
     padding: 16px 24px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
+    background: var(--color-bg-hover);
+    border-top: 1px solid var(--color-border);
 }
 
 .shared-dialog .notification-form input,
 .shared-dialog .notification-form textarea {
     width: 100%;
     padding: 10px 14px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 14px;
-    background: #f8fafc;
-    color: #1a202c;
+    background: var(--color-bg-hover);
+    color: var(--color-text-heading);
     outline: none;
     transition: all 0.15s ease;
     box-sizing: border-box;
@@ -352,9 +352,9 @@
 
 .shared-dialog .notification-form input:focus,
 .shared-dialog .notification-form textarea:focus {
-    border-color: #ff5e3a;
-    background: white;
-    box-shadow: 0 0 0 3px rgba(255, 94, 58, 0.1);
+    border-color: var(--color-accent);
+    background: var(--color-bg-surface);
+    box-shadow: 0 0 0 3px var(--color-accent-ring);
 }
 
 .shared-dialog .notification-form .form-group {
@@ -369,7 +369,7 @@
     flex-wrap: wrap;
     gap: 4px;
     padding: 8px 12px;
-    background: #f8fafc;
+    background: var(--color-bg-hover);
     border-radius: 8px;
     margin-bottom: 12px;
     font-size: 13px;
@@ -377,7 +377,7 @@
 }
 
 .move-breadcrumb-item {
-    color: #4a5568;
+    color: var(--color-text-secondary);
     cursor: pointer;
     padding: 2px 6px;
     border-radius: 4px;
@@ -386,18 +386,18 @@
 }
 
 .move-breadcrumb-item:hover {
-    background: #e2e8f0;
-    color: #1a202c;
+    background: var(--color-border);
+    color: var(--color-text-heading);
 }
 
 .move-breadcrumb-item.current {
-    color: #ff5e3a;
+    color: var(--color-accent);
     font-weight: 600;
     cursor: default;
 }
 
 .move-breadcrumb-separator {
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
     margin: 0 2px;
 }
 
@@ -410,56 +410,56 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.15s ease;
-    color: #4a5568;
+    color: var(--color-text-secondary);
     font-size: 14px;
 }
 
 .folder-select-item:hover {
-    background-color: #f0f3f7;
+    background-color: var(--color-bg-muted);
 }
 
 .folder-select-item.selected {
-    background-color: rgba(255, 94, 58, 0.1);
-    color: #ff5e3a;
+    background-color: var(--color-accent-ring);
+    color: var(--color-accent);
     font-weight: 600;
 }
 
 .folder-select-item i {
-    color: #ffa94d;
+    color: var(--color-cal-1);
     font-size: 16px;
 }
 
 .folder-select-item.selected i {
-    color: #ff5e3a;
+    color: var(--color-accent);
 }
 
 /* "Select this folder" option */
 .folder-select-item.folder-select-current {
-    background-color: rgba(72, 187, 120, 0.1);
-    color: #2f855a;
+    background-color: var(--color-success-ring);
+    color: var(--color-success-text-strong);
     font-weight: 500;
 }
 
 .folder-select-item.folder-select-current:hover {
-    background-color: rgba(72, 187, 120, 0.15);
+    background-color: var(--color-success-ring-dark);
 }
 
 .folder-select-item.folder-select-current i {
-    color: #48bb78;
+    color: var(--color-success-border);
 }
 
 /* Navigate up option */
 .folder-select-item.folder-navigate-up {
-    color: #718096;
+    color: var(--color-text-muted);
     font-style: italic;
 }
 
 .folder-select-item.folder-navigate-up:hover {
-    color: #4a5568;
+    color: var(--color-text-secondary);
 }
 
 .folder-select-item.folder-navigate-up i {
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
 }
 
 /* Folder navigation item (click to enter) */
@@ -472,7 +472,7 @@
 }
 
 .folder-select-item.folder-navigate .folder-navigate-icon {
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
     font-size: 12px;
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -489,7 +489,7 @@
     justify-content: center;
     gap: 8px;
     padding: 24px;
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
     font-size: 14px;
 }
 
@@ -511,7 +511,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: var(--color-overlay-light);
     display: none;
     align-items: center;
     justify-content: center;
@@ -526,11 +526,11 @@
 }
 
 .confirm-dialog-content {
-    background: white;
+    background: var(--color-bg-surface);
     border-radius: 16px;
     width: 400px;
     max-width: 90%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 20px 60px var(--color-shadow-2xl);
     overflow: hidden;
     animation: modalSlideIn 0.25s ease;
     text-align: center;
@@ -542,19 +542,19 @@
 
 .confirm-dialog-icon i {
     font-size: 40px;
-    color: #f56565;
+    color: var(--color-danger-bg);
 }
 
 .confirm-dialog-title {
     font-size: 17px;
     font-weight: 600;
-    color: #1a202c;
+    color: var(--color-text-heading);
     padding: 0 24px 8px;
 }
 
 .confirm-dialog-message {
     font-size: 14px;
-    color: #718096;
+    color: var(--color-text-muted);
     padding: 0 24px 20px;
     line-height: 1.5;
 }
@@ -563,25 +563,25 @@
     display: flex;
     gap: 12px;
     padding: 16px 24px;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
+    background: var(--color-bg-hover);
+    border-top: 1px solid var(--color-border);
     justify-content: flex-end;
 }
 
 .confirm-dialog-buttons .btn-danger {
-    background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
-    color: white;
+    background: linear-gradient(135deg, var(--color-danger-bg) 0%, var(--color-danger-bg-hover) 100%);
+    color: var(--color-danger-text);
     border: none;
     padding: 10px 20px;
     border-radius: 10px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
-    box-shadow: 0 2px 8px rgba(229, 62, 62, 0.3);
+    box-shadow: 0 2px 8px var(--color-danger-ring);
 }
 
 .confirm-dialog-buttons .btn-danger:hover {
-    box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+    box-shadow: 0 4px 12px var(--color-danger-ring-lg);
     transform: translateY(-1px);
 }
 
@@ -592,7 +592,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--color-overlay);
     display: none;
     align-items: center;
     justify-content: center;
@@ -604,9 +604,9 @@
 }
 
 .dialog-content {
-    background-color: white;
+    background-color: var(--color-bg-surface);
     border-radius: 10px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 25px var(--color-shadow);
     width: 500px;
     max-width: 90%;
     max-height: 90vh;
@@ -615,7 +615,7 @@
 
 .dialog-header {
     padding: 15px 20px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -623,7 +623,7 @@
 
 .dialog-header h3 {
     font-size: 18px;
-    color: #2d3748;
+    color: var(--color-text);
     margin: 0;
 }
 
@@ -632,7 +632,7 @@
     border: none;
     font-size: 24px;
     cursor: pointer;
-    color: #a0aec0;
+    color: var(--color-text-placeholder);
 }
 
 .dialog-body {
@@ -654,315 +654,7 @@
 .share-link-container input {
     flex-grow: 1;
     padding: 10px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid var(--color-border);
     border-radius: 6px;
     font-size: 14px;
-}
-
-[data-theme="dark"] .rename-dialog-content {
-    background-color: #1e293b;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="dark"] .rename-dialog-header {
-    color: #f1f5f9;
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .rename-dialog input {
-    background: #0f172a;
-    color: #e2e8f0;
-    border-color: #334155;
-}
-
-[data-theme="dark"] .rename-dialog input:focus {
-    border-color: #ff5e3a;
-    background: #0f172a;
-}
-
-[data-theme="dark"] .rename-dialog-buttons {
-    background: #162032;
-    border-top-color: #334155;
-}
-
-[data-theme="dark"] .rename-dialog-buttons .btn-outline {
-    background: transparent;
-    color: #94a3b8;
-    border-color: #475569;
-}
-
-[data-theme="dark"] .rename-dialog-buttons .btn-outline:hover {
-    background: #334155;
-    border-color: #64748b;
-}
-
-[data-theme="dark"] .shared-dialog-content {
-    background-color: #1e293b;
-}
-
-[data-theme="dark"] .shared-dialog-header {
-    color: #e2e8f0;
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .shared-dialog-header .close-dialog-btn {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .shared-dialog-header .close-dialog-btn:hover {
-    background: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .shared-dialog .share-link-input input,
-[data-theme="dark"] .shared-dialog .password-input-group input,
-[data-theme="dark"] .shared-dialog .share-expiration-section input,
-[data-theme="dark"] .shared-dialog .notification-form input,
-[data-theme="dark"] .shared-dialog .notification-form textarea {
-    background: #0f172a;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .shared-dialog .share-link-input input:focus,
-[data-theme="dark"] .shared-dialog .notification-form input:focus,
-[data-theme="dark"] .shared-dialog .notification-form textarea:focus {
-    border-color: #ff5e3a;
-    background: #1e293b;
-}
-
-[data-theme="dark"] .shared-dialog .share-link-section label,
-[data-theme="dark"] .shared-dialog .share-permissions-section h4,
-[data-theme="dark"] .shared-dialog .notification-form label {
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .shared-dialog .share-permissions-section label,
-[data-theme="dark"] .shared-dialog .share-password-section label,
-[data-theme="dark"] .shared-dialog .share-expiration-section label {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .shared-dialog .share-actions,
-[data-theme="dark"] .shared-dialog .notification-actions {
-    background: #162032;
-    border-top-color: #334155;
-}
-
-[data-theme="dark"] .confirm-dialog-content {
-    background-color: #1e293b;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="dark"] .confirm-dialog-header {
-    color: #f1f5f9;
-}
-
-[data-theme="dark"] .confirm-dialog-message {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .confirm-dialog-buttons {
-    background: #162032;
-    border-top-color: #334155;
-}
-
-[data-theme="dark"] .move-dialog-content {
-    background-color: #1e293b;
-}
-
-[data-theme="dark"] .move-dialog-header {
-    color: #f1f5f9;
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .move-dialog .folder-tree {
-    background: #0f172a;
-    border-color: #334155;
-}
-
-[data-theme="dark"] .move-dialog .folder-tree-item {
-    color: #cbd5e1;
-}
-
-[data-theme="dark"] .move-dialog .folder-tree-item:hover {
-    background: #334155;
-}
-
-[data-theme="dark"] .move-dialog .folder-tree-item.selected {
-    background: rgba(255, 94, 58, 0.1);
-    color: #ff5e3a;
-}
-
-[data-theme="dark"] .move-dialog-buttons {
-    background: #162032;
-    border-top-color: #334155;
-}
-
-[data-theme="dark"] .share-dialog-content {
-    background-color: #1e293b;
-}
-
-[data-theme="dark"] .share-dialog-header {
-    color: #f1f5f9;
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .share-dialog-body label {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .share-dialog-body input {
-    background: #0f172a;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .share-dialog-body input:focus {
-    border-color: #ff5e3a;
-    background: #0f172a;
-}
-
-[data-theme="dark"] .share-link-container {
-    background: #0f172a;
-    border-color: #334155;
-}
-
-[data-theme="dark"] .share-link-container input {
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .share-dialog-buttons {
-    background: #162032;
-    border-top-color: #334155;
-}
-
-[data-theme="dark"] .dialog {
-    background-color: rgba(0, 0, 0, 0.6);
-}
-
-[data-theme="dark"] .dialog-content {
-    background-color: #1e293b;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .dialog-header {
-    border-bottom-color: #334155;
-}
-
-[data-theme="dark"] .dialog-header h3 {
-    color: #f1f5f9;
-}
-
-[data-theme="dark"] .dialog-body label {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .dialog-body input,
-[data-theme="dark"] .dialog-body textarea {
-    background-color: #0f172a;
-    border-color: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .dialog-body input:focus,
-[data-theme="dark"] .dialog-body textarea:focus {
-    border-color: #ff5e3a;
-}
-
-[data-theme="dark"] .close-dialog-btn {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .close-dialog-btn:hover {
-    color: #f1f5f9;
-}
-
-[data-theme="dark"] .share-setting label {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .permissions-options label span {
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .share-item-info {
-    color: #e2e8f0;
-}
-
-/* Dark mode for move dialog breadcrumb */
-[data-theme="dark"] .move-dialog-breadcrumb {
-    background: #0f172a;
-}
-
-[data-theme="dark"] .move-breadcrumb-item {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .move-breadcrumb-item:hover {
-    background: #334155;
-    color: #e2e8f0;
-}
-
-[data-theme="dark"] .move-breadcrumb-item.current {
-    color: #ff5e3a;
-}
-
-[data-theme="dark"] .move-breadcrumb-separator {
-    color: #475569;
-}
-
-/* Dark mode for folder select items */
-[data-theme="dark"] .folder-select-item {
-    color: #cbd5e1;
-}
-
-[data-theme="dark"] .folder-select-item:hover {
-    background-color: #334155;
-}
-
-[data-theme="dark"] .folder-select-item.selected {
-    background-color: rgba(255, 94, 58, 0.15);
-    color: #ff5e3a;
-}
-
-[data-theme="dark"] .folder-select-item i {
-    color: #fbbf24;
-}
-
-[data-theme="dark"] .folder-select-item.selected i {
-    color: #ff5e3a;
-}
-
-[data-theme="dark"] .folder-select-item.folder-select-current {
-    background-color: rgba(74, 222, 128, 0.1);
-    color: #86efac;
-}
-
-[data-theme="dark"] .folder-select-item.folder-select-current:hover {
-    background-color: rgba(74, 222, 128, 0.15);
-}
-
-[data-theme="dark"] .folder-select-item.folder-select-current i {
-    color: #4ade80;
-}
-
-[data-theme="dark"] .folder-select-item.folder-navigate-up {
-    color: #64748b;
-}
-
-[data-theme="dark"] .folder-select-item.folder-navigate-up:hover {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .folder-select-item.folder-navigate-up i {
-    color: #475569;
-}
-
-[data-theme="dark"] .folder-select-item.folder-navigate .folder-navigate-icon {
-    color: #475569;
-}
-
-[data-theme="dark"] .folder-select-empty {
-    color: #475569;
 }
