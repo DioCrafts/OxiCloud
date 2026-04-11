@@ -189,22 +189,33 @@
     overflow: hidden;
 }
 
+/* -------------------------------------------------------------------- */
+
 .files-grid-view .file-icon {
     margin: auto;
     margin-bottom: 10px;
 }
-/* Hide FontAwesome / SVG icons inside grid card thumbnails — the decorative
-   CSS shapes (::before / ::after) already convey the file type visually.
-   Icons.js replaces <i> with <svg class="oxi-icon">, so we target both.
-   List-view icons (.file-item .file-icon) are NOT affected. */
+
 .files-grid-view .file-item .file-icon > i,
 .files-grid-view .file-item .file-icon > svg {
     /* biome-ignore lint/complexity/noImportantStyles: <explanation> */
-    display: none !important;
+    position: absolute;
+    top: 5px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* display: none !important;*/
 }
 
 .file-icon.folder-icon {
     background-color: var(--color-ft-folder-bg);
+}
+
+.file-icon.folder-icon > i,
+.file-icon.folder-icon > svg {
+    display: none !important;
 }
 
 .file-icon.folder-icon::before {
@@ -219,94 +230,28 @@
 }
 
 .file-icon.pdf-icon {
-    background-color: var(--color-error-bg);
-    border-top: 3px solid var(--color-danger-text-alt);
-}
-
-.file-icon.pdf-icon::after {
-    content: "PDF";
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--color-danger-text-alt);
-    opacity: 0.65;
-    letter-spacing: 1px;
+    background-color: var(--color-ft-pdf-bg);
+    color: var(--color-ft-pdf-text);
 }
 
 .file-icon.doc-icon {
-    background-color: var(--color-info-bg);
-    border-top: 3px solid var(--color-info-border);
-}
-
-.file-icon.doc-icon::before {
-    content: "";
-    position: absolute;
-    top: 18px;
-    left: 18px;
-    right: 18px;
-    height: 3px;
-    background-color: var(--color-info-border);
-    opacity: 0.3;
-    border-radius: 2px;
-}
-
-.file-icon.doc-icon::after {
-    content: "";
-    position: absolute;
-    top: 28px;
-    left: 18px;
-    right: 28px;
-    height: 3px;
-    background-color: var(--color-info-border);
-    opacity: 0.25;
-    border-radius: 2px;
+    background-color: var(--color-ft-doc-bg);
+    color: var(--color-ft-doc-text);
 }
 
 .file-icon.script-icon {
-    background-color: var(--color-success-bg-green);
-    border-top: 3px solid var(--color-success-text-green);
-}
-
-.file-icon.script-icon::after {
-    content: ">_";
-    font-size: 18px;
-    font-weight: 700;
-    font-family: monospace;
-    color: var(--color-success-text-green);
-    opacity: 0.55;
+    background-color: var(--color-ft-script-bg);
+    color: var(--color-ft-script-text);
 }
 
 .file-icon.config-icon {
-    background-color: var(--color-neutral-bg);
-    margin-bottom: 10px;
-    border-top: 3px solid var(--color-text-muted);
-}
-
-.file-icon.config-icon::before {
-    content: "";
-    position: absolute;
-    top: 15px;
-    left: 16px;
-    width: 10px;
-    height: 10px;
-    border: 2px solid var(--color-text-muted);
-    border-radius: 50%;
-    opacity: 0.4;
-}
-
-.file-icon.config-icon::after {
-    content: "";
-    position: absolute;
-    top: 19px;
-    left: 34px;
-    right: 16px;
-    height: 3px;
-    background-color: var(--color-text-muted);
-    opacity: 0.3;
-    border-radius: 2px;
+    background-color: var(--color-ft-config-bg);
+    color: var(--color-ft-config-text);
 }
 
 .file-icon.image-icon {
-    background-color: var(--color-cal-2);
+    background-color: var(--color-ft-image-bg);
+    color: var(--color-ft-image-text);
 }
 
 /* Thumbnail image inside file-icon (grid and list views) */
@@ -320,358 +265,118 @@
     z-index: 1;
 }
 
-.file-icon.image-icon::before {
-    content: "";
-    position: absolute;
-    top: 10px;
-    left: 15px;
-    width: 20px;
-    height: 20px;
-    background-color: var(--color-cal-4);
-    border-radius: 50%;
-}
-
 .file-icon.video-icon {
-    background: var(--color-purple-bg-gradient);
-    border: 1px solid var(--color-purple-border-light);
-}
-
-/* circle */
-.file-icon.video-icon::before {
-    content: "";
-    width: 36px;
-    height: 36px;
-    background: var(--color-purple-gradient);
-    border-radius: 50%;
-    position: absolute;
-    box-shadow: 0 3px 10px var(--color-purple-shadow);
-}
-
-/* triangle */
-.file-icon.video-icon::after {
-    content: "";
-    width: 0;
-    height: 0;
-    border-top: 7px solid transparent;
-    border-bottom: 7px solid transparent;
-    border-left: 11px solid var(--color-danger-text);
-    position: absolute;
-    margin-left: 3px;
+    background: linear-gradient(135deg, var(--color-ft-video-bg-from), var(--color-ft-video-bg-to));
+    color: var(--color-ft-video-text);
 }
 
 .file-icon.code-icon {
     background-color: var(--color-border);
-    border-top: 3px solid var(--color-ft-generic-blue);
-}
-
-.file-icon.code-icon::before,
-.file-icon.code-icon::after {
-    content: "";
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    height: 2px;
-    background-color: var(--color-ft-generic-blue);
-}
-
-.file-icon.code-icon::before {
-    top: 15px;
-    width: 80%;
-}
-
-.file-icon.code-icon::after {
-    top: 25px;
-    width: 60%;
-}
-
-.file-icon.code-icon .code-line-1,
-.file-icon.code-icon .code-line-2,
-.file-icon.code-icon .code-line-3 {
-    position: absolute;
-    left: 10px;
-    height: 2px;
-    background-color: var(--color-ft-generic-gray);
-}
-
-.file-icon.code-icon .code-line-1 {
-    top: 35px;
-    width: 70%;
-}
-
-.file-icon.code-icon .code-line-2 {
-    top: 45px;
-    width: 85%;
-}
-
-.file-icon.code-icon .code-line-3 {
-    top: 55px;
-    width: 50%;
 }
 
 .file-icon.json-icon {
     border-top-color: var(--color-ft-orange-light);
 }
 
-.file-icon.json-icon::before,
-.file-icon.json-icon::after {
-    background-color: var(--color-ft-orange-light);
-}
-
 .file-icon.js-icon {
     border-top-color: var(--color-ft-yellow);
-}
-
-.file-icon.js-icon::before,
-.file-icon.js-icon::after {
-    background-color: var(--color-ft-yellow);
 }
 
 .file-icon.html-icon {
     border-top-color: var(--color-ft-html);
 }
 
-.file-icon.html-icon::before,
-.file-icon.html-icon::after {
-    background-color: var(--color-ft-html);
-}
-
 .file-icon.css-icon {
     border-top-color: var(--color-ft-js);
-}
-
-.file-icon.css-icon::before,
-.file-icon.css-icon::after {
-    background-color: var(--color-ft-js);
 }
 
 .file-icon.py-icon {
     border-top-color: var(--color-ft-python);
 }
 
-.file-icon.py-icon::before,
-.file-icon.py-icon::after {
-    background-color: var(--color-ft-python);
-}
-
 .file-icon.ts-icon {
     border-top-color: var(--color-ft-typescript);
-}
-
-.file-icon.ts-icon::before,
-.file-icon.ts-icon::after {
-    background-color: var(--color-ft-typescript);
 }
 
 .file-icon.rust-icon {
     border-top-color: var(--color-ft-rust);
 }
 
-.file-icon.rust-icon::before,
-.file-icon.rust-icon::after {
-    background-color: var(--color-ft-rust);
-}
-
 .file-icon.go-icon {
     border-top-color: var(--color-ft-go);
-}
-
-.file-icon.go-icon::before,
-.file-icon.go-icon::after {
-    background-color: var(--color-ft-go);
 }
 
 .file-icon.java-icon {
     border-top-color: var(--color-ft-java);
 }
 
-.file-icon.java-icon::before,
-.file-icon.java-icon::after {
-    background-color: var(--color-ft-java);
-}
-
 .file-icon.c-icon {
     border-top-color: var(--color-ft-shell);
-}
-
-.file-icon.c-icon::before,
-.file-icon.c-icon::after {
-    background-color: var(--color-ft-shell);
 }
 
 .file-icon.cs-icon {
     border-top-color: var(--color-ft-csharp);
 }
 
-.file-icon.cs-icon::before,
-.file-icon.cs-icon::after {
-    background-color: var(--color-ft-csharp);
-}
-
 .file-icon.php-icon {
     border-top-color: var(--color-ft-php);
-}
-
-.file-icon.php-icon::before,
-.file-icon.php-icon::after {
-    background-color: var(--color-ft-php);
 }
 
 .file-icon.ruby-icon {
     border-top-color: var(--color-ft-ruby);
 }
 
-.file-icon.ruby-icon::before,
-.file-icon.ruby-icon::after {
-    background-color: var(--color-ft-ruby);
-}
-
 .file-icon.swift-icon {
     border-top-color: var(--color-ft-swift);
-}
-
-.file-icon.swift-icon::before,
-.file-icon.swift-icon::after {
-    background-color: var(--color-ft-swift);
 }
 
 .file-icon.kotlin-icon {
     border-top-color: var(--color-ft-kotlin);
 }
 
-.file-icon.kotlin-icon::before,
-.file-icon.kotlin-icon::after {
-    background-color: var(--color-ft-kotlin);
-}
-
 .file-icon.sql-icon {
     border-top-color: var(--color-ft-scala);
-}
-
-.file-icon.sql-icon::before,
-.file-icon.sql-icon::after {
-    background-color: var(--color-ft-scala);
 }
 
 .file-icon.yaml-icon {
     border-top-color: var(--color-ft-angular);
 }
 
-.file-icon.yaml-icon::before,
-.file-icon.yaml-icon::after {
-    background-color: var(--color-ft-angular);
-}
-
 .file-icon.toml-icon {
     border-top-color: var(--color-ft-cpp);
-}
-
-.file-icon.toml-icon::before,
-.file-icon.toml-icon::after {
-    background-color: var(--color-ft-cpp);
 }
 
 .file-icon.md-icon {
     border-top-color: var(--color-ft-docker);
 }
 
-.file-icon.md-icon::before,
-.file-icon.md-icon::after {
-    background-color: var(--color-ft-docker);
-}
-
 .file-icon.spreadsheet-icon {
-    background-color: var(--color-success-bg-alt);
-    border-top: 3px solid var(--color-success-text-alt);
-}
-
-.file-icon.spreadsheet-icon::before {
-    content: "";
-    position: absolute;
-    top: 12px;
-    left: 18px;
-    width: 64px;
-    height: 44px;
-    background:
-        repeating-linear-gradient(to bottom, var(--color-success-text-alt) 0px, var(--color-success-text-alt) 1px, transparent 1px, transparent 11px),
-        repeating-linear-gradient(to right, var(--color-success-text-alt) 0px, var(--color-success-text-alt) 1px, transparent 1px, transparent 22px);
-    opacity: 0.35;
+    background-color: var(--color-ft-spreadsheet-bg);
+    color: var(--color-ft-spreadsheet-text);
 }
 
 .file-icon.presentation-icon {
-    background-color: var(--color-warning-bg-orange);
-    border-top: 3px solid var(--color-warning-text-orange);
-}
-
-.file-icon.presentation-icon::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    left: 22px;
-    width: 56px;
-    height: 38px;
-    border: 2px solid var(--color-warning-text-orange);
-    border-radius: 4px;
-    opacity: 0.4;
-}
-
-.file-icon.presentation-icon::after {
-    content: "";
-    position: absolute;
-    top: 24px;
-    left: 38px;
-    width: 0;
-    height: 0;
-    border-top: 10px solid transparent;
-    border-bottom: 10px solid transparent;
-    border-left: 14px solid var(--color-warning-text-orange);
-    opacity: 0.5;
+    background-color: var(--color-ft-presentation-bg);
+    color: var(--color-ft-presentation-text);
 }
 
 .file-icon.audio-icon {
-    background-color: var(--color-warning-orange-bg);
-    border-top: 3px solid var(--color-warning-orange-text);
-}
-
-.file-icon.audio-icon::before {
-    content: "♪";
-    font-size: 28px;
-    color: var(--color-warning-orange-text);
-    opacity: 0.6;
+    /* background-color: var(--color-ft-audio-alt-bg);*/
+    background-color: var(--color-ft-audio-bg);
+    color: var(--color-ft-audio-text);
 }
 
 .file-icon.archive-icon {
-    background-color: var(--color-neutral-warm-bg);
-    border-top: 3px solid var(--color-neutral-warm-text);
-}
-
-.file-icon.archive-icon::before {
-    content: "";
-    position: absolute;
-    top: 10px;
-    left: 45px;
-    width: 10px;
-    height: 46px;
-    background: repeating-linear-gradient(
-        to bottom,
-        var(--color-neutral-warm-text) 0px,
-        var(--color-neutral-warm-text) 5px,
-        var(--color-neutral-warm-bg) 5px,
-        var(--color-neutral-warm-bg) 10px
-    );
-    opacity: 0.5;
+    background-color: var(--color-ft-archive-bg);
+    color: var(--color-ft-archive-text);
 }
 
 .file-icon.installer-icon {
-    background-color: var(--color-purple-bg);
-    border-top: 3px solid var(--color-purple-text);
+    background-color: var(--color-ft-installer-bg);
+    color: var(--color-ft-installer-text);
 }
 
-.file-icon.installer-icon::before {
-    content: "⬇";
-    font-size: 24px;
-    color: var(--color-purple-text);
-    opacity: 0.5;
-}
+/* -------------------------------------------------------------------- */
 
 .files-grid-view .file-item .name-cell {
     font-size: 14px;
