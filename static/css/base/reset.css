@@ -22,5 +22,6 @@ html[dir="rtl"] .fa-sign-out-alt {
 }
 /* Utility: hide elements without inline style="" (CSP-safe) */
 .hidden {
-    display: none;
+    /* biome-ignore lint/complexity/noImportantStyles: this case to overide the display when hidden is selected */
+    display: none !important;
 }
