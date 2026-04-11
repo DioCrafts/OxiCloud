@@ -1,3 +1,4 @@
+use futures::StreamExt;
 use id3::{Tag, TagLike};
 use sqlx::{FromRow, PgPool};
 use std::path::{Path, PathBuf};
@@ -55,53 +56,30 @@ impl AudioMetadataService {
         self.blob_root.join(prefix).join(format!("{}.blob", hash))
     }
 
-    fn get_duration_secs(file_path: &Path) -> i32 {
-        match mp3_duration::from_path(file_path) {
-            Ok(dur) => dur.as_secs_f64().round() as i32,
-            Err(_) => {
-                if let Ok(tag) = Tag::read_from_path(file_path) {
-                    tag.duration().unwrap_or(0) as i32
-                } else {
-                    0
-                }
-            }
-        }
-    }
-
-    pub async fn extract_and_save(
-        &self,
-        file_id: &Uuid,
+    /// Extract ID3 tag and MP3 duration from a file.
+    ///
+    /// All I/O is synchronous (id3 + mp3_duration crates), so this MUST
+    /// only be called inside `spawn_blocking`.
+    fn extract_metadata_blocking(
         file_path: &Path,
-    ) -> Result<(), DomainError> {
-        info!(
-            "AudioMetadataService: blob_root={:?}, file_id={}, file_path={:?}, exists={}",
-            self.blob_root,
-            file_id,
-            file_path,
-            file_path.exists()
-        );
-
+    ) -> Option<AudioMetadataFields> {
         if !file_path.exists() {
             warn!("File does not exist: {:?}", file_path);
-            return Ok(());
+            return None;
         }
 
         let tag = match Tag::read_from_path(file_path) {
             Ok(t) => t,
             Err(e) => {
                 warn!("Failed to read ID3 tag from {:?}: {}", file_path, e);
-                return Ok(());
+                return None;
             }
         };
 
-        let title = tag.title().map(|s| s.to_string());
-        let artist = tag.artist().map(|s| s.to_string());
-        let album = tag.album().map(|s| s.to_string());
-        let genre = tag.genre().map(|s| s.to_string());
-        let track_number: Option<i32> = tag.track().map(|n| n as i32);
-        let disc_number: Option<i32> = tag.disc().map(|n| n as i32);
-        let year: Option<i32> = tag.year();
-        let duration_secs = Self::get_duration_secs(file_path);
+        let duration_secs = match mp3_duration::from_path(file_path) {
+            Ok(dur) => dur.as_secs_f64().round() as i32,
+            Err(_) => tag.duration().unwrap_or(0) as i32,
+        };
 
         let album_artist =
             tag.frames()
@@ -111,9 +89,46 @@ impl AudioMetadataService {
                     _ => None,
                 });
 
+        Some(AudioMetadataFields {
+            title: tag.title().map(|s| s.to_string()),
+            artist: tag.artist().map(|s| s.to_string()),
+            album: tag.album().map(|s| s.to_string()),
+            album_artist,
+            genre: tag.genre().map(|s| s.to_string()),
+            track_number: tag.track().map(|n| n as i32),
+            disc_number: tag.disc().map(|n| n as i32),
+            year: tag.year(),
+            duration_secs,
+        })
+    }
+
+    pub async fn extract_and_save(
+        &self,
+        file_id: &Uuid,
+        file_path: &Path,
+    ) -> Result<(), DomainError> {
+        info!(
+            "AudioMetadataService: blob_root={:?}, file_id={}, file_path={:?}",
+            self.blob_root, file_id, file_path,
+        );
+
+        // ── Sync I/O on the blocking thread pool (never stalls Tokio workers) ──
+        let path = file_path.to_path_buf();
+        let metadata = tokio::task::spawn_blocking(move || {
+            Self::extract_metadata_blocking(&path)
+        })
+        .await
+        .map_err(|e| {
+            DomainError::internal_error("AudioMetadataService", format!("spawn_blocking join error: {e}"))
+        })?;
+
+        let Some(m) = metadata else {
+            return Ok(());
+        };
+
         info!(
             "Extracted audio metadata for file {}: title={:?}, artist={:?}, album={:?}, duration={}s",
-            file_id, title, artist, album, duration_secs
+            file_id, m.title, m.artist, m.album, m.duration_secs
         );
 
         info!("Saving metadata to database for file_id={}", file_id);
@@ -139,15 +154,15 @@ impl AudioMetadataService {
             "#,
         )
         .bind(file_id)
-        .bind(&title)
-        .bind(&artist)
-        .bind(&album)
-        .bind(&album_artist)
-        .bind(&genre)
-        .bind(track_number)
-        .bind(disc_number)
-        .bind(year)
-        .bind(duration_secs)
+        .bind(&m.title)
+        .bind(&m.artist)
+        .bind(&m.album)
+        .bind(&m.album_artist)
+        .bind(&m.genre)
+        .bind(m.track_number)
+        .bind(m.disc_number)
+        .bind(m.year)
+        .bind(m.duration_secs)
         .bind("MPEG")
         .execute(&*self.pool)
         .await
@@ -172,24 +187,27 @@ impl AudioMetadataService {
     pub async fn reextract_all_audio_metadata(
         &self,
     ) -> Result<MetadataExtractionResult, DomainError> {
-        let audio_files = sqlx::query_as::<_, AudioFileRow>(
+        // Stream rows one-by-one instead of fetch_all to keep memory O(1).
+        let mut stream = sqlx::query_as::<_, AudioFileRow>(
             r#"
             SELECT id as file_id, blob_hash
             FROM storage.files
             WHERE mime_type LIKE 'audio/%'
             "#,
         )
-        .fetch_all(&*self.pool)
-        .await
-        .map_err(|e| DomainError::database_error(format!("Failed to fetch audio files: {}", e)))?;
+        .fetch(&*self.pool);
 
-        let total = audio_files.len();
-        let mut processed = 0;
-        let mut failed = 0;
+        let mut total: usize = 0;
+        let mut processed: usize = 0;
+        let mut failed: usize = 0;
 
-        info!("Starting metadata extraction for {} audio files", total);
+        info!("Starting streaming metadata extraction for audio files");
 
-        for audio_file in audio_files {
+        while let Some(row) = stream.next().await {
+            total += 1;
+            let audio_file = row.map_err(|e| {
+                DomainError::database_error(format!("Failed to fetch audio file row: {}", e))
+            })?;
             let file_path = self.blob_path(&audio_file.blob_hash);
             match self.extract_and_save(&audio_file.file_id, &file_path).await {
                 Ok(()) => processed += 1,
@@ -214,6 +232,19 @@ impl AudioMetadataService {
             failed,
         })
     }
+}
+
+/// Extracted audio metadata fields transferred from the blocking thread.
+struct AudioMetadataFields {
+    title: Option<String>,
+    artist: Option<String>,
+    album: Option<String>,
+    album_artist: Option<String>,
+    genre: Option<String>,
+    track_number: Option<i32>,
+    disc_number: Option<i32>,
+    year: Option<i32>,
+    duration_secs: i32,
 }
 
 #[derive(Debug, serde::Serialize)]
