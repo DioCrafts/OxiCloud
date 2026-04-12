@@ -1,5 +1,6 @@
 /* Base */
 @import url("./base/variables.css");
+
 @import url("./base/reset.css");
 @import url("./base/forms.css");
 
@@ -11,8 +12,8 @@
 /* Components */
 @import url("./components/breadcrumb.css");
 @import url("./components/buttons.css");
-@import url("./components/cards.css");
-@import url("./components/fileList.css");
+@import url("./components/fileType.css");
+@import url("./components/filesView.css");
 @import url("./components/contextMenu.css");
 @import url("./components/dialogs.css");
 @import url("./components/modals.css");

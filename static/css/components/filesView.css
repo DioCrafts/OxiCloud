@@ -1,0 +1,476 @@
+.files-container {
+    padding-top: 3px; /* due to cards animation on mouse hover and page-sticky-header with a positive z-index */
+}
+
+/* Rubber band / lasso selection rectangle */
+.selection-rect {
+    position: fixed;
+    border: 1.5px solid var(--primary-color, var(--color-card-drop-border));
+    background-color: var(--color-card-drop-tint);
+    pointer-events: none;
+    z-index: 1000;
+    border-radius: 3px;
+    display: none;
+}
+
+.file-icon {
+    width: 100px;
+    height: 70px;
+    border-radius: 8px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Thumbnail image inside file-icon (grid and list views) */
+.file-icon .file-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: 1;
+}
+
+.file-item {
+    background-color: var(--color-bg-surface);
+}
+
+.file-item.selected {
+    background-color: var(--color-item-selected);
+}
+
+.file-item:hover {
+    background-color: var(--color-bg-hover);
+    border-color: var(--color-border-medium);
+}
+
+.file-item.selected:hover {
+    background-color: var(--color-item-hover-accent);
+}
+
+.file-item.dragging {
+    opacity: 0.8;
+    background-color: var(--color-bg-input);
+}
+
+.file-item.drop-target {
+    background-color: var(--color-warning-ring);
+}
+
+/* ------------------File list View --------------------- */
+
+.list-header {
+    display: grid;
+    grid-template-columns: var(--files-list-columns);
+    column-gap: 12px;
+    padding: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+    background-color: var(--color-bg-subtle);
+    border-bottom: 1px solid var(--color-border-faint);
+    align-items: center;
+}
+
+.list-header.trash-header {
+    grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
+}
+
+.trash-item.file-item {
+    grid-template-columns: minmax(180px, 1.5fr) 0.5fr 1fr 140px 100px;
+}
+
+.list-header > div,
+.files-list-view .file-item > div {
+    min-width: 0;
+}
+
+.list-header > div:nth-child(4),
+.files-list-view .file-item .size-cell {
+    justify-self: end;
+    text-align: right;
+}
+
+.files-list-view {
+    --files-list-columns: 36px minmax(200px, 2fr) 100px 110px 130px 64px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 10px;
+    overflow: hidden;
+    background-color: var(--color-bg-surface);
+    box-shadow: 0 1px 3px var(--color-shadow-xs);
+}
+
+.files-list-view .file-item {
+    display: grid;
+    grid-template-columns: var(--files-list-columns);
+    column-gap: 12px;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--color-border-xfaint);
+    align-items: center;
+    cursor: pointer;
+}
+
+.files-list-view .file-item.drop-target {
+    border: 1px dashed var(--color-warning-border);
+}
+
+.files-list-view .file-item .name-cell {
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.files-list-view .file-item .name-cell span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.files-list-view .file-item .file-icon {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 20px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+}
+
+.list-header > div:nth-child(5),
+.files-list-view .file-item .date-cell {
+    justify-self: center;
+    text-align: center;
+}
+.files-list-view .file-item .date-cell {
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
+
+.files-list-view .file-item .size-cell {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.files-list-view .file-item .type-cell {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.files-list-view .file-item .action-cell {
+    align-items: center;
+    text-align: right;
+}
+
+.files-list-view .file-item .action-cell button {
+    display: inline;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-text-subtle);
+    font-size: 16px;
+}
+
+.files-list-view .file-item .action-cell button:hover {
+    background: var(--color-border-subtle);
+    color: var(--color-text-dark);
+}
+
+/* could be visible if we want */
+.files-list-view .file-item .action-cell button.favorite-star {
+    display: none;
+    border: none;
+}
+
+.files-list-view .file-item:hover .action-cell button.favorite-star {
+    display: inline;
+}
+
+/* --------------------- Files grid view --------------------------- */
+
+.files-grid-view {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    position: relative;
+}
+
+/* header not visible in grid mode */
+.files-grid-view .list-header {
+    display: none;
+}
+
+.files-grid-view .file-item {
+    border-radius: 12px;
+    border: 2px solid var(--color-border);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 1px 3px var(--color-shadow-xs);
+    cursor: pointer;
+    width: 100%;
+    min-height: 160px;
+    position: relative;
+}
+
+.files-grid-view .file-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    box-shadow: none;
+}
+
+.files-grid-view .file-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px var(--color-shadow-sm);
+    border-color: var(--color-border-medium);
+}
+
+.files-grid-view .file-item.selected {
+    border-color: var(--color-accent);
+    box-shadow:
+        0 0 0 1px var(--color-accent-ring-dark),
+        0 4px 12px var(--color-accent-ring);
+}
+
+.files-grid-view .file-item.selected:hover {
+    box-shadow:
+        0 0 0 1px var(--color-accent-ring-strong),
+        0 6px 18px var(--color-accent-ring-dark);
+}
+
+/* element hidden on grid view */
+.files-grid-view .file-item .date-cell,
+.files-grid-view .file-item .size-cell {
+    display: none;
+}
+/* Selection checkbox */
+.files-grid-view .file-item .checkbox-cell {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: var(--color-bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    z-index: 10;
+    cursor: pointer;
+}
+
+.files-grid-view .file-item:hover .checkbox-cell {
+    opacity: 1;
+}
+
+.files-grid-view .file-item.selected .checkbox-cell {
+    opacity: 1;
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+}
+
+.files-grid-view .file-item.selected .checkbox-cell i {
+    color: var(--color-danger-text);
+    font-size: 11px;
+}
+
+/* More actions button (three dots) */
+.files-grid-view .file-item .file-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    z-index: 10;
+    cursor: pointer;
+    color: var(--color-text-subtle);
+    font-size: 16px;
+}
+
+.files-grid-view .file-item:hover .file-actions {
+    opacity: 1;
+}
+
+.files-grid-view .file-item .file-actions:hover {
+    background: var(--color-border-light);
+    color: var(--color-text-dark);
+}
+
+.files-grid-view .file-item.drop-target {
+    background-color: var(--color-warning-ring);
+    border: 2px dashed var(--color-warning-border);
+}
+
+/* Favorite star (mirrors file-actions button pattern) */
+.files-grid-view .file-item button.favorite-star {
+    position: absolute;
+    top: 8px;
+    right: 38px;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    z-index: 12;
+    cursor: pointer;
+    color: var(--color-border-medium);
+    font-size: 15px;
+    padding: 0;
+    line-height: 1;
+}
+
+.files-grid-view .file-item:hover button.favorite-star {
+    opacity: 1;
+}
+
+.files-grid-view .file-item button.favorite-star:hover {
+    color: var(--color-star-text);
+}
+
+.files-grid-view .file-item button.favorite-star.active {
+    opacity: 1;
+    color: var(--color-star-text-hover);
+}
+
+.files-grid-view .file-item button.favorite-star.active:hover {
+    color: var(--color-star-active);
+}
+
+.files-grid-view .file-item .name-cell {
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    margin-bottom: 5px;
+    color: var(--color-text);
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 8px;
+}
+
+.files-grid-view .file-item .name-cell span {
+    padding-top: 8px;
+    padding-bottom: 8px;
+    display: block;
+}
+
+.files-grid-view .file-item .name-cell svg.favorite-star-inline {
+    display: none;
+}
+
+.files-grid-view .file-item .type-cell {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+.files-grid-view .file-item .file-icon {
+    margin: auto;
+    margin-bottom: 10px;
+}
+
+.files-grid-view .file-item .file-icon > i,
+.files-grid-view .file-item .file-icon > svg {
+    position: absolute;
+    top: 5px;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ----------------------- dragged items -----------*/
+
+.dragged-items {
+    --dragged-files-list-columns: 36px minmax(200px, 1fr);
+    flex-direction: column;
+    background-color: transparent;
+    overflow: hidden;
+    border-radius: 10px;
+    width: 100%;
+}
+
+.dragged-items .file-item {
+    grid-template-columns: var(--dragged-files-list-columns);
+    column-gap: 12px;
+    align-items: center;
+    background-color: var(--color-bg-surface);
+    display: flex;
+    padding: 4px;
+    width: 360px;
+    height: 46px;
+    color: var(--color-text);
+}
+
+/* file name, text is wrapped */
+.dragged-items .file-item div:nth-child(2) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dragged-items .file-item .file-icon {
+    width: 36px;
+    height: 36px;
+}
+
+.dragged-items div.fading {
+    -webkit-mask-image: linear-gradient(to bottom, var(--color-bg-surface) 10%, transparent);
+    mask-image: linear-gradient(to bottom, var(--color-bg-surface) 10%, transparent);
+}
+
+.dragged-items-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+
+    transform: translate(50%, -50%);
+
+    background: var(--color-content-debug-bg);
+    color: var(--color-content-debug-text);
+
+    border-radius: 50%;
+    min-width: 20px;
+    height: 20px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 12px;
+    font-weight: bold;
+
+    padding: 2px;
+}
