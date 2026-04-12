@@ -24,7 +24,7 @@ NextCloud was too slow on my home server. So I built OxiCloud — a complete clo
 
 <!-- TODO: add animated GIF/demo here -->
 
----
+
 
 ## OxiCloud vs NextCloud
 
