@@ -1,0 +1,158 @@
+/* -------------------------- file's type to icons --------------------------------------- */
+
+.folder-icon {
+    background-color: var(--color-ft-folder-bg);
+}
+
+.folder-icon::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 22%;
+    background-color: var(--color-ft-folder-tab);
+    border-radius: 8px 8px 0 0;
+}
+
+/* don't use FontAwesome / svg for folders and prefer CSS trick */
+.folder-icon > i,
+.folder-icon > svg {
+    display: none !important;
+}
+
+.pdf-icon {
+    background-color: var(--color-ft-pdf-bg);
+    color: var(--color-ft-pdf-text);
+}
+
+.doc-icon {
+    background-color: var(--color-ft-doc-bg);
+    color: var(--color-ft-doc-text);
+}
+
+.script-icon {
+    background-color: var(--color-ft-script-bg);
+    color: var(--color-ft-script-text);
+}
+
+.config-icon {
+    background-color: var(--color-ft-config-bg);
+    color: var(--color-ft-config-text);
+}
+
+.image-icon {
+    background-color: var(--color-ft-image-bg);
+    color: var(--color-ft-image-text);
+}
+
+.video-icon {
+    background: linear-gradient(135deg, var(--color-ft-video-bg-from), var(--color-ft-video-bg-to));
+    color: var(--color-ft-video-text);
+}
+
+.code-icon {
+    background-color: var(--color-border);
+}
+
+.json-icon {
+    border-top-color: var(--color-ft-orange-light);
+}
+
+.js-icon {
+    border-top-color: var(--color-ft-yellow);
+}
+
+.html-icon {
+    border-top-color: var(--color-ft-html);
+}
+
+.css-icon {
+    border-top-color: var(--color-ft-js);
+}
+
+.py-icon {
+    border-top-color: var(--color-ft-python);
+}
+
+.ts-icon {
+    border-top-color: var(--color-ft-typescript);
+}
+
+.rust-icon {
+    border-top-color: var(--color-ft-rust);
+}
+
+.go-icon {
+    border-top-color: var(--color-ft-go);
+}
+
+.java-icon {
+    border-top-color: var(--color-ft-java);
+}
+
+.c-icon {
+    border-top-color: var(--color-ft-shell);
+}
+
+.cs-icon {
+    border-top-color: var(--color-ft-csharp);
+}
+
+.php-icon {
+    border-top-color: var(--color-ft-php);
+}
+
+.ruby-icon {
+    border-top-color: var(--color-ft-ruby);
+}
+
+.swift-icon {
+    border-top-color: var(--color-ft-swift);
+}
+
+.kotlin-icon {
+    border-top-color: var(--color-ft-kotlin);
+}
+
+.sql-icon {
+    border-top-color: var(--color-ft-scala);
+}
+
+.yaml-icon {
+    border-top-color: var(--color-ft-angular);
+}
+
+.toml-icon {
+    border-top-color: var(--color-ft-cpp);
+}
+
+.md-icon {
+    border-top-color: var(--color-ft-docker);
+}
+
+.spreadsheet-icon {
+    background-color: var(--color-ft-spreadsheet-bg);
+    color: var(--color-ft-spreadsheet-text);
+}
+
+.presentation-icon {
+    background-color: var(--color-ft-presentation-bg);
+    color: var(--color-ft-presentation-text);
+}
+
+.audio-icon {
+    /* background-color: var(--color-ft-audio-alt-bg);*/
+    background-color: var(--color-ft-audio-bg);
+    color: var(--color-ft-audio-text);
+}
+
+.archive-icon {
+    background-color: var(--color-ft-archive-bg);
+    color: var(--color-ft-archive-text);
+}
+
+.installer-icon {
+    background-color: var(--color-ft-installer-bg);
+    color: var(--color-ft-installer-text);
+}

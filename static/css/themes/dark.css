@@ -76,6 +76,10 @@
     /* Sidebar */
     --color-sidebar-bg-from: #0f172a;
     --color-sidebar-bg-to: #0c1322;
+
+    /* Items */
+    --color-item-selected: #1a1520;
+    --color-item-hover-accent: #1f1926;
 }
 
 /* ------------ */
@@ -234,6 +238,7 @@
 }
 
 /* ── cards.css ── */
+/* FIXME
 [data-theme="dark"] .files-grid-view .file-item {
     background-color: var(--color-bg-surface);
     border-color: var(--color-border);
@@ -242,11 +247,6 @@
 [data-theme="dark"] .files-grid-view .file-item:hover {
     border-color: var(--color-border-medium);
     box-shadow: 0 4px 12px var(--color-shadow-3xl);
-}
-
-[data-theme="dark"] .files-grid-view .file-item.selected {
-    border-color: var(--color-accent);
-    background: var(--color-item-selected-dark);
 }
 
 [data-theme="dark"] .files-grid-view .file-item .checkbox-cell {
@@ -274,6 +274,7 @@
 [data-theme="dark"] .files-grid-view .file-item.drop-target {
     background-color: var(--color-warning-ring-xs);
 }
+*/
 
 /* ── csp-utilities.css ── */
 [data-theme="dark"] .empty-state-icon {
@@ -627,6 +628,7 @@
 }
 
 /* ── fileList.css ── */
+/* FIXME
 [data-theme="dark"] .files-list-view {
     background-color: var(--color-bg-surface);
     box-shadow: 0 1px 3px var(--color-shadow-xs);
@@ -645,14 +647,6 @@
 
 [data-theme="dark"] .files-list-view .file-item:hover {
     background-color: var(--color-bg-hover);
-}
-
-[data-theme="dark"] .files-list-view .file-item.selected {
-    background-color: var(--color-item-selected);
-}
-
-[data-theme="dark"] .files-list-view .file-item.selected:hover {
-    background-color: var(--color-item-hover-accent);
 }
 
 [data-theme="dark"] .files-list-view .file-item .name-cell {
@@ -684,6 +678,7 @@
     background: var(--color-border);
     color: var(--color-text-heading);
 }
+*/
 
 /* ── languageSelector.css ── */
 [data-theme="dark"] .language-selector-toggle {

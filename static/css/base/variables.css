@@ -351,9 +351,6 @@
     /* Photo tile */
     --color-photo-check-border: rgba(255, 255, 255, 0.8);
 
-    /* Dark-mode selected card */
-    --color-item-selected-dark: #1a1520;
-
     /* Accent shadow (smaller) */
     --color-accent-shadow-sm: rgba(255, 94, 58, 0.25);
 
@@ -399,7 +396,7 @@
     /* Status badge — light mode (gray/disabled) */
     --color-badge-gray: #d1d5db;
 
-    /* Status badge — dark mode */
+    /* FIXME: Status badge — dark mode */
     --color-badge-success-dark-bg: #052e16;
     --color-badge-success-dark-border: #065f46;
     --color-badge-error-dark-bg: #3b1111;
