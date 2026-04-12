@@ -237,45 +237,6 @@
     border-color: #ff5e3a;
 }
 
-/* ── cards.css ── */
-/* FIXME
-[data-theme="dark"] .files-grid-view .file-item {
-    background-color: var(--color-bg-surface);
-    border-color: var(--color-border);
-}
-
-[data-theme="dark"] .files-grid-view .file-item:hover {
-    border-color: var(--color-border-medium);
-    box-shadow: 0 4px 12px var(--color-shadow-3xl);
-}
-
-[data-theme="dark"] .files-grid-view .file-item .checkbox-cell {
-    background: var(--color-bg-surface);
-    border-color: var(--color-border-medium);
-}
-
-[data-theme="dark"] .files-grid-view .file-actions {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .files-grid-view .file-actions:hover {
-    background: var(--color-border);
-    color: var(--color-text);
-}
-
-[data-theme="dark"] .files-grid-view .file-item .name-cell {
-    color: var(--color-text);
-}
-
-[data-theme="dark"] .files-grid-view .file-item .type-cell {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .files-grid-view .file-item.drop-target {
-    background-color: var(--color-warning-ring-xs);
-}
-*/
-
 /* ── csp-utilities.css ── */
 [data-theme="dark"] .empty-state-icon {
     color: var(--color-dark-mid);
@@ -626,59 +587,6 @@
 [data-theme="dark"] .folder-select-empty {
     color: var(--color-border-medium);
 }
-
-/* ── fileList.css ── */
-/* FIXME
-[data-theme="dark"] .files-list-view {
-    background-color: var(--color-bg-surface);
-    box-shadow: 0 1px 3px var(--color-shadow-xs);
-}
-
-[data-theme="dark"] .list-header {
-    background-color: var(--color-bg-subtle);
-    color: var(--color-text-subtle);
-    border-bottom-color: var(--color-border);
-}
-
-[data-theme="dark"] .files-list-view .file-item {
-    background-color: var(--color-bg-surface);
-    border-bottom-color: var(--color-border-faint);
-}
-
-[data-theme="dark"] .files-list-view .file-item:hover {
-    background-color: var(--color-bg-hover);
-}
-
-[data-theme="dark"] .files-list-view .file-item .name-cell {
-    color: var(--color-text-heading);
-}
-
-[data-theme="dark"] .files-list-view .file-item .date-cell,
-[data-theme="dark"] .files-list-view .file-item .size-cell {
-    color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .files-list-view .file-item .type-cell {
-    color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .files-list-view .file-item.dragging {
-    background-color: var(--color-border);
-}
-
-[data-theme="dark"] .files-list-view .file-item.drop-target {
-    background-color: var(--color-warning-ring);
-}
-
-[data-theme="dark"] .files-list-view .file-actions {
-    color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .files-list-view .file-actions:hover {
-    background: var(--color-border);
-    color: var(--color-text-heading);
-}
-*/
 
 /* ── languageSelector.css ── */
 [data-theme="dark"] .language-selector-toggle {

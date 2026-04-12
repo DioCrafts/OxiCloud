@@ -400,7 +400,6 @@
     margin-bottom: 10px;
 }
 
-/* biome-ignore lint/style/noDescendingSpecificity: biome is lost with temp element <i> */
 .files-grid-view .file-item .file-icon > i,
 .files-grid-view .file-item .file-icon > svg {
     position: absolute;
