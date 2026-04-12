@@ -15,7 +15,7 @@
   [![GitHub Issues](https://img.shields.io/github/issues/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/issues)
   [![Last Commit](https://img.shields.io/github/last-commit/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/commits/main)
 
-[**Documentation**](https://diocrafts.github.io/OxiCloud/) | [**Quick Start**](#-quick-start)
+[**Documentation**](https://diocrafts.github.io/OxiCloud/)
 
 
 NextCloud was too slow on my home server. So I built OxiCloud — a complete cloud platform written in Rust that runs on minimal hardware and stays out of your way.
