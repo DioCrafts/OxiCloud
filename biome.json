@@ -15,6 +15,12 @@
       "recommended": true,
       "correctness": {
         "noUnusedVariables": "warn"
+      },
+      "style": {
+        "noDescendingSpecificity": "off"
+      },
+      "complexity": {
+        "noImportantStyles": "off"
       }
     }
   },

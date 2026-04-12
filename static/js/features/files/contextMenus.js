@@ -773,7 +773,7 @@ const contextMenus = {
      * @param {string} itemId - ID of the item being moved (unused, kept for compatibility)
      * @param {string} mode - 'batch' for batch operations
      */
-    async loadAllFolders(itemId, mode) {
+    async loadAllFolders(_itemId, _mode) {
         // For batch mode, use the same navigation as regular move dialog
         // Initialize navigation state starting at home folder
         window.app.moveDialogBreadcrumb = [];

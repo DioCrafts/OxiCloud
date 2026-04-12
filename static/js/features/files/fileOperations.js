@@ -598,9 +598,10 @@ const fileOps = {
                     formData.append('folder_id', targetFolderId);
                     formData.append('file', uploadFile, file.name);
 
-                    const thisTimeout = file.size === 0
-                        ? TIMEOUT_MS_ZERO
-                        : Math.max(TIMEOUT_MIN_MS, TIMEOUT_BASE_MS + Math.ceil(file.size / (1024 * 1024)) * TIMEOUT_PER_MB_MS);
+                    const thisTimeout =
+                        file.size === 0
+                            ? TIMEOUT_MS_ZERO
+                            : Math.max(TIMEOUT_MIN_MS, TIMEOUT_BASE_MS + Math.ceil(file.size / (1024 * 1024)) * TIMEOUT_PER_MB_MS);
                     console.log(`[UPLOAD START] #${idx} ${rel} (${file.size} bytes, timeout=${thisTimeout}ms)`);
 
                     result = await this._uploadFileFetch(formData, thisTimeout);
@@ -917,7 +918,7 @@ const fileOps = {
      * @param {string} targetFolderId - Target folder ID
      * @returns {Promise<boolean>} - Success status
      */
-    async copyFolder(folderId, targetFolderId) {
+    async copyFolder(_folderId, _targetFolderId) {
         // Folder copy is not yet implemented in the backend
         window.ui.showNotification('Not implemented', 'Folder copy is not yet supported');
         return false;

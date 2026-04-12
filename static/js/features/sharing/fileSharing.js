@@ -175,7 +175,7 @@ const fileSharing = {
      * @param {string} message
      * @returns {Promise<boolean>}
      */
-    async sendShareNotification(shareUrl, recipientEmail, message = '') {
+    async sendShareNotification(shareUrl, recipientEmail, _message = '') {
         // TODO: implement backend endpoint for email notifications
         console.log(`Share notification for ${shareUrl} sent to ${recipientEmail}`);
         if (window.ui) {

@@ -782,7 +782,9 @@ const musicView = {
         };
         overlay.querySelector('.music-picker-close').addEventListener('click', close);
         overlay.querySelector('.music-picker-cancel').addEventListener('click', close);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) close();
+        });
 
         // ── Fetch & render audio files ──
         const AUDIO_EXTENSIONS = 'mp3,ogg,flac,wav,aac,m4a,wma,opus,webm';
@@ -810,7 +812,7 @@ const musicView = {
             listEl.innerHTML = '';
             for (const file of files) {
                 const row = document.createElement('label');
-                row.className = 'music-picker-item' + (selectedIds.has(file.id) ? ' selected' : '');
+                row.className = `music-picker-item${selectedIds.has(file.id) ? ' selected' : ''}`;
                 const sizeStr = file.size != null && window.formatFileSize ? window.formatFileSize(file.size) : '';
                 row.innerHTML = `
                     <input type="checkbox" value="${file.id}" ${selectedIds.has(file.id) ? 'checked' : ''}>
@@ -820,8 +822,13 @@ const musicView = {
                 `;
                 const cb = row.querySelector('input');
                 cb.addEventListener('change', () => {
-                    if (cb.checked) { selectedIds.add(file.id); row.classList.add('selected'); }
-                    else { selectedIds.delete(file.id); row.classList.remove('selected'); }
+                    if (cb.checked) {
+                        selectedIds.add(file.id);
+                        row.classList.add('selected');
+                    } else {
+                        selectedIds.delete(file.id);
+                        row.classList.remove('selected');
+                    }
                     countEl.textContent = `${selectedIds.size} ${t('music.selected', 'selected')}`;
                     addBtn.disabled = selectedIds.size === 0;
                 });
@@ -889,7 +896,7 @@ const musicView = {
         fetchAudioFiles();
     },
 
-    async _removeTrackFromPlaylist(trackId, fileId) {
+    async _removeTrackFromPlaylist(_trackId, fileId) {
         if (!this.currentPlaylist) return;
         const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
 

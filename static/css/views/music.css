@@ -1336,7 +1336,10 @@
     font-weight: 600;
     color: var(--color-text, #2d3748);
 }
-.music-picker-header h3 i { margin-right: 8px; color: var(--color-primary, #667eea); }
+.music-picker-header h3 i {
+    margin-right: 8px;
+    color: var(--color-primary, #667eea);
+}
 .music-picker-close {
     background: none;
     border: none;
@@ -1346,7 +1349,9 @@
     padding: 0 4px;
     line-height: 1;
 }
-.music-picker-close:hover { color: var(--color-text, #2d3748); }
+.music-picker-close:hover {
+    color: var(--color-text, #2d3748);
+}
 
 /* ── search bar ── */
 .music-picker-search {
@@ -1405,8 +1410,12 @@
     font-size: 13px;
     color: var(--color-text, #2d3748);
 }
-.music-picker-item:hover { background: var(--bg-hover, #edf2f7); }
-.music-picker-item.selected { background: rgba(102, 126, 234, 0.08); }
+.music-picker-item:hover {
+    background: var(--bg-hover, #edf2f7);
+}
+.music-picker-item.selected {
+    background: rgba(102, 126, 234, 0.08);
+}
 
 .music-picker-item input[type="checkbox"] {
     accent-color: var(--color-primary, #667eea);

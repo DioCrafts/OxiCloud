@@ -198,7 +198,6 @@
 
 .files-grid-view .file-item .file-icon > i,
 .files-grid-view .file-item .file-icon > svg {
-    /* biome-ignore lint/complexity/noImportantStyles: <explanation> */
     position: absolute;
     top: 5px;
     width: 60px;
