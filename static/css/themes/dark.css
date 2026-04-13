@@ -628,83 +628,6 @@
     color: var(--color-text);
 }
 
-/* ── notifications.css ── */
-[data-theme="dark"] .notification {
-    background-color: var(--color-notification-bg);
-    box-shadow: 0 4px 12px var(--color-shadow-4xl);
-}
-
-[data-theme="dark"] .notification-title {
-    color: var(--color-text-heading);
-}
-
-[data-theme="dark"] .notification-message {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .notification-banner {
-    background-color: var(--color-notification-bg);
-    box-shadow: 0 4px 12px var(--color-shadow-4xl);
-}
-
-[data-theme="dark"] .notif-bell-btn {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .notif-bell-btn:hover,
-[data-theme="dark"] .notif-bell-btn.active {
-    color: var(--color-accent);
-    background: var(--color-accent-ring-dark);
-}
-
-[data-theme="dark"] .notif-panel {
-    background: var(--color-notification-bg);
-    box-shadow:
-        0 12px 40px var(--color-shadow-4xl),
-        0 0 0 1px var(--color-sidebar-hover-bg);
-}
-
-[data-theme="dark"] .notif-panel-header {
-    border-bottom-color: var(--color-border);
-}
-
-[data-theme="dark"] .notif-panel-title {
-    color: var(--color-text-heading);
-}
-
-[data-theme="dark"] .notif-clear-btn {
-    color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .notif-clear-btn:hover {
-    color: var(--color-accent);
-    background: var(--color-accent-ring-dark);
-}
-
-[data-theme="dark"] .notif-empty {
-    color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .notif-item {
-    border-bottom-color: var(--color-bg-muted);
-}
-
-[data-theme="dark"] .notif-item:hover {
-    background: var(--color-bg-hover);
-}
-
-[data-theme="dark"] .notif-item-title {
-    color: var(--color-text);
-}
-
-[data-theme="dark"] .notif-item-text {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .notif-upload-bar {
-    background: var(--color-border);
-}
-
 [data-theme="dark"] .upload-toast {
     background: var(--color-notification-bg);
     box-shadow: 0 8px 32px var(--color-shadow-5xl);
@@ -724,17 +647,6 @@
 
 [data-theme="dark"] .upload-toast-footer {
     border-top-color: var(--color-border);
-}
-
-/* ── spinner.css ── */
-[data-theme="dark"] .dropzone {
-    border-color: var(--color-border-medium);
-    color: var(--color-text-faint);
-    background-color: var(--color-bg-page);
-}
-
-[data-theme="dark"] .progress-bar {
-    background-color: var(--color-border);
 }
 
 /* ── uploadDropdown.css ── */
