@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "color-no-hex": true,
+    "color-named": "never",
+    "function-disallowed-list": ["rgb", "rgba", "hsl", "hsla", "hwb", "oklch", "oklab"],
+    "selector-disallowed-list": ["/\\[data-theme/"]
+  },
+  "overrides": [
+    {
+      "files": ["**/variables.css"],
+      "rules": {
+        "color-no-hex": null,
+        "color-named": null,
+        "function-disallowed-list": null
+      }
+    },
+    {
+      "files": ["**/themes/dark.css"],
+      "rules": {
+        "color-no-hex": null,
+        "color-named": null,
+        "function-disallowed-list": null,
+        "selector-disallowed-list": null
+      }
+    }
+  ]
+}

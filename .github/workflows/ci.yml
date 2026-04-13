@@ -32,6 +32,8 @@ jobs:
             frontend:
               - 'static/**'
               - 'biome.json'
+              - '.grit'
+              - '.stylelintrc.json'
               - 'jsconfig.json'
             backend:
               - 'src/**'
@@ -39,7 +41,7 @@ jobs:
               - 'Cargo.lock'
 
   frontend-linter:
-    name: Frontend — Biome
+    name: Frontend — CSS and JS checks (format, lint, rules, etc)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -51,6 +53,14 @@ jobs:
 
       - name: Run Biome check
         run: biome ci static/
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 25
+
+      - name: Run Stylelint
+        run: npx stylelint "**/*.{css,scss}"
 
   rust-fmt:
     name: Rustfmt
