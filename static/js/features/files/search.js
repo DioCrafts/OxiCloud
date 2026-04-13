@@ -110,7 +110,8 @@ const search = {
      */
     displaySearchResults(results) {
         window.ui.resetFilesList(); // ensure also list visible & error hidden
-        const filesList = document.getElementById('files-list');
+        //FIXME: move into action rather bage sticky header + hide bread crumb ? + note also that search result does not consider section
+        const pageStickyHeader = document.getElementById('page-sticky-header');
 
         // Search results header with query time and sort controls
         const totalCount = results.total_count || results.files.length + results.folders.length;
@@ -135,7 +136,13 @@ const search = {
                 </button>
             </div>
         `;
-        filesList.appendChild(searchHeader);
+        const previousSearchHeader = document.querySelector('.search-results-header');
+
+        if (previousSearchHeader) {
+            previousSearchHeader.replaceWith(searchHeader);
+        } else {
+            pageStickyHeader.appendChild(searchHeader);
+        }
 
         // Sort dropdown — re-searches with new sort order (server-side)
         const sortSelect = document.getElementById('search-sort-select');
@@ -158,6 +165,7 @@ const search = {
                 document.querySelector('.search-container input').value = '';
                 window.app.currentPath = '';
                 window.app.isSearchMode = false;
+                document.querySelector('.search-results-header')?.remove();
                 window.ui.updateBreadcrumb('');
                 window.loadFiles();
             });
