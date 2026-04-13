@@ -145,7 +145,7 @@ body {
 }
 .user-last-login-cell {
     font-size: 12px;
-    color: var(--color-text-faint);
+    color: var(--color-text);
 }
 
 /* ── Top Header Bar ── */
@@ -422,7 +422,7 @@ table {
 th {
     text-align: left;
     padding: 12px 16px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-subtle);
     color: var(--color-text-faint);
     font-size: 11px;
     text-transform: uppercase;
@@ -440,7 +440,7 @@ tr:last-child td {
     border-bottom: none;
 }
 tr:hover {
-    background: var(--color-bg-off-white);
+    background: var(--color-bg-hover);
 }
 .user-info {
     display: flex;
