@@ -754,27 +754,6 @@
     color: var(--color-text-dark);
 }
 
-/* ── photos.css ── */
-[data-theme="dark"] .photos-day-header {
-    color: var(--color-text);
-}
-
-[data-theme="dark"] .photo-tile {
-    background: var(--color-border);
-}
-
-[data-theme="dark"] .photos-empty i {
-    color: var(--color-dark-mid);
-}
-
-[data-theme="dark"] .photos-empty .photos-empty-title {
-    color: var(--color-text-faint);
-}
-
-[data-theme="dark"] .photos-empty p {
-    color: var(--color-text-subtle);
-}
-
 /* ── shared.css ── */
 [data-theme="dark"] .shared-filters {
     background-color: var(--color-bg-subtle);
