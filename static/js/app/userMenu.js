@@ -2,6 +2,11 @@
  * User menu, profile modal and logout logic
  */
 
+import { getCsrfHeaders } from '../core/csrf.js';
+import { formatFileSize, formatQuotaSize } from '../core/formatters.js';
+import { i18n } from '../core/i18n.js';
+import { ui } from './ui.js';
+
 function setupUserMenu() {
     const wrapper = document.getElementById('user-menu-wrapper');
     const avatarBtn = document.getElementById('user-avatar-btn');
@@ -102,7 +107,7 @@ function setupUserMenu() {
                 }
             }
 
-            window.ui.showNotification(newIsDark ? '🌙' : '☀️', newIsDark ? 'Dark mode enabled' : 'Light mode enabled');
+            ui.showNotification(newIsDark ? '🌙' : '☀️', newIsDark ? 'Dark mode enabled' : 'Light mode enabled');
         });
     }
 
@@ -173,8 +178,8 @@ function updateUserMenuData() {
 
     if (storageFill) storageFill.style.width = `${percentage}%`;
     if (storageText) {
-        const used = window.formatFileSize(usedBytes);
-        const total = window.formatQuotaSize(quotaBytes);
+        const used = formatFileSize(usedBytes);
+        const total = formatQuotaSize(quotaBytes);
         storageText.textContent = `${quotaBytes > 0 ? `${percentage}% · ` : ''}${used} / ${total}`;
     }
 }
@@ -206,7 +211,7 @@ function showUserProfileModal() {
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-    const t = (key, fallback) => (window.i18n?.t ? window.i18n.t(key) || fallback : fallback);
+    const t = (key, fallback) => (i18n?.t ? i18n.t(key) || fallback : fallback);
 
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();
@@ -229,7 +234,7 @@ function showUserProfileModal() {
                 <div class="about-modal-bar-bg">
                     <div class="about-modal-bar-fill" id="about-bar-fill"></div>
                 </div>
-                <div class="about-modal-bar-text">${percentage}% · ${window.formatFileSize(usedBytes)} / ${window.formatQuotaSize(quotaBytes)}</div>
+                <div class="about-modal-bar-text">${percentage}% · ${formatFileSize(usedBytes)} / ${formatQuotaSize(quotaBytes)}</div>
             </div>
             <div class="about-modal-footer">
                 <button id="profile-modal-close" class="about-modal-close-btn">${t('actions.close', 'Close')}</button>
@@ -283,6 +288,4 @@ async function logout() {
     window.location.href = '/login';
 }
 
-window.setupUserMenu = setupUserMenu;
-window.showUserProfileModal = showUserProfileModal;
-window.logout = logout;
+export { logout, setupUserMenu, showUserProfileModal };

@@ -3,6 +3,14 @@
  * This file handles file and folder operations (create, move, delete, rename, upload)
  */
 
+import { refreshUserData } from '../../app/authSession.js';
+import { loadFiles } from '../../app/filesView.js';
+import { app } from '../../app/state.js';
+import { showConfirmDialog, ui } from '../../app/ui.js';
+import { getCsrfHeaders, getCsrfToken } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+import { notifications } from '../../core/notifications.js';
+
 /**
  * Get authorization headers for API requests.
  * Tokens are now in HttpOnly cookies — no explicit Authorization header needed.
@@ -22,13 +30,13 @@ const fileOps = {
 
     /** Start a new upload batch in the notification bell */
     _initUploadToast(totalFiles, folderName) {
-        this._currentBatchId = window.notifications ? window.notifications.addUploadBatch(totalFiles, folderName) : null;
+        this._currentBatchId = notifications ? notifications.addUploadBatch(totalFiles, folderName) : null;
     },
 
     /** Finalise the batch in the notification bell */
     _finishUploadToast(successCount, totalFiles) {
-        if (window.notifications && this._currentBatchId) {
-            window.notifications.finishBatch(this._currentBatchId, successCount, totalFiles);
+        if (notifications && this._currentBatchId) {
+            notifications.finishBatch(this._currentBatchId, successCount, totalFiles);
         }
     },
 
@@ -58,7 +66,7 @@ const fileOps = {
     _uploadFileXHR(formData, batchId, fileName, timeoutMs = 120000) {
         return new Promise((resolve) => {
             const xhr = new XMLHttpRequest();
-            const notif = window.notifications;
+            const notif = notifications;
             // Do NOT set xhr.timeout — it is a TOTAL deadline from send() to
             // response and would kill large uploads even while data is flowing.
             // Instead we rely on the stall timer (no progress for N seconds)
@@ -299,13 +307,13 @@ const fileOps = {
 
             const totalFiles = readableFiles.length;
 
-            if (skippedEntries.length > 0 && window.notifications) {
-                const locale = window.i18n?.getCurrentLocale?.() || 'en';
+            if (skippedEntries.length > 0 && notifications) {
+                const locale = i18n?.getCurrentLocale?.() || 'en';
                 const title = locale.startsWith('es') ? 'Entradas omitidas' : 'Entries skipped';
                 const text = locale.startsWith('es')
                     ? `Se omitieron ${skippedEntries.length} carpeta(s)/entrada(s) no legibles. Usa "Subir carpeta".`
                     : `${skippedEntries.length} unreadable folder/entry items were skipped. Use "Upload folder".`;
-                window.notifications.addNotification({
+                notifications.addNotification({
                     icon: 'fa-folder-open',
                     iconClass: 'upload',
                     title,
@@ -331,7 +339,7 @@ const fileOps = {
 
                 const formData = new FormData();
 
-                const targetFolderId = window.app.currentPath || window.app.userHomeFolderId;
+                const targetFolderId = app.currentPath || app.userHomeFolderId;
                 if (targetFolderId) formData.append('folder_id', targetFolderId);
                 formData.append('file', file);
 
@@ -353,9 +361,9 @@ const fileOps = {
                     progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
                 }
                 // Notify bell of per-file completion
-                if (window.notifications && batchId) {
+                if (notifications && batchId) {
                     try {
-                        window.notifications.fileCompleted(batchId, result.ok);
+                        notifications.fileCompleted(batchId, result.ok);
                     } catch (e) {
                         console.warn('Batch progress update failed:', e);
                     }
@@ -366,8 +374,8 @@ const fileOps = {
                     console.log(`Successfully uploaded ${file.name}`, result.data);
                 } else {
                     console.error(`Upload error for ${file.name}`);
-                    if (result.isTimeout && window.notifications) {
-                        window.notifications.addNotification({
+                    if (result.isTimeout && notifications) {
+                        notifications.addNotification({
                             icon: 'fa-clock',
                             iconClass: 'error',
                             title: file.name,
@@ -375,9 +383,9 @@ const fileOps = {
                         });
                     }
                     if (result.isQuotaError) {
-                        const msg = result.errorMsg || window.i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
-                        if (window.notifications) {
-                            window.notifications.addNotification({
+                        const msg = result.errorMsg || i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
+                        if (notifications) {
+                            notifications.addNotification({
                                 icon: 'fa-exclamation-triangle',
                                 iconClass: 'error',
                                 title: file.name,
@@ -393,14 +401,12 @@ const fileOps = {
             this._finishUploadToast(successCount, totalFiles);
 
             // Refresh storage usage display
-            if (typeof window.refreshUserData === 'function') {
-                try {
-                    await window.refreshUserData();
-                } catch (_) {}
-            }
+            try {
+                await refreshUserData();
+            } catch (_) {}
 
             try {
-                await window.loadFiles({ forceRefresh: true });
+                await loadFiles({ forceRefresh: true });
             } catch (reloadError) {
                 console.error('Error reloading files:', reloadError);
             }
@@ -466,7 +472,7 @@ const fileOps = {
                 return;
             }
 
-            const currentFolderId = window.app.currentPath || window.app.userHomeFolderId;
+            const currentFolderId = app.currentPath || app.userHomeFolderId;
 
             // Build folder structure from relative paths
             const folderMap = new Map();
@@ -528,7 +534,7 @@ const fileOps = {
                         .filter(Boolean)
                 )
             ];
-            const locale = window.i18n?.getCurrentLocale?.() || 'en';
+            const locale = i18n?.getCurrentLocale?.() || 'en';
             const rootFolderLabel =
                 rootFolderNames.length <= 1
                     ? rootFolderNames[0] || ''
@@ -585,9 +591,9 @@ const fileOps = {
                             console.warn(`[SKIP] #${idx} ${rel} — cannot read 0-byte file (FIFO/pipe?), skipping`);
                             uploadedCount++;
                             successCount++;
-                            if (window.notifications && batchId) {
+                            if (notifications && batchId) {
                                 try {
-                                    window.notifications.fileCompleted(batchId, true);
+                                    notifications.fileCompleted(batchId, true);
                                 } catch (_) {}
                             }
                             return;
@@ -617,9 +623,9 @@ const fileOps = {
 
                 uploadedCount++;
 
-                if (window.notifications && batchId) {
+                if (notifications && batchId) {
                     try {
-                        window.notifications.fileCompleted(batchId, result.ok);
+                        notifications.fileCompleted(batchId, result.ok);
                     } catch (_) {}
                 }
                 if (progressBar && uploadedCount % 10 === 0) {
@@ -633,8 +639,8 @@ const fileOps = {
                     successCount++;
                 } else if (result.isQuotaError) {
                     quotaStop = true;
-                    if (window.notifications) {
-                        window.notifications.addNotification({
+                    if (notifications) {
+                        notifications.addNotification({
                             icon: 'fa-exclamation-triangle',
                             iconClass: 'error',
                             title: file.name,
@@ -661,14 +667,12 @@ const fileOps = {
 
             this._finishUploadToast(successCount, totalFiles);
 
-            if (typeof window.refreshUserData === 'function') {
-                try {
-                    await window.refreshUserData();
-                } catch (_) {}
-            }
+            try {
+                await refreshUserData();
+            } catch (_) {}
 
             try {
-                await window.loadFiles({ forceRefresh: true });
+                await loadFiles({ forceRefresh: true });
             } catch (reloadError) {
                 console.error('Error reloading files:', reloadError);
             }
@@ -699,7 +703,7 @@ const fileOps = {
                 },
                 body: JSON.stringify({
                     name: name,
-                    parent_id: window.app.currentPath || window.app.userHomeFolderId || null
+                    parent_id: app.currentPath || app.userHomeFolderId || null
                 })
             });
 
@@ -710,17 +714,17 @@ const fileOps = {
 
                 // Optimistic UI: add folder card directly from server response
                 // — no reload needed since the backend already confirmed creation.
-                window.ui.addFolderToView(folder);
+                ui.addFolderToView(folder);
 
-                window.ui.showNotification('Folder created', `"${name}" created successfully`);
+                ui.showNotification('Folder created', `"${name}" created successfully`);
             } else {
                 const errorData = await response.text();
                 console.error('Create folder error:', errorData);
-                window.ui.showNotification('Error', 'Error creating the folder');
+                ui.showNotification('Error', 'Error creating the folder');
             }
         } catch (error) {
             console.error('Error creating folder:', error);
-            window.ui.showNotification('Error', 'Error creating the folder');
+            ui.showNotification('Error', 'Error creating the folder');
         }
     },
 
@@ -745,8 +749,8 @@ const fileOps = {
 
             if (response.ok) {
                 // Reload files after moving
-                await window.loadFiles();
-                window.ui.showNotification('File moved', 'File moved successfully');
+                await loadFiles();
+                ui.showNotification('File moved', 'File moved successfully');
                 return true;
             } else {
                 let errorMessage = 'Unknown error';
@@ -756,12 +760,12 @@ const fileOps = {
                 } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
-                window.ui.showNotification('Error', `Error moving the file: ${errorMessage}`);
+                ui.showNotification('Error', `Error moving the file: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error moving file:', error);
-            window.ui.showNotification('Error', 'Error moving the file');
+            ui.showNotification('Error', 'Error moving the file');
             return false;
         }
     },
@@ -787,8 +791,8 @@ const fileOps = {
 
             if (response.ok) {
                 // Reload files after moving
-                await window.loadFiles();
-                window.ui.showNotification('Folder moved', 'Folder moved successfully');
+                await loadFiles();
+                ui.showNotification('Folder moved', 'Folder moved successfully');
                 return true;
             } else {
                 let errorMessage = 'Unknown error';
@@ -798,12 +802,12 @@ const fileOps = {
                 } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
-                window.ui.showNotification('Error', `Error moving the folder: ${errorMessage}`);
+                ui.showNotification('Error', `Error moving the folder: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error moving folder:', error);
-            window.ui.showNotification('Error', 'Error moving the folder');
+            ui.showNotification('Error', 'Error moving the folder');
             return false;
         }
     },
@@ -890,8 +894,8 @@ const fileOps = {
             if (response.ok) {
                 await response.json();
                 // Reload files after copying
-                await window.loadFiles();
-                window.ui.showNotification('File copied', 'File copied successfully');
+                await loadFiles();
+                ui.showNotification('File copied', 'File copied successfully');
                 return true;
             } else {
                 let errorMessage = 'Unknown error';
@@ -901,12 +905,12 @@ const fileOps = {
                 } catch (_e) {
                     errorMessage = 'Error processing server response';
                 }
-                window.ui.showNotification('Error', `Error copying the file: ${errorMessage}`);
+                ui.showNotification('Error', `Error copying the file: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error copying file:', error);
-            window.ui.showNotification('Error', 'Error copying the file');
+            ui.showNotification('Error', 'Error copying the file');
             return false;
         }
     },
@@ -920,7 +924,7 @@ const fileOps = {
      */
     async copyFolder(_folderId, _targetFolderId) {
         // Folder copy is not yet implemented in the backend
-        window.ui.showNotification('Not implemented', 'Folder copy is not yet supported');
+        ui.showNotification('Not implemented', 'Folder copy is not yet supported');
         return false;
     },
 
@@ -954,7 +958,7 @@ const fileOps = {
 
             // Note: Folder copy is not yet implemented in batch API
             if (folderIds.length > 0) {
-                window.ui.showNotification('Info', 'Folder copy is not yet supported in batch mode');
+                ui.showNotification('Info', 'Folder copy is not yet supported in batch mode');
                 errors += folderIds.lenngth;
             }
         } catch (err) {
@@ -990,9 +994,9 @@ const fileOps = {
             console.log('Response status:', response.status);
 
             if (response.ok) {
-                window.ui.showNotification(
-                    window.i18n ? window.i18n.t('notifications.file_renamed') : 'File renamed',
-                    window.i18n ? window.i18n.t('notifications.file_renamed_to', { name: newName }) : `File renamed to "${newName}"`
+                ui.showNotification(
+                    i18n ? i18n.t('notifications.file_renamed') : 'File renamed',
+                    i18n ? i18n.t('notifications.file_renamed_to', { name: newName }) : `File renamed to "${newName}"`
                 );
                 return true;
             } else {
@@ -1005,12 +1009,12 @@ const fileOps = {
                 } catch (_e) {
                     errorMessage = errorText || response.statusText;
                 }
-                window.ui.showNotification('Error', `Error renaming the file: ${errorMessage}`);
+                ui.showNotification('Error', `Error renaming the file: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error renaming file:', error);
-            window.ui.showNotification('Error', 'Error renaming the file');
+            ui.showNotification('Error', 'Error renaming the file');
             return false;
         }
     },
@@ -1037,7 +1041,7 @@ const fileOps = {
             console.log('Response status:', response.status);
 
             if (response.ok) {
-                window.ui.showNotification('Folder renamed', `Folder renamed to "${newName}"`);
+                ui.showNotification('Folder renamed', `Folder renamed to "${newName}"`);
                 return true;
             } else {
                 const errorText = await response.text();
@@ -1053,12 +1057,12 @@ const fileOps = {
                     errorMessage = errorText || response.statusText;
                 }
 
-                window.ui.showNotification('Error', `Error renaming the folder: ${errorMessage}`);
+                ui.showNotification('Error', `Error renaming the folder: ${errorMessage}`);
                 return false;
             }
         } catch (error) {
             console.error('Error renaming folder:', error);
-            window.ui.showNotification('Error', 'Error renaming the folder');
+            ui.showNotification('Error', 'Error renaming the folder');
             return false;
         }
     },
@@ -1071,11 +1075,9 @@ const fileOps = {
      */
     async deleteFile(fileId, fileName) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: window.i18n
-                ? window.i18n.t('dialogs.confirm_delete_file', { name: fileName })
-                : `Are you sure you want to move the file "${fileName}" to trash?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
+            title: i18n ? i18n.t('dialogs.confirm_delete') : 'Move to trash',
+            message: i18n ? i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `Are you sure you want to move the file "${fileName}" to trash?`,
+            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
         });
         if (!confirmed) return false;
 
@@ -1087,8 +1089,8 @@ const fileOps = {
             });
 
             if (response.ok) {
-                window.loadFiles();
-                window.ui.showNotification('File moved to trash', `"${fileName}" moved to trash`);
+                loadFiles();
+                ui.showNotification('File moved to trash', `"${fileName}" moved to trash`);
                 return true;
             } else {
                 // Fallback to direct deletion if trash fails
@@ -1098,17 +1100,17 @@ const fileOps = {
                 });
 
                 if (fallbackResponse.ok) {
-                    window.loadFiles();
-                    window.ui.showNotification('File deleted', `"${fileName}" deleted successfully`);
+                    loadFiles();
+                    ui.showNotification('File deleted', `"${fileName}" deleted successfully`);
                     return true;
                 } else {
-                    window.ui.showNotification('Error', 'Error deleting the file');
+                    ui.showNotification('Error', 'Error deleting the file');
                     return false;
                 }
             }
         } catch (error) {
             console.error('Error deleting file:', error);
-            window.ui.showNotification('Error', 'Error deleting the file');
+            ui.showNotification('Error', 'Error deleting the file');
             return false;
         }
     },
@@ -1121,11 +1123,11 @@ const fileOps = {
      */
     async deleteFolder(folderId, folderName) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: window.i18n
-                ? window.i18n.t('dialogs.confirm_delete_folder', { name: folderName })
+            title: i18n ? i18n.t('dialogs.confirm_delete') : 'Move to trash',
+            message: i18n
+                ? i18n.t('dialogs.confirm_delete_folder', { name: folderName })
                 : `Are you sure you want to move the folder "${folderName}" and all its contents to trash?`,
-            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
+            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
         });
         if (!confirmed) return false;
 
@@ -1138,12 +1140,12 @@ const fileOps = {
 
             if (response.ok) {
                 // If we're inside the folder we just deleted, go back up
-                if (window.app.currentPath === folderId) {
-                    window.app.currentPath = '';
-                    window.ui.updateBreadcrumb('');
+                if (app.currentPath === folderId) {
+                    app.currentPath = '';
+                    ui.updateBreadcrumb('');
                 }
-                window.loadFiles();
-                window.ui.showNotification('Folder moved to trash', `"${folderName}" moved to trash`);
+                loadFiles();
+                ui.showNotification('Folder moved to trash', `"${folderName}" moved to trash`);
                 return true;
             } else {
                 // Fallback to direct deletion if trash fails
@@ -1154,21 +1156,21 @@ const fileOps = {
 
                 if (fallbackResponse.ok) {
                     // If we're inside the folder we just deleted, go back up
-                    if (window.app.currentPath === folderId) {
-                        window.app.currentPath = '';
-                        window.ui.updateBreadcrumb('');
+                    if (app.currentPath === folderId) {
+                        app.currentPath = '';
+                        ui.updateBreadcrumb('');
                     }
-                    window.loadFiles();
-                    window.ui.showNotification('Folder deleted', `"${folderName}" deleted successfully`);
+                    loadFiles();
+                    ui.showNotification('Folder deleted', `"${folderName}" deleted successfully`);
                     return true;
                 } else {
-                    window.ui.showNotification('Error', 'Error deleting the folder');
+                    ui.showNotification('Error', 'Error deleting the folder');
                     return false;
                 }
             }
         } catch (error) {
             console.error('Error deleting folder:', error);
-            window.ui.showNotification('Error', 'Error deleting the folder');
+            ui.showNotification('Error', 'Error deleting the folder');
             return false;
         }
     },
@@ -1212,15 +1214,15 @@ const fileOps = {
             });
 
             if (response.ok) {
-                window.ui.showNotification('Item restored', 'Item restored successfully');
+                ui.showNotification('Item restored', 'Item restored successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error restoring the item');
+                ui.showNotification('Error', 'Error restoring the item');
                 return false;
             }
         } catch (error) {
             console.error('Error restoring item from trash:', error);
-            window.ui.showNotification('Error', 'Error restoring the item');
+            ui.showNotification('Error', 'Error restoring the item');
             return false;
         }
     },
@@ -1232,11 +1234,11 @@ const fileOps = {
      */
     async deletePermanently(trashId) {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_permanent_delete') : 'Delete permanently',
-            message: window.i18n
-                ? window.i18n.t('dialogs.confirm_permanent_delete_msg')
+            title: i18n ? i18n.t('dialogs.confirm_permanent_delete') : 'Delete permanently',
+            message: i18n
+                ? i18n.t('dialogs.confirm_permanent_delete_msg')
                 : 'Are you sure you want to permanently delete this item? This action cannot be undone.',
-            confirmText: window.i18n ? window.i18n.t('actions.delete_permanently') : 'Delete permanently'
+            confirmText: i18n ? i18n.t('actions.delete_permanently') : 'Delete permanently'
         });
         if (!confirmed) return false;
 
@@ -1247,15 +1249,15 @@ const fileOps = {
             });
 
             if (response.ok) {
-                window.ui.showNotification('Item deleted', 'Item permanently deleted');
+                ui.showNotification('Item deleted', 'Item permanently deleted');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error deleting the item');
+                ui.showNotification('Error', 'Error deleting the item');
                 return false;
             }
         } catch (error) {
             console.error('Error deleting item permanently:', error);
-            window.ui.showNotification('Error', 'Error deleting the item');
+            ui.showNotification('Error', 'Error deleting the item');
             return false;
         }
     },
@@ -1266,11 +1268,9 @@ const fileOps = {
      */
     async emptyTrash() {
         const confirmed = await showConfirmDialog({
-            title: window.i18n ? window.i18n.t('dialogs.confirm_empty_trash') : 'Empty trash',
-            message: window.i18n
-                ? window.i18n.t('trash.empty_confirm')
-                : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
-            confirmText: window.i18n ? window.i18n.t('actions.empty_trash') : 'Empty trash'
+            title: i18n ? i18n.t('dialogs.confirm_empty_trash') : 'Empty trash',
+            message: i18n ? i18n.t('trash.empty_confirm') : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
+            confirmText: i18n ? i18n.t('actions.empty_trash') : 'Empty trash'
         });
         if (!confirmed) return false;
 
@@ -1281,15 +1281,15 @@ const fileOps = {
             });
 
             if (response.ok) {
-                window.ui.showNotification('Trash emptied', 'The trash has been emptied successfully');
+                ui.showNotification('Trash emptied', 'The trash has been emptied successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error emptying the trash');
+                ui.showNotification('Error', 'Error emptying the trash');
                 return false;
             }
         } catch (error) {
             console.error('Error emptying trash:', error);
-            window.ui.showNotification('Error', 'Error emptying the trash');
+            ui.showNotification('Error', 'Error emptying the trash');
             return false;
         }
     },
@@ -1315,11 +1315,11 @@ const fileOps = {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             } else {
-                window.ui.showNotification('Error', 'Error downloading the file');
+                ui.showNotification('Error', 'Error downloading the file');
             }
         } catch (error) {
             console.error('Error downloading file:', error);
-            window.ui.showNotification('Error', 'Error downloading the file');
+            ui.showNotification('Error', 'Error downloading the file');
         }
     },
 
@@ -1331,7 +1331,7 @@ const fileOps = {
     async downloadFolder(folderId, folderName) {
         try {
             // Show notification to user
-            window.ui.showNotification('Preparing download', 'Preparing the folder for download...');
+            ui.showNotification('Preparing download', 'Preparing the folder for download...');
 
             const response = await fetch(`/api/folders/${folderId}/download?format=zip`, {
                 headers: getAuthHeaders()
@@ -1347,14 +1347,13 @@ const fileOps = {
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
             } else {
-                window.ui.showNotification('Error', 'Error downloading the folder');
+                ui.showNotification('Error', 'Error downloading the folder');
             }
         } catch (error) {
             console.error('Error downloading folder:', error);
-            window.ui.showNotification('Error', 'Error downloading the folder');
+            ui.showNotification('Error', 'Error downloading the folder');
         }
     }
 };
 
-// Expose file operations module globally
-window.fileOps = fileOps;
+export { fileOps, getAuthHeaders };

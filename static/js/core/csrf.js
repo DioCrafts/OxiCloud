@@ -13,14 +13,14 @@
  * HttpOnly cookies.
  */
 
-// eslint-disable-next-line no-unused-vars
 function getCsrfToken() {
     const match = document.cookie.split('; ').find((row) => row.startsWith('oxicloud_csrf='));
     return match ? match.split('=')[1] : '';
 }
 
-// biome-ignore lint/correctness/noUnusedVariables: global function
 function getCsrfHeaders() {
     const token = getCsrfToken();
     return token ? { 'X-CSRF-Token': token } : {};
 }
+
+export { getCsrfHeaders, getCsrfToken };

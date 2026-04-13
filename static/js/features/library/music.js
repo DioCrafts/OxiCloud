@@ -1,3 +1,11 @@
+import { app } from '../../app/state.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { formatFileSize } from '../../core/formatters.js';
+import { i18n } from '../../core/i18n.js';
+import { oxiIcon } from '../../core/icons.js';
+import { Modal } from '../../core/modal.js';
+import { notifications } from '../../core/notifications.js';
+
 /**
  * OxiCloud - Music Library View
  * Playlist management with track listings and audio player
@@ -13,7 +21,7 @@ const musicView = {
     selected: new Set(),
 
     _headers(json = false) {
-        const h = typeof getCsrfHeaders === 'function' ? { ...getCsrfHeaders() } : {};
+        const h = { ...getCsrfHeaders() };
         if (json) h['Content-Type'] = 'application/json';
         return h;
     },
@@ -78,8 +86,9 @@ const musicView = {
     _renderPlaylists() {
         if (!this._container) return;
 
-        const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+        // FIXME should call directly
+        const t = (key, _fallback = '') => {
+            return i18n.t(key);
         };
 
         // Empty state: no playlists at all — show full-width centered onboarding
@@ -178,7 +187,7 @@ const musicView = {
         if (!listEl) return;
 
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
         if (this.playlists.length === 0) {
@@ -283,7 +292,7 @@ const musicView = {
         if (nameEl) nameEl.textContent = playlist.name;
         if (metaEl) {
             const t = (key, fallback = '') => {
-                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+                return i18n?.t ? i18n.t(key) : fallback || key;
             };
             metaEl.textContent = `${playlist.track_count || 0} ${t('music.tracks', 'tracks')}`;
         }
@@ -305,7 +314,7 @@ const musicView = {
         }
         const togglePublicBtn = document.getElementById('music-toggle-public-btn');
         if (togglePublicBtn) {
-            const t2 = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+            const t2 = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
             togglePublicBtn.title = playlist.is_public ? t2('music.make_private', 'Make private') : t2('music.make_public', 'Make public');
             togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
@@ -344,7 +353,7 @@ const musicView = {
         if (!trackListEl) return;
 
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
         if (this.currentTracks.length === 0) {
@@ -459,7 +468,7 @@ const musicView = {
         if (!this.currentTracks[idx]) return;
 
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
         musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || t('music.playlists', 'Playlist'));
         musicPlayer.playTrack(idx);
@@ -479,7 +488,7 @@ const musicView = {
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
             const t = (key, fallback = '') => {
-                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+                return i18n?.t ? i18n.t(key) : fallback || key;
             };
             musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || t('music.shuffle', 'Shuffle'));
             musicPlayer.playTrack(0);
@@ -488,11 +497,10 @@ const musicView = {
 
     async _showCreatePlaylistDialog() {
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
-        if (!window.Modal) return;
-        const name = await window.Modal.prompt({
+        const name = await Modal.prompt({
             title: t('music.create_playlist', 'Create Playlist'),
             label: t('music.playlist_name', 'Playlist name'),
             placeholder: t('music.playlist_name', 'Playlist name'),
@@ -506,7 +514,7 @@ const musicView = {
 
     async _createPlaylist(name) {
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
         const createBtn = document.getElementById('music-create-playlist-btn');
         if (createBtn) createBtn.disabled = true;
@@ -524,8 +532,8 @@ const musicView = {
             this.playlists.unshift(playlist);
             this._renderPlaylists();
             this._selectPlaylist(playlist.id);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
                     title: t('music.create_playlist', 'Create Playlist'),
@@ -534,8 +542,8 @@ const musicView = {
             }
         } catch (err) {
             console.error('Create playlist error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -549,17 +557,13 @@ const musicView = {
 
     async _deletePlaylist() {
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
         if (!this.currentPlaylist) return;
 
         const confirmed = await new Promise((resolve) => {
-            if (!window.Modal) {
-                resolve(confirm(t('music.confirm_delete', 'Delete this playlist?')));
-                return;
-            }
-            window.Modal.prompt({
+            Modal.prompt({
                 title: t('music.delete', 'Delete'),
                 label: t('music.confirm_delete', 'Delete this playlist?'),
                 placeholder: '',
@@ -586,13 +590,13 @@ const musicView = {
             this.currentPlaylist = null;
             this.currentTracks = [];
             this._renderPlaylists();
-            if (window.notifications) {
-                window.notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.delete', 'Delete'), text: deletedName });
+            if (notifications) {
+                notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.delete', 'Delete'), text: deletedName });
             }
         } catch (err) {
             console.error('Delete playlist error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -641,11 +645,10 @@ const musicView = {
     async _showEditPlaylistDialog() {
         if (!this.currentPlaylist) return;
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
-        if (!window.Modal) return;
-        const newName = await window.Modal.prompt({
+        const newName = await Modal.prompt({
             title: t('music.edit', 'Edit'),
             label: t('music.playlist_name', 'Playlist name'),
             placeholder: t('music.playlist_name', 'Playlist name'),
@@ -674,8 +677,8 @@ const musicView = {
             this._renderPlaylistList();
         } catch (err) {
             console.error('Edit playlist error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -688,11 +691,10 @@ const musicView = {
     async _showSharePlaylistDialog() {
         if (!this.currentPlaylist) return;
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
-        if (!window.Modal) return;
-        const userId = await window.Modal.prompt({
+        const userId = await Modal.prompt({
             title: t('music.share', 'Share'),
             label: t('music.share_with_user', 'User ID or email'),
             placeholder: t('music.share_with_user', 'User ID or email'),
@@ -711,8 +713,8 @@ const musicView = {
 
             if (!resp.ok) throw new Error('Failed to share playlist');
 
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
                     title: t('music.share', 'Share'),
@@ -721,8 +723,8 @@ const musicView = {
             }
         } catch (err) {
             console.error('Share playlist error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -735,7 +737,7 @@ const musicView = {
     async _showAddTracksDialog() {
         if (!this.currentPlaylist) return;
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
         // ── Build modal overlay ──
@@ -813,7 +815,7 @@ const musicView = {
             for (const file of files) {
                 const row = document.createElement('label');
                 row.className = `music-picker-item${selectedIds.has(file.id) ? ' selected' : ''}`;
-                const sizeStr = file.size != null && window.formatFileSize ? window.formatFileSize(file.size) : '';
+                const sizeStr = file.size != null && formatFileSize ? formatFileSize(file.size) : '';
                 row.innerHTML = `
                     <input type="checkbox" value="${file.id}" ${selectedIds.has(file.id) ? 'checked' : ''}>
                     <i class="fas fa-file-audio"></i>
@@ -858,8 +860,8 @@ const musicView = {
                 });
                 if (!resp.ok) throw new Error('Failed to add tracks');
 
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
                         title: t('music.add_tracks', 'Add Tracks'),
@@ -878,8 +880,8 @@ const musicView = {
                 }
             } catch (err) {
                 console.error('Add tracks error:', err);
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
                         title: t('music.error', 'Error'),
@@ -898,7 +900,7 @@ const musicView = {
 
     async _removeTrackFromPlaylist(_trackId, fileId) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks/${encodeURIComponent(fileId)}`, {
@@ -908,8 +910,8 @@ const musicView = {
             });
             if (!resp.ok) throw new Error('Failed to remove track');
 
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
                     title: t('music.remove', 'Remove'),
@@ -927,8 +929,8 @@ const musicView = {
             }
         } catch (err) {
             console.error('Remove track error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -940,7 +942,7 @@ const musicView = {
 
     async _reorderTrack(fromIdx, toIdx) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
 
         const tracks = [...this.currentTracks];
         const [moved] = tracks.splice(fromIdx, 1);
@@ -959,8 +961,8 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to reorder tracks');
         } catch (err) {
             console.error('Reorder error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -973,7 +975,7 @@ const musicView = {
 
     async _showManageSharesDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
 
         const existing = document.getElementById('music-shares-dialog');
         if (existing) existing.remove();
@@ -1025,8 +1027,8 @@ const musicView = {
                 userInput.value = '';
                 writeInput.checked = false;
                 this._loadSharesList(dialog);
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
                         title: t('music.share', 'Share'),
@@ -1034,8 +1036,8 @@ const musicView = {
                     });
                 }
             } catch (err) {
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
                         title: t('music.error', 'Error'),
@@ -1050,7 +1052,7 @@ const musicView = {
 
     async _loadSharesList(dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
         const body = dialog.querySelector('.music-shares-body');
         if (!body) return;
 
@@ -1095,7 +1097,7 @@ const musicView = {
 
     async _removeShare(userId, dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share/${encodeURIComponent(userId)}`, {
@@ -1106,8 +1108,8 @@ const musicView = {
             if (!resp.ok) throw new Error('Failed to remove share');
             this._loadSharesList(dialog);
         } catch (err) {
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -1119,7 +1121,7 @@ const musicView = {
 
     async _togglePublic() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
         const newValue = !this.currentPlaylist.is_public;
 
         try {
@@ -1144,9 +1146,9 @@ const musicView = {
                 btn.classList.toggle('active', newValue);
             }
 
-            if (window.notifications) {
+            if (notifications) {
                 const status = newValue ? t('music.public', 'Public') : t('music.private', 'Private');
-                window.notifications.addNotification({
+                notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
                     title: t('music.toggle_public', 'Visibility'),
@@ -1155,8 +1157,8 @@ const musicView = {
             }
         } catch (err) {
             console.error('Toggle public error:', err);
-            if (window.notifications) {
-                window.notifications.addNotification({
+            if (notifications) {
+                notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: t('music.error', 'Error'),
@@ -1168,7 +1170,7 @@ const musicView = {
 
     async _showCoverPicker() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key);
+        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
 
         const input = document.createElement('input');
         input.type = 'file';
@@ -1184,13 +1186,13 @@ const musicView = {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                const folderId = window.app?.currentPath || window.app?.userHomeFolderId || '';
+                const folderId = app?.currentPath || app?.userHomeFolderId || '';
                 formData.append('folder_id', folderId);
 
                 const uploadResp = await fetch('/api/files/upload', {
                     method: 'POST',
                     credentials: 'include',
-                    headers: typeof getCsrfHeaders === 'function' ? getCsrfHeaders() : {},
+                    headers: getCsrfHeaders(),
                     body: formData
                 });
                 if (!uploadResp.ok) throw new Error('Upload failed');
@@ -1214,8 +1216,8 @@ const musicView = {
                     coverEl.innerHTML = `<img src="/api/files/${encodeURIComponent(uploaded.id)}" alt="" class="music-cover-img"><div class="music-cover-overlay"><i class="fas fa-camera"></i></div>`;
                 }
 
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
                         title: t('music.set_cover', 'Set cover'),
@@ -1224,8 +1226,8 @@ const musicView = {
                 }
             } catch (err) {
                 console.error('Cover upload error:', err);
-                if (window.notifications) {
-                    window.notifications.addNotification({
+                if (notifications) {
+                    notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
                         title: t('music.error', 'Error'),
@@ -1647,11 +1649,11 @@ const musicPlayer = {
         this.isPlaying = false;
         this._updateUI();
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
-        if (window.notifications) {
+        if (notifications) {
             const trackName = this.currentTrack?.title || this.currentTrack?.file_name || t('music.unknown_title', 'Unknown');
-            window.notifications.addNotification({
+            notifications.addNotification({
                 icon: 'fa-exclamation-circle',
                 iconClass: 'error',
                 title: t('music.error', 'Error'),
@@ -1670,8 +1672,8 @@ const musicPlayer = {
             if (icon) {
                 const iconName = this.isPlaying ? 'pause' : 'play';
                 const extraClass = 'player-btn-main';
-                if (window.oxiIcon) {
-                    icon.outerHTML = window.oxiIcon(iconName, extraClass);
+                if (oxiIcon) {
+                    icon.outerHTML = oxiIcon(iconName, extraClass);
                 } else {
                     icon.className = `fas fa-${iconName} ${extraClass}`;
                 }
@@ -1680,7 +1682,7 @@ const musicPlayer = {
 
         if (trackName) {
             const t = (key, fallback = '') => {
-                return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+                return i18n?.t ? i18n.t(key) : fallback || key;
             };
             trackName.textContent = this.currentTrack
                 ? this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown')
@@ -1704,8 +1706,8 @@ const musicPlayer = {
                     if (playIcon) playIcon.classList.remove('hidden');
                     if (playIcon) {
                         const iconName = this.isPlaying ? 'pause' : 'play';
-                        if (window.oxiIcon) {
-                            playIcon.outerHTML = window.oxiIcon(iconName, 'track-play-icon');
+                        if (oxiIcon) {
+                            playIcon.outerHTML = oxiIcon(iconName, 'track-play-icon');
                         } else {
                             playIcon.className = `fas fa-${iconName} track-play-icon`;
                         }
@@ -1735,7 +1737,7 @@ const musicPlayer = {
         if (!queueList) return;
 
         const t = (key, fallback = '') => {
-            return typeof i18n !== 'undefined' && i18n.t ? i18n.t(key) : fallback || key;
+            return i18n?.t ? i18n.t(key) : fallback || key;
         };
 
         if (this.queue.length === 0) {
@@ -1838,4 +1840,4 @@ const musicPlayer = {
     }
 };
 
-window.musicView = musicView;
+export { musicView };

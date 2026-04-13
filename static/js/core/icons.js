@@ -483,9 +483,8 @@ function replaceIconsInElement(container) {
 }
 
 // ── Expose globally ────────────────────────────────────────────
-window.oxiIcon = oxiIcon;
-window.replaceIconsInElement = replaceIconsInElement;
-window.OxiIcons = _ICONS;
+export { oxiIcon, replaceIconsInElement };
+export const OxiIcons = _ICONS;
 
 // ── Auto-replace: MutationObserver bridge ──────────────────────
 // Watches the DOM for new <i class="fa-..."> elements and converts them

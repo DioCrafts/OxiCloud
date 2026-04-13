@@ -3,6 +3,10 @@
  * Photo grid grouped by day/month/year, with infinite scroll and multi-select.
  */
 
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+import { photosLightbox } from './photosLightbox.js';
+
 const photosView = {
     /** @type {Array} All loaded photo items */
     items: [],
@@ -37,7 +41,7 @@ const photosView = {
 
     /** Auth headers (HttpOnly cookies) */
     _headers(json = false) {
-        const h = typeof getCsrfHeaders === 'function' ? { ...getCsrfHeaders() } : {};
+        const h = getCsrfHeaders();
         if (json) h['Content-Type'] = 'application/json';
         return h;
     },
@@ -406,7 +410,7 @@ const photosView = {
 
     /** Render the group mode toolbar */
     _renderToolbar() {
-        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
+        const t = (k, d) => (i18n ? i18n.t(k) : d);
         const modes = [
             ['daily', t('photos.view_daily', 'Day')],
             ['monthly', t('photos.view_monthly', 'Month')],
@@ -423,7 +427,7 @@ const photosView = {
 
     /** Render empty state */
     _renderEmpty() {
-        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
+        const t = (k, d) => (i18n ? i18n.t(k) : d);
         this._container.innerHTML = `
             <div class="photos-empty">
                 <i class="fas fa-images"></i>
@@ -483,8 +487,8 @@ const photosView = {
 
         // Otherwise open lightbox
         const idx = this.items.findIndex((f) => f.id === id);
-        if (idx >= 0 && window.photosLightbox) {
-            window.photosLightbox.open(this.items, idx);
+        if (idx >= 0) {
+            photosLightbox.open(this.items, idx);
         }
     },
 
@@ -516,7 +520,7 @@ const photosView = {
             document.body.appendChild(bar);
         }
 
-        const t = (k, d) => (window.i18n ? window.i18n.t(k) : d);
+        const t = (k, d) => (i18n ? i18n.t(k) : d);
         const count = this.selected.size;
         bar.innerHTML = `
             <span class="selection-count">${count} ${t('photos.items_selected', 'selected')}</span>
@@ -605,4 +609,6 @@ const photosView = {
     }
 };
 
-window.photosView = photosView;
+photosLightbox.setPhotosView(photosView);
+
+export { photosView };

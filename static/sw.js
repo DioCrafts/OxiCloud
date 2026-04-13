@@ -1,12 +1,14 @@
 // OxiCloud Service Worker
-const CACHE_NAME = 'oxicloud-cache-v16';
+const CACHE_NAME = 'oxicloud-cache-v17';
+
+// Only cache static assets — NOT HTML files.
+// HTML files are served network-first so browsers always get the latest
+// script/link references. Caching HTML causes stale entry points.
 const ASSETS_TO_CACHE = [
-    '/',
-    '/index.html',
-    '/js/icons.js',
-    '/js/i18n.js',
-    '/js/languageSelector.js',
-    '/js/notifications.js',
+    '/js/core/icons.js',
+    '/js/core/i18n.js',
+    '/js/core/languageSelector.js',
+    '/js/core/notifications.js',
     '/locales/en.json',
     '/locales/es.json',
     '/locales/fa.json',
@@ -14,6 +16,9 @@ const ASSETS_TO_CACHE = [
     '/locales/nl.json',
     '/favicon.ico'
 ];
+
+// HTML paths that should always be fetched from the network
+const HTML_PATHS = ['/', '/index.html', '/login', '/login.html', '/admin', '/admin.html', '/profile', '/profile.html'];
 
 // Install event - cache assets
 self.addEventListener('install', (event) => {
@@ -52,6 +57,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     // Don't intercept API requests - let them go straight to the network
     if (event.request.url.includes('/api/')) {
+        return;
+    }
+
+    // HTML pages: always network-first so entry points are never stale
+    const pathname = new URL(event.request.url).pathname;
+    const isHtml = HTML_PATHS.includes(pathname) || pathname.endsWith('.html') || event.request.headers.get('accept')?.includes('text/html');
+    if (isHtml) {
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
         return;
     }
 

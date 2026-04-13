@@ -1,3 +1,6 @@
+import { ALL_LANGUAGES } from '../features/auth/auth.js';
+import { i18n } from './i18n.js';
+
 /**
  * Language Selector Component for OxiCloud
  * Custom styled dropdown with flags
@@ -63,7 +66,7 @@ function createLanguageSelector(containerId = 'language-selector') {
 
     // Get current language
     const languages = getAvailableLanguages();
-    const currentLocale = window.i18n ? window.i18n.getCurrentLocale() : 'en';
+    const currentLocale = i18n ? i18n.getCurrentLocale() : 'en';
     const currentLang = languages.find((l) => l.code === currentLocale) || languages[0];
 
     // Set initial HTML attributes
@@ -183,8 +186,8 @@ function closeDropdown(container) {
  */
 async function selectLanguage(langCode, container) {
     // Update i18n if available
-    if (window.i18n) {
-        await window.i18n.setLocale(langCode);
+    if (i18n) {
+        await i18n.setLocale(langCode);
     }
 
     // Update HTML lang attribute and dir for RTL languages

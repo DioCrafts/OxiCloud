@@ -3,8 +3,31 @@
  * This file contains the core functionality, initialization and state management
  */
 
-const app = window.app;
-const elements = window.appElements;
+import { formatFileSize, formatQuotaSize } from '../core/formatters.js';
+import { i18n } from '../core/i18n.js';
+import { Modal } from '../core/modal.js';
+import { fileOps } from '../features/files/fileOperations.js';
+import { multiSelect } from '../features/files/multiSelect.js';
+import { favorites } from '../features/library/favorites.js';
+import { recent } from '../features/library/recent.js';
+import { fileSharing } from '../features/sharing/fileSharing.js';
+import { sharedView } from '../views/shared/sharedView.js';
+import { checkAuthentication } from './authSession.js';
+import { loadFiles } from './filesView.js';
+import {
+    switchToFavoritesSection,
+    switchToFilesSection,
+    switchToMusicSection,
+    switchToPhotosSection,
+    switchToRecentFilesSection,
+    switchToSharedSection,
+    switchToTrashSection
+} from './navigation.js';
+import { performSearch } from './searchView.js';
+import { app, appElements as elements } from './state.js';
+import { loadTrashItems } from './trashView.js';
+import { ui } from './ui.js';
+import { setupUserMenu } from './userMenu.js';
 
 // Upload dropdown listener state (prevents accumulated listeners)
 /** @type { function | null } */
@@ -125,8 +148,8 @@ function setActionsBarMode(mode, force = false) {
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');
 
-    if (window.i18n?.translateElement) {
-        window.i18n.translateElement(elements.actionsBar);
+    if (i18n?.translateElement) {
+        i18n.translateElement(elements.actionsBar);
     }
 
     if (mode === 'files') {
@@ -159,7 +182,7 @@ function setupActionsBarDelegation() {
                 break;
             }
             case 'new-folder-btn': {
-                const folderName = await window.Modal.promptNewFolder();
+                const folderName = await Modal.promptNewFolder();
                 if (folderName) {
                     fileOps.createFolder(folderName);
                 }
@@ -173,14 +196,14 @@ function setupActionsBarDelegation() {
                 break;
             case 'empty-trash-btn':
                 if (await fileOps.emptyTrash()) {
-                    window.loadTrashItems();
+                    loadTrashItems();
                 }
                 break;
             case 'clear-recent-btn':
-                if (window.recent) {
-                    window.recent.clearRecentFiles();
-                    window.recent.displayRecentFiles();
-                    window.ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
+                if (recent) {
+                    recent.clearRecentFiles();
+                    recent.displayRecentFiles();
+                    ui.showNotification('Cleanup completed', 'Recent files history has been cleared');
                 }
                 break;
             default:
@@ -245,8 +268,6 @@ function deserializeHash() {
  * @param {boolean} insertHistory true to change url and browser's history, false to change url only
  */
 function updateHistory(insertHistory) {
-    const app = window.app;
-
     const historyData = {
         section: app.currentSection,
         id: app.currentFolder,
@@ -259,8 +280,8 @@ function updateHistory(insertHistory) {
         historyData.id = app.currentFolder;
         historyUrl = historyUrl.concat('/folder/', app.currentFolderInfo.id);
 
-        if (window.app.viewFile) {
-            historyUrl = historyUrl.concat('/file/', window.app.viewFile);
+        if (app.viewFile) {
+            historyUrl = historyUrl.concat('/file/', app.viewFile);
         }
         // update title
         document.title = `OxiCloud: ${app.currentFolderInfo.path}`;
@@ -281,7 +302,7 @@ function updateHistory(insertHistory) {
  * @returns
  */
 function switchSectionTo(section) {
-    if (window.app.currentSection === section)
+    if (app.currentSection === section)
         // no change ...
         return;
 
@@ -324,8 +345,8 @@ function initApp() {
     cacheElements();
 
     // Initialize file sharing module first
-    if (window.fileSharing?.init) {
-        window.fileSharing.init();
+    if (fileSharing?.init) {
+        fileSharing.init();
     } else {
         console.warn('fileSharing module not fully initialized');
     }
@@ -338,35 +359,26 @@ function initApp() {
     // Setup event listeners
     setupEventListeners();
 
-    // Ensure inline viewer is initialized
-    if (!window.inlineViewer && typeof InlineViewer !== 'undefined') {
-        try {
-            window.inlineViewer = new InlineViewer();
-        } catch (e) {
-            console.error('Error initializing inline viewer:', e);
-        }
-    }
-
     // Initialize favorites module if available
-    if (window.favorites?.init) {
+    if (favorites?.init) {
         console.log('Initializing favorites module');
-        window.favorites.init();
+        favorites.init();
     } else {
         console.warn('Favorites module not available or not initializable');
     }
 
     // Initialize recent files module if available
-    if (window.recent?.init) {
+    if (recent?.init) {
         console.log('Initializing recent files module');
-        window.recent.init();
+        recent.init();
     } else {
         console.warn('Recent files module not available or not initializable');
     }
 
     // Initialize multi-select / batch actions
-    if (window.multiSelect?.init) {
+    if (multiSelect?.init) {
         console.log('Initializing multi-select module');
-        window.multiSelect.init();
+        multiSelect.init();
     }
 
     window.addEventListener('authenticationDone', () => {
@@ -376,33 +388,33 @@ function initApp() {
         if (hashContext.section === 'files') {
             if (hashContext.path) {
                 console.log(`init: reusing folder from hash URL: ${hashContext.path}`);
-                window.app.currentPath = hashContext.path;
+                app.currentPath = hashContext.path;
             }
 
             if (hashContext.file !== null) {
-                window.app.viewFile = hashContext.file;
+                app.viewFile = hashContext.file;
             }
-            window.loadFiles();
+            loadFiles();
         }
     });
 
     // Wait for translations to load before checking authentication
-    if (window.i18n?.isLoaded?.()) {
+    if (i18n?.isLoaded?.()) {
         // Translations already loaded, proceed with authentication
-        window.checkAuthentication();
+        checkAuthentication();
     } else {
         // Wait for translations to be loaded before proceeding
         console.log('Waiting for translations to load...');
         window.addEventListener('translationsLoaded', () => {
             console.log('Translations loaded, proceeding with authentication');
-            window.checkAuthentication();
+            checkAuthentication();
         });
 
         // Set a timeout as a fallback in case translations take too long
         setTimeout(() => {
-            if (!window.i18n?.isLoaded?.()) {
+            if (!i18n?.isLoaded?.()) {
                 console.warn('Translations loading timeout, proceeding with authentication anyway');
-                window.checkAuthentication();
+                checkAuthentication();
             }
         }, 3000); // 3 second timeout
     }
@@ -493,14 +505,14 @@ function setupEventListeners() {
             const hashContext = deserializeHash();
             switchSectionTo(hashContext.section);
             if (hashContext.path) {
-                window.app.currentPath = hashContext.path;
-                window.loadFiles({ insertHistory: false });
+                app.currentPath = hashContext.path;
+                loadFiles({ insertHistory: false });
             }
         } else {
             // change is from history, data provided in event
             switchSectionTo(e.state.section);
-            window.app.currentPath = e.state.id;
-            window.loadFiles({ insertHistory: false });
+            app.currentPath = e.state.id;
+            loadFiles({ insertHistory: false });
         }
     });
 
@@ -512,19 +524,19 @@ function setupEventListeners() {
             const query = elements.searchInput.value.trim();
 
             // In shared view, filter locally
-            if (app.isSharedView && window.sharedView) {
-                window.sharedView.filterAndSortItems();
+            if (app.isSharedView && sharedView) {
+                sharedView.filterAndSortItems();
                 return;
             }
 
             if (query) {
-                window.performSearch(query);
+                performSearch(query);
             } else if (app.isSearchMode) {
                 // If search is empty and we're in search mode, return to normal view
                 app.isSearchMode = false;
                 app.currentPath = '';
                 ui.updateBreadcrumb('');
-                window.loadFiles();
+                loadFiles();
             }
         }
     });
@@ -536,7 +548,7 @@ function setupEventListeners() {
 
         if (query.length >= SEARCH_MIN_CHARS) {
             searchDebounceTimer = setTimeout(() => {
-                window.performSearch(query);
+                performSearch(query);
             }, SEARCH_DEBOUNCE_MS);
         } else if (query.length === 0 && app.isSearchMode) {
             // User cleared the search input — return to normal view
@@ -544,7 +556,7 @@ function setupEventListeners() {
                 app.isSearchMode = false;
                 app.currentPath = '';
                 ui.updateBreadcrumb('');
-                window.loadFiles();
+                loadFiles();
             }, SEARCH_DEBOUNCE_MS);
         }
     });
@@ -554,7 +566,7 @@ function setupEventListeners() {
         if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
         const query = elements.searchInput.value.trim();
         if (query) {
-            window.performSearch(query);
+            performSearch(query);
         }
     });
 
@@ -627,12 +639,12 @@ function setupEventListeners() {
 
                 default:
                     // Use the proper switchToFilesView function which handles all UI restoration
-                    window.switchToFilesSection();
+                    switchToFilesSection();
                     // FIXME: because fileview handles it: need to converge code
                     _updateHistory = false;
             }
 
-            document.title = `OxiCloud: ${window.i18n.t(itemI18nKey)}`;
+            document.title = `OxiCloud: ${i18n.t(itemI18nKey)}`;
 
             if (_updateHistory) {
                 updateHistory(true);
@@ -649,7 +661,7 @@ function setupEventListeners() {
     }
 
     // User menu
-    window.setupUserMenu();
+    setupUserMenu();
 
     // Global events to close context menus and deselect cards
     document.addEventListener('click', (e) => {
@@ -666,18 +678,19 @@ function setupEventListeners() {
     });
 }
 
-// Expose needed functions to global scope
-window.setActionsBarMode = setActionsBarMode;
+// View-switching actions moved to app/navigation.js
 
-// Set up global selectFolder function for navigation
-window.selectFolder = (id, name) => {
+/**
+ * Navigate into a folder and refresh the file list.
+ * @param {string} id
+ * @param {string} name
+ */
+export function selectFolder(id, name) {
     app.breadcrumbPath.push({ id, name });
     app.currentPath = id;
     ui.updateBreadcrumb();
-    window.loadFiles();
-};
-
-// View-switching actions moved to app/navigation.js
+    loadFiles();
+}
 
 /**
  * Update the storage usage display with the user's actual storage usage
@@ -719,8 +732,8 @@ function updateStorageUsageDisplay(userData) {
         storageInfo.removeAttribute('data-i18n');
 
         // Use i18n if available
-        if (window.i18n?.t) {
-            storageInfo.textContent = window.i18n.t('storage.used', {
+        if (i18n?.t) {
+            storageInfo.textContent = i18n.t('storage.used', {
                 percentage: usagePercentage,
                 used: usedFormatted,
                 total: quotaFormatted
@@ -733,9 +746,4 @@ function updateStorageUsageDisplay(userData) {
     console.log(`Updated storage display: ${usagePercentage}% (${usedFormatted} / ${quotaFormatted})`);
 }
 
-window.updateStorageUsageDisplay = updateStorageUsageDisplay;
-
-// Initialize app when DOM is ready
-window.initApp = initApp;
-window.updateHistory = updateHistory;
-window.deserializeHash = deserializeHash;
+export { deserializeHash, initApp, setActionsBarMode, updateHistory, updateStorageUsageDisplay };

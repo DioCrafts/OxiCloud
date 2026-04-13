@@ -3,6 +3,23 @@
  * This file handles context menus and dialog functionality
  */
 
+import { resolveHomeFolder } from '../../app/authSession.js';
+import { loadFiles } from '../../app/filesView.js';
+import { app } from '../../app/state.js';
+import { showConfirmDialog, ui } from '../../app/ui.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { escapeHtml } from '../../core/formatters.js';
+import { i18n } from '../../core/i18n.js';
+import { favorites } from '../library/favorites.js';
+import { musicView } from '../library/music.js';
+import { fileSharing } from '../sharing/fileSharing.js';
+import { fileOps } from './fileOperations.js';
+import { inlineViewer } from './inlineViewer.js';
+import { multiSelect } from './multiSelect.js';
+import { wopiEditor } from './wopiEditor.js';
+
+let _moveDialogEscapeHandler = null;
+
 // Context Menus Module
 const contextMenus = {
     _setFavoriteOptionLabel(optionId, isFavorite) {
@@ -10,11 +27,7 @@ const contextMenus = {
         if (!option) return;
         const label = option.querySelector('span');
         if (!label) return;
-        label.textContent = window.i18n
-            ? window.i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite')
-            : isFavorite
-              ? 'Remove from favorites'
-              : 'Add to favorites';
+        label.textContent = i18n ? i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite') : isFavorite ? 'Remove from favorites' : 'Add to favorites';
     },
 
     /**
@@ -25,28 +38,28 @@ const contextMenus = {
         const wopiEditTab = document.getElementById('wopi-edit-file-tab-option');
         if (!wopiEdit || !wopiEditTab) return;
 
-        const targetFile = window.app?.contextMenuTargetFile;
+        const targetFile = app?.contextMenuTargetFile;
         // Don't show WOPI editor for image files - they should use inline preview
         const isImage = targetFile?.mime_type?.startsWith('image/');
-        const show = targetFile && !isImage && window.wopiEditor && (await window.wopiEditor.canEdit(targetFile.name));
+        const show = targetFile && !isImage && wopiEditor && (await wopiEditor.canEdit(targetFile.name));
 
         wopiEdit.classList.toggle('hidden', !show);
         wopiEditTab.classList.toggle('hidden', !show);
     },
 
     syncFavoriteOptionLabels() {
-        if (!window.favorites) return;
+        if (!favorites) return;
 
-        const targetFile = window.app?.contextMenuTargetFile;
-        const targetFolder = window.app?.contextMenuTargetFolder;
+        const targetFile = app?.contextMenuTargetFile;
+        const targetFolder = app?.contextMenuTargetFolder;
 
         if (targetFile) {
-            const isFav = window.favorites.isFavorite(targetFile.id, 'file');
+            const isFav = favorites.isFavorite(targetFile.id, 'file');
             this._setFavoriteOptionLabel('favorite-file-option', isFav);
         }
 
         if (targetFolder) {
-            const isFav = window.favorites.isFavorite(targetFolder.id, 'folder');
+            const isFav = favorites.isFavorite(targetFolder.id, 'folder');
             this._setFavoriteOptionLabel('favorite-folder-option', isFav);
         }
     },
@@ -55,7 +68,7 @@ const contextMenus = {
         const option = document.getElementById('add-to-playlist-option');
         if (!option) return;
 
-        const targetFile = window.app?.contextMenuTargetFile;
+        const targetFile = app?.contextMenuTargetFile;
         if (targetFile) {
             const isAudio = targetFile.mime_type?.startsWith('audio/');
             option.classList.toggle('hidden', !isAudio);
@@ -70,172 +83,172 @@ const contextMenus = {
     assignMenuEvents() {
         // Folder context menu options
         document.getElementById('download-folder-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFolder) {
-                window.fileOps.downloadFolder(window.app.contextMenuTargetFolder.id, window.app.contextMenuTargetFolder.name);
+            if (app.contextMenuTargetFolder) {
+                fileOps.downloadFolder(app.contextMenuTargetFolder.id, app.contextMenuTargetFolder.name);
             }
-            window.ui.closeContextMenu();
+            ui.closeContextMenu();
         });
 
         document.getElementById('favorite-folder-option').addEventListener('click', async () => {
-            if (window.app.contextMenuTargetFolder) {
-                const folder = window.app.contextMenuTargetFolder;
+            if (app.contextMenuTargetFolder) {
+                const folder = app.contextMenuTargetFolder;
 
                 // Check if folder is already in favorites to toggle
-                if (window.favorites?.isFavorite(folder.id, 'folder')) {
+                if (favorites?.isFavorite(folder.id, 'folder')) {
                     // Remove from favorites
-                    const ok = await window.favorites.removeFromFavorites(folder.id, 'folder');
-                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
-                        window.ui.setFavoriteVisualState(folder.id, 'folder', false);
+                    const ok = await favorites.removeFromFavorites(folder.id, 'folder');
+                    if (ok && ui && typeof ui.setFavoriteVisualState === 'function') {
+                        ui.setFavoriteVisualState(folder.id, 'folder', false);
                     }
                 } else {
                     // Add to favorites
-                    const ok = await window.favorites.addToFavorites(folder.id, folder.name, 'folder', folder.parent_id);
-                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
-                        window.ui.setFavoriteVisualState(folder.id, 'folder', true);
+                    const ok = await favorites.addToFavorites(folder.id, folder.name, 'folder', folder.parent_id);
+                    if (ok && ui && typeof ui.setFavoriteVisualState === 'function') {
+                        ui.setFavoriteVisualState(folder.id, 'folder', true);
                     }
                 }
                 this.syncFavoriteOptionLabels();
             }
-            window.ui.closeContextMenu();
+            ui.closeContextMenu();
         });
 
         document.getElementById('rename-folder-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFolder) {
-                this.showRenameDialog(window.app.contextMenuTargetFolder);
+            if (app.contextMenuTargetFolder) {
+                this.showRenameDialog(app.contextMenuTargetFolder);
             }
-            window.ui.closeContextMenu();
+            ui.closeContextMenu();
         });
 
         document.getElementById('move-folder-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFolder) {
-                this.showMoveDialog(window.app.contextMenuTargetFolder, 'folder');
+            if (app.contextMenuTargetFolder) {
+                this.showMoveDialog(app.contextMenuTargetFolder, 'folder');
             }
-            window.ui.closeContextMenu();
+            ui.closeContextMenu();
         });
 
         document.getElementById('share-folder-option').addEventListener('click', () => {
-            const folder = window.app.contextMenuTargetFolder;
+            const folder = app.contextMenuTargetFolder;
             if (folder) {
                 this.showShareDialog(folder, 'folder');
             }
-            window.ui.closeContextMenu();
+            ui.closeContextMenu();
         });
 
         document.getElementById('delete-folder-option').addEventListener('click', async () => {
-            const folder = window.app.contextMenuTargetFolder;
-            window.ui.closeContextMenu();
+            const folder = app.contextMenuTargetFolder;
+            ui.closeContextMenu();
             if (folder) {
-                await window.fileOps.deleteFolder(folder.id, folder.name);
+                await fileOps.deleteFolder(folder.id, folder.name);
             }
         });
 
         // File context menu options
         document.getElementById('view-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
+            if (app.contextMenuTargetFile) {
                 // Capture reference before context menu cleanup nullifies it
-                const file = window.app.contextMenuTargetFile;
+                const file = app.contextMenuTargetFile;
                 fetch(`/api/files/${file.id}?metadata=true`, {
                     credentials: 'same-origin'
                 })
                     .then((response) => response.json())
                     .then((fileDetails) => {
                         // Check if viewable file type (images, PDFs, text files)
-                        if (window.ui?.isViewableFile(fileDetails)) {
+                        if (ui?.isViewableFile(fileDetails)) {
                             // Open with inline viewer
-                            if (window.inlineViewer) {
-                                window.inlineViewer.openFile(fileDetails);
+                            if (inlineViewer) {
+                                inlineViewer.openFile(fileDetails);
                             } else {
                                 // If no viewer is available, download directly
-                                window.fileOps.downloadFile(file.id, file.name);
+                                fileOps.downloadFile(file.id, file.name);
                             }
                         } else {
                             // For non-viewable files, download
-                            window.fileOps.downloadFile(file.id, file.name);
+                            fileOps.downloadFile(file.id, file.name);
                         }
                     })
                     .catch((error) => {
                         console.error('Error fetching file details:', error);
                         // On error, fallback to download
-                        window.fileOps.downloadFile(file.id, file.name);
+                        fileOps.downloadFile(file.id, file.name);
                     });
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('wopi-edit-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                const file = window.app.contextMenuTargetFile;
-                window.wopiEditor.openInModal(file.id, file.name, 'edit');
+            if (app.contextMenuTargetFile) {
+                const file = app.contextMenuTargetFile;
+                wopiEditor.openInModal(file.id, file.name, 'edit');
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('wopi-edit-file-tab-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                const file = window.app.contextMenuTargetFile;
-                window.wopiEditor.openInTab(file.id, file.name, 'edit');
+            if (app.contextMenuTargetFile) {
+                const file = app.contextMenuTargetFile;
+                wopiEditor.openInTab(file.id, file.name, 'edit');
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('download-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                window.fileOps.downloadFile(window.app.contextMenuTargetFile.id, window.app.contextMenuTargetFile.name);
+            if (app.contextMenuTargetFile) {
+                fileOps.downloadFile(app.contextMenuTargetFile.id, app.contextMenuTargetFile.name);
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('favorite-file-option').addEventListener('click', async () => {
-            if (window.app.contextMenuTargetFile) {
-                const file = window.app.contextMenuTargetFile;
+            if (app.contextMenuTargetFile) {
+                const file = app.contextMenuTargetFile;
 
                 // Check if file is already in favorites to toggle
-                if (window.favorites?.isFavorite(file.id, 'file')) {
+                if (favorites?.isFavorite(file.id, 'file')) {
                     // Remove from favorites
-                    const ok = await window.favorites.removeFromFavorites(file.id, 'file');
-                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
-                        window.ui.setFavoriteVisualState(file.id, 'file', false);
+                    const ok = await favorites.removeFromFavorites(file.id, 'file');
+                    if (ok && ui && typeof ui.setFavoriteVisualState === 'function') {
+                        ui.setFavoriteVisualState(file.id, 'file', false);
                     }
                 } else {
                     // Add to favorites
-                    const ok = await window.favorites.addToFavorites(file.id, file.name, 'file', file.folder_id);
-                    if (ok && window.ui && typeof window.ui.setFavoriteVisualState === 'function') {
-                        window.ui.setFavoriteVisualState(file.id, 'file', true);
+                    const ok = await favorites.addToFavorites(file.id, file.name, 'file', file.folder_id);
+                    if (ok && ui && typeof ui.setFavoriteVisualState === 'function') {
+                        ui.setFavoriteVisualState(file.id, 'file', true);
                     }
                 }
                 this.syncFavoriteOptionLabels();
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('rename-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                this.showRenameFileDialog(window.app.contextMenuTargetFile);
+            if (app.contextMenuTargetFile) {
+                this.showRenameFileDialog(app.contextMenuTargetFile);
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('move-file-option').addEventListener('click', () => {
-            if (window.app.contextMenuTargetFile) {
-                this.showMoveDialog(window.app.contextMenuTargetFile, 'file');
+            if (app.contextMenuTargetFile) {
+                this.showMoveDialog(app.contextMenuTargetFile, 'file');
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('share-file-option').addEventListener('click', () => {
-            const file = window.app.contextMenuTargetFile;
+            const file = app.contextMenuTargetFile;
             if (file) {
                 this.showShareDialog(file, 'file');
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('add-to-playlist-option').addEventListener('click', () => {
-            const file = window.app.contextMenuTargetFile;
+            const file = app.contextMenuTargetFile;
             if (file) {
                 this.showPlaylistDialog(file);
             }
-            window.ui.closeFileContextMenu();
+            ui.closeFileContextMenu();
         });
 
         document.getElementById('playlist-add-btn').addEventListener('click', () => {
@@ -243,10 +256,10 @@ const contextMenus = {
         });
 
         document.getElementById('delete-file-option').addEventListener('click', async () => {
-            const file = window.app.contextMenuTargetFile;
-            window.ui.closeFileContextMenu();
+            const file = app.contextMenuTargetFile;
+            ui.closeFileContextMenu();
             if (file) {
-                await window.fileOps.deleteFile(file.id, file.name);
+                await fileOps.deleteFile(file.id, file.name);
             }
         });
 
@@ -279,43 +292,43 @@ const contextMenus = {
         // Store handler reference to avoid duplicate listeners
         // Note: We don't use stopPropagation because all Escape handlers are on document level
         // Each handler checks its own state, so multiple dialogs can be closed with multiple Escape presses
-        if (!window._moveDialogEscapeHandler) {
-            window._moveDialogEscapeHandler = (e) => {
+        if (!_moveDialogEscapeHandler) {
+            _moveDialogEscapeHandler = (e) => {
                 if (e.key === 'Escape' && moveFileDialog.style.display === 'flex') {
                     this.closeMoveDialog();
                 }
             };
-            document.addEventListener('keydown', window._moveDialogEscapeHandler);
+            document.addEventListener('keydown', _moveDialogEscapeHandler);
         }
 
         // Copy button handler
         copyConfirmBtn.addEventListener('click', async () => {
             // Batch copy mode (from multiSelect)
-            if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
-                const targetId = window.app.selectedTargetFolderId;
-                const items = window.app.batchMoveItems || [];
+            if (app.moveDialogMode === 'batch' && multiSelect) {
+                const targetId = app.selectedTargetFolderId;
+                const items = app.batchMoveItems || [];
 
                 const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
                 const folderIds = items.filter((i) => i.type === 'folder').map((i) => i.id);
 
-                const result = await window.fileOps.batchCopy(fileIds, folderIds, targetId);
+                const result = await fileOps.batchCopy(fileIds, folderIds, targetId);
 
                 this.closeMoveDialog();
-                window.multiSelect.clear();
-                window.loadFiles();
+                multiSelect.clear();
+                loadFiles();
 
-                window.multiSelect.showBatchResult('copy', result);
+                multiSelect.showBatchResult('copy', result);
                 return;
             }
 
             // Single item copy
-            if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
-                const success = await window.fileOps.copyFile(window.app.contextMenuTargetFile.id, window.app.selectedTargetFolderId);
+            if (app.moveDialogMode === 'file' && app.contextMenuTargetFile) {
+                const success = await fileOps.copyFile(app.contextMenuTargetFile.id, app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
-            } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
-                const success = await window.fileOps.copyFolder(window.app.contextMenuTargetFolder.id, window.app.selectedTargetFolderId);
+            } else if (app.moveDialogMode === 'folder' && app.contextMenuTargetFolder) {
+                const success = await fileOps.copyFolder(app.contextMenuTargetFolder.id, app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
@@ -324,30 +337,30 @@ const contextMenus = {
 
         moveConfirmBtn.addEventListener('click', async () => {
             // Batch move mode (from multiSelect)
-            if (window.app.moveDialogMode === 'batch' && window.multiSelect) {
-                const targetId = window.app.selectedTargetFolderId;
-                const items = window.app.batchMoveItems || [];
+            if (app.moveDialogMode === 'batch' && multiSelect) {
+                const targetId = app.selectedTargetFolderId;
+                const items = app.batchMoveItems || [];
 
                 const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
                 const folderIds = items.filter((i) => i.type === 'folder' && i.id !== targetId).map((i) => i.id);
 
-                const result = await window.fileOps.batchMove(fileIds, folderIds, targetId);
+                const result = await fileOps.batchMove(fileIds, folderIds, targetId);
 
                 this.closeMoveDialog();
-                window.multiSelect.clear();
-                window.loadFiles();
-                window.multiSelect.showBatchResult('move', result);
+                multiSelect.clear();
+                loadFiles();
+                multiSelect.showBatchResult('move', result);
 
                 return;
             }
 
-            if (window.app.moveDialogMode === 'file' && window.app.contextMenuTargetFile) {
-                const success = await window.fileOps.moveFile(window.app.contextMenuTargetFile.id, window.app.selectedTargetFolderId);
+            if (app.moveDialogMode === 'file' && app.contextMenuTargetFile) {
+                const success = await fileOps.moveFile(app.contextMenuTargetFile.id, app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
-            } else if (window.app.moveDialogMode === 'folder' && window.app.contextMenuTargetFolder) {
-                const success = await window.fileOps.moveFolder(window.app.contextMenuTargetFolder.id, window.app.selectedTargetFolderId);
+            } else if (app.moveDialogMode === 'folder' && app.contextMenuTargetFolder) {
+                const success = await fileOps.moveFolder(app.contextMenuTargetFolder.id, app.selectedTargetFolderId);
                 if (success) {
                     this.closeMoveDialog();
                 }
@@ -363,13 +376,13 @@ const contextMenus = {
         const renameInput = document.getElementById('rename-input');
         const renameDialog = document.getElementById('rename-dialog');
 
-        window.app.renameMode = 'folder';
+        app.renameMode = 'folder';
         // Store the folder reference so it survives context menu cleanup
-        window.app.renameTarget = folder;
+        app.renameTarget = folder;
         renameInput.value = folder.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_folder') : 'Rename folder';
+        if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_folder') : 'Rename folder';
         renameDialog.style.display = 'flex';
         renameInput.focus();
         renameInput.select();
@@ -383,13 +396,13 @@ const contextMenus = {
         const renameInput = document.getElementById('rename-input');
         const renameDialog = document.getElementById('rename-dialog');
 
-        window.app.renameMode = 'file';
+        app.renameMode = 'file';
         // Store the file reference so it survives context menu cleanup
-        window.app.renameTarget = file;
+        app.renameTarget = file;
         renameInput.value = file.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = window.i18n ? window.i18n.t('dialogs.rename_file') : 'Rename file';
+        if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_file') : 'Rename file';
         renameDialog.style.display = 'flex';
         renameInput.focus();
         renameInput.select();
@@ -400,8 +413,8 @@ const contextMenus = {
      */
     closeRenameDialog() {
         document.getElementById('rename-dialog').style.display = 'none';
-        window.app.contextMenuTargetFolder = null;
-        window.app.renameTarget = null;
+        app.contextMenuTargetFolder = null;
+        app.renameTarget = null;
     },
 
     /**
@@ -411,15 +424,15 @@ const contextMenus = {
      */
     async showMoveDialog(item, mode) {
         // Set mode
-        window.app.moveDialogMode = mode;
+        app.moveDialogMode = mode;
 
         // Reset selection
-        window.app.selectedTargetFolderId = '';
+        app.selectedTargetFolderId = '';
 
         // Ensure we have the home folder ID BEFORE calculating startFolderId
-        if (!window.app.userHomeFolderId) {
+        if (!app.userHomeFolderId) {
             console.log('[Move Dialog] Home folder ID not set, resolving...');
-            await window.resolveHomeFolder();
+            await resolveHomeFolder();
         }
 
         // Initialize dialog navigation state
@@ -437,44 +450,28 @@ const contextMenus = {
             startFolderId = item.parent_id;
         } else {
             // If item is at root level, start at user's home folder
-            startFolderId = window.app.userHomeFolderId || null;
+            startFolderId = app.userHomeFolderId || null;
         }
 
-        console.log(
-            '[Move Dialog] showMoveDialog - item:',
-            item,
-            'mode:',
-            mode,
-            'startFolderId:',
-            startFolderId,
-            'userHomeFolderId:',
-            window.app.userHomeFolderId
-        );
+        console.log('[Move Dialog] showMoveDialog - item:', item, 'mode:', mode, 'startFolderId:', startFolderId, 'userHomeFolderId:', app.userHomeFolderId);
 
         // Store the item being moved and navigation state
-        window.app.moveDialogItemId = item.id;
-        window.app.moveDialogItemMode = mode;
-        window.app.moveDialogCurrentFolderId = startFolderId;
+        app.moveDialogItemId = item.id;
+        app.moveDialogItemMode = mode;
+        app.moveDialogCurrentFolderId = startFolderId;
 
         // Build initial breadcrumb if starting at a non-home folder
         // This allows proper navigation back to home
         const breadcrumb = [];
-        if (startFolderId && startFolderId !== window.app.userHomeFolderId && startFolderName) {
+        if (startFolderId && startFolderId !== app.userHomeFolderId && startFolderName) {
             // We have the folder name, add it to breadcrumb
             breadcrumb.push({ id: startFolderId, name: startFolderName });
         }
-        window.app.moveDialogBreadcrumb = breadcrumb;
+        app.moveDialogBreadcrumb = breadcrumb;
 
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
-        const titleText =
-            mode === 'file'
-                ? window.i18n
-                    ? window.i18n.t('dialogs.move_file')
-                    : 'Move file'
-                : window.i18n
-                  ? window.i18n.t('dialogs.move_folder')
-                  : 'Move folder';
+        const titleText = mode === 'file' ? (i18n ? i18n.t('dialogs.move_file') : 'Move file') : i18n ? i18n.t('dialogs.move_folder') : 'Move folder';
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
         // Load folders for the starting location
@@ -489,8 +486,8 @@ const contextMenus = {
      */
     closeMoveDialog() {
         document.getElementById('move-file-dialog').style.display = 'none';
-        window.app.contextMenuTargetFile = null;
-        window.app.contextMenuTargetFolder = null;
+        app.contextMenuTargetFile = null;
+        app.contextMenuTargetFolder = null;
     },
 
     /**
@@ -499,28 +496,28 @@ const contextMenus = {
     async renameItem() {
         const newName = document.getElementById('rename-input').value.trim();
         if (!newName) {
-            alert(window.i18n ? window.i18n.t('errors.empty_name') : 'Name cannot be empty');
+            alert(i18n ? i18n.t('errors.empty_name') : 'Name cannot be empty');
             return;
         }
 
         // Use renameTarget which was saved before the context menu was closed
-        const target = window.app.renameTarget;
+        const target = app.renameTarget;
         if (!target) {
             console.error('No rename target available');
             return;
         }
 
-        if (window.app.renameMode === 'file') {
-            const success = await window.fileOps.renameFile(target.id, newName);
+        if (app.renameMode === 'file') {
+            const success = await fileOps.renameFile(target.id, newName);
             if (success) {
                 contextMenus.closeRenameDialog();
-                window.loadFiles();
+                loadFiles();
             }
-        } else if (window.app.renameMode === 'folder') {
-            const success = await window.fileOps.renameFolder(target.id, newName);
+        } else if (app.renameMode === 'folder') {
+            const success = await fileOps.renameFolder(target.id, newName);
             if (success) {
                 contextMenus.closeRenameDialog();
-                window.loadFiles();
+                loadFiles();
             }
         }
     },
@@ -538,12 +535,12 @@ const contextMenus = {
     async loadMoveDialogFolders(parentFolderId) {
         try {
             // Ensure we have the home folder ID before proceeding
-            if (!window.app.userHomeFolderId) {
-                await window.resolveHomeFolder();
+            if (!app.userHomeFolderId) {
+                await resolveHomeFolder();
             }
 
             // Get the effective folder ID
-            const effectiveParentId = parentFolderId || window.app.userHomeFolderId;
+            const effectiveParentId = parentFolderId || app.userHomeFolderId;
 
             // Must have a folder ID to proceed
             if (!effectiveParentId) {
@@ -576,9 +573,9 @@ const contextMenus = {
             folderSelectContainer.innerHTML = '';
 
             // Get current navigation state
-            const itemId = window.app.moveDialogItemId;
-            const mode = window.app.moveDialogItemMode;
-            const breadcrumb = window.app.moveDialogBreadcrumb || [];
+            const itemId = app.moveDialogItemId;
+            const mode = app.moveDialogItemMode;
+            const breadcrumb = app.moveDialogBreadcrumb || [];
 
             // Always show breadcrumb to allow navigation back to home
             this._renderMoveDialogBreadcrumb(breadcrumbContainer, breadcrumb, effectiveParentId);
@@ -590,42 +587,42 @@ const contextMenus = {
                 currentFolderOption.className = 'folder-select-item folder-select-current';
                 currentFolderOption.innerHTML = `
                     <i class="fas fa-check-circle check-icon"></i>
-                    <span>${window.i18n ? window.i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
+                    <span>${i18n ? i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
                 `;
                 currentFolderOption.addEventListener('click', () => {
                     document.querySelectorAll('.folder-select-item').forEach((item) => {
                         item.classList.remove('selected');
                     });
                     currentFolderOption.classList.add('selected');
-                    window.app.selectedTargetFolderId = effectiveParentId;
+                    app.selectedTargetFolderId = effectiveParentId;
                 });
                 folderSelectContainer.appendChild(currentFolderOption);
             }
 
             // Add "Go to parent" option if not at home folder
-            const isAtHomeFolder = effectiveParentId === window.app.userHomeFolderId;
+            const isAtHomeFolder = effectiveParentId === app.userHomeFolderId;
             if (!isAtHomeFolder || breadcrumb.length > 0) {
                 const parentOption = document.createElement('div');
                 parentOption.className = 'folder-select-item folder-navigate-up';
                 parentOption.innerHTML = `
                     <i class="fas fa-level-up-alt"></i>
-                    <span>${window.i18n ? window.i18n.t('dialogs.go_to_parent') : '.. (parent folder)'}</span>
+                    <span>${i18n ? i18n.t('dialogs.go_to_parent') : '.. (parent folder)'}</span>
                 `;
                 parentOption.addEventListener('click', () => {
                     // Navigate to parent folder
-                    const currentBreadcrumb = window.app.moveDialogBreadcrumb || [];
+                    const currentBreadcrumb = app.moveDialogBreadcrumb || [];
                     if (currentBreadcrumb.length > 0) {
                         // Remove current folder from breadcrumb
                         currentBreadcrumb.pop();
                         const parentFolder = currentBreadcrumb.length > 0 ? currentBreadcrumb[currentBreadcrumb.length - 1] : null;
-                        window.app.moveDialogBreadcrumb = currentBreadcrumb;
-                        window.app.moveDialogCurrentFolderId = parentFolder ? parentFolder.id : null;
+                        app.moveDialogBreadcrumb = currentBreadcrumb;
+                        app.moveDialogCurrentFolderId = parentFolder ? parentFolder.id : null;
                         this.loadMoveDialogFolders(parentFolder ? parentFolder.id : null);
                     } else {
                         // Go to root (home folder)
-                        window.app.moveDialogBreadcrumb = [];
-                        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
-                        this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
+                        app.moveDialogBreadcrumb = [];
+                        app.moveDialogCurrentFolderId = app.userHomeFolderId || null;
+                        this.loadMoveDialogFolders(app.userHomeFolderId || null);
                     }
                 });
                 folderSelectContainer.appendChild(parentOption);
@@ -650,10 +647,10 @@ const contextMenus = {
                 // Click navigates INTO this folder
                 folderItem.addEventListener('click', () => {
                     // Add to breadcrumb
-                    const breadcrumb = window.app.moveDialogBreadcrumb || [];
+                    const breadcrumb = app.moveDialogBreadcrumb || [];
                     breadcrumb.push({ id: folder.id, name: folder.name });
-                    window.app.moveDialogBreadcrumb = breadcrumb;
-                    window.app.moveDialogCurrentFolderId = folder.id;
+                    app.moveDialogBreadcrumb = breadcrumb;
+                    app.moveDialogCurrentFolderId = folder.id;
                     this.loadMoveDialogFolders(folder.id);
                 });
 
@@ -667,30 +664,30 @@ const contextMenus = {
                 homeOption.className = 'folder-select-item folder-select-current';
                 homeOption.innerHTML = `
                     <i class="fas fa-check-circle check-icon"></i>
-                    <span>${window.i18n ? window.i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
+                    <span>${i18n ? i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
                 `;
                 homeOption.addEventListener('click', () => {
                     document.querySelectorAll('.folder-select-item').forEach((item) => {
                         item.classList.remove('selected');
                     });
                     homeOption.classList.add('selected');
-                    window.app.selectedTargetFolderId = ''; // Empty means root/home
+                    app.selectedTargetFolderId = ''; // Empty means root/home
                 });
                 folderSelectContainer.appendChild(homeOption);
             } else if (folders.length === 0) {
                 // Inside a subfolder with no children - show empty message
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'folder-select-empty';
-                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${window.i18n ? window.i18n.t('dialogs.no_subfolders') : 'No subfolders to navigate'}</span>`;
+                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${i18n ? i18n.t('dialogs.no_subfolders') : 'No subfolders to navigate'}</span>`;
                 folderSelectContainer.appendChild(emptyMsg);
             }
 
             // Set default selection to current folder
-            window.app.selectedTargetFolderId = parentFolderId || '';
+            app.selectedTargetFolderId = parentFolderId || '';
 
             // Translate new elements
-            if (window.i18n?.translateElement) {
-                window.i18n.translateElement(folderSelectContainer);
+            if (i18n?.translateElement) {
+                i18n.translateElement(folderSelectContainer);
             }
         } catch (error) {
             console.error('Error loading folders:', error);
@@ -704,16 +701,16 @@ const contextMenus = {
         if (!container) return;
         container.innerHTML = '';
 
-        const homeFolderId = window.app.userHomeFolderId;
-        const homeFolderName = window.app.userHomeFolderName || 'Home';
+        const homeFolderId = app.userHomeFolderId;
+        const homeFolderName = app.userHomeFolderName || 'Home';
 
         // Home icon (click to go to home folder)
         const homeItem = document.createElement('span');
         homeItem.className = 'move-breadcrumb-item';
         homeItem.innerHTML = '<i class="fas fa-home"></i>';
         homeItem.addEventListener('click', () => {
-            window.app.moveDialogBreadcrumb = [];
-            window.app.moveDialogCurrentFolderId = homeFolderId || null;
+            app.moveDialogBreadcrumb = [];
+            app.moveDialogCurrentFolderId = homeFolderId || null;
             this.loadMoveDialogFolders(homeFolderId || null);
         });
         container.appendChild(homeItem);
@@ -733,8 +730,8 @@ const contextMenus = {
             homeNameItem.textContent = homeFolderName;
             if (breadcrumb.length > 0) {
                 homeNameItem.addEventListener('click', () => {
-                    window.app.moveDialogBreadcrumb = [];
-                    window.app.moveDialogCurrentFolderId = homeFolderId || null;
+                    app.moveDialogBreadcrumb = [];
+                    app.moveDialogCurrentFolderId = homeFolderId || null;
                     this.loadMoveDialogFolders(homeFolderId || null);
                 });
             }
@@ -758,8 +755,8 @@ const contextMenus = {
             // Click to navigate back to this level
             if (index < breadcrumb.length - 1) {
                 item.addEventListener('click', () => {
-                    window.app.moveDialogBreadcrumb = breadcrumb.slice(0, index + 1);
-                    window.app.moveDialogCurrentFolderId = segment.id;
+                    app.moveDialogBreadcrumb = breadcrumb.slice(0, index + 1);
+                    app.moveDialogCurrentFolderId = segment.id;
                     this.loadMoveDialogFolders(segment.id);
                 });
             }
@@ -776,11 +773,11 @@ const contextMenus = {
     async loadAllFolders(_itemId, _mode) {
         // For batch mode, use the same navigation as regular move dialog
         // Initialize navigation state starting at home folder
-        window.app.moveDialogBreadcrumb = [];
-        window.app.moveDialogCurrentFolderId = window.app.userHomeFolderId || null;
+        app.moveDialogBreadcrumb = [];
+        app.moveDialogCurrentFolderId = app.userHomeFolderId || null;
 
         // Use loadMoveDialogFolders which uses /api/folders/{id}/contents
-        await this.loadMoveDialogFolders(window.app.userHomeFolderId || null);
+        await this.loadMoveDialogFolders(app.userHomeFolderId || null);
     },
 
     /**
@@ -793,7 +790,7 @@ const contextMenus = {
             const shareDialog = document.getElementById('share-dialog');
             if (!shareDialog) {
                 console.error('Share dialog element not found in DOM');
-                window.ui.showNotification('Error', 'Share dialog not available');
+                ui.showNotification('Error', 'Share dialog not available');
                 return;
             }
 
@@ -802,13 +799,7 @@ const contextMenus = {
             if (dialogHeader) {
                 const headerSpan = dialogHeader.querySelector('span');
                 const titleText =
-                    itemType === 'file'
-                        ? window.i18n
-                            ? window.i18n.t('dialogs.share_file')
-                            : 'Share file'
-                        : window.i18n
-                          ? window.i18n.t('dialogs.share_folder')
-                          : 'Share folder';
+                    itemType === 'file' ? (i18n ? i18n.t('dialogs.share_file') : 'Share file') : i18n ? i18n.t('dialogs.share_folder') : 'Share folder';
                 if (headerSpan) {
                     headerSpan.textContent = titleText;
                 } else {
@@ -832,11 +823,11 @@ const contextMenus = {
             if (permReshare) permReshare.checked = false;
 
             // Store the current item and type for use when creating the share
-            window.app.shareDialogItem = item;
-            window.app.shareDialogItemType = itemType;
+            app.shareDialogItem = item;
+            app.shareDialogItemType = itemType;
 
             // Check if item already has shares (async API call)
-            const existingShares = await window.fileSharing.getSharedLinksForItem(item.id, itemType);
+            const existingShares = await fileSharing.getSharedLinksForItem(item.id, itemType);
             const existingSharesContainer = document.getElementById('existing-shares-container');
 
             // Clear existing shares container
@@ -850,7 +841,7 @@ const contextMenus = {
                     const shareEl = document.createElement('div');
                     shareEl.className = 'existing-share-item';
 
-                    const expiresText = share.expires_at ? `Expires: ${window.fileSharing.formatExpirationDate(share.expires_at)}` : 'No expiration';
+                    const expiresText = share.expires_at ? `Expires: ${fileSharing.formatExpirationDate(share.expires_at)}` : 'No expiration';
 
                     // Share URL
                     const urlDiv = document.createElement('div');
@@ -899,7 +890,7 @@ const contextMenus = {
                     btn.addEventListener('click', (e) => {
                         e.preventDefault();
                         const url = btn.getAttribute('data-share-url');
-                        window.fileSharing.copyLinkToClipboard(url);
+                        fileSharing.copyLinkToClipboard(url);
                     });
                 });
 
@@ -909,12 +900,12 @@ const contextMenus = {
                         const shareId = btn.getAttribute('data-share-id');
 
                         showConfirmDialog({
-                            title: window.i18n ? window.i18n.t('dialogs.confirm_delete_share') : 'Delete link',
-                            message: window.i18n ? window.i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
-                            confirmText: window.i18n ? window.i18n.t('actions.delete') : 'Delete'
+                            title: i18n ? i18n.t('dialogs.confirm_delete_share') : 'Delete link',
+                            message: i18n ? i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
+                            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
                         }).then(async (confirmed) => {
                             if (confirmed) {
-                                await window.fileSharing.removeSharedLink(shareId);
+                                await fileSharing.removeSharedLink(shareId);
                                 btn.closest('.existing-share-item').remove();
                                 if (existingSharesContainer.children.length === 0) {
                                     document.getElementById('existing-shares-section').classList.add('hidden');
@@ -936,7 +927,7 @@ const contextMenus = {
             console.log('Share dialog opened for', itemType, item.name);
         } catch (error) {
             console.error('Error opening share dialog:', error);
-            window.ui.showNotification('Error', 'Could not open share dialog');
+            ui.showNotification('Error', 'Could not open share dialog');
         }
     },
 
@@ -944,8 +935,8 @@ const contextMenus = {
      * Create a shared link with the configured options
      */
     async createSharedLink() {
-        if (!window.app.shareDialogItem || !window.app.shareDialogItemType) {
-            window.ui.showNotification('Error', 'Could not share the item');
+        if (!app.shareDialogItem || !app.shareDialogItemType) {
+            ui.showNotification('Error', 'Could not share the item');
             return;
         }
 
@@ -956,8 +947,8 @@ const contextMenus = {
         const permissionWrite = document.getElementById('share-permission-write').checked;
         const permissionReshare = document.getElementById('share-permission-reshare').checked;
 
-        const item = window.app.shareDialogItem;
-        const itemType = window.app.shareDialogItemType;
+        const item = app.shareDialogItem;
+        const itemType = app.shareDialogItemType;
 
         // Build DTO for backend API
         const createDto = {
@@ -1002,13 +993,13 @@ const contextMenus = {
             }
 
             // Show success message
-            window.ui.showNotification(
-                window.i18n ? window.i18n.t('notifications.link_created') : 'Link created',
-                window.i18n ? window.i18n.t('notifications.share_success') : 'Shared link created successfully'
+            ui.showNotification(
+                i18n ? i18n.t('notifications.link_created') : 'Link created',
+                i18n ? i18n.t('notifications.share_success') : 'Shared link created successfully'
             );
         } catch (error) {
             console.error('Error creating shared link:', error);
-            window.ui.showNotification('Error', error.message || 'Could not create shared link');
+            ui.showNotification('Error', error.message || 'Could not create shared link');
         }
     },
 
@@ -1023,7 +1014,7 @@ const contextMenus = {
         document.getElementById('notification-message').value = '';
 
         // Store the URL for later use
-        window.app.notificationShareUrl = shareUrl;
+        app.notificationShareUrl = shareUrl;
 
         // Show dialog
         document.getElementById('notification-dialog').style.display = 'flex';
@@ -1035,26 +1026,26 @@ const contextMenus = {
     sendShareNotification() {
         const email = document.getElementById('notification-email').value.trim();
         const message = document.getElementById('notification-message').value.trim();
-        const shareUrl = window.app.notificationShareUrl;
+        const shareUrl = app.notificationShareUrl;
 
         if (!email || !shareUrl) {
-            window.ui.showNotification('Error', 'Please enter a valid email address');
+            ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
 
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
-            window.ui.showNotification('Error', 'Please enter a valid email address');
+            ui.showNotification('Error', 'Please enter a valid email address');
             return;
         }
 
         try {
-            window.fileSharing.sendShareNotification(shareUrl, email, message);
+            fileSharing.sendShareNotification(shareUrl, email, message);
             document.getElementById('notification-dialog').style.display = 'none';
         } catch (error) {
             console.error('Error sending notification:', error);
-            window.ui.showNotification('Error', 'Could not send notification');
+            ui.showNotification('Error', 'Could not send notification');
         }
     },
 
@@ -1064,8 +1055,8 @@ const contextMenus = {
     closeShareDialog() {
         const dialog = document.getElementById('share-dialog');
         if (dialog) dialog.style.display = 'none';
-        window.app.shareDialogItem = null;
-        window.app.shareDialogItemType = null;
+        app.shareDialogItem = null;
+        app.shareDialogItemType = null;
     },
 
     /**
@@ -1073,7 +1064,7 @@ const contextMenus = {
      */
     closeNotificationDialog() {
         document.getElementById('notification-dialog').style.display = 'none';
-        window.app.notificationShareUrl = null;
+        app.notificationShareUrl = null;
     },
 
     _selectedPlaylistId: null,
@@ -1089,11 +1080,11 @@ const contextMenus = {
         }
 
         // Store the file(s) to add
-        window.app.playlistDialogFiles = [file];
+        app.playlistDialogFiles = [file];
 
         // Update files info
         if (filesInfo) {
-            filesInfo.innerHTML = `<strong>${window.i18n ? window.i18n.t('music.selected_files', 'Selected:') : 'Selected:'} </strong>${file.name}`;
+            filesInfo.innerHTML = `<strong>${i18n ? i18n.t('music.selected_files', 'Selected:') : 'Selected:'} </strong>${file.name}`;
         }
 
         // Reset selection
@@ -1117,12 +1108,12 @@ const contextMenus = {
             this._renderPlaylistSelect(container, playlists);
         } catch (err) {
             console.error('Error loading playlists:', err);
-            container.innerHTML = `<div class="folder-select-empty">${window.i18n ? window.i18n.t('music.load_error', 'Error loading playlists') : 'Error loading playlists'}</div>`;
+            container.innerHTML = `<div class="folder-select-empty">${i18n ? i18n.t('music.load_error', 'Error loading playlists') : 'Error loading playlists'}</div>`;
         }
     },
 
     _renderPlaylistSelect(container, playlists) {
-        const t = (key, fallback) => (window.i18n ? window.i18n.t(key, fallback) : fallback);
+        const t = (key, fallback) => (i18n ? i18n.t(key, fallback) : fallback);
 
         container.innerHTML = '';
 
@@ -1157,7 +1148,7 @@ const contextMenus = {
 
     async addSelectedFilesToPlaylist() {
         const playlistId = this._selectedPlaylistId;
-        const files = window.app.playlistDialogFiles || [];
+        const files = app.playlistDialogFiles || [];
 
         if (!playlistId || files.length === 0) return;
 
@@ -1181,23 +1172,20 @@ const contextMenus = {
             }
 
             await resp.json();
-            window.ui.showNotification(
-                window.i18n ? window.i18n.t('music.added', 'Added!') : 'Added!',
-                `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${window.i18n ? window.i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
+            ui.showNotification(
+                i18n ? i18n.t('music.added', 'Added!') : 'Added!',
+                `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${i18n ? i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
             );
 
             this.closePlaylistDialog();
 
             // Refresh music view if open
-            if (window.musicView?.playlists) {
-                window.musicView._loadPlaylists();
+            if (musicView?.playlists) {
+                musicView._loadPlaylists();
             }
         } catch (err) {
             console.error('Error adding to playlist:', err);
-            window.ui.showNotification(
-                window.i18n ? window.i18n.t('music.error', 'Error') : 'Error',
-                err.message || window.i18n.t('music.add_error', 'Could not add tracks to playlist')
-            );
+            ui.showNotification(i18n ? i18n.t('music.error', 'Error') : 'Error', err.message || i18n.t('music.add_error', 'Could not add tracks to playlist'));
             if (addBtn) addBtn.disabled = false;
         }
     },
@@ -1210,7 +1198,7 @@ const contextMenus = {
                 dialog.style.display = 'none';
             }, 200);
         }
-        window.app.playlistDialogFiles = null;
+        app.playlistDialogFiles = null;
         this._selectedPlaylistId = null;
     },
 
@@ -1220,5 +1208,4 @@ const contextMenus = {
     }
 };
 
-// Expose context menus module globally
-window.contextMenus = contextMenus;
+export { contextMenus };

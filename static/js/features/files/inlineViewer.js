@@ -3,6 +3,11 @@
  * A simpler approach to viewing files that doesn't rely on complex DOM manipulation
  */
 
+import { updateHistory } from '../../app/main.js';
+import { app } from '../../app/state.js';
+import { isTextViewable } from '../../core/formatters.js';
+import { wopiEditor } from './wopiEditor.js';
+
 class InlineViewer {
     constructor() {
         this.setupViewer();
@@ -97,9 +102,9 @@ class InlineViewer {
         const ext = (file.name || '').split('.').pop().toLowerCase();
         const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'heic', 'heif', 'avif', 'tiff'];
         const isImage = file.mime_type?.startsWith('image/') || imageExts.includes(ext);
-        if (!isImage && window.wopiEditor && (await window.wopiEditor.canEdit(file.name))) {
+        if (!isImage && wopiEditor && (await wopiEditor.canEdit(file.name))) {
             try {
-                window.wopiEditor.openInModal(file.id, file.name, 'edit');
+                wopiEditor.openInModal(file.id, file.name, 'edit');
                 return;
             } catch (e) {
                 console.warn('WOPI editor failed, falling back to inline viewer:', e);
@@ -204,9 +209,9 @@ class InlineViewer {
         modal.classList.add('active');
     }
 
-    // Check if a MIME type is text-viewable — delegates to window.isTextViewable
+    // Check if a MIME type is text-viewable
     isTextViewable(mimeType) {
-        return window.isTextViewable ? window.isTextViewable(mimeType) : false;
+        return isTextViewable(mimeType);
     }
 
     // Creates a text viewer using authenticated fetch
@@ -513,8 +518,8 @@ class InlineViewer {
         }
 
         // clear
-        window.app.viewFile = null;
-        window.updateHistory(false);
+        app.viewFile = null;
+        updateHistory(false);
 
         // Clear references
         this.currentFile = null;
@@ -573,21 +578,4 @@ class InlineViewer {
     }
 }
 
-// Initialize viewer when document is ready
-document.addEventListener('DOMContentLoaded', () => {
-    // Check if it's already initialized
-    if (!window.inlineViewer) {
-        console.log('Initializing inline viewer on DOMContentLoaded');
-        window.inlineViewer = new InlineViewer();
-    }
-});
-
-// Fallback initialization for cases where DOMContentLoaded already fired
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    if (!window.inlineViewer) {
-        console.log('Fallback initialization for inline viewer');
-        setTimeout(() => {
-            window.inlineViewer = new InlineViewer();
-        }, 100);
-    }
-}
+export const inlineViewer = new InlineViewer();

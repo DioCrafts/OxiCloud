@@ -6,6 +6,11 @@
  * No localStorage usage — the server persists and prunes recent items.
  */
 
+import { ui } from '../../app/ui.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+import { multiSelect } from '../files/multiSelect.js';
+
 const recent = {
     /** Maximum items to request from the server */
     MAX_RECENT_FILES: 20,
@@ -86,7 +91,7 @@ const recent = {
 
             const recentItems = await response.json();
 
-            window.ui.resetFilesList(); // ensure also list visible & error hidden
+            ui.resetFilesList(); // ensure also list visible & error hidden
             const filesList = document.getElementById('files-list');
 
             filesList.innerHTML = `
@@ -100,17 +105,17 @@ const recent = {
                 </div>
             `;
 
-            if (window.multiSelect) {
-                window.multiSelect.clear();
-                window.multiSelect.init(); // this will wire buttons & select-all-checkbox
+            if (multiSelect) {
+                multiSelect.clear();
+                multiSelect.init(); // this will wire buttons & select-all-checkbox
             }
-            window.ui.updateBreadcrumb('');
+            ui.updateBreadcrumb('');
 
             if (recentItems.length === 0) {
-                window.ui.showError(`
+                ui.showError(`
                     <i class="fas fa-clock empty-state-icon"></i>
-                    <p>${window.i18n ? window.i18n.t('recent.empty_state') : 'No recent files'}</p>
-                    <p>${window.i18n ? window.i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
+                    <p>${i18n ? i18n.t('recent.empty_state') : 'No recent files'}</p>
+                    <p>${i18n ? i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
                 `);
             }
 
@@ -140,16 +145,15 @@ const recent = {
                     });
                 }
             }
-            if (folders.length) window.ui.renderFolders(folders);
-            if (files.length) window.ui.renderFiles(files);
+            if (folders.length) ui.renderFolders(folders);
+            if (files.length) ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying recent files:', error);
-            if (window.ui?.showNotification) {
-                window.ui.showNotification('Error', 'Error loading recent files');
+            if (ui?.showNotification) {
+                ui.showNotification('Error', 'Error loading recent files');
             }
         }
     }
 };
 
-// Expose globally
-window.recent = recent;
+export { recent };

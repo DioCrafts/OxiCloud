@@ -2,13 +2,20 @@
  * Trash view loading and rendering logic
  */
 
+import { escapeHtml, formatDateTime } from '../core/formatters.js';
+import { i18n } from '../core/i18n.js';
+import { fileOps } from '../features/files/fileOperations.js';
+import { multiSelect } from '../features/files/multiSelect.js';
+import { appElements } from './state.js';
+import { ui } from './ui.js';
+
 async function loadTrashItems() {
-    const elements = window.appElements;
+    const elements = appElements;
 
     try {
-        if (window.multiSelect) window.multiSelect.clear();
-        window.ui.resetFilesList(); // ensure also list visible & error hidden
-        const _tt = window.i18n?.t ? window.i18n.t : (k) => k.split('.').pop();
+        if (multiSelect) multiSelect.clear();
+        ui.resetFilesList(); // ensure also list visible & error hidden
+        const _tt = i18n?.t ? i18n.t : (k) => k.split('.').pop();
         elements.filesList.innerHTML = `
             <div class="list-header trash-header">
                 <div data-i18n="files.name">${_tt('files.name')}</div>
@@ -19,14 +26,14 @@ async function loadTrashItems() {
             </div>
         `;
 
-        window.ui.updateBreadcrumb('');
+        ui.updateBreadcrumb('');
 
-        const trashItems = await window.fileOps.getTrashItems();
+        const trashItems = await fileOps.getTrashItems();
 
         if (trashItems.length === 0) {
-            window.ui.showError(`
+            ui.showError(`
                 <i class="fas fa-trash empty-state-icon"></i>
-                <p>${window.i18n ? window.i18n.t('trash.empty_state') : 'The trash is empty'}</p>
+                <p>${i18n ? i18n.t('trash.empty_state') : 'The trash is empty'}</p>
             `);
             return;
         }
@@ -36,33 +43,27 @@ async function loadTrashItems() {
         });
     } catch (error) {
         console.error('Error loading trash items:', error);
-        window.ui.showNotification('Error', 'Error loading trash items');
+        ui.showNotification('Error', 'Error loading trash items');
     }
 }
 
 function addTrashItemToView(item) {
-    const elements = window.appElements;
+    const elements = appElements;
     const isFile = item.item_type === 'file';
 
-    const formattedDate = window.formatDateTime(item.trashed_at);
+    const formattedDate = formatDateTime(item.trashed_at);
 
     let iconClass;
     let typeLabel;
     let iconSpecialClass = '';
     if (!isFile) {
         iconClass = item.icon_class || 'fas fa-folder';
-        typeLabel = window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder';
+        typeLabel = i18n ? i18n.t('files.file_types.folder') : 'Folder';
     } else {
-        iconClass = item.icon_class || (window.ui?.getIconClass ? window.ui.getIconClass(item.name) : 'fas fa-file');
-        iconSpecialClass = window.ui?.getIconSpecialClass ? window.ui.getIconSpecialClass(item.name) : '';
+        iconClass = item.icon_class || (ui?.getIconClass ? ui.getIconClass(item.name) : 'fas fa-file');
+        iconSpecialClass = ui?.getIconSpecialClass ? ui.getIconSpecialClass(item.name) : '';
         const cat = item.category || '';
-        typeLabel = cat
-            ? window.i18n
-                ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat
-                : cat
-            : window.i18n
-              ? window.i18n.t('files.file_types.document')
-              : 'Document';
+        typeLabel = cat ? (i18n ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat) : i18n ? i18n.t('files.file_types.document') : 'Document';
     }
 
     const isFolder = !isFile;
@@ -85,10 +86,10 @@ function addTrashItemToView(item) {
         <div class="path-cell">${escapeHtml(item.original_path || '--')}</div>
         <div class="date-cell">${escapeHtml(formattedDate)}</div>
         <div class="actions-cell">
-            <button class="btn-restore" title="${window.i18n ? window.i18n.t('trash.restore') : 'Restore'}">
+            <button class="btn-restore" title="${i18n ? i18n.t('trash.restore') : 'Restore'}">
                 <i class="fas fa-undo"></i>
             </button>
-            <button class="btn-delete" title="${window.i18n ? window.i18n.t('trash.delete_permanently') : 'Delete permanently'}">
+            <button class="btn-delete" title="${i18n ? i18n.t('trash.delete_permanently') : 'Delete permanently'}">
                 <i class="fas fa-trash"></i>
             </button>
         </div>
@@ -96,19 +97,19 @@ function addTrashItemToView(item) {
 
     listElement.querySelector('.btn-restore').addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (await window.fileOps.restoreFromTrash(item.id)) {
-            window.loadTrashItems();
+        if (await fileOps.restoreFromTrash(item.id)) {
+            loadTrashItems();
         }
     });
 
     listElement.querySelector('.btn-delete').addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (await window.fileOps.deletePermanently(item.id)) {
-            window.loadTrashItems();
+        if (await fileOps.deletePermanently(item.id)) {
+            loadTrashItems();
         }
     });
 
     elements.filesList.appendChild(listElement);
 }
 
-window.loadTrashItems = loadTrashItems;
+export { loadTrashItems };

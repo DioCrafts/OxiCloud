@@ -1,3 +1,6 @@
+import { i18n } from './i18n.js';
+import { replaceIconsInElement } from './icons.js';
+
 /**
  * Modal System for OxiCloud
  * Provides modern, styled modals to replace browser prompts/alerts
@@ -86,8 +89,8 @@ const Modal = {
                 iconContainer.innerHTML = `<i id="modal-icon" class="fas ${icon}"></i>`;
                 this.icon = document.getElementById('modal-icon');
                 // Let icons.js convert it to SVG
-                if (window.replaceIconsInElement) {
-                    window.replaceIconsInElement(iconContainer);
+                if (replaceIconsInElement) {
+                    replaceIconsInElement(iconContainer);
                     this.icon = document.getElementById('modal-icon');
                 }
             }
@@ -99,14 +102,14 @@ const Modal = {
             // Set button text (use i18n if available)
             if (confirmText) {
                 this.confirmBtn.textContent = confirmText;
-            } else if (window.i18n) {
-                this.confirmBtn.textContent = window.i18n.t('actions.confirm');
+            } else if (i18n) {
+                this.confirmBtn.textContent = i18n.t('actions.confirm');
             }
 
             if (cancelText) {
                 this.cancelBtn.textContent = cancelText;
-            } else if (window.i18n) {
-                this.cancelBtn.textContent = window.i18n.t('actions.cancel');
+            } else if (i18n) {
+                this.cancelBtn.textContent = i18n.t('actions.cancel');
             }
 
             // Set callbacks
@@ -126,7 +129,7 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptNewFolder() {
-        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+        const t = i18n ? i18n.t.bind(i18n) : (k) => k;
 
         return this.prompt({
             title: t('dialogs.new_folder_title') || 'New folder',
@@ -144,7 +147,7 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptRename(currentName, isFolder = false) {
-        const t = window.i18n ? window.i18n.t.bind(window.i18n) : (k) => k;
+        const t = i18n ? i18n.t.bind(i18n) : (k) => k;
 
         // For files, we want to select only the name part (without extension)
         this._selectNameOnly = !isFolder;
@@ -232,4 +235,4 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Export for use in other modules
-window.Modal = Modal;
+export { Modal };

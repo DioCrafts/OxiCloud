@@ -3,6 +3,9 @@
  * Handles login, registration, and admin setup
  */
 
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+
 // API endpoints
 const API_URL = '/api/auth';
 const LOGIN_ENDPOINT = `${API_URL}/login`;
@@ -112,7 +115,7 @@ const LANGUAGE_TEXTS = {
 
 // Complete language registry — add new languages here, they'll appear automatically
 // `popular: true` languages show as cards on the main screen, the rest in the modal
-const ALL_LANGUAGES = [
+export const ALL_LANGUAGES = [
     {
         code: 'en',
         name: 'English',
@@ -509,8 +512,8 @@ function initLanguageSelector() {
         localStorage.setItem(FIRST_RUN_KEY, 'true');
 
         // Update i18n if available
-        if (window.i18n?.setLocale) {
-            await window.i18n.setLocale(selectedLanguage);
+        if (i18n?.setLocale) {
+            await i18n.setLocale(selectedLanguage);
         }
 
         // Hide language panel
@@ -632,7 +635,7 @@ async function configureOidcLoginUI() {
         // Update button text with provider name
         const btnTextEl = oidcBtn.querySelector('span');
         if (btnTextEl && oidcInfo.provider_name) {
-            const template = window.i18n?.t ? window.i18n.t('auth.sso_login_provider') : 'Sign in with {{provider}}';
+            const template = i18n?.t ? i18n.t('auth.sso_login_provider') : 'Sign in with {{provider}}';
             btnTextEl.textContent = template.replace('{{provider}}', oidcInfo.provider_name);
         }
 
@@ -669,7 +672,6 @@ function initLoginElements() {
         return false;
     }
 
-    languagePanel = document.getElementById('language-panel');
     loginPanel = document.getElementById('login-panel');
     registerPanel = document.getElementById('register-panel');
     adminSetupPanel = document.getElementById('admin-setup-panel');
@@ -940,7 +942,7 @@ if (isLoginPage && registerForm) {
 
         // Validate passwords match
         if (password !== confirmPassword) {
-            const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
+            const errorMsg = i18n ? i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
             registerError.textContent = errorMsg;
             registerError.style.display = 'block';
             return;
@@ -950,7 +952,7 @@ if (isLoginPage && registerForm) {
             await register(username, email, password);
 
             // Show success message
-            const successMsg = window.i18n ? window.i18n.t('auth.account_success') : 'Account created successfully! You can now log in.';
+            const successMsg = i18n ? i18n.t('auth.account_success') : 'Account created successfully! You can now log in.';
             registerSuccess.textContent = successMsg;
             registerSuccess.style.display = 'block';
 
@@ -963,7 +965,7 @@ if (isLoginPage && registerForm) {
                 hidePanel(registerPanel);
             }, 2000);
         } catch (error) {
-            const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error registering account';
+            const errorMsg = i18n ? i18n.t('auth.admin_create_error') : 'Error registering account';
             registerError.textContent = error.message || errorMsg;
             registerError.style.display = 'block';
         }
@@ -986,7 +988,7 @@ if (isLoginPage && adminSetupForm) {
 
         // Validate passwords match
         if (password !== confirmPassword) {
-            const errorMsg = window.i18n ? window.i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
+            const errorMsg = i18n ? i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
             adminSetupError.textContent = errorMsg;
             adminSetupError.style.display = 'block';
             return;
@@ -1011,7 +1013,7 @@ if (isLoginPage && adminSetupForm) {
             await response.json();
 
             // Show success message in the GUI instead of alert
-            const successMsg = window.i18n ? window.i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
+            const successMsg = i18n ? i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
 
             if (adminSetupSuccess) {
                 adminSetupSuccess.textContent = successMsg;
@@ -1025,7 +1027,7 @@ if (isLoginPage && adminSetupForm) {
                 if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
             }, 2000);
         } catch (error) {
-            const errorMsg = window.i18n ? window.i18n.t('auth.admin_create_error') : 'Error creating admin account';
+            const errorMsg = i18n ? i18n.t('auth.admin_create_error') : 'Error creating admin account';
             adminSetupError.textContent = error.message || errorMsg;
             adminSetupError.style.display = 'block';
         }

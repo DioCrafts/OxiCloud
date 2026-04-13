@@ -5,6 +5,26 @@
 
 // @ts-check
 
+import { escapeHtml, formatDateTime, formatFileSize } from '../core/formatters.js';
+import { i18n } from '../core/i18n.js';
+import { OxiIcons, replaceIconsInElement } from '../core/icons.js';
+import { contextMenus } from '../features/files/contextMenus.js';
+import { fileOps } from '../features/files/fileOperations.js';
+import { inlineViewer } from '../features/files/inlineViewer.js';
+import { multiSelect } from '../features/files/multiSelect.js';
+import { wopiEditor } from '../features/files/wopiEditor.js';
+import { favorites } from '../features/library/favorites.js';
+import { recent } from '../features/library/recent.js';
+import { fileSharing } from '../features/sharing/fileSharing.js';
+import { loadFiles } from './filesView.js';
+import { updateHistory } from './main.js';
+import { syncViewContainers } from './navigation.js';
+import { app } from './state.js';
+import { uiFileTypes } from './uiFileTypes.js';
+import { uiNotifications } from './uiNotifications.js';
+
+let __rubberBandJustFinished = false;
+
 // UI Module
 const ui = {
     /** @type {HTMLDListElement | null} */
@@ -297,13 +317,13 @@ const ui = {
             document.body.appendChild(playlistDialog);
 
             document.getElementById('playlist-cancel-btn').addEventListener('click', () => {
-                if (window.contextMenus) window.contextMenus.closePlaylistDialog();
+                if (contextMenus) contextMenus.closePlaylistDialog();
             });
         }
 
         // Assign events to menu items
-        if (window.contextMenus) {
-            window.contextMenus.assignMenuEvents();
+        if (contextMenus) {
+            contextMenus.assignMenuEvents();
         } else {
             console.warn('contextMenus module not loaded');
         }
@@ -478,10 +498,10 @@ const ui = {
     switchToGridView() {
         this._hydrateViewIfNeeded();
 
-        window.app.currentView = 'grid';
+        app.currentView = 'grid';
         localStorage.setItem('oxicloud-view', 'grid');
 
-        window.syncViewContainers();
+        syncViewContainers();
     },
 
     /**
@@ -490,10 +510,10 @@ const ui = {
     switchToListView() {
         this._hydrateViewIfNeeded();
 
-        window.app.currentView = 'list';
+        app.currentView = 'list';
         localStorage.setItem('oxicloud-view', 'list');
 
-        window.syncViewContainers();
+        syncViewContainers();
     },
 
     /**
@@ -504,12 +524,12 @@ const ui = {
     updateBreadcrumb() {
         const breadcrumb = document.querySelector('.breadcrumb');
         breadcrumb.innerHTML = '';
-        const path = window.app.breadcrumbPath; // [{id, name}, ...]
+        const path = app.breadcrumbPath; // [{id, name}, ...]
 
         // Helper function to safely get translation text
         const getTranslatedText = (key, defaultValue) => {
-            if (!window.i18n?.t) return defaultValue;
-            return window.i18n.t(key);
+            if (!i18n?.t) return defaultValue;
+            return i18n.t(key);
         };
 
         // -- Home icon (always present, clickable to go to root) --
@@ -519,24 +539,24 @@ const ui = {
         homeIcon.title = getTranslatedText('breadcrumb.home', 'Home');
 
         // Home is always clickable if we have a home folder
-        if (window.app.userHomeFolderId) {
+        if (app.userHomeFolderId) {
             homeIcon.classList.add('breadcrumb-link');
             homeIcon.addEventListener('click', () => {
-                window.app.breadcrumbPath = [];
-                window.app.currentPath = window.app.userHomeFolderId;
+                app.breadcrumbPath = [];
+                app.currentPath = app.userHomeFolderId;
                 this.updateBreadcrumb();
-                window.loadFiles();
+                loadFiles();
             });
         }
         breadcrumb.appendChild(homeIcon);
 
         // -- Root/Home folder name (if available) is always the first element of the breadcrumb --
         // TODO clarify the difference between homeIcon & this first element
-        if (window.app.userHomeFolderName) {
-            if (path.length === 0 || path[0].id !== window.app.userHomeFolderId) {
+        if (app.userHomeFolderName) {
+            if (path.length === 0 || path[0].id !== app.userHomeFolderId) {
                 path.unshift({
-                    name: window.app.userHomeFolderName,
-                    id: window.app.userHomeFolderId
+                    name: app.userHomeFolderName,
+                    id: app.userHomeFolderId
                 });
             }
         }
@@ -561,10 +581,10 @@ const ui = {
                 // Intermediate segment: clickable – truncate path to this level
                 item.classList.add('breadcrumb-link');
                 item.addEventListener('click', () => {
-                    window.app.breadcrumbPath = path.slice(0, index + 1);
-                    window.app.currentPath = segment.id;
+                    app.breadcrumbPath = path.slice(0, index + 1);
+                    app.currentPath = segment.id;
                     this.updateBreadcrumb();
-                    window.loadFiles();
+                    loadFiles();
                 });
 
                 // can drag files on this folder
@@ -611,7 +631,7 @@ const ui = {
      * @returns {boolean}
      */
     isViewableFile(file) {
-        return window.uiFileTypes.isViewableFile(file);
+        return uiFileTypes.isViewableFile(file);
     },
 
     /**
@@ -620,7 +640,7 @@ const ui = {
      * (e.g. trash items).
      */
     getIconClass(fileName) {
-        return window.uiFileTypes.getIconClass(fileName);
+        return uiFileTypes.getIconClass(fileName);
     },
 
     /**
@@ -628,7 +648,7 @@ const ui = {
      * Used as fallback when the backend DTO doesn't include icon_special_class.
      */
     getIconSpecialClass(fileName) {
-        return window.uiFileTypes.getIconSpecialClass(fileName);
+        return uiFileTypes.getIconSpecialClass(fileName);
     },
 
     /**
@@ -637,7 +657,7 @@ const ui = {
      * @param {string} message - Notification message
      */
     showNotification(title, message) {
-        window.uiNotifications.show(title, message);
+        uiNotifications.show(title, message);
     },
 
     /**
@@ -647,7 +667,7 @@ const ui = {
         const menu = document.getElementById('folder-context-menu');
         if (menu) {
             menu.style.display = 'none';
-            window.app.contextMenuTargetFolder = null;
+            app.contextMenuTargetFolder = null;
         }
     },
 
@@ -658,7 +678,7 @@ const ui = {
         const menu = document.getElementById('file-context-menu');
         if (menu) {
             menu.style.display = 'none';
-            window.app.contextMenuTargetFile = null;
+            app.contextMenuTargetFile = null;
         }
     },
 
@@ -679,8 +699,8 @@ const ui = {
     _delegationReady: false,
 
     _getActiveView() {
-        if (window.app && window.app.currentView === 'list') return 'list';
-        if (window.app && window.app.currentView === 'grid') return 'grid';
+        if (app && app.currentView === 'list') return 'list';
+        if (app && app.currentView === 'grid') return 'grid';
 
         const stored = localStorage.getItem('oxicloud-view');
         return stored === 'list' ? 'list' : 'grid';
@@ -737,9 +757,9 @@ const ui = {
      * @param {any} dataTransfer fallback if nothing is selected
      */
     async _dropToFolder(action, targetFolderId, dataTransfer) {
-        const selection = window.multiSelect.getSelection(targetFolderId);
+        const selection = multiSelect.getSelection(targetFolderId);
 
-        window.multiSelect.clear();
+        multiSelect.clear();
 
         if (selection.fileIds.length === 0 && selection.folderIds.length === 0) {
             // try to use dataTransfer (direct move without selection)
@@ -770,20 +790,20 @@ const ui = {
         let result;
         switch (action) {
             case 'copy':
-                result = await window.fileOps.batchCopy(selection.fileIds, selection.folderIds, targetFolderId);
+                result = await fileOps.batchCopy(selection.fileIds, selection.folderIds, targetFolderId);
                 break;
 
             case 'move':
-                result = await window.fileOps.batchMove(selection.fileIds, selection.folderIds, targetFolderId);
+                result = await fileOps.batchMove(selection.fileIds, selection.folderIds, targetFolderId);
                 // redraw directory
-                if (result.success > 0) window.loadFiles();
+                if (result.success > 0) loadFiles();
                 break;
 
             default:
                 console.error(`drag and drop: action ${action} unknown`);
                 return;
         }
-        window.multiSelect.showBatchResult(action, result);
+        multiSelect.showBatchResult(action, result);
         console.log(result);
     },
 
@@ -837,7 +857,7 @@ const ui = {
 
         const openFile = async (file) => {
             if (!file) return;
-            if (window.recent) {
+            if (recent) {
                 document.dispatchEvent(new CustomEvent('file-accessed', { detail: { file } }));
             }
             // WOPI editor intercept: open Office documents in the WOPI editor
@@ -846,8 +866,8 @@ const ui = {
             const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico', 'heic', 'heif', 'avif', 'tiff'];
             const isImage = file.mime_type?.startsWith('image/') || imageExts.includes(ext);
             try {
-                if (!isImage && window.wopiEditor && (await window.wopiEditor.canEdit(file.name))) {
-                    await window.wopiEditor.openInModal(file.id, file.name, 'edit');
+                if (!isImage && wopiEditor && (await wopiEditor.canEdit(file.name))) {
+                    await wopiEditor.openInModal(file.id, file.name, 'edit');
                     return;
                 }
             } catch (e) {
@@ -855,38 +875,38 @@ const ui = {
             }
 
             if (this.isViewableFile(file) || isImage) {
-                if (window.inlineViewer) {
-                    window.inlineViewer.openFile(file);
+                if (inlineViewer) {
+                    inlineViewer.openFile(file);
                     // update history
-                    window.app.viewFile = file.id;
-                    window.updateHistory(false);
+                    app.viewFile = file.id;
+                    updateHistory(false);
                 } else {
-                    window.fileOps.downloadFile(file.id, file.name);
+                    fileOps.downloadFile(file.id, file.name);
                 }
             } else {
-                window.fileOps.downloadFile(file.id, file.name);
+                fileOps.downloadFile(file.id, file.name);
             }
         };
 
         const navigateFolder = (card) => {
             const folderId = card.dataset.folderId;
             const folderName = card.dataset.folderName;
-            window.app.breadcrumbPath.push({ id: folderId, name: folderName });
-            window.app.currentPath = folderId;
+            app.breadcrumbPath.push({ id: folderId, name: folderName });
+            app.currentPath = folderId;
             this.updateBreadcrumb();
-            window.loadFiles();
+            loadFiles();
         };
 
         const setContextTarget = (card, info) => {
             if (info.type === 'folder') {
-                window.app.contextMenuTargetFolder = {
+                app.contextMenuTargetFolder = {
                     id: info.id,
                     name: card.dataset.folderName,
                     parent_id: card.dataset.parentId || ''
                 };
             } else {
                 const fileData = info.data || self._items.get(info.id);
-                window.app.contextMenuTargetFile = {
+                app.contextMenuTargetFile = {
                     id: info.id,
                     name: card.dataset.fileName,
                     folder_id: card.dataset.folderId || '',
@@ -932,8 +952,8 @@ const ui = {
             }
 
             // shiftkey is used to complete selection
-            if (e.shiftKey && window.multiSelect) {
-                window.multiSelect.handleToggleItem(card, e);
+            if (e.shiftKey && multiSelect) {
+                multiSelect.handleToggleItem(card, e);
                 return;
             }
 
@@ -962,14 +982,14 @@ const ui = {
             setContextTarget(card, info);
             const menuId = info.type === 'folder' ? 'folder-context-menu' : 'file-context-menu';
             const menu = document.getElementById(menuId);
-            if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
-                window.contextMenus.syncFavoriteOptionLabels();
+            if (contextMenus && typeof contextMenus.syncFavoriteOptionLabels === 'function') {
+                contextMenus.syncFavoriteOptionLabels();
             }
-            if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
-                window.contextMenus.syncWopiOptionVisibility().catch(() => {});
+            if (contextMenus && typeof contextMenus.syncWopiOptionVisibility === 'function') {
+                contextMenus.syncWopiOptionVisibility().catch(() => {});
             }
-            if (window.contextMenus && typeof window.contextMenus.syncAddToPlaylistOption === 'function') {
-                window.contextMenus.syncAddToPlaylistOption();
+            if (contextMenus && typeof contextMenus.syncAddToPlaylistOption === 'function') {
+                contextMenus.syncAddToPlaylistOption();
             }
             menu.style.left = `${e.pageX}px`;
             menu.style.top = `${e.pageY}px`;
@@ -1105,7 +1125,7 @@ const ui = {
             e.stopImmediatePropagation();
             e.preventDefault();
 
-            if (!window.favorites) return;
+            if (!favorites) return;
 
             const itemId = star.dataset.itemId;
             const itemType = star.dataset.itemType;
@@ -1115,15 +1135,15 @@ const ui = {
 
             if (isActive) {
                 this.setFavoriteVisualState(itemId, itemType, false);
-                window.favorites.removeFromFavorites(itemId, itemType);
+                favorites.removeFromFavorites(itemId, itemType);
             } else {
                 this.setFavoriteVisualState(itemId, itemType, true);
-                window.favorites.addToFavorites(itemId, itemName, itemType);
+                favorites.addToFavorites(itemId, itemName, itemType);
             }
 
             // Keep context-menu label in sync if available
-            if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
-                window.contextMenus.syncFavoriteOptionLabels();
+            if (contextMenus && typeof contextMenus.syncFavoriteOptionLabels === 'function') {
+                contextMenus.syncFavoriteOptionLabels();
             }
         });
     },
@@ -1142,8 +1162,8 @@ const ui = {
 
             // SVG icon path (after icons.js replacement)
             const svg = starBtn.querySelector('svg');
-            const filledPath = window.OxiIcons?.star;
-            const outlinePath = window.OxiIcons?.['star-outline'];
+            const filledPath = OxiIcons?.star;
+            const outlinePath = OxiIcons?.['star-outline'];
             const targetPath = isFavorite ? filledPath : outlinePath;
             if (svg && targetPath) {
                 const p = svg.querySelector('path');
@@ -1168,9 +1188,7 @@ const ui = {
                     inlineStar = document.createElement('i');
                     inlineStar.className = 'fas fa-star favorite-star-inline';
                     nameCell.appendChild(inlineStar);
-                    if (window.OxiIcons && typeof window.OxiIcons.replaceIconsInElement === 'function') {
-                        window.OxiIcons.replaceIconsInElement(nameCell);
-                    }
+                    replaceIconsInElement(nameCell);
                 } else if (!isFavorite && inlineStar) {
                     inlineStar.remove();
                 }
@@ -1190,8 +1208,8 @@ const ui = {
         el.dataset.folderName = folder.name;
         el.dataset.parentId = folder.parent_id || '';
 
-        const isFav = window.favorites?.isFavorite(folder.id, 'folder');
-        const formattedDate = window.formatDateTime(folder.modified_at);
+        const isFav = favorites?.isFavorite(folder.id, 'folder');
+        const formattedDate = formatDateTime(folder.modified_at);
 
         el.innerHTML = `
             <div class="checkbox-cell"><input type="checkbox" class="item-checkbox"></div>
@@ -1202,7 +1220,7 @@ const ui = {
                 <span>${escapeHtml(folder.name)}</span>
                 ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
             </div>
-            <div class="type-cell">${window.i18n ? window.i18n.t('files.file_types.folder') : 'Folder'}</div>
+            <div class="type-cell">${i18n ? i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
@@ -1213,7 +1231,7 @@ const ui = {
             </div>
         `;
 
-        if (window.app.currentPath !== '') {
+        if (app.currentPath !== '') {
             el.setAttribute('draggable', 'true');
         }
         this._bindStarClick(el);
@@ -1225,16 +1243,10 @@ const ui = {
         const iconClass = file.icon_class || this.getIconClass(file.name);
         const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
         const cat = file.category || '';
-        const typeLabel = cat
-            ? window.i18n
-                ? window.i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat
-                : cat
-            : window.i18n
-              ? window.i18n.t('files.file_types.document')
-              : 'Document';
-        const fileSize = file.size_formatted || window.formatFileSize(file.size);
-        const formattedDate = window.formatDateTime(file.modified_at);
-        const isFav = window.favorites?.isFavorite(file.id, 'file');
+        const typeLabel = cat ? (i18n ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat) : i18n ? i18n.t('files.file_types.document') : 'Document';
+        const fileSize = file.size_formatted || formatFileSize(file.size);
+        const formattedDate = formatDateTime(file.modified_at);
+        const isFav = favorites?.isFavorite(file.id, 'file');
 
         const el = document.createElement('div');
         el.className = 'file-item';
@@ -1293,7 +1305,7 @@ const ui = {
                 <div></div><!-- actions -->
             </div>`;
 
-        if (window.i18n?.translateElement) window.i18n.translateElement(filesList);
+        if (i18n?.translateElement) i18n.translateElement(filesList);
 
         filesList.classList.remove('hidden');
         filesContainerError?.classList.add('hidden');
@@ -1317,7 +1329,7 @@ const ui = {
         const filesList = document.getElementById('files-list');
         if (filesContainerError) filesContainerError.innerHTML = content;
 
-        if (window.i18n?.translateElement) window.i18n.translateElement(filesContainerError);
+        if (i18n?.translateElement) i18n.translateElement(filesContainerError);
 
         filesContainerError?.classList.remove('hidden');
         filesList?.classList.add('hidden');
@@ -1403,8 +1415,8 @@ const ui = {
  * Routes through the multiSelect module so batch actions know about selected items.
  */
 function toggleCardSelection(card, event) {
-    if (window.multiSelect) {
-        window.multiSelect.handleToggleItem(card, event);
+    if (multiSelect) {
+        multiSelect.handleToggleItem(card, event);
     } else {
         card.classList.toggle('selected');
     }
@@ -1435,14 +1447,14 @@ function showContextMenuAtElement(triggerElement, menuId) {
         top = rect.top - 4 + window.scrollY; // flip above if no room
     }
 
-    if (window.contextMenus && typeof window.contextMenus.syncFavoriteOptionLabels === 'function') {
-        window.contextMenus.syncFavoriteOptionLabels();
+    if (contextMenus && typeof contextMenus.syncFavoriteOptionLabels === 'function') {
+        contextMenus.syncFavoriteOptionLabels();
     }
-    if (window.contextMenus && typeof window.contextMenus.syncWopiOptionVisibility === 'function') {
-        window.contextMenus.syncWopiOptionVisibility().catch(() => {});
+    if (contextMenus && typeof contextMenus.syncWopiOptionVisibility === 'function') {
+        contextMenus.syncWopiOptionVisibility().catch(() => {});
     }
-    if (window.contextMenus && typeof window.contextMenus.syncAddToPlaylistOption === 'function') {
-        window.contextMenus.syncAddToPlaylistOption();
+    if (contextMenus && typeof contextMenus.syncAddToPlaylistOption === 'function') {
+        contextMenus.syncAddToPlaylistOption();
     }
 
     menu.style.left = `${left}px`;
@@ -1532,16 +1544,16 @@ function initRubberBandSelection() {
                 card.classList.add('selected');
 
                 // Sync with multiSelect module
-                if (window.multiSelect) {
-                    const info = window.multiSelect._extractInfo(card);
-                    if (info) window.multiSelect.select(info.id, info.name, info.type, info.parentId);
+                if (multiSelect) {
+                    const info = multiSelect._extractInfo(card);
+                    if (info) multiSelect.select(info.id, info.name, info.type, info.parentId);
                 }
             } else {
                 card.classList.remove('selected');
                 // Deselect from multiSelect module
-                if (window.multiSelect) {
-                    const info = window.multiSelect._extractInfo(card);
-                    if (info) window.multiSelect.deselect(info.id);
+                if (multiSelect) {
+                    const info = multiSelect._extractInfo(card);
+                    if (info) multiSelect.deselect(info.id);
                 }
             }
         });
@@ -1553,13 +1565,13 @@ function initRubberBandSelection() {
         const hadSelection = selRect.style.display === 'block';
         selRect.style.display = 'none';
         // Update the batch bar after rubber band selection completes
-        if (window.multiSelect) window.multiSelect._syncUI();
+        if (multiSelect) multiSelect._syncUI();
         // Suppress the click event that follows mouseup so the global
         // deselect handler doesn't immediately clear the selection.
         if (hadSelection) {
-            window.__rubberBandJustFinished = true;
+            __rubberBandJustFinished = true;
             requestAnimationFrame(() => {
-                window.__rubberBandJustFinished = false;
+                __rubberBandJustFinished = false;
             });
         }
     });
@@ -1572,11 +1584,6 @@ if (document.readyState === 'loading') {
     initRubberBandSelection();
 }
 
-// Expose helpers globally
-window.toggleCardSelection = toggleCardSelection;
-window.showContextMenuAtElement = showContextMenuAtElement;
-window.initRubberBandSelection = initRubberBandSelection;
-
 /**
  * Show a modern confirm dialog (replaces native confirm())
  * @param {Object} options
@@ -1588,9 +1595,9 @@ window.initRubberBandSelection = initRubberBandSelection;
  * @returns {Promise<boolean>} true if confirmed, false if cancelled
  */
 function showConfirmDialog({ title, message, confirmText, cancelText, danger = true } = {}) {
-    const ct = confirmText || (window.i18n ? window.i18n.t('actions.delete') : 'Delete');
-    const cc = cancelText || (window.i18n ? window.i18n.t('actions.cancel') : 'Cancel');
-    const t = title || (window.i18n ? window.i18n.t('dialogs.confirm_title') : 'Confirm action');
+    const ct = confirmText || (i18n ? i18n.t('actions.delete') : 'Delete');
+    const cc = cancelText || (i18n ? i18n.t('actions.cancel') : 'Cancel');
+    const t = title || (i18n ? i18n.t('dialogs.confirm_title') : 'Confirm action');
 
     return new Promise((resolve) => {
         // Remove any previous confirm dialog
@@ -1633,7 +1640,5 @@ function showConfirmDialog({ title, message, confirmText, cancelText, danger = t
         });
     });
 }
-window.showConfirmDialog = showConfirmDialog;
 
-// Expose UI module globally
-window.ui = ui;
+export { initRubberBandSelection, showConfirmDialog, showContextMenuAtElement, toggleCardSelection, ui };

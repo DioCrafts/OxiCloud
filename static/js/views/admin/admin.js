@@ -1,3 +1,7 @@
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { escapeHtml } from '../../core/formatters.js';
+import { i18n } from '../../core/i18n.js';
+
 const API = '/api';
 let currentAdminId = '';
 let usersPage = 0;
@@ -6,7 +10,7 @@ let totalUsers = 0;
 
 /* ── i18n helper — falls back to key if i18n not ready ── */
 function t(key, params) {
-    if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(key, params);
+    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
     // fallback: strip prefix and humanise
     return key.split('.').pop().replace(/_/g, ' ');
 }
@@ -748,13 +752,13 @@ function showAccessDenied() {
 
 /* ── Apply i18n when translations load / change ── */
 document.addEventListener('translationsLoaded', () => {
-    if (window.i18n?.translatePage) window.i18n.translatePage();
+    if (i18n?.translatePage) i18n.translatePage();
     // Re-render dynamic content that uses t()
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });
 document.addEventListener('localeChanged', () => {
-    if (window.i18n?.translatePage) window.i18n.translatePage();
+    if (i18n?.translatePage) i18n.translatePage();
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });

@@ -3,6 +3,19 @@
  * Extracted from main.js to keep navigation concerns isolated.
  */
 
+import { i18n } from '../core/i18n.js';
+import { multiSelect } from '../features/files/multiSelect.js';
+import { favorites } from '../features/library/favorites.js';
+import { musicView } from '../features/library/music.js';
+import { photosView } from '../features/library/photos.js';
+import { recent } from '../features/library/recent.js';
+import { sharedView } from '../views/shared/sharedView.js';
+import { loadFiles } from './filesView.js';
+import { setActionsBarMode } from './main.js';
+import { app, appElements } from './state.js';
+import { loadTrashItems } from './trashView.js';
+import { ui } from './ui.js';
+
 /**
  * Sync the hidden class and inline display for the grid/list containers
  * based on the current view preference.
@@ -12,7 +25,7 @@ function syncViewContainers() {
     const gridViewBtn = document.getElementById('grid-view-btn');
     const listViewBtn = document.getElementById('list-view-btn');
 
-    const isGrid = window.app.currentView === 'grid';
+    const isGrid = app.currentView === 'grid';
     if (isGrid) {
         filesList.classList.remove('files-list-view');
         filesList.classList.add('files-grid-view');
@@ -89,13 +102,6 @@ function initSidebarToggle() {
             }
         });
     });
-
-    // Expose functions globally
-    window.sidebarToggle = {
-        open: openSidebar,
-        close: closeSidebar,
-        toggle: toggleSidebar
-    };
 }
 
 // Initialize sidebar toggle when DOM is ready
@@ -128,17 +134,17 @@ function getSectionFromNavItem(navItem) {
  * @returns {boolean} true if the section changed
  */
 function setCurrentSection(section) {
-    if (window.app.currentSection === section) return false;
+    if (app.currentSection === section) return false;
 
     // Set all view flags - true for active section, false for others
     Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {
-        window.app[flag] = key === section;
+        app[flag] = key === section;
     });
 
-    window.app.currentSection = section;
+    app.currentSection = section;
 
     // Update nav item active classes by finding matching item from DOM
-    window.appElements.navItems.forEach((item) => {
+    appElements.navItems.forEach((item) => {
         const itemSection = getSectionFromNavItem(item);
         item.classList.toggle('active', itemSection === section);
     });
@@ -146,22 +152,22 @@ function setCurrentSection(section) {
     // Update page title
     const titleKey = `nav.${section}`;
     const defaultTitle = section.charAt(0).toUpperCase() + section.slice(1);
-    window.appElements.pageTitle.textContent = window.i18n ? window.i18n.t(titleKey) : defaultTitle;
-    window.appElements.pageTitle.setAttribute('data-i18n', titleKey);
+    appElements.pageTitle.textContent = i18n ? i18n.t(titleKey) : defaultTitle;
+    appElements.pageTitle.setAttribute('data-i18n', titleKey);
 
     // Hide sharedView when switching to any other section
-    if (section !== 'shared' && window.sharedView) {
-        window.sharedView.hide();
+    if (section !== 'shared' && sharedView) {
+        sharedView.hide();
     }
 
     // Hide photosView when switching to any other section
-    if (section !== 'photos' && window.photosView) {
-        window.photosView.hide();
+    if (section !== 'photos' && photosView) {
+        photosView.hide();
     }
 
     // Hide musicView when switching to any other section
-    if (section !== 'music' && window.musicView) {
-        window.musicView.hide();
+    if (section !== 'music' && musicView) {
+        musicView.hide();
     }
 
     return true;
@@ -175,27 +181,27 @@ function switchToSharedSection() {
     breadcrumb?.classList.add('hidden');
 
     // Hide actions-bar for shared view
-    window.setActionsBarMode('hidden');
+    setActionsBarMode('hidden');
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
     // Hide file containers
     toggleFileContainer(false);
 
     // Show shared view
-    if (window.sharedView) {
-        window.sharedView.init();
-        window.sharedView.show();
+    if (sharedView) {
+        sharedView.init();
+        sharedView.show();
     }
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
 function switchToFilesSection() {
     if (!setCurrentSection('files')) return;
 
     // Set actions bar mode
-    window.setActionsBarMode('files', true);
+    setActionsBarMode('files', true);
 
     // Show breadcrumb (only in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
@@ -208,22 +214,22 @@ function switchToFilesSection() {
     syncViewContainers();
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
     // Reset to home folder and update breadcrumb
-    window.app.currentPath = window.app.userHomeFolderId || '';
-    window.app.breadcrumbPath = [];
-    window.ui.updateBreadcrumb();
-    if (window.multiSelect) window.multiSelect.clear();
+    app.currentPath = app.userHomeFolderId || '';
+    app.breadcrumbPath = [];
+    ui.updateBreadcrumb();
+    if (multiSelect) multiSelect.clear();
 
-    window.loadFiles();
+    loadFiles();
 }
 
 function switchToFavoritesSection() {
     if (!setCurrentSection('favorites')) return;
 
     // Set actions bar mode
-    window.setActionsBarMode('favorites');
+    setActionsBarMode('favorites');
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
@@ -236,26 +242,26 @@ function switchToFavoritesSection() {
     syncViewContainers();
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
-    if (window.favorites) {
-        window.favorites.displayFavorites();
+    if (favorites) {
+        favorites.displayFavorites();
     } else {
         console.error('Favorites module not loaded or initialized');
-        window.ui.showError(`
+        ui.showError(`
                 <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                 <p>Error loading the favorites module</p>
             `);
     }
 
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
 function switchToRecentFilesSection() {
     if (!setCurrentSection('recent')) return;
 
     // Set actions bar mode
-    window.setActionsBarMode('recent');
+    setActionsBarMode('recent');
 
     // Hide breadcrumb (only shown in Files view)
     const breadcrumb = document.querySelector('.breadcrumb');
@@ -268,18 +274,18 @@ function switchToRecentFilesSection() {
     syncViewContainers();
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
-    if (window.recent) {
-        window.recent.displayRecentFiles();
+    if (recent) {
+        recent.displayRecentFiles();
     } else {
         console.error('Recent files module not loaded or initialized');
-        window.ui.showError(`
+        ui.showError(`
                 <i class="fas fa-exclamation-circle empty-state-icon error"></i>
                 <p>Error loading the recent module</p>
             `);
     }
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
 function switchToPhotosSection() {
@@ -290,19 +296,19 @@ function switchToPhotosSection() {
     breadcrumb?.classList.add('hidden');
 
     // Hide actions-bar (photos has its own upload via selection bar)
-    window.setActionsBarMode('hidden');
+    setActionsBarMode('hidden');
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
     // Hide file containers
     toggleFileContainer(false);
 
     // Show photos view
-    if (window.photosView) {
-        window.photosView.show();
+    if (photosView) {
+        photosView.show();
     }
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
 function switchToTrashSection() {
@@ -319,15 +325,15 @@ function switchToTrashSection() {
     setActionsBarMode('trash');
 
     //reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
     //ensure buttons match the current view
     syncViewContainers();
 
     // Load trash items
-    window.loadTrashItems();
+    loadTrashItems();
 
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
 function switchToMusicSection() {
@@ -341,27 +347,29 @@ function switchToMusicSection() {
     toggleFileContainer(false);
 
     // Hide actions-bar
-    window.setActionsBarMode('hidden');
+    setActionsBarMode('hidden');
 
     // Reset files view + remove any error
-    window.ui.resetFilesList();
+    ui.resetFilesList();
 
     // Hide list header (created by resetFilesList)
     const listHeader = document.querySelector('.list-header');
     listHeader?.classList.add('hidden');
 
     // Show music view
-    if (window.musicView) {
-        window.musicView.show();
+    if (musicView) {
+        musicView.show();
     }
-    if (window.multiSelect) window.multiSelect.clear();
+    if (multiSelect) multiSelect.clear();
 }
 
-window.switchToFilesSection = switchToFilesSection;
-window.switchToSharedSection = switchToSharedSection;
-window.switchToFavoritesSection = switchToFavoritesSection;
-window.switchToRecentFilesSection = switchToRecentFilesSection;
-window.switchToPhotosSection = switchToPhotosSection;
-window.switchToTrashSection = switchToTrashSection;
-window.switchToMusicSection = switchToMusicSection;
-window.syncViewContainers = syncViewContainers;
+export {
+    switchToFavoritesSection,
+    switchToFilesSection,
+    switchToMusicSection,
+    switchToPhotosSection,
+    switchToRecentFilesSection,
+    switchToSharedSection,
+    switchToTrashSection,
+    syncViewContainers
+};

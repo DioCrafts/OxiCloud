@@ -4,6 +4,11 @@
  * No localStorage is used for share data.
  */
 
+import { switchToSharedSection } from '../../app/navigation.js';
+import { ui } from '../../app/ui.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { formatDateTime } from '../../core/formatters.js';
+
 const fileSharing = {
     /** Auth header helper — tokens are in HttpOnly cookies now */
     _headers(json = true) {
@@ -149,11 +154,11 @@ const fileSharing = {
     async copyLinkToClipboard(url) {
         try {
             await navigator.clipboard.writeText(url);
-            window.ui.showNotification('Link copied', 'Link copied to clipboard');
+            ui.showNotification('Link copied', 'Link copied to clipboard');
             return true;
         } catch (error) {
             console.error('Error copying to clipboard:', error);
-            window.ui.showNotification('Error', 'Could not copy link');
+            ui.showNotification('Error', 'Could not copy link');
             return false;
         }
     },
@@ -165,7 +170,7 @@ const fileSharing = {
      */
     formatExpirationDate(value) {
         if (!value) return 'No expiration';
-        return window.formatDateTime(value);
+        return formatDateTime(value);
     },
 
     /**
@@ -178,9 +183,7 @@ const fileSharing = {
     async sendShareNotification(shareUrl, recipientEmail, _message = '') {
         // TODO: implement backend endpoint for email notifications
         console.log(`Share notification for ${shareUrl} sent to ${recipientEmail}`);
-        if (window.ui) {
-            window.ui.showNotification('Notification sent', `Notification sent to ${recipientEmail}`);
-        }
+        ui.showNotification('Notification sent', `Notification sent to ${recipientEmail}`);
         return true;
     },
 
@@ -193,20 +196,11 @@ const fileSharing = {
             const span = item.querySelector('span');
             if (span && span.getAttribute('data-i18n') === 'nav.shared') {
                 item.addEventListener('click', () => {
-                    if (window.switchToSharedSection) {
-                        window.switchToSharedSection();
-                    }
+                    switchToSharedSection();
                 });
             }
         });
     }
 };
 
-// Expose module globally
-window.fileSharing = fileSharing;
-
-// Global convenience functions that delegate to the module
-window.getSharedLinks = () => fileSharing.getSharedLinks();
-window.updateSharedLink = (id, data) => fileSharing.updateSharedLink(id, data);
-window.removeSharedLink = (id) => fileSharing.removeSharedLink(id);
-window.sendShareNotification = (url, email, msg) => fileSharing.sendShareNotification(url, email, msg);
+export { fileSharing };

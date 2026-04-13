@@ -3,6 +3,13 @@
  * In-app shared files view. All operations go through the backend API.
  */
 
+import { switchToFilesSection } from '../../app/navigation.js';
+import { ui } from '../../app/ui.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { formatDateShort } from '../../core/formatters.js';
+import { i18n } from '../../core/i18n.js';
+import { fileSharing } from '../../features/sharing/fileSharing.js';
+
 const sharedView = {
     // State
     items: [],
@@ -181,8 +188,8 @@ const sharedView = {
             </div>
         `;
 
-        if (window.i18n?.translateElement) {
-            window.i18n.translateElement(container);
+        if (i18n?.translateElement) {
+            i18n.translateElement(container);
         }
     },
 
@@ -246,7 +253,7 @@ const sharedView = {
         const goToFilesBtn = document.getElementById('go-to-files-btn');
         if (goToFilesBtn) {
             goToFilesBtn.addEventListener('click', () => {
-                if (window.switchToFilesSection) window.switchToFilesSection();
+                if (switchToFilesSection) switchToFilesSection();
             });
         }
     },
@@ -590,8 +597,8 @@ const sharedView = {
             return;
         }
 
-        if (window.fileSharing?.sendShareNotification) {
-            window.fileSharing
+        if (fileSharing?.sendShareNotification) {
+            fileSharing
                 .sendShareNotification(this.currentItem.url, email, message)
                 .then(() => {
                     this.closeNotificationDialog();
@@ -602,8 +609,8 @@ const sharedView = {
     },
 
     showNotification(message, type = 'success') {
-        if (window.ui?.showNotification) {
-            window.ui.showNotification(message, type);
+        if (ui?.showNotification) {
+            ui.showNotification(message, type);
         } else {
             alert(message);
         }
@@ -614,13 +621,13 @@ const sharedView = {
     },
 
     formatDate(value) {
-        return window.formatDateShort ? window.formatDateShort(value) : String(value);
+        return formatDateShort(value);
     },
 
     translate(key, defaultText) {
-        if (window.i18n?.t) return window.i18n.t(key, defaultText);
+        if (i18n?.t) return i18n.t(key, defaultText);
         return defaultText;
     }
 };
 
-window.sharedView = sharedView;
+export { sharedView };
