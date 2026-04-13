@@ -177,10 +177,11 @@ function switchToSharedSection() {
     // Hide actions-bar for shared view
     window.setActionsBarMode('hidden');
 
-    toggleFileContainer(false);
-
     //reset files view + remove any error
     window.ui.resetFilesList();
+
+    // Hide file containers
+    toggleFileContainer(false);
 
     // Show shared view
     if (window.sharedView) {
