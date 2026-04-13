@@ -1,0 +1,4 @@
+# Enforce Unix line endings for shell scripts
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+identifier.sh text eol=lf

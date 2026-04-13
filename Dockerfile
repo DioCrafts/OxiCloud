@@ -52,7 +52,9 @@ RUN apk --no-cache upgrade && \
 
 # Copy the compiled binary and entrypoint (--chmod avoids extra RUN chmod layers)
 COPY --from=builder --chmod=755 /app/target/release/oxicloud /usr/local/bin/
-COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r//' /usr/local/bin/entrypoint.sh && \
+    chmod 755 /usr/local/bin/entrypoint.sh
 
 # Copy processed static files (bundled/minified by build.rs in release)
 COPY --from=builder --chown=oxicloud:oxicloud /app/static-dist /app/static
