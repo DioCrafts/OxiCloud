@@ -27,22 +27,6 @@ body {
 
 /* #main-content and #auth-error start hidden via .hidden class */
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--color-shadow-md);
-    border-radius: 4px;
-}
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-shadow-md) transparent;
-}
-
 /* ── Header ── */
 .profile-header {
     background: linear-gradient(135deg, var(--color-sidebar-bg-from) 0%, var(--color-sidebar-bg-to) 100%);
@@ -198,7 +182,7 @@ body {
 }
 .info-item {
     padding: 16px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-alt);
     border-radius: 12px;
     border: 1px solid var(--color-border);
 }
@@ -305,10 +289,13 @@ body {
     border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 14px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-input);
     transition: all 0.2s;
     font-family: inherit;
     color: var(--color-text-heading);
+}
+.form-group input:hover {
+    background: var(--color-bg-surface);
 }
 .form-group input:focus {
     outline: none;
@@ -639,11 +626,16 @@ body {
     border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 14px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-input);
     transition: all 0.2s;
     font-family: inherit;
     color: var(--color-text-heading);
 }
+
+.app-pw-create input:hover {
+    background: var(--color-bg-surface);
+}
+
 .app-pw-create input:focus {
     outline: none;
     border-color: var(--color-accent);

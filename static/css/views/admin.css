@@ -145,26 +145,7 @@ body {
 }
 .user-last-login-cell {
     font-size: 12px;
-    color: var(--color-text-faint);
-}
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--color-shadow-md);
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: var(--color-shadow-2xl);
-}
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-shadow-md) transparent;
+    color: var(--color-text);
 }
 
 /* ── Top Header Bar ── */
@@ -441,7 +422,7 @@ table {
 th {
     text-align: left;
     padding: 12px 16px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-subtle);
     color: var(--color-text-faint);
     font-size: 11px;
     text-transform: uppercase;
@@ -459,7 +440,7 @@ tr:last-child td {
     border-bottom: none;
 }
 tr:hover {
-    background: var(--color-bg-off-white);
+    background: var(--color-bg-hover);
 }
 .user-info {
     display: flex;

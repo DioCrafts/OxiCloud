@@ -77,7 +77,7 @@
     padding: 12px 50px 12px 44px;
     border-radius: 12px;
     border: 2px solid var(--color-border);
-    background-color: var(--color-bg-hover);
+    background-color: var(--color-bg-input);
     font-size: 14px;
     height: 46px;
     color: var(--color-text-heading);

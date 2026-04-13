@@ -144,7 +144,7 @@
     border: 2px solid var(--color-border);
     border-radius: 10px;
     font-size: 14px;
-    background: var(--color-bg-hover);
+    background: var(--color-bg-input);
     color: var(--color-text-heading);
     transition: all 0.15s ease;
     outline: none;
@@ -386,7 +386,7 @@
 }
 
 .move-breadcrumb-item:hover {
-    background: var(--color-border);
+    background: var(--color-bg-hover);
     color: var(--color-text-heading);
 }
 
@@ -415,7 +415,7 @@
 }
 
 .folder-select-item:hover {
-    background-color: var(--color-bg-muted);
+    background-color: var(--color-bg-hover);
 }
 
 .folder-select-item.selected {

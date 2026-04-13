@@ -226,7 +226,7 @@
 }
 
 .user-menu-admin {
-    color: var(--color-primary-hover);
+    color: var(--color-primary);
 }
 
 .user-menu-admin i {
@@ -253,7 +253,7 @@
 
 .role-badge-admin {
     background: var(--color-info-surface);
-    color: var(--color-primary-hover);
+    color: var(--color-primary);
 }
 
 .role-badge i {
