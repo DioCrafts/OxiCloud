@@ -3,7 +3,7 @@
     --color-bg-page: #0f172a;
     --color-bg-surface: #1e293b;
     --color-bg-input: #0f172a;
-    --color-bg-hover: #162032;
+    --color-bg-hover: #334155;
     --color-bg-muted: #1a2540;
     --color-bg-subtle: #162032;
     --color-bg-alt: #0f172a;
@@ -79,7 +79,7 @@
 
     /* Items */
     --color-item-selected: #1a1520;
-    --color-item-hover-accent: #1f1926;
+    --color-item-hover-accent: #21262d;
 }
 
 /* ------------ */
@@ -586,43 +586,6 @@
 
 [data-theme="dark"] .folder-select-empty {
     color: var(--color-border-medium);
-}
-
-/* ── languageSelector.css ── */
-[data-theme="dark"] .language-selector-toggle {
-    background-color: var(--color-bg-surface);
-    border-color: var(--color-border);
-    color: var(--color-text-heading);
-}
-
-[data-theme="dark"] .language-selector-toggle:hover {
-    background-color: var(--color-border);
-}
-
-[data-theme="dark"] .language-selector-dropdown {
-    background-color: var(--color-bg-surface);
-    border-color: var(--color-border);
-    box-shadow: 0 8px 30px var(--color-overlay);
-}
-
-[data-theme="dark"] .language-selector-dropdown::-webkit-scrollbar-thumb {
-    background-color: var(--color-border-medium);
-}
-[data-theme="dark"] .language-selector-dropdown::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-text-subtle);
-}
-
-[data-theme="dark"] .language-option {
-    color: var(--color-text-heading);
-}
-
-[data-theme="dark"] .language-option:hover {
-    background-color: var(--color-border);
-}
-
-[data-theme="dark"] .language-option.active {
-    background-color: var(--color-accent-ring);
-    color: var(--color-accent);
 }
 
 /* ── modals.css ── */

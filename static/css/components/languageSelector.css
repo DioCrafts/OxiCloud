@@ -98,7 +98,7 @@
 }
 
 .language-option:hover {
-    background-color: var(--color-bg-alt);
+    background-color: var(--color-bg-hover);
 }
 
 .language-option.active {
