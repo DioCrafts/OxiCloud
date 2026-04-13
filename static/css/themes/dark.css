@@ -84,18 +84,6 @@
 
 /* ------------ */
 
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.15);
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.25);
-}
-
-[data-theme="dark"] * {
-    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-}
-
 [data-theme="dark"] select {
     background-color: #1e293b;
     border-color: #334155;
@@ -154,24 +142,6 @@
 
 [data-theme="dark"] .btn-secondary:active {
     background-color: #475569;
-}
-
-[data-theme="dark"] .view-toggle {
-    background-color: #1e293b;
-    border-color: #334155;
-}
-
-[data-theme="dark"] .toggle-btn {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .toggle-btn:hover {
-    background-color: #334155;
-}
-
-[data-theme="dark"] .toggle-btn.active {
-    background-color: #334155;
-    color: #ff5e3a;
 }
 
 [data-theme="dark"] .context-menu {

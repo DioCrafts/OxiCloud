@@ -64,22 +64,6 @@
     z-index: 1000;
 }
 
-/* Custom scrollbar */
-.language-selector-dropdown::-webkit-scrollbar {
-    width: 6px;
-}
-.language-selector-dropdown::-webkit-scrollbar-track {
-    background: transparent;
-    margin: 8px 0;
-}
-.language-selector-dropdown::-webkit-scrollbar-thumb {
-    background-color: var(--color-border-medium);
-    border-radius: 3px;
-}
-.language-selector-dropdown::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-text-placeholder);
-}
-
 .language-selector.open .language-selector-dropdown {
     opacity: 1;
     visibility: visible;

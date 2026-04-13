@@ -97,7 +97,7 @@
 }
 
 .toggle-btn.active {
-    background-color: var(--color-bg-surface);
+    background-color: var(--color-border);
     color: var(--color-accent);
     box-shadow: 0 1px 3px var(--color-shadow);
 }

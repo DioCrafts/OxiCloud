@@ -27,22 +27,6 @@ body {
 
 /* #main-content and #auth-error start hidden via .hidden class */
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--color-shadow-md);
-    border-radius: 4px;
-}
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-shadow-md) transparent;
-}
-
 /* ── Header ── */
 .profile-header {
     background: linear-gradient(135deg, var(--color-sidebar-bg-from) 0%, var(--color-sidebar-bg-to) 100%);

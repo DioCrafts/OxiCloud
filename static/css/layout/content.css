@@ -1,3 +1,20 @@
+/* ── Scrollbar ── */
+
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--color-bg-surface);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--color-accent);
+    border-radius: 3px;
+}
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-accent) var(--color-bg-surface);
+}
+
 /* Content area */
 .content-area {
     flex-grow: 1;

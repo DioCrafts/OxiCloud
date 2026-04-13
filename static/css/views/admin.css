@@ -148,25 +148,6 @@ body {
     color: var(--color-text-faint);
 }
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: transparent;
-}
-::-webkit-scrollbar-thumb {
-    background: var(--color-shadow-md);
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: var(--color-shadow-2xl);
-}
-* {
-    scrollbar-width: thin;
-    scrollbar-color: var(--color-shadow-md) transparent;
-}
-
 /* ── Top Header Bar ── */
 .admin-header {
     background: linear-gradient(135deg, var(--color-sidebar-bg-from) 0%, var(--color-sidebar-bg-to) 100%);

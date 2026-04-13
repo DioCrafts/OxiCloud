@@ -439,23 +439,6 @@
     padding: 6px;
 }
 
-.lang-picker-list::-webkit-scrollbar {
-    width: 6px;
-}
-
-.lang-picker-list::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.lang-picker-list::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 3px;
-}
-
-.lang-picker-list::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-faint);
-}
-
 /* Language item in dropdown */
 .lang-picker-item {
     display: flex;
