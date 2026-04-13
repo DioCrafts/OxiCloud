@@ -238,6 +238,21 @@ pub async fn auth_middleware(
                         }
                         Err(e) => {
                             tracing::warn!("App password verification failed: {}", e);
+                            // For WebDAV: include WWW-Authenticate so the client
+                            // knows to re-prompt rather than silently failing.
+                            if request.uri().path().starts_with("/webdav") {
+                                return Ok(Response::builder()
+                                    .status(StatusCode::UNAUTHORIZED)
+                                    .header(
+                                        header::WWW_AUTHENTICATE,
+                                        r#"Basic realm="OxiCloud""#,
+                                    )
+                                    .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+                                    .body(axum::body::Body::from(
+                                        "Invalid username or app password",
+                                    ))
+                                    .unwrap());
+                            }
                             return Err(AuthError::InvalidToken(
                                 "Invalid username or app password".to_string(),
                             ));
@@ -291,10 +306,24 @@ pub async fn auth_middleware(
         }
     }
 
-    // No valid credentials found via any method
+    // No valid credentials found via any method.
     if state.auth_service.is_none() {
         tracing::error!("Auth middleware invoked but auth service is not configured");
         return Err(AuthError::AuthServiceUnavailable);
+    }
+
+    // For WebDAV requests with no credentials at all: return 401 with
+    // WWW-Authenticate so that spec-compliant clients (Nautilus, Cyberduck,
+    // Windows Explorer, macOS Finder) know to prompt for a username/password.
+    // Non-WebDAV routes return the standard AuthError which renders without
+    // this header — keeping browser sessions redirecting to /login as before.
+    if request.uri().path().starts_with("/webdav") {
+        return Ok(Response::builder()
+            .status(StatusCode::UNAUTHORIZED)
+            .header(header::WWW_AUTHENTICATE, r#"Basic realm="OxiCloud""#)
+            .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
+            .body(axum::body::Body::from("Authentication required"))
+            .unwrap());
     }
 
     Err(AuthError::TokenNotProvided)
