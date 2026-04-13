@@ -144,36 +144,6 @@
     background-color: #475569;
 }
 
-[data-theme="dark"] .context-menu {
-    background: #1e293b;
-    border-color: #334155;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-}
-
-[data-theme="dark"] .context-menu-item {
-    color: #cbd5e1;
-}
-
-[data-theme="dark"] .context-menu-item:hover {
-    background: #334155;
-}
-
-[data-theme="dark"] .context-menu-item:active {
-    background: #475569;
-}
-
-[data-theme="dark"] .context-menu-item i {
-    color: #94a3b8;
-}
-
-[data-theme="dark"] .context-menu-item-danger:hover {
-    background: rgba(239, 68, 68, 0.1);
-}
-
-[data-theme="dark"] .context-menu-separator {
-    background: #334155;
-}
-
 [data-theme="dark"] .search-results-header h3 {
     color: #f1f5f9;
 }
