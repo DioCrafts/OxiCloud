@@ -113,39 +113,30 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     // ── 4. Minify ALL individual CSS in static-dist/ ─────────────────────────
     minify_tree_css(&dist_dir.join("css"));
 
-    // ── 5. Build JS bundle for index.html ────────────────────────────────────
-    let index_html = fs::read_to_string(static_dir.join("index.html")).expect("read index.html");
-    let defer_scripts = extract_defer_scripts(&index_html);
-    let js_bundle = build_js_bundle(static_dir, &defer_scripts);
-    let js_hash = fnv_hash(js_bundle.as_bytes());
-    let js_name = format!("app.{js_hash}.js");
-    fs::write(dist_dir.join("js").join(&js_name), &js_bundle).expect("write js bundle");
-
-    // ── 6. Minify ALL individual JS in static-dist/ ──────────────────────────
+    // ── 5. Minify ALL individual JS in static-dist/ ──────────────────────────
+    // ES modules cannot be safely concatenated into a flat bundle — each file is
+    // minified in-place instead.  The HTML keeps its individual <script type="module">
+    // tags; HTTP/2 multiplexing makes per-file overhead negligible.
     minify_tree_js(&dist_dir.join("js"));
 
-    // ── 7. Inline theme-init.js  &  rewrite index.html ──────────────────────
+    // ── 6. Inline theme-init.js  &  rewrite index.html ──────────────────────
+    let index_html = fs::read_to_string(static_dir.join("index.html")).expect("read index.html");
     let theme_init =
         fs::read_to_string(static_dir.join("js/core/theme-init.js")).unwrap_or_default();
     let theme_init_min = js_minify_safe(&theme_init);
-    let rewritten_index = rewrite_index_html(
-        &index_html,
-        &format!("/css/{css_name}"),
-        &format!("/js/{js_name}"),
-        &theme_init_min,
-    );
+    let rewritten_index = rewrite_index_html(&index_html, &format!("/css/{css_name}"), &theme_init_min);
     fs::write(dist_dir.join("index.html"), &rewritten_index).expect("write dist index.html");
 
-    // ── 8. Minify locale JSONs ───────────────────────────────────────────────
+    // ── 7. Minify locale JSONs ───────────────────────────────────────────────
     minify_tree_json(&dist_dir.join("locales"));
 
-    // ── 9. Update & minify sw.js ─────────────────────────────────────────────
+    // ── 8. Update & minify sw.js ─────────────────────────────────────────────
     let sw = fs::read_to_string(dist_dir.join("sw.js")).unwrap_or_default();
-    let sw_updated = update_sw_cache(&sw, &css_name, &js_name);
+    let sw_updated = update_sw_cache(&sw, &css_name);
     let sw_minified = js_minify_safe(&sw_updated);
     fs::write(dist_dir.join("sw.js"), &sw_minified).expect("write sw.js");
 
-    // ── 10. Write HTML for include_str!() to OUT_DIR ─────────────────────────
+    // ── 9. Write HTML for include_str!() to OUT_DIR ──────────────────────────
     for name in HTML_INCLUDE {
         let src = dist_dir.join(name);
         if src.exists() {
@@ -155,7 +146,7 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     // index.html too (future use / embedded route)
     fs::write(out_dir.join("index.html"), &rewritten_index).expect("write out index.html");
 
-    eprintln!("cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}  JS: {js_name}");
+    eprintln!("cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -249,39 +240,6 @@ fn minify_tree_css(dir: &Path) {
 // JS processing
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Collect `<script defer src="…">` paths from HTML.
-fn extract_defer_scripts(html: &str) -> Vec<String> {
-    html.lines()
-        .filter_map(|l| {
-            let t = l.trim();
-            if t.starts_with("<script") && t.contains("defer") && t.contains("src=\"") {
-                let s = t.find("src=\"")? + 5;
-                let e = t[s..].find('"')? + s;
-                Some(t[s..e].to_string())
-            } else {
-                None
-            }
-        })
-        .collect()
-}
-
-/// Minify each script individually, then concatenate (safer than a monolith parse).
-fn build_js_bundle(static_dir: &Path, script_paths: &[String]) -> String {
-    let mut bundle = String::with_capacity(512 * 1024);
-    for path in script_paths {
-        let file = static_dir.join(path.trim_start_matches('/'));
-        if file.exists() {
-            let src = fs::read_to_string(&file).unwrap_or_default();
-            let min = js_minify_safe(&src);
-            bundle.push_str(&min);
-            bundle.push_str(";\n");
-        } else {
-            eprintln!("cargo:warning=JS not found: {}", file.display());
-        }
-    }
-    bundle
-}
-
 /// Minify JS via oxc — returns original on failure.
 fn js_minify_safe(source: &str) -> String {
     if source.trim().is_empty() {
@@ -301,7 +259,7 @@ fn js_minify(source: &str) -> Result<String, String> {
     use oxc_span::SourceType;
 
     let allocator = Allocator::default();
-    let source_type = SourceType::cjs(); // Non-module, script mode
+    let source_type = SourceType::mjs(); // ES module mode
     let ret = Parser::new(&allocator, source, source_type).parse();
 
     if !ret.errors.is_empty() {
@@ -311,8 +269,7 @@ fn js_minify(source: &str) -> Result<String, String> {
 
     let mut program = ret.program;
 
-    // Compress (constant-fold, dead-code) — NO mangle (globals would break)
-    // Keep unused top-level functions: they're called cross-file via window.*
+    // Compress (constant-fold, dead-code) — NO mangle (exported names must be stable)
     Minifier::new(MinifierOptions {
         mangle: None,
         compress: Some(CompressOptions {
@@ -412,11 +369,11 @@ fn json_minify(source: &str) -> String {
 // HTML rewriting
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Rewrite index.html: single CSS bundle, inline theme-init, single JS bundle.
-fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js: &str) -> String {
+/// Rewrite index.html: collapse all CSS links into one bundle and inline theme-init.js.
+/// JS module scripts are left as-is — ES modules cannot be safely flat-concatenated.
+fn rewrite_index_html(html: &str, css_path: &str, inline_theme_js: &str) -> String {
     let mut out: Vec<String> = Vec::with_capacity(html.lines().count());
     let mut css_done = false;
-    let mut defer_done = false;
 
     for line in html.lines() {
         let t = line.trim();
@@ -436,22 +393,8 @@ fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js
             continue;
         }
 
-        // ── Replace all defer <script>s with single bundle ──────────────────
-        if t.starts_with("<script") && t.contains("defer") && t.contains("src=\"") {
-            if !defer_done {
-                out.push(format!("    <script defer src=\"{js_path}\"></script>"));
-                defer_done = true;
-            }
-            continue;
-        }
-
-        // ── Drop "Service Worker Registration" comment ──────────────────────
-        if t.contains("Service Worker Registration") {
-            continue;
-        }
-
-        // ── Drop "Styles" / "Scripts" section comments ──────────────────────
-        if t.starts_with("<!--") && (t.contains("Styles") || t.contains("Scripts (defer")) {
+        // ── Drop "Styles" section comment ────────────────────────────────────
+        if t.starts_with("<!--") && t.contains("Styles") {
             continue;
         }
 
@@ -465,7 +408,7 @@ fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js
 // Service Worker cache-list update
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn update_sw_cache(sw: &str, css_bundle: &str, js_bundle: &str) -> String {
+fn update_sw_cache(sw: &str, css_bundle: &str) -> String {
     let marker_start = "const ASSETS_TO_CACHE = [";
     let marker_end = "];";
 
@@ -481,10 +424,7 @@ fn update_sw_cache(sw: &str, css_bundle: &str, js_bundle: &str) -> String {
 
     format!(
         "{before}const ASSETS_TO_CACHE = [\n\
-         \x20 '/',\n\
-         \x20 '/index.html',\n\
          \x20 '/css/{css_bundle}',\n\
-         \x20 '/js/{js_bundle}',\n\
          \x20 '/locales/en.json',\n\
          \x20 '/locales/es.json',\n\
          \x20 '/favicon.ico'\n\
