@@ -118,6 +118,9 @@
     --color-overlay-darkest: rgba(0, 0, 0, 0.92);
 
     /* Items */
+    --color-item: var(--color-bg-surface);
+    --color-item-hover: var(--color-bg-hover);
+    --color-item-active: #f8d2ae;
     --color-item-selected: #fff8f6;
     --color-item-hover-accent: #fff0ec;
     --color-item-hover-blue: #f0f8ff;
@@ -418,4 +421,7 @@
     --color-bg-off-white: #fafbfd;
     --color-danger-shadow: rgba(220, 38, 38, 0.2);
     --color-danger-shadow-lg: rgba(220, 38, 38, 0.3);
+
+    --color-music-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --color-music-background: var(--color-bg-surface);
 }

@@ -94,12 +94,15 @@ p.subtitle {
     border-color: var(--color-primary);
 }
 .error-text {
-    color: var(--color-error, #e53935);
+    color: var(--color-error-text);
     font-size: 0.85rem;
     margin-bottom: 0.75rem;
 }
 
-/* Primary button */
+/* Primary button
+FIXME: use components/buttons.css ?
+*/
+
 .btn-primary {
     display: inline-block;
     width: 100%;
