@@ -113,30 +113,39 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     // ── 4. Minify ALL individual CSS in static-dist/ ─────────────────────────
     minify_tree_css(&dist_dir.join("css"));
 
-    // ── 5. Minify ALL individual JS in static-dist/ ──────────────────────────
-    // ES modules cannot be safely concatenated into a flat bundle — each file is
-    // minified in-place instead.  The HTML keeps its individual <script type="module">
-    // tags; HTTP/2 multiplexing makes per-file overhead negligible.
+    // ── 5. Bundle all ES modules into one IIFE ───────────────────────────────
+    // Walk the import graph starting from every <script type="module"> in index.html,
+    // strip import/export syntax, wrap in an IIFE, then minify as a classic script.
+    let index_html = fs::read_to_string(static_dir.join("index.html")).expect("read index.html");
+    let module_scripts = extract_module_scripts(&index_html);
+    let js_raw = build_js_module_bundle(&module_scripts, static_dir);
+    let js_bundle = js_minify_script_safe(&js_raw);
+    let js_hash = fnv_hash(js_bundle.as_bytes());
+    let js_name = format!("app.{js_hash}.js");
+    fs::create_dir_all(dist_dir.join("js")).expect("js dir");
+    fs::write(dist_dir.join("js").join(&js_name), &js_bundle).expect("write js bundle");
+
+    // ── 6. Minify ALL individual JS files in static-dist/ ────────────────────
     minify_tree_js(&dist_dir.join("js"));
 
-    // ── 6. Inline theme-init.js  &  rewrite index.html ──────────────────────
-    let index_html = fs::read_to_string(static_dir.join("index.html")).expect("read index.html");
+    // ── 7. Inline theme-init.js  &  rewrite index.html ──────────────────────
     let theme_init =
         fs::read_to_string(static_dir.join("js/core/theme-init.js")).unwrap_or_default();
     let theme_init_min = js_minify_safe(&theme_init);
-    let rewritten_index = rewrite_index_html(&index_html, &format!("/css/{css_name}"), &theme_init_min);
+    let rewritten_index =
+        rewrite_index_html(&index_html, &format!("/css/{css_name}"), &format!("/js/{js_name}"), &theme_init_min);
     fs::write(dist_dir.join("index.html"), &rewritten_index).expect("write dist index.html");
 
-    // ── 7. Minify locale JSONs ───────────────────────────────────────────────
+    // ── 8. Minify locale JSONs ───────────────────────────────────────────────
     minify_tree_json(&dist_dir.join("locales"));
 
-    // ── 8. Update & minify sw.js ─────────────────────────────────────────────
+    // ── 9. Update & minify sw.js ─────────────────────────────────────────────
     let sw = fs::read_to_string(dist_dir.join("sw.js")).unwrap_or_default();
-    let sw_updated = update_sw_cache(&sw, &css_name);
+    let sw_updated = update_sw_cache(&sw, &css_name, &js_name);
     let sw_minified = js_minify_safe(&sw_updated);
     fs::write(dist_dir.join("sw.js"), &sw_minified).expect("write sw.js");
 
-    // ── 9. Write HTML for include_str!() to OUT_DIR ──────────────────────────
+    // ── 10. Write HTML for include_str!() to OUT_DIR ─────────────────────────
     for name in HTML_INCLUDE {
         let src = dist_dir.join(name);
         if src.exists() {
@@ -146,7 +155,7 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     // index.html too (future use / embedded route)
     fs::write(out_dir.join("index.html"), &rewritten_index).expect("write out index.html");
 
-    eprintln!("cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}");
+    eprintln!("cargo:warning=OxiCloud static-dist built ✓  CSS: {css_name}  JS: {js_name}");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -237,21 +246,287 @@ fn minify_tree_css(dir: &Path) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// JS processing
+// JS bundling (ES module → single IIFE)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Minify JS via oxc — returns original on failure.
+/// Collect `<script type="module" src="…">` paths from HTML.
+fn extract_module_scripts(html: &str) -> Vec<String> {
+    html.lines()
+        .filter_map(|l| {
+            let t = l.trim();
+            if t.starts_with("<script") && t.contains("type=\"module\"") && t.contains("src=\"") {
+                let s = t.find("src=\"")? + 5;
+                let e = t[s..].find('"')? + s;
+                Some(t[s..e].to_string())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Build a single IIFE from all ES-module entry points.
+///
+/// Algorithm:
+///   1. DFS from each entry point, following `import … from '…'` edges.
+///   2. Post-order traversal ensures every dependency is emitted before its importer.
+///   3. Cycles are broken by marking files as visited before recursing.
+///   4. Each file has its import/export syntax stripped before being appended.
+///   5. The result is wrapped in `(function(){"use strict"; …})();`.
+fn build_js_module_bundle(entry_scripts: &[String], static_dir: &Path) -> String {
+    use std::collections::HashSet;
+
+    let mut order: Vec<PathBuf> = Vec::new();
+    let mut seen: HashSet<PathBuf> = HashSet::new();
+
+    for script in entry_scripts {
+        let path = static_dir.join(script.trim_start_matches('/'));
+        collect_module_deps(&path, &mut order, &mut seen);
+    }
+
+    let mut bundle = String::with_capacity(2 * 1024 * 1024);
+    bundle.push_str("(function(){\n\"use strict\";\n");
+    for file in &order {
+        match fs::read_to_string(file) {
+            Ok(src) => {
+                bundle.push_str(&strip_esm_syntax(&src));
+                bundle.push('\n');
+            }
+            Err(e) => eprintln!("cargo:warning=bundle: cannot read {}: {e}", file.display()),
+        }
+    }
+    bundle.push_str("})();\n");
+    bundle
+}
+
+/// DFS post-order: push `file` to `order` after all its imports.
+/// Marks files as seen before recursing to break circular dependencies.
+fn collect_module_deps(file: &Path, order: &mut Vec<PathBuf>, seen: &mut std::collections::HashSet<PathBuf>) {
+    let canonical = match file.canonicalize() {
+        Ok(p) => p,
+        Err(_) => {
+            eprintln!("cargo:warning=JS import not found: {}", file.display());
+            return;
+        }
+    };
+    if !seen.insert(canonical.clone()) {
+        return; // already visited (or in-progress cycle)
+    }
+
+    let src = fs::read_to_string(file).unwrap_or_default();
+    let base = file.parent().unwrap_or(Path::new("."));
+
+    for rel in extract_esm_import_paths(&src) {
+        if rel.starts_with('.') {
+            collect_module_deps(&base.join(&rel), order, seen);
+        }
+        // Non-relative (bare specifiers like 'react') are ignored — not used here.
+    }
+
+    order.push(file.to_path_buf());
+}
+
+/// Return all relative paths found in `import … from '…'` / `export … from '…'` lines.
+fn extract_esm_import_paths(source: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+    let mut multiline = false;
+
+    for line in source.lines() {
+        let t = line.trim();
+
+        if multiline {
+            // Waiting for the `from '…'` of a multi-line import
+            if let Some(p) = extract_from_clause(t) {
+                paths.push(p);
+                multiline = false;
+            } else if t.ends_with(';') {
+                multiline = false; // malformed, give up on this import
+            }
+            continue;
+        }
+
+        if !t.starts_with("import ") && !t.starts_with("export ") {
+            continue;
+        }
+
+        if let Some(p) = extract_from_clause(t) {
+            paths.push(p);
+        } else if t.starts_with("import ") && !t.ends_with(';') && !t.contains("//") {
+            // Multi-line: `import {\n  X,\n  Y\n} from '…'`
+            multiline = true;
+        }
+    }
+    paths
+}
+
+/// Extract the path string from the `from '…'` or `from "…"` tail of a line.
+fn extract_from_clause(s: &str) -> Option<String> {
+    let from = s.rfind(" from ")?;
+    let rest = s[from + 6..].trim();
+    let q = rest.chars().next()?;
+    if q != '\'' && q != '"' {
+        return None;
+    }
+    let end = rest[1..].find(q)? + 1;
+    Some(rest[1..end].to_string())
+}
+
+/// Strip ES-module syntax from a single file so it can be inlined into an IIFE.
+///
+/// | Input                                    | Output                       |
+/// |------------------------------------------|------------------------------|
+/// | `import { X } from './y.js';`            | *(empty line)*               |
+/// | `import { X as Y } from './y.js';`       | `const Y = X;`               |
+/// | `export { X, Y };`                       | *(empty line)*               |
+/// | `export { X } from './y.js';`            | *(empty line)*               |
+/// | `export const X = …`                     | `const X = …`                |
+/// | `export function f() {…}`               | `function f() {…}`           |
+/// | `export async function f() {…}`         | `async function f() {…}`     |
+/// | `export class C {…}`                    | `class C {…}`                |
+/// | `export default expr;`                   | `const _default = expr;`     |
+fn strip_esm_syntax(source: &str) -> String {
+    let mut out = String::with_capacity(source.len());
+    // True while we are inside a multi-line import/export-list that has not yet
+    // seen its terminating `;`.
+    let mut skipping = false;
+
+    for line in source.lines() {
+        let t = line.trim();
+
+        if skipping {
+            // Keep skipping until the statement ends
+            if t.ends_with(';') || t.contains(" from ") {
+                skipping = false;
+            }
+            out.push('\n'); // preserve line count for source maps / debugging
+            continue;
+        }
+
+        // ── import … ──────────────────────────────────────────────────────────
+        // Emit `const Y = X;` for any `import { X as Y }` aliases so that code
+        // using the aliased name still resolves inside the IIFE scope.
+        if t.starts_with("import ") {
+            if !t.ends_with(';') && !t.contains(" from ") {
+                skipping = true; // multi-line import
+            }
+            let aliases = collect_import_aliases(t);
+            if aliases.is_empty() {
+                out.push('\n');
+            } else {
+                out.push_str(&aliases);
+                out.push('\n');
+            }
+            continue;
+        }
+
+        // ── export { … } or export { … } from '…' ────────────────────────────
+        if t.starts_with("export {") || t.starts_with("export{") {
+            if !t.ends_with(';') {
+                skipping = true;
+            }
+            out.push('\n');
+            continue;
+        }
+
+        // ── export const/let/var/function/async function/class ─────────────────
+        if let Some(stripped) = try_strip_export_prefix(line) {
+            out.push_str(&stripped);
+            out.push('\n');
+            continue;
+        }
+
+        // ── export default expr ────────────────────────────────────────────────
+        // Rare in our codebase; keep the value as a named variable.
+        if t.starts_with("export default ") {
+            let indent = &line[..line.len() - line.trim_start().len()];
+            let rhs = &t["export default ".len()..];
+            out.push_str(&format!("{indent}const _default = {rhs}"));
+            out.push('\n');
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    out
+}
+
+/// If `line` (with leading whitespace preserved) begins with `export <decl-keyword>`,
+/// return the same line with `export ` (7 chars) removed.
+fn try_strip_export_prefix(line: &str) -> Option<String> {
+    const PREFIXES: &[&str] = &[
+        "export const ",
+        "export let ",
+        "export var ",
+        "export function ",
+        "export async function ",
+        "export class ",
+    ];
+    let t = line.trim();
+    for prefix in PREFIXES {
+        if t.starts_with(prefix) {
+            let indent_len = line.len() - line.trim_start().len();
+            // Remove "export " (7 chars) right after the indent
+            return Some(format!("{}{}", &line[..indent_len], &line[indent_len + 7..]));
+        }
+    }
+    None
+}
+
+/// For `import { A, B as C, D as E } from '…'` return `"const C = B;\nconst E = D;"`.
+/// Returns an empty string when there are no aliases.
+fn collect_import_aliases(stmt: &str) -> String {
+    let brace_start = match stmt.find('{') {
+        Some(i) => i + 1,
+        None => return String::new(),
+    };
+    let brace_end = match stmt.find('}') {
+        Some(i) => i,
+        None => return String::new(),
+    };
+    let bindings = &stmt[brace_start..brace_end];
+
+    let mut out = String::new();
+    for binding in bindings.split(',') {
+        let b = binding.trim();
+        if let Some(as_pos) = b.find(" as ") {
+            let orig = b[..as_pos].trim();
+            let alias = b[as_pos + 4..].trim();
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(&format!("const {alias} = {orig};"));
+        }
+    }
+    out
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// JS minification
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Minify an ES-module file (contains import/export) — returns original on failure.
 fn js_minify_safe(source: &str) -> String {
+    js_minify_inner(source, true)
+}
+
+/// Minify a classic script / IIFE bundle (no import/export) — returns original on failure.
+fn js_minify_script_safe(source: &str) -> String {
+    js_minify_inner(source, false)
+}
+
+fn js_minify_inner(source: &str, is_module: bool) -> String {
     if source.trim().is_empty() {
         return String::new();
     }
-    js_minify(source).unwrap_or_else(|e| {
+    js_minify(source, is_module).unwrap_or_else(|e| {
         eprintln!("cargo:warning=JS minify failed: {e}");
         source.to_string()
     })
 }
 
-fn js_minify(source: &str) -> Result<String, String> {
+fn js_minify(source: &str, is_module: bool) -> Result<String, String> {
     use oxc_allocator::Allocator;
     use oxc_codegen::{Codegen, CodegenOptions, CommentOptions};
     use oxc_minifier::{CompressOptions, CompressOptionsUnused, Minifier, MinifierOptions};
@@ -259,7 +534,7 @@ fn js_minify(source: &str) -> Result<String, String> {
     use oxc_span::SourceType;
 
     let allocator = Allocator::default();
-    let source_type = SourceType::mjs(); // ES module mode
+    let source_type = if is_module { SourceType::mjs() } else { SourceType::cjs() };
     let ret = Parser::new(&allocator, source, source_type).parse();
 
     if !ret.errors.is_empty() {
@@ -269,7 +544,6 @@ fn js_minify(source: &str) -> Result<String, String> {
 
     let mut program = ret.program;
 
-    // Compress (constant-fold, dead-code) — NO mangle (exported names must be stable)
     Minifier::new(MinifierOptions {
         mangle: None,
         compress: Some(CompressOptions {
@@ -282,11 +556,7 @@ fn js_minify(source: &str) -> Result<String, String> {
     let output = Codegen::new()
         .with_options(CodegenOptions {
             minify: true,
-            comments: CommentOptions {
-                normal: false,
-                jsdoc: false,
-                ..CommentOptions::default()
-            },
+            comments: CommentOptions { normal: false, jsdoc: false, ..CommentOptions::default() },
             ..Default::default()
         })
         .build(&program);
@@ -294,7 +564,7 @@ fn js_minify(source: &str) -> Result<String, String> {
     Ok(output.code)
 }
 
-/// Walk a directory and minify every `.js` in-place (skips generated bundles).
+/// Walk a directory and minify every `.js` in-place (skips generated `app.*` bundles).
 fn minify_tree_js(dir: &Path) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
@@ -369,11 +639,15 @@ fn json_minify(source: &str) -> String {
 // HTML rewriting
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Rewrite index.html: collapse all CSS links into one bundle and inline theme-init.js.
-/// JS module scripts are left as-is — ES modules cannot be safely flat-concatenated.
-fn rewrite_index_html(html: &str, css_path: &str, inline_theme_js: &str) -> String {
+/// Rewrite index.html for release:
+///   - Collapse all `<link stylesheet href="/css/…">` into the single CSS bundle.
+///   - Inline `theme-init.js` as a `<script>` block.
+///   - Replace all `<script type="module" src="…">` with the single JS bundle.
+///   - Leave the non-module `sw-register.js` script untouched.
+fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js: &str) -> String {
     let mut out: Vec<String> = Vec::with_capacity(html.lines().count());
     let mut css_done = false;
+    let mut js_done = false;
 
     for line in html.lines() {
         let t = line.trim();
@@ -393,8 +667,17 @@ fn rewrite_index_html(html: &str, css_path: &str, inline_theme_js: &str) -> Stri
             continue;
         }
 
-        // ── Drop "Styles" section comment ────────────────────────────────────
-        if t.starts_with("<!--") && t.contains("Styles") {
+        // ── Replace all type="module" scripts with single bundle ─────────────
+        if t.starts_with("<script") && t.contains("type=\"module\"") && t.contains("src=\"") {
+            if !js_done {
+                out.push(format!("    <script defer type=\"module\" src=\"{js_path}\"></script>"));
+                js_done = true;
+            }
+            continue;
+        }
+
+        // ── Drop "Styles" / "Scripts" section comments ───────────────────────
+        if t.starts_with("<!--") && (t.contains("Styles") || t.contains("Scripts")) {
             continue;
         }
 
@@ -408,7 +691,7 @@ fn rewrite_index_html(html: &str, css_path: &str, inline_theme_js: &str) -> Stri
 // Service Worker cache-list update
 // ═══════════════════════════════════════════════════════════════════════════════
 
-fn update_sw_cache(sw: &str, css_bundle: &str) -> String {
+fn update_sw_cache(sw: &str, css_bundle: &str, js_bundle: &str) -> String {
     let marker_start = "const ASSETS_TO_CACHE = [";
     let marker_end = "];";
 
@@ -425,6 +708,7 @@ fn update_sw_cache(sw: &str, css_bundle: &str) -> String {
     format!(
         "{before}const ASSETS_TO_CACHE = [\n\
          \x20 '/css/{css_bundle}',\n\
+         \x20 '/js/{js_bundle}',\n\
          \x20 '/locales/en.json',\n\
          \x20 '/locales/es.json',\n\
          \x20 '/favicon.ico'\n\
