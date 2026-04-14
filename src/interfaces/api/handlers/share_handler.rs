@@ -16,7 +16,10 @@ use crate::application::services::share_service::ShareService;
 use crate::{
     application::{
         dtos::share_dto::{CreateShareDto, UpdateShareDto},
-        ports::{file_ports::{FileRetrievalUseCase, OptimizedFileContent}, share_ports::ShareUseCase},
+        ports::{
+            file_ports::{FileRetrievalUseCase, OptimizedFileContent},
+            share_ports::ShareUseCase,
+        },
     },
     common::{di::AppState, errors::ErrorKind},
     domain::entities::share::ShareItemType,
@@ -290,7 +293,7 @@ pub async fn download_shared_file(
                 "Sharing is disabled",
                 "Disabled",
             )
-            .into_response()
+            .into_response();
         }
     };
 

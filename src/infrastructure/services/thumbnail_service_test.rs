@@ -40,7 +40,12 @@ async fn generate_thumbnail_from_blob_path() {
 
     // The key assertion: the service can read from a blob path (not a logical path)
     let result = svc
-        .get_thumbnail("test-file-id", "ab1234567890", ThumbnailSize::Icon, &blob_path)
+        .get_thumbnail(
+            "test-file-id",
+            "ab1234567890",
+            ThumbnailSize::Icon,
+            &blob_path,
+        )
         .await;
 
     let thumb_bytes = result.expect("thumbnail generation should succeed from blob path");
@@ -67,7 +72,12 @@ async fn generate_thumbnail_nonexistent_path_returns_error() {
 
     let bad_path = tmp.path().join("does-not-exist.png");
     let result = svc
-        .get_thumbnail("missing-id", "nonexistent-hash", ThumbnailSize::Icon, &bad_path)
+        .get_thumbnail(
+            "missing-id",
+            "nonexistent-hash",
+            ThumbnailSize::Icon,
+            &bad_path,
+        )
         .await;
 
     assert!(result.is_err(), "should fail for nonexistent file");

@@ -746,7 +746,11 @@ impl FileHandler {
 
             tokio::spawn(async move {
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                thumbnail_service.generate_all_sizes_background(file_id, blob_hash_owned, file_path);
+                thumbnail_service.generate_all_sizes_background(
+                    file_id,
+                    blob_hash_owned,
+                    file_path,
+                );
             });
         }
 

@@ -132,8 +132,12 @@ fn process_release(manifest_dir: &Path, static_dir: &Path, out_dir: &Path) {
     let theme_init =
         fs::read_to_string(static_dir.join("js/core/theme-init.js")).unwrap_or_default();
     let theme_init_min = js_minify_safe(&theme_init);
-    let rewritten_index =
-        rewrite_index_html(&index_html, &format!("/css/{css_name}"), &format!("/js/{js_name}"), &theme_init_min);
+    let rewritten_index = rewrite_index_html(
+        &index_html,
+        &format!("/css/{css_name}"),
+        &format!("/js/{js_name}"),
+        &theme_init_min,
+    );
     fs::write(dist_dir.join("index.html"), &rewritten_index).expect("write dist index.html");
 
     // ── 8. Minify locale JSONs ───────────────────────────────────────────────
@@ -301,7 +305,11 @@ fn build_js_module_bundle(entry_scripts: &[String], static_dir: &Path) -> String
 
 /// DFS post-order: push `file` to `order` after all its imports.
 /// Marks files as seen before recursing to break circular dependencies.
-fn collect_module_deps(file: &Path, order: &mut Vec<PathBuf>, seen: &mut std::collections::HashSet<PathBuf>) {
+fn collect_module_deps(
+    file: &Path,
+    order: &mut Vec<PathBuf>,
+    seen: &mut std::collections::HashSet<PathBuf>,
+) {
     let canonical = match file.canonicalize() {
         Ok(p) => p,
         Err(_) => {
@@ -437,9 +445,8 @@ fn strip_esm_syntax(source: &str) -> String {
 
         // ── export default expr ────────────────────────────────────────────────
         // Rare in our codebase; keep the value as a named variable.
-        if t.starts_with("export default ") {
+        if let Some(rhs) = t.strip_prefix("export default ") {
             let indent = &line[..line.len() - line.trim_start().len()];
-            let rhs = &t["export default ".len()..];
             out.push_str(&format!("{indent}const _default = {rhs}"));
             out.push('\n');
             continue;
@@ -468,7 +475,11 @@ fn try_strip_export_prefix(line: &str) -> Option<String> {
         if t.starts_with(prefix) {
             let indent_len = line.len() - line.trim_start().len();
             // Remove "export " (7 chars) right after the indent
-            return Some(format!("{}{}", &line[..indent_len], &line[indent_len + 7..]));
+            return Some(format!(
+                "{}{}",
+                &line[..indent_len],
+                &line[indent_len + 7..]
+            ));
         }
     }
     None
@@ -534,7 +545,11 @@ fn js_minify(source: &str, is_module: bool) -> Result<String, String> {
     use oxc_span::SourceType;
 
     let allocator = Allocator::default();
-    let source_type = if is_module { SourceType::mjs() } else { SourceType::cjs() };
+    let source_type = if is_module {
+        SourceType::mjs()
+    } else {
+        SourceType::cjs()
+    };
     let ret = Parser::new(&allocator, source, source_type).parse();
 
     if !ret.errors.is_empty() {
@@ -556,7 +571,11 @@ fn js_minify(source: &str, is_module: bool) -> Result<String, String> {
     let output = Codegen::new()
         .with_options(CodegenOptions {
             minify: true,
-            comments: CommentOptions { normal: false, jsdoc: false, ..CommentOptions::default() },
+            comments: CommentOptions {
+                normal: false,
+                jsdoc: false,
+                ..CommentOptions::default()
+            },
             ..Default::default()
         })
         .build(&program);
@@ -670,7 +689,9 @@ fn rewrite_index_html(html: &str, css_path: &str, js_path: &str, inline_theme_js
         // ── Replace all type="module" scripts with single bundle ─────────────
         if t.starts_with("<script") && t.contains("type=\"module\"") && t.contains("src=\"") {
             if !js_done {
-                out.push(format!("    <script defer type=\"module\" src=\"{js_path}\"></script>"));
+                out.push(format!(
+                    "    <script defer type=\"module\" src=\"{js_path}\"></script>"
+                ));
                 js_done = true;
             }
             continue;
