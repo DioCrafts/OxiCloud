@@ -59,8 +59,16 @@ jobs:
         with:
           node-version: 25
 
+      # because we are not using package.json
+      - name: Install Stylelint and plugins
+        run: |
+            npm install --global \
+                stylelint@17 \
+                postcss@8 \
+                stylelint-value-no-unknown-custom-properties@6
+
       - name: Run Stylelint
-        run: npx stylelint "**/*.{css,scss}"
+        run: npx stylelint "static/css/**/*.{css,scss}"
 
   rust-fmt:
     name: Rustfmt

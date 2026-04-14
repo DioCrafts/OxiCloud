@@ -1,13 +1,22 @@
 {
+  "files": ["statc/css/**/*.css"],
+  "plugins": [
+    "stylelint-value-no-unknown-custom-properties"
+  ],
   "rules": {
     "color-no-hex": true,
     "color-named": "never",
     "function-disallowed-list": ["rgb", "rgba", "hsl", "hsla", "hwb", "oklch", "oklab"],
-    "selector-disallowed-list": ["/\\[data-theme/"]
+    "selector-disallowed-list": ["/\\[data-theme/"],
+    "csstools/value-no-unknown-custom-properties": [true, {
+      "importFrom": [
+        "static/css/base/variables.css"
+      ]
+    }]
   },
   "overrides": [
     {
-      "files": ["**/variables.css"],
+      "files": ["static/css/base/variables.css"],
       "rules": {
         "color-no-hex": null,
         "color-named": null,
@@ -15,7 +24,7 @@
       }
     },
     {
-      "files": ["**/themes/dark.css"],
+      "files": ["static/css/themes/*"],
       "rules": {
         "color-no-hex": null,
         "color-named": null,
