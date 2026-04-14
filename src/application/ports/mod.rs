@@ -1,4 +1,5 @@
 pub mod auth_ports;
+pub mod blob_storage_ports;
 pub mod cache_ports;
 pub mod calendar_ports;
 pub mod carddav_ports;

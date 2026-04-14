@@ -1,18 +1,26 @@
 pub mod audio_metadata_service;
+pub mod azure_blob_backend;
+pub mod cached_blob_backend;
 pub mod chunked_upload_service;
 pub mod compression_service;
 pub mod dedup_service;
+pub mod encrypted_blob_backend;
 pub mod exif_service;
 pub mod file_content_cache;
 pub mod file_system_i18n_service;
 pub mod image_transcode_service;
 pub mod jwt_service;
+pub mod local_blob_backend;
 pub mod login_lockout_service;
+pub mod migration_blob_backend;
+pub mod migration_job;
 pub mod nextcloud_chunked_upload_service;
 pub mod oidc_service;
 pub mod password_hasher;
 pub mod path_resolver_service;
 pub mod path_service;
+pub mod retry_blob_backend;
+pub mod s3_blob_backend;
 pub mod thumbnail_service;
 #[cfg(test)]
 mod thumbnail_service_test;

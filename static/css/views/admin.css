@@ -324,6 +324,7 @@ body {
 #oidc-form,
 #secret-hint,
 #password-warning,
+#storage-secret-hint,
 #quota-modal,
 #create-user-modal,
 #reset-pw-modal {
@@ -937,4 +938,177 @@ details[open] summary {
 }
 .btn-danger:hover {
     opacity: 0.88;
+}
+
+/* ── Storage Tab ── */
+
+.storage-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.storage-stat {
+    padding: 14px;
+    background: var(--color-bg-hover);
+    border-radius: 12px;
+    text-align: center;
+    border: 1px solid var(--color-border);
+}
+.storage-stat__label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+}
+.storage-stat__value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text-heading);
+}
+
+.storage-backend-selector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.storage-backend-option {
+    flex: 1;
+    cursor: pointer;
+}
+.storage-backend-option input[type="radio"] {
+    display: none;
+}
+.storage-backend-option__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 14px;
+    border: 2px solid var(--color-border);
+    border-radius: 12px;
+    transition: border-color 0.2s, background 0.2s;
+    text-align: center;
+    font-weight: 500;
+}
+.storage-backend-option__card i {
+    font-size: 1.5rem;
+    color: var(--color-text-secondary);
+    transition: color 0.2s;
+}
+.storage-backend-option input[type="radio"]:checked + .storage-backend-option__card {
+    border-color: var(--color-accent);
+    background: var(--color-accent-subtle);
+}
+.storage-backend-option input[type="radio"]:checked + .storage-backend-option__card i {
+    color: var(--color-accent);
+}
+
+.storage-form {
+    margin-top: 8px;
+}
+
+.storage-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 24px;
+    justify-content: flex-end;
+}
+
+.storage-migration-section {
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border);
+}
+.storage-migration-section h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    color: var(--color-text-heading);
+}
+.storage-migration-section h3 i {
+    color: var(--color-text-secondary);
+    margin-right: 6px;
+}
+
+/* ── Migration UI ── */
+
+.migration-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    font-size: 14px;
+}
+
+.badge-migration {
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+.badge-migration--idle {
+    background: var(--color-bg-hover);
+    color: var(--color-text-secondary);
+}
+.badge-migration--running {
+    background: var(--color-accent-subtle);
+    color: var(--color-accent);
+}
+.badge-migration--paused {
+    background: var(--color-warning-bg, #fff8e1);
+    color: var(--color-warning-text, #b28704);
+}
+.badge-migration--completed {
+    background: var(--color-success-bg, #e8f5e9);
+    color: var(--color-success-text, #2e7d32);
+}
+.badge-migration--failed {
+    background: var(--color-danger-bg, #fce4ec);
+    color: var(--color-danger-text, #c62828);
+}
+
+.migration-progress-bar {
+    width: 100%;
+    height: 10px;
+    background: var(--color-bg-hover);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 6px;
+}
+.migration-progress-bar__fill {
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.migration-progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px;
+}
+
+.migration-failed-list {
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 11px;
+    background: var(--color-bg-hover);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    margin-top: 6px;
+}
+
+.migration-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
 }

@@ -211,6 +211,127 @@ pub struct StorageConfig {
     /// Maximum upload file size in bytes (default: 10 GB).
     /// Applied as a hard limit to WebDAV PUT and streaming uploads.
     pub max_upload_size: usize,
+    /// Which blob storage backend to use (`local`, `s3`, or `azure`).
+    pub backend: StorageBackendType,
+    /// S3-compatible backend configuration (used when `backend == S3`).
+    pub s3: Option<S3StorageConfig>,
+    /// Azure Blob Storage configuration (used when `backend == Azure`).
+    pub azure: Option<AzureStorageConfig>,
+    /// Local disk cache for remote backends.
+    pub cache: BlobCacheConfig,
+    /// Client-side encryption.
+    pub encryption: EncryptionConfig,
+    /// Retry policy for remote backends.
+    pub retry: RetryConfig,
+}
+
+/// Which blob storage backend to use.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum StorageBackendType {
+    /// Local filesystem (default).
+    #[default]
+    Local,
+    /// Any S3-compatible object store (AWS, Backblaze B2, R2, MinIO, …).
+    S3,
+    /// Azure Blob Storage.
+    Azure,
+}
+
+/// Configuration for an S3-compatible blob storage backend.
+#[derive(Debug, Clone)]
+pub struct S3StorageConfig {
+    /// Custom endpoint URL (required for non-AWS providers).
+    pub endpoint_url: Option<String>,
+    /// S3 bucket name.
+    pub bucket: String,
+    /// AWS region (default: `us-east-1`).
+    pub region: String,
+    /// Access key ID.
+    pub access_key: String,
+    /// Secret access key.
+    pub secret_key: String,
+    /// Force path-style access (required for MinIO, R2, some providers).
+    pub force_path_style: bool,
+}
+
+/// Configuration for Azure Blob Storage.
+#[derive(Debug, Clone)]
+pub struct AzureStorageConfig {
+    /// Azure storage account name.
+    pub account_name: String,
+    /// Azure storage account key.
+    pub account_key: String,
+    /// Container name.
+    pub container: String,
+    /// Optional SAS token (alternative to account key).
+    pub sas_token: Option<String>,
+}
+
+/// LRU local disk cache configuration for remote blob backends.
+#[derive(Debug, Clone)]
+pub struct BlobCacheConfig {
+    /// Enable the LRU disk cache (only useful for remote backends).
+    pub enabled: bool,
+    /// Maximum cache size in bytes (default: 50 GB).
+    pub max_size_bytes: u64,
+    /// Cache directory path (default: `{root_dir}/.blob-cache`).
+    pub cache_path: Option<String>,
+}
+
+impl Default for BlobCacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_size_bytes: 50 * 1024 * 1024 * 1024, // 50 GB
+            cache_path: None,
+        }
+    }
+}
+
+/// Client-side encryption configuration.
+#[derive(Debug, Clone)]
+pub struct EncryptionConfig {
+    /// Enable AES-256-GCM encryption for blobs at rest.
+    pub enabled: bool,
+    /// Base64-encoded 32-byte encryption key.
+    pub key_base64: Option<String>,
+}
+
+impl Default for EncryptionConfig {
+    #[allow(clippy::derivable_impls)]
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            key_base64: None,
+        }
+    }
+}
+
+/// Retry policy configuration for remote backends.
+#[derive(Debug, Clone)]
+pub struct RetryConfig {
+    /// Enable retry with exponential backoff.
+    pub enabled: bool,
+    /// Maximum number of retry attempts.
+    pub max_retries: u32,
+    /// Initial backoff in milliseconds.
+    pub initial_backoff_ms: u64,
+    /// Maximum backoff in milliseconds.
+    pub max_backoff_ms: u64,
+    /// Backoff multiplier.
+    pub backoff_multiplier: f64,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_retries: 3,
+            initial_backoff_ms: 100,
+            max_backoff_ms: 10_000,
+            backoff_multiplier: 2.0,
+        }
+    }
 }
 
 impl Default for StorageConfig {
@@ -227,6 +348,12 @@ impl Default for StorageConfig {
             parallel_threshold: 100 * 1024 * 1024, // 100 MB
             trash_retention_days: 30,              // 30 days
             max_upload_size: MAX_UPLOAD_SIZE,
+            backend: StorageBackendType::Local,
+            s3: None,
+            azure: None,
+            cache: BlobCacheConfig::default(),
+            encryption: EncryptionConfig::default(),
+            retry: RetryConfig::default(),
         }
     }
 }
@@ -826,6 +953,95 @@ impl AppConfig {
             && let Ok(val) = max_upload
         {
             config.storage.max_upload_size = val;
+        }
+
+        // Storage backend selection
+        if let Ok(backend) = env::var("OXICLOUD_STORAGE_BACKEND") {
+            match backend.to_lowercase().as_str() {
+                "s3" => config.storage.backend = StorageBackendType::S3,
+                "azure" => config.storage.backend = StorageBackendType::Azure,
+                _ => config.storage.backend = StorageBackendType::Local,
+            }
+        }
+
+        // S3-compatible storage configuration
+        if config.storage.backend == StorageBackendType::S3 {
+            let bucket = env::var("OXICLOUD_S3_BUCKET").unwrap_or_default();
+            if bucket.is_empty() {
+                tracing::warn!("OXICLOUD_STORAGE_BACKEND=s3 but OXICLOUD_S3_BUCKET is not set");
+            }
+            config.storage.s3 = Some(S3StorageConfig {
+                endpoint_url: env::var("OXICLOUD_S3_ENDPOINT_URL").ok(),
+                bucket,
+                region: env::var("OXICLOUD_S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
+                access_key: env::var("OXICLOUD_S3_ACCESS_KEY").unwrap_or_default(),
+                secret_key: env::var("OXICLOUD_S3_SECRET_KEY").unwrap_or_default(),
+                force_path_style: env::var("OXICLOUD_S3_FORCE_PATH_STYLE")
+                    .map(|v| v.parse::<bool>().unwrap_or(false))
+                    .unwrap_or(false),
+            });
+        }
+
+        // Azure Blob Storage configuration
+        if config.storage.backend == StorageBackendType::Azure {
+            let container = env::var("OXICLOUD_AZURE_CONTAINER").unwrap_or_default();
+            if container.is_empty() {
+                tracing::warn!(
+                    "OXICLOUD_STORAGE_BACKEND=azure but OXICLOUD_AZURE_CONTAINER is not set"
+                );
+            }
+            config.storage.azure = Some(AzureStorageConfig {
+                account_name: env::var("OXICLOUD_AZURE_ACCOUNT_NAME").unwrap_or_default(),
+                account_key: env::var("OXICLOUD_AZURE_ACCOUNT_KEY").unwrap_or_default(),
+                container,
+                sas_token: env::var("OXICLOUD_AZURE_SAS_TOKEN").ok(),
+            });
+        }
+
+        // Blob cache configuration
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_CACHE_ENABLED") {
+            config.storage.cache.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_CACHE_MAX_SIZE")
+            && let Ok(bytes) = v.parse::<u64>()
+        {
+            config.storage.cache.max_size_bytes = bytes;
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_CACHE_PATH") {
+            config.storage.cache.cache_path = Some(v);
+        }
+
+        // Encryption configuration
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_ENCRYPTION_ENABLED") {
+            config.storage.encryption.enabled = v.parse::<bool>().unwrap_or(false);
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_ENCRYPTION_KEY") {
+            config.storage.encryption.key_base64 = Some(v);
+        }
+
+        // Retry configuration
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_RETRY_ENABLED") {
+            config.storage.retry.enabled = v.parse::<bool>().unwrap_or(true);
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_RETRY_MAX_RETRIES")
+            && let Ok(n) = v.parse::<u32>()
+        {
+            config.storage.retry.max_retries = n;
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_RETRY_INITIAL_BACKOFF_MS")
+            && let Ok(n) = v.parse::<u64>()
+        {
+            config.storage.retry.initial_backoff_ms = n;
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_RETRY_MAX_BACKOFF_MS")
+            && let Ok(n) = v.parse::<u64>()
+        {
+            config.storage.retry.max_backoff_ms = n;
+        }
+        if let Ok(v) = env::var("OXICLOUD_STORAGE_RETRY_BACKOFF_MULTIPLIER")
+            && let Ok(n) = v.parse::<f64>()
+        {
+            config.storage.retry.backoff_multiplier = n;
         }
 
         // OIDC configuration

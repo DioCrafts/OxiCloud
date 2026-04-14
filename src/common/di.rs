@@ -2,10 +2,14 @@ use sqlx::PgPool;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use crate::application::ports::blob_storage_ports::BlobStorageBackend;
+use crate::common::config::StorageBackendType;
 use crate::infrastructure::db::DbPools;
 
 use crate::application::services::admin_settings_service::AdminSettingsService;
 use crate::application::services::auth_application_service::AuthApplicationService;
+use crate::application::services::storage_settings_service::StorageSettingsService;
+use crate::infrastructure::services::migration_blob_backend::MigrationState;
 
 use crate::application::ports::file_ports::FileUseCaseFactory;
 use crate::application::services::favorites_service::FavoritesService;
@@ -153,10 +157,110 @@ impl AppServiceFactory {
         );
         image_transcode_service.initialize().await?;
 
+        // Build blob storage backend based on configuration
+        let base_backend: Arc<dyn BlobStorageBackend> = match self.config.storage.backend {
+            StorageBackendType::S3 => {
+                let s3_config = self
+                    .config
+                    .storage
+                    .s3
+                    .as_ref()
+                    .expect("S3 config required when OXICLOUD_STORAGE_BACKEND=s3");
+                Arc::new(
+                    crate::infrastructure::services::s3_blob_backend::S3BlobBackend::new(s3_config),
+                )
+            }
+            StorageBackendType::Azure => {
+                let az_config = self
+                    .config
+                    .storage
+                    .azure
+                    .as_ref()
+                    .expect("Azure config required when OXICLOUD_STORAGE_BACKEND=azure");
+                Arc::new(
+                    crate::infrastructure::services::azure_blob_backend::AzureBlobBackend::new(
+                        az_config,
+                    ),
+                )
+            }
+            StorageBackendType::Local => Arc::new(
+                crate::infrastructure::services::local_blob_backend::LocalBlobBackend::new(
+                    &self.storage_path,
+                ),
+            ),
+        };
+
+        // Stack decorators: retry → encryption → cache (inner-to-outer)
+        let mut blob_backend: Arc<dyn BlobStorageBackend> = base_backend;
+
+        // Retry decorator (for remote backends)
+        if self.config.storage.retry.enabled
+            && self.config.storage.backend != StorageBackendType::Local
+        {
+            use crate::infrastructure::services::retry_blob_backend::{
+                RetryBlobBackend, RetryPolicy,
+            };
+            let policy = RetryPolicy {
+                max_retries: self.config.storage.retry.max_retries,
+                initial_backoff: std::time::Duration::from_millis(
+                    self.config.storage.retry.initial_backoff_ms,
+                ),
+                max_backoff: std::time::Duration::from_millis(
+                    self.config.storage.retry.max_backoff_ms,
+                ),
+                backoff_multiplier: self.config.storage.retry.backoff_multiplier,
+            };
+            blob_backend = Arc::new(RetryBlobBackend::new(blob_backend, policy));
+            tracing::info!("Blob storage retry decorator enabled");
+        }
+
+        // Encryption decorator
+        if self.config.storage.encryption.enabled {
+            use crate::infrastructure::services::encrypted_blob_backend::EncryptedBlobBackend;
+            let key_b64 = self
+                .config
+                .storage
+                .encryption
+                .key_base64
+                .as_ref()
+                .expect("OXICLOUD_STORAGE_ENCRYPTION_KEY required when encryption is enabled");
+            let key_bytes =
+                base64::Engine::decode(&base64::engine::general_purpose::STANDARD, key_b64)
+                    .expect("OXICLOUD_STORAGE_ENCRYPTION_KEY must be valid base64");
+            let key: [u8; 32] = key_bytes.try_into().expect(
+                "OXICLOUD_STORAGE_ENCRYPTION_KEY must be exactly 32 bytes (base64 of 32 bytes)",
+            );
+            blob_backend = Arc::new(EncryptedBlobBackend::new(blob_backend, &key));
+            tracing::info!("Blob storage encryption decorator enabled (AES-256-GCM)");
+        }
+
+        // Cache decorator (for remote backends only)
+        if self.config.storage.cache.enabled
+            && self.config.storage.backend != StorageBackendType::Local
+        {
+            use crate::infrastructure::services::cached_blob_backend::{
+                BlobCacheConfig as CacheCfg, CachedBlobBackend,
+            };
+            let cache_path = self
+                .config
+                .storage
+                .cache
+                .cache_path
+                .as_ref()
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| self.storage_path.join(".blob-cache"));
+            let cfg = CacheCfg {
+                cache_dir: cache_path,
+                max_cache_bytes: self.config.storage.cache.max_size_bytes,
+            };
+            blob_backend = Arc::new(CachedBlobBackend::new(blob_backend, &cfg));
+            tracing::info!("Blob storage LRU disk cache enabled");
+        }
+
         // Deduplication service — PRIMARY blob storage engine (PostgreSQL-backed index)
         let dedup_service = Arc::new(
             crate::infrastructure::services::dedup_service::DedupService::new(
-                &self.storage_path,
+                blob_backend,
                 db_pool.clone(),
                 maintenance_pool.clone(),
             ),
@@ -631,6 +735,8 @@ impl AppServiceFactory {
             auth_service: auth_services,
             nextcloud: nextcloud_services,
             admin_settings_service: None,
+            storage_settings_service: None,
+            migration_state: Arc::new(tokio::sync::RwLock::new(MigrationState::default())),
             trash_service,
             share_service,
             favorites_service,
@@ -699,6 +805,15 @@ impl AppServiceFactory {
             }
 
             app_state.admin_settings_service = Some(admin_svc.clone());
+
+            // 9b-1b. Wire storage settings service (reuses same settings_repo)
+            let storage_settings_svc = Arc::new(StorageSettingsService::new(
+                settings_repo.clone(),
+                self.config.storage.clone(),
+                app_state.core.dedup_service.clone(),
+            ));
+            app_state.storage_settings_service = Some(storage_settings_svc);
+            tracing::info!("Storage settings service initialized");
 
             // 9b-2. Log whether system needs first-time admin setup
             if !admin_svc.is_system_initialized().await {
@@ -928,6 +1043,8 @@ pub struct AppState {
     pub auth_service: Option<AuthServices>,
     pub nextcloud: Option<NextcloudServices>,
     pub admin_settings_service: Option<Arc<AdminSettingsService>>,
+    pub storage_settings_service: Option<Arc<StorageSettingsService>>,
+    pub migration_state: Arc<tokio::sync::RwLock<MigrationState>>,
     pub trash_service: Option<Arc<TrashService>>,
     pub share_service: Option<Arc<ShareService>>,
     pub favorites_service: Option<Arc<FavoritesService>>,

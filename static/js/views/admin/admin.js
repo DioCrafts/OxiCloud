@@ -138,6 +138,7 @@ function switchTab(name, el) {
     activeTabName = name;
     if (name === 'users') loadUsers();
     if (name === 'dashboard') loadDashboard();
+    if (name === 'storage') loadStorage();
 }
 
 async function loadDashboard() {
@@ -693,6 +694,353 @@ async function saveOidcSettings() {
     btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.save_btn'))}`;
 }
 
+/* ── Storage tab ── */
+
+const STORAGE_PRESETS = {
+    'custom':        { endpoint: '',                                    region: '',            pathStyle: false },
+    'aws':           { endpoint: '',                                    region: 'us-east-1',   pathStyle: false },
+    'backblaze':     { endpoint: 'https://s3.{region}.backblazeb2.com', region: 'us-west-004', pathStyle: false },
+    'cloudflare-r2': { endpoint: 'https://{accountId}.r2.cloudflarestorage.com', region: 'auto', pathStyle: true },
+    'minio':         { endpoint: 'http://localhost:9000',               region: 'us-east-1',   pathStyle: true },
+    'digitalocean':  { endpoint: 'https://{region}.digitaloceanspaces.com', region: 'nyc3',    pathStyle: false },
+    'wasabi':        { endpoint: 'https://s3.{region}.wasabisys.com',   region: 'us-east-1',   pathStyle: false },
+};
+
+function toggleS3Form(visible) {
+    if (visible) showElement('storage-s3-form');
+    else hideElement('storage-s3-form');
+}
+
+function onStoragePresetChange() {
+    const preset = document.getElementById('storage-preset').value;
+    const p = STORAGE_PRESETS[preset];
+    if (!p) return;
+    if (p.endpoint) document.getElementById('storage-endpoint-url').value = p.endpoint;
+    if (p.region) document.getElementById('storage-region').value = p.region;
+    document.getElementById('storage-path-style').checked = p.pathStyle;
+}
+
+function showStorageStatus(msg, type) {
+    const el = document.getElementById('storage-status');
+    el.textContent = msg;
+    el.className = `alert alert-${type}`;
+}
+
+async function loadStorage() {
+    try {
+        const resp = await fetch(`${API}/admin/settings/storage`, {
+            headers: headers(),
+            credentials: 'same-origin'
+        });
+        if (!resp.ok) return;
+        const s = await resp.json();
+
+        // Backend selector
+        document.querySelectorAll('input[name="storage-backend"]').forEach((r) => {
+            r.checked = r.value === s.backend;
+        });
+        toggleS3Form(s.backend === 's3');
+
+        // S3 fields
+        document.getElementById('storage-endpoint-url').value = s.s3_endpoint_url || '';
+        document.getElementById('storage-bucket').value = s.s3_bucket || '';
+        document.getElementById('storage-region').value = s.s3_region || '';
+        document.getElementById('storage-access-key').value = '';
+        document.getElementById('storage-secret-key').value = '';
+        document.getElementById('storage-path-style').checked = s.s3_force_path_style;
+
+        // Secret hints
+        if (s.s3_access_key_set) {
+            document.getElementById('storage-access-key').placeholder = t('admin.storage_key_placeholder') || 'Leave empty to keep current value';
+        }
+        if (s.s3_secret_key_set) {
+            showElement('storage-secret-hint');
+        } else {
+            hideElement('storage-secret-hint');
+        }
+
+        // ENV badges
+        (s.env_overrides || []).forEach((field) => {
+            const badge = document.getElementById(`badge-${field}`);
+            if (badge) badge.innerHTML = '<span class="badge badge-env">ENV</span>';
+        });
+
+        // Status section
+        document.getElementById('storage-current-backend').textContent = s.current_backend || '—';
+        document.getElementById('storage-total-blobs').textContent = s.total_blobs != null ? s.total_blobs.toLocaleString() : '—';
+        document.getElementById('storage-total-size').textContent = s.total_bytes_stored != null ? formatBytes(s.total_bytes_stored) : '—';
+        document.getElementById('storage-dedup-ratio').textContent = s.dedup_ratio != null ? `${s.dedup_ratio.toFixed(2)}x` : '—';
+    } catch (e) {
+        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+    }
+
+    // Also load migration status
+    loadMigrationStatus();
+}
+
+async function saveStorageSettings() {
+    const btn = document.getElementById('btn-save-storage');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.saving'))}`;
+
+    const backend = document.querySelector('input[name="storage-backend"]:checked').value;
+    const body = {
+        backend,
+        s3_endpoint_url: document.getElementById('storage-endpoint-url').value.trim() || null,
+        s3_bucket: document.getElementById('storage-bucket').value.trim() || null,
+        s3_region: document.getElementById('storage-region').value.trim() || null,
+        s3_access_key: document.getElementById('storage-access-key').value || null,
+        s3_secret_key: document.getElementById('storage-secret-key').value || null,
+        s3_force_path_style: document.getElementById('storage-path-style').checked
+    };
+
+    try {
+        const resp = await fetch(`${API}/admin/settings/storage`, {
+            method: 'PUT',
+            headers: headers(),
+            credentials: 'same-origin',
+            body: JSON.stringify(body)
+        });
+        if (resp.ok) {
+            showStorageStatus(t('admin.storage_saved') || 'Storage settings saved successfully', 'success');
+            loadStorage();
+        } else {
+            const e = await resp.json().catch(() => ({}));
+            showStorageStatus(`Error: ${e.message || resp.statusText}`, 'error');
+        }
+    } catch (e) {
+        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.storage_save') || 'Save')}`;
+}
+
+async function testStorageConnection() {
+    const btn = document.getElementById('btn-test-storage');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.testing') || 'Testing...')}`;
+
+    const backend = document.querySelector('input[name="storage-backend"]:checked').value;
+    const body = {
+        backend,
+        s3_endpoint_url: document.getElementById('storage-endpoint-url').value.trim() || null,
+        s3_bucket: document.getElementById('storage-bucket').value.trim() || null,
+        s3_region: document.getElementById('storage-region').value.trim() || null,
+        s3_access_key: document.getElementById('storage-access-key').value || null,
+        s3_secret_key: document.getElementById('storage-secret-key').value || null,
+        s3_force_path_style: document.getElementById('storage-path-style').checked
+    };
+
+    try {
+        const resp = await fetch(`${API}/admin/settings/storage/test`, {
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin',
+            body: JSON.stringify(body)
+        });
+        const r = await resp.json();
+        if (r.connected) {
+            let msg = `${t('admin.storage_test_success') || 'Connection successful'} (${escapeHtml(r.backend_type)})`;
+            if (r.available_bytes != null) msg += ` — ${formatBytes(r.available_bytes)} available`;
+            showStorageStatus(msg, 'success');
+        } else {
+            showStorageStatus(`${t('admin.storage_test_failure') || 'Connection failed'}: ${escapeHtml(r.message)}`, 'error');
+        }
+    } catch (e) {
+        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-vial"></i> ${escapeHtml(t('admin.storage_test_connection') || 'Test Connection')}`;
+}
+
+/* ── Migration ── */
+
+let migrationPollTimer = null;
+
+function showMigrationMsg(msg, type) {
+    const el = document.getElementById('migration-status-msg');
+    el.textContent = msg;
+    el.className = `alert alert-${type}`;
+    el.style.display = '';
+}
+
+function updateMigrationUI(m) {
+    // Status badge
+    const badge = document.getElementById('migration-status-badge');
+    badge.textContent = (m.status || 'idle').charAt(0).toUpperCase() + (m.status || 'idle').slice(1);
+    badge.className = `badge badge-migration badge-migration--${m.status || 'idle'}`;
+
+    const isActive = m.status === 'running' || m.status === 'paused';
+    const isCompleted = m.status === 'completed';
+
+    // Progress section
+    const progressSection = document.getElementById('migration-progress-section');
+    progressSection.style.display = (isActive || isCompleted) ? '' : 'none';
+
+    if (m.total_blobs > 0) {
+        const pct = Math.round((m.migrated_blobs / m.total_blobs) * 100);
+        document.getElementById('migration-progress-fill').style.width = `${pct}%`;
+        document.getElementById('migration-progress-label').textContent =
+            `${m.migrated_blobs.toLocaleString()} / ${m.total_blobs.toLocaleString()} blobs (${pct}%)`;
+        document.getElementById('migration-bytes-label').textContent =
+            `${formatBytes(m.migrated_bytes)} transferred`;
+
+        if (m.throughput_bytes_per_sec && m.status === 'running') {
+            document.getElementById('migration-throughput').textContent =
+                `${formatBytes(Math.round(m.throughput_bytes_per_sec))}/s`;
+            const remaining = m.total_blobs - m.migrated_blobs;
+            if (remaining > 0 && m.throughput_bytes_per_sec > 0) {
+                const avgBlobSize = m.migrated_bytes / Math.max(m.migrated_blobs, 1);
+                const etaSecs = Math.round((remaining * avgBlobSize) / m.throughput_bytes_per_sec);
+                const etaMin = Math.ceil(etaSecs / 60);
+                document.getElementById('migration-eta').textContent =
+                    `~${etaMin} min remaining`;
+            }
+        } else {
+            document.getElementById('migration-throughput').textContent = '';
+            document.getElementById('migration-eta').textContent = '';
+        }
+    }
+
+    // Failed blobs section
+    const failedSection = document.getElementById('migration-failed-section');
+    if (m.failed_blobs && m.failed_blobs.length > 0) {
+        failedSection.style.display = '';
+        document.getElementById('migration-failed-count').textContent = m.failed_blobs.length;
+        document.getElementById('migration-failed-list').textContent = m.failed_blobs.join('\n');
+    } else {
+        failedSection.style.display = 'none';
+    }
+
+    // Button visibility
+    document.getElementById('btn-start-migration').style.display =
+        (!isActive && !isCompleted) ? '' : 'none';
+    document.getElementById('btn-pause-migration').style.display =
+        m.status === 'running' ? '' : 'none';
+    document.getElementById('btn-resume-migration').style.display =
+        m.status === 'paused' ? '' : 'none';
+    document.getElementById('btn-verify-migration').style.display =
+        isCompleted ? '' : 'none';
+    document.getElementById('btn-complete-migration').style.display =
+        isCompleted ? '' : 'none';
+}
+
+async function loadMigrationStatus() {
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration`, {
+            headers: headers(),
+            credentials: 'same-origin'
+        });
+        if (!resp.ok) return;
+        const m = await resp.json();
+        updateMigrationUI(m);
+
+        // Auto-poll while running
+        if (m.status === 'running') {
+            if (!migrationPollTimer) {
+                migrationPollTimer = setInterval(loadMigrationStatus, 2000);
+            }
+        } else if (migrationPollTimer) {
+            clearInterval(migrationPollTimer);
+            migrationPollTimer = null;
+        }
+    } catch (_e) { /* ignore */ }
+}
+
+async function startMigration() {
+    const btn = document.getElementById('btn-start-migration');
+    btn.disabled = true;
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration/start`, {
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ concurrency: 4 })
+        });
+        if (resp.ok) {
+            showMigrationMsg(t('admin.migration_started') || 'Migration started', 'success');
+            loadMigrationStatus();
+        } else {
+            const e = await resp.json().catch(() => ({}));
+            showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
+        }
+    } catch (e) {
+        showMigrationMsg(t('admin.error_network', { message: e.message }), 'error');
+    }
+    btn.disabled = false;
+}
+
+async function pauseMigration() {
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration/pause`, {
+            method: 'POST', headers: headers(), credentials: 'same-origin'
+        });
+        if (resp.ok) {
+            showMigrationMsg(t('admin.migration_paused_msg') || 'Migration paused', 'success');
+            loadMigrationStatus();
+        }
+    } catch (_e) { /* ignore */ }
+}
+
+async function resumeMigration() {
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration/resume`, {
+            method: 'POST', headers: headers(), credentials: 'same-origin'
+        });
+        if (resp.ok) {
+            showMigrationMsg(t('admin.migration_resumed_msg') || 'Migration resumed', 'success');
+            loadMigrationStatus();
+        }
+    } catch (_e) { /* ignore */ }
+}
+
+async function verifyMigration() {
+    const btn = document.getElementById('btn-verify-migration');
+    btn.disabled = true;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.migration_verifying') || 'Verifying...')}`;
+    const resultDiv = document.getElementById('migration-verify-result');
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration/verify`, {
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ sample_size: 100 })
+        });
+        const r = await resp.json();
+        resultDiv.style.display = '';
+        if (r.passed) {
+            resultDiv.innerHTML = `<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ${escapeHtml(t('admin.migration_verify_passed') || 'Verification passed')}</strong><p>${r.sample_checked} blobs checked, ${r.pg_blob_count} total in database</p></div>`;
+        } else {
+            const issues = [];
+            if (r.missing_in_target.length) issues.push(`${r.missing_in_target.length} missing`);
+            if (r.size_mismatches.length) issues.push(`${r.size_mismatches.length} size mismatches`);
+            resultDiv.innerHTML = `<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ${escapeHtml(t('admin.migration_verify_failed') || 'Verification failed')}</strong><p>${issues.join(', ')}</p></div>`;
+        }
+    } catch (e) {
+        resultDiv.style.display = '';
+        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<i class="fas fa-check-double"></i> ${escapeHtml(t('admin.migration_verify') || 'Verify Integrity')}`;
+}
+
+async function completeMigration() {
+    try {
+        const resp = await fetch(`${API}/admin/storage/migration/complete`, {
+            method: 'POST', headers: headers(), credentials: 'same-origin'
+        });
+        if (resp.ok) {
+            showMigrationMsg(t('admin.migration_completed_msg') || 'Migration finalized. Restart the server to use the new backend.', 'success');
+            loadMigrationStatus();
+        } else {
+            const e = await resp.json().catch(() => ({}));
+            showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
+        }
+    } catch (e) {
+        showMigrationMsg(t('admin.error_network', { message: e.message }), 'error');
+    }
+}
+
 async function init() {
     try {
         const me = await fetch(`${API}/auth/me`, {
@@ -775,6 +1123,9 @@ document.getElementById('tab-btn-users').addEventListener('click', function () {
 document.getElementById('tab-btn-oidc').addEventListener('click', function () {
     switchTab('oidc', this);
 });
+document.getElementById('tab-btn-storage').addEventListener('click', function () {
+    switchTab('storage', this);
+});
 
 document.getElementById('ds-registration').addEventListener('change', function () {
     toggleRegistration(this.checked);
@@ -797,3 +1148,20 @@ document.getElementById('cu-submit').addEventListener('click', submitCreateUser)
 
 document.getElementById('btn-close-reset-pw').addEventListener('click', closeResetPasswordModal);
 document.getElementById('rp-submit').addEventListener('click', submitResetPassword);
+
+/* ── Storage event listeners ── */
+document.querySelectorAll('input[name="storage-backend"]').forEach((r) => {
+    r.addEventListener('change', function () {
+        toggleS3Form(this.value === 's3');
+    });
+});
+document.getElementById('storage-preset').addEventListener('change', onStoragePresetChange);
+document.getElementById('btn-test-storage').addEventListener('click', testStorageConnection);
+document.getElementById('btn-save-storage').addEventListener('click', saveStorageSettings);
+
+/* ── Migration event listeners ── */
+document.getElementById('btn-start-migration').addEventListener('click', startMigration);
+document.getElementById('btn-pause-migration').addEventListener('click', pauseMigration);
+document.getElementById('btn-resume-migration').addEventListener('click', resumeMigration);
+document.getElementById('btn-verify-migration').addEventListener('click', verifyMigration);
+document.getElementById('btn-complete-migration').addEventListener('click', completeMigration);

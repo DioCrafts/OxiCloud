@@ -39,24 +39,22 @@ use sqlx::PgPool;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
-use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
-use tokio_util::io::ReaderStream;
+use tokio::fs;
 
+use crate::application::ports::blob_storage_ports::BlobStorageBackend;
 use crate::application::ports::dedup_ports::{
     BlobMetadataDto, DedupPort, DedupResultDto, DedupStatsDto,
 };
 use crate::domain::errors::{DomainError, ErrorKind};
 
-/// Chunk size for streaming file reads (256 KB)
-const STREAM_CHUNK_SIZE: usize = 256 * 1024;
-
 /// Content-Addressable Storage Service (PostgreSQL-backed)
+///
+/// Delegates all byte-level I/O to a [`BlobStorageBackend`] implementation
+/// (local filesystem, S3, etc.) while keeping BLAKE3 hashing, ref-counting
+/// and the PostgreSQL dedup index here.
 pub struct DedupService {
-    /// Root directory for blob storage on the filesystem
-    blob_root: PathBuf,
-    /// Root directory for temporary files during upload
-    temp_root: PathBuf,
+    /// Pluggable blob storage backend (local FS, S3, …).
+    backend: Arc<dyn BlobStorageBackend>,
     /// PostgreSQL connection pool (dedup index in `storage.blobs`) — primary,
     /// used by request-path operations (store_from_file, etc.).
     pool: Arc<PgPool>,
@@ -65,39 +63,19 @@ pub struct DedupService {
     maintenance_pool: Arc<PgPool>,
 }
 
-/// Compile-time lookup table for the 256 two-digit lowercase hex prefixes ("00"…"ff").
-/// Avoids a `format!("{:02x}", i)` allocation on every iteration of `initialize()`.
-static HEX_PREFIXES: [&str; 256] = [
-    "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "0a", "0b", "0c", "0d", "0e", "0f",
-    "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "1a", "1b", "1c", "1d", "1e", "1f",
-    "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "2a", "2b", "2c", "2d", "2e", "2f",
-    "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "3a", "3b", "3c", "3d", "3e", "3f",
-    "40", "41", "42", "43", "44", "45", "46", "47", "48", "49", "4a", "4b", "4c", "4d", "4e", "4f",
-    "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "5a", "5b", "5c", "5d", "5e", "5f",
-    "60", "61", "62", "63", "64", "65", "66", "67", "68", "69", "6a", "6b", "6c", "6d", "6e", "6f",
-    "70", "71", "72", "73", "74", "75", "76", "77", "78", "79", "7a", "7b", "7c", "7d", "7e", "7f",
-    "80", "81", "82", "83", "84", "85", "86", "87", "88", "89", "8a", "8b", "8c", "8d", "8e", "8f",
-    "90", "91", "92", "93", "94", "95", "96", "97", "98", "99", "9a", "9b", "9c", "9d", "9e", "9f",
-    "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "aa", "ab", "ac", "ad", "ae", "af",
-    "b0", "b1", "b2", "b3", "b4", "b5", "b6", "b7", "b8", "b9", "ba", "bb", "bc", "bd", "be", "bf",
-    "c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "ca", "cb", "cc", "cd", "ce", "cf",
-    "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9", "da", "db", "dc", "dd", "de", "df",
-    "e0", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ea", "eb", "ec", "ed", "ee", "ef",
-    "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "fa", "fb", "fc", "fd", "fe", "ff",
-];
-
 impl DedupService {
     /// Create a new dedup service backed by PostgreSQL.
     ///
+    /// * `backend` — pluggable blob storage (local filesystem, S3, etc.).
     /// * `pool` — primary pool for request-path operations.
     /// * `maintenance_pool` — isolated pool for verify_integrity / garbage_collect.
-    pub fn new(storage_root: &Path, pool: Arc<PgPool>, maintenance_pool: Arc<PgPool>) -> Self {
-        let blob_root = storage_root.join(".blobs");
-        let temp_root = storage_root.join(".dedup_temp");
-
+    pub fn new(
+        backend: Arc<dyn BlobStorageBackend>,
+        pool: Arc<PgPool>,
+        maintenance_pool: Arc<PgPool>,
+    ) -> Self {
         Self {
-            blob_root,
-            temp_root,
+            backend,
             pool,
             maintenance_pool,
         }
@@ -106,6 +84,7 @@ impl DedupService {
     /// Creates a stub instance for testing — never hits PG or the filesystem.
     #[cfg(any(test, feature = "integration_tests"))]
     pub fn new_stub() -> Self {
+        use crate::infrastructure::services::local_blob_backend::LocalBlobBackend;
         let stub_pool = Arc::new(
             sqlx::pool::PoolOptions::<sqlx::Postgres>::new()
                 .max_connections(1)
@@ -113,29 +92,15 @@ impl DedupService {
                 .unwrap(),
         );
         Self {
-            blob_root: std::path::PathBuf::from("/tmp/oxicloud_stub_blobs"),
-            temp_root: std::path::PathBuf::from("/tmp/oxicloud_stub_temp"),
+            backend: Arc::new(LocalBlobBackend::new(Path::new("/tmp/oxicloud_stub_blobs"))),
             pool: stub_pool.clone(),
             maintenance_pool: stub_pool,
         }
     }
 
-    /// Initialize the service (create blob directories on the filesystem).
+    /// Initialize the service (delegate to backend + log stats from PG).
     pub async fn initialize(&self) -> Result<(), DomainError> {
-        // Create directories
-        fs::create_dir_all(&self.blob_root)
-            .await
-            .map_err(DomainError::from)?;
-        fs::create_dir_all(&self.temp_root)
-            .await
-            .map_err(DomainError::from)?;
-
-        // Create hash prefix directories (00-ff)
-        for prefix in &HEX_PREFIXES {
-            fs::create_dir_all(self.blob_root.join(prefix))
-                .await
-                .map_err(DomainError::from)?;
-        }
+        self.backend.initialize().await?;
 
         // Log existing blob stats from PG
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM storage.blobs")
@@ -150,7 +115,8 @@ impl DedupService {
                 .unwrap_or(0);
 
         tracing::info!(
-            "Dedup service initialized (PostgreSQL-backed): {} blobs, {} bytes stored",
+            "Dedup service initialized (backend={}): {} blobs, {} bytes stored",
+            self.backend.backend_type(),
             count,
             total_bytes
         );
@@ -158,12 +124,18 @@ impl DedupService {
         Ok(())
     }
 
+    /// Return a reference to the underlying blob storage backend.
+    pub fn backend(&self) -> &Arc<dyn BlobStorageBackend> {
+        &self.backend
+    }
+
     // ── Path helpers ─────────────────────────────────────────────
 
-    /// Get the blob path for a given hash.
+    /// Get the local blob path for a given hash (if the backend supports it).
     pub fn blob_path(&self, hash: &str) -> PathBuf {
-        let prefix = &hash[0..2];
-        self.blob_root.join(prefix).join(format!("{}.blob", hash))
+        self.backend
+            .local_blob_path(hash)
+            .unwrap_or_else(|| PathBuf::from(format!("remote://{}", hash)))
     }
 
     // ── Hash helpers ─────────────────────────────────────────────
@@ -193,9 +165,9 @@ impl DedupService {
 
     /// Store content with deduplication (streaming from file).
     ///
-    /// **Write-first strategy**: the source file is moved/copied to the
-    /// blob store *before* touching PostgreSQL, so the PG connection is
-    /// never held during disk I/O.
+    /// **Write-first strategy**: the source file is moved/uploaded to the
+    /// blob backend *before* touching PostgreSQL, so the PG connection is
+    /// never held during I/O.
     ///
     /// If `pre_computed_hash` is `Some`, the file will NOT be re-read for
     /// BLAKE3 — saving one full sequential read (the biggest I/O win).
@@ -205,13 +177,6 @@ impl DedupService {
         content_type: Option<String>,
         pre_computed_hash: Option<String>,
     ) -> Result<DedupResultDto, DomainError> {
-        let file_size = fs::metadata(source_path)
-            .await
-            .map_err(|e| {
-                DomainError::internal_error("Dedup", format!("Failed to get file metadata: {}", e))
-            })?
-            .len();
-
         // Use pre-computed hash if available, otherwise calculate (streaming)
         let hash = match pre_computed_hash {
             Some(h) => h,
@@ -220,43 +185,10 @@ impl DedupService {
                 .map_err(DomainError::from)?,
         };
 
+        // ── Phase 1: Place blob in backend (NO PG connection held) ───
+        let file_size = self.backend.put_blob(&hash, source_path).await?;
+
         let blob_path = self.blob_path(&hash);
-
-        // ── Phase 1: Move/place blob on disk (NO PG connection held) ─
-        //
-        // If the blob file already exists on disk, the source is simply
-        // deleted — the file content is identical by definition.
-        if fs::try_exists(&blob_path).await.unwrap_or(false) {
-            // Blob already on disk — discard the source file
-            let _ = fs::remove_file(source_path).await;
-        } else {
-            // Parent directory (xx/) guaranteed to exist — created by initialize()
-
-            // rename is atomic on the same filesystem.  If source and blob
-            // dirs live on different filesystems (rare), this falls back to
-            // copy+delete which is slower but still correct.
-            if let Err(e) = fs::rename(source_path, &blob_path).await {
-                if e.raw_os_error() == Some(18) {
-                    // EXDEV: cross-device link — fall back to copy+delete
-                    fs::copy(source_path, &blob_path).await.map_err(|ce| {
-                        DomainError::internal_error(
-                            "Dedup",
-                            format!("Failed to copy file to blob store: {}", ce),
-                        )
-                    })?;
-                    let _ = fs::remove_file(source_path).await;
-                } else if fs::try_exists(&blob_path).await.unwrap_or(false) {
-                    // Another writer may have placed the blob concurrently
-                    let _ = fs::remove_file(source_path).await;
-                    tracing::debug!("Blob file placed by concurrent writer: {}", e);
-                } else {
-                    return Err(DomainError::internal_error(
-                        "Dedup",
-                        format!("Failed to move file to blob store: {}", e),
-                    ));
-                }
-            }
-        }
 
         // ── Phase 2: Single atomic upsert (~2-4 ms, no explicit TX) ─
         let ref_count: i32 = sqlx::query_scalar(
@@ -415,10 +347,9 @@ impl DedupService {
                 DomainError::internal_error("Dedup", format!("Failed to commit: {}", e))
             })?;
 
-            // Delete blob file AFTER committing PG — the row is gone, so no
-            // concurrent store_from_file can resurrect a reference to this hash.
-            let blob_path = self.blob_path(hash);
-            if let Err(e) = fs::remove_file(&blob_path).await {
+            // Delete blob from backend AFTER committing PG — the row is gone,
+            // so no concurrent store_from_file can resurrect a reference.
+            if let Err(e) = self.backend.delete_blob(hash).await {
                 tracing::warn!("Failed to delete blob file {}: {}", hash, e);
             }
 
@@ -449,31 +380,16 @@ impl DedupService {
 
     // ── Read operations ──────────────────────────────────────────
 
-    /// Stream blob content in 64 KB chunks — constant memory (~64 KB per stream).
-    ///
-    /// A 1 GB file uses the same ~64 KB as a 1 KB file.
+    /// Stream blob content in chunks — constant memory usage.
     pub async fn read_blob_stream(
         &self,
         hash: &str,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
     {
-        let blob_path = self.blob_path(hash);
-        let file = File::open(&blob_path).await.map_err(|e| {
-            DomainError::new(
-                ErrorKind::NotFound,
-                "Blob",
-                format!("Failed to open blob {}: {}", hash, e),
-            )
-        })?;
-        Ok(Box::pin(ReaderStream::with_capacity(
-            file,
-            STREAM_CHUNK_SIZE,
-        )))
+        self.backend.get_blob_stream(hash).await
     }
 
     /// Stream a byte range of a blob — only reads the requested portion.
-    ///
-    /// Uses seek + take so a 1 MB range request on a 1 GB file only reads 1 MB.
     pub async fn read_blob_range_stream(
         &self,
         hash: &str,
@@ -481,49 +397,12 @@ impl DedupService {
         end: Option<u64>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>> + Send>>, DomainError>
     {
-        let blob_path = self.blob_path(hash);
-        let mut file = File::open(&blob_path).await.map_err(|e| {
-            DomainError::new(
-                ErrorKind::NotFound,
-                "Blob",
-                format!("Failed to open blob {}: {}", hash, e),
-            )
-        })?;
-
-        // Seek to the start position
-        file.seek(std::io::SeekFrom::Start(start))
-            .await
-            .map_err(|e| {
-                DomainError::internal_error("Blob", format!("Failed to seek in blob: {}", e))
-            })?;
-
-        // If an end is specified, limit the read with take()
-        if let Some(end_pos) = end {
-            let limit = end_pos.saturating_sub(start);
-            let limited = file.take(limit);
-            Ok(Box::pin(ReaderStream::with_capacity(
-                limited,
-                STREAM_CHUNK_SIZE,
-            )))
-        } else {
-            Ok(Box::pin(ReaderStream::with_capacity(
-                file,
-                STREAM_CHUNK_SIZE,
-            )))
-        }
+        self.backend.get_blob_range_stream(hash, start, end).await
     }
 
     /// Get the size of a blob without reading its content.
     pub async fn blob_size(&self, hash: &str) -> Result<u64, DomainError> {
-        let blob_path = self.blob_path(hash);
-        let meta = fs::metadata(&blob_path).await.map_err(|e| {
-            DomainError::new(
-                ErrorKind::NotFound,
-                "Blob",
-                format!("Failed to stat blob {}: {}", hash, e),
-            )
-        })?;
-        Ok(meta.len())
+        self.backend.blob_size(hash).await
     }
 
     // ── Statistics (computed from PG) ────────────────────────────
@@ -596,56 +475,46 @@ impl DedupService {
 
             // Flush when batch is full or we've exhausted the cursor
             if batch.len() >= VERIFY_CONCURRENCY || (is_done && !batch.is_empty()) {
-                let blob_root = self.blob_root.clone();
+                let backend = self.backend.clone();
                 let current_batch =
                     std::mem::replace(&mut batch, Vec::with_capacity(VERIFY_CONCURRENCY));
 
                 let issues: Vec<String> = stream::iter(current_batch)
                     .map(move |(hash, expected_size)| {
-                        let blob_root = blob_root.clone();
+                        let backend = backend.clone();
                         async move {
-                            let prefix = &hash[0..2];
-                            let blob_path = blob_root.join(prefix).join(format!("{}.blob", hash));
-
                             let mut issues = Vec::new();
 
-                            // Single async metadata() replaces the previous
-                            // blocking .exists() + separate metadata() — one
-                            // stat() syscall instead of two, and non-blocking.
-                            let file_meta = match fs::metadata(&blob_path).await {
-                                Ok(m) => m,
-                                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                                    issues.push(format!("{}: file missing on disk", hash));
-                                    return issues;
+                            // Check existence + size via backend
+                            match backend.blob_size(&hash).await {
+                                Ok(actual_size) => {
+                                    if actual_size != expected_size as u64 {
+                                        issues.push(format!(
+                                            "{}: size mismatch (expected: {}, actual: {})",
+                                            hash, expected_size, actual_size,
+                                        ));
+                                    }
                                 }
-                                Err(e) => {
-                                    issues.push(format!("{}: metadata error ({})", hash, e));
+                                Err(_) => {
+                                    issues.push(format!("{}: blob missing in backend", hash));
                                     return issues;
                                 }
                             };
 
-                            // Check size
-                            if file_meta.len() != expected_size as u64 {
-                                issues.push(format!(
-                                    "{}: size mismatch (expected: {}, actual: {})",
-                                    hash,
-                                    expected_size,
-                                    file_meta.len(),
-                                ));
-                            }
-
-                            // Verify hash
-                            match Self::hash_file(&blob_path).await {
-                                Ok(actual_hash) => {
-                                    if actual_hash != hash {
-                                        issues.push(format!(
-                                            "{}: hash mismatch (actual: {})",
-                                            hash, actual_hash,
-                                        ));
+                            // Verify hash — only possible for local backends
+                            if let Some(blob_path) = backend.local_blob_path(&hash) {
+                                match Self::hash_file(&blob_path).await {
+                                    Ok(actual_hash) => {
+                                        if actual_hash != hash {
+                                            issues.push(format!(
+                                                "{}: hash mismatch (actual: {})",
+                                                hash, actual_hash,
+                                            ));
+                                        }
                                     }
-                                }
-                                Err(e) => {
-                                    issues.push(format!("{}: read error ({})", hash, e));
+                                    Err(e) => {
+                                        issues.push(format!("{}: read error ({})", hash, e));
+                                    }
                                 }
                             }
 
@@ -717,20 +586,20 @@ impl DedupService {
             // Also clean up any thumbnail files for these blob hashes
             // (thumbnails are keyed by blob_hash and live under
             // storage_root/.thumbnails/{icon,preview,large}/{hash}.jpg).
-            let thumbnails_root = self
-                .blob_root
-                .parent()
-                .unwrap_or(&self.blob_root)
-                .join(".thumbnails");
+
             for (hash, size) in &batch {
-                let blob_path = self.blob_path(hash);
-                if let Err(e) = fs::remove_file(&blob_path).await {
+                if let Err(e) = self.backend.delete_blob(hash).await {
                     tracing::warn!("Failed to delete orphan blob file {hash}: {e}");
                 }
-                // Remove associated thumbnail files (best-effort)
-                for dir in &["icon", "preview", "large"] {
-                    let thumb = thumbnails_root.join(dir).join(format!("{hash}.jpg"));
-                    let _ = fs::remove_file(&thumb).await;
+                // Remove associated thumbnail files (best-effort, always local)
+                if let Some(blob_path) = self.backend.local_blob_path(hash)
+                    && let Some(storage_root) = blob_path.ancestors().nth(3)
+                {
+                    let thumbnails_root = storage_root.join(".thumbnails");
+                    for dir in &["icon", "preview", "large"] {
+                        let thumb = thumbnails_root.join(dir).join(format!("{hash}.jpg"));
+                        let _ = fs::remove_file(&thumb).await;
+                    }
                 }
                 total_bytes += *size as u64;
             }

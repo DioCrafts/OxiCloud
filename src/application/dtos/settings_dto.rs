@@ -128,3 +128,97 @@ pub struct DashboardStatsDto {
     pub users_over_quota: i64,
     pub registration_enabled: bool,
 }
+
+// ============================================================================
+// Storage Settings DTOs (Admin Panel)
+// ============================================================================
+
+/// Current storage settings returned to admin UI (secrets masked)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageSettingsDto {
+    /// Active backend type: "local" or "s3"
+    pub backend: String,
+    pub s3_endpoint_url: Option<String>,
+    pub s3_bucket: Option<String>,
+    pub s3_region: Option<String>,
+    /// True if an access key is configured (never reveals the actual value)
+    pub s3_access_key_set: bool,
+    /// True if a secret key is configured (never reveals the actual value)
+    pub s3_secret_key_set: bool,
+    pub s3_force_path_style: bool,
+    /// Field names overridden by environment variables (read-only in UI)
+    pub env_overrides: Vec<String>,
+    // ── Current stats ──
+    pub current_backend: String,
+    pub total_blobs: u64,
+    pub total_bytes_stored: u64,
+    pub dedup_ratio: f64,
+}
+
+/// Request body for saving storage settings from the admin panel
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SaveStorageSettingsDto {
+    pub backend: String,
+    pub s3_endpoint_url: Option<String>,
+    pub s3_bucket: Option<String>,
+    pub s3_region: Option<String>,
+    /// Only update if provided and non-empty (None = keep existing)
+    pub s3_access_key: Option<String>,
+    /// Only update if provided and non-empty (None = keep existing)
+    pub s3_secret_key: Option<String>,
+    pub s3_force_path_style: Option<bool>,
+}
+
+/// Request body for testing a storage connection
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TestStorageConnectionDto {
+    pub backend: String,
+    pub s3_endpoint_url: Option<String>,
+    pub s3_bucket: Option<String>,
+    pub s3_region: Option<String>,
+    pub s3_access_key: Option<String>,
+    pub s3_secret_key: Option<String>,
+    pub s3_force_path_style: Option<bool>,
+}
+
+/// Result of a storage connection test
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StorageTestResultDto {
+    pub connected: bool,
+    pub message: String,
+    pub backend_type: String,
+    pub available_bytes: Option<u64>,
+}
+
+// ============================================================================
+// Migration DTOs (Admin Panel — Storage Migration)
+// ============================================================================
+
+/// Migration progress returned by `GET /api/admin/storage/migration`.
+/// Re-exports the `MigrationState` shape for the admin UI.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MigrationStateDto {
+    pub status: String,
+    pub total_blobs: u64,
+    pub migrated_blobs: u64,
+    pub migrated_bytes: u64,
+    pub failed_blobs: Vec<String>,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    /// Estimated throughput in bytes/sec (for UI ETA calculation).
+    pub throughput_bytes_per_sec: Option<f64>,
+}
+
+/// Request body for `POST /api/admin/storage/migration/start`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StartMigrationDto {
+    /// How many blobs to copy in parallel (default: 4).
+    pub concurrency: Option<usize>,
+}
+
+/// Request body (empty) for `POST /api/admin/storage/migration/verify`.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct VerifyMigrationDto {
+    /// Number of random blobs to sample-check (default: 100).
+    pub sample_size: Option<usize>,
+}

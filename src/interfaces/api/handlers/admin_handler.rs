@@ -8,8 +8,9 @@ use axum::{
 
 use crate::application::dtos::settings_dto::{
     AdminCreateUserDto, AdminResetPasswordDto, DashboardStatsDto, ListUsersQueryDto,
-    SaveOidcSettingsDto, TestOidcConnectionDto, UpdateUserActiveDto, UpdateUserQuotaDto,
-    UpdateUserRoleDto,
+    MigrationStateDto, SaveOidcSettingsDto, SaveStorageSettingsDto, StartMigrationDto,
+    TestOidcConnectionDto, TestStorageConnectionDto, UpdateUserActiveDto, UpdateUserQuotaDto,
+    UpdateUserRoleDto, VerifyMigrationDto,
 };
 use crate::application::ports::auth_ports::TokenServicePort;
 use crate::common::di::AppState;
@@ -24,6 +25,22 @@ pub fn admin_routes() -> Router<Arc<AppState>> {
         .route("/settings/oidc", get(get_oidc_settings))
         .route("/settings/oidc", put(save_oidc_settings))
         .route("/settings/oidc/test", post(test_oidc_connection))
+        // Storage settings
+        .route("/settings/storage", get(get_storage_settings))
+        .route("/settings/storage", put(save_storage_settings))
+        .route("/settings/storage/test", post(test_storage_connection))
+        // Storage migration
+        .route("/storage/migration", get(get_migration_status))
+        .route("/storage/migration/start", post(start_migration))
+        .route("/storage/migration/pause", post(pause_migration))
+        .route("/storage/migration/resume", post(resume_migration))
+        .route("/storage/migration/complete", post(complete_migration))
+        .route("/storage/migration/verify", post(verify_migration))
+        // Encryption key generation
+        .route(
+            "/settings/storage/generate-key",
+            post(generate_encryption_key),
+        )
         .route("/settings/general", get(get_general_settings))
         // Dashboard / stats
         .route("/dashboard", get(get_dashboard_stats))
@@ -146,6 +163,336 @@ async fn test_oidc_connection(
         .map_err(|e| AppError::internal_error(format!("Connection test failed: {}", e)))?;
 
     Ok(Json(result))
+}
+
+// ─────────────────────────────────────────────────────
+// Storage settings handlers
+// ─────────────────────────────────────────────────────
+
+/// GET /api/admin/settings/storage — get storage backend settings
+async fn get_storage_settings(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let svc = state
+        .storage_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Storage settings service not available"))?;
+
+    let settings = svc
+        .get_storage_settings()
+        .await
+        .map_err(|e| AppError::internal_error(format!("Failed to load storage settings: {}", e)))?;
+
+    Ok(Json(settings))
+}
+
+/// PUT /api/admin/settings/storage — save storage backend settings
+async fn save_storage_settings(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(dto): Json<SaveStorageSettingsDto>,
+) -> Result<impl IntoResponse, AppError> {
+    let (user_id, _) = admin_guard(&state, &headers).await?;
+
+    let svc = state
+        .storage_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Storage settings service not available"))?;
+
+    svc.save_storage_settings(dto, user_id)
+        .await
+        .map_err(|e| AppError::internal_error(format!("Failed to save storage settings: {}", e)))?;
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({
+            "message": "Storage settings saved successfully"
+        })),
+    ))
+}
+
+/// POST /api/admin/settings/storage/test — test storage backend connection
+async fn test_storage_connection(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(dto): Json<TestStorageConnectionDto>,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let svc = state
+        .storage_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Storage settings service not available"))?;
+
+    let result = svc
+        .test_storage_connection(dto)
+        .await
+        .map_err(|e| AppError::internal_error(format!("Storage connection test failed: {}", e)))?;
+
+    Ok(Json(result))
+}
+
+// ─────────────────────────────────────────────────────
+// Storage migration handlers
+// ─────────────────────────────────────────────────────
+
+/// GET /api/admin/storage/migration — current migration progress
+async fn get_migration_status(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+    let s = state.migration_state.read().await;
+    Ok(Json(migration_state_to_dto(&s)))
+}
+
+/// POST /api/admin/storage/migration/start — begin background migration
+async fn start_migration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(dto): Json<StartMigrationDto>,
+) -> Result<impl IntoResponse, AppError> {
+    use crate::infrastructure::services::migration_blob_backend::MigrationStatus;
+
+    admin_guard(&state, &headers).await?;
+
+    // Check not already running.
+    {
+        let s = state.migration_state.read().await;
+        if s.status == MigrationStatus::Running {
+            return Err(AppError::bad_request("A migration is already running"));
+        }
+    }
+
+    let pool = state
+        .db_pool
+        .clone()
+        .ok_or_else(|| AppError::internal_error("Database not available"))?;
+
+    let source = state.core.dedup_service.backend().clone();
+    let svc = state
+        .storage_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Storage settings service not available"))?;
+
+    // Build target backend from saved settings.
+    let effective = svc
+        .load_effective_storage_config()
+        .await
+        .map_err(|e| AppError::internal_error(format!("Failed to load storage config: {}", e)))?;
+
+    let target = build_backend_from_config(&effective)
+        .map_err(|e| AppError::internal_error(format!("Failed to build target backend: {}", e)))?;
+    target
+        .initialize()
+        .await
+        .map_err(|e| AppError::internal_error(format!("Target backend init failed: {}", e)))?;
+
+    let concurrency = dto.concurrency.unwrap_or(4).clamp(1, 16);
+    let migration_state = state.migration_state.clone();
+
+    // Spawn the background migration job.
+    tokio::spawn(async move {
+        if let Err(e) = crate::infrastructure::services::migration_job::run_migration(
+            source,
+            target,
+            pool,
+            migration_state,
+            concurrency,
+        )
+        .await
+        {
+            tracing::error!("Migration job error: {}", e);
+        }
+    });
+
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "message": "Migration started" })),
+    ))
+}
+
+/// POST /api/admin/storage/migration/pause — pause running migration
+async fn pause_migration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    use crate::infrastructure::services::migration_blob_backend::MigrationStatus;
+    admin_guard(&state, &headers).await?;
+
+    let mut s = state.migration_state.write().await;
+    if s.status != MigrationStatus::Running {
+        return Err(AppError::bad_request("No running migration to pause"));
+    }
+    s.status = MigrationStatus::Paused;
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "message": "Migration paused" })),
+    ))
+}
+
+/// POST /api/admin/storage/migration/resume — resume paused migration
+async fn resume_migration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    use crate::infrastructure::services::migration_blob_backend::MigrationStatus;
+    admin_guard(&state, &headers).await?;
+
+    // Set status back to Running — the background task checks on each blob.
+    let mut s = state.migration_state.write().await;
+    if s.status != MigrationStatus::Paused {
+        return Err(AppError::bad_request("No paused migration to resume"));
+    }
+    s.status = MigrationStatus::Running;
+    Ok((
+        StatusCode::OK,
+        Json(serde_json::json!({ "message": "Migration resumed" })),
+    ))
+}
+
+/// POST /api/admin/storage/migration/complete — finalize migration
+async fn complete_migration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    use crate::infrastructure::services::migration_blob_backend::MigrationStatus;
+    admin_guard(&state, &headers).await?;
+
+    let s = state.migration_state.read().await;
+    if s.status != MigrationStatus::Completed {
+        return Err(AppError::bad_request(
+            "Migration must be completed (100%) before finalizing",
+        ));
+    }
+    drop(s);
+
+    // Mark as idle — the admin has acknowledged completion.
+    let mut s = state.migration_state.write().await;
+    s.status = MigrationStatus::Idle;
+
+    Ok((
+        StatusCode::OK,
+        Json(
+            serde_json::json!({ "message": "Migration finalized. Restart the server to use the new backend." }),
+        ),
+    ))
+}
+
+/// POST /api/admin/storage/migration/verify — run integrity check
+async fn verify_migration(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(dto): Json<VerifyMigrationDto>,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let pool = state
+        .db_pool
+        .clone()
+        .ok_or_else(|| AppError::internal_error("Database not available"))?;
+
+    let svc = state
+        .storage_settings_service
+        .as_ref()
+        .ok_or_else(|| AppError::internal_error("Storage settings service not available"))?;
+
+    let effective = svc
+        .load_effective_storage_config()
+        .await
+        .map_err(|e| AppError::internal_error(format!("Failed to load storage config: {}", e)))?;
+
+    let target = build_backend_from_config(&effective)
+        .map_err(|e| AppError::internal_error(format!("Failed to build target backend: {}", e)))?;
+    target
+        .initialize()
+        .await
+        .map_err(|e| AppError::internal_error(format!("Target backend init failed: {}", e)))?;
+
+    let sample_size = dto.sample_size.unwrap_or(100).clamp(1, 1000);
+
+    let result =
+        crate::infrastructure::services::migration_job::verify_migration(target, pool, sample_size)
+            .await
+            .map_err(|e| AppError::internal_error(format!("Verification failed: {}", e)))?;
+
+    Ok(Json(result))
+}
+
+/// Helper: convert MigrationState to DTO for JSON serialization.
+fn migration_state_to_dto(
+    s: &crate::infrastructure::services::migration_blob_backend::MigrationState,
+) -> MigrationStateDto {
+    let throughput = match (s.started_at, s.migrated_bytes) {
+        (Some(start), bytes) if bytes > 0 => {
+            let elapsed = chrono::Utc::now()
+                .signed_duration_since(start)
+                .num_seconds()
+                .max(1) as f64;
+            Some(bytes as f64 / elapsed)
+        }
+        _ => None,
+    };
+
+    MigrationStateDto {
+        status: format!("{:?}", s.status).to_lowercase(),
+        total_blobs: s.total_blobs,
+        migrated_blobs: s.migrated_blobs,
+        migrated_bytes: s.migrated_bytes,
+        failed_blobs: s.failed_blobs.clone(),
+        started_at: s.started_at.map(|d| d.to_rfc3339()),
+        completed_at: s.completed_at.map(|d| d.to_rfc3339()),
+        throughput_bytes_per_sec: throughput,
+    }
+}
+
+/// POST /api/admin/settings/storage/generate-key — generate a random AES-256 key.
+async fn generate_encryption_key(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Result<impl IntoResponse, AppError> {
+    admin_guard(&state, &headers).await?;
+
+    let key =
+        crate::infrastructure::services::encrypted_blob_backend::EncryptedBlobBackend::generate_key(
+        );
+    let key_b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, key);
+
+    Ok(Json(serde_json::json!({
+        "key": key_b64,
+        "warning": "Store this key securely. If lost, encrypted data is IRRECOVERABLY LOST."
+    })))
+}
+
+/// Helper: build a BlobStorageBackend from StorageConfig.
+fn build_backend_from_config(
+    config: &crate::common::config::StorageConfig,
+) -> Result<
+    std::sync::Arc<dyn crate::application::ports::blob_storage_ports::BlobStorageBackend>,
+    String,
+> {
+    match config.backend {
+        crate::common::config::StorageBackendType::Local => Ok(std::sync::Arc::new(
+            crate::infrastructure::services::local_blob_backend::LocalBlobBackend::new(
+                std::path::Path::new(&config.root_dir),
+            ),
+        )),
+        crate::common::config::StorageBackendType::S3 => {
+            let s3 = config.s3.as_ref().ok_or("S3 config missing")?;
+            Ok(std::sync::Arc::new(
+                crate::infrastructure::services::s3_blob_backend::S3BlobBackend::new(s3),
+            ))
+        }
+        crate::common::config::StorageBackendType::Azure => {
+            let az = config.azure.as_ref().ok_or("Azure config missing")?;
+            Ok(std::sync::Arc::new(
+                crate::infrastructure::services::azure_blob_backend::AzureBlobBackend::new(az),
+            ))
+        }
+    }
 }
 
 /// GET /api/admin/settings/general — system overview (backward compat)

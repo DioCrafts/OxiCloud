@@ -53,6 +53,9 @@
                     <button class="admin-tab" id="tab-btn-oidc">
                         <i class="fas fa-key"></i> <span data-i18n="admin.tab_oidc">SSO / OIDC</span>
                     </button>
+                    <button class="admin-tab" id="tab-btn-storage">
+                        <i class="fas fa-database"></i> <span data-i18n="admin.tab_storage">Storage</span>
+                    </button>
                 </div>
 
                 <div id="tab-dashboard" class="tab-content active">
@@ -421,6 +424,183 @@
                                 </button>
                             </div>
                             <div id="oidc-status" class="alert"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ════════ Storage tab ════════ -->
+                <div id="tab-storage" class="tab-content">
+                    <div class="admin-card">
+                        <h2>
+                            <i class="fas fa-database"></i> <span data-i18n="admin.storage_title">Storage Backend</span>
+                        </h2>
+
+                        <!-- Current status -->
+                        <div class="storage-status-grid">
+                            <div class="storage-stat">
+                                <span class="storage-stat__label" data-i18n="admin.storage_current_backend">Active Backend</span>
+                                <span class="storage-stat__value" id="storage-current-backend">—</span>
+                            </div>
+                            <div class="storage-stat">
+                                <span class="storage-stat__label" data-i18n="admin.storage_total_blobs">Total Blobs</span>
+                                <span class="storage-stat__value" id="storage-total-blobs">—</span>
+                            </div>
+                            <div class="storage-stat">
+                                <span class="storage-stat__label" data-i18n="admin.storage_total_size">Total Size</span>
+                                <span class="storage-stat__value" id="storage-total-size">—</span>
+                            </div>
+                            <div class="storage-stat">
+                                <span class="storage-stat__label" data-i18n="admin.storage_dedup_ratio">Dedup Ratio</span>
+                                <span class="storage-stat__value" id="storage-dedup-ratio">—</span>
+                            </div>
+                        </div>
+
+                        <!-- Backend selector -->
+                        <div class="storage-backend-selector">
+                            <label class="storage-backend-option">
+                                <input type="radio" name="storage-backend" value="local" checked />
+                                <span class="storage-backend-option__card">
+                                    <i class="fas fa-hdd"></i>
+                                    <span data-i18n="admin.storage_local">Local Filesystem</span>
+                                </span>
+                            </label>
+                            <label class="storage-backend-option">
+                                <input type="radio" name="storage-backend" value="s3" />
+                                <span class="storage-backend-option__card">
+                                    <i class="fas fa-cloud"></i>
+                                    <span data-i18n="admin.storage_s3">S3-Compatible</span>
+                                </span>
+                            </label>
+                        </div>
+
+                        <!-- S3 form (shown when S3 is selected) -->
+                        <div id="storage-s3-form" class="storage-form" style="display:none">
+                            <!-- Provider preset -->
+                            <div class="form-group">
+                                <label data-i18n="admin.storage_provider_preset">Provider Preset</label>
+                                <select id="storage-preset">
+                                    <option value="custom" data-i18n="admin.storage_preset_custom">Custom</option>
+                                    <option value="aws">Amazon S3</option>
+                                    <option value="backblaze">Backblaze B2</option>
+                                    <option value="cloudflare-r2">Cloudflare R2</option>
+                                    <option value="minio">MinIO</option>
+                                    <option value="digitalocean">DigitalOcean Spaces</option>
+                                    <option value="wasabi">Wasabi</option>
+                                </select>
+                            </div>
+
+                            <!-- Endpoint URL -->
+                            <div class="form-group">
+                                <label><span data-i18n="admin.storage_endpoint_url">Endpoint URL</span>
+                                    <span id="badge-s3_endpoint_url"></span></label>
+                                <input type="url" id="storage-endpoint-url" placeholder="https://s3.amazonaws.com" />
+                                <small data-i18n="admin.storage_endpoint_hint">Leave empty for Amazon S3 default</small>
+                            </div>
+
+                            <!-- Bucket -->
+                            <div class="form-group">
+                                <label><span data-i18n="admin.storage_bucket">Bucket</span>
+                                    <span id="badge-s3_bucket"></span></label>
+                                <input type="text" id="storage-bucket" placeholder="my-oxicloud-bucket" />
+                            </div>
+
+                            <!-- Region -->
+                            <div class="form-group">
+                                <label><span data-i18n="admin.storage_region">Region</span>
+                                    <span id="badge-s3_region"></span></label>
+                                <input type="text" id="storage-region" placeholder="us-east-1" />
+                            </div>
+
+                            <!-- Access Key -->
+                            <div class="form-group">
+                                <label><span data-i18n="admin.storage_access_key">Access Key ID</span>
+                                    <span id="badge-s3_access_key"></span></label>
+                                <input type="text" id="storage-access-key" placeholder="AKIA..." />
+                            </div>
+
+                            <!-- Secret Key -->
+                            <div class="form-group">
+                                <label><span data-i18n="admin.storage_secret_key">Secret Access Key</span>
+                                    <span id="badge-s3_secret_key"></span></label>
+                                <input type="password" id="storage-secret-key" placeholder="Leave empty to keep current value" />
+                                <small id="storage-secret-hint" style="display:none">
+                                    <i class="fas fa-check-circle secret-icon"></i>
+                                    <span data-i18n="admin.storage_secret_configured">A secret key is already configured</span>
+                                </small>
+                            </div>
+
+                            <!-- Force Path Style -->
+                            <div class="toggle-row">
+                                <label data-i18n="admin.storage_path_style">Force Path Style</label>
+                                <label class="switch">
+                                    <input type="checkbox" id="storage-path-style" /><span class="slider"></span>
+                                </label>
+                            </div>
+                            <small data-i18n="admin.storage_path_style_hint">Required for MinIO and some S3-compatible providers</small>
+                        </div>
+
+                        <!-- Action buttons -->
+                        <div class="storage-actions">
+                            <button class="btn btn-secondary" id="btn-test-storage">
+                                <i class="fas fa-vial"></i> <span data-i18n="admin.storage_test_connection">Test Connection</span>
+                            </button>
+                            <button class="btn btn-primary" id="btn-save-storage">
+                                <i class="fas fa-save"></i> <span data-i18n="admin.storage_save">Save</span>
+                            </button>
+                        </div>
+                        <div id="storage-status" class="alert"></div>
+
+                        <!-- Migration section -->
+                        <div class="storage-migration-section">
+                            <h3><i class="fas fa-exchange-alt"></i> <span data-i18n="admin.storage_migration">Backend Migration</span></h3>
+
+                            <!-- Status badge -->
+                            <div class="migration-status-row">
+                                <span data-i18n="admin.migration_status_label">Status:</span>
+                                <span id="migration-status-badge" class="badge badge-migration badge-migration--idle">Idle</span>
+                            </div>
+
+                            <!-- Progress bar (hidden when idle) -->
+                            <div id="migration-progress-section" style="display:none">
+                                <div class="migration-progress-bar">
+                                    <div class="migration-progress-bar__fill" id="migration-progress-fill" style="width:0%"></div>
+                                </div>
+                                <div class="migration-progress-text">
+                                    <span id="migration-progress-label">0 / 0 blobs (0%)</span>
+                                    <span id="migration-throughput"></span>
+                                </div>
+                                <div class="migration-progress-text">
+                                    <span id="migration-bytes-label"></span>
+                                    <span id="migration-eta"></span>
+                                </div>
+                            </div>
+
+                            <!-- Failed blobs (expandable) -->
+                            <details id="migration-failed-section" style="display:none">
+                                <summary><i class="fas fa-exclamation-triangle"></i> <span id="migration-failed-count">0</span> <span data-i18n="admin.migration_failed_blobs">failed blobs</span></summary>
+                                <pre id="migration-failed-list" class="migration-failed-list"></pre>
+                            </details>
+
+                            <!-- Action buttons -->
+                            <div class="migration-actions">
+                                <button class="btn btn-primary" id="btn-start-migration">
+                                    <i class="fas fa-play"></i> <span data-i18n="admin.migration_start">Start Migration</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-pause-migration" style="display:none">
+                                    <i class="fas fa-pause"></i> <span data-i18n="admin.migration_pause">Pause</span>
+                                </button>
+                                <button class="btn btn-primary" id="btn-resume-migration" style="display:none">
+                                    <i class="fas fa-play"></i> <span data-i18n="admin.migration_resume">Resume</span>
+                                </button>
+                                <button class="btn btn-secondary" id="btn-verify-migration" style="display:none">
+                                    <i class="fas fa-check-double"></i> <span data-i18n="admin.migration_verify">Verify Integrity</span>
+                                </button>
+                                <button class="btn btn-primary" id="btn-complete-migration" style="display:none">
+                                    <i class="fas fa-flag-checkered"></i> <span data-i18n="admin.migration_complete">Finalize</span>
+                                </button>
+                            </div>
+                            <div id="migration-verify-result" style="display:none"></div>
+                            <div id="migration-status-msg" class="alert" style="display:none"></div>
                         </div>
                     </div>
                 </div>

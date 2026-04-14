@@ -58,6 +58,14 @@ dashmap = "6"
 socket2 = { version = "0.6.2", features = ["all"] }
 urlencoding = "2.1.3"
 utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
+aws-sdk-s3 = "1"
+aws-config = { version = "1", features = ["behavior-version-latest"] }
+aws-smithy-types = "1"
+azure_core = "0.21"
+azure_storage = "0.21"
+azure_storage_blobs = "0.21"
+aes-gcm = "0.10"
+lru = "0.12"
 
 [features]
 default = []
