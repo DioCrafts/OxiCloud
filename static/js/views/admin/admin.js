@@ -696,14 +696,15 @@ async function saveOidcSettings() {
 
 /* ── Storage tab ── */
 
+// biome-ignore format: keep the following indent
 const STORAGE_PRESETS = {
-    'custom':        { endpoint: '',                                    region: '',            pathStyle: false },
-    'aws':           { endpoint: '',                                    region: 'us-east-1',   pathStyle: false },
-    'backblaze':     { endpoint: 'https://s3.{region}.backblazeb2.com', region: 'us-west-004', pathStyle: false },
-    'cloudflare-r2': { endpoint: 'https://{accountId}.r2.cloudflarestorage.com', region: 'auto', pathStyle: true },
-    'minio':         { endpoint: 'http://localhost:9000',               region: 'us-east-1',   pathStyle: true },
-    'digitalocean':  { endpoint: 'https://{region}.digitaloceanspaces.com', region: 'nyc3',    pathStyle: false },
-    'wasabi':        { endpoint: 'https://s3.{region}.wasabisys.com',   region: 'us-east-1',   pathStyle: false },
+    'custom':        { endpoint: '',                                             region: '',            pathStyle: false },
+    'aws':           { endpoint: '',                                             region: 'us-east-1',   pathStyle: false },
+    'backblaze':     { endpoint: 'https://s3.{region}.backblazeb2.com',          region: 'us-west-004', pathStyle: false },
+    'cloudflare-r2': { endpoint: 'https://{accountId}.r2.cloudflarestorage.com', region: 'auto',        pathStyle: true  },
+    'minio':         { endpoint: 'http://localhost:9000',                        region: 'us-east-1',   pathStyle: true  },
+    'digitalocean':  { endpoint: 'https://{region}.digitaloceanspaces.com',      region: 'nyc3',        pathStyle: false },
+    'wasabi':        { endpoint: 'https://s3.{region}.wasabisys.com',            region: 'us-east-1',   pathStyle: false },
 };
 
 function toggleS3Form(visible) {
@@ -875,26 +876,23 @@ function updateMigrationUI(m) {
 
     // Progress section
     const progressSection = document.getElementById('migration-progress-section');
-    progressSection.style.display = (isActive || isCompleted) ? '' : 'none';
+    progressSection.style.display = isActive || isCompleted ? '' : 'none';
 
     if (m.total_blobs > 0) {
         const pct = Math.round((m.migrated_blobs / m.total_blobs) * 100);
         document.getElementById('migration-progress-fill').style.width = `${pct}%`;
         document.getElementById('migration-progress-label').textContent =
             `${m.migrated_blobs.toLocaleString()} / ${m.total_blobs.toLocaleString()} blobs (${pct}%)`;
-        document.getElementById('migration-bytes-label').textContent =
-            `${formatBytes(m.migrated_bytes)} transferred`;
+        document.getElementById('migration-bytes-label').textContent = `${formatBytes(m.migrated_bytes)} transferred`;
 
         if (m.throughput_bytes_per_sec && m.status === 'running') {
-            document.getElementById('migration-throughput').textContent =
-                `${formatBytes(Math.round(m.throughput_bytes_per_sec))}/s`;
+            document.getElementById('migration-throughput').textContent = `${formatBytes(Math.round(m.throughput_bytes_per_sec))}/s`;
             const remaining = m.total_blobs - m.migrated_blobs;
             if (remaining > 0 && m.throughput_bytes_per_sec > 0) {
                 const avgBlobSize = m.migrated_bytes / Math.max(m.migrated_blobs, 1);
                 const etaSecs = Math.round((remaining * avgBlobSize) / m.throughput_bytes_per_sec);
                 const etaMin = Math.ceil(etaSecs / 60);
-                document.getElementById('migration-eta').textContent =
-                    `~${etaMin} min remaining`;
+                document.getElementById('migration-eta').textContent = `~${etaMin} min remaining`;
             }
         } else {
             document.getElementById('migration-throughput').textContent = '';
@@ -913,16 +911,11 @@ function updateMigrationUI(m) {
     }
 
     // Button visibility
-    document.getElementById('btn-start-migration').style.display =
-        (!isActive && !isCompleted) ? '' : 'none';
-    document.getElementById('btn-pause-migration').style.display =
-        m.status === 'running' ? '' : 'none';
-    document.getElementById('btn-resume-migration').style.display =
-        m.status === 'paused' ? '' : 'none';
-    document.getElementById('btn-verify-migration').style.display =
-        isCompleted ? '' : 'none';
-    document.getElementById('btn-complete-migration').style.display =
-        isCompleted ? '' : 'none';
+    document.getElementById('btn-start-migration').style.display = !isActive && !isCompleted ? '' : 'none';
+    document.getElementById('btn-pause-migration').style.display = m.status === 'running' ? '' : 'none';
+    document.getElementById('btn-resume-migration').style.display = m.status === 'paused' ? '' : 'none';
+    document.getElementById('btn-verify-migration').style.display = isCompleted ? '' : 'none';
+    document.getElementById('btn-complete-migration').style.display = isCompleted ? '' : 'none';
 }
 
 async function loadMigrationStatus() {
@@ -944,7 +937,9 @@ async function loadMigrationStatus() {
             clearInterval(migrationPollTimer);
             migrationPollTimer = null;
         }
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+        /* ignore */
+    }
 }
 
 async function startMigration() {
@@ -973,25 +968,33 @@ async function startMigration() {
 async function pauseMigration() {
     try {
         const resp = await fetch(`${API}/admin/storage/migration/pause`, {
-            method: 'POST', headers: headers(), credentials: 'same-origin'
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin'
         });
         if (resp.ok) {
             showMigrationMsg(t('admin.migration_paused_msg') || 'Migration paused', 'success');
             loadMigrationStatus();
         }
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+        /* ignore */
+    }
 }
 
 async function resumeMigration() {
     try {
         const resp = await fetch(`${API}/admin/storage/migration/resume`, {
-            method: 'POST', headers: headers(), credentials: 'same-origin'
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin'
         });
         if (resp.ok) {
             showMigrationMsg(t('admin.migration_resumed_msg') || 'Migration resumed', 'success');
             loadMigrationStatus();
         }
-    } catch (_e) { /* ignore */ }
+    } catch (_e) {
+        /* ignore */
+    }
 }
 
 async function verifyMigration() {
@@ -1027,7 +1030,9 @@ async function verifyMigration() {
 async function completeMigration() {
     try {
         const resp = await fetch(`${API}/admin/storage/migration/complete`, {
-            method: 'POST', headers: headers(), credentials: 'same-origin'
+            method: 'POST',
+            headers: headers(),
+            credentials: 'same-origin'
         });
         if (resp.ok) {
             showMigrationMsg(t('admin.migration_completed_msg') || 'Migration finalized. Restart the server to use the new backend.', 'success');
