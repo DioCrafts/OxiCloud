@@ -55,3 +55,7 @@ front-fmt:
 
 front-lint:
     biome lint static/
+
+# check CSS rules
+front-rules:
+    stylelint static/css/

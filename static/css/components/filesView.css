@@ -36,7 +36,7 @@
 }
 
 .file-item {
-    background-color: var(--color-bg-surface);
+    background-color: var(--color-item);
 }
 
 .file-item.selected {
@@ -44,7 +44,7 @@
 }
 
 .file-item:hover {
-    background-color: var(--color-bg-hover);
+    background-color: var(--color-item-hover);
     border-color: var(--color-border-medium);
 }
 
@@ -101,7 +101,7 @@
     width: 100%;
     border-radius: 10px;
     overflow: hidden;
-    background-color: var(--color-bg-surface);
+    background-color: var(--color-item);
     box-shadow: 0 1px 3px var(--color-shadow-xs);
 }
 
@@ -269,7 +269,7 @@
     width: 22px;
     height: 22px;
     border-radius: 6px;
-    background: var(--color-bg-surface);
+    background: var(--color-item);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -426,7 +426,7 @@
     grid-template-columns: var(--dragged-files-list-columns);
     column-gap: 12px;
     align-items: center;
-    background-color: var(--color-bg-surface);
+    background-color: var(--color-item);
     display: flex;
     padding: 4px;
     width: 360px;
@@ -447,8 +447,8 @@
 }
 
 .dragged-items div.fading {
-    -webkit-mask-image: linear-gradient(to bottom, var(--color-bg-surface) 10%, transparent);
-    mask-image: linear-gradient(to bottom, var(--color-bg-surface) 10%, transparent);
+    -webkit-mask-image: linear-gradient(to bottom, var(--color-item) 10%, transparent);
+    mask-image: linear-gradient(to bottom, var(--color-item) 10%, transparent);
 }
 
 .dragged-items-badge {

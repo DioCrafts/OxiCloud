@@ -501,7 +501,7 @@
 .playlist-track-count {
     margin-left: auto;
     font-size: 12px;
-    color: #718096;
+    color: var(--color-text-muted);
 }
 
 /* Custom confirm dialog */

@@ -56,5 +56,5 @@
 }
 
 .danger:hover {
-    background-color: var(--color-danger-hover);
+    background-color: var(--color-danger-bg-hover);
 }

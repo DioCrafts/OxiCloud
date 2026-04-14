@@ -1,48 +1,47 @@
 {
-  "files": {
-    "includes": ["static/**/*.js", "static/**/*.css", "static/**/*.json" ]
-  },
-  "formatter": {
-    "enabled": true,
-    "indentStyle": "space",
-    "indentWidth": 4,
-    "lineWidth": 160,
-    "lineEnding": "lf"
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "correctness": {
-        "noUnusedVariables": "warn"
-      },
-      "style": {
-        "noDescendingSpecificity": "off"
-      },
-      "complexity": {
-        "noImportantStyles": "off"
-      }
-    }
-  },
-  "javascript": {
-    "formatter": {
-      "indentStyle": "space",
-      "indentWidth": 4,
-      "quoteStyle": "single",
-      "semicolons": "always",
-      "trailingCommas": "none",
-      "bracketSameLine": false,
-      "bracketSpacing": true,
-      "operatorLinebreak": "after"
-
-    }
-  },
-  "css": {
-    "linter": {
-      "enabled": true
+    "files": {
+        "includes": ["static/**/*.js", "static/**/*.css", "static/**/*.json"]
     },
     "formatter": {
-      "enabled": true
+        "enabled": true,
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 160,
+        "lineEnding": "lf"
+    },
+    "linter": {
+        "enabled": true,
+        "rules": {
+            "recommended": true,
+            "correctness": {
+                "noUnusedVariables": "warn"
+            },
+            "style": {
+                "noDescendingSpecificity": "off"
+            },
+            "complexity": {
+                "noImportantStyles": "off"
+            }
+        }
+    },
+    "javascript": {
+        "formatter": {
+            "indentStyle": "space",
+            "indentWidth": 4,
+            "quoteStyle": "single",
+            "semicolons": "always",
+            "trailingCommas": "none",
+            "bracketSameLine": false,
+            "bracketSpacing": true,
+            "operatorLinebreak": "after"
+        }
+    },
+    "css": {
+        "linter": {
+            "enabled": true
+        },
+        "formatter": {
+            "enabled": true
+        }
     }
-  }
 }

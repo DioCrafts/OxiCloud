@@ -79,8 +79,9 @@
     --color-sidebar-bg-to: #0c1322;
 
     /* Items */
-    --color-item-selected: #1a1520;
-    --color-item-hover-accent: #21262d;
+    --color-item-active: #5a5047;
+    --color-item-selected: #39281a;
+    --color-item-hover-accent: #3d342c;
 
     /* Primary */
     /* TODO: rename into primary-blue ? */
