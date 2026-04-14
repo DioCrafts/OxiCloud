@@ -28,16 +28,11 @@ pub struct BlobMetadataDto {
 #[derive(Debug, Clone)]
 pub enum DedupResultDto {
     /// New content was stored (first occurrence).
-    NewBlob {
-        hash: String,
-        size: u64,
-        blob_path: PathBuf,
-    },
+    NewBlob { hash: String, size: u64 },
     /// Content already existed; a reference was added instead.
     ExistingBlob {
         hash: String,
         size: u64,
-        blob_path: PathBuf,
         saved_bytes: u64,
     },
 }
@@ -54,13 +49,6 @@ impl DedupResultDto {
         match self {
             DedupResultDto::NewBlob { size, .. } => *size,
             DedupResultDto::ExistingBlob { size, .. } => *size,
-        }
-    }
-
-    pub fn blob_path(&self) -> &Path {
-        match self {
-            DedupResultDto::NewBlob { blob_path, .. } => blob_path,
-            DedupResultDto::ExistingBlob { blob_path, .. } => blob_path,
         }
     }
 

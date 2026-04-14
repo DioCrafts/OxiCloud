@@ -115,6 +115,29 @@ impl BlobStorageBackend for AzureBlobBackend {
         })
     }
 
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let hash = hash.to_owned();
+        Box::pin(async move {
+            let client = self.blob_client(&hash);
+            let size = data.len() as u64;
+
+            // Idempotent: skip if exists
+            if client.get_properties().await.is_ok() {
+                return Ok(size);
+            }
+
+            client.put_block_blob(data.to_vec()).await.map_err(|e| {
+                DomainError::internal_error("Azure", format!("Failed to upload blob {hash}: {e}"))
+            })?;
+
+            Ok(size)
+        })
+    }
+
     fn get_blob_stream(
         &self,
         hash: &str,

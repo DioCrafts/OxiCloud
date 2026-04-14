@@ -4,6 +4,7 @@
 //! Wasabi, and any other service that implements the S3 API.
 
 use aws_sdk_s3::primitives::ByteStream;
+use bytes::Bytes;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use tokio::fs;
@@ -154,6 +155,48 @@ impl BlobStorageBackend for S3BlobBackend {
             let _ = fs::remove_file(&source_path).await;
 
             Ok(file_size)
+        })
+    }
+
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let hash = hash.to_owned();
+        Box::pin(async move {
+            let key = Self::object_key(&hash);
+            let size = data.len() as u64;
+
+            // Idempotent: skip if already exists
+            if self
+                .client
+                .head_object()
+                .bucket(&self.bucket)
+                .key(&key)
+                .send()
+                .await
+                .is_ok()
+            {
+                return Ok(size);
+            }
+
+            let body = ByteStream::from(data);
+            self.client
+                .put_object()
+                .bucket(&self.bucket)
+                .key(&key)
+                .body(body)
+                .send()
+                .await
+                .map_err(|e| {
+                    DomainError::internal_error(
+                        "S3",
+                        format!("Failed to upload blob {}: {}", hash, e),
+                    )
+                })?;
+
+            Ok(size)
         })
     }
 

@@ -54,6 +54,12 @@ pub trait BlobStorageBackend: Send + Sync + 'static {
     /// without overwriting.  Returns the number of bytes stored.
     fn put_blob(&self, hash: &str, source_path: &Path) -> BoxFut<'_, Result<u64, DomainError>>;
 
+    /// Store a blob from in-memory bytes (used by CDC chunk storage).
+    ///
+    /// Must be **idempotent**: if the blob already exists the call succeeds
+    /// without overwriting.  Returns the number of bytes stored.
+    fn put_blob_from_bytes(&self, hash: &str, data: Bytes) -> BoxFut<'_, Result<u64, DomainError>>;
+
     /// Stream the full blob content in chunks.
     fn get_blob_stream(&self, hash: &str) -> BoxFut<'_, Result<BlobStream, DomainError>>;
 

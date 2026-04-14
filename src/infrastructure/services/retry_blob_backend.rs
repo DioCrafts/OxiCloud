@@ -14,6 +14,7 @@ use crate::application::ports::blob_storage_ports::{
     BlobStorageBackend, BlobStream, StorageHealthStatus,
 };
 use crate::domain::errors::DomainError;
+use bytes::Bytes;
 
 // ── Retry policy ───────────────────────────────────────────────────
 
@@ -134,6 +135,25 @@ impl BlobStorageBackend for RetryBlobBackend {
                 let hash = hash.clone();
                 let path = path.clone();
                 async move { inner.put_blob(&hash, &path).await }
+            })
+            .await
+        })
+    }
+
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let inner = self.inner.clone();
+        let policy = self.policy.clone();
+        let hash = hash.to_string();
+        Box::pin(async move {
+            retry_async(&policy, &format!("put_blob_from_bytes({hash})"), || {
+                let inner = inner.clone();
+                let hash = hash.clone();
+                let data = data.clone();
+                async move { inner.put_blob_from_bytes(&hash, data).await }
             })
             .await
         })

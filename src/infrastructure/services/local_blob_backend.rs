@@ -9,6 +9,8 @@ use tokio::fs::{self, File};
 use tokio::io::AsyncSeekExt;
 use tokio_util::io::ReaderStream;
 
+use bytes::Bytes;
+
 use crate::application::ports::blob_storage_ports::{
     BlobStorageBackend, BlobStream, StorageHealthStatus,
 };
@@ -143,6 +145,33 @@ impl BlobStorageBackend for LocalBlobBackend {
             }
 
             Ok(file_size)
+        })
+    }
+
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let hash = hash.to_owned();
+        Box::pin(async move {
+            let blob_path = self.blob_path(&hash);
+            let size = data.len() as u64;
+
+            // Idempotent: if blob already exists, skip
+            if fs::try_exists(&blob_path).await.unwrap_or(false) {
+                return Ok(size);
+            }
+
+            // Write directly to blob path
+            fs::write(&blob_path, &data).await.map_err(|e| {
+                DomainError::internal_error(
+                    "Blob",
+                    format!("Failed to write blob from bytes: {}", e),
+                )
+            })?;
+
+            Ok(size)
         })
     }
 

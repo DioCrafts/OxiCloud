@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use tokio::sync::RwLock;
@@ -112,6 +113,12 @@ impl BlobStorageBackend for MigrationBlobBackend {
         let hash = hash.to_string();
         let path = source_path.to_path_buf();
         Box::pin(async move { self.target.put_blob(&hash, &path).await })
+    }
+
+    /// Writes bytes to **target** only.
+    fn put_blob_from_bytes(&self, hash: &str, data: Bytes) -> BoxFut<'_, Result<u64, DomainError>> {
+        let hash = hash.to_string();
+        Box::pin(async move { self.target.put_blob_from_bytes(&hash, data).await })
     }
 
     /// Read from target first; fall back to source.

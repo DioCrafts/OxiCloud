@@ -12,6 +12,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use bytes::Bytes;
 use lru::LruCache;
 use std::num::NonZeroUsize;
 use tokio::fs;
@@ -148,6 +149,37 @@ impl BlobStorageBackend for CachedBlobBackend {
             // Also cache locally (best-effort)
             let _ = self_ref.insert_into_cache_static(&hash, &source).await;
             Ok(bytes)
+        })
+    }
+
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let inner = self.inner.clone();
+        let hash = hash.to_string();
+        let self_ref = CachedRef {
+            cache_dir: self.cache_dir.clone(),
+            max_cache_bytes: self.max_cache_bytes,
+            index: self.index.clone(),
+            current_size: self.current_size.clone(),
+        };
+        Box::pin(async move {
+            let size = inner.put_blob_from_bytes(&hash, data.clone()).await?;
+            // Also cache locally (best-effort): write bytes to cache path
+            let dest = self_ref.cached_path(&hash);
+            if let Some(parent) = dest.parent() {
+                let _ = fs::create_dir_all(parent).await;
+            }
+            let _ = fs::write(&dest, &data).await;
+            let data_len = data.len() as u64;
+            let mut idx = self_ref.index.lock().await;
+            if let Some(old) = idx.put(hash, CacheEntry { size: data_len }) {
+                self_ref.current_size.fetch_sub(old.size, Ordering::Relaxed);
+            }
+            self_ref.current_size.fetch_add(data_len, Ordering::Relaxed);
+            Ok(size)
         })
     }
 

@@ -1,89 +1,222 @@
 # 06 - Deduplication
 
-OxiCloud uses **content-addressable deduplication** via SHA-256 hashing. Uploaded file content is hashed and stored in a central blob store. Identical files share the same blob, tracked by a reference counter. Disk savings scale with the number of duplicates.
+OxiCloud uses **content-defined chunking (CDC)** via FastCDC for sub-file deduplication. Files are split into variable-size chunks (64 KB – 1 MB, average 256 KB) using the FastCDC 2020 algorithm. Each chunk is individually BLAKE3-hashed and stored in a pluggable blob backend (local FS, S3, Azure). A PostgreSQL *manifest* maps the whole-file BLAKE3 hash to the ordered list of chunk hashes that compose it. Identical chunks across any files are stored once and reference-counted.
 
-Deduplication is always enabled and non-fatal -- if dedup fails, file operations proceed normally with a warning log.
+Deduplication is always enabled and non-fatal — if dedup fails, file operations proceed normally with a warning log.
+
+**Backward compatibility**: files uploaded before CDC (legacy whole-file blobs in `storage.blobs`) are served transparently. When no manifest row exists for a hash, the service falls back to direct blob reads.
 
 ## Architecture
 
 ```
-User Files (references) ──▶ Dedup Index (hash→metadata) ──▶ Blob Store (actual data)
+┌─────────────────┐     ┌─────────────────────┐     ┌───────────────┐
+│ storage.files   │────▶│ chunk_manifests      │────▶│ storage.blobs │──▶ Blob Store
+│ (references)    │     │ (file→[chunk_hashes])│     │ (chunks)      │    (Local/S3/Azure)
+└─────────────────┘     └─────────────────────┘     └───────────────┘
 ```
 
-### Storage Layout
+### Database Tables
 
-```
-<storage_path>/
-  .blobs/
-    00/ .. ff/              ← 256 prefix directories (hex) for FS distribution
-      <sha256>.blob         ← actual blob files
-  .dedup_temp/              ← temp staging directory for atomic writes
-  .dedup_index.json         ← persistent JSON index (hash → metadata)
-```
+| Table | Schema | Purpose |
+|---|---|---|
+| `storage.chunk_manifests` | `storage` | Maps file_hash → ordered chunk_hashes[] + chunk_sizes[] + ref_count |
+| `storage.blobs` | `storage` | Per-chunk metadata: hash (PK), size, ref_count, content_type |
+
+Defined in `migrations/20260414000000_chunk_manifests.sql`. Blobs table is part of the initial schema.
 
 ### Layer Placement
 
 | Layer | Component | File |
 |---|---|---|
 | Application Port | **DedupPort** trait + DTOs | `src/application/ports/dedup_ports.rs` |
+| Application Port | **BlobStorageBackend** trait | `src/application/ports/blob_storage_ports.rs` |
 | Infrastructure | **DedupService** implementation | `src/infrastructure/services/dedup_service.rs` |
+| Infrastructure | Blob backends (Local, S3, Azure, Retry, Encrypted, Cached, Migration) | `src/infrastructure/services/*_blob_backend.rs` |
 | Interfaces | **DedupHandler** REST endpoints | `src/interfaces/api/handlers/dedup_handler.rs` |
-| Integration | **FileUploadService** (dedup on upload) | `src/application/services/file_upload_service.rs` |
-| Integration | **FileManagementService** (ref-count on delete) | `src/application/services/file_management_service.rs` |
+| Integration | **FileBlobWriteRepository** (dedup on upload) | `src/infrastructure/repositories/pg/file_blob_write_repository.rs` |
+| Integration | **FileBlobReadRepository** (dedup reads) | `src/infrastructure/repositories/pg/file_blob_read_repository.rs` |
 
 ## Constants
 
 | Constant | Value | Description |
 |---|---|---|
-| `HASH_CHUNK_SIZE` | 256 KB (`256 * 1024`) | Chunk size for streaming SHA-256 computation |
-| `MIN_DEDUP_SIZE` | 4 KB (`4096`) | Files below this size skip deduplication |
+| `CDC_MIN_CHUNK` | 64 KB (`65_536`) | Minimum CDC chunk size |
+| `CDC_AVG_CHUNK` | 256 KB (`262_144`) | Average / target CDC chunk size |
+| `CDC_MAX_CHUNK` | 1 MB (`1_048_576`) | Maximum CDC chunk size |
+| `CHUNK_UPLOAD_CONCURRENCY` | 8 | Maximum parallel chunk uploads to blob backend |
 
-Hardcoded in `dedup_service.rs`. No runtime configuration beyond **storage_path**.
+Hardcoded in `dedup_service.rs`.
+
+## Write Path: `store_from_file`
+
+The core write operation follows a **write-first strategy** that never holds a PG connection during disk I/O:
+
+```
+store_from_file(source_path, content_type, pre_computed_hash)
+  │
+  ├─ Fast path: pre_computed_hash provided?
+  │    └─ try_dedup_hit() → check manifest + legacy blob
+  │         └─ Hit? → bump ref_count, delete source, return ExistingBlob
+  │
+  ├─ CDC analysis (single mmap pass, spawn_blocking):
+  │    ├─ Memory-map the file (memmap2)
+  │    ├─ FastCDC 2020 boundary detection → ChunkMeta[]
+  │    └─ BLAKE3 whole-file hash (concurrent with chunking)
+  │
+  ├─ Second dedup check with computed hash (if no pre_computed_hash)
+  │
+  ├─ store_chunks() — 3-phase pipeline:
+  │    │
+  │    ├─ Phase 0: Batch-check existing chunks (single PG query)
+  │    │    SELECT hash FROM storage.blobs WHERE hash = ANY($1)
+  │    │    → HashSet<String> of already-stored chunk hashes
+  │    │
+  │    ├─ Phase 1: Selective disk read (sequential, one pass)
+  │    │    For each chunk:
+  │    │      existing? → skip read (None)
+  │    │      new?      → seek + read_exact → Some(Bytes)
+  │    │
+  │    └─ Phase 2: Parallel operations (buffer_unordered × 8)
+  │         new chunk:      put_blob_from_bytes + INSERT ON CONFLICT
+  │         existing chunk: UPDATE ref_count + 1 (no disk I/O)
+  │
+  ├─ INSERT manifest into storage.chunk_manifests
+  │    (file_hash, chunk_hashes[], chunk_sizes[], total_size, chunk_count)
+  │
+  └─ Delete source file, return NewBlob { hash, size }
+```
+
+### Dedup Skip Optimization
+
+The **biggest I/O saving** for versioned files. Before reading any chunk from disk or uploading it to the blob backend, `store_chunks` batch-queries PG to discover which chunk hashes already exist:
+
+```sql
+SELECT hash FROM storage.blobs WHERE hash = ANY($1)
+```
+
+This single round-trip returns all known chunks. For each existing chunk, the service skips:
+- `seek()` + `read_exact()` from the source file (no disk I/O)
+- `put_blob_from_bytes()` to the backend (no network I/O for S3/Azure)
+
+Only a lightweight `UPDATE ref_count + 1` is executed in PG (~0.1 ms per chunk).
+
+**Impact**: for a 100 MB versioned file where 95% of chunks are unchanged, only ~5 MB is read from disk and uploaded. The remaining 95% costs only PG ref-count bumps.
+
+### Parallel Chunk Storage
+
+Phase 2 of `store_chunks` uses `futures::stream::buffer_unordered(8)` to execute up to 8 concurrent chunk operations. This is a major win for S3/Azure backends where each PUT has 50-200 ms of network latency.
+
+Chunk order in the returned `(chunk_hashes, chunk_sizes)` is preserved by deriving both from the original `ChunkMeta` slice (CDC order), not from the unordered parallel results.
+
+### Full-File Dedup Hit (Fast Path)
+
+When a file with the exact same BLAKE3 hash already has a manifest, `try_dedup_hit` returns immediately:
+- Bumps `chunk_manifests.ref_count`
+- Deletes the source file
+- Returns `ExistingBlob` — **zero chunk I/O**
+
+Also checks legacy whole-file blobs in `storage.blobs` for backward compatibility.
+
+## Read Path
+
+### Streaming Read (`read_blob_stream`)
+
+CDC-aware with legacy fallback:
+
+1. Query `chunk_manifests` for `chunk_hashes[]`
+2. If found: stream chunks in order via `backend.get_blob_stream(chunk_hash)`, concatenated into a single byte stream with `buffered(1) + try_flatten`
+3. If not found: fall back to `backend.get_blob_stream(hash)` for legacy blobs
+
+### Range Read (`read_blob_range_stream`)
+
+For HTTP Range requests (and WOPI/WebDAV partial reads):
+
+1. Query manifest for `chunk_hashes[]`, `chunk_sizes[]`, `total_size`
+2. Calculate which chunks overlap `[start, end)` using cumulative offsets
+3. For each overlapping chunk, compute the sub-range within that chunk
+4. Stream only the relevant chunk portions via `backend.get_blob_range_stream()`
+
+### Blob Size (`blob_size`)
+
+Returns `total_size` from the manifest (O(1) PG lookup). Falls back to `backend.blob_size()` for legacy blobs. Used by HEAD requests for Content-Length.
+
+## Reference Counting
+
+### Adding References (`add_reference`)
+
+Manifest-aware with legacy fallback:
+1. Try `UPDATE chunk_manifests SET ref_count = ref_count + 1 WHERE file_hash = $1`
+2. If no rows affected, try `UPDATE storage.blobs SET ref_count + 1 WHERE hash = $1`
+3. If neither exists, return NotFound error
+
+### Removing References (`remove_reference`)
+
+**CDC manifest path** (transactional):
+1. Check `chunk_manifests` for the file hash
+2. If `ref_count > 1`: decrement manifest ref_count → commit
+3. If `ref_count == 1` (last reference):
+   - `SELECT ... FOR UPDATE` to lock the manifest row
+   - `DELETE FROM chunk_manifests`
+   - `UPDATE storage.blobs SET ref_count = ref_count - 1 WHERE hash = ANY(chunk_hashes)`
+   - `DELETE FROM storage.blobs WHERE hash = ANY(chunk_hashes) AND ref_count <= 0 RETURNING hash`
+   - Commit TX
+   - Delete orphaned chunk blob files from backend (after commit)
+
+**Legacy blob path** (transactional):
+1. `SELECT ref_count, size FROM storage.blobs WHERE hash = $1 FOR UPDATE`
+2. If `ref_count == 1`: `DELETE FROM storage.blobs` + delete blob file
+3. If `ref_count > 1`: `UPDATE SET ref_count = ref_count - 1`
 
 ## Port: DedupPort Trait
 
 Defined in `src/application/ports/dedup_ports.rs`:
 
 ```rust
-#[async_trait]
 pub trait DedupPort: Send + Sync + 'static {
-    /// Store content from bytes, returning dedup result
-    async fn store_bytes(&self, content: &[u8], content_type: Option<String>) -> Result<DedupResultDto, DomainError>;
+    /// Store content with CDC deduplication (from file).
+    async fn store_from_file(
+        &self,
+        source_path: &Path,
+        content_type: Option<String>,
+        pre_computed_hash: Option<String>,
+    ) -> Result<DedupResultDto, DomainError>;
 
-    /// Store content from an existing file path
-    async fn store_from_file(&self, source_path: &Path, content_type: Option<String>) -> Result<DedupResultDto, DomainError>;
-
-    /// Check if a blob exists by hash
+    /// Check if a blob exists by hash (manifest or legacy).
     async fn blob_exists(&self, hash: &str) -> bool;
 
-    /// Get metadata for a blob
+    /// Get metadata for a blob.
     async fn get_blob_metadata(&self, hash: &str) -> Option<BlobMetadataDto>;
 
-    /// Read blob content as Vec<u8>
-    async fn read_blob(&self, hash: &str) -> Result<Vec<u8>, DomainError>;
+    /// Stream blob content — CDC-aware with legacy fallback.
+    async fn read_blob_stream(&self, hash: &str)
+        -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, io::Error>> + Send>>, DomainError>;
 
-    /// Read blob content as Bytes
-    async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError>;
+    /// Stream a byte range — CDC-aware with legacy fallback.
+    async fn read_blob_range_stream(&self, hash: &str, start: u64, end: Option<u64>)
+        -> Result<Pin<Box<dyn Stream<Item = Result<Bytes, io::Error>> + Send>>, DomainError>;
 
-    /// Increment reference count for a blob
+    /// Get blob size without reading content.
+    async fn blob_size(&self, hash: &str) -> Result<u64, DomainError>;
+
+    /// Increment reference count (manifest-aware).
     async fn add_reference(&self, hash: &str) -> Result<(), DomainError>;
 
-    /// Decrement reference count; deletes blob if it reaches 0. Returns true if deleted.
+    /// Decrement reference count. Returns true if blob was deleted.
     async fn remove_reference(&self, hash: &str) -> Result<bool, DomainError>;
 
-    /// Compute SHA-256 hash of bytes (synchronous)
-    fn hash_bytes(&self, content: &[u8]) -> String;
-
-    /// Compute SHA-256 hash of file (streaming)
+    /// Calculate BLAKE3 hash of a file (mmap + rayon).
     async fn hash_file(&self, path: &Path) -> Result<String, DomainError>;
 
-    /// Get deduplication statistics
+    /// Get local filesystem path for a blob hash.
+    fn blob_path(&self, hash: &str) -> PathBuf;
+
+    /// Get deduplication statistics (computed from PG).
     async fn get_stats(&self) -> DedupStatsDto;
 
-    /// Persist index to disk
+    /// Flush index to persistent storage (no-op for PG backend).
     async fn flush(&self) -> Result<(), DomainError>;
 
-    /// Verify integrity of all blobs (existence, hash, size)
+    /// Verify integrity of all stored blobs and manifests.
     async fn verify_integrity(&self) -> Result<Vec<String>, DomainError>;
 }
 ```
@@ -91,22 +224,22 @@ pub trait DedupPort: Send + Sync + 'static {
 ### Port DTOs
 
 ```rust
-/// Result of a dedup store operation
+/// Result of a dedup store operation.
 pub enum DedupResultDto {
-    NewBlob { hash: String, size: u64, blob_path: PathBuf },
-    ExistingBlob { hash: String, size: u64, blob_path: PathBuf, saved_bytes: u64 },
+    NewBlob { hash: String, size: u64 },
+    ExistingBlob { hash: String, size: u64, saved_bytes: u64 },
 }
-// Methods: hash(), size(), blob_path(), was_deduplicated()
+// Methods: hash(), size(), was_deduplicated()
 
-/// Metadata for a stored blob
+/// Metadata for a stored blob.
 pub struct BlobMetadataDto {
-    pub hash: String,           // SHA-256 hex string
+    pub hash: String,           // BLAKE3 hex string
     pub size: u64,
     pub ref_count: u32,
     pub content_type: Option<String>,
 }
 
-/// Aggregate dedup statistics
+/// Aggregate dedup statistics (computed from PG).
 pub struct DedupStatsDto {
     pub total_blobs: u64,
     pub total_bytes_stored: u64,
@@ -125,11 +258,9 @@ Implemented in `src/infrastructure/services/dedup_service.rs`.
 
 ```rust
 pub struct DedupService {
-    blob_root: PathBuf,                                  // <storage>/.blobs
-    temp_root: PathBuf,                                  // <storage>/.dedup_temp
-    index: Arc<RwLock<HashMap<String, BlobMetadata>>>,   // in-memory index
-    index_path: PathBuf,                                 // <storage>/.dedup_index.json
-    stats: Arc<RwLock<DedupStats>>,
+    backend: Arc<dyn BlobStorageBackend>,  // Pluggable blob storage (Local/S3/Azure/...)
+    pool: Arc<PgPool>,                     // Primary pool (request-path operations)
+    maintenance_pool: Arc<PgPool>,         // Isolated pool (verify_integrity, GC)
 }
 ```
 
@@ -137,28 +268,34 @@ pub struct DedupService {
 
 | Method | Description |
 |---|---|
-| `new(storage_root: &Path)` | Constructs paths, initializes empty index |
-| `initialize()` | Creates `.blobs/` (256 prefix dirs), `.dedup_temp/`, loads index JSON |
-| `blob_path(hash: &str)` | Returns `<blob_root>/<first2chars>/<hash>.blob` |
-| `hash_bytes(content: &[u8])` | Static SHA-256 → hex string |
-| `hash_file(path: &Path)` | Streaming SHA-256 of file (256 KB chunks) |
-| `store_bytes(content, content_type)` | Hash → check existing → increment ref or write new blob atomically |
-| `store_from_file(source_path, content_type)` | Hash file → dedup check → move file to blob store |
-| `add_reference(hash)` | Increments **ref_count** + updates stats |
-| `remove_reference(hash)` | Decrements **ref_count**. If 0, deletes blob file + removes from index |
-| `read_blob(hash)` | Reads blob file content |
-| `get_stats()` | Returns current dedup statistics |
-| `flush()` | Saves index to JSON atomically (write to `.json.tmp` then rename) |
-| `verify_integrity()` | Checks every blob: file exists, hash matches, size matches |
-| `garbage_collect()` | Removes blobs with `ref_count == 0`. Returns `(deleted_count, deleted_bytes)` |
+| `new(backend, pool, maintenance_pool)` | Construct — wires pluggable backend + dual PG pools |
+| `initialize()` | Initialize backend + log blob/manifest counts from PG |
+| `cdc_hash_and_chunk_file(path)` | Single mmap pass: BLAKE3 whole-file hash + FastCDC chunk boundaries + per-chunk BLAKE3 |
+| `cdc_chunk_file(path)` | CDC without whole-file hash (when hash is pre-computed) |
+| `hash_file(path)` | BLAKE3 hash via mmap + rayon parallelism |
+| `store_from_file(path, ct, hash)` | CDC → store_chunks → manifest INSERT (main write path) |
+| `try_dedup_hit(hash, path)` | Check manifest/legacy for full-file dedup hit |
+| `store_chunks(path, chunks)` | 3-phase: batch-check → selective read → parallel upload |
+| `blob_exists(hash)` | Check manifest + legacy blob existence |
+| `user_owns_blob_reference(hash, user_id)` | Authorization: check file ownership |
+| `get_blob_metadata(hash)` | Manifest-aware metadata with legacy fallback |
+| `add_reference(hash)` | Manifest-aware ref_count increment |
+| `remove_reference(hash)` | Manifest-aware ref_count decrement + cascade cleanup |
+| `read_blob_stream(hash)` | CDC chunk-streaming with legacy fallback |
+| `read_blob_range_stream(hash, start, end)` | CDC range-streaming with legacy fallback |
+| `blob_size(hash)` | O(1) from manifest, fallback to backend |
+| `get_stats()` | Compute stats from PG (blobs + manifests) |
+| `verify_integrity()` | Verify manifests (counts, sizes) + blobs (existence, size, re-hash) |
+| `garbage_collect()` | Batch-delete orphaned manifests/blobs (uses maintenance pool) |
 
 ### Key Behaviors
 
-- **Atomic writes**: new blobs are written to `.dedup_temp/<uuid>.tmp` then renamed into `.blobs/<prefix>/<hash>.blob`
-- **Index persistence**: auto-saved every 100 new blobs, also saved explicitly via `flush()`
-- **Small file bypass**: files < 4 KB skip deduplication
-- **File move optimization**: `store_from_file` uses `fs::rename` to move the source file into the blob store (zero-copy on same filesystem)
-- **Thread safety**: index and stats are protected by `Arc<RwLock<...>>`
+- **CDC analysis in `spawn_blocking`**: mmap + FastCDC runs off the async runtime to avoid blocking the event loop
+- **Dual PG pools**: request-path operations use the primary pool; `verify_integrity` and `garbage_collect` use the maintenance pool to prevent starvation
+- **Pluggable blob backend**: all chunk I/O goes through `Arc<dyn BlobStorageBackend>` — works with local FS, S3, Azure, or any composed backend (retry, encryption, caching)
+- **Atomic chunk storage**: `put_blob_from_bytes` is idempotent; `INSERT ON CONFLICT` handles concurrent uploads of the same chunk
+- **Delete-after-commit**: blob files are deleted from the backend only after the PG transaction commits, preventing orphaned PG rows
+- **Flush is no-op**: PG handles durability via WAL/commit — no explicit index persistence needed
 
 ## REST API Endpoints
 
@@ -166,7 +303,7 @@ All routes under `/api/dedup`, authentication required.
 
 | Method | Path | Handler | Description |
 |---|---|---|---|
-| `GET` | `/api/dedup/check/{hash}` | `DedupHandler::check_hash` | Check if a blob exists by SHA-256 hash |
+| `GET` | `/api/dedup/check/{hash}` | `DedupHandler::check_hash` | Check if a blob exists by BLAKE3 hash |
 | `POST` | `/api/dedup/upload` | `DedupHandler::upload_with_dedup` | Multipart upload with automatic dedup |
 | `GET` | `/api/dedup/stats` | `DedupHandler::get_stats` | Get deduplication statistics |
 | `GET` | `/api/dedup/blob/{hash}` | `DedupHandler::get_blob` | Retrieve raw blob content by hash |
@@ -184,8 +321,6 @@ All routes under `/api/dedup`, authentication required.
   "ref_count": 3
 }
 ```
-- Validates 64-character hex format for the hash parameter
-- `existing_size` and `ref_count` are omitted when `exists` is `false`
 
 **Dedup Upload** (`POST /api/dedup/upload`):
 ```json
@@ -197,8 +332,6 @@ All routes under `/api/dedup`, authentication required.
   "ref_count": 2
 }
 ```
-- Returns `201 Created` for new blobs, `200 OK` for deduplicated content
-- Accepts multipart form data
 
 **Stats** (`GET /api/dedup/stats`):
 ```json
@@ -213,70 +346,22 @@ All routes under `/api/dedup`, authentication required.
 }
 ```
 
-**Get Blob** (`GET /api/dedup/blob/{hash}`):
-- Returns raw blob content with `Content-Type` from metadata
-- Adds `X-Dedup-Hash` response header
-
-**Remove Reference** (`DELETE /api/dedup/blob/{hash}`):
-```json
-{
-  "success": true,
-  "deleted": true,
-  "message": "Blob deleted (ref count reached 0)"
-}
-```
-
-## Integration with File Upload
-
-**FileUploadService** holds `dedup: Option<Arc<dyn DedupPort>>`.
-
-During `smart_upload()`, dedup runs for **all upload tiers** (write-behind, buffered, streaming):
-
-```rust
-// Inside smart_upload() — dedup runs after data is collected
-{
-    let dedup_data: Vec<u8> = { /* combine all chunks */ };
-    self.run_dedup(&dedup_data, &content_type).await;
-}
-```
-
-The private `run_dedup` method:
-
-```rust
-async fn run_dedup(&self, data: &[u8], content_type: &str) {
-    let Some(dedup) = &self.dedup else { return };
-    match dedup.store_bytes(data, Some(content_type.to_string())).await {
-        Ok(result) => { /* log new or dedup hit */ }
-        Err(e) => { warn!("DEDUP: Failed to store in blob store: {}", e); }
-    }
-}
-```
-
-Dedup is non-fatal -- failures are only logged as warnings. The file upload always completes regardless of dedup outcome.
-
-## Integration with File Deletion
-
-**FileManagementService** holds `dedup_service: Option<Arc<dyn DedupPort>>`.
-
-In `delete_with_cleanup()`:
-
-1. **Compute content hash** -- reads file via **FileReadPort**, calls `dedup.hash_bytes(&content)`
-2. **Delete file** -- tries trash (soft delete) first, falls back to permanent delete
-3. **Decrement dedup ref-count** -- calls `dedup.remove_reference(hash)` which may delete the blob if **ref_count** reaches 0
-
-```rust
-// Private helpers in FileManagementService
-async fn compute_content_hash(&self, id: &str) -> Option<String>
-async fn decrement_dedup_ref(&self, hash: &str)
-```
-
 ## DI Wiring
 
 In `src/common/di.rs`:
 
 ```rust
-// Initialization (in create_core_services)
-let dedup_service = Arc::new(DedupService::new(&self.storage_path));
+// Blob backend is assembled from layered backends:
+// LocalBlobBackend / S3BlobBackend / AzureBlobBackend
+// → RetryBlobBackend → EncryptedBlobBackend → CachedBlobBackend
+let blob_backend: Arc<dyn BlobStorageBackend> = /* ... */;
+
+// DedupService receives the composed blob backend + dual PG pools
+let dedup_service = Arc::new(DedupService::new(
+    blob_backend,
+    db_pool.clone(),
+    maintenance_pool.clone(),
+));
 dedup_service.initialize().await?;
 
 // Stored in CoreServices as:
@@ -285,36 +370,70 @@ pub struct CoreServices {
     // ...
 }
 
-// Injected into blob repositories (which handle dedup internally):
+// Injected into blob repositories:
 FileBlobReadRepository::new(pool, core.dedup_service.clone(), folder_repo)
 FileBlobWriteRepository::new(pool, core.dedup_service.clone(), folder_repo)
-
-// Also injected into FileManagementService for ref cleanup on delete:
-FileManagementService::new_full(write, read, trash, core.dedup_service.clone())
 ```
 
-## Persistence
+## Maintenance
 
-Deduplication uses a **file-based JSON index** (`<storage>/.dedup_index.json`), NOT a database table. The index is loaded into memory at startup and flushed to disk:
+### Garbage Collection (`garbage_collect`)
 
-- Automatically every 100 new blobs
-- Explicitly via `flush()`
-- Uses atomic write (write to `.json.tmp` then rename) for crash safety
+Two-phase batch deletion using the maintenance pool:
+
+1. **Phase 1 — Orphaned manifests**: `DELETE FROM chunk_manifests WHERE ref_count <= 0` (batches of 500). For each deleted manifest, `UPDATE storage.blobs SET ref_count = ref_count - 1` for its chunks.
+2. **Phase 2 — Orphaned blobs**: `DELETE FROM storage.blobs WHERE ref_count <= 0` (batches of 500). Deletes blob files from backend + thumbnail cleanup (best-effort).
+
+Uses `tokio::task::yield_now()` between batches to avoid starving other tasks.
+
+### Integrity Verification (`verify_integrity`)
+
+Phase 1 — Verify CDC manifests:
+- `chunk_hashes.len() == chunk_sizes.len()`
+- `SUM(chunk_sizes) == total_size`
+- Every referenced chunk exists in the blob backend with correct size
+
+Phase 2 — Verify blobs (chunks + legacy):
+- Blob file exists in backend
+- Actual size matches PG record
+- (Local backends only) Re-hash file content to verify BLAKE3 integrity
+- Processes 16 blobs concurrently via `buffer_unordered`
 
 ## Tests
 
-Located at the bottom of `src/infrastructure/services/dedup_service.rs`:
+Located at the bottom of `src/infrastructure/services/dedup_service.rs` (12 tests):
 
 | Test | Description |
 |---|---|
-| `test_dedup_identical_content` | Stores same content (>4KB) twice. Verifies second is deduplicated, hashes match, `stats.dedup_hits == 1` |
-| `test_reference_counting` | Stores twice (ref_count=2), removes one ref (not deleted), removes second (blob deleted) |
+| `test_cdc_deterministic_same_content` | Same content → same file hash + same chunk hashes/offsets/lengths |
+| `test_cdc_empty_file` | Empty file → zero chunks, correct BLAKE3 empty hash |
+| `test_cdc_small_file_single_chunk` | File below min chunk → single chunk covering entire file |
+| `test_cdc_chunk_sizes_within_bounds` | All non-last chunks are within [64 KB, 1 MB] |
+| `test_cdc_file_hash_matches_hash_file` | CDC whole-file hash matches standalone `hash_file()` |
+| `test_cdc_chunk_hashes_are_correct` | Each chunk hash == BLAKE3 of that chunk's data |
+| `test_cdc_reassembly_matches_original` | Concatenating chunks reproduces original file |
+| `test_cdc_chunks_are_contiguous` | Chunks cover entire file with no gaps or overlaps |
+| `test_cdc_similar_files_share_chunks` | Editing last 64 KB of 2 MB file → most chunks shared |
+| `test_cdc_chunk_file_matches_full` | `cdc_chunk_file` produces same chunks as `cdc_hash_and_chunk_file` |
+| `test_cdc_large_file_chunk_count` | 8 MB file produces 8-128 chunks (avg ~256 KB) |
+| `test_cdc_insert_at_beginning_preserves_later_chunks` | 128 KB prefix insert → CDC resynchronizes, later chunks shared |
+
+## Performance Characteristics
+
+| Scenario | Behavior |
+|---|---|
+| **First upload of new file** | Single mmap pass (CDC + hash) → parallel chunk upload → manifest INSERT |
+| **Re-upload of identical file** | `try_dedup_hit` → manifest ref_count bump → zero chunk I/O |
+| **Upload of edited file (5% changed)** | CDC → batch-check finds 95% existing → reads only 5% → uploads 5% → ref-bumps 95% |
+| **Range read (1 MB from 1 GB file)** | Manifest lookup → identify overlapping chunks → stream only those portions |
+| **Delete last reference** | TX: delete manifest → batch-decrement chunks → delete zero-ref chunks → commit → delete blob files |
+| **Garbage collection** | Maintenance pool, batches of 500, yields between batches |
 
 ## Client Usage Example
 
 ```bash
 # 1. Check if file already exists by hash
-HASH=$(sha256sum myfile.txt | cut -d' ' -f1)
+HASH=$(b3sum myfile.txt | cut -d' ' -f1)
 curl -H "Authorization: Bearer $TOKEN" \
   "https://oxicloud.example.com/api/dedup/check/$HASH"
 

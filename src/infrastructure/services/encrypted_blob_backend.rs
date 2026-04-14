@@ -104,6 +104,31 @@ impl BlobStorageBackend for EncryptedBlobBackend {
         })
     }
 
+    fn put_blob_from_bytes(
+        &self,
+        hash: &str,
+        data: Bytes,
+    ) -> Pin<Box<dyn std::future::Future<Output = Result<u64, DomainError>> + Send + '_>> {
+        let inner = self.inner.clone();
+        let hash = hash.to_string();
+        let cipher = self.cipher.clone();
+        Box::pin(async move {
+            // Encrypt in memory: nonce || ciphertext (includes GCM tag)
+            let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+            let ciphertext = cipher.encrypt(&nonce, data.as_ref()).map_err(|e| {
+                DomainError::internal_error("Encryption", format!("encrypt failed: {e}"))
+            })?;
+
+            let mut encrypted = Vec::with_capacity(NONCE_SIZE + ciphertext.len());
+            encrypted.extend_from_slice(nonce.as_slice());
+            encrypted.extend_from_slice(&ciphertext);
+
+            inner
+                .put_blob_from_bytes(&hash, Bytes::from(encrypted))
+                .await
+        })
+    }
+
     fn get_blob_stream(
         &self,
         hash: &str,
