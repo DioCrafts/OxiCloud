@@ -6,6 +6,10 @@
  * rendering path so star icons can be painted without a round-trip.
  */
 
+import { ui } from '../../app/ui.js';
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+
 const favorites = {
     /** @type {Map<string, object>} key = "file:<id>" | "folder:<id>" */
     _cache: new Map(),
@@ -104,10 +108,10 @@ const favorites = {
             await this._fetchFromServer();
 
             // Notify user
-            if (window.ui?.showNotification) {
-                window.ui.showNotification(
-                    window.i18n ? window.i18n.t('favorites.added_title') : 'Added to favorites',
-                    `"${name}" ${window.i18n ? window.i18n.t('favorites.added_msg') : 'added to favorites'}`
+            if (ui?.showNotification) {
+                ui.showNotification(
+                    i18n ? i18n.t('favorites.added_title') : 'Added to favorites',
+                    `"${name}" ${i18n ? i18n.t('favorites.added_msg') : 'added to favorites'}`
                 );
             }
 
@@ -139,10 +143,10 @@ const favorites = {
             // Remove from local cache
             this._cache.delete(this._cacheKey(id, type));
 
-            if (window.ui?.showNotification) {
-                window.ui.showNotification(
-                    window.i18n ? window.i18n.t('favorites.removed_title') : 'Removed from favorites',
-                    `"${itemName}" ${window.i18n ? window.i18n.t('favorites.removed_msg') : 'removed from favorites'}`
+            if (ui?.showNotification) {
+                ui.showNotification(
+                    i18n ? i18n.t('favorites.removed_title') : 'Removed from favorites',
+                    `"${itemName}" ${i18n ? i18n.t('favorites.removed_msg') : 'removed from favorites'}`
                 );
             }
 
@@ -167,14 +171,14 @@ const favorites = {
                 await this._fetchFromServer();
             }
 
-            window.ui.resetFilesList(); // ensure also list visible & error hidden
-            window.ui.updateBreadcrumb('');
+            ui.resetFilesList(); // ensure also list visible & error hidden
+            ui.updateBreadcrumb('');
 
             if (this._cache.size === 0) {
-                window.ui.showError(`
+                ui.showError(`
                     <i class="fas fa-star empty-state-icon"></i>
-                    <p>${window.i18n ? window.i18n.t('favorites.empty_state') : 'No favorite items'}</p>
-                    <p>${window.i18n ? window.i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
+                    <p>${i18n ? i18n.t('favorites.empty_state') : 'No favorite items'}</p>
+                    <p>${i18n ? i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
                 `);
                 return;
             }
@@ -204,16 +208,15 @@ const favorites = {
                     });
                 }
             }
-            if (folders.length) window.ui.renderFolders(folders);
-            if (files.length) window.ui.renderFiles(files);
+            if (folders.length) ui.renderFolders(folders);
+            if (files.length) ui.renderFiles(files);
         } catch (error) {
             console.error('Error displaying favorites:', error);
-            if (window.ui?.showNotification) {
-                window.ui.showNotification('Error', 'Error loading favorite items');
+            if (ui?.showNotification) {
+                ui.showNotification('Error', 'Error loading favorite items');
             }
         }
     }
 };
 
-// Expose globally
-window.favorites = favorites;
+export { favorites };

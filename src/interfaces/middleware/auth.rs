@@ -243,10 +243,7 @@ pub async fn auth_middleware(
                             if request.uri().path().starts_with("/webdav") {
                                 return Ok(Response::builder()
                                     .status(StatusCode::UNAUTHORIZED)
-                                    .header(
-                                        header::WWW_AUTHENTICATE,
-                                        r#"Basic realm="OxiCloud""#,
-                                    )
+                                    .header(header::WWW_AUTHENTICATE, r#"Basic realm="OxiCloud""#)
                                     .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
                                     .body(axum::body::Body::from(
                                         "Invalid username or app password",

@@ -2,6 +2,12 @@
  * Authentication/session bootstrap and home-folder resolution
  */
 
+import { getCsrfHeaders } from '../core/csrf.js';
+import { loadFiles } from './filesView.js';
+import { updateStorageUsageDisplay } from './main.js';
+import { app } from './state.js';
+import { ui } from './ui.js';
+
 async function refreshUserData() {
     const USER_DATA_KEY = 'oxicloud_user';
 
@@ -24,7 +30,7 @@ async function refreshUserData() {
         console.log('Storage from server: used=', userData.storage_used_bytes, 'quota=', userData.storage_quota_bytes);
 
         localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
-        window.updateStorageUsageDisplay(userData);
+        updateStorageUsageDisplay(userData);
         return userData;
     } catch (error) {
         console.error('Error refreshing user data:', error);
@@ -89,7 +95,7 @@ async function checkAuthentication() {
             if (menuName) menuName.textContent = userData.username;
             if (menuEmail) menuEmail.textContent = userData.email || '';
 
-            window.updateStorageUsageDisplay(userData);
+            updateStorageUsageDisplay(userData);
 
             // Validate session BEFORE loading files to avoid 401 race condition
             const freshData = await refreshUserData();
@@ -133,8 +139,8 @@ async function checkAuthentication() {
                     document.querySelectorAll('.user-avatar, .user-menu-avatar').forEach((el) => {
                         el.textContent = userInitials;
                     });
-                    window.updateStorageUsageDisplay(freshData);
-                    resolveHomeFolder().then(() => window.loadFiles());
+                    updateStorageUsageDisplay(freshData);
+                    resolveHomeFolder().then(() => loadFiles());
                 } else {
                     console.warn('Could not retrieve user data, redirecting to login');
                     localStorage.removeItem(USER_DATA_KEY);
@@ -154,8 +160,6 @@ async function checkAuthentication() {
 }
 
 async function resolveHomeFolder() {
-    const app = window.app;
-
     if (app.userHomeFolderId) return;
     try {
         const response = await fetch('/api/folders', {
@@ -173,22 +177,20 @@ async function resolveHomeFolder() {
             app.userHomeFolderName = home.name;
             app.currentPath = home.id;
             app.breadcrumbPath = [];
-            window.ui.updateBreadcrumb();
+            ui.updateBreadcrumb();
             console.log(`Home folder resolved: ${home.name} (${home.id})`);
         } else {
             console.warn('No root folders found for user');
             app.currentPath = '';
             app.breadcrumbPath = [];
-            window.ui.updateBreadcrumb();
+            ui.updateBreadcrumb();
         }
     } catch (error) {
         console.error('Error resolving home folder:', error);
         app.currentPath = '';
         app.breadcrumbPath = [];
-        window.ui.updateBreadcrumb();
+        ui.updateBreadcrumb();
     }
 }
 
-window.refreshUserData = refreshUserData;
-window.checkAuthentication = checkAuthentication;
-window.resolveHomeFolder = resolveHomeFolder;
+export { checkAuthentication, refreshUserData, resolveHomeFolder };

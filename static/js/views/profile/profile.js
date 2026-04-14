@@ -1,8 +1,11 @@
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { i18n } from '../../core/i18n.js';
+
 const API = '/api';
 
 /* ── i18n helper — falls back to key if i18n not ready ── */
 function t(key, params) {
-    if (window.i18n && typeof window.i18n.t === 'function') return window.i18n.t(key, params);
+    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
     return key.split('.').pop().replace(/_/g, ' ');
 }
 

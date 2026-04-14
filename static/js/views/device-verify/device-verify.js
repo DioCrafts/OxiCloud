@@ -1,4 +1,6 @@
 // device-verify.js — Extracted from inline <script> in device-verify.html
+import { getCsrfHeaders } from '../../core/csrf.js';
+
 (() => {
     var API_BASE = window.location.origin;
     var codeInput = document.getElementById('user-code');

@@ -1,5 +1,16 @@
 // @ts-check
 
+import { i18n } from '../core/i18n.js';
+import { inlineViewer } from '../features/files/inlineViewer.js';
+import { multiSelect } from '../features/files/multiSelect.js';
+import { resolveHomeFolder } from './authSession.js';
+import { updateHistory } from './main.js';
+import { app } from './state.js';
+import { ui } from './ui.js';
+import { uiNotifications } from './uiNotifications.js';
+
+let isLoadingFiles = false;
+
 // TODO move to features/files/fileOperations.js ?
 /**
  * @typedef {Object} FolderInfo
@@ -48,8 +59,6 @@ async function getFolder(id) {
  * rebuild breadcrumb from selected folder (iterate up to root)
  */
 async function rebuildBreadCrumb() {
-    const app = window.app;
-
     /**
      * Store the leaf (this is the current displayed folder)
      * @type {FolderInfo | null}
@@ -87,10 +96,7 @@ async function rebuildBreadCrumb() {
         } catch (_e) {
             console.log(`Error loading information from folder ${app.currentPath}, falling back to ${app.userHomeFolderId}`);
             // fallback of root
-            window.uiNotifications.show(
-                'error: folder not found or permission denied',
-                'the given folder is not available or you do not have sufficient rights'
-            );
+            uiNotifications.show('error: folder not found or permission denied', 'the given folder is not available or you do not have sufficient rights');
             app.breadcrumbPath = [];
             id = app.userHomeFolderId;
             app.currentPath = id;
@@ -109,33 +115,31 @@ async function rebuildBreadCrumb() {
  * @param {boolean} [options.forceRefresh] force refresh of content
  */
 async function loadFiles(options = { insertHistory: true }) {
-    const app = window.app;
-
     try {
         console.log('Starting loadFiles() - loading files...', options);
 
         const forceRefresh = options.forceRefresh || false;
 
-        if (window.isLoadingFiles) {
+        if (isLoadingFiles) {
             console.log('A file load is already in progress, ignoring request');
             return;
         }
 
-        window.isLoadingFiles = true;
+        isLoadingFiles = true;
 
         // This to avoid blinking page, a better solution would be to put loading on an overlay and remove timeout
         const loadingFiles = setTimeout(() => {
             // display loader after few delay (will be canceled if result take less time)
-            window.ui.showError(`
+            ui.showError(`
                 <div class="files-loading-spinner">
                     <div class="spinner"></div>
-                    <span>${window.i18n ? window.i18n.t('files.loading') : 'Loading files…'}</span>
+                    <span>${i18n ? i18n.t('files.loading') : 'Loading files…'}</span>
                 </div>
             `);
         }, 100);
 
         if (!app.userHomeFolderId) {
-            await window.resolveHomeFolder();
+            await resolveHomeFolder();
         }
 
         const timestamp = Math.floor(Date.now() / 1000);
@@ -143,9 +147,9 @@ async function loadFiles(options = { insertHistory: true }) {
         await rebuildBreadCrumb();
 
         // request a breadcrumb paint
-        window.ui.updateBreadcrumb();
+        ui.updateBreadcrumb();
 
-        window.updateHistory(options.insertHistory || false);
+        updateHistory(options.insertHistory || false);
 
         let url;
 
@@ -154,7 +158,7 @@ async function loadFiles(options = { insertHistory: true }) {
                 url = `/api/folders/${app.userHomeFolderId}/listing?t=${timestamp}`;
                 app.currentPath = app.userHomeFolderId;
                 app.breadcrumbPath = [];
-                window.ui.updateBreadcrumb();
+                ui.updateBreadcrumb();
                 console.log(`Loading user folder: ${app.userHomeFolderName} (${app.userHomeFolderId})`);
             } else {
                 url = `/api/folders?t=${timestamp}`;
@@ -193,7 +197,7 @@ async function loadFiles(options = { insertHistory: true }) {
         if (response.status === 401 || response.status === 403) {
             console.warn('Auth error when loading files, showing empty list');
             // FIXME: i18n
-            window.ui.showError(`<p>Could not load files</p>`);
+            ui.showError(`<p>Could not load files</p>`);
             return;
         }
 
@@ -203,44 +207,44 @@ async function loadFiles(options = { insertHistory: true }) {
 
         const listing = await response.json();
 
-        window.ui._items.clear();
-        window.ui.resetFilesList();
-        if (window.multiSelect) {
-            window.multiSelect.clear();
-            window.multiSelect.init(); // this will wire buttons & select-all-checkbox
+        ui._items.clear();
+        ui.resetFilesList();
+        if (multiSelect) {
+            multiSelect.clear();
+            multiSelect.init(); // this will wire buttons & select-all-checkbox
         }
 
         const folderList = Array.isArray(listing.folders) ? listing.folders : [];
         const fileList = Array.isArray(listing.files) ? listing.files : [];
 
         if (folderList.length === 0 && fileList.length === 0) {
-            window.ui.showEmptyList();
+            ui.showEmptyList();
         } else {
-            window.ui.renderFolders(folderList);
-            window.ui.renderFiles(fileList);
+            ui.renderFolders(folderList);
+            ui.renderFiles(fileList);
 
             // check if a file was provided
-            if (window.app.viewFile) {
+            if (app.viewFile) {
                 let fileFound = null;
 
                 // lookup for the given fle
                 for (const file of fileList) {
-                    if (file.id === window.app.viewFile) {
+                    if (file.id === app.viewFile) {
                         fileFound = file;
                         break;
                     }
                 }
 
                 if (fileFound) {
-                    console.log(`file ${window.app.viewFile} found, calling viewer`);
-                    await window.inlineViewer.openFile(fileFound);
+                    console.log(`file ${app.viewFile} found, calling viewer`);
+                    await inlineViewer.openFile(fileFound);
                 } else {
                     // remove file
-                    console.log(`file ${window.app.viewFile} not found`);
-                    window.app.viewFile = null;
+                    console.log(`file ${app.viewFile} not found`);
+                    app.viewFile = null;
 
                     // correct url/history as file is not found
-                    window.updateHistory(false);
+                    updateHistory(false);
                 }
             }
         }
@@ -248,10 +252,10 @@ async function loadFiles(options = { insertHistory: true }) {
         console.log(`Loaded ${folderList.length} folders and ${fileList.length} files`);
     } catch (error) {
         console.error('Error loading folders:', error);
-        window.ui.showNotification('Error', 'Could not load files and folders');
+        ui.showNotification('Error', 'Could not load files and folders');
     } finally {
-        window.isLoadingFiles = false;
+        isLoadingFiles = false;
     }
 }
 
-window.loadFiles = loadFiles;
+export { loadFiles };

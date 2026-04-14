@@ -65,9 +65,4 @@ function isTextViewable(mimeType) {
     return textTypes.includes(mimeType);
 }
 
-window.escapeHtml = escapeHtml;
-window.formatFileSize = formatFileSize;
-window.formatQuotaSize = formatQuotaSize;
-window.formatDateTime = formatDateTime;
-window.formatDateShort = formatDateShort;
-window.isTextViewable = isTextViewable;
+export { escapeHtml, formatDateShort, formatDateTime, formatFileSize, formatQuotaSize, isTextViewable };

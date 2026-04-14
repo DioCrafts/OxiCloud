@@ -3,6 +3,8 @@
  * Isolated icon and preview classification helpers used by ui.js.
  */
 
+import { isTextViewable } from '../core/formatters.js';
+
 const uiFileTypes = {
     // TODO: 'd better to use a canViw() method in inlineViewer
     isViewableFile(file) {
@@ -11,7 +13,7 @@ const uiFileTypes = {
         if (file.mime_type === 'application/pdf') return true;
         if (file.mime_type.startsWith('audio/')) return true;
         if (file.mime_type.startsWith('video/')) return true;
-        return window.isTextViewable ? window.isTextViewable(file.mime_type) : false;
+        return isTextViewable(file.mime_type);
     },
 
     getIconClass(fileName) {
@@ -170,4 +172,4 @@ const uiFileTypes = {
     }
 };
 
-window.uiFileTypes = uiFileTypes;
+export { uiFileTypes };

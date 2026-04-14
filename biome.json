@@ -14,7 +14,8 @@
         "rules": {
             "recommended": true,
             "correctness": {
-                "noUnusedVariables": "warn"
+                "noUnusedVariables": "warn",
+                "noUndeclaredVariables": "error"
             },
             "style": {
                 "noDescendingSpecificity": "off"

@@ -1,3 +1,5 @@
+import { i18n } from './i18n.js';
+
 /**
  * OxiCloud – Notification Bell Module
  *
@@ -5,7 +7,7 @@
  * in the top-bar. Upload progress, quota errors, and general messages all
  * go through this module.
  *
- * Public API (on window.notifications):
+ * Public API (exported as `notifications`):
  *   addUploadBatch(totalFiles)       → batchId
  *   updateFile(batchId, fileName, pct, status)
  *   finishBatch(batchId, successCount, totalFiles)
@@ -147,7 +149,7 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const t = window.i18n?.t || ((k) => k);
+        const t = i18n?.t || ((k) => k);
         const uploadingText = folderName ? `📁 ${t('upload.uploading')} ${_esc(folderName)}…` : t('upload.uploading');
         const filesLabel = t('upload.files');
 
@@ -252,7 +254,7 @@ const notifications = (() => {
         const pctEl = $(`${batchId}-pct`);
         const statsEl = $(`${batchId}-stats`);
 
-        const t = window.i18n?.t || ((k) => k);
+        const t = i18n?.t || ((k) => k);
         const filesLabel = t('upload.files');
 
         if (fillEl) fillEl.style.width = `${pctVal}%`;
@@ -280,7 +282,7 @@ const notifications = (() => {
         const curEl = $(`${batchId}-current`);
         if (curEl) curEl.textContent = '';
 
-        const t = window.i18n?.t || ((k) => k);
+        const t = i18n?.t || ((k) => k);
         const completeText = t('upload.complete', {
             count: successCount,
             total: totalFiles
@@ -351,4 +353,4 @@ const notifications = (() => {
     };
 })();
 
-window.notifications = notifications;
+export { notifications };

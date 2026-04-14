@@ -60,9 +60,7 @@ impl AudioMetadataService {
     ///
     /// All I/O is synchronous (id3 + mp3_duration crates), so this MUST
     /// only be called inside `spawn_blocking`.
-    fn extract_metadata_blocking(
-        file_path: &Path,
-    ) -> Option<AudioMetadataFields> {
+    fn extract_metadata_blocking(file_path: &Path) -> Option<AudioMetadataFields> {
         if !file_path.exists() {
             warn!("File does not exist: {:?}", file_path);
             return None;
@@ -114,13 +112,14 @@ impl AudioMetadataService {
 
         // ── Sync I/O on the blocking thread pool (never stalls Tokio workers) ──
         let path = file_path.to_path_buf();
-        let metadata = tokio::task::spawn_blocking(move || {
-            Self::extract_metadata_blocking(&path)
-        })
-        .await
-        .map_err(|e| {
-            DomainError::internal_error("AudioMetadataService", format!("spawn_blocking join error: {e}"))
-        })?;
+        let metadata = tokio::task::spawn_blocking(move || Self::extract_metadata_blocking(&path))
+            .await
+            .map_err(|e| {
+                DomainError::internal_error(
+                    "AudioMetadataService",
+                    format!("spawn_blocking join error: {e}"),
+                )
+            })?;
 
         let Some(m) = metadata else {
             return Ok(());

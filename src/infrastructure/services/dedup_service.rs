@@ -717,7 +717,11 @@ impl DedupService {
             // Also clean up any thumbnail files for these blob hashes
             // (thumbnails are keyed by blob_hash and live under
             // storage_root/.thumbnails/{icon,preview,large}/{hash}.jpg).
-            let thumbnails_root = self.blob_root.parent().unwrap_or(&self.blob_root).join(".thumbnails");
+            let thumbnails_root = self
+                .blob_root
+                .parent()
+                .unwrap_or(&self.blob_root)
+                .join(".thumbnails");
             for (hash, size) in &batch {
                 let blob_path = self.blob_path(hash);
                 if let Err(e) = fs::remove_file(&blob_path).await {

@@ -3,9 +3,11 @@
  * Isolates notification rendering policy from ui.js.
  */
 
+import { notifications } from '../core/notifications.js';
+
 const uiNotifications = {
     show(title, message) {
-        if (window.notifications && typeof window.notifications.addNotification === 'function') {
+        if (notifications && typeof notifications.addNotification === 'function') {
             const normalizedTitle = String(title || '').toLowerCase();
             let icon = 'fa-info-circle';
             let iconClass = 'upload';
@@ -27,7 +29,7 @@ const uiNotifications = {
                 iconClass = 'success';
             }
 
-            window.notifications.addNotification({
+            notifications.addNotification({
                 icon,
                 iconClass,
                 title: title || '',
@@ -58,4 +60,4 @@ const uiNotifications = {
     }
 };
 
-window.uiNotifications = uiNotifications;
+export { uiNotifications };

@@ -7,6 +7,11 @@
  * displays the enriched results returned by the server.
  */
 
+import { loadFiles } from '../../app/filesView.js';
+import { app } from '../../app/state.js';
+import { ui } from '../../app/ui.js';
+import { getAuthHeaders } from './fileOperations.js';
+
 const search = {
     /**
      * Perform a search using query parameters.
@@ -55,7 +60,7 @@ const search = {
             }
         } catch (error) {
             console.error('Error performing search:', error);
-            window.ui.showNotification('Error', 'Error performing search');
+            ui.showNotification('Error', 'Error performing search');
             return {
                 files: [],
                 folders: [],
@@ -109,7 +114,7 @@ const search = {
      * @param {Object} results - Enriched search results from backend
      */
     displaySearchResults(results) {
-        window.ui.resetFilesList(); // ensure also list visible & error hidden
+        ui.resetFilesList(); // ensure also list visible & error hidden
         //FIXME: move into action rather bage sticky header + hide bread crumb ? + note also that search result does not consider section
         const pageStickyHeader = document.getElementById('page-sticky-header');
 
@@ -163,17 +168,17 @@ const search = {
         if (clearSearchBtn) {
             clearSearchBtn.addEventListener('click', () => {
                 document.querySelector('.search-container input').value = '';
-                window.app.currentPath = '';
-                window.app.isSearchMode = false;
+                app.currentPath = '';
+                app.isSearchMode = false;
                 document.querySelector('.search-results-header')?.remove();
-                window.ui.updateBreadcrumb('');
-                window.loadFiles();
+                ui.updateBreadcrumb('');
+                loadFiles();
             });
         }
 
         // Empty state
         if (results.files.length === 0 && results.folders.length === 0) {
-            window.ui.showError(`
+            ui.showError(`
                 <i class="fas fa-search empty-state-icon"></i>
                 <p class="search-empty-text">No results found for this search</p>
             `);
@@ -182,12 +187,12 @@ const search = {
 
         // Render folders (server-provided enriched data)
         results.folders.forEach((folder) => {
-            window.ui.addFolderToView(folder);
+            ui.addFolderToView(folder);
         });
 
         // Render files (server-provided enriched data)
         results.files.forEach((file) => {
-            window.ui.addFileToView(file);
+            ui.addFileToView(file);
         });
     },
 
@@ -203,19 +208,18 @@ const search = {
             });
 
             if (response.ok) {
-                window.ui.showNotification('Cache cleared', 'Search cache cleared successfully');
+                ui.showNotification('Cache cleared', 'Search cache cleared successfully');
                 return true;
             } else {
-                window.ui.showNotification('Error', 'Error clearing search cache');
+                ui.showNotification('Error', 'Error clearing search cache');
                 return false;
             }
         } catch (error) {
             console.error('Error clearing search cache:', error);
-            window.ui.showNotification('Error', 'Error clearing search cache');
+            ui.showNotification('Error', 'Error clearing search cache');
             return false;
         }
     }
 };
 
-// Expose the search module globally
-window.search = search;
+export { search };

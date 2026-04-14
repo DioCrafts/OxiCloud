@@ -314,8 +314,7 @@ function safeT(key, params = {}) {
     return interpolate(value, params);
 }
 
-// Export functions for use in other modules
-window.i18n = {
+export const i18n = {
     t: safeT,
     setLocale,
     getCurrentLocale,

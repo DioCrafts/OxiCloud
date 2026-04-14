@@ -4,6 +4,9 @@
  * Opens document files in Collabora Online / OnlyOffice via WOPI protocol.
  * Supports two modes: in-app modal (default) and new browser tab.
  */
+
+import { loadFiles } from '../../app/filesView.js';
+
 class WopiEditor {
     constructor() {
         this.editorModal = null;
@@ -203,10 +206,9 @@ class WopiEditor {
             this._messageHandler = null;
         }
         this.editorModal = null;
+
         // Refresh file list to pick up any saves
-        if (typeof loadFiles === 'function') {
-            loadFiles();
-        }
+        loadFiles();
     }
 
     /**
@@ -243,7 +245,7 @@ class WopiEditor {
 }
 
 // Global instance
-window.wopiEditor = new WopiEditor();
+export const wopiEditor = new WopiEditor();
 
 // Prefetch supported extensions so canEdit() is fast on first use
-window.wopiEditor._fetchSupportedExtensions();
+wopiEditor._fetchSupportedExtensions();

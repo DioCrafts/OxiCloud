@@ -11,6 +11,14 @@
 
 // @ts-check
 
+import { loadFiles } from '../../app/filesView.js';
+import { app } from '../../app/state.js';
+import { showConfirmDialog, ui } from '../../app/ui.js';
+import { i18n } from '../../core/i18n.js';
+import { favorites } from '../library/favorites.js';
+import { contextMenus } from './contextMenus.js';
+import { getAuthHeaders } from './fileOperations.js';
+
 const multiSelect = {
     /** Currently selected items: Map<id, { id, name, type, parentId }> */
     _selected: new Map(),
@@ -42,8 +50,8 @@ const multiSelect = {
     // ── Helpers for i18n ────────────────────────────────────
 
     _t(key, vars) {
-        if (window.i18n && typeof window.i18n.t === 'function') {
-            const val = window.i18n.t(key, vars);
+        if (i18n && typeof i18n.t === 'function') {
+            const val = i18n.t(key, vars);
             // If i18n returned the key itself, it's missing → fall back
             if (val && val !== key) return val;
         }
@@ -133,15 +141,15 @@ const multiSelect = {
     showBatchResult(action, result) {
         if (action === 'copy') {
             if (result.errors > 0) {
-                window.ui.showNotification('Batch copy', `${result.success} copied, ${result.errors} failed`);
+                ui.showNotification('Batch copy', `${result.success} copied, ${result.errors} failed`);
             } else {
-                window.ui.showNotification('Items copied', `${result.success} item${result.success !== 1 ? 's' : ''} copied successfully`);
+                ui.showNotification('Items copied', `${result.success} item${result.success !== 1 ? 's' : ''} copied successfully`);
             }
         } else {
             if (result.errors > 0) {
-                window.ui.showNotification('Batch move', `${result.success} moved, ${result.errors} failed`);
+                ui.showNotification('Batch move', `${result.success} moved, ${result.errors} failed`);
             } else {
-                window.ui.showNotification('Items moved', `${result.success} item${result.success !== 1 ? 's' : ''} moved successfully`);
+                ui.showNotification('Items moved', `${result.success} item${result.success !== 1 ? 's' : ''} moved successfully`);
             }
         }
     },
@@ -366,18 +374,18 @@ const multiSelect = {
             const errors = data.stats?.failed || 0;
 
             this.clear();
-            window.loadFiles();
+            loadFiles();
 
             if (errors > 0) {
-                window.ui.showNotification('Batch delete', `${success} moved to trash, ${errors} failed`);
+                ui.showNotification('Batch delete', `${success} moved to trash, ${errors} failed`);
             } else {
-                window.ui.showNotification('Moved to trash', `${success} item${success !== 1 ? 's' : ''} moved to trash`);
+                ui.showNotification('Moved to trash', `${success} item${success !== 1 ? 's' : ''} moved to trash`);
             }
         } catch (e) {
             console.error('Batch trash error:', e);
-            window.ui.showNotification('Error', 'Could not move items to trash');
+            ui.showNotification('Error', 'Could not move items to trash');
             this.clear();
-            window.loadFiles();
+            loadFiles();
         }
     },
 
@@ -386,9 +394,9 @@ const multiSelect = {
         const items = this.items;
         if (items.length === 0) return;
 
-        window.app.moveDialogMode = 'batch';
-        window.app.batchMoveItems = items;
-        window.app.selectedTargetFolderId = '';
+        app.moveDialogMode = 'batch';
+        app.batchMoveItems = items;
+        app.selectedTargetFolderId = '';
 
         const dialog = document.getElementById('move-file-dialog');
         const dialogHeader = dialog.querySelector('.rename-dialog-header');
@@ -406,7 +414,7 @@ const multiSelect = {
         const items = this.items;
         if (items.length === 0) return;
 
-        window.ui.showNotification('Preparing download', 'Creating ZIP archive...');
+        ui.showNotification('Preparing download', 'Creating ZIP archive...');
 
         try {
             const fileIds = items.filter((i) => i.type === 'file').map((i) => i.id);
@@ -431,20 +439,20 @@ const multiSelect = {
             URL.revokeObjectURL(url);
         } catch (e) {
             console.error('Batch download error:', e);
-            window.ui.showNotification('Error', 'Could not download selected items');
+            ui.showNotification('Error', 'Could not download selected items');
         }
     },
 
     /** Batch add to favorites — single API call */
     async batchFavorites() {
         const items = this.items;
-        if (items.length === 0 || !window.favorites) return;
+        if (items.length === 0 || !favorites) return;
 
         // Filter out items already in favourites
-        const toAdd = items.filter((i) => !window.favorites.isFavorite(i.id, i.type));
+        const toAdd = items.filter((i) => !favorites.isFavorite(i.id, i.type));
         if (toAdd.length === 0) {
             this.clear();
-            window.ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
+            ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
             return;
         }
 
@@ -463,23 +471,23 @@ const multiSelect = {
             const inserted = data.stats?.inserted || 0;
 
             // Replace cache directly from response (no extra GET)
-            if (data.favorites && window.favorites._replaceCacheFromResponse) {
-                window.favorites._replaceCacheFromResponse(data.favorites);
+            if (data.favorites && favorites._replaceCacheFromResponse) {
+                favorites._replaceCacheFromResponse(data.favorites);
             } else {
-                await window.favorites._fetchFromServer();
+                await favorites._fetchFromServer();
             }
 
             this.clear();
-            if (typeof window.loadFiles === 'function') window.loadFiles();
+            loadFiles();
 
             if (inserted > 0) {
-                window.ui.showNotification(this._t('favorites.add') || 'Added to favorites', `${inserted} item${inserted !== 1 ? 's' : ''} added to favorites`);
+                ui.showNotification(this._t('favorites.add') || 'Added to favorites', `${inserted} item${inserted !== 1 ? 's' : ''} added to favorites`);
             } else {
-                window.ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
+                ui.showNotification(this._t('favorites.add') || 'Favorites', 'All selected items are already favorites');
             }
         } catch (e) {
             console.error('Batch favorites error:', e);
-            window.ui.showNotification('Error', 'Could not add items to favorites');
+            ui.showNotification('Error', 'Could not add items to favorites');
         }
     },
 
@@ -510,8 +518,8 @@ const multiSelect = {
         const batchSelectionBar = document.getElementById('batch-selection-bar');
         batchSelectionBar.innerHTML = this._buildSelectionBarHTML();
 
-        if (window.i18n?.translateElement) {
-            window.i18n.translateElement(batchSelectionBar);
+        if (i18n?.translateElement) {
+            i18n.translateElement(batchSelectionBar);
         }
         this._wireBarButtons();
     },
@@ -524,5 +532,4 @@ const multiSelect = {
     }
 };
 
-// Expose globally
-window.multiSelect = multiSelect;
+export { multiSelect };

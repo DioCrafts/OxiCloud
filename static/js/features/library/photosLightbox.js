@@ -3,7 +3,10 @@
  * Full-screen image/video viewer with prev/next navigation.
  */
 
-const photosLightbox = {
+import { getCsrfHeaders } from '../../core/csrf.js';
+import { favorites } from '../library/favorites.js';
+
+export const photosLightbox = {
     /** @type {Array} Items array reference */
     items: [],
     /** @type {number} Current index */
@@ -14,10 +17,20 @@ const photosLightbox = {
     _blobUrl: null,
     /** @type {Function|null} */
     _keyHandler: null,
+    /** @type {Object|null} Reference to photosView, set after both modules load */
+    _photosView: null,
+
+    /**
+     * Register the photosView reference (called from photos.js to avoid circular imports).
+     * @param {Object} pv
+     */
+    setPhotosView(pv) {
+        this._photosView = pv;
+    },
 
     /** Auth headers */
     _headers() {
-        return typeof getCsrfHeaders === 'function' ? { ...getCsrfHeaders() } : {};
+        return getCsrfHeaders();
     },
 
     /** Open lightbox at given index */
@@ -202,7 +215,7 @@ const photosLightbox = {
     /** Toggle favorite on current item */
     async _toggleFavorite() {
         const item = this.items[this.index];
-        if (!item || !window.favorites) return;
+        if (!item || !favorites) return;
         try {
             await fetch(`/api/favorites/file/${item.id}`, {
                 method: 'POST',
@@ -235,17 +248,17 @@ const photosLightbox = {
                 headers: this._headers()
             });
             // Remove from photosView items too
-            if (window.photosView) {
-                window.photosView.items = window.photosView.items.filter((f) => f.id !== item.id);
+            if (this._photosView) {
+                this._photosView.items = this._photosView.items.filter((f) => f.id !== item.id);
             }
             this.items.splice(this.index, 1);
             if (this.items.length === 0) {
                 this.close();
-                if (window.photosView) window.photosView._render();
+                if (this._photosView) this._photosView._render();
             } else {
                 if (this.index >= this.items.length) this.index = this.items.length - 1;
                 this._show();
-                if (window.photosView) window.photosView._render();
+                if (this._photosView) this._photosView._render();
             }
         } catch (err) {
             console.error('Delete failed:', err);
@@ -282,5 +295,3 @@ const photosLightbox = {
             .replace(/</g, '&lt;');
     }
 };
-
-window.photosLightbox = photosLightbox;

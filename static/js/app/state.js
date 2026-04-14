@@ -3,7 +3,7 @@
  * Centralized mutable state for app and cached DOM references.
  */
 
-window.app = {
+export const app = {
     currentView: 'grid',
     currentPath: '',
     currentFolder: null,
@@ -29,4 +29,4 @@ window.app = {
     viewFile: null // current file in inline view
 };
 
-window.appElements = {};
+export const appElements = {};
