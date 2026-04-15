@@ -107,6 +107,7 @@ async function rebuildBreadCrumb() {
     app.currentFolderInfo = currentFolderInfo;
 }
 
+// TODO split load() vs view()
 /**
  * Files view loading logic
  *

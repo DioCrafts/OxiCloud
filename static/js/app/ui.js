@@ -1309,6 +1309,9 @@ const ui = {
 
         filesList.classList.remove('hidden');
         filesContainerError?.classList.add('hidden');
+
+        // apply hook as header changed
+        multiSelect.init();
     },
 
     showEmptyList() {

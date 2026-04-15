@@ -37,15 +37,11 @@
 .batch-selection-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     background: var(--color-multiselect-bg);
     color: var(--color-multiselect-text);
     padding: 10px 20px;
     border-radius: 12px;
-    margin: 0 0 12px;
-    height: 60px;
     overflow: hidden;
-    transform: translateY(-8px);
     transition:
         opacity 0.2s,
         max-height 0.25s,
@@ -53,12 +49,6 @@
         margin 0.2s,
         padding 0.2s;
     pointer-events: auto;
-}
-
-.batch-bar-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
 }
 
 .batch-bar-close {

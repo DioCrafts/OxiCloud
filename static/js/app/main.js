@@ -38,9 +38,51 @@ let uploadDropdownDocumentClickHandler = null;
 let uploadDropdownBindingsController = null;
 let actionsBarDelegationBound = false;
 
+const _multiSelectButons = `
+    <div class="action-buttons batch-selection-bar hidden" id="multi-select-buttons">
+        <div class="list-header-checkbox">
+            <button class="batch-bar-close" id="batch-selection-close" title="Cancel selection">
+                    <i class="fas fa-times"></i>
+            </button>
+            <span class="batch-bar-count" id="batch-bar-count"></span>
+        </div>
+        <div class="batch-selection-info">
+            <div class="batch-bar-actions">
+                <button class="batch-btn" id="batch-fav" title="Add to favorites" data-i18n-title="batch.add_favorites">
+                    <i class="fas fa-star"></i>
+                    <span data-i18n="batch.add_favorites">Add to favorites</span>
+                </button>
+                <button class="batch-btn" id="batch-move" title="Move or copy" data-i18n-title="batch.move_copy">
+                    <i class="fas fa-arrows-alt"></i>
+                    <span data-i18n="batch.move_copy">Move or copy</span>
+                </button>
+                <button class="batch-btn" id="batch-download" title="Download" data-i18n-title="actions.download">
+                    <i class="fas fa-download"></i>
+                    <span data-i18n="actions.download">Download</span>
+                </button>
+                <button class="batch-btn batch-btn-danger" id="batch-delete" title="Delete" data-i18-title="actions.delete">
+                    <i class="fas fa-trash-alt"></i>
+                    <span data-i18n="actions.delete">Delete</span>
+                </button>
+            </div>
+        </div>
+    </div>
+`;
+
+const _toggleButtons = `
+    <div class="view-toggle">
+        <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
+            <i class="fas fa-th"></i>
+        </button>
+        <button class="toggle-btn" id="list-view-btn" title="List view">
+            <i class="fas fa-list"></i>
+        </button>
+    </div>
+`;
+
 const ACTIONS_BAR_TEMPLATES = {
     files: `
-        <div class="action-buttons">
+        <div class="action-buttons" id="default-buttons">
             <div class="upload-dropdown" id="upload-dropdown">
                 <button class="btn btn-primary" id="upload-btn">
                     <i class="fas fa-cloud-upload-alt icon-mr"></i>
@@ -63,57 +105,32 @@ const ACTIONS_BAR_TEMPLATES = {
                 <span data-i18n="actions.new_folder">New folder</span>
             </button>
         </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
+        ${_multiSelectButons}
+        ${_toggleButtons}
     `,
     trash: `
-        <div class="action-buttons">
+        <div class="action-buttons" id="default-buttons">
             <button class="btn btn-danger" id="empty-trash-btn">
                 <i class="fas fa-trash-alt"></i>
                 <span data-i18n="trash.empty_trash">Empty trash</span>
             </button>
         </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
+        ${_toggleButtons}
     `,
     favorites: `
-        <div class="action-buttons"></div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
+        <div class="action-buttons" id="default-buttons"></div>
+        ${_multiSelectButons}
+        ${_toggleButtons}
     `,
     recent: `
-        <div class="action-buttons">
+        <div class="action-buttons" id="default-buttons">
             <button class="btn btn-secondary" id="clear-recent-btn">
                 <i class="fas fa-broom icon-mr"></i>
                 <span data-i18n="actions.clear_recent">Clear recent</span>
             </button>
         </div>
-        <div class="view-toggle">
-            <button class="toggle-btn active" id="grid-view-btn" title="Grid view">
-                <i class="fas fa-th"></i>
-            </button>
-            <button class="toggle-btn" id="list-view-btn" title="List view">
-                <i class="fas fa-list"></i>
-            </button>
-        </div>
+        ${_multiSelectButons}
+        ${_toggleButtons}
     `
 };
 

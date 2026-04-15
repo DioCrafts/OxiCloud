@@ -230,51 +230,12 @@ const multiSelect = {
         this._syncSelectAllCheckbox();
     },
 
-    // ── Selection bar (replaces list-header when items selected) ────
-
-    /**
-     * Build the inner HTML for the selection bar that replaces the
-     * normal list-header columns (Name / Type / Size / Modified).
-     */
-    _buildSelectionBarHTML() {
-        //FIXME: should support i18n lang change
-
-        return `
-            <div x-class="batch-bar-left" class="list-header-checkbox">
-                <button class="batch-bar-close" id="batch-grid-close" title="Cancel selection">
-                     <i class="fas fa-times"></i>
-                </button>
-                <span class="batch-bar-count" id="batch-bar-count"></span>
-            </div>
-            <div class="batch-selection-info">
-                <div class="batch-bar-actions">
-                    <button class="batch-btn" id="batch-fav" title="Add to favorites" data-i18n-title="batch.add_favorites">
-                        <i class="fas fa-star"></i>
-                        <span data-i18n="batch.add_favorites">Add to favorites</span>
-                    </button>
-                    <button class="batch-btn" id="batch-move" title="Move or copy" data-i18n-title="batch.move_copy">
-                        <i class="fas fa-arrows-alt"></i>
-                        <span data-i18n="batch.move_copy">Move or copy</span>
-                    </button>
-                    <button class="batch-btn" id="batch-download" title="Download" data-i18n-title="actions.download">
-                        <i class="fas fa-download"></i>
-                        <span data-i18n="actions.download">Download</span>
-                    </button>
-                    <button class="batch-btn batch-btn-danger" id="batch-delete" title="Delete" data-i18-title="actions.delete">
-                        <i class="fas fa-trash-alt"></i>
-                        <span data-i18n="actions.delete">Delete</span>
-                    </button>
-                </div>
-            </div>
-        `;
-    },
-
     /** Main UI sync — called after every selection change */
     _syncUI() {
         const n = this._selected.size;
 
-        const batchSelectionBar = document.getElementById('batch-selection-bar');
-        const actionsBar = document.getElementById('actions-bar');
+        const multiSelectButtons = document.getElementById('multi-select-buttons');
+        const defaultButtons = document.getElementById('default-buttons');
 
         if (n > 0) {
             this._barVisible = true;
@@ -282,16 +243,14 @@ const multiSelect = {
             const countText = n === 1 ? this._t('batch.one_selected') || '1 item selected' : this._t('batch.n_selected', { count: n }) || `${n} items selected`;
             document.getElementById('batch-bar-count').innerText = countText;
 
-            actionsBar.classList.add('hidden');
-
-            batchSelectionBar.classList.remove('hidden');
+            defaultButtons?.classList.add('hidden');
+            multiSelectButtons?.classList.remove('hidden');
         } else {
             this._barVisible = false;
 
             // Hide grid bar
-            batchSelectionBar.classList.add('hidden');
-
-            if (actionsBar.dataset.mode !== 'hidden') actionsBar.classList.remove('hidden');
+            multiSelectButtons?.classList.add('hidden');
+            defaultButtons?.classList.remove('hidden');
         }
 
         // Sync individual item checkboxes
@@ -306,7 +265,7 @@ const multiSelect = {
         const move = document.getElementById('batch-move');
         const dl = document.getElementById('batch-download');
         const fav = document.getElementById('batch-fav');
-        const closeBtn = document.getElementById('batch-grid-close');
+        const closeBtn = document.getElementById('batch-selection-close');
         if (del) del.onclick = () => this.batchDelete();
         if (move) move.onclick = () => this.batchMove();
         if (dl) dl.onclick = () => this.batchDownload();
@@ -515,12 +474,6 @@ const multiSelect = {
             if (e.key === 'Delete' && this.hasSelection) this.batchDelete();
         });
 
-        const batchSelectionBar = document.getElementById('batch-selection-bar');
-        batchSelectionBar.innerHTML = this._buildSelectionBarHTML();
-
-        if (i18n?.translateElement) {
-            i18n.translateElement(batchSelectionBar);
-        }
         this._wireBarButtons();
     },
 
