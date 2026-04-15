@@ -61,9 +61,9 @@ utoipa = { version = "5.4.0", features = ["axum_extras", "uuid", "chrono"] }
 aws-sdk-s3 = "1.129.0"
 aws-config = { version = "1.8.15", features = ["behavior-version-latest"] }
 aws-smithy-types = "1.4.7"
-azure_core = "0.21"
-azure_storage = "0.21"
-azure_storage_blobs = "0.21"
+azure_core = { version = "0.21", default-features = false, features = ["enable_reqwest_rustls", "hmac_rust"] }
+azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest_rustls", "hmac_rust"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest_rustls", "hmac_rust"] }
 aes-gcm = "0.10.3"
 lru = "0.16.4"
 fastcdc = "4.0.0"
