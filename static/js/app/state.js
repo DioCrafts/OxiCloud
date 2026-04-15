@@ -12,13 +12,8 @@ export const app = {
     contextMenuTargetFile: null,
     selectedTargetFolderId: '',
     moveDialogMode: 'file',
-    isFilesView: true,
-    isTrashView: false,
-    isSharedView: false,
-    isFavoritesView: false,
-    isRecentView: false,
-    isPhotosView: false,
-    currentSection: 'files',
+
+    currentSection: null, // will be defined on first call
     isSearchMode: false,
     shareDialogItem: null,
     shareDialogItemType: null,

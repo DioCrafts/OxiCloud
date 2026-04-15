@@ -107,17 +107,6 @@ function initSidebarToggle() {
 // Initialize sidebar toggle when DOM is ready
 document.addEventListener('DOMContentLoaded', initSidebarToggle);
 
-// Mapping of section names to their corresponding view flags
-export const VIEW_FLAGS = {
-    files: 'isFilesView',
-    shared: 'isSharedView',
-    recent: 'isRecentView',
-    favorites: 'isFavoritesView',
-    trash: 'isTrashView',
-    photos: 'isPhotosView',
-    music: 'isMusicView'
-};
-
 /**
  * Derive section name from nav item's data-i18n attribute.
  * @param {HTMLElement} navItem - The nav item element
@@ -128,6 +117,17 @@ function getSectionFromNavItem(navItem) {
     return i18nKey ? i18nKey.replace('nav.', '') : null;
 }
 
+// Mapping section name to associated switch functions
+export const SECTIONS_MAPPER = {
+    files: switchToFilesSection,
+    shared: switchToSharedSection,
+    recent: switchToRecentFilesSection,
+    favorites: switchToFavoritesSection,
+    trash: switchToTrashSection,
+    photos: switchToPhotosSection,
+    music: switchToMusicSection
+};
+
 /**
  * Set the current active section, updating all view flags and nav UI.
  * @param {string} section - The section to activate ('files', 'shared', 'recent', 'favorites', 'trash')
@@ -137,7 +137,7 @@ function setCurrentSection(section) {
     if (app.currentSection === section) return false;
 
     // Set all view flags - true for active section, false for others
-    Object.entries(VIEW_FLAGS).forEach(([key, flag]) => {
+    Object.entries(SECTIONS_MAPPER).forEach(([key, flag]) => {
         app[flag] = key === section;
     });
 
