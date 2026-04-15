@@ -42,6 +42,9 @@
     padding: 10px 20px;
     border-radius: 12px;
     overflow: hidden;
+    margin-right: 12px;
+    height: 60px;
+    transform: translateY(-8px);
     transition:
         opacity 0.2s,
         max-height 0.25s,
