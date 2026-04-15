@@ -990,7 +990,9 @@ details[open] summary {
     padding: 18px 14px;
     border: 2px solid var(--color-border);
     border-radius: 12px;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+        border-color 0.2s,
+        background 0.2s;
     text-align: center;
     font-weight: 500;
 }
