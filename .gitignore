@@ -24,6 +24,9 @@
 .cargo/*
 !.cargo/config.toml
 
+# temporary file to tools
+tmp/
+
 # Visual Studio Code directory
 .vscode/
 
