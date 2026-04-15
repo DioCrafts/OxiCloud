@@ -49,6 +49,7 @@
 
 .action-buttons {
     display: flex;
+    flex: auto;
     gap: 12px;
 }
 
