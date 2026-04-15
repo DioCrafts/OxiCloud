@@ -15,14 +15,14 @@ import { sharedView } from '../views/shared/sharedView.js';
 import { checkAuthentication } from './authSession.js';
 import { loadFiles } from './filesView.js';
 import {
+    SECTIONS_MAPPER,
     switchToFavoritesSection,
     switchToFilesSection,
     switchToMusicSection,
     switchToPhotosSection,
     switchToRecentFilesSection,
     switchToSharedSection,
-    switchToTrashSection,
-    VIEW_FLAGS
+    switchToTrashSection
 } from './navigation.js';
 import { performSearch } from './searchView.js';
 import { app, appElements as elements } from './state.js';
@@ -247,7 +247,7 @@ function deserializeHash() {
 
     const section = hash_elements[1];
 
-    if (section in VIEW_FLAGS) {
+    if (section in SECTIONS_MAPPER) {
         hashContext.section = section;
     }
 
@@ -306,40 +306,13 @@ function switchSectionTo(section) {
         // no change ...
         return;
 
-    //TODO: better to use a registry for the future (easier to add new section)
-    switch (section) {
-        case 'files':
-            switchToFilesSection();
-            break;
-
-        case 'shared':
-            switchToSharedSection();
-            break;
-
-        case 'recent':
-            switchToRecentFilesSection();
-            break;
-
-        case 'favorites':
-            switchToFavoritesSection();
-            break;
-
-        case 'photos':
-            switchToPhotosSection();
-            break;
-
-        case 'music':
-            switchToMusicSection();
-            break;
-
-        case 'trash':
-            switchToTrashSection();
-            break;
-
-        default:
-            console.warn(`context view ${section} unkonwn fallback to drive section`);
-            switchToFilesSection();
+    if ((!section) in SECTIONS_MAPPER) {
+        console.warn(`context view ${section} unkonwn fallback to files section`);
+        section = 'files';
     }
+
+    const switchHandler = SECTIONS_MAPPER[section];
+    switchHandler();
 }
 
 /**
@@ -528,8 +501,8 @@ function setupEventListeners() {
             if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
             const query = elements.searchInput.value.trim();
 
-            // In shared view, filter locally
-            if (app.isSharedView && sharedView) {
+            // In shared section, filter locally
+            if (app.currentSection === 'shared' && sharedView) {
                 sharedView.filterAndSortItems();
                 return;
             }

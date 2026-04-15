@@ -26,7 +26,7 @@ async function performSearch(query, sortBy) {
             sort_by: sortBy || 'relevance'
         };
 
-        if (!app.isTrashView) {
+        if (app.currentSection !== 'trash') {
             // Ensure we have a valid folder_id before searching
             if (!app.currentPath || app.currentPath === '') {
                 await resolveHomeFolder();
