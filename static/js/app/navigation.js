@@ -108,7 +108,7 @@ function initSidebarToggle() {
 document.addEventListener('DOMContentLoaded', initSidebarToggle);
 
 // Mapping of section names to their corresponding view flags
-const VIEW_FLAGS = {
+export const VIEW_FLAGS = {
     files: 'isFilesView',
     shared: 'isSharedView',
     recent: 'isRecentView',

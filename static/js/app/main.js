@@ -21,7 +21,8 @@ import {
     switchToPhotosSection,
     switchToRecentFilesSection,
     switchToSharedSection,
-    switchToTrashSection
+    switchToTrashSection,
+    VIEW_FLAGS
 } from './navigation.js';
 import { performSearch } from './searchView.js';
 import { app, appElements as elements } from './state.js';
@@ -246,8 +247,7 @@ function deserializeHash() {
 
     const section = hash_elements[1];
 
-    // FIXME: use navigation.VIEW_FLAGS
-    if (section && ['files', 'shared', 'recent', 'favorites', 'trash', 'photos'].includes(section)) {
+    if (section in VIEW_FLAGS) {
         hashContext.section = section;
     }
 
@@ -306,6 +306,7 @@ function switchSectionTo(section) {
         // no change ...
         return;
 
+    //TODO: better to use a registry for the future (easier to add new section)
     switch (section) {
         case 'files':
             switchToFilesSection();
@@ -325,6 +326,10 @@ function switchSectionTo(section) {
 
         case 'photos':
             switchToPhotosSection();
+            break;
+
+        case 'music':
+            switchToMusicSection();
             break;
 
         case 'trash':
