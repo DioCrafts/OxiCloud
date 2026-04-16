@@ -10,9 +10,17 @@ import { formatDateShort } from '../../core/formatters.js';
 import { i18n } from '../../core/i18n.js';
 import { fileSharing } from '../../features/sharing/fileSharing.js';
 
+const TTL = 5 * 60 * 1000; // 5 min
+
 const sharedView = {
     // State
     items: [],
+
+    _expires: 0,
+
+    /** @type {Map<string, boolean>} key = "file:<id>" | "folder:<id>" */
+    _knownItemsId: new Map(),
+
     filteredItems: [],
     currentItem: null,
 
@@ -23,15 +31,15 @@ const sharedView = {
         return h;
     },
 
-    init() {
+    async init() {
         console.log('Initializing shared view component (API-backed)');
-        this.loadItems();
+        await this.loadItems();
     },
 
     show() {
         this.displayUI();
         this.attachEventListeners();
-        this.loadItems().then(() => this.filterAndSortItems());
+        this.filterAndSortItems();
         const c = document.getElementById('shared-container');
         if (c) c.classList.remove('hidden');
     },
@@ -41,8 +49,27 @@ const sharedView = {
         if (c) c.classList.add('hidden');
     },
 
-    // Load shared items from backend API
-    async loadItems() {
+    /**
+     * tells if item_id is shared
+     *
+     * @param {string} id the item_id
+     * @param {string} type folder|file
+     * @returns {boolean} true if this item is shared
+     */
+    isShared(id, type) {
+        return this._knownItemsId.has(`${type}:${id}`);
+    },
+
+    // Load shared items from backend API,
+    // TODO cache entries to minimize calls
+    /**
+     * load shared items
+     *
+     * @param {boolean} force ignore cache
+     */
+    async loadItems(force) {
+        if (this._expires > Date.now() && !force) return;
+
         try {
             const res = await fetch('/api/shares?page=1&per_page=1000', {
                 headers: this._headers()
@@ -53,11 +80,16 @@ const sharedView = {
             } else {
                 this.items = [];
             }
+            this.filteredItems = { ...this.items };
+            this._knownItemsId.clear();
+            this.items.forEach((item) => {
+                this._knownItemsId.set(`${item.item_type}:${item.item_id}`, true);
+            });
+            this._expires = Date.now() + TTL;
         } catch (err) {
             console.error('Error loading shared items:', err);
             this.items = [];
         }
-        this.filteredItems = [...this.items];
     },
 
     // Create and display the shared view UI
@@ -559,7 +591,7 @@ const sharedView = {
         }
 
         this.closeShareDialog();
-        await this.loadItems();
+        await this.loadItems(true);
         this.filterAndSortItems();
     },
 
@@ -580,7 +612,7 @@ const sharedView = {
         }
 
         this.closeShareDialog();
-        await this.loadItems();
+        await this.loadItems(true);
         this.filterAndSortItems();
     },
 
