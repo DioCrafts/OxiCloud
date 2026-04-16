@@ -9,6 +9,7 @@
 import { ui } from '../../app/ui.js';
 import { getCsrfHeaders } from '../../core/csrf.js';
 import { i18n } from '../../core/i18n.js';
+import { multiSelect } from '../files/multiSelect.js';
 
 const favorites = {
     /** @type {Map<string, object>} key = "file:<id>" | "folder:<id>" */
@@ -172,6 +173,10 @@ const favorites = {
             }
 
             ui.resetFilesList(); // ensure also list visible & error hidden
+            // wire buttons & select-all-checkbox as list header has changed in ui.resetFilesList()
+            // FIXME: this case is not easy to understand, should apply better implementation
+            multiSelect.init();
+
             ui.updateBreadcrumb('');
 
             if (this._cache.size === 0) {

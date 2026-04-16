@@ -256,7 +256,7 @@ const multiSelect = {
         // Sync individual item checkboxes
         this._syncItemCheckboxes();
         // Sync select-all checkbox state (for non-selection-mode)
-        if (!this._barVisible) this._syncSelectAllCheckbox();
+        this._syncSelectAllCheckbox();
     },
 
     /** Wire click handlers on batch action buttons (idempotent per render) */
