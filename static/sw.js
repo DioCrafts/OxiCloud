@@ -1,5 +1,6 @@
 // OxiCloud Service Worker
-const CACHE_NAME = 'oxicloud-cache-v17';
+// FIXME: generate cache name according build ?
+const CACHE_NAME = 'oxicloud-cache-v19';
 
 // Only cache static assets — NOT HTML files.
 // HTML files are served network-first so browsers always get the latest

@@ -16,6 +16,7 @@ import { wopiEditor } from '../features/files/wopiEditor.js';
 import { favorites } from '../features/library/favorites.js';
 import { recent } from '../features/library/recent.js';
 import { fileSharing } from '../features/sharing/fileSharing.js';
+import { sharedView } from '../views/shared/sharedView.js';
 import { loadFiles } from './filesView.js';
 import { updateHistory } from './main.js';
 import { syncViewContainers } from './navigation.js';
@@ -1209,6 +1210,7 @@ const ui = {
         el.dataset.parentId = folder.parent_id || '';
 
         const isFav = favorites?.isFavorite(folder.id, 'folder');
+        const isShared = sharedView.isShared(folder.id, 'folder');
         const formattedDate = formatDateTime(folder.modified_at);
 
         el.innerHTML = `
@@ -1219,15 +1221,16 @@ const ui = {
                 </div>
                 <span>${escapeHtml(folder.name)}</span>
                 ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
             </div>
             <div class="type-cell">${i18n ? i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
-              <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
+                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
                     <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
-              </button>
-              <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
+                </button>
+                <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
             </div>
         `;
 
@@ -1247,6 +1250,7 @@ const ui = {
         const fileSize = file.size_formatted || formatFileSize(file.size);
         const formattedDate = formatDateTime(file.modified_at);
         const isFav = favorites?.isFavorite(file.id, 'file');
+        const isShared = sharedView.isShared(file.id, 'file');
 
         const el = document.createElement('div');
         el.className = 'file-item';
@@ -1265,6 +1269,8 @@ const ui = {
                 </div>
                 <span>${escapeHtml(file.name)}</span>
                 ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
+                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
+
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>

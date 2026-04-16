@@ -376,7 +376,7 @@ function initApp() {
         multiSelect.init();
     }
 
-    window.addEventListener('authenticationDone', () => {
+    window.addEventListener('authenticationDone', async () => {
         // Check if a context was provided in the URL
         const hashContext = deserializeHash();
         switchSectionTo(hashContext.section);
@@ -389,6 +389,7 @@ function initApp() {
             if (hashContext.file !== null) {
                 app.viewFile = hashContext.file;
             }
+
             loadFiles();
         }
     });
@@ -604,6 +605,7 @@ function setupEventListeners() {
             let _updateHistory = true;
 
             const itemI18nKey = item.querySelector('span').getAttribute('data-i18n');
+
             switch (itemI18nKey) {
                 case 'nav.shared':
                     // Switch to shared view

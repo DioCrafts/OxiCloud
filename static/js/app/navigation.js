@@ -190,10 +190,10 @@ function switchToSharedSection() {
     toggleFileContainer(false);
 
     // Show shared view
-    if (sharedView) {
-        sharedView.init();
+    sharedView.init().then(() => {
         sharedView.show();
-    }
+    });
+
     if (multiSelect) multiSelect.clear();
 }
 
@@ -222,7 +222,10 @@ function switchToFilesSection() {
     ui.updateBreadcrumb();
     if (multiSelect) multiSelect.clear();
 
-    loadFiles();
+    // temp solution
+    sharedView.loadItems().then(() => {
+        loadFiles();
+    });
 }
 
 function switchToFavoritesSection() {
@@ -245,7 +248,10 @@ function switchToFavoritesSection() {
     ui.resetFilesList();
 
     if (favorites) {
-        favorites.displayFavorites();
+        // temp solution
+        sharedView.loadItems().then(() => {
+            favorites.displayFavorites();
+        });
     } else {
         console.error('Favorites module not loaded or initialized');
         ui.showError(`
@@ -277,7 +283,9 @@ function switchToRecentFilesSection() {
     ui.resetFilesList();
 
     if (recent) {
-        recent.displayRecentFiles();
+        sharedView.loadItems().then(() => {
+            favorites.displayFavorites();
+        });
     } else {
         console.error('Recent files module not loaded or initialized');
         ui.showError(`
