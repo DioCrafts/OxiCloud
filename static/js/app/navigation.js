@@ -284,7 +284,7 @@ function switchToRecentFilesSection() {
 
     if (recent) {
         sharedView.loadItems().then(() => {
-            favorites.displayFavorites();
+            recent.displayRecentFiles();
         });
     } else {
         console.error('Recent files module not loaded or initialized');
