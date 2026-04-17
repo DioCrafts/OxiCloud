@@ -1048,7 +1048,7 @@ services:
       retries: 5
 
   oxicloud:
-    image: oxicloud
+    image: diocrafts/oxicloud:latest
     restart: always
     build:
       context: .
