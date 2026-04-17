@@ -235,7 +235,7 @@ KeyCloak setup via docker-compose:
 version: '3'
 services:
   oxicloud:
-    image: oxicloud:latest
+    image: diocrafts/oxicloud:latest
     environment:
       OXICLOUD_OIDC_ENABLED: "true"
       OXICLOUD_OIDC_ISSUER_URL: "https://keycloak.example.com/realms/your-realm"

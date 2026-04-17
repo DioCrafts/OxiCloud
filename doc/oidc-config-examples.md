@@ -58,7 +58,7 @@ OXICLOUD_OIDC_DISABLE_PASSWORD_LOGIN="false"
 version: '3'
 services:
   oxicloud:
-    image: oxicloud:latest
+    image: diocrafts/oxicloud:latest
     environment:
       OXICLOUD_OIDC_ENABLED: "true"
       OXICLOUD_OIDC_PROVIDER_NAME: "Authentik"
@@ -113,7 +113,7 @@ identity_providers:
 version: '3'
 services:
   oxicloud:
-    image: oxicloud:latest
+    image: diocrafts/oxicloud:latest
     environment:
       OXICLOUD_OIDC_ENABLED: "true"
       OXICLOUD_OIDC_PROVIDER_NAME: "Authelia"
@@ -159,7 +159,7 @@ services:
 version: '3'
 services:
   oxicloud:
-    image: oxicloud:latest
+    image: diocrafts/oxicloud:latest
     environment:
       OXICLOUD_OIDC_ENABLED: "true"
       OXICLOUD_OIDC_PROVIDER_NAME: "KeyCloak"
