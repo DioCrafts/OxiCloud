@@ -1144,8 +1144,22 @@ impl AuthApplicationService {
 
                 let quota = self.capped_quota(&role);
 
-                // Sanitize username (max 32 chars, ensure uniqueness)
-                let mut username = oidc_username.chars().take(32).collect::<String>();
+                // Sanitize username: if it looks like an email, extract the local part
+                // (some OIDC providers like Keycloak use email as the preferred username)
+                let base_username = if oidc_username.contains('@') {
+                    oidc_username.split('@').next().unwrap_or(&oidc_username)
+                } else {
+                    &oidc_username
+                };
+
+                // Filter to valid username characters only, then truncate to 32 chars
+                let mut username = base_username
+                    .chars()
+                    .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+                    .take(32)
+                    .collect::<String>();
+
+                // Ensure minimum length
                 if username.len() < 3 {
                     username = format!("user_{}", &claims.sub[..8.min(claims.sub.len())]);
                 }
