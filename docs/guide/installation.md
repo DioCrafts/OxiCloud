@@ -31,7 +31,7 @@ services:
       retries: 5
 
   oxicloud:
-    image: oxicloud:latest
+    image: diocrafts/oxicloud:latest
     ports:
       - "8086:8086"
     env_file:
