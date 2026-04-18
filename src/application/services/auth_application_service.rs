@@ -1159,9 +1159,18 @@ impl AuthApplicationService {
                     .take(32)
                     .collect::<String>();
 
-                // Ensure minimum length
+                // Filter helper: removes any chars that are not valid in a username
+                let filter_username_chars = |s: &str| {
+                    s.chars()
+                        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+                        .take(32)
+                        .collect::<String>()
+                };
+
+                // Ensure minimum length (the padding suffix must also be filtered)
                 if username.len() < 3 {
-                    username = format!("user_{}", &claims.sub[..8.min(claims.sub.len())]);
+                    let filtered_sub = filter_username_chars(&claims.sub);
+                    username = format!("user_{}", &filtered_sub[..filtered_sub.len().min(8)]);
                 }
 
                 // Check for username collision
@@ -1171,7 +1180,8 @@ impl AuthApplicationService {
                     .await
                     .is_ok()
                 {
-                    let suffix = &claims.sub[..4.min(claims.sub.len())];
+                    let filtered_sub = filter_username_chars(&claims.sub);
+                    let suffix = &filtered_sub[..filtered_sub.len().min(4)];
                     username = format!("{}_{}", &username[..username.len().min(27)], suffix);
                 }
 
