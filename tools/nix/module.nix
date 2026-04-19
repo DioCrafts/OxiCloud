@@ -29,13 +29,13 @@
     OXICLOUD_ENABLE_TRASH=${lib.boolToString cfg.features.trash}
     OXICLOUD_ENABLE_SEARCH=${lib.boolToString cfg.features.search}
 
-    OXICLOUD_OIDC_ENABLED=${lib.boolToString cfg.sso.enable}
-    OXICLOUD_OIDC_ISSUER_URL=${cfg.sso.issuerUrl}
-    OXICLOUD_OIDC_CLIENT_ID=${cfg.sso.clientId}
-    OXICLOUD_OIDC_CLIENT_SECRET=${builtins.readFile cfg.sso.clientSecret.file}
-    OXICLOUD_OIDC_REDIRECT_URI=${cfg.sso.redirectUri}
-    OXICLOUD_OIDC_SCOPES=${cfg.sso.scopes}
-    OXICLOUD_OIDC_FRONTEND_URL=${cfg.sso.frontendUrl}
+    OXICLOUD_OIDC_ENABLED=${lib.boolToString cfg.oauth2.enable}
+    OXICLOUD_OIDC_ISSUER_URL=${cfg.oauth2.issuerUrl}
+    OXICLOUD_OIDC_CLIENT_ID=${cfg.oauth2.clientId}
+    OXICLOUD_OIDC_CLIENT_SECRET=${builtins.readFile cfg.oauth2.clientSecret.file}
+    OXICLOUD_OIDC_REDIRECT_URI=${cfg.oauth2.redirectUri}
+    OXICLOUD_OIDC_SCOPES=${cfg.oauth2.scopes}
+    OXICLOUD_OIDC_FRONTEND_URL=${cfg.oauth2.frontendUrl}
 
     OXICLOUD_WOPI_ENABLED=${lib.boolToString cfg.wopi.enable}
     OXICLOUD_WOPI_DISCOVERY_URL=${cfg.wopi.discoveryUrl}
@@ -88,12 +88,6 @@ in {
     };
 
     database = {
-      url = lib.mkOption {
-        type = lib.types.str;
-        default = "";
-        description = "PostgreSQL connection string: postgres://postgres:postgres@localhost:5432/oxicloud";
-      };
-
       user = lib.mkOption {
         type = lib.types.str;
         default = "oxicloud";
