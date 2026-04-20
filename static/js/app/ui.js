@@ -208,6 +208,7 @@ const ui = {
                                 </div>
                             </div>
                         </div>
+                        <button class="btn btn-primary btn-small" id="share-confirm-btn" data-i18n="actions.share">Share</button>
                     </div>
 
                     <div id="new-share-section" class="share-section hidden">
@@ -226,15 +227,15 @@ const ui = {
                     </div>
 
                     <div class="share-dialog-buttons">
-                        <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancel</button>
-                        <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Share</button>
+                        <button class="btn btn-secondary" id="share-close-btn" data-i18n="actions.close">Close</button>
                     </div>
                 </div>
             `;
+            i18n.translateElement(shareDialog);
             document.body.appendChild(shareDialog);
 
             // Add event listeners for share dialog
-            document.getElementById('share-cancel-btn').addEventListener('click', () => {
+            document.getElementById('share-close-btn').addEventListener('click', () => {
                 contextMenus.closeShareDialog();
             });
 
