@@ -1120,18 +1120,19 @@ const ui = {
      * ================================================================ */
     _bindStarClick(el) {
         const star = el.querySelector('.favorite-star');
-        if (!star) return;
-
-        star.addEventListener('click', (e) => {
+        star?.addEventListener('click', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
             e.preventDefault();
 
             if (!favorites) return;
 
-            const itemId = star.dataset.itemId;
-            const itemType = star.dataset.itemType;
-            const itemName = star.dataset.itemName;
+            // FIXME: make a function
+            const itemElement = shared?.closest('.file-item');
+
+            const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
+            const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
+            const itemName = itemElement.dataset.fileId ? itemElement.dataset.fileName : itemElement.dataset.folderName;
 
             const isActive = star.classList.contains('active');
 
@@ -1147,6 +1148,30 @@ const ui = {
             if (contextMenus && typeof contextMenus.syncFavoriteOptionLabels === 'function') {
                 contextMenus.syncFavoriteOptionLabels();
             }
+        });
+
+        const shared = el.querySelector('.file-badge-shared');
+        shared?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+
+            // FIXME: make a function
+            const itemElement = shared?.closest('.file-item');
+
+            const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
+            const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
+            const itemName = itemElement.dataset.fileId ? itemElement.dataset.fileName : itemElement.dataset.folderName;
+
+            // TODO corrently dirty
+            const item = {
+                id: itemId,
+                item_id: itemId,
+                item_type: itemType,
+                item_name: itemName
+            };
+
+            contextMenus.showShareDialog(item, itemType);
         });
     },
 
@@ -1230,7 +1255,7 @@ const ui = {
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
-                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
+                <button class="favorite-star${isFav ? ' active' : ''}">
                     <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
                 </button>
                 <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
@@ -1278,7 +1303,7 @@ const ui = {
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
-                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
+                <button class="favorite-star${isFav ? ' active' : ''}">
                     <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
                 </button>
                 <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
