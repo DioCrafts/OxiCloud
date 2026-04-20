@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/oxicloud-logo.svg" alt="OxiCloud" width="375" />
+  <img src="images/oxicloud-logo.png" alt="OxiCloud" width="375" />
 </p>
 
 <h3 align="center">Self-hosted cloud storage, calendar &amp; contacts — blazingly fast.</h3>
