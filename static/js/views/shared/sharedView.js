@@ -575,6 +575,7 @@ const sharedView = {
         };
 
         try {
+            // FIXME: redundance with fileSharing
             const res = await fetch(`/api/shares/${this.currentItem.id}`, {
                 method: 'PUT',
                 headers: this._headers(true),
@@ -589,7 +590,8 @@ const sharedView = {
             console.error('Error updating share:', err);
             this.showNotification(err.message || 'Error updating share', 'error');
         }
-
+        // update UI
+        ui.setSharedVisualState(this.currentItem.item_id, this.currentItem.item_type, true);
         this.closeShareDialog();
         await this.loadItems(true);
         this.filterAndSortItems();
@@ -600,6 +602,7 @@ const sharedView = {
         if (!this.currentItem) return;
 
         try {
+            // FIXME: redundance with fileSharing
             const res = await fetch(`/api/shares/${this.currentItem.id}`, {
                 method: 'DELETE',
                 headers: this._headers()
@@ -614,6 +617,8 @@ const sharedView = {
         this.closeShareDialog();
         await this.loadItems(true);
         this.filterAndSortItems();
+        // update UI
+        ui.setSharedVisualState(this.currentItem.item_id, this.currentItem.item_type, this.isShared(this.currentItem.item_id, this.currentItem.item_type));
     },
 
     // Send notification (stub)

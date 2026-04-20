@@ -909,6 +909,7 @@ const contextMenus = {
                                 btn.closest('.existing-share-item').remove();
                                 if (existingSharesContainer.children.length === 0) {
                                     document.getElementById('existing-shares-section').classList.add('hidden');
+                                    ui.setSharedVisualState(item.id, item.type, false);
                                 }
                             }
                         });
@@ -991,6 +992,9 @@ const contextMenus = {
                 shareUrl.focus();
                 shareUrl.select();
             }
+
+            // Update Item's shared badge
+            ui.setSharedVisualState(item.id, item.type, true);
 
             // Show success message
             ui.showNotification(
