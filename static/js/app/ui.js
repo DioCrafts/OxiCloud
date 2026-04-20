@@ -7,7 +7,7 @@
 
 import { escapeHtml, formatDateTime, formatFileSize } from '../core/formatters.js';
 import { i18n } from '../core/i18n.js';
-import { OxiIcons, replaceIconsInElement } from '../core/icons.js';
+import { OxiIcons } from '../core/icons.js';
 import { contextMenus } from '../features/files/contextMenus.js';
 import { fileOps } from '../features/files/fileOperations.js';
 import { inlineViewer } from '../features/files/inlineViewer.js';
@@ -1155,9 +1155,10 @@ const ui = {
     setFavoriteVisualState(itemId, itemType, isFavorite) {
         const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
 
-        const card = document.querySelector(selector);
-        const starBtn = card ? card.querySelector('.favorite-star') : null;
+        const item = document.querySelector(selector);
+        const starBtn = item?.querySelector('.favorite-star');
 
+        // chzn
         if (starBtn) {
             starBtn.classList.toggle('active', !!isFavorite);
 
@@ -1180,20 +1181,21 @@ const ui = {
             }
         }
 
-        const listItem = document.querySelector(selector);
-        if (listItem) {
-            const nameCell = listItem.querySelector('.name-cell');
-            if (nameCell) {
-                let inlineStar = nameCell.querySelector('.favorite-star-inline');
-                if (isFavorite && !inlineStar) {
-                    inlineStar = document.createElement('i');
-                    inlineStar.className = 'fas fa-star favorite-star-inline';
-                    nameCell.appendChild(inlineStar);
-                    replaceIconsInElement(nameCell);
-                } else if (!isFavorite && inlineStar) {
-                    inlineStar.remove();
-                }
-            }
+        // toggle favorite's badge
+        if (item) {
+            const badgeFavorite = item.querySelector('.file-badge-favorite');
+            badgeFavorite?.classList.toggle('hidden', !isFavorite);
+        }
+    },
+
+    setSharedVisualState(itemId, itemType, isShared) {
+        console.log(`setSharedVisual call for ${itemId} ${itemType} to ${isShared}`);
+        const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
+        // toggle favorite's badge
+        const item = document.querySelector(selector);
+        if (item) {
+            const badgeShared = item.querySelector('.file-badge-shared');
+            badgeShared?.classList.toggle('hidden', !isShared);
         }
     },
 
@@ -1220,8 +1222,8 @@ const ui = {
                     <i class="fas fa-folder"></i>
                 </div>
                 <span>${escapeHtml(folder.name)}</span>
-                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
-                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
+                <div class="file-badge file-badge-favorite ${isFav ? '' : 'hidden'}"><i class="fas fa-star favorite-star-inline"></i></div>
+                <div class="file-badge file-badge-shared ${isShared ? '' : 'hidden'}"><i class="fas fa-share-alt"></i></div>
             </div>
             <div class="type-cell">${i18n ? i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
@@ -1268,9 +1270,8 @@ const ui = {
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${escapeHtml(file.name)}</span>
-                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
-                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
-
+                <div class="file-badge file-badge-favorite ${isFav ? '' : 'hidden'}"><i class="fas fa-star favorite-star-inline"></i></div>
+                <div class="file-badge file-badge-shared ${isShared ? '' : 'hidden'}"><i class="fas fa-share-alt"></i></div>
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>
