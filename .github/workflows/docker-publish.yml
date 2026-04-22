@@ -4,6 +4,9 @@ on:
   push:
     tags:
       - "v*"
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       version:
@@ -38,8 +41,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # For workflow_dispatch, checkout the exact tag so we build the right code
-          ref: ${{ github.event.inputs.version || github.ref }}
+          # Build the exact tag behind the published release or manual dispatch.
+          ref: ${{ github.event.inputs.version || github.event.release.tag_name || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
@@ -60,14 +63,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # For workflow_dispatch, checkout the exact tag so we build the right code
-          ref: ${{ github.event.inputs.version || github.ref }}
+          # Build the exact tag behind the published release or manual dispatch.
+          ref: ${{ github.event.inputs.version || github.event.release.tag_name || github.ref }}
 
       - name: Set version tag
         id: version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" == "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
