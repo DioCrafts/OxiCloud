@@ -2,8 +2,6 @@
   <img src="images/oxicloud-logo.png" alt="OxiCloud logo" width="360" />
 </p>
 
-<h1 align="center">OxiCloud</h1>
-
 <p align="center">
   A fast self-hosted cloud for people who want files, calendars, contacts, and office editing without dragging a heavy stack behind them.
 </p>
