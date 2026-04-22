@@ -1,6 +1,6 @@
 # Environment Variables
 
-All variables use the `OXICLOUD_` prefix.
+Most runtime variables use the `OXICLOUD_` prefix. A few build-time or allocator variables do not.
 
 ## Server
 
@@ -19,6 +19,14 @@ All variables use the `OXICLOUD_` prefix.
 | `OXICLOUD_DB_CONNECTION_STRING` | `postgres://postgres:postgres@localhost:5432/oxicloud` | PostgreSQL connection string |
 | `OXICLOUD_DB_MAX_CONNECTIONS` | `20` | Max pool connections |
 | `OXICLOUD_DB_MIN_CONNECTIONS` | `5` | Min pool connections |
+| `OXICLOUD_DB_MAINTENANCE_MAX_CONNECTIONS` | `5` | Max connections in the isolated maintenance pool |
+| `OXICLOUD_DB_MAINTENANCE_MIN_CONNECTIONS` | `1` | Min connections in the isolated maintenance pool |
+
+## Build-Time SQLx
+
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | — | Build-time database URL for SQLx compile-time checks |
 
 ## Authentication
 
@@ -67,6 +75,15 @@ See the [WOPI configuration guide](/config/wopi) for details.
 | `OXICLOUD_WOPI_SECRET` | (JWT secret) | WOPI token signing key |
 | `OXICLOUD_WOPI_TOKEN_TTL_SECS` | `86400` | Token lifetime |
 | `OXICLOUD_WOPI_LOCK_TTL_SECS` | `1800` | Lock expiration |
+
+## Allocator Tuning
+
+These variables are read directly by **mimalloc**, not by OxiCloud's config parser.
+
+| Variable | Default | Description |
+|---|---|---|
+| `MIMALLOC_PURGE_DELAY` | `0` | Delay in ms before freed memory is returned to the OS |
+| `MIMALLOC_ALLOW_LARGE_OS_PAGES` | `0` | Enable or disable large OS pages for allocations |
 
 ## Internal Defaults (not configurable via env)
 

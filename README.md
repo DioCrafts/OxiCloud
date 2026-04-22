@@ -1,305 +1,202 @@
 <p align="center">
-  <img src="images/oxicloud-logo.png" alt="OxiCloud" width="375" />
+  <img src="images/oxicloud-logo.png" alt="OxiCloud logo" width="360" />
 </p>
 
-<h3 align="center">Self-hosted cloud storage, calendar &amp; contacts — blazingly fast.</h3>
+<h1 align="center">OxiCloud</h1>
 
-<div align="center">
+<p align="center">
+  A fast self-hosted cloud for people who want files, calendars, contacts, and office editing without dragging a heavy stack behind them.
+</p>
 
-  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Latest Release](https://img.shields.io/github/release/diocrafts/OxiCloud.svg?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/releases)
-  [![CI](https://img.shields.io/github/actions/workflow/status/diocrafts/OxiCloud/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/diocrafts/OxiCloud/actions/workflows/ci.yml)
-  [![Rust](https://img.shields.io/badge/Rust-1.93+-orange?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
-  [![Docker Image Size](https://img.shields.io/docker/image-size/diocrafts/oxicloud?style=for-the-badge&logo=docker)](https://hub.docker.com/r/diocrafts/oxicloud)
-  [![GitHub Stars](https://img.shields.io/github/stars/diocrafts/OxiCloud?style=for-the-badge&logo=github)](https://github.com/diocrafts/OxiCloud/stargazers)
-  [![GitHub Issues](https://img.shields.io/github/issues/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/issues)
-  [![Last Commit](https://img.shields.io/github/last-commit/diocrafts/OxiCloud?style=for-the-badge)](https://github.com/diocrafts/OxiCloud/commits/main)
+<p align="center">
+  <a href="https://diocrafts.github.io/OxiCloud/">Documentation</a>
+  ·
+  <a href="#quick-start">Quick Start</a>
+  ·
+  <a href="https://github.com/DioCrafts/OxiCloud/stargazers">Star OxiCloud</a>
+  ·
+  <a href="https://github.com/DioCrafts/OxiCloud/issues/new?template=feature_request.md">Request a Feature</a>
+  ·
+  <a href="#supported-clients">Supported Clients</a>
+  ·
+  <a href="#project-status">Project Status</a>
+</p>
 
-[**Documentation**](https://diocrafts.github.io/OxiCloud/)
+<p align="center">
+  <a href="https://github.com/diocrafts/OxiCloud/releases"><img src="https://img.shields.io/github/release/diocrafts/OxiCloud.svg?style=for-the-badge" alt="Latest release" /></a>
+  <a href="https://github.com/diocrafts/OxiCloud/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/diocrafts/OxiCloud/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI" /></a>
+  <a href="https://github.com/diocrafts/OxiCloud/stargazers"><img src="https://img.shields.io/github/stars/diocrafts/OxiCloud?style=for-the-badge&logo=github" alt="GitHub stars" /></a>
+  <a href="https://hub.docker.com/r/diocrafts/oxicloud"><img src="https://img.shields.io/docker/image-size/diocrafts/oxicloud?style=for-the-badge&logo=docker" alt="Docker image size" /></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Rust-1.93%2B-orange?style=for-the-badge&logo=rust" alt="Rust 1.93+" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="MIT license" /></a>
+</p>
 
+<p align="center">
+  If OxiCloud saves you setup time, RAM, or complexity, <a href="https://github.com/DioCrafts/OxiCloud/stargazers">give it a star</a>.
+  If something is missing, <a href="https://github.com/DioCrafts/OxiCloud/issues/new?template=feature_request.md">ask for a feature</a> or <a href="https://github.com/DioCrafts/OxiCloud/issues/new?template=documentation_request.md">request a docs improvement</a>.
+</p>
 
-NextCloud was too slow on my home server. So I built OxiCloud — a complete cloud platform written in Rust that runs on minimal hardware and stays out of your way.
+![OxiCloud dashboard](<images/Captura de pantalla 2025-03-23 230739.png>)
 
-![OxiCloud Dashboard](doc/images/Captura%20de%20pantalla%202025-03-23%20230739.png)
+## Why People Try OxiCloud
 
-<!-- TODO: add animated GIF/demo here -->
+OxiCloud is aimed at self-hosters, home labs, and small teams who want the useful parts of a cloud suite without the operational drag of a traditional PHP stack.
 
+What pulls people in:
 
+- Standard protocols first: WebDAV, CalDAV, and CardDAV are built in
+- Useful product surface already there: files, previews, sharing, trash, search, favorites, and recent items
+- Modern auth and admin basics: OIDC/SSO, quotas, roles, and shared links
+- Better interoperability: native desktop and mobile clients work without custom sync tooling for basic access
+- Lower deployment friction: Docker Compose, environment-based configuration, Helm chart, and Nix module
 
-## OxiCloud vs NextCloud
-
-| Metric | OxiCloud | NextCloud |
-|--------|----------|-----------|
-| **Language** | Rust (compiled, zero-cost abstractions) | PHP (interpreted) |
-| **Docker image** | ~40 MB (Alpine, static binary) | ~1 GB+ (Apache + PHP + modules) |
-| **Idle RAM** | ~30–50 MB | ~250–512 MB |
-| **Cold start** | < 1 s | 5–15 s |
-| **CPU at idle** | ~0 % | 1–5 % (cron, background jobs) |
-| **Min. hardware** | 1 vCPU / 512 MB RAM | 2 vCPU / 2 GB RAM (recommended) |
-| **Concurrent uploads** | Parallel chunked (TUS-like), async I/O | Sequential PHP workers |
-| **File dedup** | SHA-256 content-addressable, ref-counting | None (each user = full copy) |
-| **DB connections** | Dual pool (user + maintenance) | Single pool, background jobs compete |
-| **LTO + PGO** | Fat LTO, codegen-units=1, opt-level=3 | N/A (interpreted) |
-| **Dependencies** | Single binary + PostgreSQL | PHP, Apache/Nginx, Redis, Cron, …  |
-| **WebDAV** | Built-in (RFC 4918, PROPFIND streaming) | Built-in |
-| **CalDAV / CardDAV** | Built-in | Via apps |
-| **WOPI (Office editing)** | Built-in (Collabora / OnlyOffice) | Via apps |
-| **OIDC / SSO** | Built-in (Keycloak, Authentik, …) | Via apps |
-
-> **Note:** NextCloud is a mature, feature-rich ecosystem. OxiCloud targets users who prioritise raw performance, simplicity, and low resource usage over plugin breadth.
-
----
-
-## Features
-
-### Storage & Files
-- **Upload / download / organise** — drag-and-drop, multi-file, grid & list views
-- **Chunked uploads** — TUS-like protocol, parallel chunks, resumable, MD5 integrity
-- **File deduplication** — SHA-256 content-addressable blobs with automatic ref-counting
-- **Adaptive compression** — zstd / gzip selected per MIME type
-- **Trash bin** — soft-delete, restore, auto-purge by retention policy
-- **Favourites & recent files**
-- **Full-text search** — by name, type, date range, size, recursive subtree (ltree)
-- **MIME magic-byte detection** — `infer` crate, not just extension guessing
-- **Inline preview** — images, PDF, text, audio & video player modal
-- **Thumbnails & transcoding** — WebP / AVIF on-the-fly via `image` crate
-
-### Protocols
-- **WebDAV** — RFC 4918, streaming PROPFIND, locking, compatible with all major clients
-- **CalDAV** — calendar sync (Thunderbird, GNOME Calendar, iOS, DAVx⁵, …)
-- **CardDAV** — contacts sync with vCard support
-- **WOPI** — edit Office docs in Collabora Online or OnlyOffice
-- **REST API** — complete JSON API for all operations
-
-### Security & Auth
-- **JWT authentication** with refresh tokens
-- **Argon2id** password hashing
-- **OIDC / SSO** — Keycloak, Authentik, Authelia, Google, Azure AD…
-- **Role-based access** — admin / user, per-folder permissions
-- **Storage quotas** per user
-- **Shared links** with optional password protection
-
-### Infrastructure
-- **Single binary** — no runtime, no interpreter, no framework overhead
-- **~40 MB Docker image** (Alpine)
-- **Dual DB pool** — dedicated maintenance pool so background tasks never starve user queries
-- **LTO-optimised release** — fat LTO, 1 codegen-unit, `opt-level = 3`, stripped
-- **Write-behind caching** (moka) — sub-millisecond hot reads
-- **222+ automated tests** — `cargo test` on every push (CI)
-- **14 languages** — EN, ES, DE, FR, IT, PT, NL, ZH, JA, KO, AR, HI, FA, RU
-
----
-
-## Feature Status
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **File storage & upload** | ✅ Working | Chunked uploads, deduplication, thumbnails |
-| **WebDAV** | ✅ Working | Fully compatible with major clients |
-| **CalDAV (Thunderbird, iOS)** | ✅ Working | Calendar sync functional |
-| **CardDAV (Thunderbird, iOS)** | ✅ Working | Contacts sync functional |
-| **DAVx⁵ (Android)** | ⚠️ Partial | File sync works; calendar/contacts in progress |
-| **WOPI / Office editing** | ✅ Working | Collabora/OnlyOffice integration |
-| **OIDC / SSO** | ✅ Working | Keycloak, Authentik, Google, Azure AD |
-| **Trash / recycle bin** | ✅ Working | Soft-delete with restore |
-| **Full-text search** | ✅ Working | Recursive subtree search |
-| **Shared links** | ✅ Working | Optional password protection |
-| **Music library & playlists** | ✅ Working | Streaming player, drag-and-drop reorder |
-| **Photo gallery** | ✅ Working | Day/month/year views, multi-select |
-| **Desktop sync client** | ❌ Planned | Not yet available |
-| **Android / iOS app** | ❌ Planned | Not yet available |
-| **End-to-end encryption** | ❌ Planned | Roadmap item |
-
-> **Note:** The DAVx⁵ Android app currently works for file sync via WebDAV, but calendar and contacts sync via CalDAV/CardDAV is still being refined. Use Thunderbird or iOS native clients for full CalDAV/CardDAV support.
-
----
+> OxiCloud is not trying to mirror the full plugin ecosystem of Nextcloud. It is designed for a smaller stack, fast startup, and standards-based interoperability.
 
 ## Quick Start
 
-### Docker (recommended)
+### Docker Compose
+
+Requires Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/DioCrafts/oxicloud.git
-cd oxicloud
-
-# Copy and optionally edit environment
+git clone https://github.com/DioCrafts/OxiCloud.git
+cd OxiCloud
 cp example.env .env
 
+# If users will access OxiCloud through a domain or reverse proxy,
+# set OXICLOUD_BASE_URL in .env before the first login.
 docker compose up -d
 ```
 
-Open **http://localhost:8086**. That's it.
+Open `http://localhost:8086`.
 
-If you want to access the server remotely set the OXICLOUD_BASE_URL to your server's domain/port or the authentication will fail after setting up the admin user.
+### Run from source
 
-### From source
-
-Requires **Rust 1.93+** and **PostgreSQL 13+**.
+Requires Rust 1.93+ and PostgreSQL.
 
 ```bash
-git clone https://github.com/DioCrafts/oxicloud.git
-cd oxicloud
+git clone https://github.com/DioCrafts/OxiCloud.git
+cd OxiCloud
+cp example.env .env
 
-# Configure database
-echo "DATABASE_URL=postgres://user:pass@localhost/oxicloud" > .env
-
-# Build optimised binary
-cargo build --release
-
-# Start the server (migrations run automatically)
-cargo run --release
+# If PostgreSQL runs on your host instead of Docker, update both
+# OXICLOUD_DB_CONNECTION_STRING and DATABASE_URL to use localhost:5432.
+cargo run
 ```
 
----
+Deployment details: [deployment guide](docs/config/deployment.md) · [example.env](example.env)
 
-## Client Setup
+## What You Get
 
-OxiCloud speaks standard protocols — any WebDAV / CalDAV / CardDAV client works:
+| Area | Included |
+| --- | --- |
+| Files | Multi-file upload, folders, inline previews, thumbnails, chunked uploads, deduplication, trash |
+| Sync and clients | WebDAV, CalDAV, CardDAV, native OS clients, Thunderbird, DAVx5 |
+| Security | JWT auth, Argon2id, OIDC/SSO, shared links, quotas, admin/user roles |
+| Integrations | REST API and WOPI for Collabora or OnlyOffice |
+| Operations | Docker image, Docker Compose, env-driven config, PostgreSQL backend |
+| Project tooling | Architecture docs, Helm chart, Nix module, CI |
 
-| Client | Protocol | URL |
-|--------|----------|-----|
-| Windows Explorer | WebDAV | `http://host:8086/webdav/` |
-| macOS Finder | WebDAV | `http://host:8086/webdav/` |
-| Nautilus / Dolphin | WebDAV | `dav://host:8086/webdav/` |
-| Thunderbird (calendar) | CalDAV | `http://host:8086/caldav/` |
-| Thunderbird (contacts) | CardDAV | `http://host:8086/carddav/` |
-| DAVx⁵ (Android) | CalDAV + CardDAV | `http://host:8086/` |
-| GNOME Calendar | CalDAV | `http://host:8086/caldav/` |
-| GNOME Contacts | CardDAV | `http://host:8086/carddav/` |
-| Collabora / OnlyOffice | WOPI | See [WOPI docs](doc/wopi-integration.md) |
+## Supported Clients
 
-For detailed setup guides: [WebDAV](doc/webdav-integration-guide.md) · [CalDAV](doc/caldav-technical-spec.md) · [CardDAV](doc/carddav-technical-spec.md) · [OIDC/SSO](doc/oidc-integration.md)
+OxiCloud uses standard DAV protocols, so it works with native clients instead of requiring a custom sync stack for basic access.
 
----
+| Use case | URL |
+| --- | --- |
+| Files via WebDAV | `https://your-host/webdav/` |
+| Calendars via CalDAV | `https://your-host/caldav/` |
+| Contacts via CardDAV | `https://your-host/carddav/` |
 
-## Architecture
+Common clients that work well:
 
-Clean / Hexagonal architecture — each layer depends only on the one below:
+- macOS Finder
+- Windows Explorer
+- GNOME Files and KDE Dolphin
+- Thunderbird
+- Apple Calendar and Contacts
+- DAVx5 on Android
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│  Interfaces    │ REST API, WebDAV, CalDAV, CardDAV, WOPI      │
-├───────────────────────────────────────────────────────────────┤
-│  Application   │ Use cases, DTOs, port definitions            │
-├───────────────────────────────────────────────────────────────┤
-│  Domain        │ Entities, business rules, repository traits  │
-├───────────────────────────────────────────────────────────────┤
-│  Infrastructure│ PostgreSQL, filesystem, caching, auth        │
-└───────────────────────────────────────────────────────────────┘
-```
+Client setup guides: [DAV client setup](docs/guide/dav-client-setup.md) · [WebDAV guide](docs/guide/webdav.md) · [CalDAV & CardDAV guide](docs/guide/caldav-carddav.md)
 
-Swap the database, add a new protocol, or change auth — without touching business logic.
+## Project Status
 
-For a deep dive: [Internal Architecture](doc/internal-architecture.md) · [Caching](doc/caching-architecture.md) · [DB Transactions](doc/database-transactions.md)
+OxiCloud is actively developed and already covers the core self-hosted cloud workflow.
 
----
+| Capability | Status | Notes |
+| --- | --- | --- |
+| File storage and web UI | Ready | Uploads, previews, sharing, trash, and search |
+| WebDAV | Ready | Standard file access for desktop and mobile clients |
+| CalDAV and CardDAV | Ready | Working with Thunderbird, Apple clients, and others |
+| OIDC / SSO | Ready | Documentation and config examples included |
+| WOPI office editing | Ready | Works with Collabora or OnlyOffice |
+| DAVx5 Android support | Partial | File sync works well; calendar and contact behavior is still being refined |
+| Desktop sync client | Planned | Not yet available |
+| Mobile apps | Planned | Not yet available |
+| End-to-end encryption | Planned | Roadmap item |
 
-## Configuration
+Roadmap: [TODO-LIST.md](TODO-LIST.md)
 
-All config via environment variables (see [`example.env`](example.env)):
+## Help Shape OxiCloud
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OXICLOUD_STORAGE_PATH` | `./storage` | Root directory for file storage |
-| `OXICLOUD_SERVER_PORT` | `8086` | HTTP listen port |
-| `OXICLOUD_DB_CONNECTION_STRING` | — | PostgreSQL connection string |
-| `OXICLOUD_JWT_SECRET` | random | Token signing key (set in production!) |
-| `OXICLOUD_OIDC_ENABLED` | `false` | Enable OpenID Connect SSO |
-| `OXICLOUD_WOPI_ENABLED` | `false` | Enable Collabora / OnlyOffice editing |
-| `OXICLOUD_ENABLE_AUTH` | `true` | Toggle authentication |
-| `OXICLOUD_ENABLE_TRASH` | `true` | Toggle trash / recycle bin |
+If you want OxiCloud to get better faster, use the repo like a product feedback loop, not just a code dump.
 
-Full reference: [`example.env`](example.env) · [Deployment guide](https://diocrafts.github.io/OxiCloud/config/deployment) · [OIDC setup](https://diocrafts.github.io/OxiCloud/config/oidc)
+- Give it a star if you want more people to discover the project: [Star OxiCloud](https://github.com/DioCrafts/OxiCloud/stargazers)
+- Propose missing functionality: [feature request](https://github.com/DioCrafts/OxiCloud/issues/new?template=feature_request.md)
+- Point out confusing onboarding or weak docs: [documentation request](https://github.com/DioCrafts/OxiCloud/issues/new?template=documentation_request.md)
+- Report breakage or regressions: [bug report](https://github.com/DioCrafts/OxiCloud/issues/new?template=bug_report.md)
+- Build it with us: [CONTRIBUTING.md](CONTRIBUTING.md)
 
----
+The best feature ideas usually come from real deployment pain. If you hit friction, open an issue and describe the workflow you want.
 
-## Development
+## Architecture and Deployment
 
-### Server side
+OxiCloud follows a clean, hexagonal architecture so protocol handlers, business logic, and infrastructure stay separated.
 
-```bash
-cargo build                 # Dev build
-cargo run                   # Run locally
-cargo test --workspace      # 112 tests
-cargo clippy -- -D warnings # Lint (zero warnings policy)
-cargo fmt --all --check     # Format check
-RUST_LOG=debug cargo run    # Debug logging
-```
+- Backend: Rust + Axum
+- Database: PostgreSQL
+- Configuration: environment variables
+- Default deployment: Docker Compose
+- Additional packaging: [Helm chart](charts/oxicloud) and [Nix module](tools/nix/module.nix)
 
-### Client side
+Architecture docs: [internal architecture](docs/architecture/index.md) · [caching architecture](docs/architecture/caching.md) · [database transactions](docs/architecture/database-transactions.md) · [storage safety](docs/architecture/file-system-safety.md)
 
-Run server in dev profile:
+## Configuration and Integrations
 
-```bash
-PROFILE=dev cargo run
-```
+Start with [example.env](example.env). The most important settings are:
 
-CSS & JS linter is `biome` (can be installed via `cargo install biome-cli` or on MacOS: `brew install biome`)
+- `OXICLOUD_BASE_URL` for reverse proxies, domains, and external access
+- `OXICLOUD_DB_CONNECTION_STRING` for PostgreSQL
+- `OXICLOUD_OIDC_ENABLED` and related settings for SSO
+- `OXICLOUD_WOPI_ENABLED` and discovery URL for office editing
+- `MIMALLOC_PURGE_DELAY=0` for lower idle RSS in constrained environments
 
-### Project stats
-
-| Metric | Value |
-|--------|-------|
-| Rust source files | 170 |
-| Lines of code | ~50 000 |
-| Automated tests | 222+ |
-| Documentation pages | 35+ |
-
----
+Integration docs: [OIDC setup](docs/config/oidc.md) · [OIDC architecture](docs/config/oidc.md) · [OIDC config examples](docs/config/oidc-config-examples.md) · [WOPI integration](docs/config/wopi.md)
 
 ## Documentation
 
-📖 **Full documentation:** [**diocrafts.github.io/OxiCloud**](https://diocrafts.github.io/OxiCloud/)
+- Docs site: [diocrafts.github.io/OxiCloud](https://diocrafts.github.io/OxiCloud/)
+- Deployment: [docs/config/deployment.md](docs/config/deployment.md)
+- Batch operations: [docs/guide/batch-operations.md](docs/guide/batch-operations.md)
+- Search: [docs/guide/search.md](docs/guide/search.md)
+- Thumbnails and transcoding: [docs/guide/thumbnails-and-transcoding.md](docs/guide/thumbnails-and-transcoding.md)
+- Deduplication: [docs/guide/deduplication.md](docs/guide/deduplication.md)
 
-| Topic | Online | Source |
-|-------|--------|--------|
-| Quick Start | [Guide](https://diocrafts.github.io/OxiCloud/guide/installation) | [doc/deployment.md](doc/deployment.md) |
-| WebDAV | [Guide](https://diocrafts.github.io/OxiCloud/guide/webdav) | [doc/webdav-integration-guide.md](doc/webdav-integration-guide.md) |
-| CalDAV / CardDAV | [Guide](https://diocrafts.github.io/OxiCloud/guide/caldav-carddav) | [doc/caldav-technical-spec.md](doc/caldav-technical-spec.md) |
-| OIDC / SSO | [Guide](https://diocrafts.github.io/OxiCloud/config/oidc) | [doc/oidc-integration.md](doc/oidc-integration.md) |
-| WOPI (Office) | [Guide](https://diocrafts.github.io/OxiCloud/config/wopi) | [doc/wopi-integration.md](doc/wopi-integration.md) |
-| Architecture | [Guide](https://diocrafts.github.io/OxiCloud/architecture/) | [doc/internal-architecture.md](doc/internal-architecture.md) |
-| All env variables | [Reference](https://diocrafts.github.io/OxiCloud/config/env) | [`example.env`](example.env) |
+## Development
 
----
+```bash
+cargo fmt --all --check
+cargo clippy -- -D warnings
+cargo test --workspace
+```
 
-## Roadmap
-
-Check [TODO-LIST.md](TODO-LIST.md) for the full roadmap. Highlights:
-
-- [ ] File versioning & diff viewer
-- [ ] End-to-end encryption
-- [ ] Desktop sync client (Rust)
-- [ ] Android / iOS app
-- [ ] OCR & intelligent tagging
-- [ ] Automated workflows
-
----
+Contributor guide: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Contributing
 
-The project is actively developed. Contributions welcome!
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting a PR. Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+If you are not ready to code yet, starring the project and opening a precise feature request is still a meaningful contribution.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
-
----
-
-## Star History
-
-<div align="center">
-  <a href="https://star-history.com/#DioCrafts/OxiCloud&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date" />
-      <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=DioCrafts/OxiCloud&type=Date" style="border-radius: 15px; box-shadow: 0 0 30px rgba(0, 217, 255, 0.3);" />
-    </picture>
-  </a>
-</div>
-
----
-
-Questions? [Open an issue](https://github.com/DioCrafts/OxiCloud/issues). Want to help? PRs welcome.
+MIT. See [LICENSE](LICENSE).

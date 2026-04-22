@@ -6,6 +6,7 @@ OxiCloud is configured entirely via **environment variables** (no config files n
 
 - [Deployment & Docker](/config/deployment) — Docker Compose, Kubernetes Helm chart, image details
 - [Environment Variables](/config/env) — complete reference of all `OXICLOUD_*` variables
+- [Authentication](/config/authentication) — JWT auth, login, refresh, password changes, and auth status
 - [OIDC / SSO](/config/oidc) — single sign-on with Keycloak, Authentik, Authelia, Google, Azure AD
 - [WOPI (Office Editing)](/config/wopi) — Collabora Online / OnlyOffice integration
 

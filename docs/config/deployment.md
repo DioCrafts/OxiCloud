@@ -16,14 +16,18 @@ The final image runs as non-root user `oxicloud` (UID/GID 1001). Exposed port: *
 ```yaml
 services:
   postgres:
-    image: postgres:17.4-alpine
+    image: postgres:18.2-alpine3.23
+    restart: always
     environment:
       POSTGRES_DB: oxicloud
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres       # change in production!
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - oxicloud
     volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - pg_data:/var/lib/postgresql/
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -31,9 +35,15 @@ services:
       retries: 5
 
   oxicloud:
-    image: ghcr.io/diocrafts/oxicloud:latest
+    image: diocrafts/oxicloud:latest
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8086:8086"
+    networks:
+      - oxicloud
     env_file:
       - .env
     volumes:
@@ -42,10 +52,16 @@ services:
       postgres:
         condition: service_healthy
 
+networks:
+  oxicloud:
+    driver: bridge
+
 volumes:
   pg_data:
   storage_data:
 ```
+
+This example mirrors the repository's current `docker-compose.yml`. If you deploy from a registry-only setup, you can keep the `image:` line and remove the `build:` stanza.
 
 ## Kubernetes (Helm)
 

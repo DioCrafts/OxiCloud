@@ -37,6 +37,17 @@ All cross-layer dependencies point **inward** via trait-based ports. The DI cont
 8. **ZIP service** (last, depends on file & folder services)
 9. **Assemble `AppState`**
 
+## AppState Shape
+
+The assembled `AppState` groups the application into a few stable buckets:
+
+- `core` for cross-cutting runtime services such as path resolution, caching, chunked uploads, deduplication, compression, thumbnails, and ZIP handling
+- `repositories` for PostgreSQL-backed folder, file, trash, and i18n persistence
+- `applications` for the use-case layer exposed to handlers
+- optional auth, admin, trash, share, favorites, recent, storage usage, calendar, and contact services when those features are enabled
+
+This lets handlers depend on stable interfaces while the concrete implementation details stay inside the DI container.
+
 ## Project Structure
 
 ```

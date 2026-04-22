@@ -6,7 +6,7 @@
 //! These endpoints use `?access_token=` query parameter auth, NOT the
 //! regular JWT auth middleware.
 //!
-//! Reference: doc/wopi-integration.md
+//! Reference: docs/config/wopi.md
 
 use crate::interfaces::middleware::auth::AuthUser;
 use axum::{

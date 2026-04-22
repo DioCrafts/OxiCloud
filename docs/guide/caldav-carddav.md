@@ -16,6 +16,33 @@ https://your-server:8086/caldav/
 - RFC 5545 (iCalendar format)
 - DAV capabilities: `1, 2, calendar-access`
 
+### Route Structure
+
+CalDAV is mounted at the top level, not under `/api`:
+
+- `/caldav`
+- `/caldav/`
+- `/caldav/{*path}`
+
+OxiCloud also exposes `/.well-known/caldav` and redirects it to `/caldav/`.
+
+Typical resource shapes:
+
+- `/caldav/` for the calendar home
+- `/caldav/{calendar_id}/` for one calendar
+- `/caldav/{calendar_id}/{ical_uid}.ics` for one event
+
+### Supported Methods
+
+- `OPTIONS`
+- `PROPFIND`
+- `REPORT`
+- `MKCALENDAR`
+- `PUT`
+- `GET`
+- `DELETE`
+- `PROPPATCH`
+
 ### Client Setup
 
 | Client | URL |
@@ -48,6 +75,31 @@ https://your-server:8086/carddav/
 - RFC 6352 (CardDAV)
 - RFC 6350 (vCard 4.0)
 
+### Route Structure
+
+CardDAV is also mounted at the top level:
+
+- `/carddav`
+- `/carddav/`
+- `/carddav/{*path}`
+
+Typical resource shapes:
+
+- `/carddav/` for the address book home
+- `/carddav/{addressBookId}/` for one address book
+- `/carddav/{addressBookId}/{contactId}.vcf` for one contact
+
+### Supported Methods
+
+- `OPTIONS`
+- `PROPFIND`
+- `REPORT`
+- `MKCOL`
+- `PUT`
+- `GET`
+- `DELETE`
+- `PROPPATCH`
+
 ### Client Setup
 
 | Client | URL |
@@ -68,3 +120,7 @@ https://your-server:8086/carddav/
 ::: info
 DAVx⁵ file sync works. CalDAV/CardDAV support on DAVx⁵ is still being refined.
 :::
+
+## Client Setup
+
+For platform-specific instructions, see [DAV Client Setup](/guide/dav-client-setup).

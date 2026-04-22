@@ -1,43 +1,66 @@
 # Search
 
-OxiCloud provides full-text search across your files with multiple filter options.
+OxiCloud provides authenticated file and folder search with simple query parameters, advanced JSON criteria, pagination, recursive traversal, and in-memory result caching.
 
-## Endpoint
+## Endpoints
 
-```http
-GET /api/search?q=report&type_filter=pdf,docx&recursive=true
-```
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/search/` | Simple search using query parameters |
+| `POST` | `/api/search/advanced` | Advanced search with a JSON body |
+| `GET` | `/api/search/suggest` | Lightweight autocomplete suggestions |
+| `DELETE` | `/api/search/cache` | Clear the search results cache |
 
-## Query Parameters
+All search endpoints require authentication.
+
+## Simple Search Parameters
 
 | Parameter | Description |
-|---|---|
-| `q` | Search query (matches file name) |
-| `type_filter` | Comma-separated file extensions to filter by |
-| `folder_id` | Restrict search to a specific folder |
-| `recursive` | `true` to search subfolders |
-| `date_from` / `date_to` | Filter by modification date |
-| `size_min` / `size_max` | Filter by file size (bytes) |
-| `limit` | Maximum results to return |
+| --- | --- |
+| `query` | Text to search in file and folder names |
+| `type` | Comma-separated file extensions |
+| `created_after` / `created_before` | Filter by creation time |
+| `modified_after` / `modified_before` | Filter by modification time |
+| `min_size` / `max_size` | Filter by file size in bytes |
+| `folder_id` | Restrict search scope to one folder |
+| `recursive` | Search subfolders, defaults to `true` |
+| `limit` | Maximum results, defaults to `100` |
 | `offset` | Pagination offset |
+| `sort_by` | `relevance`, `name`, `name_desc`, `date`, `date_desc`, `size`, or `size_desc` |
 
-## How It Works
+### Example
 
-OxiCloud stores file metadata in PostgreSQL with an `ltree` path column, enabling efficient recursive subtree queries:
-
-```sql
-SELECT * FROM storage.files
-WHERE path <@ 'root.folder_id'
-  AND LOWER(name) LIKE '%query%'
-  AND LOWER(extension) = ANY('{pdf,docx}')
-ORDER BY updated_at DESC
-LIMIT 50;
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://oxicloud.example.com/api/search/?query=report&type=pdf,docx&recursive=true&limit=20"
 ```
 
-## Frontend
+## Advanced Search
 
-The web UI includes a search bar in the toolbar. Results appear instantly with file name, path, size, and type. Clicking a result navigates to the file's location.
+```json
+{
+  "name_contains": "report",
+  "file_types": ["pdf", "docx"],
+  "min_size": 1024,
+  "folder_id": "folder-uuid",
+  "recursive": true,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+## Suggestions
+
+Use `/api/search/suggest?query=rep&limit=10` for quick autocomplete-style results. Suggestions can also be scoped to a folder with `folder_id`.
+
+## Result Caching
+
+Search results are cached in memory using the search criteria and user ID as the cache key.
+
+- Cache TTL: 5 minutes
+- Max entries: 1000
+- Manual invalidation: `DELETE /api/search/cache`
 
 ## Feature Flag
 
-Search can be disabled via `OXICLOUD_ENABLE_SEARCH=false`.
+Search can be disabled with `OXICLOUD_ENABLE_SEARCH=false`.

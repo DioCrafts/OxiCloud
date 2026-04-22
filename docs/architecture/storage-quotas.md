@@ -15,6 +15,10 @@ OXICLOUD_ENABLE_USER_STORAGE_QUOTAS=true
 3. If the upload would exceed the quota, it's rejected with a `413 Payload Too Large` error
 4. Admins can view and set quotas via the admin panel or API
 
+## Usage Calculation
+
+The storage usage service recalculates logical usage from the user's home folder tree and sums file sizes recursively. Directory entries are skipped and the final value is written back to `auth.users.storage_used`.
+
 ## API
 
 | Method | Endpoint | Description |
@@ -25,6 +29,14 @@ OXICLOUD_ENABLE_USER_STORAGE_QUOTAS=true
 ## Admin Panel
 
 The admin panel (`/admin.html`) shows each user's current usage vs. quota with a visual progress bar.
+
+The dashboard also exposes aggregate quota stats such as:
+
+- total quota bytes
+- total used bytes
+- overall storage usage percent
+- users above 80% usage
+- users over quota
 
 ## Deduplication Interaction
 

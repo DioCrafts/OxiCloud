@@ -10,6 +10,16 @@ OxiCloud supports OpenID Connect for single sign-on with providers like **Keyclo
 4. IdP redirects back to OxiCloud with an auth code
 5. OxiCloud exchanges the code for user info and issues its own JWT tokens
 
+## Architecture
+
+OIDC follows the Authorization Code Flow and keeps a clear split between provider communication and local session handling.
+
+- `OidcService` discovers provider metadata, builds authorization URLs, exchanges authorization codes, and validates the token response
+- `AuthApplicationService` coordinates user lookup or auto-provisioning and then issues OxiCloud's own access and refresh tokens
+- the auth handler exposes the public OIDC endpoints under `/api/auth/oidc/*`
+
+After the browser returns from the IdP, OxiCloud does not reuse the provider token for app requests. It converts the identity into its own JWT session model.
+
 ## Configuration
 
 ```bash
@@ -53,6 +63,15 @@ If `OXICLOUD_OIDC_ENABLED=true` but `issuer_url`, `client_id`, or `client_secret
 | GET | `/api/auth/oidc/authorize` | Authorization URL for redirect to IdP |
 | GET | `/api/auth/oidc/callback` | Callback from IdP with auth code |
 | POST | `/api/auth/oidc/exchange` | Exchange auth code for JWT tokens |
+
+## Identity Mapping
+
+OIDC users are matched by the pair:
+
+- `oidc_provider`
+- `oidc_subject`
+
+This allows one external identity to map to one local user record and supports just-in-time provisioning when `OXICLOUD_OIDC_AUTO_PROVISION=true`.
 
 ## Provider Examples
 

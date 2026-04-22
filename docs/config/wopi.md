@@ -9,6 +9,15 @@ OxiCloud integrates with **Collabora Online** and **OnlyOffice** via the WOPI pr
 3. The editor fetches the file from OxiCloud via WOPI endpoints
 4. Edits are saved back via `PutFile`
 
+## Host / Client Flow
+
+OxiCloud acts as the **WOPI host** and Collabora or OnlyOffice acts as the **WOPI client**.
+
+1. OxiCloud loads the discovery document from the configured WOPI client
+2. The frontend opens a host page that embeds the editor in an iframe
+3. The iframe URL includes `WOPISrc`, which points back to OxiCloud's `/wopi/files/*` endpoints
+4. The editor calls back into OxiCloud with the WOPI access token to read, lock, and save the file
+
 ## Configuration
 
 ```bash
@@ -68,7 +77,25 @@ services:
 | GET | `/wopi/files/{id}` | CheckFileInfo — file metadata |
 | GET | `/wopi/files/{id}/contents` | GetFile — download file content |
 | POST | `/wopi/files/{id}/contents` | PutFile — save edited content |
-| POST | `/wopi/files/{id}` | Lock / Unlock / RefreshLock |
+| POST | `/wopi/files/{id}` | Lock / Unlock / RefreshLock / Rename / Delete / Save As |
+
+### Common `X-WOPI-Override` operations
+
+| Override | Purpose |
+| --- | --- |
+| `LOCK` | Acquire or refresh an editor lock |
+| `UNLOCK` | Release a lock |
+| `REFRESH_LOCK` | Extend the current lock |
+| `PUT_RELATIVE` | Save as a related file |
+| `RENAME_FILE` | Rename from inside the editor |
+| `DELETE` | Delete from the editor when supported |
+
+## Notes
+
+- `CheckFileInfo` is required for every WOPI action
+- `PutFile` uploads the full file content back to OxiCloud
+- lock conflicts return `409 Conflict` with the current lock value
+- OxiCloud uses query parameter `?access_token=` authentication for WOPI callbacks instead of the standard JWT middleware
 
 ## Supported Formats
 
