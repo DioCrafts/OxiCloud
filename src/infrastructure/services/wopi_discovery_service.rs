@@ -202,10 +202,15 @@ impl WopiDiscoveryService {
                     let mut urlsrc = String::new();
 
                     for attr in e.attributes().flatten() {
+                        let value = attr
+                            .decode_and_unescape_value(reader.decoder())
+                            .map(|value| value.into_owned())
+                            .unwrap_or_else(|_| String::from_utf8_lossy(&attr.value).to_string());
+
                         match attr.key.as_ref() {
-                            b"name" => name = String::from_utf8_lossy(&attr.value).to_string(),
-                            b"ext" => ext = String::from_utf8_lossy(&attr.value).to_string(),
-                            b"urlsrc" => urlsrc = String::from_utf8_lossy(&attr.value).to_string(),
+                            b"name" => name = value,
+                            b"ext" => ext = value,
+                            b"urlsrc" => urlsrc = value,
                             _ => {}
                         }
                     }
@@ -333,6 +338,28 @@ mod tests {
         assert_eq!(docx_actions.len(), 2);
         assert!(docx_actions.iter().any(|a| a.name == "view"));
         assert!(docx_actions.iter().any(|a| a.name == "edit"));
+        assert!(
+            docx_actions
+                .iter()
+                .all(|action| !action.urlsrc.contains("&amp;"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_get_action_url_decodes_xml_escaped_ampersands() {
+        let service = WopiDiscoveryService::new("http://example.test/discovery".to_string(), 60);
+        *service.actions.write().await =
+            WopiDiscoveryService::parse_discovery_xml(SAMPLE_DISCOVERY).expect("Should parse");
+        *service.last_fetched.write().await = Some(Instant::now());
+
+        let url = service
+            .get_action_url("docx", "edit", "https://oxicloud.test/wopi/files/abc")
+            .await
+            .expect("Should build URL")
+            .expect("Action URL should exist");
+
+        assert!(url.contains("lang=en-US"));
+        assert!(!url.contains("&amp;"));
     }
 
     #[test]
