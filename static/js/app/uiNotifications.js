@@ -7,56 +7,34 @@ import { notifications } from '../core/notifications.js';
 
 const uiNotifications = {
     show(title, message) {
-        if (notifications && typeof notifications.addNotification === 'function') {
-            const normalizedTitle = String(title || '').toLowerCase();
-            let icon = 'fa-info-circle';
-            let iconClass = 'upload';
+        const normalizedTitle = String(title || '').toLowerCase();
+        let icon = 'fa-info-circle';
+        let iconClass = 'upload';
 
-            if (normalizedTitle.includes('error') || normalizedTitle.includes('failed') || normalizedTitle.includes('fail')) {
-                icon = 'fa-exclamation-circle';
-                iconClass = 'error';
-            } else if (normalizedTitle.includes('favorite') || normalizedTitle.includes('favorit') || normalizedTitle.includes('fav')) {
-                icon = 'fa-star';
-                iconClass = 'success';
-            } else if (
-                normalizedTitle.includes('delete') ||
-                normalizedTitle.includes('removed') ||
-                normalizedTitle.includes('trash') ||
-                normalizedTitle.includes('rename') ||
-                normalizedTitle.includes('complete')
-            ) {
-                icon = 'fa-check-circle';
-                iconClass = 'success';
-            }
-
-            notifications.addNotification({
-                icon,
-                iconClass,
-                title: title || '',
-                text: message || ''
-            });
-            return;
+        if (normalizedTitle.includes('error') || normalizedTitle.includes('failed') || normalizedTitle.includes('fail')) {
+            icon = 'fa-exclamation-circle';
+            iconClass = 'error';
+        } else if (normalizedTitle.includes('favorite') || normalizedTitle.includes('favorit') || normalizedTitle.includes('fav')) {
+            icon = 'fa-star';
+            iconClass = 'success';
+        } else if (
+            normalizedTitle.includes('delete') ||
+            normalizedTitle.includes('removed') ||
+            normalizedTitle.includes('trash') ||
+            normalizedTitle.includes('rename') ||
+            normalizedTitle.includes('complete')
+        ) {
+            icon = 'fa-check-circle';
+            iconClass = 'success';
         }
 
-        let notification = document.querySelector('.notification');
-        if (!notification) {
-            notification = document.createElement('div');
-            notification.classList.add('notification', 'hidden');
-            notification.innerHTML = `
-                <div class="notification-title">${title}</div>
-                <div class="notification-message">${message}</div>
-            `;
-            document.body.appendChild(notification);
-        } else {
-            notification.querySelector('.notification-title').textContent = title;
-            notification.querySelector('.notification-message').textContent = message;
-        }
-
-        notification.classList.remove('hidden');
-
-        setTimeout(() => {
-            notification.classList.add('hidden');
-        }, 5000);
+        notifications.addNotification({
+            icon,
+            iconClass,
+            title: title || '',
+            text: message || ''
+        });
+        return;
     }
 };
 
