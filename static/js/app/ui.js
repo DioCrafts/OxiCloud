@@ -260,6 +260,12 @@ const ui = {
                     contextMenus.closeShareDialog();
                 }
             });
+
+            shareDialog.addEventListener('click', (e) => {
+                if (e.target === shareDialog) {
+                    contextMenus.closeShareDialog();
+                }
+            });
         }
 
         // Notification dialog

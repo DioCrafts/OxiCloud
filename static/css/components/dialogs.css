@@ -213,10 +213,6 @@
     animation: modalFadeIn 0.2s ease;
 }
 
-.shared-dialog.active {
-    display: flex;
-}
-
 .shared-dialog-content {
     background-color: var(--color-bg-surface);
     border-radius: 16px;
@@ -597,10 +593,6 @@
     align-items: center;
     justify-content: center;
     z-index: 1000;
-}
-
-.dialog.active {
-    display: flex;
 }
 
 .dialog-content {
