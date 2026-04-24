@@ -11,7 +11,7 @@
 }
 
 .upload-dropdown-menu {
-    display: none;
+    display: block;
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
@@ -23,10 +23,6 @@
     z-index: 1000;
     overflow: hidden;
     animation: dropdownFadeIn 0.15s ease-out;
-}
-
-.upload-dropdown-menu.show {
-    display: block;
 }
 
 @keyframes dropdownFadeIn {

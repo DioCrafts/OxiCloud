@@ -41,7 +41,7 @@ const uiNotifications = {
         let notification = document.querySelector('.notification');
         if (!notification) {
             notification = document.createElement('div');
-            notification.className = 'notification';
+            notification.classList.add('notification', 'hidden');
             notification.innerHTML = `
                 <div class="notification-title">${title}</div>
                 <div class="notification-message">${message}</div>
@@ -52,10 +52,10 @@ const uiNotifications = {
             notification.querySelector('.notification-message').textContent = message;
         }
 
-        notification.style.display = 'block';
+        notification.classList.remove('hidden');
 
         setTimeout(() => {
-            notification.style.display = 'none';
+            notification.classList.add('hidden');
         }, 5000);
     }
 };
