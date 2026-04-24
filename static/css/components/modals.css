@@ -126,7 +126,7 @@
     width: 100%;
     height: 100%;
     background-color: var(--color-overlay);
-    display: none;
+    display: flex;
     justify-content: center;
     align-items: center;
     z-index: 3000;

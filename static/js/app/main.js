@@ -663,13 +663,12 @@ function setupEventListeners() {
     // Global events to close context menus and deselect cards
     document.addEventListener('click', (e) => {
         const folderMenu = document.getElementById('folder-context-menu');
-        const fileMenu = document.getElementById('file-context-menu');
-
-        if (folderMenu && folderMenu.style.display === 'block' && !folderMenu.contains(e.target)) {
+        if (folderMenu && !folderMenu.classList.contains('hidden') && !folderMenu.contains(e.target)) {
             ui.closeContextMenu();
         }
 
-        if (fileMenu && fileMenu.style.display === 'block' && !fileMenu.contains(e.target)) {
+        const fileMenu = document.getElementById('file-context-menu');
+        if (fileMenu && !fileMenu.classList.contains('hidden') && !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
         }
     });

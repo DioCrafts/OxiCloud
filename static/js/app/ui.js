@@ -38,7 +38,7 @@ const ui = {
         // Folder context menu
         if (!document.getElementById('folder-context-menu')) {
             const folderMenu = document.createElement('div');
-            folderMenu.className = 'context-menu';
+            folderMenu.classList.add('context-menu', 'hidden');
             folderMenu.id = 'folder-context-menu';
             folderMenu.innerHTML = `
                 <div class="context-menu-item" id="download-folder-option">
@@ -68,7 +68,7 @@ const ui = {
         // File context menu
         if (!document.getElementById('file-context-menu')) {
             const fileMenu = document.createElement('div');
-            fileMenu.className = 'context-menu';
+            fileMenu.classList.add('context-menu', 'hidden');
             fileMenu.id = 'file-context-menu';
             fileMenu.innerHTML = `
                 <div class="context-menu-item" id="view-file-option">
@@ -426,7 +426,7 @@ const ui = {
                         fileOps.uploadFiles(droppedEntries.map((x) => x.file));
                     }
                     setTimeout(() => {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }, 500);
                     return;
                 }
@@ -440,7 +440,7 @@ const ui = {
                 }
             }
             setTimeout(() => {
-                dropzone.style.display = 'none';
+                dropzone?.classList.add('hidden');
             }, 500);
         });
 
@@ -448,8 +448,8 @@ const ui = {
         document.addEventListener('dragover', (e) => {
             e.preventDefault();
             if (e.dataTransfer.types.includes('Files')) {
-                dropzone.style.display = 'block';
-                dropzone.classList.add('active');
+                dropzone?.classList.remove('hidden');
+                dropzone?.classList.add('active');
             }
         });
 
@@ -458,7 +458,7 @@ const ui = {
                 dropzone.classList.remove('active');
                 setTimeout(() => {
                     if (!dropzone.classList.contains('active')) {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }
                 }, 100);
             }
@@ -482,7 +482,7 @@ const ui = {
                         fileOps.uploadFiles(droppedEntries.map((x) => x.file));
                     }
                     setTimeout(() => {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }, 500);
                     return;
                 }
@@ -497,7 +497,7 @@ const ui = {
             }
 
             setTimeout(() => {
-                dropzone.style.display = 'none';
+                dropzone?.classList.add('hidden');
             }, 500);
         });
     },
@@ -676,7 +676,7 @@ const ui = {
     closeContextMenu() {
         const menu = document.getElementById('folder-context-menu');
         if (menu) {
-            menu.style.display = 'none';
+            menu.classList.add('hidden');
             app.contextMenuTargetFolder = null;
         }
     },
@@ -687,7 +687,7 @@ const ui = {
     closeFileContextMenu() {
         const menu = document.getElementById('file-context-menu');
         if (menu) {
-            menu.style.display = 'none';
+            menu.classList.add('hidden');
             app.contextMenuTargetFile = null;
         }
     },
@@ -1003,7 +1003,7 @@ const ui = {
             }
             menu.style.left = `${e.pageX}px`;
             menu.style.top = `${e.pageY}px`;
-            menu.style.display = 'block';
+            menu?.classList.remove('hidden');
         });
 
         // dragstart
@@ -1469,7 +1469,7 @@ function toggleCardSelection(card, event) {
 function showContextMenuAtElement(triggerElement, menuId) {
     // Hide any open menus first
     document.querySelectorAll('.context-menu').forEach((m) => {
-        m.style.display = 'none';
+        m.classList.add('hidden');
     });
 
     const menu = document.getElementById(menuId);
@@ -1500,7 +1500,7 @@ function showContextMenuAtElement(triggerElement, menuId) {
 
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    menu.style.display = 'block';
+    menu.classList.remove('hidden');
 }
 
 /**

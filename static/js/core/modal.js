@@ -8,14 +8,23 @@ import { replaceIconsInElement } from './icons.js';
 
 const Modal = {
     // Modal element references
+    /** @private @type {HTMLElement | null} */
     overlay: null,
+    // FIXME: unused ?
     container: null,
+    /** @private @type {HTMLElement | null} */
     icon: null,
+    /** @private @type {HTMLElement | null} */
     title: null,
+    /** @private @type {HTMLElement | null} */
     label: null,
+    /** @private @type {HTMLElement | null} */
     input: null,
+    /** @private @type {HTMLElement | null} */
     cancelBtn: null,
+    /** @private @type {HTMLElement | null} */
     confirmBtn: null,
+    /** @private @type {HTMLElement | null} */
     closeBtn: null,
 
     // Current callback
@@ -169,7 +178,7 @@ const Modal = {
         if (!this.overlay) return;
 
         // Show overlay
-        this.overlay.style.display = 'flex';
+        this.overlay.classList.remove('hidden');
 
         // Trigger animation
         requestAnimationFrame(() => {
@@ -206,7 +215,7 @@ const Modal = {
         this.overlay.classList.remove('active');
 
         setTimeout(() => {
-            this.overlay.style.display = 'none';
+            this.overlay.classList.add('hidden');
 
             if (!confirmed && this.onCancel) {
                 this.onCancel();

@@ -37,7 +37,7 @@
     text-align: center;
     margin: 20px 0;
     color: var(--color-text-medium);
-    display: none;
+    display: block;
 }
 
 .dropzone-icon {
