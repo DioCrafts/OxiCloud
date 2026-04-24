@@ -111,7 +111,7 @@ const ui = {
         // Rename dialog — modern
         if (!document.getElementById('rename-dialog')) {
             const renameDialog = document.createElement('div');
-            renameDialog.className = 'rename-dialog';
+            renameDialog.classList.add('rename-dialog', 'hidden');
             renameDialog.id = 'rename-dialog';
             renameDialog.innerHTML = `
                 <div class="rename-dialog-content">
@@ -134,7 +134,7 @@ const ui = {
         // Move dialog — modern with navigation
         if (!document.getElementById('move-file-dialog')) {
             const moveDialog = document.createElement('div');
-            moveDialog.className = 'rename-dialog';
+            moveDialog.classList.add('rename-dialog', 'hidden');
             moveDialog.id = 'move-file-dialog';
             moveDialog.innerHTML = `
                 <div class="rename-dialog-content">
@@ -161,7 +161,7 @@ const ui = {
         // Share dialog
         if (!document.getElementById('share-dialog')) {
             const shareDialog = document.createElement('div');
-            shareDialog.className = 'share-dialog';
+            shareDialog.classList.add('share-dialog', 'hidden');
             shareDialog.id = 'share-dialog';
             shareDialog.innerHTML = `
                 <div class="share-dialog-content">
@@ -252,12 +252,20 @@ const ui = {
                 const shareUrl = document.getElementById('generated-share-url').value;
                 contextMenus.showEmailNotificationDialog(shareUrl);
             });
+
+            // FIXME make generic function (close all dialog / etc)
+            document.addEventListener('keydown', (e) => {
+                const dialog = document.getElementById('share-dialog');
+                if (e.key === 'Escape' && !dialog?.classList.contains('hidden')) {
+                    contextMenus.closeShareDialog();
+                }
+            });
         }
 
         // Notification dialog
         if (!document.getElementById('notification-dialog')) {
             const notificationDialog = document.createElement('div');
-            notificationDialog.className = 'share-dialog';
+            notificationDialog.classList.add('share-dialog', 'hidden');
             notificationDialog.id = 'notification-dialog';
             notificationDialog.innerHTML = `
                 <div class="share-dialog-content">
@@ -299,7 +307,7 @@ const ui = {
         // Playlist selection dialog
         if (!document.getElementById('playlist-dialog')) {
             const playlistDialog = document.createElement('div');
-            playlistDialog.className = 'share-dialog';
+            playlistDialog.classList.add('share-dialog', 'hidden');
             playlistDialog.id = 'playlist-dialog';
             playlistDialog.innerHTML = `
                 <div class="share-dialog-content">
