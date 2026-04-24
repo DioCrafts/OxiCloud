@@ -1,6 +1,6 @@
 /* About Modal */
 .about-modal-overlay {
-    display: none;
+    display: flex;
     position: fixed;
     inset: 0;
     background: var(--color-overlay);
@@ -8,10 +8,6 @@
     z-index: 3000;
     justify-content: center;
     align-items: center;
-}
-
-.about-modal-overlay.show {
-    display: flex;
 }
 
 .about-modal {
