@@ -7,7 +7,7 @@
 
 import { escapeHtml, formatDateTime, formatFileSize } from '../core/formatters.js';
 import { i18n } from '../core/i18n.js';
-import { OxiIcons, replaceIconsInElement } from '../core/icons.js';
+import { OxiIcons } from '../core/icons.js';
 import { contextMenus } from '../features/files/contextMenus.js';
 import { fileOps } from '../features/files/fileOperations.js';
 import { inlineViewer } from '../features/files/inlineViewer.js';
@@ -38,7 +38,7 @@ const ui = {
         // Folder context menu
         if (!document.getElementById('folder-context-menu')) {
             const folderMenu = document.createElement('div');
-            folderMenu.className = 'context-menu';
+            folderMenu.classList.add('context-menu', 'hidden');
             folderMenu.id = 'folder-context-menu';
             folderMenu.innerHTML = `
                 <div class="context-menu-item" id="download-folder-option">
@@ -68,7 +68,7 @@ const ui = {
         // File context menu
         if (!document.getElementById('file-context-menu')) {
             const fileMenu = document.createElement('div');
-            fileMenu.className = 'context-menu';
+            fileMenu.classList.add('context-menu', 'hidden');
             fileMenu.id = 'file-context-menu';
             fileMenu.innerHTML = `
                 <div class="context-menu-item" id="view-file-option">
@@ -111,7 +111,7 @@ const ui = {
         // Rename dialog — modern
         if (!document.getElementById('rename-dialog')) {
             const renameDialog = document.createElement('div');
-            renameDialog.className = 'rename-dialog';
+            renameDialog.classList.add('rename-dialog', 'hidden');
             renameDialog.id = 'rename-dialog';
             renameDialog.innerHTML = `
                 <div class="rename-dialog-content">
@@ -134,7 +134,7 @@ const ui = {
         // Move dialog — modern with navigation
         if (!document.getElementById('move-file-dialog')) {
             const moveDialog = document.createElement('div');
-            moveDialog.className = 'rename-dialog';
+            moveDialog.classList.add('rename-dialog', 'hidden');
             moveDialog.id = 'move-file-dialog';
             moveDialog.innerHTML = `
                 <div class="rename-dialog-content">
@@ -161,7 +161,7 @@ const ui = {
         // Share dialog
         if (!document.getElementById('share-dialog')) {
             const shareDialog = document.createElement('div');
-            shareDialog.className = 'share-dialog';
+            shareDialog.classList.add('share-dialog', 'hidden');
             shareDialog.id = 'share-dialog';
             shareDialog.innerHTML = `
                 <div class="share-dialog-content">
@@ -208,6 +208,7 @@ const ui = {
                                 </div>
                             </div>
                         </div>
+                        <button class="btn btn-primary btn-small" id="share-confirm-btn" data-i18n="actions.share">Share</button>
                     </div>
 
                     <div id="new-share-section" class="share-section hidden">
@@ -226,15 +227,15 @@ const ui = {
                     </div>
 
                     <div class="share-dialog-buttons">
-                        <button class="btn btn-secondary" id="share-cancel-btn" data-i18n="actions.cancel">Cancel</button>
-                        <button class="btn btn-primary" id="share-confirm-btn" data-i18n="actions.share">Share</button>
+                        <button class="btn btn-secondary" id="share-close-btn" data-i18n="actions.close">Close</button>
                     </div>
                 </div>
             `;
+            i18n.translateElement(shareDialog);
             document.body.appendChild(shareDialog);
 
             // Add event listeners for share dialog
-            document.getElementById('share-cancel-btn').addEventListener('click', () => {
+            document.getElementById('share-close-btn').addEventListener('click', () => {
                 contextMenus.closeShareDialog();
             });
 
@@ -251,12 +252,26 @@ const ui = {
                 const shareUrl = document.getElementById('generated-share-url').value;
                 contextMenus.showEmailNotificationDialog(shareUrl);
             });
+
+            // FIXME make generic function (close all dialog / etc)
+            document.addEventListener('keydown', (e) => {
+                const dialog = document.getElementById('share-dialog');
+                if (e.key === 'Escape' && !dialog?.classList.contains('hidden')) {
+                    contextMenus.closeShareDialog();
+                }
+            });
+
+            shareDialog.addEventListener('click', (e) => {
+                if (e.target === shareDialog) {
+                    contextMenus.closeShareDialog();
+                }
+            });
         }
 
         // Notification dialog
         if (!document.getElementById('notification-dialog')) {
             const notificationDialog = document.createElement('div');
-            notificationDialog.className = 'share-dialog';
+            notificationDialog.classList.add('share-dialog', 'hidden');
             notificationDialog.id = 'notification-dialog';
             notificationDialog.innerHTML = `
                 <div class="share-dialog-content">
@@ -298,7 +313,7 @@ const ui = {
         // Playlist selection dialog
         if (!document.getElementById('playlist-dialog')) {
             const playlistDialog = document.createElement('div');
-            playlistDialog.className = 'share-dialog';
+            playlistDialog.classList.add('share-dialog', 'hidden');
             playlistDialog.id = 'playlist-dialog';
             playlistDialog.innerHTML = `
                 <div class="share-dialog-content">
@@ -417,7 +432,7 @@ const ui = {
                         fileOps.uploadFiles(droppedEntries.map((x) => x.file));
                     }
                     setTimeout(() => {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }, 500);
                     return;
                 }
@@ -431,7 +446,7 @@ const ui = {
                 }
             }
             setTimeout(() => {
-                dropzone.style.display = 'none';
+                dropzone?.classList.add('hidden');
             }, 500);
         });
 
@@ -439,8 +454,8 @@ const ui = {
         document.addEventListener('dragover', (e) => {
             e.preventDefault();
             if (e.dataTransfer.types.includes('Files')) {
-                dropzone.style.display = 'block';
-                dropzone.classList.add('active');
+                dropzone?.classList.remove('hidden');
+                dropzone?.classList.add('active');
             }
         });
 
@@ -449,7 +464,7 @@ const ui = {
                 dropzone.classList.remove('active');
                 setTimeout(() => {
                     if (!dropzone.classList.contains('active')) {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }
                 }, 100);
             }
@@ -473,7 +488,7 @@ const ui = {
                         fileOps.uploadFiles(droppedEntries.map((x) => x.file));
                     }
                     setTimeout(() => {
-                        dropzone.style.display = 'none';
+                        dropzone?.classList.add('hidden');
                     }, 500);
                     return;
                 }
@@ -488,7 +503,7 @@ const ui = {
             }
 
             setTimeout(() => {
-                dropzone.style.display = 'none';
+                dropzone?.classList.add('hidden');
             }, 500);
         });
     },
@@ -667,7 +682,7 @@ const ui = {
     closeContextMenu() {
         const menu = document.getElementById('folder-context-menu');
         if (menu) {
-            menu.style.display = 'none';
+            menu.classList.add('hidden');
             app.contextMenuTargetFolder = null;
         }
     },
@@ -678,7 +693,7 @@ const ui = {
     closeFileContextMenu() {
         const menu = document.getElementById('file-context-menu');
         if (menu) {
-            menu.style.display = 'none';
+            menu.classList.add('hidden');
             app.contextMenuTargetFile = null;
         }
     },
@@ -994,7 +1009,7 @@ const ui = {
             }
             menu.style.left = `${e.pageX}px`;
             menu.style.top = `${e.pageY}px`;
-            menu.style.display = 'block';
+            menu?.classList.remove('hidden');
         });
 
         // dragstart
@@ -1119,18 +1134,19 @@ const ui = {
      * ================================================================ */
     _bindStarClick(el) {
         const star = el.querySelector('.favorite-star');
-        if (!star) return;
-
-        star.addEventListener('click', (e) => {
+        star?.addEventListener('click', (e) => {
             e.stopPropagation();
             e.stopImmediatePropagation();
             e.preventDefault();
 
             if (!favorites) return;
 
-            const itemId = star.dataset.itemId;
-            const itemType = star.dataset.itemType;
-            const itemName = star.dataset.itemName;
+            // FIXME: make a function
+            const itemElement = shared?.closest('.file-item');
+
+            const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
+            const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
+            const itemName = itemElement.dataset.fileId ? itemElement.dataset.fileName : itemElement.dataset.folderName;
 
             const isActive = star.classList.contains('active');
 
@@ -1147,6 +1163,30 @@ const ui = {
                 contextMenus.syncFavoriteOptionLabels();
             }
         });
+
+        const shared = el.querySelector('.file-badge-shared');
+        shared?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            e.preventDefault();
+
+            // FIXME: make a function
+            const itemElement = shared?.closest('.file-item');
+
+            const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
+            const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
+            const itemName = itemElement.dataset.fileId ? itemElement.dataset.fileName : itemElement.dataset.folderName;
+
+            // TODO corrently dirty
+            const item = {
+                id: itemId,
+                item_id: itemId,
+                item_type: itemType,
+                item_name: itemName
+            };
+
+            contextMenus.showShareDialog(item, itemType);
+        });
     },
 
     /**
@@ -1155,9 +1195,10 @@ const ui = {
     setFavoriteVisualState(itemId, itemType, isFavorite) {
         const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
 
-        const card = document.querySelector(selector);
-        const starBtn = card ? card.querySelector('.favorite-star') : null;
+        const item = document.querySelector(selector);
+        const starBtn = item?.querySelector('.favorite-star');
 
+        // chzn
         if (starBtn) {
             starBtn.classList.toggle('active', !!isFavorite);
 
@@ -1180,20 +1221,21 @@ const ui = {
             }
         }
 
-        const listItem = document.querySelector(selector);
-        if (listItem) {
-            const nameCell = listItem.querySelector('.name-cell');
-            if (nameCell) {
-                let inlineStar = nameCell.querySelector('.favorite-star-inline');
-                if (isFavorite && !inlineStar) {
-                    inlineStar = document.createElement('i');
-                    inlineStar.className = 'fas fa-star favorite-star-inline';
-                    nameCell.appendChild(inlineStar);
-                    replaceIconsInElement(nameCell);
-                } else if (!isFavorite && inlineStar) {
-                    inlineStar.remove();
-                }
-            }
+        // toggle favorite's badge
+        if (item) {
+            const badgeFavorite = item.querySelector('.file-badge-favorite');
+            badgeFavorite?.classList.toggle('hidden', !isFavorite);
+        }
+    },
+
+    setSharedVisualState(itemId, itemType, isShared) {
+        console.log(`setSharedVisual call for ${itemId} ${itemType} to ${isShared}`);
+        const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
+        // toggle favorite's badge
+        const item = document.querySelector(selector);
+        if (item) {
+            const badgeShared = item.querySelector('.file-badge-shared');
+            badgeShared?.classList.toggle('hidden', !isShared);
         }
     },
 
@@ -1220,14 +1262,14 @@ const ui = {
                     <i class="fas fa-folder"></i>
                 </div>
                 <span>${escapeHtml(folder.name)}</span>
-                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
-                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
+                <div class="file-badge file-badge-favorite ${isFav ? '' : 'hidden'}"><i class="fas fa-star favorite-star-inline"></i></div>
+                <div class="file-badge file-badge-shared ${isShared ? '' : 'hidden'}"><i class="fas fa-share-alt"></i></div>
             </div>
             <div class="type-cell">${i18n ? i18n.t('files.file_types.folder') : 'Folder'}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
-                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${folder.id}" data-item-type="folder" data-item-name="${escapeHtml(folder.name)}">
+                <button class="favorite-star${isFav ? ' active' : ''}">
                     <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
                 </button>
                 <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
@@ -1268,15 +1310,14 @@ const ui = {
                     <i class="${iconClass}"></i>
                 </div>
                 <span>${escapeHtml(file.name)}</span>
-                ${isFav ? '<i class="fas fa-star favorite-star-inline"></i>' : ''}
-                ${isShared ? '<div class="file-badge-shared"><i class="fas fa-share-alt"></i></div>' : ''}
-
+                <div class="file-badge file-badge-favorite ${isFav ? '' : 'hidden'}"><i class="fas fa-star favorite-star-inline"></i></div>
+                <div class="file-badge file-badge-shared ${isShared ? '' : 'hidden'}"><i class="fas fa-share-alt"></i></div>
             </div>
             <div class="type-cell">${typeLabel}</div>
             <div class="size-cell">${fileSize}</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
-                <button class="favorite-star${isFav ? ' active' : ''}" data-item-id="${file.id}" data-item-type="file" data-item-name="${escapeHtml(file.name)}">
+                <button class="favorite-star${isFav ? ' active' : ''}">
                     <i class="${isFav ? 'fas' : 'far'} fa-star"></i>
                 </button>
                 <button class="file-actions"><i class="fas fa-ellipsis-v"></i></button>
@@ -1434,7 +1475,7 @@ function toggleCardSelection(card, event) {
 function showContextMenuAtElement(triggerElement, menuId) {
     // Hide any open menus first
     document.querySelectorAll('.context-menu').forEach((m) => {
-        m.style.display = 'none';
+        m.classList.add('hidden');
     });
 
     const menu = document.getElementById(menuId);
@@ -1465,7 +1506,7 @@ function showContextMenuAtElement(triggerElement, menuId) {
 
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
-    menu.style.display = 'block';
+    menu.classList.remove('hidden');
 }
 
 /**

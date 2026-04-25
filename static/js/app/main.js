@@ -89,7 +89,7 @@ const ACTIONS_BAR_TEMPLATES = {
                     <span data-i18n="actions.upload">Upload</span>
                     <i class="fas fa-caret-down icon-ml"></i>
                 </button>
-                <div class="upload-dropdown-menu" id="upload-dropdown-menu">
+                <div class="upload-dropdown-menu hidden" id="upload-dropdown-menu">
                     <button class="upload-dropdown-item" id="upload-files-btn">
                         <i class="fas fa-file"></i>
                         <span data-i18n="actions.upload_files">Upload files</span>
@@ -187,14 +187,14 @@ function setupActionsBarDelegation() {
             case 'upload-files-btn': {
                 e.stopPropagation();
                 const menu = document.getElementById('upload-dropdown-menu');
-                if (menu) menu.classList.remove('show');
+                if (menu) menu.classList.add('hidden');
                 if (elements.fileInput) elements.fileInput.click();
                 break;
             }
             case 'upload-folder-btn': {
                 e.stopPropagation();
                 const menu = document.getElementById('upload-dropdown-menu');
-                if (menu) menu.classList.remove('show');
+                if (menu) menu.classList.add('hidden');
                 const folderInput = document.getElementById('folder-input');
                 if (folderInput) folderInput.click();
                 break;
@@ -456,13 +456,13 @@ function setupUploadDropdown() {
         'click',
         (e) => {
             e.stopPropagation();
-            const isOpen = menu.classList.contains('show');
+            const isOpen = !menu.classList.contains('hidden');
             // Close any other open dropdowns
-            document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
-                m.classList.remove('show');
+            document.querySelectorAll('.upload-dropdown-menu').forEach((m) => {
+                m.classList.add('hidden');
             });
             if (!isOpen) {
-                menu.classList.add('show');
+                menu.classList.remove('hidden');
             }
         },
         { signal }
@@ -475,8 +475,8 @@ function setupUploadDropdown() {
     }
     uploadDropdownDocumentClickHandler = (e) => {
         if (e.target.closest('#upload-dropdown')) return;
-        document.querySelectorAll('.upload-dropdown-menu.show').forEach((m) => {
-            m.classList.remove('show');
+        document.querySelectorAll('.upload-dropdown-menu').forEach((m) => {
+            m.classList.add('hidden');
         });
     };
     document.addEventListener('click', uploadDropdownDocumentClickHandler);
@@ -663,13 +663,12 @@ function setupEventListeners() {
     // Global events to close context menus and deselect cards
     document.addEventListener('click', (e) => {
         const folderMenu = document.getElementById('folder-context-menu');
-        const fileMenu = document.getElementById('file-context-menu');
-
-        if (folderMenu && folderMenu.style.display === 'block' && !folderMenu.contains(e.target)) {
+        if (folderMenu && !folderMenu.classList.contains('hidden') && !folderMenu.contains(e.target)) {
             ui.closeContextMenu();
         }
 
-        if (fileMenu && fileMenu.style.display === 'block' && !fileMenu.contains(e.target)) {
+        const fileMenu = document.getElementById('file-context-menu');
+        if (fileMenu && !fileMenu.classList.contains('hidden') && !fileMenu.contains(e.target)) {
             ui.closeFileContextMenu();
         }
     });

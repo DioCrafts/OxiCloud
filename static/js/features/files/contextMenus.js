@@ -294,7 +294,7 @@ const contextMenus = {
         // Each handler checks its own state, so multiple dialogs can be closed with multiple Escape presses
         if (!_moveDialogEscapeHandler) {
             _moveDialogEscapeHandler = (e) => {
-                if (e.key === 'Escape' && moveFileDialog.style.display === 'flex') {
+                if (e.key === 'Escape' && !moveFileDialog?.classList.contains('hidden')) {
                     this.closeMoveDialog();
                 }
             };
@@ -383,7 +383,7 @@ const contextMenus = {
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
         if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_folder') : 'Rename folder';
-        renameDialog.style.display = 'flex';
+        renameDialog?.classList.remove('hidden');
         renameInput.focus();
         renameInput.select();
     },
@@ -403,7 +403,7 @@ const contextMenus = {
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
         if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_file') : 'Rename file';
-        renameDialog.style.display = 'flex';
+        renameDialog?.classList.remove('hidden');
         renameInput.focus();
         renameInput.select();
     },
@@ -412,7 +412,7 @@ const contextMenus = {
      * Close rename dialog
      */
     closeRenameDialog() {
-        document.getElementById('rename-dialog').style.display = 'none';
+        document.getElementById('rename-dialog')?.classList.add('hidden');
         app.contextMenuTargetFolder = null;
         app.renameTarget = null;
     },
@@ -478,14 +478,14 @@ const contextMenus = {
         await this.loadMoveDialogFolders(startFolderId);
 
         // Show dialog
-        document.getElementById('move-file-dialog').style.display = 'flex';
+        document.getElementById('move-file-dialog')?.classList.remove('hidden');
     },
 
     /**
      * Close move dialog
      */
     closeMoveDialog() {
-        document.getElementById('move-file-dialog').style.display = 'none';
+        document.getElementById('move-file-dialog')?.classList.add('hidden');
         app.contextMenuTargetFile = null;
         app.contextMenuTargetFolder = null;
     },
@@ -909,6 +909,7 @@ const contextMenus = {
                                 btn.closest('.existing-share-item').remove();
                                 if (existingSharesContainer.children.length === 0) {
                                     document.getElementById('existing-shares-section').classList.add('hidden');
+                                    ui.setSharedVisualState(item.id, item.type, false);
                                 }
                             }
                         });
@@ -923,7 +924,7 @@ const contextMenus = {
             if (newShareSection) newShareSection.classList.add('hidden');
 
             // Show dialog
-            shareDialog.style.display = 'flex';
+            shareDialog.classList.remove('hidden');
             console.log('Share dialog opened for', itemType, item.name);
         } catch (error) {
             console.error('Error opening share dialog:', error);
@@ -992,6 +993,9 @@ const contextMenus = {
                 shareUrl.select();
             }
 
+            // Update Item's shared badge
+            ui.setSharedVisualState(item.id, item.type, true);
+
             // Show success message
             ui.showNotification(
                 i18n ? i18n.t('notifications.link_created') : 'Link created',
@@ -1017,7 +1021,7 @@ const contextMenus = {
         app.notificationShareUrl = shareUrl;
 
         // Show dialog
-        document.getElementById('notification-dialog').style.display = 'flex';
+        document.getElementById('notification-dialog')?.classList.remove('hidden');
     },
 
     /**
@@ -1042,7 +1046,7 @@ const contextMenus = {
 
         try {
             fileSharing.sendShareNotification(shareUrl, email, message);
-            document.getElementById('notification-dialog').style.display = 'none';
+            document.getElementById('notification-dialog')?.classList.add('hidden');
         } catch (error) {
             console.error('Error sending notification:', error);
             ui.showNotification('Error', 'Could not send notification');
@@ -1054,7 +1058,7 @@ const contextMenus = {
      */
     closeShareDialog() {
         const dialog = document.getElementById('share-dialog');
-        if (dialog) dialog.style.display = 'none';
+        if (dialog) dialog.classList.add('hidden');
         app.shareDialogItem = null;
         app.shareDialogItemType = null;
     },
@@ -1063,7 +1067,7 @@ const contextMenus = {
      * Close notification dialog
      */
     closeNotificationDialog() {
-        document.getElementById('notification-dialog').style.display = 'none';
+        document.getElementById('notification-dialog')?.classList.add('hidden');
         app.notificationShareUrl = null;
     },
 
@@ -1096,7 +1100,7 @@ const contextMenus = {
         if (addBtn) addBtn.disabled = true;
 
         // Show dialog
-        dialog.style.display = 'flex';
+        dialog.classList.remove('hidden');
         requestAnimationFrame(() => dialog.classList.add('active'));
 
         // Load playlists
@@ -1195,7 +1199,7 @@ const contextMenus = {
         if (dialog) {
             dialog.classList.remove('active');
             setTimeout(() => {
-                dialog.style.display = 'none';
+                dialog.classList.add('hidden');
             }, 200);
         }
         app.playlistDialogFiles = null;

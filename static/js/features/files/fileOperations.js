@@ -289,7 +289,7 @@ const fileOps = {
             const progressBar = document.querySelector('.progress-fill');
             const uploadProgressDiv = document.querySelector('.upload-progress');
             if (uploadProgressDiv) {
-                uploadProgressDiv.style.display = 'block';
+                uploadProgressDiv.classList.remove('hidden');
             }
             if (progressBar) {
                 progressBar.style.width = '0%';
@@ -322,7 +322,7 @@ const fileOps = {
             }
 
             if (totalFiles === 0) {
-                if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+                if (uploadProgressDiv) uploadProgressDiv.classList.add('hidden');
                 this._isUploading = false;
                 return;
             }
@@ -412,8 +412,8 @@ const fileOps = {
             }
 
             const dropzone = document.getElementById('dropzone');
-            if (dropzone) dropzone.style.display = 'none';
-            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+            if (dropzone) dropzone.classList.add('hidden');
+            if (uploadProgressDiv) uploadProgressDiv.classList.add('hidden');
         } finally {
             this._isUploading = false;
         }
@@ -450,7 +450,7 @@ const fileOps = {
         const progressBar = document.querySelector('.progress-fill');
         const uploadProgressDiv = document.querySelector('.upload-progress');
         if (uploadProgressDiv) {
-            uploadProgressDiv.style.display = 'block';
+            uploadProgressDiv.classList.remove('hidden');
         }
         if (progressBar) {
             progressBar.style.width = '0%';
@@ -468,7 +468,7 @@ const fileOps = {
 
             const totalFiles = validEntries.length;
             if (totalFiles === 0) {
-                if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+                if (uploadProgressDiv) uploadProgressDiv.classList.add('hidden');
                 return;
             }
 
@@ -678,8 +678,8 @@ const fileOps = {
             }
 
             const dropzone = document.getElementById('dropzone');
-            if (dropzone) dropzone.style.display = 'none';
-            if (uploadProgressDiv) uploadProgressDiv.style.display = 'none';
+            if (dropzone) dropzone.classList.add('hidden');
+            if (uploadProgressDiv) uploadProgressDiv.classList.add('hidden');
         } finally {
             this._isUploading = false;
         }

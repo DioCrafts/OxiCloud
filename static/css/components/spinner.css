@@ -37,7 +37,7 @@
     text-align: center;
     margin: 20px 0;
     color: var(--color-text-medium);
-    display: none;
+    display: block;
 }
 
 .dropzone-icon {
@@ -53,7 +53,7 @@
 .upload-progress {
     margin-top: 15px;
     width: 100%;
-    display: none;
+    display: block;
 }
 
 .progress-bar {

@@ -10,7 +10,7 @@
     padding: 6px;
     min-width: 200px;
     z-index: 2000;
-    display: none;
+    display: block;
     animation: contextMenuIn 0.15s ease-out;
 }
 

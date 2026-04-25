@@ -157,7 +157,7 @@ const sharedView = {
             </div>
 
             <!-- Share Edit Dialog (sharedView-specific) -->
-            <div id="shared-view-edit-dialog" class="shared-dialog">
+            <div id="shared-view-edit-dialog" class="shared-dialog hidden">
                 <div class="shared-dialog-content">
                     <div class="shared-dialog-header">
                         <span id="sv-dialog-icon">📄</span>
@@ -196,7 +196,7 @@ const sharedView = {
             </div>
 
             <!-- Notification Dialog (sharedView-specific) -->
-            <div id="sv-notification-dialog" class="shared-dialog">
+            <div id="sv-notification-dialog" class="shared-dialog hidden">
                 <div class="shared-dialog-content">
                     <div class="shared-dialog-header">
                         <span id="sv-notify-dialog-icon">📧</span>
@@ -493,12 +493,12 @@ const sharedView = {
             }
         }
 
-        shareDialog.classList.add('active');
+        shareDialog.classList.remove('hidden');
     },
 
     closeShareDialog() {
         const d = document.getElementById('shared-view-edit-dialog');
-        if (d) d.classList.remove('active');
+        if (d) d.classList.add('hidden');
         this.currentItem = null;
     },
 
@@ -516,12 +516,12 @@ const sharedView = {
         if (nameEl) nameEl.textContent = dn;
         if (emailEl) emailEl.value = '';
         if (msgEl) msgEl.value = '';
-        d.classList.add('active');
+        d.classList.remove('hidden');
     },
 
     closeNotificationDialog() {
         const d = document.getElementById('sv-notification-dialog');
-        if (d) d.classList.remove('active');
+        if (d) d.classList.add('hidden');
         this.currentItem = null;
     },
 
@@ -575,6 +575,7 @@ const sharedView = {
         };
 
         try {
+            // FIXME: redundance with fileSharing
             const res = await fetch(`/api/shares/${this.currentItem.id}`, {
                 method: 'PUT',
                 headers: this._headers(true),
@@ -589,7 +590,8 @@ const sharedView = {
             console.error('Error updating share:', err);
             this.showNotification(err.message || 'Error updating share', 'error');
         }
-
+        // update UI
+        ui.setSharedVisualState(this.currentItem.item_id, this.currentItem.item_type, true);
         this.closeShareDialog();
         await this.loadItems(true);
         this.filterAndSortItems();
@@ -600,6 +602,7 @@ const sharedView = {
         if (!this.currentItem) return;
 
         try {
+            // FIXME: redundance with fileSharing
             const res = await fetch(`/api/shares/${this.currentItem.id}`, {
                 method: 'DELETE',
                 headers: this._headers()
@@ -614,6 +617,8 @@ const sharedView = {
         this.closeShareDialog();
         await this.loadItems(true);
         this.filterAndSortItems();
+        // update UI
+        ui.setSharedVisualState(this.currentItem.item_id, this.currentItem.item_type, this.isShared(this.currentItem.item_id, this.currentItem.item_type));
     },
 
     // Send notification (stub)
