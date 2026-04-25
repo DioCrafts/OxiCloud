@@ -151,7 +151,7 @@ function setCurrentSection(section) {
 
     // Update page title
     const titleKey = `nav.${section}`;
-    const defaultTitle = section.charAt(0).toUpperCase() + section.slice(1);
+    // TODO check why no more used: const defaultTitle = section.charAt(0).toUpperCase() + section.slice(1);
     appElements.pageTitle.textContent = i18n.t(titleKey);
     appElements.pageTitle.setAttribute('data-i18n', titleKey);
 

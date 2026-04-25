@@ -796,8 +796,7 @@ const contextMenus = {
             const dialogHeader = shareDialog.querySelector('.share-dialog-header');
             if (dialogHeader) {
                 const headerSpan = dialogHeader.querySelector('span');
-                const titleText =
-                    itemType === 'file' ? i18n.t('dialogs.share_file') : i18n.t('dialogs.share_folder');
+                const titleText = itemType === 'file' ? i18n.t('dialogs.share_file') : i18n.t('dialogs.share_folder');
                 if (headerSpan) {
                     headerSpan.textContent = titleText;
                 } else {
@@ -995,10 +994,7 @@ const contextMenus = {
             ui.setSharedVisualState(item.id, item.type, true);
 
             // Show success message
-            ui.showNotification(
-                i18n.t('notifications.link_created'),
-                i18n.t('notifications.share_success')
-            );
+            ui.showNotification(i18n.t('notifications.link_created'), i18n.t('notifications.share_success'));
         } catch (error) {
             console.error('Error creating shared link:', error);
             ui.showNotification('Error', error.message || 'Could not create shared link');
@@ -1172,10 +1168,7 @@ const contextMenus = {
             }
 
             await resp.json();
-            ui.showNotification(
-                i18n.t('music.added'),
-                `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${i18n.t('music.added_to_playlist')}`
-            );
+            ui.showNotification(i18n.t('music.added'), `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${i18n.t('music.added_to_playlist')}`);
 
             this.closePlaylistDialog();
 

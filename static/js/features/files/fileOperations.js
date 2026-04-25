@@ -994,10 +994,7 @@ const fileOps = {
             console.log('Response status:', response.status);
 
             if (response.ok) {
-                ui.showNotification(
-                    i18n.t('notifications.file_renamed'),
-                    i18n.t('notifications.file_renamed_to', { name: newName })
-                );
+                ui.showNotification(i18n.t('notifications.file_renamed'), i18n.t('notifications.file_renamed_to', { name: newName }));
                 return true;
             } else {
                 const errorText = await response.text();

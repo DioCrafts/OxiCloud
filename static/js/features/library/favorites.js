@@ -110,10 +110,7 @@ const favorites = {
 
             // Notify user
             if (ui?.showNotification) {
-                ui.showNotification(
-                    i18n.t('favorites.added_title'),
-                    `"${name}" ${i18n.t('favorites.added_msg')}`
-                );
+                ui.showNotification(i18n.t('favorites.added_title'), `"${name}" ${i18n.t('favorites.added_msg')}`);
             }
 
             return true;
@@ -145,10 +142,7 @@ const favorites = {
             this._cache.delete(this._cacheKey(id, type));
 
             if (ui?.showNotification) {
-                ui.showNotification(
-                    i18n.t('favorites.removed_title'),
-                    `"${itemName}" ${i18n.t('favorites.removed_msg')}`
-                );
+                ui.showNotification(i18n.t('favorites.removed_title'), `"${itemName}" ${i18n.t('favorites.removed_msg')}`);
             }
 
             return true;

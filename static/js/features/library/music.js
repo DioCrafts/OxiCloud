@@ -183,7 +183,6 @@ const musicView = {
         const listEl = document.getElementById('music-playlist-list');
         if (!listEl) return;
 
-
         if (this.playlists.length === 0) {
             listEl.innerHTML = `
                 <div class="music-empty">
@@ -342,7 +341,6 @@ const musicView = {
         const trackListEl = document.getElementById('music-track-list');
         if (!trackListEl) return;
 
-
         if (this.currentTracks.length === 0) {
             trackListEl.innerHTML = `
                 <div class="music-empty">
@@ -477,7 +475,6 @@ const musicView = {
     },
 
     async _showCreatePlaylistDialog() {
-
         const name = await Modal.prompt({
             title: i18n.t('music.create_playlist'),
             label: i18n.t('music.playlist_name'),
@@ -531,7 +528,6 @@ const musicView = {
     },
 
     async _deletePlaylist() {
-
         if (!this.currentPlaylist) return;
 
         const confirmed = await new Promise((resolve) => {
@@ -1685,7 +1681,6 @@ const musicPlayer = {
     _updateQueueUI() {
         const queueList = document.getElementById('player-queue-list');
         if (!queueList) return;
-
 
         if (this.queue.length === 0) {
             queueList.innerHTML = `

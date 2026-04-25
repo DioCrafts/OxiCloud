@@ -62,7 +62,7 @@ function addTrashItemToView(item) {
         iconClass = item.icon_class || (ui?.getIconClass ? ui.getIconClass(item.name) : 'fas fa-file');
         iconSpecialClass = ui?.getIconSpecialClass ? ui.getIconSpecialClass(item.name) : '';
         const cat = item.category || '';
-        typeLabel = cat ? (i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat) : i18n.t('files.file_types.document');
+        typeLabel = cat ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : i18n.t('files.file_types.document');
     }
 
     const isFolder = !isFile;

@@ -212,7 +212,6 @@ function showUserProfileModal() {
     // FIXME: use classes
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();
 
