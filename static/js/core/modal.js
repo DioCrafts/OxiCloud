@@ -137,14 +137,12 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptNewFolder() {
-        const t = i18n.t.bind(i18n);
-
         return this.prompt({
-            title: t('dialogs.new_folder_title') || 'New folder',
-            label: t('dialogs.folder_name') || 'Folder name',
-            placeholder: t('dialogs.folder_placeholder') || 'My folder',
+            title: i18n.t('dialogs.new_folder_title'),
+            label: i18n.t('dialogs.folder_name'),
+            placeholder: i18n.t('dialogs.folder_placeholder'),
             icon: 'fa-folder-plus',
-            confirmText: t('actions.create') || 'Create'
+            confirmText: i18n.t('actions.create')
         });
     },
 
@@ -155,18 +153,15 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptRename(currentName, isFolder = false) {
-        const t = i18n.t.bind(i18n);
-
-        // For files, we want to select only the name part (without extension)
         this._selectNameOnly = !isFolder;
 
         return this.prompt({
-            title: t('dialogs.rename_title') || 'Renombrar',
-            label: t('dialogs.new_name') || 'Nuevo nombre',
+            title: i18n.t('dialogs.rename_title'),
+            label: i18n.t('dialogs.new_name'),
             placeholder: '',
             value: currentName,
             icon: isFolder ? 'fa-folder' : 'fa-file',
-            confirmText: t('actions.rename') || 'Renombrar'
+            confirmText: i18n.t('actions.rename')
         });
     },
 

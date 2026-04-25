@@ -87,9 +87,6 @@ const musicView = {
         if (!this._container) return;
 
         // FIXME should call directly
-        const t = (key, _fallback = '') => {
-            return i18n.t(key);
-        };
 
         // Empty state: no playlists at all — show full-width centered onboarding
         if (this.playlists.length === 0) {
@@ -98,11 +95,11 @@ const musicView = {
                     <div class="music-empty-state-icon">
                         <i class="fas fa-music"></i>
                     </div>
-                    <h3 class="music-empty-state-title">${t('music.no_playlists', 'No playlists yet')}</h3>
-                    <p class="music-empty-state-desc">${t('music.empty_hint', 'Create your first playlist to start organizing your music')}</p>
+                    <h3 class="music-empty-state-title">${i18n.t('music.no_playlists')}</h3>
+                    <p class="music-empty-state-desc">${i18n.t('music.empty_hint')}</p>
                     <button class="btn btn-primary" id="music-create-playlist-btn">
                         <i class="fas fa-plus"></i>
-                        <span>${t('music.create_playlist', 'Create Playlist')}</span>
+                        <span>${i18n.t('music.create_playlist')}</span>
                     </button>
                 </div>
             `;
@@ -118,8 +115,8 @@ const musicView = {
             <div class="music-content">
                 <div class="music-sidebar">
                     <div class="music-sidebar-header">
-                        <h3>${t('music.playlists', 'Playlists')}</h3>
-                        <button class="music-sidebar-add-btn" id="music-create-playlist-btn" title="${t('music.create_playlist', 'Create Playlist')}">
+                        <h3>${i18n.t('music.playlists')}</h3>
+                        <button class="music-sidebar-add-btn" id="music-create-playlist-btn" title="${i18n.t('music.create_playlist')}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -128,44 +125,44 @@ const musicView = {
                 <div class="music-main">
                     <div class="music-welcome">
                         <i class="fas fa-music"></i>
-                        <h3>${t('music.select_playlist', 'Select a playlist')}</h3>
-                        <p>${t('music.select_hint', 'Choose a playlist from the sidebar or create a new one')}</p>
+                        <h3>${i18n.t('music.select_playlist')}</h3>
+                        <p>${i18n.t('music.select_hint')}</p>
                     </div>
                     <div class="music-playlist-detail hidden" id="music-playlist-detail">
                         <div class="music-playlist-header">
-                            <div class="music-playlist-cover" id="music-playlist-cover" title="${t('music.set_cover', 'Set cover')}">
+                            <div class="music-playlist-cover" id="music-playlist-cover" title="${i18n.t('music.set_cover')}">
                                 <i class="fas fa-music"></i>
                             </div>
                             <div class="music-playlist-info">
                                 <h2 id="music-playlist-name"></h2>
                                 <p id="music-playlist-meta"></p>
                                 <span class="music-public-badge hidden" id="music-public-badge">
-                                    <i class="fas fa-globe"></i> <span id="music-public-text">${t('music.public', 'Public')}</span>
+                                    <i class="fas fa-globe"></i> <span id="music-public-text">${i18n.t('music.public')}</span>
                                 </span>
                             </div>
                         </div>
                         <div class="music-playlist-actions">
                             <button class="btn btn-secondary" id="music-play-all-btn">
                                 <i class="fas fa-play"></i>
-                                <span>${t('music.play_all', 'Play All')}</span>
+                                <span>${i18n.t('music.play_all')}</span>
                             </button>
                             <button class="btn btn-secondary" id="music-shuffle-btn">
                                 <i class="fas fa-shuffle"></i>
                             </button>
                             <button class="btn btn-secondary" id="music-add-tracks-btn">
                                 <i class="fas fa-plus"></i>
-                                <span>${t('music.add_tracks', 'Add Tracks')}</span>
+                                <span>${i18n.t('music.add_tracks')}</span>
                             </button>
-                            <button class="btn btn-secondary" id="music-edit-playlist-btn" title="${t('music.edit', 'Edit')}">
+                            <button class="btn btn-secondary" id="music-edit-playlist-btn" title="${i18n.t('music.edit')}">
                                 <i class="fas fa-pen"></i>
                             </button>
-                            <button class="btn btn-secondary" id="music-share-playlist-btn" title="${t('music.share', 'Share')}">
+                            <button class="btn btn-secondary" id="music-share-playlist-btn" title="${i18n.t('music.share')}">
                                 <i class="fas fa-share-alt"></i>
                             </button>
-                            <button class="btn btn-secondary" id="music-manage-shares-btn" title="${t('music.manage_shares', 'Manage Shares')}">
+                            <button class="btn btn-secondary" id="music-manage-shares-btn" title="${i18n.t('music.manage_shares')}">
                                 <i class="fas fa-users"></i>
                             </button>
-                            <button class="btn btn-secondary" id="music-toggle-public-btn" title="${t('music.toggle_public', 'Toggle public')}">
+                            <button class="btn btn-secondary" id="music-toggle-public-btn" title="${i18n.t('music.toggle_public')}">
                                 <i class="fas fa-globe"></i>
                             </button>
                             <button class="btn btn-secondary" id="music-delete-playlist-btn">
@@ -186,13 +183,12 @@ const musicView = {
         const listEl = document.getElementById('music-playlist-list');
         if (!listEl) return;
 
-        const t = (key) => i18n.t(key);
 
         if (this.playlists.length === 0) {
             listEl.innerHTML = `
                 <div class="music-empty">
                     <i class="fas fa-music"></i>
-                    <p>${t('music.no_playlists', 'No playlists yet')}</p>
+                    <p>${i18n.t('music.no_playlists')}</p>
                 </div>
             `;
             return;
@@ -207,7 +203,7 @@ const musicView = {
                 </div>
                 <div class="music-playlist-item-info">
                     <span class="music-playlist-item-name">${this._escapeHtml(p.name)}</span>
-                    <span class="music-playlist-item-count">${p.track_count || 0} ${t('music.tracks', 'tracks')}</span>
+                    <span class="music-playlist-item-count">${p.track_count || 0} ${i18n.t('music.tracks')}</span>
                 </div>
             </div>
         `
@@ -289,8 +285,7 @@ const musicView = {
         if (detailEl) detailEl.classList.remove('hidden');
         if (nameEl) nameEl.textContent = playlist.name;
         if (metaEl) {
-            const t = (key) => i18n.t(key);
-            metaEl.textContent = `${playlist.track_count || 0} ${t('music.tracks', 'tracks')}`;
+            metaEl.textContent = `${playlist.track_count || 0} ${i18n.t('music.tracks')}`;
         }
 
         // Cover art
@@ -310,8 +305,7 @@ const musicView = {
         }
         const togglePublicBtn = document.getElementById('music-toggle-public-btn');
         if (togglePublicBtn) {
-            const t2 = (key) => i18n.t(key);
-            togglePublicBtn.title = playlist.is_public ? t2('music.make_private', 'Make private') : t2('music.make_public', 'Make public');
+            togglePublicBtn.title = playlist.is_public ? i18n.t('music.make_private') : i18n.t('music.make_public');
             togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
 
@@ -348,13 +342,12 @@ const musicView = {
         const trackListEl = document.getElementById('music-track-list');
         if (!trackListEl) return;
 
-        const t = (key) => i18n.t(key);
 
         if (this.currentTracks.length === 0) {
             trackListEl.innerHTML = `
                 <div class="music-empty">
                     <i class="fas fa-music"></i>
-                    <p>${t('music.no_tracks', 'No tracks in this playlist')}</p>
+                    <p>${i18n.t('music.no_tracks')}</p>
                 </div>
             `;
             return;
@@ -364,9 +357,9 @@ const musicView = {
             <div class="music-track-header">
                 <span class="music-track-col music-track-drag"></span>
                 <span class="music-track-col music-track-num">#</span>
-                <span class="music-track-col music-track-title">${t('music.title', 'Title')}</span>
-                <span class="music-track-col music-track-artist">${t('music.artist', 'Artist')}</span>
-                <span class="music-track-col music-track-album">${t('music.album', 'Album')}</span>
+                <span class="music-track-col music-track-title">${i18n.t('music.title')}</span>
+                <span class="music-track-col music-track-artist">${i18n.t('music.artist')}</span>
+                <span class="music-track-col music-track-album">${i18n.t('music.album')}</span>
                 <span class="music-track-col music-track-duration"><i class="far fa-clock"></i></span>
                 <span class="music-track-col music-track-actions"></span>
             </div>
@@ -381,13 +374,13 @@ const musicView = {
                     </span>
                     <span class="music-track-col music-track-title">
                         <i class="fas fa-music music-track-icon"></i>
-                        <span class="music-track-name">${this._escapeHtml(track.title || track.file_name || t('music.unknown_title', 'Unknown'))}</span>
+                        <span class="music-track-name">${this._escapeHtml(track.title || track.file_name || i18n.t('music.unknown_title'))}</span>
                     </span>
-                    <span class="music-track-col music-track-artist">${this._escapeHtml(track.artist || t('music.unknown_artist', 'Unknown Artist'))}</span>
+                    <span class="music-track-col music-track-artist">${this._escapeHtml(track.artist || i18n.t('music.unknown_artist'))}</span>
                     <span class="music-track-col music-track-album">${this._escapeHtml(track.album || '-')}</span>
                     <span class="music-track-col music-track-duration">${this._formatDuration(track.duration_secs)}</span>
                     <span class="music-track-col music-track-actions">
-                        <button class="music-track-remove-btn" title="${t('music.remove', 'Remove')}"><i class="fas fa-times"></i></button>
+                        <button class="music-track-remove-btn" title="${i18n.t('music.remove')}"><i class="fas fa-times"></i></button>
                     </span>
                 </div>
             `
@@ -461,8 +454,7 @@ const musicView = {
     _playTrack(idx) {
         if (!this.currentTracks[idx]) return;
 
-        const t = (key) => i18n.t(key);
-        musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || t('music.playlists', 'Playlist'));
+        musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || i18n.t('music.playlists'));
         musicPlayer.playTrack(idx);
     },
 
@@ -479,21 +471,19 @@ const musicView = {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
-            const t = (key) => i18n.t(key);
-            musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || t('music.shuffle', 'Shuffle'));
+            musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || i18n.t('music.shuffle'));
             musicPlayer.playTrack(0);
         }
     },
 
     async _showCreatePlaylistDialog() {
-        const t = (key) => i18n.t(key);
 
         const name = await Modal.prompt({
-            title: t('music.create_playlist', 'Create Playlist'),
-            label: t('music.playlist_name', 'Playlist name'),
-            placeholder: t('music.playlist_name', 'Playlist name'),
+            title: i18n.t('music.create_playlist'),
+            label: i18n.t('music.playlist_name'),
+            placeholder: i18n.t('music.playlist_name'),
             icon: 'fa-music',
-            confirmText: t('music.create', 'Create')
+            confirmText: i18n.t('music.create')
         });
         if (!name?.trim()) return;
 
@@ -501,7 +491,6 @@ const musicView = {
     },
 
     async _createPlaylist(name) {
-        const t = (key) => i18n.t(key);
         const createBtn = document.getElementById('music-create-playlist-btn');
         if (createBtn) createBtn.disabled = true;
         try {
@@ -522,7 +511,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
-                    title: t('music.create_playlist', 'Create Playlist'),
+                    title: i18n.t('music.create_playlist'),
                     text: name
                 });
             }
@@ -532,7 +521,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -542,18 +531,17 @@ const musicView = {
     },
 
     async _deletePlaylist() {
-        const t = (key) => i18n.t(key);
 
         if (!this.currentPlaylist) return;
 
         const confirmed = await new Promise((resolve) => {
             Modal.prompt({
-                title: t('music.delete', 'Delete'),
-                label: t('music.confirm_delete', 'Delete this playlist?'),
+                title: i18n.t('music.delete'),
+                label: i18n.t('music.confirm_delete'),
                 placeholder: '',
                 value: this.currentPlaylist.name,
                 icon: 'fa-trash',
-                confirmText: t('music.delete', 'Delete')
+                confirmText: i18n.t('music.delete')
             }).then((val) => resolve(val !== null));
         });
         if (!confirmed) return;
@@ -575,7 +563,7 @@ const musicView = {
             this.currentTracks = [];
             this._renderPlaylists();
             if (notifications) {
-                notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: t('music.delete', 'Delete'), text: deletedName });
+                notifications.addNotification({ icon: 'fa-check-circle', iconClass: 'upload', title: i18n.t('music.delete'), text: deletedName });
             }
         } catch (err) {
             console.error('Delete playlist error:', err);
@@ -583,7 +571,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -628,15 +616,14 @@ const musicView = {
 
     async _showEditPlaylistDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         const newName = await Modal.prompt({
-            title: t('music.edit', 'Edit'),
-            label: t('music.playlist_name', 'Playlist name'),
-            placeholder: t('music.playlist_name', 'Playlist name'),
+            title: i18n.t('music.edit'),
+            label: i18n.t('music.playlist_name'),
+            placeholder: i18n.t('music.playlist_name'),
             value: this.currentPlaylist.name,
             icon: 'fa-pen',
-            confirmText: t('actions.confirm', 'Save')
+            confirmText: i18n.t('actions.confirm')
         });
         if (!newName?.trim() || newName.trim() === this.currentPlaylist.name) return;
 
@@ -663,7 +650,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -672,14 +659,13 @@ const musicView = {
 
     async _showSharePlaylistDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         const userId = await Modal.prompt({
-            title: t('music.share', 'Share'),
-            label: t('music.share_with_user', 'User ID or email'),
-            placeholder: t('music.share_with_user', 'User ID or email'),
+            title: i18n.t('music.share'),
+            label: i18n.t('music.share_with_user'),
+            placeholder: i18n.t('music.share_with_user'),
             icon: 'fa-share-alt',
-            confirmText: t('music.share', 'Share')
+            confirmText: i18n.t('music.share')
         });
         if (!userId?.trim()) return;
 
@@ -697,8 +683,8 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
-                    title: t('music.share', 'Share'),
-                    text: t('music.added', 'Added!')
+                    title: i18n.t('music.share'),
+                    text: i18n.t('music.added')
                 });
             }
         } catch (err) {
@@ -707,7 +693,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -716,7 +702,6 @@ const musicView = {
 
     async _showAddTracksDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         // ── Build modal overlay ──
         const overlay = document.createElement('div');
@@ -724,23 +709,23 @@ const musicView = {
         overlay.innerHTML = `
             <div class="music-picker-modal">
                 <div class="music-picker-header">
-                    <h3><i class="fas fa-music"></i> ${t('music.add_tracks', 'Add Tracks')}</h3>
-                    <button class="music-picker-close" title="${t('common.close', 'Close')}">&times;</button>
+                    <h3><i class="fas fa-music"></i> ${i18n.t('music.add_tracks')}</h3>
+                    <button class="music-picker-close" title="${i18n.t('common.close')}">&times;</button>
                 </div>
                 <div class="music-picker-search">
                     <i class="fas fa-search"></i>
                     <input type="text" id="music-picker-query"
-                           placeholder="${t('music.search_audio', 'Search audio files…')}" autocomplete="off">
+                           placeholder="${i18n.t('music.search_audio')}" autocomplete="off">
                 </div>
                 <div class="music-picker-list" id="music-picker-list">
-                    <div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${t('music.loading', 'Loading…')}</div>
+                    <div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${i18n.t('music.loading')}</div>
                 </div>
                 <div class="music-picker-footer">
-                    <span class="music-picker-selected-count" id="music-picker-count">0 ${t('music.selected', 'selected')}</span>
+                    <span class="music-picker-selected-count" id="music-picker-count">0 ${i18n.t('music.selected')}</span>
                     <div class="music-picker-actions">
-                        <button class="btn btn-secondary music-picker-cancel">${t('common.cancel', 'Cancel')}</button>
+                        <button class="btn btn-secondary music-picker-cancel">${i18n.t('common.cancel')}</button>
                         <button class="btn btn-primary music-picker-add" id="music-picker-add-btn" disabled>
-                            <i class="fas fa-plus"></i> ${t('music.add', 'Add')}
+                            <i class="fas fa-plus"></i> ${i18n.t('music.add')}
                         </button>
                     </div>
                 </div>
@@ -770,7 +755,7 @@ const musicView = {
         const AUDIO_EXTENSIONS = 'mp3,ogg,flac,wav,aac,m4a,wma,opus,webm';
 
         const fetchAudioFiles = async (query = '') => {
-            listEl.innerHTML = `<div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${t('music.loading', 'Loading…')}</div>`;
+            listEl.innerHTML = `<div class="music-picker-loading"><i class="fas fa-spinner fa-spin"></i> ${i18n.t('music.loading')}</div>`;
             try {
                 const params = new URLSearchParams({ type_filter: AUDIO_EXTENSIONS, limit: '200', recursive: 'true' });
                 if (query.trim()) params.set('query', query.trim());
@@ -780,13 +765,13 @@ const musicView = {
                 renderFiles(data.files || []);
             } catch (err) {
                 console.error('Audio search error:', err);
-                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-exclamation-triangle"></i> ${t('music.search_error', 'Could not load audio files')}</div>`;
+                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-exclamation-triangle"></i> ${i18n.t('music.search_error')}</div>`;
             }
         };
 
         const renderFiles = (files) => {
             if (files.length === 0) {
-                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-folder-open"></i> ${t('music.no_audio_files', 'No audio files found')}</div>`;
+                listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-folder-open"></i> ${i18n.t('music.no_audio_files')}</div>`;
                 return;
             }
             listEl.innerHTML = '';
@@ -809,7 +794,7 @@ const musicView = {
                         selectedIds.delete(file.id);
                         row.classList.remove('selected');
                     }
-                    countEl.textContent = `${selectedIds.size} ${t('music.selected', 'selected')}`;
+                    countEl.textContent = `${selectedIds.size} ${i18n.t('music.selected')}`;
                     addBtn.disabled = selectedIds.size === 0;
                 });
                 listEl.appendChild(row);
@@ -827,7 +812,7 @@ const musicView = {
         addBtn.addEventListener('click', async () => {
             if (selectedIds.size === 0) return;
             addBtn.disabled = true;
-            addBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${t('music.adding', 'Adding…')}`;
+            addBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${i18n.t('music.adding')}`;
 
             try {
                 const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks`, {
@@ -842,8 +827,8 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
-                        title: t('music.add_tracks', 'Add Tracks'),
-                        text: `${selectedIds.size} ${t('music.added_to_playlist', 'added to playlist')}`
+                        title: i18n.t('music.add_tracks'),
+                        text: `${selectedIds.size} ${i18n.t('music.added_to_playlist')}`
                     });
                 }
                 close();
@@ -854,7 +839,7 @@ const musicView = {
                     this.currentPlaylist.track_count = playlist.track_count;
                     this._renderPlaylistList();
                     const metaEl = document.getElementById('music-playlist-meta');
-                    if (metaEl) metaEl.textContent = `${playlist.track_count} ${t('music.tracks', 'tracks')}`;
+                    if (metaEl) metaEl.textContent = `${playlist.track_count} ${i18n.t('music.tracks')}`;
                 }
             } catch (err) {
                 console.error('Add tracks error:', err);
@@ -862,12 +847,12 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
-                        title: t('music.error', 'Error'),
-                        text: t('music.add_error', 'Could not add tracks to playlist')
+                        title: i18n.t('music.error'),
+                        text: i18n.t('music.add_error')
                     });
                 }
                 addBtn.disabled = false;
-                addBtn.innerHTML = `<i class="fas fa-plus"></i> ${t('music.add', 'Add')}`;
+                addBtn.innerHTML = `<i class="fas fa-plus"></i> ${i18n.t('music.add')}`;
             }
         });
 
@@ -878,7 +863,6 @@ const musicView = {
 
     async _removeTrackFromPlaylist(_trackId, fileId) {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks/${encodeURIComponent(fileId)}`, {
@@ -892,8 +876,8 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
-                    title: t('music.remove', 'Remove'),
-                    text: t('music.track_removed', 'Track removed')
+                    title: i18n.t('music.remove'),
+                    text: i18n.t('music.track_removed')
                 });
             }
             await this._loadPlaylistTracks(this.currentPlaylist.id);
@@ -903,7 +887,7 @@ const musicView = {
                 this.currentPlaylist.track_count = playlist.track_count;
                 this._renderPlaylistList();
                 const metaEl = document.getElementById('music-playlist-meta');
-                if (metaEl) metaEl.textContent = `${playlist.track_count} ${t('music.tracks', 'tracks')}`;
+                if (metaEl) metaEl.textContent = `${playlist.track_count} ${i18n.t('music.tracks')}`;
             }
         } catch (err) {
             console.error('Remove track error:', err);
@@ -911,7 +895,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -920,7 +904,6 @@ const musicView = {
 
     async _reorderTrack(fromIdx, toIdx) {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         const tracks = [...this.currentTracks];
         const [moved] = tracks.splice(fromIdx, 1);
@@ -943,7 +926,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -953,7 +936,6 @@ const musicView = {
 
     async _showManageSharesDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         const existing = document.getElementById('music-shares-dialog');
         if (existing) existing.remove();
@@ -964,19 +946,19 @@ const musicView = {
         dialog.innerHTML = `
             <div class="music-shares-panel">
                 <div class="music-shares-header">
-                    <h3><i class="fas fa-users"></i> ${t('music.manage_shares', 'Manage Shares')}</h3>
+                    <h3><i class="fas fa-users"></i> ${i18n.t('music.manage_shares')}</h3>
                     <button class="music-shares-close-btn"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="music-shares-body">
                     <div class="music-shares-loading"><i class="fas fa-spinner fa-spin"></i></div>
                 </div>
                 <div class="music-shares-add">
-                    <input type="text" id="music-share-user-input" placeholder="${t('music.share_with_user', 'User ID or email')}" class="music-shares-input">
+                    <input type="text" id="music-share-user-input" placeholder="${i18n.t('music.share_with_user')}" class="music-shares-input">
                     <label class="music-shares-write-label">
-                        <input type="checkbox" id="music-share-write-input"> ${t('music.can_write', 'Can edit')}
+                        <input type="checkbox" id="music-share-write-input"> ${i18n.t('music.can_write')}
                     </label>
                     <button class="btn btn-primary btn-sm" id="music-share-add-btn">
-                        <i class="fas fa-plus"></i> ${t('music.share', 'Share')}
+                        <i class="fas fa-plus"></i> ${i18n.t('music.share')}
                     </button>
                 </div>
             </div>
@@ -1009,8 +991,8 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
-                        title: t('music.share', 'Share'),
-                        text: t('music.added', 'Added!')
+                        title: i18n.t('music.share'),
+                        text: i18n.t('music.added')
                     });
                 }
             } catch (err) {
@@ -1018,7 +1000,7 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
-                        title: t('music.error', 'Error'),
+                        title: i18n.t('music.error'),
                         text: err.message
                     });
                 }
@@ -1030,7 +1012,6 @@ const musicView = {
 
     async _loadSharesList(dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
         const body = dialog.querySelector('.music-shares-body');
         if (!body) return;
 
@@ -1045,7 +1026,7 @@ const musicView = {
             const shares = await resp.json();
 
             if (shares.length === 0) {
-                body.innerHTML = `<p class="music-shares-empty">${t('music.no_shares', 'No shares yet')}</p>`;
+                body.innerHTML = `<p class="music-shares-empty">${i18n.t('music.no_shares')}</p>`;
                 return;
             }
 
@@ -1054,8 +1035,8 @@ const musicView = {
                     (s) => `
                 <div class="music-share-item" data-user-id="${this._escapeHtml(s.user_id)}">
                     <span class="music-share-user"><i class="fas fa-user"></i> ${this._escapeHtml(s.user_id)}</span>
-                    <span class="music-share-perm">${s.can_write ? t('music.can_write', 'Can edit') : t('music.read_only', 'Read only')}</span>
-                    <button class="music-share-remove-btn" title="${t('music.remove_share', 'Remove share')}"><i class="fas fa-times"></i></button>
+                    <span class="music-share-perm">${s.can_write ? i18n.t('music.can_write') : i18n.t('music.read_only')}</span>
+                    <button class="music-share-remove-btn" title="${i18n.t('music.remove_share')}"><i class="fas fa-times"></i></button>
                 </div>
             `
                 )
@@ -1075,7 +1056,6 @@ const musicView = {
 
     async _removeShare(userId, dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share/${encodeURIComponent(userId)}`, {
@@ -1090,7 +1070,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -1099,7 +1079,6 @@ const musicView = {
 
     async _togglePublic() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
         const newValue = !this.currentPlaylist.is_public;
 
         try {
@@ -1120,16 +1099,16 @@ const musicView = {
 
             const btn = document.getElementById('music-toggle-public-btn');
             if (btn) {
-                btn.title = newValue ? t('music.make_private', 'Make private') : t('music.make_public', 'Make public');
+                btn.title = newValue ? i18n.t('music.make_private') : i18n.t('music.make_public');
                 btn.classList.toggle('active', newValue);
             }
 
             if (notifications) {
-                const status = newValue ? t('music.public', 'Public') : t('music.private', 'Private');
+                const status = newValue ? i18n.t('music.public') : i18n.t('music.private');
                 notifications.addNotification({
                     icon: 'fa-check-circle',
                     iconClass: 'upload',
-                    title: t('music.toggle_public', 'Visibility'),
+                    title: i18n.t('music.toggle_public'),
                     text: status
                 });
             }
@@ -1139,7 +1118,7 @@ const musicView = {
                 notifications.addNotification({
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
-                    title: t('music.error', 'Error'),
+                    title: i18n.t('music.error'),
                     text: err.message
                 });
             }
@@ -1148,7 +1127,6 @@ const musicView = {
 
     async _showCoverPicker() {
         if (!this.currentPlaylist) return;
-        const t = (key) => i18n.t(key);
 
         const input = document.createElement('input');
         input.type = 'file';
@@ -1198,8 +1176,8 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-check-circle',
                         iconClass: 'upload',
-                        title: t('music.set_cover', 'Set cover'),
-                        text: t('music.cover_updated', 'Cover updated')
+                        title: i18n.t('music.set_cover'),
+                        text: i18n.t('music.cover_updated')
                     });
                 }
             } catch (err) {
@@ -1208,7 +1186,7 @@ const musicView = {
                     notifications.addNotification({
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
-                        title: t('music.error', 'Error'),
+                        title: i18n.t('music.error'),
                         text: err.message
                     });
                 }
@@ -1626,14 +1604,13 @@ const musicPlayer = {
         console.error('Audio error:', e);
         this.isPlaying = false;
         this._updateUI();
-        const t = (key) => i18n.t(key);
         if (notifications) {
-            const trackName = this.currentTrack?.title || this.currentTrack?.file_name || t('music.unknown_title', 'Unknown');
+            const trackName = this.currentTrack?.title || this.currentTrack?.file_name || i18n.t('music.unknown_title');
             notifications.addNotification({
                 icon: 'fa-exclamation-circle',
                 iconClass: 'error',
-                title: t('music.error', 'Error'),
-                text: `${t('music.playback_error', 'Playback failed')}: ${trackName}`
+                title: i18n.t('music.error'),
+                text: `${i18n.t('music.playback_error')}: ${trackName}`
             });
         }
     },
@@ -1657,10 +1634,9 @@ const musicPlayer = {
         }
 
         if (trackName) {
-            const t = (key) => i18n.t(key);
             trackName.textContent = this.currentTrack
-                ? this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown')
-                : t('music.not_playing', 'Not playing');
+                ? this.currentTrack.title || this.currentTrack.file_name || i18n.t('music.unknown_title')
+                : i18n.t('music.not_playing');
         }
 
         if (trackArtist) {
@@ -1710,13 +1686,12 @@ const musicPlayer = {
         const queueList = document.getElementById('player-queue-list');
         if (!queueList) return;
 
-        const t = (key) => i18n.t(key);
 
         if (this.queue.length === 0) {
             queueList.innerHTML = `
                 <div class="player-queue-empty">
                     <i class="fas fa-music"></i>
-                    <p>${t('music.queue_empty', 'Queue is empty')}</p>
+                    <p>${i18n.t('music.queue_empty')}</p>
                 </div>
             `;
             return;
@@ -1728,8 +1703,8 @@ const musicPlayer = {
             <div class="player-queue-item ${idx === this.currentIndex ? 'active' : ''}" data-idx="${idx}">
                 <span class="queue-item-num">${idx + 1}</span>
                 <span class="queue-item-info">
-                    <span class="queue-item-name">${this._escapeHtml(track.title || track.file_name || t('music.unknown_title', 'Unknown'))}</span>
-                    <span class="queue-item-artist">${this._escapeHtml(track.artist || t('music.unknown_artist', 'Unknown Artist'))}</span>
+                    <span class="queue-item-name">${this._escapeHtml(track.title || track.file_name || i18n.t('music.unknown_title'))}</span>
+                    <span class="queue-item-artist">${this._escapeHtml(track.artist || i18n.t('music.unknown_artist'))}</span>
                 </span>
                 <span class="queue-item-duration">${this._formatDuration(track.duration_secs)}</span>
                 <button class="queue-item-remove" data-idx="${idx}">

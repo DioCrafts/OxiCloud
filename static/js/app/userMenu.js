@@ -212,7 +212,6 @@ function showUserProfileModal() {
     // FIXME: use classes
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-    const t = (key, fallback) => i18n.t(key) || fallback;
 
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();
@@ -226,11 +225,11 @@ function showUserProfileModal() {
                 <div class="about-modal-avatar">${initials}</div>
                 <h3 class="about-modal-username">${username}</h3>
                 <p class="about-modal-email">${email}</p>
-                <span class="about-modal-role ${role === 'admin' ? 'about-modal-role-admin' : 'about-modal-role-user'}">${role === 'admin' ? '🛡️ Admin' : `👤 ${t('user_menu.role_user', 'User')}`}</span>
+                <span class="about-modal-role ${role === 'admin' ? 'about-modal-role-admin' : 'about-modal-role-user'}">${role === 'admin' ? '🛡️ Admin' : `👤 ${i18n.t('user_menu.role_user')}`}</span>
             </div>
             <div class="about-modal-storage">
                 <div class="about-modal-storage-label">
-                    <i class="fas fa-database"></i>${t('storage.title', 'Storage')}
+                    <i class="fas fa-database"></i>${i18n.t('storage.title')}
                 </div>
                 <div class="about-modal-bar-bg">
                     <div class="about-modal-bar-fill" id="about-bar-fill"></div>
@@ -238,7 +237,7 @@ function showUserProfileModal() {
                 <div class="about-modal-bar-text">${percentage}% · ${formatFileSize(usedBytes)} / ${formatQuotaSize(quotaBytes)}</div>
             </div>
             <div class="about-modal-footer">
-                <button id="profile-modal-close" class="about-modal-close-btn">${t('actions.close', 'Close')}</button>
+                <button id="profile-modal-close" class="about-modal-close-btn">${i18n.t('actions.close')}</button>
             </div>
         </div>
     `;

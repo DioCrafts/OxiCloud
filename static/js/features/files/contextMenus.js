@@ -1115,12 +1115,10 @@ const contextMenus = {
     },
 
     _renderPlaylistSelect(container, playlists) {
-        const t = i18n.t.bind(i18n);
-
         container.innerHTML = '';
 
         if (playlists.length === 0) {
-            container.innerHTML = `<div class="folder-select-empty">${t('music.no_playlists', 'No playlists yet. Create one first!')}</div>`;
+            container.innerHTML = `<div class="folder-select-empty">${i18n.t('music.no_playlists')}</div>`;
             return;
         }
 
@@ -1131,7 +1129,7 @@ const contextMenus = {
             item.innerHTML = `
                 <i class="fas fa-list"></i>
                 <span>${this._escapeHtml(playlist.name)}</span>
-                <span class="playlist-track-count">${playlist.track_count || 0} ${t('music.tracks', 'tracks')}</span>
+                <span class="playlist-track-count">${playlist.track_count || 0} ${i18n.t('music.tracks')}</span>
             `;
 
             item.addEventListener('click', () => {
