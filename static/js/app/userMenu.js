@@ -209,9 +209,10 @@ function showUserProfileModal() {
     const usedBytes = userData.storage_used_bytes || 0;
     const quotaBytes = userData.storage_quota_bytes == null ? 10 * 1024 * 1024 * 1024 : userData.storage_quota_bytes;
     const percentage = quotaBytes > 0 ? Math.min(Math.round((usedBytes / quotaBytes) * 100), 100) : 0;
+    // FIXME: use classes
     const barColor = percentage > 90 ? '#ef4444' : percentage > 70 ? '#f59e0b' : '#22c55e';
 
-    const t = (key, fallback) => (i18n?.t ? i18n.t(key) || fallback : fallback);
+    const t = (key, fallback) => i18n.t(key) || fallback;
 
     const existing = document.getElementById('profile-modal-overlay');
     if (existing) existing.remove();

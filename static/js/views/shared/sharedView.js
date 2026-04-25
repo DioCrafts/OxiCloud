@@ -220,9 +220,7 @@ const sharedView = {
             </div>
         `;
 
-        if (i18n?.translateElement) {
-            i18n.translateElement(container);
-        }
+        i18n.translateElement(container);
     },
 
     // Attach event listeners
@@ -662,8 +660,7 @@ const sharedView = {
     },
 
     translate(key, defaultText) {
-        if (i18n?.t) return i18n.t(key, defaultText);
-        return defaultText;
+        return i18n.t(key, defaultText);
     }
 };
 

@@ -149,7 +149,7 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const t = i18n?.t || ((k) => k);
+        const t = i18n.t.bind(i18n);
         const uploadingText = folderName ? `📁 ${t('upload.uploading')} ${_esc(folderName)}…` : t('upload.uploading');
         const filesLabel = t('upload.files');
 
@@ -254,7 +254,7 @@ const notifications = (() => {
         const pctEl = $(`${batchId}-pct`);
         const statsEl = $(`${batchId}-stats`);
 
-        const t = i18n?.t || ((k) => k);
+        const t = i18n.t.bind(i18n);
         const filesLabel = t('upload.files');
 
         if (fillEl) fillEl.style.width = `${pctVal}%`;
@@ -282,7 +282,7 @@ const notifications = (() => {
         const curEl = $(`${batchId}-current`);
         if (curEl) curEl.textContent = '';
 
-        const t = i18n?.t || ((k) => k);
+        const t = i18n.t.bind(i18n);
         const completeText = t('upload.complete', {
             count: successCount,
             total: totalFiles

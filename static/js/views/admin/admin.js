@@ -8,11 +8,9 @@ let usersPage = 0;
 const PAGE_SIZE = 50;
 let totalUsers = 0;
 
-/* ── i18n helper — falls back to key if i18n not ready ── */
+/* ── i18n helper ── */
 function t(key, params) {
-    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
-    // fallback: strip prefix and humanise
-    return key.split('.').pop().replace(/_/g, ' ');
+    return i18n.t(key, params);
 }
 
 /** Escape a string for safe embedding inside a JS string literal within an HTML attribute. */
@@ -1105,13 +1103,13 @@ function showAccessDenied() {
 
 /* ── Apply i18n when translations load / change ── */
 document.addEventListener('translationsLoaded', () => {
-    if (i18n?.translatePage) i18n.translatePage();
+    i18n.translatePage();
     // Re-render dynamic content that uses t()
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });
 document.addEventListener('localeChanged', () => {
-    if (i18n?.translatePage) i18n.translatePage();
+    i18n.translatePage();
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });

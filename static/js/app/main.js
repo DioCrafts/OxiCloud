@@ -166,9 +166,7 @@ function setActionsBarMode(mode, force = false) {
     elements.gridViewBtn = document.getElementById('grid-view-btn');
     elements.listViewBtn = document.getElementById('list-view-btn');
 
-    if (i18n?.translateElement) {
-        i18n.translateElement(elements.actionsBar);
-    }
+    i18n.translateElement(elements.actionsBar);
 
     if (mode === 'files') {
         setupUploadDropdown();
@@ -395,7 +393,7 @@ function initApp() {
     });
 
     // Wait for translations to load before checking authentication
-    if (i18n?.isLoaded?.()) {
+    if (i18n.isLoaded()) {
         // Translations already loaded, proceed with authentication
         checkAuthentication();
     } else {
@@ -408,7 +406,7 @@ function initApp() {
 
         // Set a timeout as a fallback in case translations take too long
         setTimeout(() => {
-            if (!i18n?.isLoaded?.()) {
+            if (!i18n.isLoaded()) {
                 console.warn('Translations loading timeout, proceeding with authentication anyway');
                 checkAuthentication();
             }
@@ -727,16 +725,11 @@ function updateStorageUsageDisplay(userData) {
         // Remove data-i18n attribute to prevent i18n from overwriting our value
         storageInfo.removeAttribute('data-i18n');
 
-        // Use i18n if available
-        if (i18n?.t) {
-            storageInfo.textContent = i18n.t('storage.used', {
-                percentage: usagePercentage,
-                used: usedFormatted,
-                total: quotaFormatted
-            });
-        } else {
-            storageInfo.textContent = `${usagePercentage}% used (${usedFormatted} / ${quotaFormatted})`;
-        }
+        storageInfo.textContent = i18n.t('storage.used', {
+            percentage: usagePercentage,
+            used: usedFormatted,
+            total: quotaFormatted
+        });
     }
 
     console.log(`Updated storage display: ${usagePercentage}% (${usedFormatted} / ${quotaFormatted})`);

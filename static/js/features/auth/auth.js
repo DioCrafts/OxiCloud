@@ -511,10 +511,7 @@ function initLanguageSelector() {
         localStorage.setItem(LOCALE_KEY, selectedLanguage);
         localStorage.setItem(FIRST_RUN_KEY, 'true');
 
-        // Update i18n if available
-        if (i18n?.setLocale) {
-            await i18n.setLocale(selectedLanguage);
-        }
+        await i18n.setLocale(selectedLanguage);
 
         // Hide language panel
         hidePanel(languagePanel);
@@ -635,7 +632,7 @@ async function configureOidcLoginUI() {
         // Update button text with provider name
         const btnTextEl = oidcBtn.querySelector('span');
         if (btnTextEl && oidcInfo.provider_name) {
-            const template = i18n?.t ? i18n.t('auth.sso_login_provider') : 'Sign in with {{provider}}';
+            const template = i18n.t('auth.sso_login_provider');
             btnTextEl.textContent = template.replace('{{provider}}', oidcInfo.provider_name);
         }
 
@@ -942,8 +939,7 @@ if (isLoginPage && registerForm) {
 
         // Validate passwords match
         if (password !== confirmPassword) {
-            const errorMsg = i18n ? i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
-            registerError.textContent = errorMsg;
+            registerError.textContent = i18n.t('auth.passwords_mismatch');
             registerError.style.display = 'block';
             return;
         }
@@ -951,9 +947,7 @@ if (isLoginPage && registerForm) {
         try {
             await register(username, email, password);
 
-            // Show success message
-            const successMsg = i18n ? i18n.t('auth.account_success') : 'Account created successfully! You can now log in.';
-            registerSuccess.textContent = successMsg;
+            registerSuccess.textContent = i18n.t('auth.account_success');
             registerSuccess.style.display = 'block';
 
             // Clear form
@@ -965,8 +959,7 @@ if (isLoginPage && registerForm) {
                 hidePanel(registerPanel);
             }, 2000);
         } catch (error) {
-            const errorMsg = i18n ? i18n.t('auth.admin_create_error') : 'Error registering account';
-            registerError.textContent = error.message || errorMsg;
+            registerError.textContent = error.message || i18n.t('auth.admin_create_error');
             registerError.style.display = 'block';
         }
     });
@@ -988,8 +981,7 @@ if (isLoginPage && adminSetupForm) {
 
         // Validate passwords match
         if (password !== confirmPassword) {
-            const errorMsg = i18n ? i18n.t('auth.passwords_mismatch') : 'Passwords do not match';
-            adminSetupError.textContent = errorMsg;
+            adminSetupError.textContent = i18n.t('auth.passwords_mismatch');
             adminSetupError.style.display = 'block';
             return;
         }
@@ -1012,11 +1004,8 @@ if (isLoginPage && adminSetupForm) {
             }
             await response.json();
 
-            // Show success message in the GUI instead of alert
-            const successMsg = i18n ? i18n.t('auth.admin_success') : 'Admin account created successfully! You can now log in.';
-
             if (adminSetupSuccess) {
-                adminSetupSuccess.textContent = successMsg;
+                adminSetupSuccess.textContent = i18n.t('auth.admin_success');
                 adminSetupSuccess.style.display = 'block';
             }
 
@@ -1027,8 +1016,7 @@ if (isLoginPage && adminSetupForm) {
                 if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
             }, 2000);
         } catch (error) {
-            const errorMsg = i18n ? i18n.t('auth.admin_create_error') : 'Error creating admin account';
-            adminSetupError.textContent = error.message || errorMsg;
+            adminSetupError.textContent = error.message || i18n.t('auth.admin_create_error');
             adminSetupError.style.display = 'block';
         }
     });

@@ -114,8 +114,8 @@ const recent = {
             if (recentItems.length === 0) {
                 ui.showError(`
                     <i class="fas fa-clock empty-state-icon"></i>
-                    <p>${i18n ? i18n.t('recent.empty_state') : 'No recent files'}</p>
-                    <p>${i18n ? i18n.t('recent.empty_hint') : 'Files you open will appear here'}</p>
+                    <p>${i18n.t('recent.empty_state')}</p>
+                    <p>${i18n.t('recent.empty_hint')}</p>
                 `);
             }
 

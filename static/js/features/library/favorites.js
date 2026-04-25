@@ -111,8 +111,8 @@ const favorites = {
             // Notify user
             if (ui?.showNotification) {
                 ui.showNotification(
-                    i18n ? i18n.t('favorites.added_title') : 'Added to favorites',
-                    `"${name}" ${i18n ? i18n.t('favorites.added_msg') : 'added to favorites'}`
+                    i18n.t('favorites.added_title'),
+                    `"${name}" ${i18n.t('favorites.added_msg')}`
                 );
             }
 
@@ -146,8 +146,8 @@ const favorites = {
 
             if (ui?.showNotification) {
                 ui.showNotification(
-                    i18n ? i18n.t('favorites.removed_title') : 'Removed from favorites',
-                    `"${itemName}" ${i18n ? i18n.t('favorites.removed_msg') : 'removed from favorites'}`
+                    i18n.t('favorites.removed_title'),
+                    `"${itemName}" ${i18n.t('favorites.removed_msg')}`
                 );
             }
 
@@ -182,8 +182,8 @@ const favorites = {
             if (this._cache.size === 0) {
                 ui.showError(`
                     <i class="fas fa-star empty-state-icon"></i>
-                    <p>${i18n ? i18n.t('favorites.empty_state') : 'No favorite items'}</p>
-                    <p>${i18n ? i18n.t('favorites.empty_hint') : 'To mark as favorite, right-click on any file or folder'}</p>
+                    <p>${i18n.t('favorites.empty_state')}</p>
+                    <p>${i18n.t('favorites.empty_hint')}</p>
                 `);
                 return;
             }

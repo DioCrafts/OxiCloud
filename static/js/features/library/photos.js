@@ -410,7 +410,7 @@ const photosView = {
 
     /** Render the group mode toolbar */
     _renderToolbar() {
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
+        const t = (k) => i18n.t(k);
         const modes = [
             ['daily', t('photos.view_daily', 'Day')],
             ['monthly', t('photos.view_monthly', 'Month')],
@@ -427,7 +427,7 @@ const photosView = {
 
     /** Render empty state */
     _renderEmpty() {
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
+        const t = (k) => i18n.t(k);
         this._container.innerHTML = `
             <div class="photos-empty">
                 <i class="fas fa-images"></i>
@@ -520,7 +520,7 @@ const photosView = {
             document.body.appendChild(bar);
         }
 
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
+        const t = (k) => i18n.t(k);
         const count = this.selected.size;
         bar.innerHTML = `
             <span class="selection-count">${count} ${t('photos.items_selected', 'selected')}</span>

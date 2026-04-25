@@ -108,16 +108,15 @@ const Modal = {
             this.input.placeholder = placeholder;
             this.input.value = value;
 
-            // Set button text (use i18n if available)
             if (confirmText) {
                 this.confirmBtn.textContent = confirmText;
-            } else if (i18n) {
+            } else {
                 this.confirmBtn.textContent = i18n.t('actions.confirm');
             }
 
             if (cancelText) {
                 this.cancelBtn.textContent = cancelText;
-            } else if (i18n) {
+            } else {
                 this.cancelBtn.textContent = i18n.t('actions.cancel');
             }
 
@@ -138,7 +137,7 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptNewFolder() {
-        const t = i18n ? i18n.t.bind(i18n) : (k) => k;
+        const t = i18n.t.bind(i18n);
 
         return this.prompt({
             title: t('dialogs.new_folder_title') || 'New folder',
@@ -156,7 +155,7 @@ const Modal = {
      * @returns {Promise<string|null>}
      */
     promptRename(currentName, isFolder = false) {
-        const t = i18n ? i18n.t.bind(i18n) : (k) => k;
+        const t = i18n.t.bind(i18n);
 
         // For files, we want to select only the name part (without extension)
         this._selectNameOnly = !isFolder;

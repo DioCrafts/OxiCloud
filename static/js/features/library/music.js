@@ -186,9 +186,7 @@ const musicView = {
         const listEl = document.getElementById('music-playlist-list');
         if (!listEl) return;
 
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         if (this.playlists.length === 0) {
             listEl.innerHTML = `
@@ -291,9 +289,7 @@ const musicView = {
         if (detailEl) detailEl.classList.remove('hidden');
         if (nameEl) nameEl.textContent = playlist.name;
         if (metaEl) {
-            const t = (key, fallback = '') => {
-                return i18n?.t ? i18n.t(key) : fallback || key;
-            };
+            const t = (key) => i18n.t(key);
             metaEl.textContent = `${playlist.track_count || 0} ${t('music.tracks', 'tracks')}`;
         }
 
@@ -314,7 +310,7 @@ const musicView = {
         }
         const togglePublicBtn = document.getElementById('music-toggle-public-btn');
         if (togglePublicBtn) {
-            const t2 = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+            const t2 = (key) => i18n.t(key);
             togglePublicBtn.title = playlist.is_public ? t2('music.make_private', 'Make private') : t2('music.make_public', 'Make public');
             togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
@@ -352,9 +348,7 @@ const musicView = {
         const trackListEl = document.getElementById('music-track-list');
         if (!trackListEl) return;
 
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         if (this.currentTracks.length === 0) {
             trackListEl.innerHTML = `
@@ -467,9 +461,7 @@ const musicView = {
     _playTrack(idx) {
         if (!this.currentTracks[idx]) return;
 
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
         musicPlayer.setQueue(this.currentTracks, this.currentPlaylist?.name || t('music.playlists', 'Playlist'));
         musicPlayer.playTrack(idx);
     },
@@ -487,18 +479,14 @@ const musicView = {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
-            const t = (key, fallback = '') => {
-                return i18n?.t ? i18n.t(key) : fallback || key;
-            };
+            const t = (key) => i18n.t(key);
             musicPlayer.setQueue(shuffled, this.currentPlaylist?.name || t('music.shuffle', 'Shuffle'));
             musicPlayer.playTrack(0);
         }
     },
 
     async _showCreatePlaylistDialog() {
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         const name = await Modal.prompt({
             title: t('music.create_playlist', 'Create Playlist'),
@@ -513,9 +501,7 @@ const musicView = {
     },
 
     async _createPlaylist(name) {
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
         const createBtn = document.getElementById('music-create-playlist-btn');
         if (createBtn) createBtn.disabled = true;
         try {
@@ -556,9 +542,7 @@ const musicView = {
     },
 
     async _deletePlaylist() {
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         if (!this.currentPlaylist) return;
 
@@ -644,9 +628,7 @@ const musicView = {
 
     async _showEditPlaylistDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         const newName = await Modal.prompt({
             title: t('music.edit', 'Edit'),
@@ -690,9 +672,7 @@ const musicView = {
 
     async _showSharePlaylistDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         const userId = await Modal.prompt({
             title: t('music.share', 'Share'),
@@ -736,9 +716,7 @@ const musicView = {
 
     async _showAddTracksDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         // ── Build modal overlay ──
         const overlay = document.createElement('div');
@@ -900,7 +878,7 @@ const musicView = {
 
     async _removeTrackFromPlaylist(_trackId, fileId) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/tracks/${encodeURIComponent(fileId)}`, {
@@ -942,7 +920,7 @@ const musicView = {
 
     async _reorderTrack(fromIdx, toIdx) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
 
         const tracks = [...this.currentTracks];
         const [moved] = tracks.splice(fromIdx, 1);
@@ -975,7 +953,7 @@ const musicView = {
 
     async _showManageSharesDialog() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
 
         const existing = document.getElementById('music-shares-dialog');
         if (existing) existing.remove();
@@ -1052,7 +1030,7 @@ const musicView = {
 
     async _loadSharesList(dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
         const body = dialog.querySelector('.music-shares-body');
         if (!body) return;
 
@@ -1097,7 +1075,7 @@ const musicView = {
 
     async _removeShare(userId, dialog) {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
 
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}/share/${encodeURIComponent(userId)}`, {
@@ -1121,7 +1099,7 @@ const musicView = {
 
     async _togglePublic() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
         const newValue = !this.currentPlaylist.is_public;
 
         try {
@@ -1170,7 +1148,7 @@ const musicView = {
 
     async _showCoverPicker() {
         if (!this.currentPlaylist) return;
-        const t = (key, fallback = '') => (i18n?.t ? i18n.t(key) : fallback || key);
+        const t = (key) => i18n.t(key);
 
         const input = document.createElement('input');
         input.type = 'file';
@@ -1289,25 +1267,25 @@ const musicPlayer = {
                     <i class="fas fa-music"></i>
                 </div>
                 <div class="player-track-details">
-                    <span class="player-track-name">${i18n?.t('music.not_playing', 'Not playing') || 'Not playing'}</span>
+                    <span class="player-track-name">${i18n.t('music.not_playing')}</span>
                     <span class="player-track-artist"></span>
                 </div>
             </div>
             <div class="player-controls">
                 <div class="player-buttons">
-                    <button class="player-btn" id="player-shuffle-btn" title="${i18n?.t('music.shuffle', 'Shuffle') || 'Shuffle'}">
+                    <button class="player-btn" id="player-shuffle-btn" title="${i18n.t('music.shuffle')}">
                         <i class="fas fa-shuffle"></i>
                     </button>
-                    <button class="player-btn" id="player-prev-btn" title="${i18n?.t('music.previous', 'Previous') || 'Previous'}">
+                    <button class="player-btn" id="player-prev-btn" title="${i18n.t('music.previous')}">
                         <i class="fas fa-backward"></i>
                     </button>
-                    <button class="player-btn player-btn-main" id="player-play-btn" title="${i18n?.t('music.play', 'Play') || 'Play'}">
+                    <button class="player-btn player-btn-main" id="player-play-btn" title="${i18n.t('music.play')}">
                         <i class="fas fa-play"></i>
                     </button>
-                    <button class="player-btn" id="player-next-btn" title="${i18n?.t('music.next', 'Next') || 'Next'}">
+                    <button class="player-btn" id="player-next-btn" title="${i18n.t('music.next')}">
                         <i class="fas fa-forward"></i>
                     </button>
-                    <button class="player-btn" id="player-repeat-btn" title="${i18n?.t('music.repeat', 'Repeat') || 'Repeat'}">
+                    <button class="player-btn" id="player-repeat-btn" title="${i18n.t('music.repeat')}">
                         <i class="fas fa-repeat"></i>
                     </button>
                 </div>
@@ -1321,22 +1299,22 @@ const musicPlayer = {
                 </div>
             </div>
             <div class="player-extra">
-                <button class="player-btn player-btn-small" id="player-playlist-btn" title="${i18n?.t('music.queue', 'Queue') || 'Queue'}">
+                <button class="player-btn player-btn-small" id="player-playlist-btn" title="${i18n.t('music.queue')}">
                     <i class="fas fa-list"></i>
                 </button>
-                <button class="player-btn player-btn-small" id="player-vol-btn" title="${i18n?.t('music.volume', 'Volume') || 'Volume'}">
+                <button class="player-btn player-btn-small" id="player-vol-btn" title="${i18n.t('music.volume')}">
                     <i class="fas fa-volume-up"></i>
                 </button>
                 <div class="player-volume-slider" id="player-volume-slider">
                     <input type="range" min="0" max="100" value="70" id="player-volume-input">
                 </div>
-                <button class="player-btn player-btn-small player-close-btn" id="player-close-btn" title="${i18n?.t('actions.close', 'Close') || 'Close'}">
+                <button class="player-btn player-btn-small player-close-btn" id="player-close-btn" title="${i18n.t('actions.close')}">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             <div class="player-queue hidden" id="player-queue">
                 <div class="player-queue-header">
-                    <h3>${i18n?.t('music.queue', 'Queue') || 'Queue'}</h3>
+                    <h3>${i18n.t('music.queue')}</h3>
                     <button class="player-btn player-btn-small" id="player-close-queue-btn">
                         <i class="fas fa-times"></i>
                     </button>
@@ -1648,9 +1626,7 @@ const musicPlayer = {
         console.error('Audio error:', e);
         this.isPlaying = false;
         this._updateUI();
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
         if (notifications) {
             const trackName = this.currentTrack?.title || this.currentTrack?.file_name || t('music.unknown_title', 'Unknown');
             notifications.addNotification({
@@ -1681,9 +1657,7 @@ const musicPlayer = {
         }
 
         if (trackName) {
-            const t = (key, fallback = '') => {
-                return i18n?.t ? i18n.t(key) : fallback || key;
-            };
+            const t = (key) => i18n.t(key);
             trackName.textContent = this.currentTrack
                 ? this.currentTrack.title || this.currentTrack.file_name || t('music.unknown_title', 'Unknown')
                 : t('music.not_playing', 'Not playing');
@@ -1736,9 +1710,7 @@ const musicPlayer = {
         const queueList = document.getElementById('player-queue-list');
         if (!queueList) return;
 
-        const t = (key, fallback = '') => {
-            return i18n?.t ? i18n.t(key) : fallback || key;
-        };
+        const t = (key) => i18n.t(key);
 
         if (this.queue.length === 0) {
             queueList.innerHTML = `
