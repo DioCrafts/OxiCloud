@@ -710,7 +710,7 @@ const musicView = {
             <div class="music-picker-modal">
                 <div class="music-picker-header">
                     <h3><i class="fas fa-music"></i> ${i18n.t('music.add_tracks')}</h3>
-                    <button class="music-picker-close" title="${i18n.t('common.close')}">&times;</button>
+                    <button class="music-picker-close" title="${i18n.t('actions.close')}">&times;</button>
                 </div>
                 <div class="music-picker-search">
                     <i class="fas fa-search"></i>
@@ -723,7 +723,7 @@ const musicView = {
                 <div class="music-picker-footer">
                     <span class="music-picker-selected-count" id="music-picker-count">0 ${i18n.t('music.selected')}</span>
                     <div class="music-picker-actions">
-                        <button class="btn btn-secondary music-picker-cancel">${i18n.t('common.cancel')}</button>
+                        <button class="btn btn-secondary music-picker-cancel">${i18n.t('actions.cancel')}</button>
                         <button class="btn btn-primary music-picker-add" id="music-picker-add-btn" disabled>
                             <i class="fas fa-plus"></i> ${i18n.t('music.add')}
                         </button>
