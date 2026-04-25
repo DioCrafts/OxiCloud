@@ -28,7 +28,7 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 24px;
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+    box-shadow: 0 8px 32px var(--color-shadow-2xl);
 }
 
 .music-empty-state-icon i {
@@ -230,7 +230,7 @@
     justify-content: center;
     color: var(--color-danger-text);
     font-size: 48px;
-    box-shadow: 0 8px 24px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 8px 24px var(--color-shadow-3xl);
 }
 
 .music-playlist-info {
@@ -1024,7 +1024,7 @@
 }
 .music-track-remove-btn:hover {
     color: var(--color-danger-text);
-    background: rgba(231, 76, 60, 0.08);
+    background: var(--color-danger-bg);
 }
 
 /* ========== Cover art ========== */
@@ -1063,7 +1063,7 @@
     gap: 4px;
     padding: 2px 8px;
     font-size: 0.72rem;
-    background: rgba(74, 144, 217, 0.12);
+    background: var(--color-music-public-bg);
     color: var(--color-text);
     border-radius: 12px;
     margin-top: 4px;
@@ -1073,7 +1073,7 @@
 }
 #music-toggle-public-btn.active {
     color: var(--color-text);
-    background: rgba(74, 144, 217, 0.1);
+    background: var(--color-item-active);
 }
 
 /* ========== Shares management dialog ========== */
@@ -1290,8 +1290,7 @@
     outline: none;
 }
 .music-picker-search input:focus {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.15);
+    border-color: var(--color-accent);
 }
 
 /* ── file list ── */
@@ -1323,10 +1322,10 @@
     color: var(--color-text);
 }
 .music-picker-item:hover {
-    background: var(--color-bg-hover);
+    background: var(--color-item-hover);
 }
 .music-picker-item.selected {
-    background: rgba(102, 126, 234, 0.08);
+    background: var(--color-item-selected);
 }
 
 .music-picker-item input[type="checkbox"] {

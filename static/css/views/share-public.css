@@ -108,7 +108,7 @@ FIXME: use components/buttons.css ?
     width: 100%;
     padding: 0.75rem 1.5rem;
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-bg-surface);
     border: none;
     border-radius: 8px;
     font-size: 0.95rem;
