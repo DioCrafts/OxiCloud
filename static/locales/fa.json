@@ -307,7 +307,8 @@
         "move_folder": "Move folder",
         "no_subfolders": "No subfolders",
         "rename_file": "Rename file",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "انتقال به پوشه خانگی"
     },
     "dropzone": {
         "drag_files": "پرونده‌ها را اینجا بکشید یا برای انتخاب کلیک کنید",
@@ -553,7 +554,50 @@
         "error_password_short": "رمز عبور حداقل ۸ کاراکتر",
         "error_generic": "خطا",
         "error_network": "خطای شبکه: {{message}}",
-        "error_create_user": "خطا در ایجاد کاربر"
+        "error_create_user": "خطا در ایجاد کاربر",
+        "tab_storage": "فضای ذخیره‌سازی",
+        "storage_title": "تنظیمات فضای ذخیره‌سازی",
+        "storage_current_backend": "بک‌اند فعلی",
+        "storage_total_blobs": "مجموع بلوب‌ها",
+        "storage_total_size": "حجم کل",
+        "storage_dedup_ratio": "نسبت حذف تکراری",
+        "storage_backend": "بک‌اند",
+        "storage_local": "محلی",
+        "storage_s3": "سازگار با S3",
+        "storage_provider_preset": "پیش‌تنظیم ارائه‌دهنده",
+        "storage_preset_custom": "سفارشی",
+        "storage_endpoint_url": "آدرس نقطه پایانی",
+        "storage_endpoint_hint": "برای AWS S3 خالی بگذارید",
+        "storage_bucket": "باکت",
+        "storage_region": "منطقه",
+        "storage_access_key": "کلید دسترسی",
+        "storage_secret_key": "کلید مخفی",
+        "storage_secret_configured": "کلید تنظیم شد",
+        "storage_key_placeholder": "کلید جدید وارد کنید",
+        "storage_path_style": "اجبار سبک مسیر",
+        "storage_path_style_hint": "برای MinIO و برخی سرویس‌های سازگار با S3 لازم است",
+        "storage_test_connection": "آزمایش اتصال",
+        "storage_test_success": "اتصال موفق",
+        "storage_test_failure": "اتصال ناموفق",
+        "storage_save": "ذخیره تنظیمات",
+        "storage_saved": "تنظیمات ذخیره شد",
+        "storage_migration": "انتقال داده",
+        "storage_migration_coming_soon": "ابزارهای انتقال به زودی",
+        "migration_status_label": "وضعیت انتقال",
+        "migration_start": "شروع انتقال",
+        "migration_pause": "توقف",
+        "migration_resume": "ادامه",
+        "migration_verify": "تأیید",
+        "migration_complete": "تکمیل",
+        "migration_started": "انتقال شروع شد",
+        "migration_paused_msg": "انتقال متوقف شد",
+        "migration_resumed_msg": "انتقال ادامه یافت",
+        "migration_completed_msg": "انتقال با موفقیت تکمیل شد",
+        "migration_verifying": "در حال تأیید...",
+        "migration_verify_passed": "تأیید موفق",
+        "migration_verify_failed": "تأیید ناموفق",
+        "migration_failed_blobs": "بلوب‌های ناموفق",
+        "testing": "در حال آزمایش..."
     },
     "profile": {
         "page_title": "پروفایل",
@@ -626,6 +670,14 @@
         "item_deleted_permanently": "آیتم برای همیشه حذف شد",
         "trash_emptied": "زباله‌دان خالی شد",
         "title": "اعلان‌ها",
-        "empty": "بدون اعلان"
-    }
+        "empty": "بدون اعلان",
+        "link_created": "پیوند ایجاد شد",
+        "share_success": "پیوند اشتراک‌گذاری با موفقیت ایجاد شد"
+    },
+    "upload": {
+        "uploading": "در حال آپلود...",
+        "files": "فایل‌ها",
+        "complete": "{{count}} / {{total}} آپلود شد"
+    },
+    "storage_quota_exceeded": "سهمیه فضای ذخیره‌سازی تجاوز کرده است"
 }

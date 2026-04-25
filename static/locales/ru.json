@@ -307,7 +307,8 @@
         "generated_link": "Сгенерированная ссылка",
         "notify": "Отправить уведомление",
         "recipient": "Получатель",
-        "message": "Сообщение"
+        "message": "Сообщение",
+        "move_to_home": "Переместить в домашнюю папку"
     },
     "dropzone": {
         "drag_files": "Перетащите файлы сюда или нажмите для выбора",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Элемент удалён навсегда",
         "trash_emptied": "Корзина успешно очищена",
         "title": "Уведомления",
-        "empty": "Нет уведомлений"
+        "empty": "Нет уведомлений",
+        "link_created": "Ссылка создана",
+        "share_success": "Ссылка для общего доступа успешно создана"
     },
     "batch": {
         "one_selected": "Выбран 1 элемент",
@@ -566,7 +569,50 @@
         "error_password_short": "Пароль минимум 8 символов",
         "error_generic": "Ошибка",
         "error_network": "Ошибка сети: {{message}}",
-        "error_create_user": "Не удалось создать"
+        "error_create_user": "Не удалось создать",
+        "tab_storage": "Хранилище",
+        "storage_title": "Настройка хранилища",
+        "storage_current_backend": "Текущий бэкенд",
+        "storage_total_blobs": "Всего блобов",
+        "storage_total_size": "Общий размер",
+        "storage_dedup_ratio": "Коэффициент дедупликации",
+        "storage_backend": "Бэкенд",
+        "storage_local": "Локальный",
+        "storage_s3": "Совместимый с S3",
+        "storage_provider_preset": "Пресет провайдера",
+        "storage_preset_custom": "Пользовательский",
+        "storage_endpoint_url": "URL конечной точки",
+        "storage_endpoint_hint": "Оставьте пустым для AWS S3",
+        "storage_bucket": "Бакет",
+        "storage_region": "Регион",
+        "storage_access_key": "Ключ доступа",
+        "storage_secret_key": "Секретный ключ",
+        "storage_secret_configured": "Ключ настроен",
+        "storage_key_placeholder": "Введите новый ключ",
+        "storage_path_style": "Принудительный стиль пути",
+        "storage_path_style_hint": "Требуется для MinIO и некоторых S3-совместимых сервисов",
+        "storage_test_connection": "Проверить соединение",
+        "storage_test_success": "Соединение успешно",
+        "storage_test_failure": "Ошибка соединения",
+        "storage_save": "Сохранить конфигурацию",
+        "storage_saved": "Конфигурация сохранена",
+        "storage_migration": "Миграция данных",
+        "storage_migration_coming_soon": "Инструменты миграции скоро появятся",
+        "migration_status_label": "Статус миграции",
+        "migration_start": "Начать миграцию",
+        "migration_pause": "Пауза",
+        "migration_resume": "Возобновить",
+        "migration_verify": "Проверить",
+        "migration_complete": "Завершить",
+        "migration_started": "Миграция начата",
+        "migration_paused_msg": "Миграция приостановлена",
+        "migration_resumed_msg": "Миграция возобновлена",
+        "migration_completed_msg": "Миграция успешно завершена",
+        "migration_verifying": "Проверка...",
+        "migration_verify_passed": "Проверка пройдена",
+        "migration_verify_failed": "Проверка не пройдена",
+        "migration_failed_blobs": "Неудачные блобы",
+        "testing": "Тестирование..."
     },
     "profile": {
         "page_title": "Профиль",
@@ -627,5 +673,11 @@
         "error_create_pw": "Не удалось создать пароль",
         "confirm_revoke": "Отозвать пароль «{{label}}»? Клиенты перестанут работать.",
         "error_revoke": "Не удалось отозвать"
-    }
+    },
+    "upload": {
+        "uploading": "Загрузка...",
+        "files": "файлов",
+        "complete": "{{count}} / {{total}} загружено"
+    },
+    "storage_quota_exceeded": "Превышена квота хранилища"
 }

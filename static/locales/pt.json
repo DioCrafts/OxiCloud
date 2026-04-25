@@ -307,7 +307,8 @@
         "message": "Mensagem",
         "go_to_parent": ".. (parent folder)",
         "no_subfolders": "No subfolders",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "Mover para a pasta inicial"
     },
     "dropzone": {
         "drag_files": "Arraste arquivos aqui ou clique para selecionar",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Item excluído permanentemente",
         "trash_emptied": "Lixeira esvaziada com sucesso",
         "empty": "No notifications",
-        "title": "Notifications"
+        "title": "Notifications",
+        "link_created": "Link criado",
+        "share_success": "Link de partilha criado com sucesso"
     },
     "batch": {
         "one_selected": "1 item selecionado",
@@ -566,7 +569,50 @@
         "error_password_short": "A senha deve ter pelo menos 8 caracteres",
         "error_generic": "Falha",
         "error_network": "Erro de rede: {{message}}",
-        "error_create_user": "Falha ao criar usuário"
+        "error_create_user": "Falha ao criar usuário",
+        "tab_storage": "Armazenamento",
+        "storage_title": "Configuração de armazenamento",
+        "storage_current_backend": "Backend atual",
+        "storage_total_blobs": "Total de blobs",
+        "storage_total_size": "Tamanho total",
+        "storage_dedup_ratio": "Taxa de deduplicação",
+        "storage_backend": "Backend",
+        "storage_local": "Local",
+        "storage_s3": "Compatível com S3",
+        "storage_provider_preset": "Predefinição do fornecedor",
+        "storage_preset_custom": "Personalizado",
+        "storage_endpoint_url": "URL do endpoint",
+        "storage_endpoint_hint": "Deixar em branco para AWS S3",
+        "storage_bucket": "Bucket",
+        "storage_region": "Região",
+        "storage_access_key": "Chave de acesso",
+        "storage_secret_key": "Chave secreta",
+        "storage_secret_configured": "Chave configurada",
+        "storage_key_placeholder": "Introduzir nova chave",
+        "storage_path_style": "Forçar estilo de caminho",
+        "storage_path_style_hint": "Necessário para MinIO e alguns serviços compatíveis com S3",
+        "storage_test_connection": "Testar ligação",
+        "storage_test_success": "Ligação bem-sucedida",
+        "storage_test_failure": "Falha na ligação",
+        "storage_save": "Guardar configuração",
+        "storage_saved": "Configuração guardada",
+        "storage_migration": "Migração de dados",
+        "storage_migration_coming_soon": "Ferramentas de migração em breve",
+        "migration_status_label": "Estado da migração",
+        "migration_start": "Iniciar migração",
+        "migration_pause": "Pausar",
+        "migration_resume": "Retomar",
+        "migration_verify": "Verificar",
+        "migration_complete": "Concluir",
+        "migration_started": "Migração iniciada",
+        "migration_paused_msg": "Migração pausada",
+        "migration_resumed_msg": "Migração retomada",
+        "migration_completed_msg": "Migração concluída com sucesso",
+        "migration_verifying": "A verificar...",
+        "migration_verify_passed": "Verificação aprovada",
+        "migration_verify_failed": "Verificação falhou",
+        "migration_failed_blobs": "Blobs com falha",
+        "testing": "A testar..."
     },
     "profile": {
         "page_title": "Perfil",
@@ -627,5 +673,11 @@
         "error_create_pw": "Falha ao criar senha de aplicativo",
         "confirm_revoke": "Revogar senha \"{{label}}\"? Clientes que usam esta senha deixarão de funcionar.",
         "error_revoke": "Falha ao revogar"
-    }
+    },
+    "upload": {
+        "uploading": "A carregar...",
+        "files": "ficheiros",
+        "complete": "{{count}} / {{total}} carregados"
+    },
+    "storage_quota_exceeded": "Cota de armazenamento excedida"
 }

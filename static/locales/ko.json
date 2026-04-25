@@ -307,7 +307,8 @@
         "generated_link": "생성된 링크",
         "notify": "알림 보내기",
         "recipient": "수신자",
-        "message": "메시지"
+        "message": "메시지",
+        "move_to_home": "홈 폴더로 이동"
     },
     "dropzone": {
         "drag_files": "여기에 파일을 드래그하거나 클릭하여 선택하세요",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "항목이 영구적으로 삭제되었습니다",
         "trash_emptied": "휴지통이 성공적으로 비워졌습니다",
         "title": "알림",
-        "empty": "알림이 없습니다"
+        "empty": "알림이 없습니다",
+        "link_created": "링크 생성됨",
+        "share_success": "공유 링크가 성공적으로 생성되었습니다"
     },
     "batch": {
         "one_selected": "1개 선택됨",
@@ -566,7 +569,50 @@
         "error_password_short": "비밀번호 최소 8자",
         "error_generic": "실패",
         "error_network": "네트워크 오류: {{message}}",
-        "error_create_user": "사용자 생성 실패"
+        "error_create_user": "사용자 생성 실패",
+        "tab_storage": "저장소",
+        "storage_title": "저장소 구성",
+        "storage_current_backend": "현재 백엔드",
+        "storage_total_blobs": "총 블롭 수",
+        "storage_total_size": "총 크기",
+        "storage_dedup_ratio": "중복 제거 비율",
+        "storage_backend": "백엔드",
+        "storage_local": "로컬",
+        "storage_s3": "S3 호환",
+        "storage_provider_preset": "공급자 프리셋",
+        "storage_preset_custom": "사용자 지정",
+        "storage_endpoint_url": "엔드포인트 URL",
+        "storage_endpoint_hint": "AWS S3의 경우 비워두세요",
+        "storage_bucket": "버킷",
+        "storage_region": "지역",
+        "storage_access_key": "액세스 키",
+        "storage_secret_key": "시크릿 키",
+        "storage_secret_configured": "키 구성됨",
+        "storage_key_placeholder": "새 키 입력",
+        "storage_path_style": "경로 스타일 강제",
+        "storage_path_style_hint": "MinIO 및 일부 S3 호환 서비스에 필요",
+        "storage_test_connection": "연결 테스트",
+        "storage_test_success": "연결 성공",
+        "storage_test_failure": "연결 실패",
+        "storage_save": "구성 저장",
+        "storage_saved": "구성이 저장되었습니다",
+        "storage_migration": "데이터 마이그레이션",
+        "storage_migration_coming_soon": "마이그레이션 도구 곧 출시",
+        "migration_status_label": "마이그레이션 상태",
+        "migration_start": "마이그레이션 시작",
+        "migration_pause": "일시 중지",
+        "migration_resume": "재개",
+        "migration_verify": "확인",
+        "migration_complete": "완료",
+        "migration_started": "마이그레이션 시작됨",
+        "migration_paused_msg": "마이그레이션 일시 중지됨",
+        "migration_resumed_msg": "마이그레이션 재개됨",
+        "migration_completed_msg": "마이그레이션이 성공적으로 완료되었습니다",
+        "migration_verifying": "확인 중...",
+        "migration_verify_passed": "확인 통과",
+        "migration_verify_failed": "확인 실패",
+        "migration_failed_blobs": "실패한 블롭",
+        "testing": "테스트 중..."
     },
     "profile": {
         "page_title": "프로필",
@@ -627,5 +673,11 @@
         "error_create_pw": "앱 비밀번호 생성 실패",
         "confirm_revoke": "앱 비밀번호 \"{{label}}\"을(를) 취소하시겠습니까? 이 비밀번호를 사용하는 클라이언트가 작동하지 않게 됩니다.",
         "error_revoke": "취소 실패"
-    }
+    },
+    "upload": {
+        "uploading": "업로드 중...",
+        "files": "파일",
+        "complete": "{{count}} / {{total}} 업로드됨"
+    },
+    "storage_quota_exceeded": "저장 공간 할당량 초과"
 }

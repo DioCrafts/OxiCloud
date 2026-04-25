@@ -307,7 +307,8 @@
         "generated_link": "الرابط المُنشأ",
         "notify": "إرسال إشعار",
         "recipient": "المستلم",
-        "message": "الرسالة"
+        "message": "الرسالة",
+        "move_to_home": "نقل إلى المجلد الرئيسي"
     },
     "dropzone": {
         "drag_files": "اسحب الملفات هنا أو انقر للاختيار",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "تم حذف العنصر نهائياً",
         "trash_emptied": "تم تفريغ سلة المهملات بنجاح",
         "title": "الإشعارات",
-        "empty": "لا توجد إشعارات"
+        "empty": "لا توجد إشعارات",
+        "link_created": "تم إنشاء الرابط",
+        "share_success": "تم إنشاء رابط المشاركة بنجاح"
     },
     "batch": {
         "one_selected": "عنصر واحد محدد",
@@ -566,7 +569,50 @@
         "error_password_short": "كلمة المرور 8 أحرف على الأقل",
         "error_generic": "فشل",
         "error_network": "خطأ في الشبكة: {{message}}",
-        "error_create_user": "فشل إنشاء المستخدم"
+        "error_create_user": "فشل إنشاء المستخدم",
+        "tab_storage": "التخزين",
+        "storage_title": "إعداد التخزين",
+        "storage_current_backend": "الواجهة الخلفية الحالية",
+        "storage_total_blobs": "إجمالي الكتل",
+        "storage_total_size": "الحجم الإجمالي",
+        "storage_dedup_ratio": "نسبة إزالة التكرار",
+        "storage_backend": "الواجهة الخلفية",
+        "storage_local": "محلي",
+        "storage_s3": "متوافق مع S3",
+        "storage_provider_preset": "إعداد مسبق للمزود",
+        "storage_preset_custom": "مخصص",
+        "storage_endpoint_url": "رابط نقطة النهاية",
+        "storage_endpoint_hint": "اتركه فارغاً لـ AWS S3",
+        "storage_bucket": "الحاوية",
+        "storage_region": "المنطقة",
+        "storage_access_key": "مفتاح الوصول",
+        "storage_secret_key": "المفتاح السري",
+        "storage_secret_configured": "تم إعداد المفتاح",
+        "storage_key_placeholder": "أدخل مفتاحاً جديداً",
+        "storage_path_style": "فرض أسلوب المسار",
+        "storage_path_style_hint": "مطلوب لـ MinIO وبعض الخدمات المتوافقة مع S3",
+        "storage_test_connection": "اختبار الاتصال",
+        "storage_test_success": "نجح الاتصال",
+        "storage_test_failure": "فشل الاتصال",
+        "storage_save": "حفظ الإعداد",
+        "storage_saved": "تم حفظ الإعداد",
+        "storage_migration": "ترحيل البيانات",
+        "storage_migration_coming_soon": "أدوات الترحيل قريباً",
+        "migration_status_label": "حالة الترحيل",
+        "migration_start": "بدء الترحيل",
+        "migration_pause": "إيقاف مؤقت",
+        "migration_resume": "استئناف",
+        "migration_verify": "التحقق",
+        "migration_complete": "إكمال",
+        "migration_started": "بدأ الترحيل",
+        "migration_paused_msg": "الترحيل متوقف مؤقتاً",
+        "migration_resumed_msg": "استُؤنف الترحيل",
+        "migration_completed_msg": "اكتمل الترحيل بنجاح",
+        "migration_verifying": "جارٍ التحقق...",
+        "migration_verify_passed": "اجتاز التحقق",
+        "migration_verify_failed": "فشل التحقق",
+        "migration_failed_blobs": "كتل فاشلة",
+        "testing": "جارٍ الاختبار..."
     },
     "profile": {
         "page_title": "الملف الشخصي",
@@ -627,5 +673,11 @@
         "error_create_pw": "فشل إنشاء كلمة المرور",
         "confirm_revoke": "إلغاء كلمة المرور \"{{label}}\"؟ ستتوقف العملاء عن العمل.",
         "error_revoke": "فشل الإلغاء"
-    }
+    },
+    "upload": {
+        "uploading": "جارٍ الرفع...",
+        "files": "ملفات",
+        "complete": "{{count}} / {{total}} تم الرفع"
+    },
+    "storage_quota_exceeded": "تجاوز حصة التخزين"
 }

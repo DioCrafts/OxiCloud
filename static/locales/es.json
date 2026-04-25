@@ -307,7 +307,8 @@
         "generated_link": "Enlace Generado",
         "notify": "Enviar Notificación",
         "recipient": "Destinatario",
-        "message": "Mensaje"
+        "message": "Mensaje",
+        "move_to_home": "Mover a la carpeta de inicio"
     },
     "dropzone": {
         "drag_files": "Arrastra archivos aquí o haz clic para seleccionar",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Elemento eliminado permanentemente",
         "trash_emptied": "Papelera vaciada correctamente",
         "title": "Notificaciones",
-        "empty": "Sin notificaciones"
+        "empty": "Sin notificaciones",
+        "link_created": "Enlace creado",
+        "share_success": "Enlace compartido creado correctamente"
     },
     "batch": {
         "one_selected": "1 elemento seleccionado",
@@ -670,5 +673,11 @@
         "error_create_pw": "Error al crear contraseña de aplicación",
         "confirm_revoke": "¿Revocar contraseña \"{{label}}\"? Los clientes que la usen dejarán de funcionar.",
         "error_revoke": "Error al revocar contraseña"
-    }
+    },
+    "upload": {
+        "uploading": "Subiendo...",
+        "files": "archivos",
+        "complete": "{{count}} / {{total}} subidos"
+    },
+    "storage_quota_exceeded": "Cuota de almacenamiento superada"
 }

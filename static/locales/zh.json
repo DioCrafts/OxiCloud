@@ -307,7 +307,8 @@
         "move_folder": "Move folder",
         "no_subfolders": "No subfolders",
         "rename_file": "Rename file",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "移动到主文件夹"
     },
     "dropzone": {
         "drag_files": "将文件拖到这里，或点击选择",
@@ -553,7 +554,50 @@
         "error_password_short": "密码至少需要8个字符",
         "error_generic": "失败",
         "error_network": "网络错误：{{message}}",
-        "error_create_user": "创建用户失败"
+        "error_create_user": "创建用户失败",
+        "tab_storage": "存储",
+        "storage_title": "存储配置",
+        "storage_current_backend": "当前后端",
+        "storage_total_blobs": "总块数",
+        "storage_total_size": "总大小",
+        "storage_dedup_ratio": "去重比率",
+        "storage_backend": "后端",
+        "storage_local": "本地",
+        "storage_s3": "S3 兼容",
+        "storage_provider_preset": "提供商预设",
+        "storage_preset_custom": "自定义",
+        "storage_endpoint_url": "端点 URL",
+        "storage_endpoint_hint": "AWS S3 请留空",
+        "storage_bucket": "存储桶",
+        "storage_region": "地区",
+        "storage_access_key": "访问密钥",
+        "storage_secret_key": "密钥",
+        "storage_secret_configured": "密钥已配置",
+        "storage_key_placeholder": "输入新密钥",
+        "storage_path_style": "强制路径风格",
+        "storage_path_style_hint": "MinIO 及某些 S3 兼容服务需要此选项",
+        "storage_test_connection": "测试连接",
+        "storage_test_success": "连接成功",
+        "storage_test_failure": "连接失败",
+        "storage_save": "保存配置",
+        "storage_saved": "配置已保存",
+        "storage_migration": "数据迁移",
+        "storage_migration_coming_soon": "迁移工具即将推出",
+        "migration_status_label": "迁移状态",
+        "migration_start": "开始迁移",
+        "migration_pause": "暂停",
+        "migration_resume": "继续",
+        "migration_verify": "验证",
+        "migration_complete": "完成",
+        "migration_started": "迁移已开始",
+        "migration_paused_msg": "迁移已暂停",
+        "migration_resumed_msg": "迁移已继续",
+        "migration_completed_msg": "迁移成功完成",
+        "migration_verifying": "正在验证...",
+        "migration_verify_passed": "验证通过",
+        "migration_verify_failed": "验证失败",
+        "migration_failed_blobs": "失败的块",
+        "testing": "正在测试..."
     },
     "profile": {
         "page_title": "个人资料",
@@ -626,6 +670,14 @@
         "item_deleted_permanently": "项目已永久删除",
         "trash_emptied": "回收站已清空",
         "title": "通知",
-        "empty": "暂无通知"
-    }
+        "empty": "暂无通知",
+        "link_created": "链接已创建",
+        "share_success": "分享链接创建成功"
+    },
+    "upload": {
+        "uploading": "正在上传...",
+        "files": "个文件",
+        "complete": "已上传 {{count}} / {{total}}"
+    },
+    "storage_quota_exceeded": "存储配额已超限"
 }
