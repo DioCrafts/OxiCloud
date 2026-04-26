@@ -12,6 +12,7 @@ use socket2::{Domain, Protocol, Socket, TcpKeepalive, Type};
 
 use axum::Router;
 use axum::extract::DefaultBodyLimit;
+use oxicloud::interfaces::middleware::trace_span::ClientIpMakeSpan;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
@@ -61,6 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    oxicloud::interfaces::middleware::trusted_proxy::log_config();
+
     // Load configuration from environment variables
     let config = common::config::AppConfig::from_env();
 
@@ -69,8 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if !storage_path.exists() {
         std::fs::create_dir_all(&storage_path).expect("Failed to create storage directory");
     }
-    // Locales are embedded in the binary via rust-embed — no filesystem path needed.
-
     // Initialize database pools if auth is enabled
     let db_pools = if config.features.enable_auth {
         match create_database_pools(&config).await {
@@ -342,7 +343,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(carddav_protected)
             .merge(webdav_protected)
             .merge(web_routes)
-            .layer(TraceLayer::new_for_http());
+            .layer(TraceLayer::new_for_http().make_span_with(ClientIpMakeSpan));
 
         // Mount Nextcloud routes (uses its own Basic Auth middleware)
         if let Some(nc_router) = nextcloud_router {
@@ -374,7 +375,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .merge(carddav_router)
             .merge(webdav_router)
             .merge(web_routes)
-            .layer(TraceLayer::new_for_http());
+            .layer(TraceLayer::new_for_http().make_span_with(ClientIpMakeSpan));
 
         // Mount Nextcloud routes
         if let Some(nc_router) = nextcloud_router {
@@ -498,7 +499,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TCP_NODELAY is inherited from the listening socket on Linux,
     // so every accepted connection already has Nagle disabled.
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     tracing::info!("Server shutdown completed");
 
     Ok(())
