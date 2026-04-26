@@ -396,7 +396,7 @@ impl FileHandler {
                 .into_response();
         }
 
-        // Resolve the physical blob path (content-addressable storage)
+        // Resolve the blob hash (content-addressable storage).
         let blob_hash = match state
             .repositories
             .file_read_repository
@@ -408,10 +408,34 @@ impl FileHandler {
                 return AppError::internal_error("File blob not found").into_response();
             }
         };
-        let file_path = state.core.dedup_service.blob_path(&blob_hash);
+        if let Some(data) = thumbnail_service
+            .get_cached_thumbnail(&id, Some(&blob_hash), thumb_size.into())
+            .await
+        {
+            return Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "image/jpeg")
+                .header(header::CONTENT_LENGTH, data.len())
+                .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+                .header(header::ETAG, &etag)
+                .body(Body::from(data))
+                .unwrap()
+                .into_response();
+        }
+
+        let original_bytes = match state.core.dedup_service.read_blob_bytes(&blob_hash).await {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                return AppError::internal_error(format!(
+                    "Failed to load source image for thumbnail generation: {}",
+                    err
+                ))
+                .into_response();
+            }
+        };
 
         match thumbnail_service
-            .get_thumbnail(&id, &blob_hash, thumb_size.into(), &file_path)
+            .get_thumbnail_from_bytes(&id, &blob_hash, thumb_size.into(), original_bytes)
             .await
         {
             Ok(data) => Response::builder()
@@ -733,7 +757,8 @@ impl FileHandler {
 
         // Generate thumbnails for supported images in background.
         // The blob_hash was already computed during the hash-on-write spool,
-        // so we resolve the physical path directly — no extra DB round-trip.
+        // so we can reconstruct the source bytes directly from DedupService
+        // without an extra DB round-trip.
         if state
             .core
             .thumbnail_service
@@ -741,16 +766,27 @@ impl FileHandler {
         {
             let file_id = file.id.clone();
             let thumbnail_service = state.core.thumbnail_service.clone();
-            let file_path = state.core.dedup_service.blob_path(&blob_hash);
+            let dedup_service = state.core.dedup_service.clone();
             let blob_hash_owned = blob_hash.clone();
 
             tokio::spawn(async move {
                 tracing::info!("🖼️ Generating thumbnails for: {}", file_id);
-                thumbnail_service.generate_all_sizes_background(
-                    file_id,
-                    blob_hash_owned,
-                    file_path,
-                );
+                match dedup_service.read_blob_bytes(&blob_hash_owned).await {
+                    Ok(original_bytes) => {
+                        thumbnail_service.generate_all_sizes_background_from_bytes(
+                            file_id,
+                            blob_hash_owned,
+                            original_bytes,
+                        );
+                    }
+                    Err(err) => {
+                        tracing::warn!(
+                            "Failed to load source image for thumbnail generation {}: {}",
+                            file_id,
+                            err
+                        );
+                    }
+                }
             });
         }
 

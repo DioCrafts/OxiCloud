@@ -1162,7 +1162,9 @@ impl AuthApplicationService {
                 // Filter helper: removes any chars that are not valid in a username
                 let filter_username_chars = |s: &str| {
                     s.chars()
-                        .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+                        .filter(|c| {
+                            c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.'
+                        })
                         .take(32)
                         .collect::<String>()
                 };

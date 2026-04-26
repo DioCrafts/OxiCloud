@@ -1,6 +1,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use bytes::Bytes;
+
 use super::thumbnail_service::{ThumbnailService, ThumbnailSize};
 
 /// Minimal valid 1x1 red PNG (68 bytes).
@@ -81,4 +83,36 @@ async fn generate_thumbnail_nonexistent_path_returns_error() {
         .await;
 
     assert!(result.is_err(), "should fail for nonexistent file");
+}
+
+/// Regression test: thumbnail generation must also work when the image source
+/// is reconstructed from blob storage bytes instead of a single local file.
+#[tokio::test]
+async fn generate_thumbnail_from_blob_bytes() {
+    let tmp = tempfile::tempdir().expect("create temp dir");
+    let storage_root = tmp.path();
+
+    let svc = Arc::new(ThumbnailService::new(
+        storage_root,
+        100,
+        10 * 1024 * 1024,
+        Some(Duration::from_secs(30)),
+    ));
+    svc.initialize().await.expect("init thumbnail dirs");
+
+    let result = svc
+        .get_thumbnail_from_bytes(
+            "bytes-file-id",
+            "bytes-hash-123",
+            ThumbnailSize::Preview,
+            Bytes::from(tiny_png()),
+        )
+        .await;
+
+    let thumb_bytes = result.expect("thumbnail generation should succeed from raw bytes");
+    assert!(!thumb_bytes.is_empty(), "thumbnail bytes must not be empty");
+    assert!(
+        thumb_bytes.len() > 2 && thumb_bytes[0] == 0xFF && thumb_bytes[1] == 0xD8,
+        "output should be JPEG format"
+    );
 }

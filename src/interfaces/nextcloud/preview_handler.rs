@@ -125,7 +125,7 @@ pub async fn handle_preview(
             .unwrap();
     }
 
-    // Get the physical blob path (content-addressable storage)
+    // Resolve the blob hash (content-addressable storage)
     let blob_hash = match state
         .repositories
         .file_read_repository
@@ -140,20 +140,50 @@ pub async fn handle_preview(
                 .unwrap();
         }
     };
-    let blob_path = state.core.dedup_service.blob_path(&blob_hash);
+    if let Some(data) = state
+        .core
+        .thumbnail_service
+        .get_cached_thumbnail(&object_id, Some(&blob_hash), thumb_size.into())
+        .await
+    {
+        let etag = format!("\"thumb-{}-{:?}\"", object_id, thumb_size);
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "image/jpeg")
+            .header(header::CONTENT_LENGTH, data.len())
+            .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
+            .header(header::ETAG, etag)
+            .body(Body::from(data))
+            .unwrap();
+    }
+
+    let original_bytes = match state.core.dedup_service.read_blob_bytes(&blob_hash).await {
+        Ok(bytes) => bytes,
+        Err(err) => {
+            tracing::error!(
+                "Failed to load source image for preview {}: {}",
+                object_id,
+                err
+            );
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::from("Failed to load preview source"))
+                .unwrap();
+        }
+    };
 
     // Generate/get thumbnail
     match state
         .core
         .thumbnail_service
-        .get_thumbnail(&object_id, &blob_hash, thumb_size.into(), &blob_path)
+        .get_thumbnail_from_bytes(&object_id, &blob_hash, thumb_size.into(), original_bytes)
         .await
     {
         Ok(data) => {
             let etag = format!("\"thumb-{}-{:?}\"", object_id, thumb_size);
             Response::builder()
                 .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "image/webp")
+                .header(header::CONTENT_TYPE, "image/jpeg")
                 .header(header::CONTENT_LENGTH, data.len())
                 .header(header::CACHE_CONTROL, "public, max-age=31536000, immutable")
                 .header(header::ETAG, etag)

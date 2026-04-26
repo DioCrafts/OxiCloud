@@ -254,6 +254,76 @@ impl ThumbnailService {
         Ok(bytes)
     }
 
+    /// Get a thumbnail from raw image bytes, generating it if needed.
+    ///
+    /// This is the storage-model-safe entrypoint for CDC/manifest-backed
+    /// blobs where no single local source file exists on disk.
+    pub async fn get_thumbnail_from_bytes(
+        &self,
+        file_id: &str,
+        blob_hash: &str,
+        size: ThumbnailSize,
+        original_data: Bytes,
+    ) -> Result<Bytes, ThumbnailError> {
+        let cache_key = ThumbnailCacheKey {
+            file_id: file_id.to_string(),
+            size,
+        };
+
+        let thumb_path = self.get_thumbnail_path(blob_hash, size);
+        let file_id_owned = file_id.to_string();
+
+        let entry = self
+            .cache
+            .entry(cache_key)
+            .or_insert_with(async move {
+                if let Ok(data) = fs::read(&thumb_path).await {
+                    tracing::debug!(
+                        "💾 Thumbnail loaded from disk: {} {:?}",
+                        file_id_owned,
+                        size
+                    );
+                    return Bytes::from(data);
+                }
+
+                tracing::info!("🎨 Generating thumbnail: {} {:?}", file_id_owned, size);
+                match Self::generate_thumbnail_from_data(
+                    original_data,
+                    size,
+                    self.generation_timeout,
+                )
+                .await
+                {
+                    Ok(bytes) => {
+                        if let Some(parent) = thumb_path.parent() {
+                            let _ = fs::create_dir_all(parent).await;
+                        }
+                        let _ = fs::write(&thumb_path, &bytes).await;
+                        bytes
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Thumbnail generation failed for {} {:?}: {e}",
+                            file_id_owned,
+                            size
+                        );
+                        Bytes::new()
+                    }
+                }
+            })
+            .await;
+
+        let bytes = entry.into_value();
+        if bytes.is_empty() {
+            return Err(ThumbnailError::ImageError(
+                "Thumbnail generation failed".to_string(),
+            ));
+        }
+
+        tracing::debug!("🔥 Thumbnail served: {} {:?}", file_id, size);
+        Ok(bytes)
+    }
+
     /// Try to serve a thumbnail from cache only (memory → disk).
     ///
     /// Unlike `get_thumbnail`, this does **not** generate a new thumbnail.
@@ -395,6 +465,141 @@ impl ThumbnailService {
         Ok(bytes)
     }
 
+    fn render_thumbnail_from_data(
+        data: &[u8],
+        size: ThumbnailSize,
+    ) -> Result<Vec<u8>, ThumbnailError> {
+        let max_dim = size.max_dimension();
+
+        let (w, h) = image::ImageReader::new(std::io::Cursor::new(data))
+            .with_guessed_format()
+            .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
+            .into_dimensions()
+            .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+        if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
+            return Err(ThumbnailError::ImageError(format!(
+                "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
+                w as u64 * h as u64 / 1_000_000
+            )));
+        }
+
+        let img =
+            image::load_from_memory(data).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+
+        let img = {
+            use crate::infrastructure::services::exif_service::{ExifService, apply_orientation};
+            let orientation = ExifService::extract(data)
+                .and_then(|m| m.orientation)
+                .unwrap_or(1);
+            apply_orientation(img, orientation)
+        };
+
+        let (orig_width, orig_height) = (img.width(), img.height());
+        let (new_width, new_height) = if orig_width > orig_height {
+            let ratio = max_dim as f32 / orig_width as f32;
+            (max_dim, (orig_height as f32 * ratio) as u32)
+        } else {
+            let ratio = max_dim as f32 / orig_height as f32;
+            ((orig_width as f32 * ratio) as u32, max_dim)
+        };
+
+        let filter = match size {
+            ThumbnailSize::Icon => FilterType::Triangle,
+            ThumbnailSize::Preview => FilterType::CatmullRom,
+            ThumbnailSize::Large => FilterType::CatmullRom,
+        };
+        let thumbnail = img.resize(new_width, new_height, filter);
+
+        let rgb = thumbnail.to_rgb8();
+        let mut buffer = Vec::new();
+        let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
+        rgb.write_with_encoder(encoder)
+            .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+
+        Ok(buffer)
+    }
+
+    fn render_all_thumbnails_from_data(
+        data: &[u8],
+    ) -> Result<Vec<(ThumbnailSize, Bytes)>, ThumbnailError> {
+        let (w, h) = image::ImageReader::new(std::io::Cursor::new(data))
+            .with_guessed_format()
+            .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
+            .into_dimensions()
+            .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+        if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
+            return Err(ThumbnailError::ImageError(format!(
+                "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
+                w as u64 * h as u64 / 1_000_000
+            )));
+        }
+
+        let img =
+            image::load_from_memory(data).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+
+        let img = {
+            use crate::infrastructure::services::exif_service::{ExifService, apply_orientation};
+            let orientation = ExifService::extract(data)
+                .and_then(|m| m.orientation)
+                .unwrap_or(1);
+            apply_orientation(img, orientation)
+        };
+
+        let (orig_w, orig_h) = (img.width(), img.height());
+
+        ThumbnailSize::all()
+            .par_iter()
+            .map(|&size| {
+                let max_dim = size.max_dimension();
+
+                let (new_w, new_h) = if orig_w > orig_h {
+                    let ratio = max_dim as f32 / orig_w as f32;
+                    (max_dim, (orig_h as f32 * ratio) as u32)
+                } else {
+                    let ratio = max_dim as f32 / orig_h as f32;
+                    ((orig_w as f32 * ratio) as u32, max_dim)
+                };
+
+                let filter = match size {
+                    ThumbnailSize::Icon => FilterType::Triangle,
+                    ThumbnailSize::Preview => FilterType::CatmullRom,
+                    ThumbnailSize::Large => FilterType::CatmullRom,
+                };
+                let thumb = img.resize(new_w, new_h, filter);
+
+                let rgb = thumb.to_rgb8();
+                let mut buf = Vec::new();
+                let encoder = JpegEncoder::new_with_quality(&mut buf, 80);
+                rgb.write_with_encoder(encoder)
+                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
+
+                Ok((size, Bytes::from(buf)))
+            })
+            .collect::<Result<Vec<_>, ThumbnailError>>()
+    }
+
+    async fn generate_thumbnail_from_data(
+        original_data: Bytes,
+        size: ThumbnailSize,
+        timeout_duration: Duration,
+    ) -> Result<Bytes, ThumbnailError> {
+        let spawn_result = tokio::task::spawn_blocking(move || {
+            Self::render_thumbnail_from_data(original_data.as_ref(), size)
+        });
+
+        let result = timeout(timeout_duration, spawn_result)
+            .await
+            .map_err(|_| {
+                ThumbnailError::TaskError(format!(
+                    "Thumbnail generation timed out after {:?}",
+                    timeout_duration
+                ))
+            })?
+            .map_err(|e| ThumbnailError::TaskError(e.to_string()))?;
+
+        result.map(Bytes::from)
+    }
+
     /// Generate a thumbnail from an image file.
     ///
     /// Concurrency is bounded by `decode_semaphore` to prevent OOM when
@@ -409,7 +614,6 @@ impl ThumbnailService {
         size: ThumbnailSize,
     ) -> Result<Bytes, ThumbnailError> {
         let path = original_path.to_path_buf();
-        let max_dim = size.max_dimension();
         let timeout_duration = self.generation_timeout;
 
         // Acquire semaphore permit — bounds peak RAM from concurrent decodes
@@ -422,68 +626,9 @@ impl ThumbnailService {
         // Run image processing in blocking thread pool with timeout
         let spawn_result =
             tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ThumbnailError> {
-                // Single read: load file once into memory, then work from the buffer
                 let data =
                     std::fs::read(&path).map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
-
-                // Safety check: read dimensions from in-memory buffer (no 2nd I/O)
-                let (w, h) = image::ImageReader::new(std::io::Cursor::new(&data))
-                    .with_guessed_format()
-                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?
-                    .into_dimensions()
-                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
-                if (w as u64) * (h as u64) > MAX_DECODE_PIXELS {
-                    return Err(ThumbnailError::ImageError(format!(
-                        "Image too large for thumbnail: {w}×{h} ({} MP, max {MAX_DECODE_PIXELS})",
-                        w as u64 * h as u64 / 1_000_000
-                    )));
-                }
-
-                // Full decode from the same in-memory buffer (no 2nd disk read)
-                let img = image::load_from_memory(&data)
-                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
-
-                // Apply EXIF orientation so thumbnails display correctly
-                let img = {
-                    use crate::infrastructure::services::exif_service::{
-                        ExifService, apply_orientation,
-                    };
-                    let orientation = ExifService::extract(&data)
-                        .and_then(|m| m.orientation)
-                        .unwrap_or(1);
-                    // Free the encoded image data now that image is decoded and EXIF extracted
-                    drop(data);
-                    apply_orientation(img, orientation)
-                };
-
-                // Calculate new dimensions preserving aspect ratio
-                let (orig_width, orig_height) = (img.width(), img.height());
-                let (new_width, new_height) = if orig_width > orig_height {
-                    let ratio = max_dim as f32 / orig_width as f32;
-                    (max_dim, (orig_height as f32 * ratio) as u32)
-                } else {
-                    let ratio = max_dim as f32 / orig_height as f32;
-                    ((orig_width as f32 * ratio) as u32, max_dim)
-                };
-
-                // Adaptive filter: faster filters for smaller sizes where
-                // quality difference vs Lanczos3 is imperceptible
-                let filter = match size {
-                    ThumbnailSize::Icon => FilterType::Triangle, // 150px — max speed
-                    ThumbnailSize::Preview => FilterType::CatmullRom, // 400px — good balance
-                    ThumbnailSize::Large => FilterType::CatmullRom, // 800px — sufficient quality
-                };
-                let thumbnail = img.resize(new_width, new_height, filter);
-
-                // Encode as JPEG (lossy q=80) — explicit quality control,
-                // ~2× smaller than image-webp's Rust encoder at same visual quality
-                let rgb = thumbnail.to_rgb8();
-                let mut buffer = Vec::new();
-                let encoder = JpegEncoder::new_with_quality(&mut buffer, 80);
-                rgb.write_with_encoder(encoder)
-                    .map_err(|e| ThumbnailError::ImageError(e.to_string()))?;
-
-                Ok(buffer)
+                Self::render_thumbnail_from_data(&data, size)
             });
 
         // Apply timeout to prevent hanging on large images
@@ -664,6 +809,98 @@ impl ThumbnailService {
                     tracing::warn!("Failed to save thumbnail {} {:?}: {}", file_id, size, e);
                 } else {
                     // Populate in-memory cache for instant first-hit serving
+                    let cache_key = ThumbnailCacheKey {
+                        file_id: file_id.clone(),
+                        size,
+                    };
+                    self.cache.insert(cache_key, bytes).await;
+                    tracing::debug!("✅ Generated thumbnail: {} {:?}", file_id, size);
+                }
+            }
+
+            tracing::info!("✅ Background thumbnail generation complete: {}", file_id);
+        });
+    }
+
+    /// Generate all thumbnail sizes in the background from raw image bytes.
+    ///
+    /// This is compatible with CDC/manifest-backed blobs because it does not
+    /// require a single physical source file on disk.
+    pub fn generate_all_sizes_background_from_bytes(
+        self: Arc<Self>,
+        file_id: String,
+        blob_hash: String,
+        original_data: Bytes,
+    ) {
+        tokio::spawn(async move {
+            tracing::info!("🖼️ Background thumbnail generation starting: {}", file_id);
+
+            let all_exist = {
+                let mut ok = true;
+                for size in ThumbnailSize::all() {
+                    let thumb_path = self.get_thumbnail_path(&blob_hash, *size);
+                    if fs::metadata(&thumb_path).await.is_err() {
+                        ok = false;
+                        break;
+                    }
+                }
+                ok
+            };
+            if all_exist {
+                for size in ThumbnailSize::all() {
+                    let thumb_path = self.get_thumbnail_path(&blob_hash, *size);
+                    if let Ok(data) = fs::read(&thumb_path).await {
+                        let cache_key = ThumbnailCacheKey {
+                            file_id: file_id.clone(),
+                            size: *size,
+                        };
+                        self.cache.insert(cache_key, Bytes::from(data)).await;
+                    }
+                }
+                tracing::info!(
+                    "🖼️ Thumbnail dedup hit for {} (blob {}): skipped generation",
+                    file_id,
+                    &blob_hash[..12]
+                );
+                return;
+            }
+
+            let _permit = match self.decode_semaphore.acquire().await {
+                Ok(p) => p,
+                Err(_) => {
+                    tracing::warn!(
+                        "Decode semaphore closed, skipping thumbnails for {}",
+                        file_id
+                    );
+                    return;
+                }
+            };
+
+            let results = tokio::task::spawn_blocking(move || {
+                Self::render_all_thumbnails_from_data(original_data.as_ref())
+            })
+            .await;
+
+            let thumbnails = match results {
+                Ok(Ok(t)) => t,
+                Ok(Err(e)) => {
+                    tracing::warn!("Thumbnail generation failed for {}: {}", file_id, e);
+                    return;
+                }
+                Err(e) => {
+                    tracing::warn!("Thumbnail task panicked for {}: {}", file_id, e);
+                    return;
+                }
+            };
+
+            for (size, bytes) in thumbnails {
+                let thumb_path = self.get_thumbnail_path(&blob_hash, size);
+                if let Some(parent) = thumb_path.parent() {
+                    let _ = fs::create_dir_all(parent).await;
+                }
+                if let Err(e) = fs::write(&thumb_path, &bytes).await {
+                    tracing::warn!("Failed to save thumbnail {} {:?}: {}", file_id, size, e);
+                } else {
                     let cache_key = ThumbnailCacheKey {
                         file_id: file_id.clone(),
                         size,

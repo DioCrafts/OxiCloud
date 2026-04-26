@@ -918,6 +918,26 @@ impl DedupService {
         }
     }
 
+    /// Read the full blob into memory — CDC-aware with legacy fallback.
+    ///
+    /// This is intended for image-oriented workflows such as thumbnail
+    /// generation where the downstream library already requires the full
+    /// payload in memory to decode the image.
+    pub async fn read_blob_bytes(&self, hash: &str) -> Result<Bytes, DomainError> {
+        let expected_size = self.blob_size(hash).await? as usize;
+        let mut data = Vec::with_capacity(expected_size);
+        let mut stream = self.read_blob_stream(hash).await?;
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| {
+                DomainError::internal_error("Dedup", format!("Failed to read blob chunk: {}", e))
+            })?;
+            data.extend_from_slice(&chunk);
+        }
+
+        Ok(Bytes::from(data))
+    }
+
     /// Stream a byte range — CDC-aware with legacy fallback.
     ///
     /// For CDC files: calculates which chunks overlap the requested range,
