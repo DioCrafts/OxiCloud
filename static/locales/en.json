@@ -307,7 +307,8 @@
         "generated_link": "Generated Link",
         "notify": "Send Notification",
         "recipient": "Recipient",
-        "message": "Message"
+        "message": "Message",
+        "move_to_home": "Move to Home folder"
     },
     "dropzone": {
         "drag_files": "Drag files here or click to select",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Item permanently deleted",
         "trash_emptied": "Trash emptied successfully",
         "title": "Notifications",
-        "empty": "No notifications"
+        "empty": "No notifications",
+        "link_created": "Link created",
+        "share_success": "Shared link created successfully"
     },
     "batch": {
         "one_selected": "1 item selected",
@@ -670,5 +673,11 @@
         "error_create_pw": "Failed to create app password",
         "confirm_revoke": "Revoke app password \"{{label}}\"? Clients using this password will stop working.",
         "error_revoke": "Failed to revoke app password"
-    }
+    },
+    "upload": {
+        "uploading": "Uploading...",
+        "files": "files",
+        "complete": "{{count}} / {{total}} uploaded"
+    },
+    "storage_quota_exceeded": "Storage quota exceeded"
 }

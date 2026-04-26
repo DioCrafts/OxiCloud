@@ -307,7 +307,8 @@
         "generated_link": "जनरेट किया गया लिंक",
         "notify": "सूचना भेजें",
         "recipient": "प्राप्तकर्ता",
-        "message": "संदेश"
+        "message": "संदेश",
+        "move_to_home": "होम फ़ोल्डर में ले जाएं"
     },
     "dropzone": {
         "drag_files": "फ़ाइलें यहाँ खींचें या चुनने के लिए क्लिक करें",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "आइटम स्थायी रूप से हटाया गया",
         "trash_emptied": "रद्दी सफलतापूर्वक खाली की गई",
         "title": "सूचनाएँ",
-        "empty": "कोई सूचना नहीं"
+        "empty": "कोई सूचना नहीं",
+        "link_created": "लिंक बनाया गया",
+        "share_success": "शेयर लिंक सफलतापूर्वक बनाया गया"
     },
     "batch": {
         "one_selected": "1 आइटम चयनित",
@@ -566,7 +569,50 @@
         "error_password_short": "पासवर्ड कम से कम 8 अक्षर",
         "error_generic": "विफल",
         "error_network": "नेटवर्क त्रुटि: {{message}}",
-        "error_create_user": "उपयोगकर्ता बनाने में विफल"
+        "error_create_user": "उपयोगकर्ता बनाने में विफल",
+        "tab_storage": "स्टोरेज",
+        "storage_title": "स्टोरेज कॉन्फ़िगरेशन",
+        "storage_current_backend": "वर्तमान बैकएंड",
+        "storage_total_blobs": "कुल ब्लॉब्स",
+        "storage_total_size": "कुल आकार",
+        "storage_dedup_ratio": "डीडुप्लिकेशन अनुपात",
+        "storage_backend": "बैकएंड",
+        "storage_local": "स्थानीय",
+        "storage_s3": "S3 संगत",
+        "storage_provider_preset": "प्रदाता प्रीसेट",
+        "storage_preset_custom": "कस्टम",
+        "storage_endpoint_url": "एंडपॉइंट URL",
+        "storage_endpoint_hint": "AWS S3 के लिए खाली छोड़ें",
+        "storage_bucket": "बकेट",
+        "storage_region": "क्षेत्र",
+        "storage_access_key": "एक्सेस की",
+        "storage_secret_key": "सीक्रेट की",
+        "storage_secret_configured": "की कॉन्फ़िगर की गई",
+        "storage_key_placeholder": "नई की दर्ज करें",
+        "storage_path_style": "पाथ स्टाइल फ़ोर्स करें",
+        "storage_path_style_hint": "MinIO और कुछ S3-संगत सेवाओं के लिए आवश्यक",
+        "storage_test_connection": "कनेक्शन परीक्षण",
+        "storage_test_success": "कनेक्शन सफल",
+        "storage_test_failure": "कनेक्शन विफल",
+        "storage_save": "कॉन्फ़िगरेशन सहेजें",
+        "storage_saved": "कॉन्फ़िगरेशन सहेजी गई",
+        "storage_migration": "डेटा माइग्रेशन",
+        "storage_migration_coming_soon": "माइग्रेशन टूल्स जल्द आ रहे हैं",
+        "migration_status_label": "माइग्रेशन स्थिति",
+        "migration_start": "माइग्रेशन शुरू करें",
+        "migration_pause": "रोकें",
+        "migration_resume": "फिर से शुरू करें",
+        "migration_verify": "सत्यापित करें",
+        "migration_complete": "पूर्ण करें",
+        "migration_started": "माइग्रेशन शुरू हुआ",
+        "migration_paused_msg": "माइग्रेशन रोका गया",
+        "migration_resumed_msg": "माइग्रेशन फिर से शुरू हुआ",
+        "migration_completed_msg": "माइग्रेशन सफलतापूर्वक पूर्ण हुआ",
+        "migration_verifying": "सत्यापन हो रहा है...",
+        "migration_verify_passed": "सत्यापन पास",
+        "migration_verify_failed": "सत्यापन विफल",
+        "migration_failed_blobs": "विफल ब्लॉब्स",
+        "testing": "परीक्षण हो रहा है..."
     },
     "profile": {
         "page_title": "प्रोफ़ाइल",
@@ -627,5 +673,11 @@
         "error_create_pw": "ऐप पासवर्ड बनाने में विफल",
         "confirm_revoke": "ऐप पासवर्ड \"{{label}}\" रद्द करें? इसका उपयोग करने वाले क्लाइंट काम करना बंद कर देंगे।",
         "error_revoke": "रद्द करने में विफल"
-    }
+    },
+    "upload": {
+        "uploading": "अपलोड हो रहा है...",
+        "files": "फ़ाइलें",
+        "complete": "{{count}} / {{total}} अपलोड हुए"
+    },
+    "storage_quota_exceeded": "स्टोरेज कोटा पार हो गया"
 }

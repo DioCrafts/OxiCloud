@@ -30,12 +30,12 @@ const fileOps = {
 
     /** Start a new upload batch in the notification bell */
     _initUploadToast(totalFiles, folderName) {
-        this._currentBatchId = notifications ? notifications.addUploadBatch(totalFiles, folderName) : null;
+        this._currentBatchId = notifications.addUploadBatch(totalFiles, folderName);
     },
 
     /** Finalise the batch in the notification bell */
     _finishUploadToast(successCount, totalFiles) {
-        if (notifications && this._currentBatchId) {
+        if (this._currentBatchId) {
             notifications.finishBatch(this._currentBatchId, successCount, totalFiles);
         }
     },
@@ -361,7 +361,7 @@ const fileOps = {
                     progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
                 }
                 // Notify bell of per-file completion
-                if (notifications && batchId) {
+                if (batchId) {
                     try {
                         notifications.fileCompleted(batchId, result.ok);
                     } catch (e) {
@@ -383,7 +383,7 @@ const fileOps = {
                         });
                     }
                     if (result.isQuotaError) {
-                        const msg = result.errorMsg || i18n?.t('storage_quota_exceeded') || 'Storage quota exceeded';
+                        const msg = result.errorMsg || i18n.t('storage_quota_exceeded');
                         if (notifications) {
                             notifications.addNotification({
                                 icon: 'fa-exclamation-triangle',
@@ -591,7 +591,7 @@ const fileOps = {
                             console.warn(`[SKIP] #${idx} ${rel} — cannot read 0-byte file (FIFO/pipe?), skipping`);
                             uploadedCount++;
                             successCount++;
-                            if (notifications && batchId) {
+                            if (batchId) {
                                 try {
                                     notifications.fileCompleted(batchId, true);
                                 } catch (_) {}
@@ -623,7 +623,7 @@ const fileOps = {
 
                 uploadedCount++;
 
-                if (notifications && batchId) {
+                if (batchId) {
                     try {
                         notifications.fileCompleted(batchId, result.ok);
                     } catch (_) {}
@@ -994,10 +994,7 @@ const fileOps = {
             console.log('Response status:', response.status);
 
             if (response.ok) {
-                ui.showNotification(
-                    i18n ? i18n.t('notifications.file_renamed') : 'File renamed',
-                    i18n ? i18n.t('notifications.file_renamed_to', { name: newName }) : `File renamed to "${newName}"`
-                );
+                ui.showNotification(i18n.t('notifications.file_renamed'), i18n.t('notifications.file_renamed_to', { name: newName }));
                 return true;
             } else {
                 const errorText = await response.text();
@@ -1075,9 +1072,9 @@ const fileOps = {
      */
     async deleteFile(fileId, fileName) {
         const confirmed = await showConfirmDialog({
-            title: i18n ? i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: i18n ? i18n.t('dialogs.confirm_delete_file', { name: fileName }) : `Are you sure you want to move the file "${fileName}" to trash?`,
-            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
+            title: i18n.t('dialogs.confirm_delete'),
+            message: i18n.t('dialogs.confirm_delete_file', { name: fileName }),
+            confirmText: i18n.t('actions.delete')
         });
         if (!confirmed) return false;
 
@@ -1123,11 +1120,9 @@ const fileOps = {
      */
     async deleteFolder(folderId, folderName) {
         const confirmed = await showConfirmDialog({
-            title: i18n ? i18n.t('dialogs.confirm_delete') : 'Move to trash',
-            message: i18n
-                ? i18n.t('dialogs.confirm_delete_folder', { name: folderName })
-                : `Are you sure you want to move the folder "${folderName}" and all its contents to trash?`,
-            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
+            title: i18n.t('dialogs.confirm_delete'),
+            message: i18n.t('dialogs.confirm_delete_folder', { name: folderName }),
+            confirmText: i18n.t('actions.delete')
         });
         if (!confirmed) return false;
 
@@ -1234,11 +1229,9 @@ const fileOps = {
      */
     async deletePermanently(trashId) {
         const confirmed = await showConfirmDialog({
-            title: i18n ? i18n.t('dialogs.confirm_permanent_delete') : 'Delete permanently',
-            message: i18n
-                ? i18n.t('dialogs.confirm_permanent_delete_msg')
-                : 'Are you sure you want to permanently delete this item? This action cannot be undone.',
-            confirmText: i18n ? i18n.t('actions.delete_permanently') : 'Delete permanently'
+            title: i18n.t('dialogs.confirm_permanent_delete'),
+            message: i18n.t('dialogs.confirm_permanent_delete_msg'),
+            confirmText: i18n.t('actions.delete_permanently')
         });
         if (!confirmed) return false;
 
@@ -1268,9 +1261,9 @@ const fileOps = {
      */
     async emptyTrash() {
         const confirmed = await showConfirmDialog({
-            title: i18n ? i18n.t('dialogs.confirm_empty_trash') : 'Empty trash',
-            message: i18n ? i18n.t('trash.empty_confirm') : 'Are you sure you want to empty the trash? This action will permanently delete all items.',
-            confirmText: i18n ? i18n.t('actions.empty_trash') : 'Empty trash'
+            title: i18n.t('dialogs.confirm_empty_trash'),
+            message: i18n.t('trash.empty_confirm'),
+            confirmText: i18n.t('actions.empty_trash')
         });
         if (!confirmed) return false;
 

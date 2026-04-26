@@ -50,12 +50,8 @@ const multiSelect = {
     // ── Helpers for i18n ────────────────────────────────────
 
     _t(key, vars) {
-        if (i18n && typeof i18n.t === 'function') {
-            const val = i18n.t(key, vars);
-            // If i18n returned the key itself, it's missing → fall back
-            if (val && val !== key) return val;
-        }
-        return null;
+        const val = i18n.t(key, vars);
+        return val !== key ? val : null;
     },
 
     // ── Selection state management ──────────────────────────

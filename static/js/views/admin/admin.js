@@ -8,13 +8,6 @@ let usersPage = 0;
 const PAGE_SIZE = 50;
 let totalUsers = 0;
 
-/* ── i18n helper — falls back to key if i18n not ready ── */
-function t(key, params) {
-    if (i18n && typeof i18n.t === 'function') return i18n.t(key, params);
-    // fallback: strip prefix and humanise
-    return key.split('.').pop().replace(/_/g, ' ');
-}
-
 /** Escape a string for safe embedding inside a JS string literal within an HTML attribute. */
 function _escJs(s) {
     if (typeof s !== 'string') return '';
@@ -54,14 +47,14 @@ function formatBytes(bytes) {
 }
 
 function timeAgo(dateStr) {
-    if (!dateStr) return t('admin.never');
+    if (!dateStr) return i18n.t('admin.never');
     const d = new Date(dateStr);
     const now = new Date();
     const secs = Math.floor((now - d) / 1000);
-    if (secs < 60) return t('admin.just_now');
-    if (secs < 3600) return t('admin.minutes_ago', { n: Math.floor(secs / 60) });
-    if (secs < 86400) return t('admin.hours_ago', { n: Math.floor(secs / 3600) });
-    if (secs < 2592000) return t('admin.days_ago', { n: Math.floor(secs / 86400) });
+    if (secs < 60) return i18n.t('admin.just_now');
+    if (secs < 3600) return i18n.t('admin.minutes_ago', { n: Math.floor(secs / 60) });
+    if (secs < 86400) return i18n.t('admin.hours_ago', { n: Math.floor(secs / 3600) });
+    if (secs < 2592000) return i18n.t('admin.days_ago', { n: Math.floor(secs / 86400) });
     return d.toLocaleDateString();
 }
 
@@ -159,9 +152,9 @@ async function loadDashboard() {
         const bar = document.getElementById('ds-bar');
         bar.style.width = `${Math.min(d.storage_usage_percent, 100)}%`;
         bar.className = `progress-fill ${d.storage_usage_percent > 90 ? 'red' : d.storage_usage_percent > 70 ? 'orange' : 'green'}`;
-        document.getElementById('ds-auth').textContent = d.auth_enabled ? t('admin.enabled') : t('admin.disabled');
-        document.getElementById('ds-oidc').textContent = d.oidc_configured ? t('admin.active') : t('admin.off');
-        document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? t('admin.enabled') : t('admin.disabled');
+        document.getElementById('ds-auth').textContent = d.auth_enabled ? i18n.t('admin.enabled') : i18n.t('admin.disabled');
+        document.getElementById('ds-oidc').textContent = d.oidc_configured ? i18n.t('admin.active') : i18n.t('admin.off');
+        document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? i18n.t('admin.enabled') : i18n.t('admin.disabled');
 
         if (typeof d.registration_enabled !== 'undefined') {
             document.getElementById('ds-registration').checked = d.registration_enabled;
@@ -184,7 +177,7 @@ async function loadDashboard() {
 
 async function loadUsers() {
     const tbody = document.getElementById('users-tbody');
-    tbody.innerHTML = `<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.loading_users'))}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="table-loading-cell"><i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.loading_users'))}</td></tr>`;
     try {
         const resp = await fetch(`${API}/admin/users?limit=${PAGE_SIZE}&offset=${usersPage * PAGE_SIZE}`, {
             headers: headers(),
@@ -193,7 +186,7 @@ async function loadUsers() {
         if (!resp.ok) {
             tbody.innerHTML =
                 '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> ' +
-                escapeHtml(t('admin.failed_load_users')) +
+                escapeHtml(i18n.t('admin.failed_load_users')) +
                 '</td></tr>';
             return;
         }
@@ -201,7 +194,7 @@ async function loadUsers() {
         totalUsers = data.total;
         const users = data.users;
         if (users.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" class="table-status-empty">${escapeHtml(t('admin.no_users_found'))}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" class="table-status-empty">${escapeHtml(i18n.t('admin.no_users_found'))}</td></tr>`;
             return;
         }
 
@@ -221,12 +214,12 @@ async function loadUsers() {
                       '"><i class="fas fa-key badge-admin-icon-small"></i> ' +
                       escapeHtml(u.auth_provider) +
                       '</span>'
-                    : `<span class="badge badge-local">${escapeHtml(t('admin.local'))}</span>`;
+                    : `<span class="badge badge-local">${escapeHtml(i18n.t('admin.local'))}</span>`;
                 return (
                     '<tr>' +
                     '<td><div class="user-info"><span class="user-name">' +
                     escapeHtml(u.username) +
-                    (isSelf ? ` <span class="user-self-badge">${escapeHtml(t('admin.you_badge'))}</span>` : '') +
+                    (isSelf ? ` <span class="user-self-badge">${escapeHtml(i18n.t('admin.you_badge'))}</span>` : '') +
                     '</span><span class="user-email">' +
                     escapeHtml(u.email) +
                     '</span></div></td>' +
@@ -242,7 +235,7 @@ async function loadUsers() {
                     '<td><span class="badge badge-' +
                     (u.active ? 'active' : 'inactive') +
                     '">' +
-                    (u.active ? escapeHtml(t('admin.active')) : escapeHtml(t('admin.inactive'))) +
+                    (u.active ? escapeHtml(i18n.t('admin.active')) : escapeHtml(i18n.t('admin.inactive'))) +
                     '</span></td>' +
                     '<td><div class="quota-bar"><div class="progress-bar quota-progress-fixed"><div class="progress-fill ' +
                     quotaColor +
@@ -262,7 +255,7 @@ async function loadUsers() {
                     '" data-quota="' +
                     u.storage_quota_bytes +
                     '" title="' +
-                    escapeHtml(t('admin.edit_quota_title')) +
+                    escapeHtml(i18n.t('admin.edit_quota_title')) +
                     '"><i class="fas fa-box"></i></button>' +
                     (isOidc
                         ? ''
@@ -271,14 +264,14 @@ async function loadUsers() {
                           '" data-uname="' +
                           _escJs(u.username) +
                           '" title="' +
-                          escapeHtml(t('admin.reset_password_title')) +
+                          escapeHtml(i18n.t('admin.reset_password_title')) +
                           '"><i class="fas fa-key"></i></button>') +
                     '<button class="btn btn-sm btn-secondary admin-action-btn" data-action="toggle-role" data-uid="' +
                     _escJs(u.id) +
                     '" data-role="' +
                     _escJs(u.role) +
                     '" title="' +
-                    escapeHtml(t('admin.toggle_role_title')) +
+                    escapeHtml(i18n.t('admin.toggle_role_title')) +
                     '"' +
                     (isSelf ? ' disabled' : '') +
                     '><i class="fas fa-' +
@@ -291,7 +284,7 @@ async function loadUsers() {
                     '" data-active="' +
                     u.active +
                     '" title="' +
-                    (u.active ? escapeHtml(t('admin.deactivate_title')) : escapeHtml(t('admin.activate_title'))) +
+                    (u.active ? escapeHtml(i18n.t('admin.deactivate_title')) : escapeHtml(i18n.t('admin.activate_title'))) +
                     '"' +
                     (isSelf && u.active ? ' disabled' : '') +
                     '><i class="fas fa-' +
@@ -302,7 +295,7 @@ async function loadUsers() {
                     '" data-uname="' +
                     _escJs(u.username) +
                     '" title="' +
-                    escapeHtml(t('admin.delete_title')) +
+                    escapeHtml(i18n.t('admin.delete_title')) +
                     '"' +
                     (isSelf ? ' disabled' : '') +
                     '><i class="fas fa-trash-alt"></i></button>' +
@@ -331,13 +324,13 @@ async function loadUsers() {
 
         const from = usersPage * PAGE_SIZE + 1;
         const to = Math.min((usersPage + 1) * PAGE_SIZE, totalUsers);
-        document.getElementById('users-info').textContent = t('admin.showing_users', { from: from, to: to, total: totalUsers });
+        document.getElementById('users-info').textContent = i18n.t('admin.showing_users', { from: from, to: to, total: totalUsers });
         document.getElementById('prev-btn').disabled = usersPage === 0;
         document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
     } catch (e) {
         tbody.innerHTML =
             '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> ' +
-            escapeHtml(t('admin.error_network', { message: e.message })) +
+            escapeHtml(i18n.t('admin.error_network', { message: e.message })) +
             '</td></tr>';
     }
 }
@@ -357,7 +350,7 @@ function nextPage() {
 
 async function toggleRole(userId, currentRole) {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
-    const ok = await showConfirm(t('admin.confirm_role_change', { role: newRole }));
+    const ok = await showConfirm(i18n.t('admin.confirm_role_change', { role: newRole }));
     if (!ok) return;
     try {
         const resp = await fetch(`${API}/admin/users/${userId}/role`, {
@@ -369,15 +362,15 @@ async function toggleRole(userId, currentRole) {
         if (resp.ok) loadUsers();
         else {
             const e = await resp.json();
-            alert(e.message || t('admin.error_generic'));
+            alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: e.message }));
     }
 }
 
 async function toggleActive(userId, currentActive) {
-    const msg = currentActive ? t('admin.confirm_deactivate') : t('admin.confirm_activate');
+    const msg = currentActive ? i18n.t('admin.confirm_deactivate') : i18n.t('admin.confirm_activate');
     const ok = await showConfirm(msg);
     if (!ok) return;
     try {
@@ -390,15 +383,15 @@ async function toggleActive(userId, currentActive) {
         if (resp.ok) loadUsers();
         else {
             const e = await resp.json();
-            alert(e.message || t('admin.error_generic'));
+            alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: e.message }));
     }
 }
 
 async function deleteUser(userId, username) {
-    const ok = await showConfirm(t('admin.confirm_delete_user', { name: username }));
+    const ok = await showConfirm(i18n.t('admin.confirm_delete_user', { name: username }));
     if (!ok) return;
     try {
         const resp = await fetch(`${API}/admin/users/${userId}`, {
@@ -411,10 +404,10 @@ async function deleteUser(userId, username) {
             loadDashboard();
         } else {
             const e = await resp.json();
-            alert(e.message || t('admin.error_generic'));
+            alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: e.message }));
     }
 }
 
@@ -448,10 +441,10 @@ async function saveQuota() {
             loadDashboard();
         } else {
             const e = await resp.json();
-            alert(e.message || t('admin.error_generic'));
+            alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: e.message }));
     }
 }
 
@@ -482,19 +475,19 @@ async function submitCreateUser() {
 
     const errorEl = document.getElementById('cu-error');
     if (username.length < 3) {
-        errorEl.textContent = t('admin.error_username_short');
+        errorEl.textContent = i18n.t('admin.error_username_short');
         errorEl.className = 'alert alert-error';
         return;
     }
     if (password.length < 8) {
-        errorEl.textContent = t('admin.error_password_short');
+        errorEl.textContent = i18n.t('admin.error_password_short');
         errorEl.className = 'alert alert-error';
         return;
     }
 
     const btn = document.getElementById('cu-submit');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.creating'))}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.creating'))}`;
     try {
         const resp = await fetch(`${API}/admin/users`, {
             method: 'POST',
@@ -514,15 +507,15 @@ async function submitCreateUser() {
             loadDashboard();
         } else {
             const e = await resp.json().catch(() => ({}));
-            errorEl.textContent = e.message || t('admin.error_create_user');
+            errorEl.textContent = e.message || i18n.t('admin.error_create_user');
             errorEl.className = 'alert alert-error';
         }
     } catch (e) {
-        errorEl.textContent = t('admin.error_network', { message: e.message });
+        errorEl.textContent = i18n.t('admin.error_network', { message: e.message });
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-user-plus"></i> ${escapeHtml(t('admin.create_user'))}`;
+    btn.innerHTML = `<i class="fas fa-user-plus"></i> ${escapeHtml(i18n.t('admin.create_user'))}`;
 }
 
 let resetPwUserId = '';
@@ -543,14 +536,14 @@ async function submitResetPassword() {
     const password = document.getElementById('rp-password').value;
     const errorEl = document.getElementById('rp-error');
     if (password.length < 8) {
-        errorEl.textContent = t('admin.error_password_short');
+        errorEl.textContent = i18n.t('admin.error_password_short');
         errorEl.className = 'alert alert-error';
         return;
     }
 
     const btn = document.getElementById('rp-submit');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.resetting'))}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.resetting'))}`;
     try {
         const resp = await fetch(`${API}/admin/users/${resetPwUserId}/password`, {
             method: 'PUT',
@@ -562,15 +555,15 @@ async function submitResetPassword() {
             closeResetPasswordModal();
         } else {
             const e = await resp.json().catch(() => ({}));
-            errorEl.textContent = e.message || t('admin.error_generic');
+            errorEl.textContent = e.message || i18n.t('admin.error_generic');
             errorEl.className = 'alert alert-error';
         }
     } catch (e) {
-        errorEl.textContent = t('admin.error_network', { message: e.message });
+        errorEl.textContent = i18n.t('admin.error_network', { message: e.message });
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.reset_btn'))}`;
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.reset_btn'))}`;
 }
 
 async function toggleRegistration(enabled) {
@@ -588,13 +581,13 @@ async function toggleRegistration(enabled) {
             if (!enabled) showElement('registration-warning', 'flex');
             else hideElement('registration-warning');
             const e = await resp.json().catch(() => ({}));
-            alert(e.message || t('admin.error_generic'));
+            alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
         document.getElementById('ds-registration').checked = !enabled;
         if (!enabled) showElement('registration-warning', 'flex');
         else hideElement('registration-warning');
-        alert(t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: e.message }));
     }
 }
 
@@ -626,7 +619,7 @@ async function testConnection() {
     }
     const btn = document.getElementById('discover-btn');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.discovering'))}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.discovering'))}`;
     const resultDiv = document.getElementById('discovery-result');
     try {
         const resp = await fetch(`${API}/admin/settings/oidc/test`, {
@@ -654,13 +647,13 @@ async function testConnection() {
         resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-search"></i> ${escapeHtml(t('admin.auto_discover'))}`;
+    btn.innerHTML = `<i class="fas fa-search"></i> ${escapeHtml(i18n.t('admin.auto_discover'))}`;
 }
 
 async function saveOidcSettings() {
     const btn = document.getElementById('save-btn');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.saving'))}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.saving'))}`;
     const body = {
         enabled: document.getElementById('oidc-enabled').checked,
         issuer_url: document.getElementById('issuer-url').value.trim(),
@@ -680,18 +673,18 @@ async function saveOidcSettings() {
             body: JSON.stringify(body)
         });
         if (resp.ok) {
-            const status = body.enabled ? t('admin.active').toLowerCase() : t('admin.disabled').toLowerCase();
-            showOidcStatus(t('admin.settings_saved', { status: status }), 'success');
+            const status = body.enabled ? i18n.t('admin.active').toLowerCase() : i18n.t('admin.disabled').toLowerCase();
+            showOidcStatus(i18n.t('admin.settings_saved', { status: status }), 'success');
             loadDashboard();
         } else {
             const e = await resp.json().catch(() => ({}));
             showOidcStatus(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showOidcStatus(t('admin.error_network', { message: e.message }), 'error');
+        showOidcStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.save_btn'))}`;
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.save_btn'))}`;
 }
 
 /* ── Storage tab ── */
@@ -752,7 +745,7 @@ async function loadStorage() {
 
         // Secret hints
         if (s.s3_access_key_set) {
-            document.getElementById('storage-access-key').placeholder = t('admin.storage_key_placeholder') || 'Leave empty to keep current value';
+            document.getElementById('storage-access-key').placeholder = i18n.t('admin.storage_key_placeholder') || 'Leave empty to keep current value';
         }
         if (s.s3_secret_key_set) {
             showElement('storage-secret-hint');
@@ -772,7 +765,7 @@ async function loadStorage() {
         document.getElementById('storage-total-size').textContent = s.total_bytes_stored != null ? formatBytes(s.total_bytes_stored) : '—';
         document.getElementById('storage-dedup-ratio').textContent = s.dedup_ratio != null ? `${s.dedup_ratio.toFixed(2)}x` : '—';
     } catch (e) {
-        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
 
     // Also load migration status
@@ -782,7 +775,7 @@ async function loadStorage() {
 async function saveStorageSettings() {
     const btn = document.getElementById('btn-save-storage');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.saving'))}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.saving'))}`;
 
     const backend = document.querySelector('input[name="storage-backend"]:checked').value;
     const body = {
@@ -803,23 +796,23 @@ async function saveStorageSettings() {
             body: JSON.stringify(body)
         });
         if (resp.ok) {
-            showStorageStatus(t('admin.storage_saved') || 'Storage settings saved successfully', 'success');
+            showStorageStatus(i18n.t('admin.storage_saved') || 'Storage settings saved successfully', 'success');
             loadStorage();
         } else {
             const e = await resp.json().catch(() => ({}));
             showStorageStatus(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(t('admin.storage_save') || 'Save')}`;
+    btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.storage_save') || 'Save')}`;
 }
 
 async function testStorageConnection() {
     const btn = document.getElementById('btn-test-storage');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.testing') || 'Testing...')}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.testing') || 'Testing...')}`;
 
     const backend = document.querySelector('input[name="storage-backend"]:checked').value;
     const body = {
@@ -841,17 +834,17 @@ async function testStorageConnection() {
         });
         const r = await resp.json();
         if (r.connected) {
-            let msg = `${t('admin.storage_test_success') || 'Connection successful'} (${escapeHtml(r.backend_type)})`;
+            let msg = `${i18n.t('admin.storage_test_success') || 'Connection successful'} (${escapeHtml(r.backend_type)})`;
             if (r.available_bytes != null) msg += ` — ${formatBytes(r.available_bytes)} available`;
             showStorageStatus(msg, 'success');
         } else {
-            showStorageStatus(`${t('admin.storage_test_failure') || 'Connection failed'}: ${escapeHtml(r.message)}`, 'error');
+            showStorageStatus(`${i18n.t('admin.storage_test_failure') || 'Connection failed'}: ${escapeHtml(r.message)}`, 'error');
         }
     } catch (e) {
-        showStorageStatus(t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-vial"></i> ${escapeHtml(t('admin.storage_test_connection') || 'Test Connection')}`;
+    btn.innerHTML = `<i class="fas fa-vial"></i> ${escapeHtml(i18n.t('admin.storage_test_connection') || 'Test Connection')}`;
 }
 
 /* ── Migration ── */
@@ -953,14 +946,14 @@ async function startMigration() {
             body: JSON.stringify({ concurrency: 4 })
         });
         if (resp.ok) {
-            showMigrationMsg(t('admin.migration_started') || 'Migration started', 'success');
+            showMigrationMsg(i18n.t('admin.migration_started') || 'Migration started', 'success');
             loadMigrationStatus();
         } else {
             const e = await resp.json().catch(() => ({}));
             showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showMigrationMsg(t('admin.error_network', { message: e.message }), 'error');
+        showMigrationMsg(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
     btn.disabled = false;
 }
@@ -973,7 +966,7 @@ async function pauseMigration() {
             credentials: 'same-origin'
         });
         if (resp.ok) {
-            showMigrationMsg(t('admin.migration_paused_msg') || 'Migration paused', 'success');
+            showMigrationMsg(i18n.t('admin.migration_paused_msg') || 'Migration paused', 'success');
             loadMigrationStatus();
         }
     } catch (_e) {
@@ -989,7 +982,7 @@ async function resumeMigration() {
             credentials: 'same-origin'
         });
         if (resp.ok) {
-            showMigrationMsg(t('admin.migration_resumed_msg') || 'Migration resumed', 'success');
+            showMigrationMsg(i18n.t('admin.migration_resumed_msg') || 'Migration resumed', 'success');
             loadMigrationStatus();
         }
     } catch (_e) {
@@ -1000,7 +993,7 @@ async function resumeMigration() {
 async function verifyMigration() {
     const btn = document.getElementById('btn-verify-migration');
     btn.disabled = true;
-    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(t('admin.migration_verifying') || 'Verifying...')}`;
+    btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.migration_verifying') || 'Verifying...')}`;
     const resultDiv = document.getElementById('migration-verify-result');
     try {
         const resp = await fetch(`${API}/admin/storage/migration/verify`, {
@@ -1012,19 +1005,19 @@ async function verifyMigration() {
         const r = await resp.json();
         resultDiv.style.display = '';
         if (r.passed) {
-            resultDiv.innerHTML = `<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ${escapeHtml(t('admin.migration_verify_passed') || 'Verification passed')}</strong><p>${r.sample_checked} blobs checked, ${r.pg_blob_count} total in database</p></div>`;
+            resultDiv.innerHTML = `<div class="discovery-result ok"><strong><i class="fas fa-check-circle"></i> ${escapeHtml(i18n.t('admin.migration_verify_passed') || 'Verification passed')}</strong><p>${r.sample_checked} blobs checked, ${r.pg_blob_count} total in database</p></div>`;
         } else {
             const issues = [];
             if (r.missing_in_target.length) issues.push(`${r.missing_in_target.length} missing`);
             if (r.size_mismatches.length) issues.push(`${r.size_mismatches.length} size mismatches`);
-            resultDiv.innerHTML = `<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ${escapeHtml(t('admin.migration_verify_failed') || 'Verification failed')}</strong><p>${issues.join(', ')}</p></div>`;
+            resultDiv.innerHTML = `<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ${escapeHtml(i18n.t('admin.migration_verify_failed') || 'Verification failed')}</strong><p>${issues.join(', ')}</p></div>`;
         }
     } catch (e) {
         resultDiv.style.display = '';
         resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
     }
     btn.disabled = false;
-    btn.innerHTML = `<i class="fas fa-check-double"></i> ${escapeHtml(t('admin.migration_verify') || 'Verify Integrity')}`;
+    btn.innerHTML = `<i class="fas fa-check-double"></i> ${escapeHtml(i18n.t('admin.migration_verify') || 'Verify Integrity')}`;
 }
 
 async function completeMigration() {
@@ -1035,14 +1028,14 @@ async function completeMigration() {
             credentials: 'same-origin'
         });
         if (resp.ok) {
-            showMigrationMsg(t('admin.migration_completed_msg') || 'Migration finalized. Restart the server to use the new backend.', 'success');
+            showMigrationMsg(i18n.t('admin.migration_completed_msg') || 'Migration finalized. Restart the server to use the new backend.', 'success');
             loadMigrationStatus();
         } else {
             const e = await resp.json().catch(() => ({}));
             showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showMigrationMsg(t('admin.error_network', { message: e.message }), 'error');
+        showMigrationMsg(i18n.t('admin.error_network', { message: e.message }), 'error');
     }
 }
 
@@ -1105,13 +1098,13 @@ function showAccessDenied() {
 
 /* ── Apply i18n when translations load / change ── */
 document.addEventListener('translationsLoaded', () => {
-    if (i18n?.translatePage) i18n.translatePage();
-    // Re-render dynamic content that uses t()
+    i18n.translatePage();
+    // Re-render dynamic content that uses i18n.t()
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });
 document.addEventListener('localeChanged', () => {
-    if (i18n?.translatePage) i18n.translatePage();
+    i18n.translatePage();
     loadDashboard();
     if (activeTabName === 'users') loadUsers();
 });

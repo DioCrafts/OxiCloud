@@ -149,9 +149,8 @@ const notifications = (() => {
         item.className = 'notif-item';
         item.id = batchId;
 
-        const t = i18n?.t || ((k) => k);
-        const uploadingText = folderName ? `📁 ${t('upload.uploading')} ${_esc(folderName)}…` : t('upload.uploading');
-        const filesLabel = t('upload.files');
+        const uploadingText = folderName ? `📁 ${i18n.t('upload.uploading')} ${_esc(folderName)}…` : i18n.t('upload.uploading');
+        const filesLabel = i18n.t('upload.files');
 
         item.innerHTML = `
             <div class="notif-item-icon upload"><i class="fas fa-cloud-upload-alt"></i></div>
@@ -254,8 +253,7 @@ const notifications = (() => {
         const pctEl = $(`${batchId}-pct`);
         const statsEl = $(`${batchId}-stats`);
 
-        const t = i18n?.t || ((k) => k);
-        const filesLabel = t('upload.files');
+        const filesLabel = i18n.t('upload.files');
 
         if (fillEl) fillEl.style.width = `${pctVal}%`;
         if (pctEl) pctEl.textContent = `${pctVal}%`;
@@ -282,8 +280,7 @@ const notifications = (() => {
         const curEl = $(`${batchId}-current`);
         if (curEl) curEl.textContent = '';
 
-        const t = i18n?.t || ((k) => k);
-        const completeText = t('upload.complete', {
+        const completeText = i18n.t('upload.complete', {
             count: successCount,
             total: totalFiles
         });

@@ -307,7 +307,8 @@
         "message": "Bericht",
         "go_to_parent": ".. (parent folder)",
         "no_subfolders": "No subfolders",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "Verplaatsen naar de thuismap"
     },
     "dropzone": {
         "drag_files": "Sleep bestanden hierheen of klik om te selecteren",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Item permanent verwijderd",
         "trash_emptied": "Prullenbak succesvol geleegd",
         "title": "Notificaties",
-        "empty": "Geen notificaties"
+        "empty": "Geen notificaties",
+        "link_created": "Link aangemaakt",
+        "share_success": "Deellink succesvol aangemaakt"
     },
     "batch": {
         "one_selected": "1 item geselecteerd",
@@ -566,7 +569,50 @@
         "error_password_short": "Wachtwoord moet minimaal 8 tekens bevatten",
         "error_generic": "Mislukt",
         "error_network": "Netwerkfout: {{message}}",
-        "error_create_user": "Kan gebruiker niet aanmaken"
+        "error_create_user": "Kan gebruiker niet aanmaken",
+        "tab_storage": "Opslag",
+        "storage_title": "Opslagconfiguratie",
+        "storage_current_backend": "Huidig backend",
+        "storage_total_blobs": "Totaal blobs",
+        "storage_total_size": "Totale grootte",
+        "storage_dedup_ratio": "Deduplicatieverhouding",
+        "storage_backend": "Backend",
+        "storage_local": "Lokaal",
+        "storage_s3": "S3-compatibel",
+        "storage_provider_preset": "Providerinstelling",
+        "storage_preset_custom": "Aangepast",
+        "storage_endpoint_url": "Eindpunt-URL",
+        "storage_endpoint_hint": "Leeg laten voor AWS S3",
+        "storage_bucket": "Bucket",
+        "storage_region": "Regio",
+        "storage_access_key": "Toegangssleutel",
+        "storage_secret_key": "Geheime sleutel",
+        "storage_secret_configured": "Sleutel geconfigureerd",
+        "storage_key_placeholder": "Nieuwe sleutel invoeren",
+        "storage_path_style": "Padstijl forceren",
+        "storage_path_style_hint": "Vereist voor MinIO en sommige S3-compatibele diensten",
+        "storage_test_connection": "Verbinding testen",
+        "storage_test_success": "Verbinding geslaagd",
+        "storage_test_failure": "Verbinding mislukt",
+        "storage_save": "Configuratie opslaan",
+        "storage_saved": "Configuratie opgeslagen",
+        "storage_migration": "Gegevensmigratie",
+        "storage_migration_coming_soon": "Migratietools binnenkort beschikbaar",
+        "migration_status_label": "Migratiestatus",
+        "migration_start": "Migratie starten",
+        "migration_pause": "Pauzeren",
+        "migration_resume": "Hervatten",
+        "migration_verify": "Verifiëren",
+        "migration_complete": "Voltooien",
+        "migration_started": "Migratie gestart",
+        "migration_paused_msg": "Migratie gepauzeerd",
+        "migration_resumed_msg": "Migratie hervat",
+        "migration_completed_msg": "Migratie succesvol voltooid",
+        "migration_verifying": "Bezig met verifiëren...",
+        "migration_verify_passed": "Verificatie geslaagd",
+        "migration_verify_failed": "Verificatie mislukt",
+        "migration_failed_blobs": "Mislukte blobs",
+        "testing": "Bezig met testen..."
     },
     "profile": {
         "page_title": "Profiel",
@@ -627,5 +673,11 @@
         "error_create_pw": "App-wachtwoord aanmaken mislukt",
         "confirm_revoke": "App-wachtwoord \"{{label}}\" intrekken? Clients die dit wachtwoord gebruiken zullen stoppen.",
         "error_revoke": "Intrekken mislukt"
-    }
+    },
+    "upload": {
+        "uploading": "Bezig met uploaden...",
+        "files": "bestanden",
+        "complete": "{{count}} / {{total}} geüpload"
+    },
+    "storage_quota_exceeded": "Opslagquotum overschreden"
 }

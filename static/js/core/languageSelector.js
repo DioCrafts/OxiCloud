@@ -66,7 +66,7 @@ function createLanguageSelector(containerId = 'language-selector') {
 
     // Get current language
     const languages = getAvailableLanguages();
-    const currentLocale = i18n ? i18n.getCurrentLocale() : 'en';
+    const currentLocale = i18n.getCurrentLocale();
     const currentLang = languages.find((l) => l.code === currentLocale) || languages[0];
 
     // Set initial HTML attributes
@@ -185,10 +185,7 @@ function closeDropdown(container) {
  * Select a language
  */
 async function selectLanguage(langCode, container) {
-    // Update i18n if available
-    if (i18n) {
-        await i18n.setLocale(langCode);
-    }
+    await i18n.setLocale(langCode);
 
     // Update HTML lang attribute and dir for RTL languages
     updateHtmlAttributes(langCode);

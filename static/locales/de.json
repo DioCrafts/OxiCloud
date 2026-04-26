@@ -307,7 +307,8 @@
         "message": "Nachricht",
         "go_to_parent": ".. (parent folder)",
         "no_subfolders": "No subfolders",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "In den Home-Ordner verschieben"
     },
     "dropzone": {
         "drag_files": "Dateien hierher ziehen oder klicken zum Auswählen",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Element endgültig gelöscht",
         "trash_emptied": "Papierkorb erfolgreich geleert",
         "title": "Benachrichtigungen",
-        "empty": "Keine Benachrichtigungen"
+        "empty": "Keine Benachrichtigungen",
+        "link_created": "Link erstellt",
+        "share_success": "Freigabelink erfolgreich erstellt"
     },
     "batch": {
         "one_selected": "1 Element ausgewählt",
@@ -566,7 +569,50 @@
         "error_password_short": "Passwort muss mindestens 8 Zeichen haben",
         "error_generic": "Fehlgeschlagen",
         "error_network": "Netzwerkfehler: {{message}}",
-        "error_create_user": "Benutzer erstellen fehlgeschlagen"
+        "error_create_user": "Benutzer erstellen fehlgeschlagen",
+        "tab_storage": "Speicher",
+        "storage_title": "Speicherkonfiguration",
+        "storage_current_backend": "Aktuelles Backend",
+        "storage_total_blobs": "Gesamt-Blobs",
+        "storage_total_size": "Gesamtgröße",
+        "storage_dedup_ratio": "Deduplizierungsrate",
+        "storage_backend": "Backend",
+        "storage_local": "Lokal",
+        "storage_s3": "S3-kompatibel",
+        "storage_provider_preset": "Anbieter-Voreinstellung",
+        "storage_preset_custom": "Benutzerdefiniert",
+        "storage_endpoint_url": "Endpunkt-URL",
+        "storage_endpoint_hint": "Leer lassen für AWS S3",
+        "storage_bucket": "Bucket",
+        "storage_region": "Region",
+        "storage_access_key": "Zugriffsschlüssel",
+        "storage_secret_key": "Geheimschlüssel",
+        "storage_secret_configured": "Schlüssel konfiguriert",
+        "storage_key_placeholder": "Neuen Schlüssel eingeben",
+        "storage_path_style": "Pfadstil erzwingen",
+        "storage_path_style_hint": "Erforderlich für MinIO und einige S3-kompatible Dienste",
+        "storage_test_connection": "Verbindung testen",
+        "storage_test_success": "Verbindung erfolgreich",
+        "storage_test_failure": "Verbindung fehlgeschlagen",
+        "storage_save": "Konfiguration speichern",
+        "storage_saved": "Konfiguration gespeichert",
+        "storage_migration": "Datenmigration",
+        "storage_migration_coming_soon": "Migrationstools demnächst verfügbar",
+        "migration_status_label": "Migrationsstatus",
+        "migration_start": "Migration starten",
+        "migration_pause": "Pausieren",
+        "migration_resume": "Fortsetzen",
+        "migration_verify": "Verifizieren",
+        "migration_complete": "Abschließen",
+        "migration_started": "Migration gestartet",
+        "migration_paused_msg": "Migration pausiert",
+        "migration_resumed_msg": "Migration fortgesetzt",
+        "migration_completed_msg": "Migration erfolgreich abgeschlossen",
+        "migration_verifying": "Wird verifiziert...",
+        "migration_verify_passed": "Verifizierung erfolgreich",
+        "migration_verify_failed": "Verifizierung fehlgeschlagen",
+        "migration_failed_blobs": "Fehlgeschlagene Blobs",
+        "testing": "Wird getestet..."
     },
     "profile": {
         "page_title": "Profil",
@@ -627,5 +673,11 @@
         "error_create_pw": "App-Passwort erstellen fehlgeschlagen",
         "confirm_revoke": "App-Passwort \"{{label}}\" widerrufen? Clients werden nicht mehr funktionieren.",
         "error_revoke": "Widerrufen fehlgeschlagen"
-    }
+    },
+    "upload": {
+        "uploading": "Wird hochgeladen...",
+        "files": "Dateien",
+        "complete": "{{count}} / {{total}} hochgeladen"
+    },
+    "storage_quota_exceeded": "Speicherplatz erschöpft"
 }

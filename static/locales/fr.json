@@ -307,7 +307,8 @@
         "message": "Message",
         "go_to_parent": ".. (parent folder)",
         "no_subfolders": "No subfolders",
-        "select_this_folder": "Select this folder"
+        "select_this_folder": "Select this folder",
+        "move_to_home": "Déplacer vers le dossier personnel"
     },
     "dropzone": {
         "drag_files": "Glissez des fichiers ici ou cliquez pour sélectionner",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "Élément supprimé définitivement",
         "trash_emptied": "Corbeille vidée avec succès",
         "empty": "No notifications",
-        "title": "Notifications"
+        "title": "Notifications",
+        "link_created": "Lien créé",
+        "share_success": "Lien de partage créé avec succès"
     },
     "batch": {
         "one_selected": "1 élément sélectionné",
@@ -566,7 +569,50 @@
         "error_password_short": "Le mot de passe doit contenir au moins 8 caractères",
         "error_generic": "Échec",
         "error_network": "Erreur réseau : {{message}}",
-        "error_create_user": "Impossible de créer l'utilisateur"
+        "error_create_user": "Impossible de créer l'utilisateur",
+        "tab_storage": "Stockage",
+        "storage_title": "Configuration du stockage",
+        "storage_current_backend": "Backend actuel",
+        "storage_total_blobs": "Total des blobs",
+        "storage_total_size": "Taille totale",
+        "storage_dedup_ratio": "Taux de déduplication",
+        "storage_backend": "Backend",
+        "storage_local": "Local",
+        "storage_s3": "Compatible S3",
+        "storage_provider_preset": "Préréglage du fournisseur",
+        "storage_preset_custom": "Personnalisé",
+        "storage_endpoint_url": "URL du point de terminaison",
+        "storage_endpoint_hint": "Laisser vide pour AWS S3",
+        "storage_bucket": "Bucket",
+        "storage_region": "Région",
+        "storage_access_key": "Clé d'accès",
+        "storage_secret_key": "Clé secrète",
+        "storage_secret_configured": "Clé configurée",
+        "storage_key_placeholder": "Saisir une nouvelle clé",
+        "storage_path_style": "Forcer le style de chemin",
+        "storage_path_style_hint": "Requis pour MinIO et certains services compatibles S3",
+        "storage_test_connection": "Tester la connexion",
+        "storage_test_success": "Connexion réussie",
+        "storage_test_failure": "Échec de la connexion",
+        "storage_save": "Enregistrer la configuration",
+        "storage_saved": "Configuration enregistrée",
+        "storage_migration": "Migration des données",
+        "storage_migration_coming_soon": "Outils de migration bientôt disponibles",
+        "migration_status_label": "État de la migration",
+        "migration_start": "Démarrer la migration",
+        "migration_pause": "Pause",
+        "migration_resume": "Reprendre",
+        "migration_verify": "Vérifier",
+        "migration_complete": "Terminer",
+        "migration_started": "Migration démarrée",
+        "migration_paused_msg": "Migration en pause",
+        "migration_resumed_msg": "Migration reprise",
+        "migration_completed_msg": "Migration terminée avec succès",
+        "migration_verifying": "Vérification en cours...",
+        "migration_verify_passed": "Vérification réussie",
+        "migration_verify_failed": "Échec de la vérification",
+        "migration_failed_blobs": "Blobs échoués",
+        "testing": "Test en cours..."
     },
     "profile": {
         "page_title": "Profil",
@@ -627,5 +673,11 @@
         "error_create_pw": "Impossible de créer le mot de passe",
         "confirm_revoke": "Révoquer le mot de passe \"{{label}}\" ? Les clients l'utilisant ne fonctionneront plus.",
         "error_revoke": "Échec de la révocation"
-    }
+    },
+    "upload": {
+        "uploading": "Téléchargement en cours...",
+        "files": "fichiers",
+        "complete": "{{count}} / {{total}} téléchargés"
+    },
+    "storage_quota_exceeded": "Quota de stockage dépassé"
 }

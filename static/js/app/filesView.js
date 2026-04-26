@@ -134,7 +134,7 @@ async function loadFiles(options = { insertHistory: true }) {
             ui.showError(`
                 <div class="files-loading-spinner">
                     <div class="spinner"></div>
-                    <span>${i18n ? i18n.t('files.loading') : 'Loading files…'}</span>
+                    <span>${i18n.t('files.loading')}</span>
                 </div>
             `);
         }, 100);

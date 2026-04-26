@@ -178,14 +178,14 @@ const sharedView = {
                         <label><input type="checkbox" id="sv-permission-reshare"> <span data-i18n="share.permissionReshare">Reshare</span></label>
                     </div>
                     <div class="share-password-section">
-                        <label><input type="checkbox" id="sv-enable-password"> <span data-i18n="share.enablePassword">Password protection</span></label>
+                        <label><input type="checkbox" id="sv-enable-password"> <span data-i18n="share.password">Password protection</span></label>
                         <div class="password-input-group">
                             <input type="text" id="sv-share-password" disabled placeholder="Enter password">
                             <button id="sv-generate-password" class="button small" data-i18n="share.generatePassword">Generate</button>
                         </div>
                     </div>
                     <div class="share-expiration-section">
-                        <label><input type="checkbox" id="sv-enable-expiration"> <span data-i18n="share.enableExpiration">Set expiration</span></label>
+                        <label><input type="checkbox" id="sv-enable-expiration"> <span data-i18n="share.expiration">Set expiration</span></label>
                         <input type="date" id="sv-share-expiration" disabled>
                     </div>
                     <div class="share-actions">
@@ -205,11 +205,11 @@ const sharedView = {
                     </div>
                     <div class="notification-form">
                         <div class="form-group">
-                            <label data-i18n="share.notifyEmail">Email:</label>
+                            <label data-i18n="share.notifyEmailLabel">Email:</label>
                             <input type="email" id="sv-notification-email" placeholder="recipient@example.com">
                         </div>
                         <div class="form-group">
-                            <label data-i18n="share.notifyMessage">Message (optional):</label>
+                            <label data-i18n="share.notifyMessageLabel">Message (optional):</label>
                             <textarea id="sv-notification-message" rows="3"></textarea>
                         </div>
                     </div>
@@ -220,9 +220,7 @@ const sharedView = {
             </div>
         `;
 
-        if (i18n?.translateElement) {
-            i18n.translateElement(container);
-        }
+        i18n.translateElement(container);
     },
 
     // Attach event listeners
@@ -662,8 +660,7 @@ const sharedView = {
     },
 
     translate(key, defaultText) {
-        if (i18n?.t) return i18n.t(key, defaultText);
-        return defaultText;
+        return i18n.t(key, defaultText);
     }
 };
 

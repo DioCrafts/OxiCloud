@@ -15,14 +15,13 @@ async function loadTrashItems() {
     try {
         if (multiSelect) multiSelect.clear();
         ui.resetFilesList(); // ensure also list visible & error hidden
-        const _tt = i18n?.t ? i18n.t : (k) => k.split('.').pop();
         elements.filesList.innerHTML = `
             <div class="list-header trash-header">
-                <div data-i18n="files.name">${_tt('files.name')}</div>
-                <div data-i18n="files.type">${_tt('files.type')}</div>
-                <div data-i18n="trash.original_location">${_tt('trash.original_location')}</div>
-                <div data-i18n="trash.deleted_date">${_tt('trash.deleted_date')}</div>
-                <div data-i18n="trash.actions">${_tt('trash.actions')}</div>
+                <div data-i18n="files.name">${i18n.t('files.name')}</div>
+                <div data-i18n="files.type">${i18n.t('files.type')}</div>
+                <div data-i18n="trash.original_location">${i18n.t('trash.original_location')}</div>
+                <div data-i18n="trash.deleted_date">${i18n.t('trash.deleted_date')}</div>
+                <div data-i18n="trash.actions">${i18n.t('trash.actions')}</div>
             </div>
         `;
 
@@ -33,7 +32,7 @@ async function loadTrashItems() {
         if (trashItems.length === 0) {
             ui.showError(`
                 <i class="fas fa-trash empty-state-icon"></i>
-                <p>${i18n ? i18n.t('trash.empty_state') : 'The trash is empty'}</p>
+                <p>${i18n.t('trash.empty_state')}</p>
             `);
             return;
         }
@@ -58,12 +57,12 @@ function addTrashItemToView(item) {
     let iconSpecialClass = '';
     if (!isFile) {
         iconClass = item.icon_class || 'fas fa-folder';
-        typeLabel = i18n ? i18n.t('files.file_types.folder') : 'Folder';
+        typeLabel = i18n.t('files.file_types.folder');
     } else {
         iconClass = item.icon_class || (ui?.getIconClass ? ui.getIconClass(item.name) : 'fas fa-file');
         iconSpecialClass = ui?.getIconSpecialClass ? ui.getIconSpecialClass(item.name) : '';
         const cat = item.category || '';
-        typeLabel = cat ? (i18n ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat) : i18n ? i18n.t('files.file_types.document') : 'Document';
+        typeLabel = cat ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : i18n.t('files.file_types.document');
     }
 
     const isFolder = !isFile;
@@ -86,10 +85,10 @@ function addTrashItemToView(item) {
         <div class="path-cell">${escapeHtml(item.original_path || '--')}</div>
         <div class="date-cell">${escapeHtml(formattedDate)}</div>
         <div class="actions-cell">
-            <button class="btn-restore" title="${i18n ? i18n.t('trash.restore') : 'Restore'}">
+            <button class="btn-restore" title="${i18n.t('trash.restore')}">
                 <i class="fas fa-undo"></i>
             </button>
-            <button class="btn-delete" title="${i18n ? i18n.t('trash.delete_permanently') : 'Delete permanently'}">
+            <button class="btn-delete" title="${i18n.t('trash.delete_permanently')}">
                 <i class="fas fa-trash"></i>
             </button>
         </div>

@@ -307,7 +307,8 @@
         "generated_link": "生成されたリンク",
         "notify": "通知を送信",
         "recipient": "宛先",
-        "message": "メッセージ"
+        "message": "メッセージ",
+        "move_to_home": "ホームフォルダへ移動"
     },
     "dropzone": {
         "drag_files": "ファイルをここにドラッグするか、クリックして選択",
@@ -439,7 +440,9 @@
         "item_deleted_permanently": "アイテムを完全に削除しました",
         "trash_emptied": "ゴミ箱を正常に空にしました",
         "title": "通知",
-        "empty": "通知はありません"
+        "empty": "通知はありません",
+        "link_created": "リンクを作成しました",
+        "share_success": "共有リンクを正常に作成しました"
     },
     "batch": {
         "one_selected": "1件選択中",
@@ -566,7 +569,50 @@
         "error_password_short": "パスワードは8文字以上",
         "error_generic": "失敗",
         "error_network": "ネットワークエラー: {{message}}",
-        "error_create_user": "ユーザー作成失敗"
+        "error_create_user": "ユーザー作成失敗",
+        "tab_storage": "ストレージ",
+        "storage_title": "ストレージ設定",
+        "storage_current_backend": "現在のバックエンド",
+        "storage_total_blobs": "総ブロブ数",
+        "storage_total_size": "合計サイズ",
+        "storage_dedup_ratio": "重複排除率",
+        "storage_backend": "バックエンド",
+        "storage_local": "ローカル",
+        "storage_s3": "S3互換",
+        "storage_provider_preset": "プロバイダープリセット",
+        "storage_preset_custom": "カスタム",
+        "storage_endpoint_url": "エンドポイントURL",
+        "storage_endpoint_hint": "AWS S3の場合は空欄のまま",
+        "storage_bucket": "バケット",
+        "storage_region": "リージョン",
+        "storage_access_key": "アクセスキー",
+        "storage_secret_key": "シークレットキー",
+        "storage_secret_configured": "キーが設定済み",
+        "storage_key_placeholder": "新しいキーを入力",
+        "storage_path_style": "パススタイルを強制",
+        "storage_path_style_hint": "MinIOおよび一部のS3互換サービスに必要",
+        "storage_test_connection": "接続テスト",
+        "storage_test_success": "接続成功",
+        "storage_test_failure": "接続失敗",
+        "storage_save": "設定を保存",
+        "storage_saved": "設定を保存しました",
+        "storage_migration": "データ移行",
+        "storage_migration_coming_soon": "移行ツールは近日公開予定",
+        "migration_status_label": "移行状況",
+        "migration_start": "移行を開始",
+        "migration_pause": "一時停止",
+        "migration_resume": "再開",
+        "migration_verify": "検証",
+        "migration_complete": "完了",
+        "migration_started": "移行を開始しました",
+        "migration_paused_msg": "移行を一時停止しました",
+        "migration_resumed_msg": "移行を再開しました",
+        "migration_completed_msg": "移行が正常に完了しました",
+        "migration_verifying": "検証中...",
+        "migration_verify_passed": "検証に合格",
+        "migration_verify_failed": "検証に失敗",
+        "migration_failed_blobs": "失敗したブロブ",
+        "testing": "テスト中..."
     },
     "profile": {
         "page_title": "プロフィール",
@@ -627,5 +673,11 @@
         "error_create_pw": "アプリパスワードの作成に失敗しました",
         "confirm_revoke": "アプリパスワード「{{label}}」を失効させますか？使用中のクライアントは動作しなくなります。",
         "error_revoke": "失効に失敗しました"
-    }
+    },
+    "upload": {
+        "uploading": "アップロード中...",
+        "files": "ファイル",
+        "complete": "{{count}} / {{total}} アップロード済み"
+    },
+    "storage_quota_exceeded": "ストレージ容量を超過しました"
 }

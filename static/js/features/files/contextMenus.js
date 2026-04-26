@@ -27,7 +27,7 @@ const contextMenus = {
         if (!option) return;
         const label = option.querySelector('span');
         if (!label) return;
-        label.textContent = i18n ? i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite') : isFavorite ? 'Remove from favorites' : 'Add to favorites';
+        label.textContent = i18n.t(isFavorite ? 'actions.unfavorite' : 'actions.favorite');
     },
 
     /**
@@ -382,7 +382,7 @@ const contextMenus = {
         renameInput.value = folder.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_folder') : 'Rename folder';
+        if (headerSpan) headerSpan.textContent = i18n.t('dialogs.rename_folder');
         renameDialog?.classList.remove('hidden');
         renameInput.focus();
         renameInput.select();
@@ -402,7 +402,7 @@ const contextMenus = {
         renameInput.value = file.name;
         // Update header text
         const headerSpan = renameDialog.querySelector('.rename-dialog-header span');
-        if (headerSpan) headerSpan.textContent = i18n ? i18n.t('dialogs.rename_file') : 'Rename file';
+        if (headerSpan) headerSpan.textContent = i18n.t('dialogs.rename_file');
         renameDialog?.classList.remove('hidden');
         renameInput.focus();
         renameInput.select();
@@ -471,7 +471,7 @@ const contextMenus = {
 
         // Update dialog title (preserve icon)
         const dialogHeader = document.getElementById('move-file-dialog').querySelector('.rename-dialog-header');
-        const titleText = mode === 'file' ? (i18n ? i18n.t('dialogs.move_file') : 'Move file') : i18n ? i18n.t('dialogs.move_folder') : 'Move folder';
+        const titleText = mode === 'file' ? i18n.t('dialogs.move_file') : i18n.t('dialogs.move_folder');
         dialogHeader.innerHTML = `<i class="fas fa-arrows-alt dialog-header-icon"></i> <span>${titleText}</span>`;
 
         // Load folders for the starting location
@@ -496,7 +496,7 @@ const contextMenus = {
     async renameItem() {
         const newName = document.getElementById('rename-input').value.trim();
         if (!newName) {
-            alert(i18n ? i18n.t('errors.empty_name') : 'Name cannot be empty');
+            alert(i18n.t('errors.empty_name'));
             return;
         }
 
@@ -587,7 +587,7 @@ const contextMenus = {
                 currentFolderOption.className = 'folder-select-item folder-select-current';
                 currentFolderOption.innerHTML = `
                     <i class="fas fa-check-circle check-icon"></i>
-                    <span>${i18n ? i18n.t('dialogs.select_this_folder') : 'Select this folder'}</span>
+                    <span>${i18n.t('dialogs.select_this_folder')}</span>
                 `;
                 currentFolderOption.addEventListener('click', () => {
                     document.querySelectorAll('.folder-select-item').forEach((item) => {
@@ -606,7 +606,7 @@ const contextMenus = {
                 parentOption.className = 'folder-select-item folder-navigate-up';
                 parentOption.innerHTML = `
                     <i class="fas fa-level-up-alt"></i>
-                    <span>${i18n ? i18n.t('dialogs.go_to_parent') : '.. (parent folder)'}</span>
+                    <span>${i18n.t('dialogs.go_to_parent')}</span>
                 `;
                 parentOption.addEventListener('click', () => {
                     // Navigate to parent folder
@@ -664,7 +664,7 @@ const contextMenus = {
                 homeOption.className = 'folder-select-item folder-select-current';
                 homeOption.innerHTML = `
                     <i class="fas fa-check-circle check-icon"></i>
-                    <span>${i18n ? i18n.t('dialogs.move_to_home') : 'Move to Home folder'}</span>
+                    <span>${i18n.t('dialogs.move_to_home')}</span>
                 `;
                 homeOption.addEventListener('click', () => {
                     document.querySelectorAll('.folder-select-item').forEach((item) => {
@@ -678,7 +678,7 @@ const contextMenus = {
                 // Inside a subfolder with no children - show empty message
                 const emptyMsg = document.createElement('div');
                 emptyMsg.className = 'folder-select-empty';
-                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${i18n ? i18n.t('dialogs.no_subfolders') : 'No subfolders to navigate'}</span>`;
+                emptyMsg.innerHTML = `<i class="fas fa-folder-open"></i> <span>${i18n.t('dialogs.no_subfolders')}</span>`;
                 folderSelectContainer.appendChild(emptyMsg);
             }
 
@@ -686,9 +686,7 @@ const contextMenus = {
             app.selectedTargetFolderId = parentFolderId || '';
 
             // Translate new elements
-            if (i18n?.translateElement) {
-                i18n.translateElement(folderSelectContainer);
-            }
+            i18n.translateElement(folderSelectContainer);
         } catch (error) {
             console.error('Error loading folders:', error);
         }
@@ -798,8 +796,7 @@ const contextMenus = {
             const dialogHeader = shareDialog.querySelector('.share-dialog-header');
             if (dialogHeader) {
                 const headerSpan = dialogHeader.querySelector('span');
-                const titleText =
-                    itemType === 'file' ? (i18n ? i18n.t('dialogs.share_file') : 'Share file') : i18n ? i18n.t('dialogs.share_folder') : 'Share folder';
+                const titleText = itemType === 'file' ? i18n.t('dialogs.share_file') : i18n.t('dialogs.share_folder');
                 if (headerSpan) {
                     headerSpan.textContent = titleText;
                 } else {
@@ -900,9 +897,9 @@ const contextMenus = {
                         const shareId = btn.getAttribute('data-share-id');
 
                         showConfirmDialog({
-                            title: i18n ? i18n.t('dialogs.confirm_delete_share') : 'Delete link',
-                            message: i18n ? i18n.t('dialogs.confirm_delete_share_msg') : 'Are you sure you want to delete this shared link?',
-                            confirmText: i18n ? i18n.t('actions.delete') : 'Delete'
+                            title: i18n.t('dialogs.confirm_delete_share'),
+                            message: i18n.t('dialogs.confirm_delete_share_msg'),
+                            confirmText: i18n.t('actions.delete')
                         }).then(async (confirmed) => {
                             if (confirmed) {
                                 await fileSharing.removeSharedLink(shareId);
@@ -997,10 +994,7 @@ const contextMenus = {
             ui.setSharedVisualState(item.id, item.type, true);
 
             // Show success message
-            ui.showNotification(
-                i18n ? i18n.t('notifications.link_created') : 'Link created',
-                i18n ? i18n.t('notifications.share_success') : 'Shared link created successfully'
-            );
+            ui.showNotification(i18n.t('notifications.link_created'), i18n.t('notifications.share_success'));
         } catch (error) {
             console.error('Error creating shared link:', error);
             ui.showNotification('Error', error.message || 'Could not create shared link');
@@ -1088,7 +1082,7 @@ const contextMenus = {
 
         // Update files info
         if (filesInfo) {
-            filesInfo.innerHTML = `<strong>${i18n ? i18n.t('music.selected_files', 'Selected:') : 'Selected:'} </strong>${file.name}`;
+            filesInfo.innerHTML = `<strong>${i18n.t('music.selected_files')} </strong>${file.name}`;
         }
 
         // Reset selection
@@ -1112,17 +1106,15 @@ const contextMenus = {
             this._renderPlaylistSelect(container, playlists);
         } catch (err) {
             console.error('Error loading playlists:', err);
-            container.innerHTML = `<div class="folder-select-empty">${i18n ? i18n.t('music.load_error', 'Error loading playlists') : 'Error loading playlists'}</div>`;
+            container.innerHTML = `<div class="folder-select-empty">${i18n.t('music.load_error')}</div>`;
         }
     },
 
     _renderPlaylistSelect(container, playlists) {
-        const t = (key, fallback) => (i18n ? i18n.t(key, fallback) : fallback);
-
         container.innerHTML = '';
 
         if (playlists.length === 0) {
-            container.innerHTML = `<div class="folder-select-empty">${t('music.no_playlists', 'No playlists yet. Create one first!')}</div>`;
+            container.innerHTML = `<div class="folder-select-empty">${i18n.t('music.no_playlists')}</div>`;
             return;
         }
 
@@ -1133,7 +1125,7 @@ const contextMenus = {
             item.innerHTML = `
                 <i class="fas fa-list"></i>
                 <span>${this._escapeHtml(playlist.name)}</span>
-                <span class="playlist-track-count">${playlist.track_count || 0} ${t('music.tracks', 'tracks')}</span>
+                <span class="playlist-track-count">${playlist.track_count || 0} ${i18n.t('music.tracks')}</span>
             `;
 
             item.addEventListener('click', () => {
@@ -1176,10 +1168,7 @@ const contextMenus = {
             }
 
             await resp.json();
-            ui.showNotification(
-                i18n ? i18n.t('music.added', 'Added!') : 'Added!',
-                `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${i18n ? i18n.t('music.added_to_playlist', 'added to playlist') : 'added to playlist'}`
-            );
+            ui.showNotification(i18n.t('music.added'), `${files.length} ${files.length === 1 ? 'track' : 'tracks'} ${i18n.t('music.added_to_playlist')}`);
 
             this.closePlaylistDialog();
 
@@ -1189,7 +1178,7 @@ const contextMenus = {
             }
         } catch (err) {
             console.error('Error adding to playlist:', err);
-            ui.showNotification(i18n ? i18n.t('music.error', 'Error') : 'Error', err.message || i18n.t('music.add_error', 'Could not add tracks to playlist'));
+            ui.showNotification(i18n.t('music.error'), err.message || i18n.t('music.add_error'));
             if (addBtn) addBtn.disabled = false;
         }
     },

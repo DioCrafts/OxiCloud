@@ -410,11 +410,10 @@ const photosView = {
 
     /** Render the group mode toolbar */
     _renderToolbar() {
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
         const modes = [
-            ['daily', t('photos.view_daily', 'Day')],
-            ['monthly', t('photos.view_monthly', 'Month')],
-            ['yearly', t('photos.view_yearly', 'Year')]
+            ['daily', i18n.t('photos.view_daily')],
+            ['monthly', i18n.t('photos.view_monthly')],
+            ['yearly', i18n.t('photos.view_yearly')]
         ];
         let html = '<div class="photos-toolbar"><div class="view-toggle">';
         for (const [mode, label] of modes) {
@@ -427,12 +426,11 @@ const photosView = {
 
     /** Render empty state */
     _renderEmpty() {
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
         this._container.innerHTML = `
             <div class="photos-empty">
                 <i class="fas fa-images"></i>
-                <p class="photos-empty-title">${t('photos.empty_state', 'No photos yet')}</p>
-                <p>${t('photos.empty_hint', 'Upload images or videos to see them here')}</p>
+                <p class="photos-empty-title">${i18n.t('photos.empty_state')}</p>
+                <p>${i18n.t('photos.empty_hint')}</p>
             </div>`;
     },
 
@@ -520,10 +518,9 @@ const photosView = {
             document.body.appendChild(bar);
         }
 
-        const t = (k, d) => (i18n ? i18n.t(k) : d);
         const count = this.selected.size;
         bar.innerHTML = `
-            <span class="selection-count">${count} ${t('photos.items_selected', 'selected')}</span>
+            <span class="selection-count">${count} ${i18n.t('photos.items_selected')}</span>
             <button id="photos-sel-download" title="Download"><i class="fas fa-download"></i></button>
             <button id="photos-sel-delete" title="Delete"><i class="fas fa-trash"></i></button>
             <button id="photos-sel-clear" title="Clear"><i class="fas fa-times"></i></button>

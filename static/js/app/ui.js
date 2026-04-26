@@ -542,17 +542,11 @@ const ui = {
         breadcrumb.innerHTML = '';
         const path = app.breadcrumbPath; // [{id, name}, ...]
 
-        // Helper function to safely get translation text
-        const getTranslatedText = (key, defaultValue) => {
-            if (!i18n?.t) return defaultValue;
-            return i18n.t(key);
-        };
-
         // -- Home icon (always present, clickable to go to root) --
         const homeIcon = document.createElement('span');
         homeIcon.className = 'breadcrumb-item breadcrumb-home';
         homeIcon.innerHTML = '<i class="fas fa-home"></i>';
-        homeIcon.title = getTranslatedText('breadcrumb.home', 'Home');
+        homeIcon.title = i18n.t('breadcrumb.home');
 
         // Home is always clickable if we have a home folder
         if (app.userHomeFolderId) {
@@ -1265,7 +1259,7 @@ const ui = {
                 <div class="file-badge file-badge-favorite ${isFav ? '' : 'hidden'}"><i class="fas fa-star favorite-star-inline"></i></div>
                 <div class="file-badge file-badge-shared ${isShared ? '' : 'hidden'}"><i class="fas fa-share-alt"></i></div>
             </div>
-            <div class="type-cell">${i18n ? i18n.t('files.file_types.folder') : 'Folder'}</div>
+            <div class="type-cell">${i18n.t('files.file_types.folder')}</div>
             <div class="size-cell">--</div>
             <div class="date-cell">${formattedDate}</div>
             <div class="action-cell">
@@ -1288,7 +1282,7 @@ const ui = {
         const iconClass = file.icon_class || this.getIconClass(file.name);
         const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
         const cat = file.category || '';
-        const typeLabel = cat ? (i18n ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : cat) : i18n ? i18n.t('files.file_types.document') : 'Document';
+        const typeLabel = cat ? i18n.t(`files.file_types.${cat.toLowerCase()}`) || cat : i18n.t('files.file_types.document');
         const fileSize = file.size_formatted || formatFileSize(file.size);
         const formattedDate = formatDateTime(file.modified_at);
         const isFav = favorites?.isFavorite(file.id, 'file');
@@ -1352,7 +1346,7 @@ const ui = {
                 <div></div><!-- actions -->
             </div>`;
 
-        if (i18n?.translateElement) i18n.translateElement(filesList);
+        i18n.translateElement(filesList);
 
         filesList.classList.remove('hidden');
         filesContainerError?.classList.add('hidden');
@@ -1376,7 +1370,7 @@ const ui = {
         const filesList = document.getElementById('files-list');
         if (filesContainerError) filesContainerError.innerHTML = content;
 
-        if (i18n?.translateElement) i18n.translateElement(filesContainerError);
+        i18n.translateElement(filesContainerError);
 
         filesContainerError?.classList.remove('hidden');
         filesList?.classList.add('hidden');
@@ -1642,9 +1636,9 @@ if (document.readyState === 'loading') {
  * @returns {Promise<boolean>} true if confirmed, false if cancelled
  */
 function showConfirmDialog({ title, message, confirmText, cancelText, danger = true } = {}) {
-    const ct = confirmText || (i18n ? i18n.t('actions.delete') : 'Delete');
-    const cc = cancelText || (i18n ? i18n.t('actions.cancel') : 'Cancel');
-    const t = title || (i18n ? i18n.t('dialogs.confirm_title') : 'Confirm action');
+    const ct = confirmText || i18n.t('actions.delete');
+    const cc = cancelText || i18n.t('actions.cancel');
+    const t = title || i18n.t('dialogs.confirm_title');
 
     return new Promise((resolve) => {
         // Remove any previous confirm dialog
