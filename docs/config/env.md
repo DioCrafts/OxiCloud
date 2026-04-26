@@ -72,9 +72,13 @@ See the [WOPI configuration guide](/config/wopi) for details.
 |---|---|---|
 | `OXICLOUD_WOPI_ENABLED` | `false` | Enable WOPI |
 | `OXICLOUD_WOPI_DISCOVERY_URL` | — | Collabora/OnlyOffice discovery URL |
+| `OXICLOUD_WOPI_BASE_URL` | `OXICLOUD_BASE_URL` | URL the editor uses to call OxiCloud's `/wopi/*` endpoints |
+| `OXICLOUD_WOPI_PUBLIC_BASE_URL` | `OXICLOUD_WOPI_BASE_URL` | URL the browser uses to open OxiCloud's WOPI host page and `postMessage` origin |
 | `OXICLOUD_WOPI_SECRET` | (JWT secret) | WOPI token signing key |
 | `OXICLOUD_WOPI_TOKEN_TTL_SECS` | `86400` | Token lifetime |
 | `OXICLOUD_WOPI_LOCK_TTL_SECS` | `1800` | Lock expiration |
+
+When Collabora or OnlyOffice runs on a different hostname, set `OXICLOUD_WOPI_PUBLIC_BASE_URL` to the public OxiCloud URL that the browser can reach. If the editor reaches OxiCloud through a different internal URL, also set `OXICLOUD_WOPI_BASE_URL` for those callbacks.
 
 ## Allocator Tuning
 

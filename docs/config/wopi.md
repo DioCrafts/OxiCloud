@@ -29,9 +29,13 @@ OXICLOUD_WOPI_DISCOVERY_URL="http://collabora:9980/hosting/discovery"
 |---|---|---|
 | `OXICLOUD_WOPI_ENABLED` | `false` | Enable WOPI integration |
 | `OXICLOUD_WOPI_DISCOVERY_URL` | — | Editor's WOPI discovery URL |
+| `OXICLOUD_WOPI_BASE_URL` | `OXICLOUD_BASE_URL` | URL the editor uses to call OxiCloud's `/wopi/*` endpoints |
+| `OXICLOUD_WOPI_PUBLIC_BASE_URL` | `OXICLOUD_WOPI_BASE_URL` | URL the browser uses to open the host page and the `postMessage` origin |
 | `OXICLOUD_WOPI_SECRET` | (JWT secret) | Token signing key |
 | `OXICLOUD_WOPI_TOKEN_TTL_SECS` | `86400` | Access token lifetime |
 | `OXICLOUD_WOPI_LOCK_TTL_SECS` | `1800` | Lock expiration |
+
+If Collabora or OnlyOffice runs on a separate hostname, `OXICLOUD_WOPI_PUBLIC_BASE_URL` should still point to OxiCloud's public URL, not the office URL. Use `OXICLOUD_WOPI_BASE_URL` only when the editor reaches OxiCloud through a different callback URL (for example an internal Docker or cluster address).
 
 ## Docker Compose with Collabora
 
@@ -68,7 +72,17 @@ services:
     environment:
       OXICLOUD_WOPI_ENABLED: "true"
       OXICLOUD_WOPI_DISCOVERY_URL: "http://onlyoffice/hosting/discovery"
+      OXICLOUD_WOPI_PUBLIC_BASE_URL: "https://cloud.example.com"
+      # Optional when OnlyOffice reaches OxiCloud through a different internal URL.
+      # Otherwise OxiCloud falls back to OXICLOUD_WOPI_PUBLIC_BASE_URL / OXICLOUD_BASE_URL.
+      OXICLOUD_WOPI_BASE_URL: "http://oxicloud:8086"
 ```
+
+In that example:
+
+- the browser loads OxiCloud from `https://cloud.example.com`, so `OXICLOUD_WOPI_PUBLIC_BASE_URL` must use that public OxiCloud URL
+- OnlyOffice calls OxiCloud from the Docker network, so `OXICLOUD_WOPI_BASE_URL` can use `http://oxicloud:8086`
+- if both the browser and the editor use the same OxiCloud URL, you can omit both variables and rely on `OXICLOUD_BASE_URL`
 
 ## WOPI Endpoints
 
