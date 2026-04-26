@@ -1003,7 +1003,7 @@ details[open] summary {
 }
 .storage-backend-option input[type="radio"]:checked + .storage-backend-option__card {
     border-color: var(--color-accent);
-    background: var(--color-accent-subtle);
+    background: var(--color-bg-subtle);
 }
 .storage-backend-option input[type="radio"]:checked + .storage-backend-option__card i {
     color: var(--color-accent);
@@ -1058,20 +1058,20 @@ details[open] summary {
     color: var(--color-text-secondary);
 }
 .badge-migration--running {
-    background: var(--color-accent-subtle);
+    background: var(--color-bg-subtle);
     color: var(--color-accent);
 }
 .badge-migration--paused {
-    background: var(--color-warning-bg, #fff8e1);
-    color: var(--color-warning-text, #b28704);
+    background: var(--color-warning-bg);
+    color: var(--color-warning-text);
 }
 .badge-migration--completed {
-    background: var(--color-success-bg, #e8f5e9);
-    color: var(--color-success-text, #2e7d32);
+    background: var(--color-success-bg);
+    color: var(--color-success-text);
 }
 .badge-migration--failed {
-    background: var(--color-danger-bg, #fce4ec);
-    color: var(--color-danger-text, #c62828);
+    background: var(--color-danger-bg);
+    color: var(--color-danger-text);
 }
 
 .migration-progress-bar {
