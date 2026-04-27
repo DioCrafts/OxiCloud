@@ -37,8 +37,8 @@ Database setup: `docker compose up -d postgres` — schema is applied automatica
 Always run these before committing, in this order:
 
 ```bash
-cargo fmt --all                      # Auto-format
-cargo clippy -- -D warnings          # Lint (must pass with zero warnings)
+cargo fmt --all                                              # Auto-format
+cargo clippy --all-features --all-targets -- -D warnings     # Lint (must pass with zero warnings)
 ```
 
 CI enforces both — commits that fail either check will not merge.

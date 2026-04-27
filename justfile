@@ -31,11 +31,11 @@ fmt-check:
     cargo fmt --all --check
 
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --all-features --all-targets -- -D warnings
 
 check:
     cargo fmt --all
-    cargo clippy -- -D warnings
+    cargo clippy --all-features --all-targets -- -D warnings
 
 openapi:
     cargo run --bin generate-openapi

@@ -183,7 +183,7 @@ Integration docs: [OIDC setup](docs/config/oidc.md) · [OIDC architecture](docs/
 
 ```bash
 cargo fmt --all --check
-cargo clippy -- -D warnings
+cargo clippy --all-features --all-targets -- -D warnings
 cargo test --workspace
 ```
 

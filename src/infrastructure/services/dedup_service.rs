@@ -1517,7 +1517,7 @@ mod tests {
             let is_last = i == chunks.len() - 1;
             if !is_last {
                 assert!(
-                    chunk.length >= CDC_MIN_CHUNK as usize,
+                    chunk.length >= CDC_MIN_CHUNK,
                     "non-last chunk {} too small: {} < {}",
                     i,
                     chunk.length,
@@ -1525,7 +1525,7 @@ mod tests {
                 );
             }
             assert!(
-                chunk.length <= CDC_MAX_CHUNK as usize,
+                chunk.length <= CDC_MAX_CHUNK,
                 "chunk {} too large: {} > {}",
                 i,
                 chunk.length,
