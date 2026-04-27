@@ -112,6 +112,13 @@ The server exposes multiple protocol interfaces simultaneously:
 
 Tests are primarily `#[cfg(test)]` modules within source files (~36 files have inline tests). Dedicated test files exist at `*_test.rs` alongside their source. The `test_utils` feature flag enables `mockall` mock generation for trait-heavy testing. No separate `tests/` directory.
 
+### Code duplication
+
+Never duplicate logic across handlers or services. If the same behaviour is needed in more than one place, extract it into a shared function, method, or service before writing the second callsite. Preferred homes by layer:
+- Cross-handler request logic → method on `CoreServices` or `AppState` (`common/di.rs`)
+- Reusable infrastructure behaviour → method on the relevant service struct
+- Shared port behaviour → default method on the trait
+
 # Frontend part
 
 ## Code conventions
@@ -139,6 +146,13 @@ Tests are primarily `#[cfg(test)]` modules within source files (~36 files have i
  */
 async function updateUser(user, role = 'viewer') { … }
 ```
+
+### Code duplication
+
+Never duplicate logic across JS modules. If the same behaviour is needed in more than one place, extract it into a shared utility function and import it. Preferred homes:
+- DOM/UI helpers → `static/js/utils/` or an existing utility module
+- API call wrappers → the relevant API module (e.g. `api/files.js`)
+- Event or state patterns shared across components → a dedicated shared module
 
 ### CSS
 - BEM methodology for class names (`.block__element--modifier`)
