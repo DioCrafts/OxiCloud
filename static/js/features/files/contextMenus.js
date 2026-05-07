@@ -20,10 +20,19 @@ import { inlineViewer } from './inlineViewer.js';
 import { multiSelect } from './multiSelect.js';
 import { wopiEditor } from './wopiEditor.js';
 
+/**
+ *  @import {FolderItem, FileItem, ItemTypeEnum, Playlist} from '../../core/types.js'
+ */
+
+/** @type {EventListener | null} */
 let _moveDialogEscapeHandler = null;
 
 // Context Menus Module
 const contextMenus = {
+    /**
+     * @param {string} optionId
+     * @param {boolean} isFavorite
+     */
     _setFavoriteOptionLabel(optionId, isFavorite) {
         const option = document.getElementById(optionId);
         if (!option) return;
@@ -308,11 +317,13 @@ const contextMenus = {
         // Note: We don't use stopPropagation because all Escape handlers are on document level
         // Each handler checks its own state, so multiple dialogs can be closed with multiple Escape presses
         if (!_moveDialogEscapeHandler) {
-            _moveDialogEscapeHandler = (e) => {
-                if (e.key === 'Escape' && !moveFileDialog?.classList.contains('hidden')) {
-                    this.closeMoveDialog();
+            _moveDialogEscapeHandler = /** @type {EventListener} */ (
+                (/** @type {KeyboardEvent} */ e) => {
+                    if (e.key === 'Escape' && !moveFileDialog?.classList.contains('hidden')) {
+                        this.closeMoveDialog();
+                    }
                 }
-            };
+            );
             document.addEventListener('keydown', _moveDialogEscapeHandler);
         }
 
@@ -385,8 +396,8 @@ const contextMenus = {
 
     /**
      * Show move dialog for a file or folder
-     * @param {Object} item - File or folder object
-     * @param {string} mode - 'file' or 'folder'
+     * @param {FolderItem | FileItem} item - File or folder object
+     * @param {ItemTypeEnum} mode
      */
     async showMoveDialog(item, mode) {
         // Set mode
@@ -405,15 +416,15 @@ const contextMenus = {
         // Start at the parent of the item being moved (so user sees siblings and can navigate)
         let startFolderId = null;
         let startFolderName = null;
-        if (mode === 'file' && item.folder_id) {
-            startFolderId = item.folder_id;
+        if (mode === 'file' && /** @type {FileItem} */ (item).folder_id) {
+            startFolderId = /** @type {FileItem} */ (item).folder_id;
             // We need the folder name for breadcrumb - try to get it from current view
             const folderEl = document.querySelector(`[data-folder-id="${startFolderId}"]`);
             if (folderEl) {
                 startFolderName = folderEl.querySelector('.folder-name, .item-name')?.textContent || null;
             }
-        } else if (mode === 'folder' && item.parent_id) {
-            startFolderId = item.parent_id;
+        } else if (mode === 'folder' && /** @type {FolderItem} */ (item).parent_id) {
+            startFolderId = /** @type {FolderItem} */ (item).parent_id;
         } else {
             // If item is at root level, start at user's home folder
             startFolderId = app.userHomeFolderId || null;
@@ -492,6 +503,7 @@ const contextMenus = {
 
             // The contents endpoint returns an array of child folders
             // The fallback /api/folders returns root folders (home folder itself)
+            /** @type {FolderItem[]} */
             const folders = Array.isArray(data) ? data : data.folders || [];
             console.log('[Move Dialog] Loaded folders:', folders.length, 'folders:', folders);
 
@@ -623,6 +635,9 @@ const contextMenus = {
 
     /**
      * Render breadcrumb navigation for move dialog
+     * @param {HTMLElement | null} container
+     * @param {Array<{id: string, name: string}>} breadcrumb
+     * @param {string | null} _currentFolderId
      */
     _renderMoveDialogBreadcrumb(container, breadcrumb, _currentFolderId) {
         if (!container) return;
@@ -666,7 +681,7 @@ const contextMenus = {
         }
 
         // Breadcrumb path
-        breadcrumb.forEach((segment, index) => {
+        breadcrumb.forEach((/** @type {{id: string, name: string}} */ segment, /** @type {number} */ index) => {
             const separator = document.createElement('span');
             separator.className = 'move-breadcrumb-separator';
             separator.textContent = '>';
@@ -709,8 +724,8 @@ const contextMenus = {
 
     /**
      * Show share dialog for files or folders
-     * @param {Object} item - File or folder object
-     * @param {string} itemType - 'file' or 'folder'
+     * @param {FileItem | FolderItem} item - File or folder object
+     * @param {ItemTypeEnum} itemType
      */
     async showShareDialog(item, itemType) {
         try {
@@ -835,7 +850,7 @@ const contextMenus = {
                                 btn.closest('.existing-share-item').remove();
                                 if (existingSharesContainer.children.length === 0) {
                                     document.getElementById('existing-shares-section').classList.add('hidden');
-                                    ui.setSharedVisualState(item.id, item.type, false);
+                                    ui.setSharedVisualState(item.id, itemType, false);
                                 }
                             }
                         });
@@ -920,7 +935,7 @@ const contextMenus = {
             }
 
             // Update Item's shared badge
-            ui.setSharedVisualState(item.id, item.type, true);
+            ui.setSharedVisualState(item.id, itemType, true);
 
             // Show success message
             ui.showNotification(i18n.t('notifications.link_created'), i18n.t('notifications.share_success'));
@@ -994,8 +1009,14 @@ const contextMenus = {
         app.notificationShareUrl = null;
     },
 
+    /** @type {String | null} */
     _selectedPlaylistId: null,
 
+    /**
+     *
+     * @param {FileItem} file
+     * @returns
+     */
     async showPlaylistDialog(file) {
         const dialog = document.getElementById('playlist-dialog');
         const container = document.getElementById('playlist-select-container');
@@ -1031,6 +1052,7 @@ const contextMenus = {
             const resp = await fetch('/api/playlists', { credentials: 'include' });
             if (!resp.ok) throw new Error('Failed to load playlists');
 
+            /** @type {Playlist[]} */
             const playlists = await resp.json();
             this._renderPlaylistSelect(container, playlists);
         } catch (err) {
@@ -1039,6 +1061,12 @@ const contextMenus = {
         }
     },
 
+    /**
+     *
+     * @param {HTMLElement} container
+     * @param {Playlist[]} playlists
+     * @returns
+     */
     _renderPlaylistSelect(container, playlists) {
         container.innerHTML = '';
 
@@ -1124,6 +1152,12 @@ const contextMenus = {
         this._selectedPlaylistId = null;
     },
 
+    /**
+     *
+     * @param {string} str
+     * @returns
+     */
+    //FIXME: move to common library
     _escapeHtml(str) {
         if (!str) return '';
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

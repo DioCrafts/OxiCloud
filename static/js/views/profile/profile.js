@@ -4,10 +4,16 @@ import { oxiIconsInit } from '../../core/icons.js';
 
 const API = '/api';
 
+// TOOD: reuse common library
+/**
+ * @returns {Record<string, string>}
+ */
 function headers() {
     return { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 }
 
+// TOOD: move to common library
+/** @param {number} bytes */
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024,
@@ -16,11 +22,13 @@ function formatBytes(bytes) {
     return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
+// TOOD: move to common library
+/** @param {string | null | undefined} dateStr */
 function timeAgo(dateStr) {
     if (!dateStr) return i18n.t('profile.never');
     const d = new Date(dateStr);
-    const now = new Date();
-    const secs = Math.floor((now - d) / 1000);
+    const now = Date.now();
+    const secs = Math.floor((now - d.valueOf()) / 1000);
     if (secs < 60) return i18n.t('profile.just_now');
     if (secs < 3600) return i18n.t('profile.minutes_ago', { n: Math.floor(secs / 60) });
     if (secs < 86400) return i18n.t('profile.hours_ago', { n: Math.floor(secs / 3600) });
@@ -104,11 +112,12 @@ function showError() {
     document.getElementById('auth-error').classList.remove('hidden');
 }
 
+/** @param {Event} e */
 async function changePassword(e) {
     e.preventDefault();
-    const currentPw = document.getElementById('current-password').value;
-    const newPw = document.getElementById('new-password').value;
-    const confirmPw = document.getElementById('confirm-password').value;
+    const currentPw = /** @type {HTMLInputElement} */ (document.getElementById('current-password')).value;
+    const newPw = /** @type {HTMLInputElement} */ (document.getElementById('new-password')).value;
+    const confirmPw = /** @type {HTMLInputElement} */ (document.getElementById('confirm-password')).value;
     const statusEl = document.getElementById('pw-status');
 
     if (newPw !== confirmPw) {
@@ -121,7 +130,7 @@ async function changePassword(e) {
         return false;
     }
 
-    const btn = document.getElementById('pw-submit');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('pw-submit'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('profile.updating'))}`;
 
@@ -138,7 +147,7 @@ async function changePassword(e) {
 
         if (resp.ok) {
             statusEl.innerHTML = `<div class="alert alert-success"><i class="fas fa-check-circle"></i> ${escapeHtml(i18n.t('profile.password_updated'))}</div>`;
-            document.getElementById('password-form').reset();
+            /** @type {HTMLFormElement} */ (document.getElementById('password-form')).reset();
         } else {
             const err = await resp.json().catch(() => ({}));
             statusEl.innerHTML =
@@ -149,7 +158,7 @@ async function changePassword(e) {
     } catch (err) {
         statusEl.innerHTML =
             '<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ' +
-            escapeHtml(i18n.t('profile.error_network', { message: err.message })) +
+            escapeHtml(i18n.t('profile.error_network', { message: /** @type {Error} */ (err).message })) +
             '</div>';
     }
 
@@ -162,10 +171,12 @@ async function changePassword(e) {
 
 const AUTO_LABELS = ['Nextcloud', 'Nextcloud (OIDC)'];
 
+/** @param {{label: string, active?: boolean, id: string}} pw */
 function isAutoPassword(pw) {
     return AUTO_LABELS.includes(pw.label);
 }
 
+/** @param {{label: string, active?: boolean, id: string, created_at: string, last_used_at?: string}} pw */
 function renderPwRow(pw) {
     const tr = document.createElement('tr');
     const label = document.createElement('td');
@@ -210,7 +221,9 @@ async function loadAppPasswords() {
             return;
         }
         const data = await resp.json();
-        const passwords = data.app_passwords || data;
+        const passwords = /** @type {Array<{label: string, active?: boolean, id: string, created_at: string, last_used_at?: string}>} */ (
+            data.app_passwords || data
+        );
         const userPws = passwords.filter((pw) => {
             return !isAutoPassword(pw);
         });
@@ -236,7 +249,7 @@ async function loadAppPasswords() {
             autoSection.classList.add('hidden');
         } else {
             autoSection.classList.remove('hidden');
-            document.getElementById('app-pw-auto-count').textContent = autoPws.length;
+            document.getElementById('app-pw-auto-count').textContent = String(autoPws.length);
             const autoTbody = document.getElementById('app-pw-auto-tbody');
             autoTbody.innerHTML = '';
             for (const pw of autoPws) autoTbody.appendChild(renderPwRow(pw));
@@ -255,10 +268,10 @@ function toggleAutoPasswords() {
 }
 
 async function createAppPassword() {
-    const labelInput = document.getElementById('app-pw-label');
+    const labelInput = /** @type {HTMLInputElement} */ (document.getElementById('app-pw-label'));
     const label = labelInput.value.trim();
     const statusEl = document.getElementById('app-pw-status');
-    const btn = document.getElementById('app-pw-generate');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('app-pw-generate'));
 
     if (!label) {
         statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${escapeHtml(i18n.t('profile.error_label_required'))}</div>`;
@@ -291,7 +304,7 @@ async function createAppPassword() {
         labelInput.value = '';
         loadAppPasswords();
     } catch (err) {
-        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${err.message}</div>`;
+        statusEl.innerHTML = `<div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> ${/** @type {Error} */ (err).message}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = `<i class="fas fa-plus"></i> ${escapeHtml(i18n.t('profile.generate'))}`;
@@ -309,6 +322,10 @@ function copyAppPassword() {
     });
 }
 
+/**
+ * @param {string} id
+ * @param {string} label
+ */
 async function revokeAppPassword(id, label) {
     if (!confirm(i18n.t('profile.confirm_revoke', { label: label }))) return;
     try {
@@ -325,10 +342,11 @@ async function revokeAppPassword(id, label) {
             alert(err.message || i18n.t('profile.error_revoke'));
         }
     } catch (err) {
-        alert(i18n.t('profile.error_network', { message: err.message }));
+        alert(i18n.t('profile.error_network', { message: /** @type {Error} */ (err).message }));
     }
 }
 
+/** @param {string} str */
 function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str || '';

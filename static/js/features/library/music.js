@@ -6,17 +6,27 @@ import { oxiIcon } from '../../core/icons.js';
 import { Modal } from '../../core/modal.js';
 import { notifications } from '../../core/notifications.js';
 
+/** @import {FileItem, Musicshare, Playlist, PlaylistItem} from '../../core/types.js' */
+
 /**
  * OxiCloud - Music Library View
  * Playlist management with track listings and audio player
  */
 
 const musicView = {
+    /** @type {Playlist[]} */
     playlists: [],
+
+    /** @type {Playlist | null} */
     currentPlaylist: null,
+
+    /** @type {PlaylistItem[]} */
     currentTracks: [],
     loading: false,
+
+    /** @type {HTMLDivElement | null} */
     _container: null,
+
     _initialized: false,
     selected: new Set(),
 
@@ -72,11 +82,11 @@ const musicView = {
 
             if (!resp.ok) throw new Error('Failed to load playlists');
 
-            this.playlists = await resp.json();
+            this.playlists = /** @type {Playlist[]} */ (await resp.json());
             this._renderPlaylists();
         } catch (err) {
             console.error('Music load error:', err);
-            this._showError(err.message);
+            this._showError(/** @type {Error} */ (err).message);
         } finally {
             this.loading = false;
             this._showLoading(false);
@@ -209,7 +219,7 @@ const musicView = {
             )
             .join('');
 
-        listEl.querySelectorAll('.music-playlist-item').forEach((item) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (listEl.querySelectorAll('.music-playlist-item')).forEach((item) => {
             item.addEventListener('click', () => {
                 const id = item.dataset.id;
                 this._selectPlaylist(id);
@@ -269,6 +279,11 @@ const musicView = {
         }
     },
 
+    /**
+     *
+     * @param {string} playlistId
+     * @returns
+     */
     async _selectPlaylist(playlistId) {
         const playlist = this.playlists.find((p) => p.id === playlistId);
         if (!playlist) return;
@@ -308,13 +323,18 @@ const musicView = {
             togglePublicBtn.classList.toggle('active', playlist.is_public);
         }
 
-        document.querySelectorAll('.music-playlist-item').forEach((item) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (document.querySelectorAll('.music-playlist-item')).forEach((item) => {
             item.classList.toggle('active', item.dataset.id === playlistId);
         });
 
         await this._loadPlaylistTracks(playlistId);
     },
 
+    /**
+     *
+     * @param {string} playlistId
+     * @returns
+     */
     async _loadPlaylistTracks(playlistId) {
         const trackListEl = document.getElementById('music-track-list');
         if (!trackListEl) return;
@@ -333,7 +353,7 @@ const musicView = {
             this._renderTracks();
         } catch (err) {
             console.error('Track load error:', err);
-            trackListEl.innerHTML = `<div class="music-error">${err.message}</div>`;
+            trackListEl.innerHTML = `<div class="music-error">${/** @type {Error} */ (err).message}</div>`;
         }
     },
 
@@ -385,7 +405,7 @@ const musicView = {
                 )
                 .join('')}
         `;
-        trackListEl.querySelectorAll('.music-track').forEach((row) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (trackListEl.querySelectorAll('.music-track')).forEach((row) => {
             row.addEventListener('click', () => {
                 const idx = parseInt(row.dataset.idx, 10);
                 // Toggle selection
@@ -449,6 +469,11 @@ const musicView = {
         });
     },
 
+    /**
+     *
+     * @param {number} idx
+     * @returns
+     */
     _playTrack(idx) {
         if (!this.currentTracks[idx]) return;
 
@@ -487,8 +512,12 @@ const musicView = {
         this._createPlaylist(name.trim());
     },
 
+    /**
+     *
+     * @param {String} name
+     */
     async _createPlaylist(name) {
-        const createBtn = document.getElementById('music-create-playlist-btn');
+        const createBtn = /** @type {HTMLButtonElement} */ (document.getElementById('music-create-playlist-btn'));
         if (createBtn) createBtn.disabled = true;
         try {
             const resp = await fetch('/api/playlists', {
@@ -519,7 +548,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         } finally {
@@ -542,7 +571,7 @@ const musicView = {
         });
         if (!confirmed) return;
 
-        const deleteBtn = document.getElementById('music-delete-playlist-btn');
+        const deleteBtn = /** @type {HTMLButtonElement} */ (document.getElementById('music-delete-playlist-btn'));
         if (deleteBtn) deleteBtn.disabled = true;
         try {
             const resp = await fetch(`/api/playlists/${this.currentPlaylist.id}`, {
@@ -568,7 +597,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         } finally {
@@ -576,6 +605,11 @@ const musicView = {
         }
     },
 
+    /**
+     *
+     * @param {number|null} secs
+     * @returns
+     */
     _formatDuration(secs) {
         if (!secs) return '-';
         const mins = Math.floor(secs / 60);
@@ -583,11 +617,20 @@ const musicView = {
         return `${mins}:${s.toString().padStart(2, '0')}`;
     },
 
+    /**
+     *
+     * @param {string|null} str
+     * @returns
+     */
     _escapeHtml(str) {
         if (!str) return '';
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     },
 
+    /**
+     *
+     * @param {boolean} show
+     */
     _showLoading(show) {
         const existing = this._container?.querySelector('.music-loading');
         if (show && !existing) {
@@ -600,6 +643,11 @@ const musicView = {
         }
     },
 
+    /**
+     *
+     * @param {string} message
+     * @returns
+     */
     _showError(message) {
         if (!this._container) return;
         this._container.innerHTML = `
@@ -647,7 +695,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         }
@@ -690,7 +738,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         }
@@ -731,8 +779,8 @@ const musicView = {
         requestAnimationFrame(() => overlay.classList.add('active'));
 
         const listEl = document.getElementById('music-picker-list');
-        const queryInput = document.getElementById('music-picker-query');
-        const addBtn = document.getElementById('music-picker-add-btn');
+        const queryInput = /** @type {HTMLInputElement} */ (document.getElementById('music-picker-query'));
+        const addBtn = /** @type {HTMLButtonElement} */ (document.getElementById('music-picker-add-btn'));
         const countEl = document.getElementById('music-picker-count');
         const selectedIds = new Set();
 
@@ -765,6 +813,11 @@ const musicView = {
             }
         };
 
+        /**
+         *
+         * @param {FileItem[]} files
+         * @returns
+         */
         const renderFiles = (files) => {
             if (files.length === 0) {
                 listEl.innerHTML = `<div class="music-picker-empty"><i class="fas fa-folder-open"></i> ${i18n.t('music.no_audio_files')}</div>`;
@@ -798,6 +851,7 @@ const musicView = {
         };
 
         // ── Debounced search ──
+        /** @type {ReturnType<typeof setTimeout> | null} */
         let searchTimer = null;
         queryInput.addEventListener('input', () => {
             clearTimeout(searchTimer);
@@ -857,6 +911,12 @@ const musicView = {
         fetchAudioFiles();
     },
 
+    /**
+     *
+     * @param {string} _trackId
+     * @param {string} fileId
+     * @returns
+     */
     async _removeTrackFromPlaylist(_trackId, fileId) {
         if (!this.currentPlaylist) return;
 
@@ -892,12 +952,18 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         }
     },
 
+    /**
+     *
+     * @param {number} fromIdx
+     * @param {number} toIdx
+     * @returns
+     */
     async _reorderTrack(fromIdx, toIdx) {
         if (!this.currentPlaylist) return;
 
@@ -923,7 +989,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
             await this._loadPlaylistTracks(this.currentPlaylist.id);
@@ -967,8 +1033,8 @@ const musicView = {
         });
 
         dialog.querySelector('#music-share-add-btn').addEventListener('click', async () => {
-            const userInput = dialog.querySelector('#music-share-user-input');
-            const writeInput = dialog.querySelector('#music-share-write-input');
+            const userInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#music-share-user-input'));
+            const writeInput = /** @type {HTMLInputElement} */ (dialog.querySelector('#music-share-write-input'));
             const userId = userInput.value.trim();
             if (!userId) return;
 
@@ -997,7 +1063,7 @@ const musicView = {
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
                         title: i18n.t('music.error'),
-                        text: err.message
+                        text: /** @type {Error} */ (err).message
                     });
                 }
             }
@@ -1006,6 +1072,11 @@ const musicView = {
         this._loadSharesList(dialog);
     },
 
+    /**
+     *
+     * @param {HTMLDivElement} dialog
+     * @returns
+     */
     async _loadSharesList(dialog) {
         if (!this.currentPlaylist) return;
         const body = dialog.querySelector('.music-shares-body');
@@ -1019,6 +1090,7 @@ const musicView = {
                 headers: this._headers()
             });
             if (!resp.ok) throw new Error('Failed to load shares');
+            /** @type {Musicshare[]} */
             const shares = await resp.json();
 
             if (shares.length === 0) {
@@ -1040,16 +1112,22 @@ const musicView = {
 
             body.querySelectorAll('.music-share-remove-btn').forEach((btn) => {
                 btn.addEventListener('click', async () => {
-                    const item = btn.closest('.music-share-item');
+                    const item = /** @type {HTMLDivElement} */ (btn.closest('.music-share-item'));
                     const userId = item.dataset.userId;
                     await this._removeShare(userId, dialog);
                 });
             });
         } catch (err) {
-            body.innerHTML = `<p class="music-shares-empty">${this._escapeHtml(err.message)}</p>`;
+            body.innerHTML = `<p class="music-shares-empty">${this._escapeHtml(/** @type {Error} */ (err).message)}</p>`;
         }
     },
 
+    /**
+     *
+     * @param {string} userId
+     * @param {HTMLDivElement} dialog
+     * @returns
+     */
     async _removeShare(userId, dialog) {
         if (!this.currentPlaylist) return;
 
@@ -1067,7 +1145,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         }
@@ -1115,7 +1193,7 @@ const musicView = {
                     icon: 'fa-exclamation-circle',
                     iconClass: 'error',
                     title: i18n.t('music.error'),
-                    text: err.message
+                    text: /** @type {Error} */ (err).message
                 });
             }
         }
@@ -1183,7 +1261,7 @@ const musicView = {
                         icon: 'fa-exclamation-circle',
                         iconClass: 'error',
                         title: i18n.t('music.error'),
-                        text: err.message
+                        text: /** @type {Error} */ (err).message
                     });
                 }
             }
@@ -1198,10 +1276,15 @@ const musicView = {
  * Handles audio playback, queue, and controls
  */
 const musicPlayer = {
+    /** @type {HTMLAudioElement | null} */
     audio: null,
+
+    /** @type {PlaylistItem[]} */
     queue: [],
     currentIndex: -1,
+    /** @type {PlaylistItem|null} */
     currentTrack: null,
+
     isPlaying: false,
     volume: 0.7,
     isMuted: false,
@@ -1306,7 +1389,7 @@ const musicPlayer = {
         const shuffleBtn = document.getElementById('player-shuffle-btn');
         const repeatBtn = document.getElementById('player-repeat-btn');
         const progressBar = document.getElementById('player-progress-bar');
-        const volumeInput = document.getElementById('player-volume-input');
+        const volumeInput = /** @type {HTMLInputElement} */ (document.getElementById('player-volume-input'));
         const volBtn = document.getElementById('player-vol-btn');
         const playlistBtn = document.getElementById('player-playlist-btn');
         const closeQueueBtn = document.getElementById('player-close-queue-btn');
@@ -1338,7 +1421,8 @@ const musicPlayer = {
 
         if (volumeInput) {
             volumeInput.addEventListener('input', (e) => {
-                this.setVolume(e.target.value / 100);
+                const target = /** @type {HTMLInputElement} */ (e.target);
+                this.setVolume(parseFloat(target.value) / 100);
             });
         }
 
@@ -1381,12 +1465,22 @@ const musicPlayer = {
         document.body.classList.remove('music-player-active');
     },
 
+    /**
+     *
+     * @param {PlaylistItem[]} tracks
+     * @param {string} playlistName
+     */
     setQueue(tracks, playlistName = '') {
         this.queue = [...tracks];
         this.playlistName = playlistName;
         this._updateQueueUI();
     },
 
+    /**
+     *
+     * @param {number} index
+     * @returns
+     */
     playTrack(index) {
         if (index < 0 || index >= this.queue.length) return;
 
@@ -1488,15 +1582,19 @@ const musicPlayer = {
         }
     },
 
+    /**
+     *
+     * @param {number} vol
+     */
     setVolume(vol) {
         this.volume = Math.max(0, Math.min(1, vol));
         this.audio.volume = this.volume;
         this.isMuted = this.volume === 0;
         this._updateVolumeIcon();
 
-        const input = document.getElementById('player-volume-input');
+        const input = /** @type {HTMLInputElement} */ (document.getElementById('player-volume-input'));
         if (input) {
-            input.value = this.volume * 100;
+            input.value = String(this.volume * 100);
         }
     },
 
@@ -1522,6 +1620,11 @@ const musicPlayer = {
         btn.querySelector('i').className = `fas ${icon}`;
     },
 
+    /**
+     *
+     * @param {PointerEvent} e
+     * @returns
+     */
     _seek(e) {
         const bar = document.getElementById('player-progress-bar');
         if (!bar) return;
@@ -1596,6 +1699,10 @@ const musicPlayer = {
         this._updateUI();
     },
 
+    /**
+     *
+     * @param {ErrorEvent} e
+     */
     _onError(e) {
         console.error('Audio error:', e);
         this.isPlaying = false;
@@ -1624,7 +1731,8 @@ const musicPlayer = {
                 if (oxiIcon) {
                     icon.outerHTML = oxiIcon(iconName, extraClass);
                 } else {
-                    icon.className = `fas fa-${iconName} ${extraClass}`;
+                    icon.classList.remove(...icon.classList);
+                    icon.classList.add('fas', `fa-${iconName}`, `${extraClass}`);
                 }
             }
         }
@@ -1640,7 +1748,7 @@ const musicPlayer = {
         }
 
         if (musicView.currentTracks.length > 0) {
-            document.querySelectorAll('.music-track').forEach((row) => {
+            /** @type {NodeListOf<HTMLDivElement>} */ (document.querySelectorAll('.music-track')).forEach((row) => {
                 const idx = parseInt(row.dataset.idx, 10);
                 row.classList.toggle('playing', idx === this.currentIndex && this.isPlaying);
 
@@ -1710,15 +1818,16 @@ const musicPlayer = {
             )
             .join('');
 
-        queueList.querySelectorAll('.player-queue-item').forEach((item) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (queueList.querySelectorAll('.player-queue-item')).forEach((item) => {
             item.addEventListener('click', (e) => {
-                if (e.target.closest('.queue-item-remove')) return;
+                const target = /** @type {Element} */ (e.target);
+                if (target.closest('.queue-item-remove')) return;
                 const idx = parseInt(item.dataset.idx, 10);
                 this.playTrack(idx);
             });
         });
 
-        queueList.querySelectorAll('.queue-item-remove').forEach((btn) => {
+        /** @type {NodeListOf<HTMLButtonElement>} */ (queueList.querySelectorAll('.queue-item-remove')).forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const idx = parseInt(btn.dataset.idx, 10);
@@ -1727,6 +1836,10 @@ const musicPlayer = {
         });
     },
 
+    /**
+     *
+     * @param {number} idx
+     */
     _removeFromQueue(idx) {
         if (idx === this.currentIndex) {
             if (this.queue.length === 1) {
@@ -1754,6 +1867,10 @@ const musicPlayer = {
         this._updateUI();
     },
 
+    /**
+     *
+     * @param {boolean|undefined} [show]
+     */
     _toggleQueue(show) {
         const queue = document.getElementById('player-queue');
         if (queue) {
@@ -1765,6 +1882,11 @@ const musicPlayer = {
         }
     },
 
+    /**
+     *
+     * @param {number|null} secs
+     * @returns {String}
+     */
     _formatTime(secs) {
         if (!secs || Number.isNaN(secs)) return '0:00';
         const mins = Math.floor(secs / 60);
@@ -1772,10 +1894,19 @@ const musicPlayer = {
         return `${mins}:${s.toString().padStart(2, '0')}`;
     },
 
+    /**
+     *
+     * @param {number|null} secs
+     * @returns {String}
+     */
     _formatDuration(secs) {
         return this._formatTime(secs);
     },
 
+    /**
+     * @param {string|null} str
+     * @returns {String}
+     */
     _escapeHtml(str) {
         if (!str) return '';
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

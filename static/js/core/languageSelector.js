@@ -34,6 +34,10 @@ function getAvailableLanguages() {
 const rtlLanguages = ['fa', 'ar'];
 
 // Update HTML lang attribute and dir for RTL languages
+/**
+ *
+ * @param {string} langCode
+ */
 function updateHtmlAttributes(langCode) {
     const htmlElement = document.documentElement;
 
@@ -150,6 +154,7 @@ function createLanguageSelector(containerId = 'language-selector') {
 
 /**
  * Toggle dropdown open/closed
+ * @param {HTMLElement} container
  */
 function toggleDropdown(container) {
     const isOpen = container.classList.contains('open');
@@ -162,6 +167,7 @@ function toggleDropdown(container) {
 
 /**
  * Open dropdown
+ * @param {HTMLElement} container
  */
 function openDropdown(container) {
     container.classList.add('open');
@@ -173,6 +179,7 @@ function openDropdown(container) {
 
 /**
  * Close dropdown
+ * @param {HTMLElement} container
  */
 function closeDropdown(container) {
     container.classList.remove('open');
@@ -184,6 +191,8 @@ function closeDropdown(container) {
 
 /**
  * Select a language
+ * @param {String} langCode
+ * @param {HTMLElement} container
  */
 async function selectLanguage(langCode, container) {
     await i18n.setLocale(langCode);
@@ -197,6 +206,8 @@ async function selectLanguage(langCode, container) {
 
 /**
  * Update the UI to reflect selected language
+ * @param {String} langCode
+ * @param {HTMLElement} container
  */
 function updateSelectedLanguage(langCode, container) {
     const languages = getAvailableLanguages();
@@ -213,7 +224,7 @@ function updateSelectedLanguage(langCode, container) {
     options.forEach((option) => {
         const isActive = option.getAttribute('data-lang') === langCode;
         option.classList.toggle('active', isActive);
-        option.setAttribute('aria-selected', isActive);
+        option.setAttribute('aria-selected', String(isActive));
     });
 }
 

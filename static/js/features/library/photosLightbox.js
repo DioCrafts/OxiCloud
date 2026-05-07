@@ -6,8 +6,11 @@
 import { getCsrfHeaders } from '../../core/csrf.js';
 import { favorites } from '../library/favorites.js';
 
+/** @import {FileItem, FileMetadata} from '../../core/types.js' */
+/** @typedef {typeof import('./photos.js').photosView} PhotosView */
+
 export const photosLightbox = {
-    /** @type {Array} Items array reference */
+    /** @type {Array<FileItem>} Items array reference */
     items: [],
     /** @type {number} Current index */
     index: -1,
@@ -15,14 +18,14 @@ export const photosLightbox = {
     _overlay: null,
     /** @type {string|null} Current blob URL to revoke */
     _blobUrl: null,
-    /** @type {Function|null} */
+    /** @type {(ev: KeyboardEvent) => any|null} */
     _keyHandler: null,
-    /** @type {Object|null} Reference to photosView, set after both modules load */
+    /** @type {PhotosView|null} Reference to photosView, set after both modules load */
     _photosView: null,
 
     /**
      * Register the photosView reference (called from photos.js to avoid circular imports).
-     * @param {Object} pv
+     * @param {any} pv
      */
     setPhotosView(pv) {
         this._photosView = pv;
@@ -33,7 +36,11 @@ export const photosLightbox = {
         return getCsrfHeaders();
     },
 
-    /** Open lightbox at given index */
+    /**
+     * Open lightbox at given index
+     * @param {FileItem[]} items
+     * @param {number} index
+     */
     open(items, index) {
         this.items = items;
         this.index = index;
@@ -99,21 +106,21 @@ export const photosLightbox = {
         this._overlay = el;
 
         // Event listeners
-        el.querySelector('.lightbox-close').onclick = () => this.close();
-        el.querySelector('.lightbox-prev').onclick = () => this.prev();
-        el.querySelector('.lightbox-next').onclick = () => this.next();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lightbox-close')).onclick = () => this.close();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lightbox-prev')).onclick = () => this.prev();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lightbox-next')).onclick = () => this.next();
 
         // Click backdrop to close
         el.addEventListener('click', (e) => {
-            if (e.target === el || e.target.classList.contains('lightbox-content')) {
+            if (e.target === el || /** @type {HTMLElement} */ (e.target).classList.contains('lightbox-content')) {
                 this.close();
             }
         });
 
         // Toolbar actions
-        el.querySelector('.lb-download').onclick = () => this._download();
-        el.querySelector('.lb-favorite').onclick = () => this._toggleFavorite();
-        el.querySelector('.lb-delete').onclick = () => this._delete();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lb-download')).onclick = () => this._download();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lb-favorite')).onclick = () => this._toggleFavorite();
+        /** @type {HTMLButtonElement} */ (el.querySelector('.lb-delete')).onclick = () => this._delete();
 
         // Animate in
         requestAnimationFrame(() => el.classList.add('active'));
@@ -144,8 +151,8 @@ export const photosLightbox = {
         meta.textContent = `${dateStr} · ${item.size_formatted || ''}`;
 
         // Update nav button visibility
-        this._overlay.querySelector('.lightbox-prev').style.visibility = this.index > 0 ? 'visible' : 'hidden';
-        this._overlay.querySelector('.lightbox-next').style.visibility = this.index < this.items.length - 1 ? 'visible' : 'hidden';
+        /** @type {HTMLButtonElement} */ (this._overlay.querySelector('.lightbox-prev')).classList.toggle('hidden', !(this.index > 0));
+        /** @type {HTMLButtonElement} */ (this._overlay.querySelector('.lightbox-next')).classList.toggle('hidden', !(this.index < this.items.length - 1));
 
         // Load content
         this._revokeBlob();
@@ -176,7 +183,13 @@ export const photosLightbox = {
         this._loadMetadata(item.id, meta, dateStr, item.size_formatted || '');
     },
 
-    /** Load EXIF metadata for info bar */
+    /**
+     * Load EXIF metadata for info bar
+     * @param {string} fileId
+     * @param {Element} metaEl
+     * @param {string} dateStr
+     * @param {string} sizeStr
+     */
     async _loadMetadata(fileId, metaEl, dateStr, sizeStr) {
         try {
             const res = await fetch(`/api/files/${fileId}/metadata`, {
@@ -184,16 +197,18 @@ export const photosLightbox = {
                 headers: this._headers()
             });
             if (res.ok) {
-                const data = await res.json();
+                const metadata = /** @type {FileMetadata} */ (await res.json());
                 const parts = [dateStr];
                 if (sizeStr) parts.push(sizeStr);
-                if (data.camera_make || data.camera_model) {
-                    parts.push([data.camera_make, data.camera_model].filter(Boolean).join(' '));
+                if (metadata.camera_make || metadata.camera_model) {
+                    parts.push([metadata.camera_make, metadata.camera_model].filter(Boolean).join(' '));
                 }
-                if (data.width && data.height) {
-                    parts.push(`${data.width}×${data.height}`);
+                if (metadata.width && metadata.height) {
+                    parts.push(`${metadata.width}×${metadata.height}`);
                 }
                 metaEl.textContent = parts.join(' · ');
+
+                //TODO: add geoloc pointer to openstreetmap ?
             }
         } catch (_err) {
             // Non-critical, keep existing meta
@@ -220,7 +235,7 @@ export const photosLightbox = {
             await fetch(`/api/favorites/file/${item.id}`, {
                 method: 'POST',
                 credentials: 'include',
-                headers: this._headers(true)
+                headers: this._headers()
             });
             const btn = this._overlay.querySelector('.lb-favorite');
             if (btn) {
@@ -254,11 +269,11 @@ export const photosLightbox = {
             this.items.splice(this.index, 1);
             if (this.items.length === 0) {
                 this.close();
-                if (this._photosView) this._photosView._render();
+                if (this._photosView) this._photosView._renderFull(); // will call renderEmpty() on this case
             } else {
                 if (this.index >= this.items.length) this.index = this.items.length - 1;
                 this._show();
-                if (this._photosView) this._photosView._render();
+                if (this._photosView) this._photosView._renderFull();
             }
         } catch (err) {
             console.error('Delete failed:', err);
@@ -289,6 +304,7 @@ export const photosLightbox = {
         }
     },
 
+    /** @param {any} s */
     _escAttr(s) {
         return String(s || '')
             .replace(/"/g, '&quot;')

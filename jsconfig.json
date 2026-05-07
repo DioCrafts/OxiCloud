@@ -5,10 +5,13 @@
     "allowJs": true,
     "strict": true,
     "noEmit": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
+    "strictFunctionTypes": true,
+
     "lib": ["ES2022", "DOM"],
     // Treat all JS files as modules
     "moduleDetection": "force",
@@ -17,6 +20,6 @@
     "skipLibCheck": true,
     "target": "ESNext"
   },
-  "include": ["static/js/**/*.js"],
-  "exclude": ["static/js/vendors/**", "static/js/vendors/**/*.mjs"]
+  "include": ["static/js/**/*.js" ],
+  "exclude": ["static/js/vendors/**", "static/js/vendors/**/*.mjs", "static/js/vendors/**/*.js"  ]
 }

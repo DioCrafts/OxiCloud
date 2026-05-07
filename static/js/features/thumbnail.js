@@ -1,8 +1,11 @@
 import { getCsrfHeaders } from '../core/csrf.js';
 
-/** @import {FileInfo} from '../core/types.js' */
+/** @import {FileItem} from '../core/types.js' */
 
-/** @type {typeof import('../vendors/pdf.min.d.ts') | null} */
+/**
+ * use any type so tsc will not scan library
+ * @type {any}
+ */
 let _pdfjsLib = null;
 
 // TODO: do we need to add a max concurrncy ?
@@ -10,11 +13,13 @@ let _pdfjsLib = null;
 /**
  * Lazy-loads pdf.min.mjs on first use via dynamic import so it is never
  * bundled into the IIFE (it uses top-level await which breaks IIFE wrapping).
- * @returns {Promise<typeof import('../vendors/pdf.min.d.ts')>}
+ * @returns {Promise<any>}
  */
 async function getPdfjsLib() {
     if (_pdfjsLib) return _pdfjsLib;
-    _pdfjsLib = await import('/js/vendors/pdf.min.mjs');
+    // IMPORTANT: this hack (const lib=...) so tsc will not load vendors library
+    const lib = '../vendors/pdf.min.mjs';
+    _pdfjsLib = /** @type {any} */ (await import(lib));
     _pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/vendors/pdf.worker.min.mjs';
     return _pdfjsLib;
 }
@@ -23,7 +28,7 @@ export const thumbnail = {
     SUPPORTED_MIME_TYPE: [/^image\//, /^application\/pdf$/, /^video\//],
     /**
      *
-     * @param {Object} file
+     * @param {FileItem} file
      * @returns {boolean}
      */
     canHandle(file) {
@@ -109,7 +114,7 @@ export const thumbnail = {
 
     /**
      *
-     * @param {FileInfo} file
+     * @param {FileItem} file
      * @param {string} source
      * @returns {Promise<ImageBitmap>}
      *
@@ -163,7 +168,7 @@ export const thumbnail = {
     /**
      * generateThumbnail and update image
      *
-     * @param {Object} file the source of the image
+     * @param {FileItem} file the source of the image
      * @param {((dataURL: string) => void) | null} [onIconGenerated] the callback once thumbnail is generated
      * @param {((dataURL: string) => void) | null} [onPreviewGenerated] the callback once thumbnail is generated
      *
@@ -203,7 +208,7 @@ export const thumbnail = {
 
     MAX_CONCURRENT: 3,
     _activeGenerates: 0,
-    /** @type {Array<() => void>} */
+    /** @type {Array<(resolve: any) => void>} */
     _generateQueue: [],
 
     /**
@@ -211,7 +216,7 @@ export const thumbnail = {
      * At most MAX_CONCURRENT generations run simultaneously; excess calls are
      * queued and resume automatically as slots free up.
      *
-     * @param {FileInfo} file
+     * @param {FileItem} file
      * @param {((dataURL: string) => void) | null} [onIconGenerated]
      * @param {((dataURL: string) => void) | null} [onPreviewGenerated]
      * @returns {Promise<void>}
@@ -224,7 +229,7 @@ export const thumbnail = {
         try {
             await this._generate(file, onIconGenerated, onPreviewGenerated);
         } catch (err) {
-            if (err instanceof Event) {
+            if (err instanceof Event && 'error' in err.target) {
                 console.warn(`generation of thumbnail for ${file.name} failed: `, err.target.error);
             } else if (err instanceof Error) {
                 console.warn(`generation of thumbnail for ${file.name} failed: `, err.message);

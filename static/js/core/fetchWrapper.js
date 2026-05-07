@@ -37,6 +37,7 @@ const WRAPPER_USER_DATA_KEY = 'oxicloud_user';
 let _originalFetch = window.fetch.bind(window);
 
 /** Deduplicates concurrent refresh attempts into a single in-flight promise. */
+/** @type {Promise<boolean> | null} */
 let _refreshInFlight = null;
 
 async function _refresh() {

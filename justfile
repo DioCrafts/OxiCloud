@@ -59,6 +59,7 @@ front-fmt:
 
 front-lint:
     biome lint static/
+    tsc -p jsconfig.json
 
 # check CSS rules
 front-rules:

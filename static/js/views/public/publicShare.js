@@ -17,12 +17,12 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
     const $folder = document.getElementById('share-folder');
 
     const $pwForm = document.getElementById('password-form');
-    const $pwInput = document.getElementById('password-input');
+    const $pwInput = /** @type {HTMLInputElement} */ (document.getElementById('password-input'));
     const $pwError = document.getElementById('password-error');
 
     const $fileName = document.getElementById('file-name');
     const $fileMeta = document.getElementById('file-meta');
-    const $fileDl = document.getElementById('file-download');
+    const $fileDl = /** @type {HTMLAnchorElement} */ (document.getElementById('file-download'));
     const $expiredMsg = document.getElementById('expired-message');
 
     // ── Token from URL path (/s/{token}) ──────────────────────────
@@ -49,35 +49,49 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
     }
     let rootDisplayName = 'Shared folder';
 
+    /**
+     * @param {'loading'|'password'|'expired'|'file'|'folder'} name
+     */
     function showState(name) {
         for (const el of [$loading, $password, $expired, $file, $folder]) {
             if (el) el.classList.add('hidden');
         }
-        const target = {
+        /** @type {{ loading: HTMLElement|null, password: HTMLElement|null, expired: HTMLElement|null, file: HTMLElement|null, folder: HTMLElement|null }} */
+        const map = {
             loading: $loading,
             password: $password,
             expired: $expired,
             file: $file,
             folder: $folder
-        }[name];
+        };
+        const target = map[name];
         if (target) target.classList.remove('hidden');
         document.body.classList.toggle('gallery-mode', name === 'folder');
     }
 
     // ── Utilities ─────────────────────────────────────────────────
+    /**
+     * @param {string|null|undefined} s
+     * @returns {string}
+     */
     function escapeHtml(s) {
         return String(s == null ? '' : s).replace(
             /[&<>"']/g,
             (c) =>
+                /** @type {Record<string, string>} */
                 ({
                     '&': '&amp;',
                     '<': '&lt;',
                     '>': '&gt;',
                     '"': '&quot;',
                     "'": '&#39;'
-                })[c]
+                })[c] ?? c
         );
     }
+    /**
+     * @param {number} bytes
+     * @returns {string}
+     */
     function formatSize(bytes) {
         if (bytes == null || Number.isNaN(bytes)) return '';
         if (bytes < 1024) return `${bytes} B`;
@@ -90,6 +104,10 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         }
         return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
     }
+    /**
+     * @param {string|null|undefined} mime
+     * @returns {'image'|'video'|null}
+     */
     function mediaKind(mime) {
         const m = (mime || '').toLowerCase();
         if (m.startsWith('image/')) return 'image';
@@ -97,6 +115,9 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         return null;
     }
     // ── Render share data ─────────────────────────────────────────
+    /**
+     * @param {any} data
+     */
     function renderShare(data) {
         if (data.item_type === 'folder') {
             rootDisplayName = data.item_name || 'Shared folder';
@@ -114,13 +135,15 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
             .then((res) => {
                 if (res.ok) return res.json();
                 if (res.status === 401) {
-                    return res.json().then((body) => {
-                        if (body?.requiresPassword) {
-                            showState('password');
-                            return null;
+                    return res.json().then(
+                        /** @type {(body:any) => null} */ (body) => {
+                            if (body?.requiresPassword) {
+                                showState('password');
+                                return null;
+                            }
+                            throw new Error('Unauthorized');
                         }
-                        throw new Error('Unauthorized');
-                    });
+                    );
                 }
                 if (res.status === 410) {
                     showState('expired');
@@ -171,7 +194,9 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
 
     // ── Folder gallery ────────────────────────────────────────────
 
+    /** @type {string | null} */
     let currentFolderId = null;
+    /** @type {string | null} */
     let currentFolderName = null;
 
     function initFolderGallery() {
@@ -195,17 +220,33 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         return m ? m[1] : null;
     }
 
+    /**
+     * @param {string | null} folderId
+     * @returns {string}
+     */
     function listingUrl(folderId) {
         return folderId ? `/api/s/${TOKEN_ENC}/contents/${encodeURIComponent(folderId)}` : `/api/s/${TOKEN_ENC}/contents`;
     }
+    /**
+     * @param {string} fileId
+     * @returns {string}
+     */
     function fileUrl(fileId) {
         return `/api/s/${TOKEN_ENC}/file/${encodeURIComponent(fileId)}`;
     }
+    /**
+     * @param {string | null} folderId
+     * @returns {string}
+     */
     function zipUrl(folderId) {
         return folderId ? `/api/s/${TOKEN_ENC}/zip/${encodeURIComponent(folderId)}` : `/api/s/${TOKEN_ENC}/zip`;
     }
 
+    /** @type {AbortController | null} */
     let currentLoadController = null;
+    /**
+     * @param {string | null} folderId
+     */
     function loadAndRender(folderId) {
         if (currentLoadController) currentLoadController.abort();
         const controller = new AbortController();
@@ -236,6 +277,10 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
             });
     }
 
+    /**
+     * @param {any} listing
+     * @param {string | null} folderId
+     */
     function renderGallery(listing, folderId) {
         const isSubfolder = folderId !== null;
         const title = isSubfolder ? currentFolderName || 'Subfolder' : rootDisplayName;
@@ -252,7 +297,7 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
 
         const filesHtml =
             listing.files && listing.files.length > 0
-                ? `<h3 class="gallery-section-title">Files</h3><div class="gallery-files">${listing.files.map((f) => fileCardHtml(f)).join('')}</div>`
+                ? `<h3 class="gallery-section-title">Files</h3><div class="gallery-files">${listing.files.map((/** @type {any} */ f) => fileCardHtml(f)).join('')}</div>`
                 : '';
 
         const emptyHtml = empty ? '<div class="gallery-empty">This folder is empty.</div>' : '';
@@ -265,10 +310,18 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         wireImageRetry();
     }
 
+    /**
+     * @param {any} folder
+     * @returns {string}
+     */
     function folderCardHtml(folder) {
         return `<a class="folder-card" href="#" data-action="open-folder" data-id="${escapeHtml(folder.id)}" data-name="${escapeHtml(folder.name)}"><i class="fas fa-folder folder-icon"></i><div class="card-body"><div class="card-name">${escapeHtml(folder.name)}</div><div class="card-meta">Subfolder</div></div></a>`;
     }
 
+    /**
+     * @param {any} file
+     * @returns {string}
+     */
     function fileCardHtml(file) {
         const url = fileUrl(file.id);
         const kind = mediaKind(file.mime_type);
@@ -286,7 +339,7 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
     }
 
     function wireGallery() {
-        for (const btn of $folder.querySelectorAll('.gallery-view-toggle button')) {
+        for (const btn of /** @type {NodeListOf<HTMLButtonElement>} */ ($folder.querySelectorAll('.gallery-view-toggle button'))) {
             btn.addEventListener('click', () => setViewMode(btn.dataset.view));
         }
         const backBtn = $folder.querySelector('[data-action="back"]');
@@ -296,14 +349,15 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
                 navigate(null, rootDisplayName);
             });
         }
-        for (const card of $folder.querySelectorAll('[data-action="open-folder"]')) {
+        for (const card of /** @type {NodeListOf<HTMLDivElement>} */ ($folder.querySelectorAll('[data-action="open-folder"]'))) {
             card.addEventListener('click', (e) => {
+                if (!(e instanceof MouseEvent)) return;
                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
                 e.preventDefault();
                 navigate(card.dataset.id, card.dataset.name);
             });
         }
-        const mediaCards = Array.from($folder.querySelectorAll('.file-card[data-mediakind]'));
+        const mediaCards = Array.from(/** @type {NodeListOf<HTMLDivElement>} */ ($folder.querySelectorAll('.file-card[data-mediakind]')));
         const items = mediaCards.map((el) => ({
             kind: el.dataset.mediakind,
             src: el.dataset.src,
@@ -318,6 +372,9 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         });
     }
 
+    /**
+     * @param {string | null | undefined} v
+     */
     function setViewMode(v) {
         const mode = v === 'list' ? 'list' : 'grid';
         viewMode = mode;
@@ -327,11 +384,15 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
             // ignore
         }
         document.body.dataset.shareView = mode;
-        for (const b of $folder.querySelectorAll('.gallery-view-toggle button')) {
+        for (const b of /** @type {NodeListOf<HTMLButtonElement>} */ ($folder.querySelectorAll('.gallery-view-toggle button'))) {
             b.setAttribute('aria-pressed', String(b.dataset.view === mode));
         }
     }
 
+    /**
+     * @param {string | null} folderId
+     * @param {string | null | undefined} folderName
+     */
     function navigate(folderId, folderName) {
         currentFolderId = folderId;
         currentFolderName = folderName;
@@ -352,7 +413,7 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
     function wireLazyVideos() {
         const lazy = $folder.querySelectorAll('.file-thumb video[data-lazy-src]');
         if (!lazy.length) return;
-        const start = (v) => {
+        const start = (/** @type {HTMLVideoElement} */ v) => {
             v.addEventListener(
                 'loadedmetadata',
                 () => {
@@ -385,20 +446,21 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
                 (entries) => {
                     for (const e of entries) {
                         if (!e.isIntersecting) continue;
-                        if (e.target.dataset.lazySrc && !e.target.src) start(e.target);
-                        obs.unobserve(e.target);
+                        const target = /** @type {HTMLVideoElement} */ (e.target);
+                        if (target.dataset.lazySrc && !target.src) start(target);
+                        obs.unobserve(target);
                     }
                 },
                 { rootMargin: '300px' }
             );
             for (const v of lazy) obs.observe(v);
         } else {
-            for (const v of lazy) start(v);
+            for (const v of lazy) start(/** @type {HTMLVideoElement} */ (v));
         }
     }
 
     function wireImageRetry() {
-        for (const img of $folder.querySelectorAll('.file-thumb img')) {
+        for (const img of /** @type {NodeListOf<HTMLImageElement>} */ ($folder.querySelectorAll('.file-thumb img'))) {
             img.addEventListener('error', () => {
                 if (img.dataset.retried === '1') return;
                 img.dataset.retried = '1';
@@ -412,7 +474,12 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
     }
 
     // ── Lightbox ──────────────────────────────────────────────────
+    /**
+     * @typedef {{ root: HTMLElement, title: Element|null, download: HTMLAnchorElement|null, close: HTMLButtonElement|null, stage: Element|null, content: Element|null, prev: HTMLButtonElement|null, next: HTMLButtonElement|null }} LightboxRefs
+     */
+    /** @type {LightboxRefs | null} */
     let lb = null;
+    /** @type {Array<{kind: string|undefined, src: string|undefined, name: string|undefined}>} */
     let lbItems = [];
     let lbIndex = -1;
 
@@ -466,11 +533,18 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         return lb;
     }
 
+    /**
+     * @param {Array<{kind: string|undefined, src: string|undefined, name: string|undefined}>} items
+     * @param {number} index
+     */
     function openLightbox(items, index) {
         ensureLightbox();
         lbItems = items;
         showLightboxItem(index);
     }
+    /**
+     * @param {number} i
+     */
     function showLightboxItem(i) {
         if (i < 0 || i >= lbItems.length) return;
         lbIndex = i;
@@ -497,6 +571,9 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
         lb.root.classList.remove('hidden');
         lb.root.setAttribute('aria-hidden', 'false');
     }
+    /**
+     * @param {number} delta
+     */
     function stepLightbox(delta) {
         const next = lbIndex + delta;
         if (next >= 0 && next < lbItems.length) showLightboxItem(next);

@@ -9,6 +9,11 @@ import { multiSelect } from '../features/files/multiSelect.js';
 import { appElements } from './state.js';
 import { ui } from './ui.js';
 
+/**
+ *
+ * @import {TrashItem} from '../core/types.js'
+ */
+
 async function loadTrashItems() {
     const elements = appElements;
 
@@ -25,7 +30,7 @@ async function loadTrashItems() {
             </div>
         `;
 
-        ui.updateBreadcrumb('');
+        ui.updateBreadcrumb();
 
         const trashItems = await fileOps.getTrashItems();
 
@@ -46,6 +51,10 @@ async function loadTrashItems() {
     }
 }
 
+/**
+ *
+ * @param {TrashItem} item
+ */
 function addTrashItemToView(item) {
     const elements = appElements;
     const isFile = item.item_type === 'file';

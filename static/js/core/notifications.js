@@ -15,13 +15,28 @@ import { i18n } from './i18n.js';
  *   clear()
  */
 
+/**
+ * @typedef {Object} BatchNotification
+ * @property {HTMLElement} el
+ * @property {Number} totalFiles,
+ * @property {Number} completed
+ * @property {Number} successCount
+ * @property {Number} errorCount
+ * @property {Number} lastLabelUpdateTs
+ * @property {String} lastLabelFile
+ */
+
 const notifications = (() => {
     /* ── state ──────────────────────────────────────────────── */
     let _badgeCount = 0;
     let _batchSeq = 0;
-    const _batches = {}; // batchId → { el, files:{}, totalFiles }
+
+    /** @type {Record<String,BatchNotification>} */
+    const _batches = {};
 
     /* ── DOM refs (resolved lazily) ─────────────────────────── */
+
+    /** @type {(id: string) => HTMLElement | null } */
     const $ = (id) => document.getElementById(id);
 
     /* ── bell toggle ────────────────────────────────────────── */
@@ -237,6 +252,8 @@ const notifications = (() => {
     /**
      * Mark a file as completed within a batch (updates overall bar).
      * DOM updates are throttled to every 5 files to avoid reflow starvation.
+     * @param {string} batchId
+     * @param {boolean} success
      */
     function fileCompleted(batchId, success) {
         const batch = _batches[batchId];
@@ -262,6 +279,9 @@ const notifications = (() => {
 
     /**
      * Finalise a batch – update icon and title.
+     * @param {string} batchId
+     * @param {number} successCount
+     * @param {number} totalFiles
      */
     function finishBatch(batchId, successCount, totalFiles) {
         const batch = _batches[batchId];
@@ -320,6 +340,10 @@ const notifications = (() => {
     }
 
     /* ── util ───────────────────────────────────────────────── */
+    // FIXME move to global library
+    /**
+     * @param {string} s
+     */
     function _esc(s) {
         const d = document.createElement('div');
         d.textContent = s;

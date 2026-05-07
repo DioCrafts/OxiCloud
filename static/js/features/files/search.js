@@ -12,6 +12,10 @@ import { app } from '../../app/state.js';
 import { ui } from '../../app/ui.js';
 import { getAuthHeaders } from './fileOperations.js';
 
+/**
+ * @import {SearchCriteria, SearchResults} from '../../core/types.js'}
+ */
+
 const search = {
     /**
      * Perform a search using query parameters.
@@ -19,25 +23,29 @@ const search = {
      * relevance_score, icon_class, category, size_formatted, etc.
      *
      * @param {string} query - Search query
-     * @param {Object} options - Additional search options
-     * @returns {Promise<Object>} - Enriched search results from backend
+     * @param {SearchCriteria} [options] - Additional search options
+     * @returns {Promise<SearchResults>} - Enriched search results from backend
      */
-    async searchFiles(query, options = {}) {
+    async searchFiles(query, options) {
         try {
             const params = new URLSearchParams();
             params.append('query', query);
 
             if (options.folder_id) params.append('folder_id', options.folder_id);
-            if (options.recursive !== undefined) params.append('recursive', options.recursive);
-            if (options.file_types) params.append('type', options.file_types);
-            if (options.min_size) params.append('min_size', options.min_size);
-            if (options.max_size) params.append('max_size', options.max_size);
-            if (options.created_after) params.append('created_after', options.created_after);
-            if (options.created_before) params.append('created_before', options.created_before);
-            if (options.modified_after) params.append('modified_after', options.modified_after);
-            if (options.modified_before) params.append('modified_before', options.modified_before);
-            if (options.limit) params.append('limit', options.limit);
-            if (options.offset) params.append('offset', options.offset);
+            if (options.recursive !== undefined) params.append('recursive', String(options.recursive));
+            if (options.file_types) {
+                options.file_types.forEach((file_type) => {
+                    params.append('type', file_type);
+                });
+            }
+            if (options.min_size) params.append('min_size', String(options.min_size));
+            if (options.max_size) params.append('max_size', String(options.max_size));
+            if (options.created_after) params.append('created_after', String(options.created_after));
+            if (options.created_before) params.append('created_before', String(options.created_before));
+            if (options.modified_after) params.append('modified_after', String(options.modified_after));
+            if (options.modified_before) params.append('modified_before', String(options.modified_before));
+            if (options.limit) params.append('limit', String(options.limit));
+            if (options.offset) params.append('offset', String(options.offset));
             if (options.sort_by) params.append('sort_by', options.sort_by);
 
             const url = `/api/search?${params.toString()}`;
@@ -46,6 +54,7 @@ const search = {
             const response = await fetch(url, { headers: getAuthHeaders() });
 
             if (response.ok) {
+                /** @type {SearchResults} */
                 return await response.json();
             } else {
                 let errorText = '';
@@ -66,7 +75,10 @@ const search = {
                 folders: [],
                 total_count: 0,
                 query_time_ms: 0,
-                sort_by: 'relevance'
+                sort_by: 'relevance',
+                limit: 0,
+                offset: 0,
+                has_more: false
             };
         }
     },
@@ -76,15 +88,15 @@ const search = {
      * Returns lightweight name suggestions without full search overhead.
      *
      * @param {string} query - Prefix to search for
-     * @param {Object} options - { folder_id, limit }
+     * @param {SearchCriteria} [options] - { folder_id, limit }
      * @returns {Promise<Object>} - { suggestions: [...], query_time_ms }
      */
-    async getSuggestions(query, options = {}) {
+    async getSuggestions(query, options) {
         try {
             const params = new URLSearchParams();
             params.append('query', query);
             if (options.folder_id) params.append('folder_id', options.folder_id);
-            if (options.limit) params.append('limit', options.limit);
+            if (options.limit) params.append('limit', String(options.limit));
 
             const url = `/api/search/suggest?${params.toString()}`;
             const response = await fetch(url, { headers: getAuthHeaders() });
@@ -111,7 +123,7 @@ const search = {
      * - query_time_ms: Server-side query execution time
      * - sort_by: Active sort order
      *
-     * @param {Object} results - Enriched search results from backend
+     * @param {SearchResults} results - Enriched search results from backend
      */
     displaySearchResults(results) {
         ui.resetFilesList(); // ensure also list visible & error hidden

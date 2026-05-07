@@ -37,7 +37,7 @@ function resolveBrowserLocale() {
 let currentLocale = resolveBrowserLocale();
 
 // Cache for translations
-/** @type {Record<string, Object>} */
+/** @type {Record<string, any>} */
 const translations = {};
 
 /**
@@ -71,7 +71,7 @@ async function loadTranslations(locale) {
 
 /**
  * Get a nested translation value
- * @param {object} obj - The translations object
+ * @param {Record<string, any>} obj - The translations object
  * @param {string} path - The dot-notation path to the translation
  * @returns {string|null} - The translation value or null if not found
  */
@@ -110,7 +110,7 @@ function getNestedValue(obj, path) {
 /**
  * Replace parameters in a translation string
  * @param {string} text - The translation string with placeholders
- * @param {object} params - The parameters to replace
+ * @param {Record<string, any>} params - The parameters to replace
  * @returns {string} - The interpolated string
  */
 function interpolate(text, params) {
@@ -244,11 +244,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Self-contained t wrapper — does NOT call the global t() because other
 // scripts (e.g. admin.js) may shadow it, which would cause infinite recursion.
-function safeT(key, params = {}) {
+/**
+ * @param {string} key
+ * @param {string | Record<string, any>} [paramsOrFallback] - interpolation params object, or a string fallback used when the key is missing
+ * @returns {string}
+ */
+function safeT(key, paramsOrFallback = {}) {
+    const fallback = typeof paramsOrFallback === 'string' ? paramsOrFallback : null;
+    const params = typeof paramsOrFallback === 'object' ? paramsOrFallback : {};
+
     const localeData = translations[currentLocale];
     if (!localeData) {
-        // Translations not loaded yet — return humanised key suffix
-        return key.split('.').pop() || key;
+        // Translations not loaded yet — return fallback or humanised key suffix
+        return fallback ?? key.split('.').pop() ?? key;
     }
 
     let value = getNestedValue(localeData, key);
@@ -258,7 +266,7 @@ function safeT(key, params = {}) {
         value = getNestedValue(translations.en, key);
     }
 
-    if (!value) return key;
+    if (!value) return fallback ?? key;
     return interpolate(value, params);
 }
 

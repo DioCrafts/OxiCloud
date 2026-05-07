@@ -11,10 +11,18 @@ import { getCsrfHeaders, getCsrfToken } from '../../core/csrf.js';
 import { i18n } from '../../core/i18n.js';
 import { notifications } from '../../core/notifications.js';
 
+/** @import {TrashItem} from '../../core/types.js' */
+
+/**
+ * @typedef {Object} BatchResult
+ * @property {number} success number of files|folders sucessfully updated
+ * @property {number} errors  number of files|folders in error
+ * /
+
 /**
  * Get authorization headers for API requests.
  * Tokens are now in HttpOnly cookies — no explicit Authorization header needed.
- * @returns {Object} Headers object
+ * @returns {Record<String, String>} Headers object
  */
 function getAuthHeaders() {
     return { ...getCsrfHeaders() };
@@ -25,15 +33,26 @@ const fileOps = {
     // ========================================================================
     // Upload progress — notification bell integration
     // ========================================================================
+    /** @type {string | null} */
     _currentBatchId: null,
+
+    /** @type {boolean} */
     _isUploading: false, // Guard against concurrent upload calls
 
-    /** Start a new upload batch in the notification bell */
+    /**
+     * Start a new upload batch in the notification bell
+     * @param {number} totalFiles
+     * @param {string} [folderName]
+     */
     _initUploadToast(totalFiles, folderName) {
         this._currentBatchId = notifications.addUploadBatch(totalFiles, folderName);
     },
 
-    /** Finalise the batch in the notification bell */
+    /**
+     * Finalise the batch in the notification bell
+     * @param {number} successCount
+     * @param {number} totalFiles
+     * */
     _finishUploadToast(successCount, totalFiles) {
         if (this._currentBatchId) {
             notifications.finishBatch(this._currentBatchId, successCount, totalFiles);
@@ -44,6 +63,8 @@ const fileOps = {
      * Some drag-and-drop sources can inject directory placeholders into
      * DataTransfer.files. Browsers fail those with net::ERR_ACCESS_DENIED
      * when trying to send them as normal files.
+     * @param {File} file
+     * @returns {Promise<boolean>}
      */
     _canReadFileBlob(file) {
         return new Promise((resolve) => {
@@ -58,10 +79,24 @@ const fileOps = {
         });
     },
 
+    // FIXME: prefer exceptions for errors
+    /**
+     * @typedef {Object} UploadAnswer
+     * @property {boolean} ok
+     * @property {any} [data]
+     * @property {string} [errorMsg]
+     * @property {boolean} [isQuotaError]
+     * @property {boolean} [isTimeout]
+     */
+
     /**
      * Upload a single file via XMLHttpRequest with progress events.
      * Progress is reported to the notification bell via batchId + fileName.
      * Returns a promise that resolves with { ok, data?, errorMsg?, isQuotaError? }.
+     * @param {FormData} formData
+     * @param {string} batchId
+     * @param {string} fileName
+     * @param {number} [timeoutMs=120000]
      */
     _uploadFileXHR(formData, batchId, fileName, timeoutMs = 120000) {
         return new Promise((resolve) => {
@@ -76,9 +111,16 @@ const fileOps = {
             let lastProgressPctSent = -1;
 
             let isSettled = false;
+            /** @type {ReturnType<typeof setTimeout>} */
             let stallTimer = null;
+            /** @type {ReturnType<typeof setTimeout>} */
             let hardTimer = null;
 
+            /**
+             *
+             * @param {number} pct
+             * @param {'uploading' | 'done' | 'error'} status
+             */
             const safeUpdateFile = (pct, status) => {
                 if (!notif || !batchId) return;
                 try {
@@ -88,6 +130,11 @@ const fileOps = {
                 }
             };
 
+            /**
+             *
+             * @param {UploadAnswer} result
+             * @returns
+             */
             const finalize = (result) => {
                 if (isSettled) return;
                 isSettled = true;
@@ -219,6 +266,12 @@ const fileOps = {
      * Used by folder uploads to avoid browser XHR edge-cases with dragged entries.
      * Returns { ok, data?, errorMsg?, isQuotaError?, isTimeout? }.
      */
+    /**
+     *
+     * @param {*} formData
+     * @param {*} timeoutMs
+     * @returns {Promise<UploadAnswer>}
+     */
     async _uploadFileFetch(formData, timeoutMs = 60000) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -254,11 +307,13 @@ const fileOps = {
             const isQuotaError = (body && typeof body === 'object' && body.error_type === 'QuotaExceeded') || response.status === 507;
             return { ok: false, errorMsg, isQuotaError };
         } catch (e) {
-            const isTimeout = e?.name === 'AbortError';
+            const isTimeout = /** @type {Error} */ (e)?.name === 'AbortError';
             return {
                 ok: false,
                 isTimeout,
-                errorMsg: isTimeout ? `Timeout after ${Math.round(timeoutMs / 1000)}s` : `Fetch upload failed: ${e?.message || 'network error'}`
+                errorMsg: isTimeout
+                    ? `Timeout after ${Math.round(timeoutMs / 1000)}s`
+                    : `Fetch upload failed: ${/** @type {Error} */ (e)?.message || 'network error'}`
             };
         } finally {
             clearTimeout(timeoutId);
@@ -458,6 +513,7 @@ const fileOps = {
 
         try {
             // Filter unreadable entries
+            /** @type {Array<{file: File, relativePath: string}>} */
             const validEntries = [];
             for (const e of rawEntries) {
                 // eslint-disable-next-line no-await-in-loop
@@ -560,12 +616,18 @@ const fileOps = {
             const TIMEOUT_MIN_MS = 10000; // floor for tiny files
             const TIMEOUT_MS_ZERO = 3000; // 3s for 0-byte files
 
+            /**
+             *
+             * @param {number} idx
+             * @returns
+             */
             const uploadOneFile = async (idx) => {
                 if (quotaStop) return;
                 const entry = validEntries[idx];
                 const file = entry.file;
                 const rel = entry.relativePath || file.name;
 
+                /** @type {UploadAnswer} */
                 let result = { ok: false, errorMsg: 'Unknown client error' };
                 try {
                     const parts = rel.split('/');
@@ -577,6 +639,7 @@ const fileOps = {
                     // but block on open(). Pre-read only 0-byte files into
                     // memory; files with size>0 are always regular files and
                     // go straight to FormData (zero extra memory copy).
+                    /** @type {Blob} */
                     let uploadFile = file; // default: use original File
                     if (file.size === 0) {
                         try {
@@ -616,7 +679,7 @@ const fileOps = {
                 } catch (e) {
                     result = {
                         ok: false,
-                        errorMsg: `Client exception: ${e?.message || 'unknown'}`
+                        errorMsg: `Client exception: ${/** @type {Error} */ (e)?.message || 'unknown'}`
                     };
                     console.error(`[UPLOAD EXCEPTION] #${idx} ${rel}:`, e);
                 }
@@ -824,12 +887,6 @@ const fileOps = {
     },
 
     /**
-    * @typedef {Object} BatchResult
-    * @property {number} success number of files|folders sucessfully updated
-    * @property {number} errors  number of files|folders in error
-    * /
-
-    /**
      * Move files & folders
      * @param {string[]} fileIds - File IDs
      * @param {string[]} folderIds - Folder IDs
@@ -942,17 +999,11 @@ const fileOps = {
     },
 
     /**
-     * @typedef {Object} BatchCopyReturn
-     * @property {number} success
-     * @property {number} errors
-     */
-
-    /**
      * Copy files & folders
      * @param {string[]} fileIds - File IDs
      * @param {string[]} folderIds - Folder IDs
      * @param {string} targetFolderId - Target folder ID
-     * @returns {Promise<BatchCopyReturn>} - Success status
+     * @returns {Promise<BatchResult>} - Success status
      */
     async batchCopy(fileIds, folderIds, targetFolderId) {
         // FIXME ensure not moving a folder into itself
@@ -1010,7 +1061,6 @@ const fileOps = {
      * Rename a file
      * @param {string} fileId - File ID
      * @param {string} newName - New file name
-     * @returns {Promise<string|null>} - null on success, error message string on failure
      */
     async renameFile(fileId, newName) {
         try {
@@ -1052,13 +1102,6 @@ const fileOps = {
      * Rename a folder
      * @param {string} folderId - Folder ID
      * @param {string} newName - New folder name
-     * @returns {Promise<boolean>} - Success status
-     */
-    /**
-     * Rename a folder
-     * @param {string} folderId - Folder ID
-     * @param {string} newName - New folder name
-     * @returns {Promise<string|null>} - null on success, error message string on failure
      */
     async renameFolder(folderId, newName) {
         try {
@@ -1170,7 +1213,7 @@ const fileOps = {
                 // If we're inside the folder we just deleted, go back up
                 if (app.currentPath === folderId) {
                     app.currentPath = '';
-                    ui.updateBreadcrumb('');
+                    ui.updateBreadcrumb();
                 }
                 loadFiles();
                 ui.showNotification('Folder moved to trash', `"${folderName}" moved to trash`);
@@ -1186,7 +1229,7 @@ const fileOps = {
                     // If we're inside the folder we just deleted, go back up
                     if (app.currentPath === folderId) {
                         app.currentPath = '';
-                        ui.updateBreadcrumb('');
+                        ui.updateBreadcrumb();
                     }
                     loadFiles();
                     ui.showNotification('Folder deleted', `"${folderName}" deleted successfully`);
@@ -1205,7 +1248,7 @@ const fileOps = {
 
     /**
      * Get trash items
-     * @returns {Promise<Array>} - List of trash items
+     * @returns {Promise<Array<TrashItem>>} - List of trash items
      */
     async getTrashItems() {
         try {
@@ -1214,7 +1257,7 @@ const fileOps = {
             });
 
             if (response.ok) {
-                return await response.json();
+                return /** @type {TrashItem[]} */ (await response.json());
             } else {
                 console.error('Error fetching trash items:', response.statusText);
                 return [];

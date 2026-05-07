@@ -8,10 +8,14 @@ import { i18n } from '../../core/i18n.js';
 import { thumbnail } from '../thumbnail.js';
 import { photosLightbox } from './photosLightbox.js';
 
-/** @import {FileInfo} from '../../core/types.js' */
+/** @import {FileItem} from '../../core/types.js' */
+
+/**
+ * @typedef {'daily'|'monthly'|'yearly'} PhotoModeEnum
+ */
 
 const photosView = {
-    /** @type {Array} All loaded photo items */
+    /** @type {Array<FileItem>} All loaded photo items */
     items: [],
     /** @type {string|null} Cursor for next page */
     nextCursor: null,
@@ -27,7 +31,7 @@ const photosView = {
     _container: null,
     /** @type {boolean} */
     _initialized: false,
-    /** @type {'daily'|'monthly'|'yearly'} */
+    /** @type {PhotoModeEnum} */
     groupMode: 'monthly',
     /** @type {Map<string, string>} fileId → thumbnail URL (persists across re-renders) */
     _videoThumbCache: new Map(),
@@ -84,6 +88,11 @@ const photosView = {
     },
 
     /** Switch grouping mode */
+    /**
+     *
+     * @param {PhotoModeEnum} mode
+     * @returns
+     */
     setGroupMode(mode) {
         if (this.groupMode === mode) return;
         this.groupMode = mode;
@@ -112,6 +121,7 @@ const photosView = {
 
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
+            /** @type {FileItem[]} */
             const data = await res.json();
 
             if (!data || data.length === 0) {
@@ -178,7 +188,9 @@ const photosView = {
 
     /** Append-only render for infinite scroll — inserts only the items
      *  from this.items[startIndex..] without destroying existing DOM.
-     *  Complexity: O(batch) instead of O(total_items). */
+     *  Complexity: O(batch) instead of O(total_items).
+     * @param {number} startIndex
+     */
     _appendBatch(startIndex) {
         if (!this._container) return;
         this._destroyObserver();
@@ -227,7 +239,10 @@ const photosView = {
         this._setupVideoThumbnails(startIndex);
     },
 
-    /** Generate HTML for a single photo/video tile */
+    /**
+     * Generate HTML for a single photo/video tile
+     * @param {FileItem} file
+     */
     _renderTile(file) {
         const isVideo = file.mime_type?.startsWith('video/');
         const selected = this.selected.has(file.id) ? ' selected' : '';
@@ -266,7 +281,7 @@ const photosView = {
     /** @param {number} [startIndex=0] When > 0, only process video tiles
      *  for items[startIndex..] — avoids re-scanning the entire DOM. */
     _setupVideoThumbnails(startIndex = 0) {
-        const tiles = /** @type {NodeListOf<HTMLDivElement> */ (this._container?.querySelectorAll('.photo-tile[data-mime^="video/"]'));
+        const tiles = /** @type {NodeListOf<HTMLDivElement>} */ (this._container?.querySelectorAll('.photo-tile[data-mime^="video/"]'));
         const newIds = startIndex > 0 ? new Set(this.items.slice(startIndex).map((f) => f.id)) : null;
 
         if (!tiles) return;
@@ -290,11 +305,15 @@ const photosView = {
         }
     },
 
-    /** Extract a frame and upload all thumbnail sizes via thumbnail.queueGenerate(). */
+    /**
+     * Extract a frame and upload all thumbnail sizes via thumbnail.queueGenerate().
+     * @param {HTMLDivElement} tile
+     * @param {HTMLImageElement} img
+     */
     async _generateVideoThumbnail(tile, img) {
         const fileId = tile.dataset.id;
         // TODO: remove this HACK, this is not evolutive...
-        const file = /** @type {FileInfo} */ ({ id: fileId, icon_special_class: 'video-icon', name: tile.dataset.name, mime_type: tile.dataset.mime });
+        const file = /** @type {FileItem} */ ({ id: fileId, icon_special_class: 'video-icon', name: tile.dataset.name, mime_type: tile.dataset.mime });
 
         try {
             await thumbnail.queueGenerate(file, null, (previewDataUrl) => {
@@ -335,7 +354,10 @@ const photosView = {
             </div>`;
     },
 
-    /** Group items by the current groupMode */
+    /**
+     *  Group items by the current groupMode
+     * @param {FileItem[]} items
+     */
     _groupItems(items) {
         const map = new Map();
         for (const item of items) {
@@ -363,20 +385,24 @@ const photosView = {
         return map;
     },
 
-    /** Handle click on photo tile or toolbar */
+    /**
+     * Handle click on photo tile or toolbar
+     * @param {MouseEvent} e
+     */
     _handleClick(e) {
         // Handle group mode toggle
-        const modeBtn = e.target.closest('[data-group-mode]');
+        const target = /** @type {Element} */ (e.target);
+        const modeBtn = /** @type {HTMLButtonElement} */ (target.closest('[data-group-mode]'));
         if (modeBtn) {
-            this.setGroupMode(modeBtn.dataset.groupMode);
+            this.setGroupMode(/** @type {PhotoModeEnum} */ (modeBtn.dataset.groupMode));
             return;
         }
 
-        const tile = e.target.closest('.photo-tile');
+        const tile = /** @type {HTMLDivElement} */ (target.closest('.photo-tile'));
         if (!tile) return;
 
         const id = tile.dataset.id;
-        const check = e.target.closest('.photo-check');
+        const check = target.closest('.photo-check');
 
         // If clicking checkbox or in selection mode, toggle select
         if (check || this.selected.size > 0) {
@@ -391,7 +417,11 @@ const photosView = {
         }
     },
 
-    /** Toggle selection of an item */
+    /**
+     * Toggle selection of an item
+     * @param {string} id
+     * @param {HTMLDivElement} tile
+     */
     _toggleSelect(id, tile) {
         if (this.selected.has(id)) {
             this.selected.delete(id);
@@ -483,6 +513,7 @@ const photosView = {
         if (bar) bar.style.display = 'none';
     },
 
+    /** @param {boolean} show */
     _showLoading(show) {
         if (!this._container) return;
         let loader = this._container.querySelector('.photos-loading');
@@ -503,12 +534,14 @@ const photosView = {
         }
     },
 
+    /** @param {any} s */
     _escHtml(s) {
         const d = document.createElement('div');
         d.textContent = s;
         return d.innerHTML;
     },
 
+    /** @param {any} s */
     _escAttr(s) {
         return String(s || '')
             .replace(/"/g, '&quot;')

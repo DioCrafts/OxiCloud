@@ -6,6 +6,10 @@
 import { getCsrfHeaders } from '../../core/csrf.js';
 import { i18n } from '../../core/i18n.js';
 
+/**
+ * @import {AuthResponse, RoleEnum, User} from '../../core/types.js'
+ */
+
 // API endpoints
 const API_URL = '/api/auth';
 const LOGIN_ENDPOINT = `${API_URL}/login`;
@@ -41,6 +45,18 @@ function inputVal(id) {
 }
 
 // Language selector texts (used before i18n is loaded)
+/**
+ * @typedef {Object} PreTranslatedText
+ * @property {string} title
+ * @property {string} subtitle
+ * @property {string} continue
+ * @property {string} autodetected
+ * @property {string} moreLanguages
+ * @property {string} modalTitle
+ * @property {string} searchPlaceholder
+ */
+
+/** @type {Record<String,PreTranslatedText>} */
 const LANGUAGE_TEXTS = {
     en: {
         title: 'Welcome!',
@@ -145,6 +161,16 @@ const LANGUAGE_TEXTS = {
 
 // Complete language registry — add new languages here, they'll appear automatically
 // `popular: true` languages show as cards on the main screen, the rest in the modal
+/**
+ * @typedef {Object} Lang
+ * @property {string} code
+ * @property {string} name
+ * @property {string} nativeName
+ * @property {string} flag
+ * @property {boolean} popular
+ */
+
+/** @type {Lang[]} */
 export const ALL_LANGUAGES = [
     {
         code: 'en',
@@ -377,9 +403,18 @@ export const ALL_LANGUAGES = [
 // --- Panel visibility helpers ---
 // The `.hidden` CSS class uses `display: none !important`, so inline
 // `style.display` can never override it.  Always toggle the class instead.
+/**
+ *
+ * @param {HTMLElement} el
+ */
 function showPanel(el) {
     if (el) el.classList.remove('hidden');
 }
+
+/**
+ *
+ * @param {HTMLElement} el
+ */
 function hidePanel(el) {
     if (el) el.classList.add('hidden');
 }
@@ -434,13 +469,18 @@ function detectBrowserLanguage() {
     return ALL_LANGUAGES[0]; // fallback to English
 }
 
-// Build a language option element (card style)
+/**
+ * Build a language option element (card style)
+ * @param {Lang} lang
+ * @param {boolean} isSelected
+ * @returns
+ */
 function buildLanguageCard(lang, isSelected) {
     const item = document.createElement('div');
     item.className = `lang-picker-item${isSelected ? ' selected' : ''}`;
     item.setAttribute('data-lang', lang.code);
     item.setAttribute('role', 'option');
-    item.setAttribute('aria-selected', isSelected);
+    item.setAttribute('aria-selected', String(isSelected));
     item.innerHTML = `
         <span class="lang-picker-item-flag">${lang.flag}</span>
         <span class="lang-picker-item-name">${lang.nativeName}</span>
@@ -596,7 +636,10 @@ function initLanguageSelector() {
     });
 }
 
-// Update language panel texts based on selected language
+/**
+ * Update language panel texts based on selected language
+ * @param {string} lang
+ */
 function updateLanguagePanelTexts(lang) {
     const texts = LANGUAGE_TEXTS[lang] || LANGUAGE_TEXTS.en;
     const titleEl = document.getElementById('language-title');
@@ -1089,6 +1132,9 @@ if (isLoginPage && adminSetupForm) {
 
 /**
  * Login with username and password
+ * @param {string} username
+ * @param {string} password
+ * @returns {Promise<AuthResponse>}
  */
 async function login(username, password) {
     try {
@@ -1126,8 +1172,9 @@ async function login(username, password) {
 
         // Parse the JSON response
         try {
+            /** @type {AuthResponse} */
             const data = await response.json();
-            console.log('Login successful, received data');
+            console.log(`Login successful for user id ${data.user.id}, received data`);
             return data;
         } catch (jsonError) {
             console.error('Error parsing login response:', jsonError);
@@ -1141,6 +1188,11 @@ async function login(username, password) {
 
 /**
  * Register a new user
+ * @param {string} username
+ * @param {string} email
+ * @param {string} password
+ * @param {RoleEnum} [role]
+ * @returns {Promise<User>}
  */
 async function register(username, email, password, role = 'user') {
     try {
@@ -1170,8 +1222,9 @@ async function register(username, email, password, role = 'user') {
 
         // Parse the JSON response
         try {
+            /** @type {User} */
             const data = await response.json();
-            console.log('Registration successful, received data');
+            console.log(`Registration successful, user created: ${data.id}, received data`);
             return data;
         } catch (jsonError) {
             console.error('Error parsing registration response:', jsonError);
