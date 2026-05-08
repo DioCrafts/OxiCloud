@@ -28,6 +28,21 @@ function getAuthHeaders() {
     return { ...getCsrfHeaders() };
 }
 
+/**
+ * Extract a translated error message from a parsed API error body.
+ * Uses error_code for i18n when available, falls back to the raw error string.
+ * @param {Object} body - Parsed JSON error response
+ * @returns {string}
+ */
+function extractApiError(body) {
+    if (body?.error_code) {
+        const key = `errors.validation.${body.error_code}`;
+        const translated = i18n.t(key);
+        if (translated && translated !== key) return translated;
+    }
+    return body?.error || body?.message || 'Unknown error';
+}
+
 // File Operations Module
 const fileOps = {
     // ========================================================================

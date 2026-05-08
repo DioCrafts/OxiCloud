@@ -198,12 +198,7 @@ impl FileManagementUseCase for FileManagementService {
     }
 
     async fn rename_file(&self, file_id: &str, new_name: &str) -> Result<FileDto, DomainError> {
-        if let Err(reason) = validate_storage_name(new_name) {
-            return Err(DomainError::validation_error(format!(
-                "Invalid file name '{new_name}': {reason}"
-            )));
-        }
-
+        validate_storage_name(new_name).map_err(DomainError::from)?;
         info!("Renaming file with ID: {} to \"{}\"", file_id, new_name);
 
         let renamed_file = self

@@ -31,6 +31,7 @@ macro_rules! impl_infra_error_to_domain {
                     entity_type: $entity_type,
                     entity_id: None,
                     message: format!("{}", err),
+                    error_code: None,
                     source: Some(Box::new(err)),
                 }
             }

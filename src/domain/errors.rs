@@ -64,6 +64,8 @@ pub struct DomainError {
     pub entity_id: Option<String>,
     /// Descriptive error message
     pub message: String,
+    /// Optional stable machine-readable code for client-side i18n (e.g. "name_empty").
+    pub error_code: Option<&'static str>,
     /// Source error (optional)
     #[source]
     pub source: Option<Box<dyn StdError + Send + Sync>>,
@@ -77,6 +79,7 @@ impl DomainError {
             entity_type,
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -89,6 +92,7 @@ impl DomainError {
             entity_type,
             entity_id: Some(id.clone()),
             message: format!("{} not found: {}", entity_type, id),
+            error_code: None,
             source: None,
         }
     }
@@ -101,6 +105,7 @@ impl DomainError {
             entity_type,
             entity_id: Some(id.clone()),
             message: format!("{} already exists: {}", entity_type, id),
+            error_code: None,
             source: None,
         }
     }
@@ -117,6 +122,7 @@ impl DomainError {
             entity_type,
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -128,6 +134,7 @@ impl DomainError {
             entity_type,
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -139,6 +146,7 @@ impl DomainError {
             entity_type,
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -150,6 +158,7 @@ impl DomainError {
             entity_type: "Authorization",
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -161,6 +170,7 @@ impl DomainError {
             entity_type: "Database",
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -172,6 +182,7 @@ impl DomainError {
             entity_type: "Storage",
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -183,6 +194,7 @@ impl DomainError {
             entity_type: "Validation",
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -194,6 +206,7 @@ impl DomainError {
             entity_type,
             entity_id: None,
             message: message.into(),
+            error_code: None,
             source: None,
         }
     }
@@ -201,6 +214,12 @@ impl DomainError {
     /// Sets the entity ID
     pub fn with_id<S: Into<String>>(mut self, entity_id: S) -> Self {
         self.entity_id = Some(entity_id.into());
+        self
+    }
+
+    /// Attaches a stable machine-readable code for client-side i18n.
+    pub fn with_code(mut self, code: &'static str) -> Self {
+        self.error_code = Some(code);
         self
     }
 
@@ -236,6 +255,7 @@ impl<T, E: StdError + Send + Sync + 'static> ErrorContext<T, E> for std::result:
             entity_type: "Unknown",
             entity_id: None,
             message: context().into(),
+            error_code: None,
             source: Some(Box::new(e)),
         })
     }
@@ -250,6 +270,7 @@ impl<T, E: StdError + Send + Sync + 'static> ErrorContext<T, E> for std::result:
             entity_type,
             entity_id: None,
             message: format!("{}", e),
+            error_code: None,
             source: Some(Box::new(e)),
         })
     }
@@ -263,6 +284,7 @@ impl From<std::io::Error> for DomainError {
             entity_type: "IO",
             entity_id: None,
             message: format!("{}", err),
+            error_code: None,
             source: Some(Box::new(err)),
         }
     }
@@ -275,6 +297,7 @@ impl From<uuid::Error> for DomainError {
             entity_type: "UUID",
             entity_id: None,
             message: format!("{}", err),
+            error_code: None,
             source: Some(Box::new(err)),
         }
     }

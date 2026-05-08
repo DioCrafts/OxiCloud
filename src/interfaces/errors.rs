@@ -19,6 +19,7 @@ pub struct AppError {
     pub status_code: StatusCode,
     pub message: String,
     pub error_type: String,
+    pub error_code: Option<&'static str>,
 }
 
 /// JSON response structure for errors.
@@ -32,6 +33,8 @@ pub struct ErrorResponse {
     pub error: String,
     pub message: String,
     pub error_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<&'static str>,
 }
 
 impl AppError {
@@ -45,6 +48,7 @@ impl AppError {
             status_code,
             message: message.into(),
             error_type: error_type.into(),
+            error_code: None,
         }
     }
 
@@ -131,6 +135,7 @@ impl From<DomainError> for AppError {
             status_code,
             message: err.message,
             error_type: err.kind.to_string(),
+            error_code: err.error_code,
         }
     }
 }
@@ -159,6 +164,7 @@ impl IntoResponse for AppError {
             error: client_message.clone(),
             message: client_message,
             error_type: self.error_type,
+            error_code: self.error_code,
         };
 
         let body = Json(error_response);
