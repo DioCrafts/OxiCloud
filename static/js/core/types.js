@@ -2,6 +2,13 @@
  * @typedef {'file' | 'folder'} ItemTypeEnum
  */
 
+/**
+ * @typedef {Object} ApiErrorResponse
+ * @property {String} error
+ * @property {String} error_type
+ * @property {String|null} error_code
+ */
+
 // FIXME to simplify
 /**
  * @typedef {Object} LightItem
