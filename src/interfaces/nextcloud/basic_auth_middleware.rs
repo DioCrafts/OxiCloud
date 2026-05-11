@@ -63,7 +63,7 @@ pub async fn basic_auth_middleware(
         parse_basic_auth(auth_header).ok_or(NextcloudAuthError::Unauthorized)?;
 
     // Check account lockout before attempting password verification (saves CPU).
-    // The lockout is per (account, IP) — see #323 for rationale.
+    // The lockout is per (account, IP), see #323 for rationale.
     let client_ip =
         crate::interfaces::middleware::rate_limit::extract_client_ip(&request);
     if let Some(auth_svc) = state.auth_service.as_ref()
@@ -73,7 +73,7 @@ pub async fn basic_auth_middleware(
             username = %username,
             client_ip = %client_ip,
             lockout_remaining_secs = secs,
-            "[NC] Account locked — too many failed attempts from this IP"
+            "[NC] Account locked, too many failed attempts from this IP"
         );
         return Err(NextcloudAuthError::Unauthorized);
     }

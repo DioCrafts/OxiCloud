@@ -5,7 +5,7 @@
 //! [`RateLimiter`] instance with independently tuneable limits.
 //!
 //! The middleware extracts the client IP from (in order):
-//! 1. `X-Forwarded-For` header (first entry — set by reverse proxies)
+//! 1. `X-Forwarded-For` header (first entry, set by reverse proxies)
 //! 2. `X-Real-Ip` header
 //! 3. The TCP peer address from the connection info
 //!
@@ -24,7 +24,7 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
 /// Cached value of `OXICLOUD_TRUST_PROXY_HEADERS` env var.
-/// Read once on first access, never again — avoids a syscall per request.
+/// Read once on first access, never again, avoids a syscall per request.
 static TRUST_PROXY: OnceLock<bool> = OnceLock::new();
 
 /// A simple sliding-window counter keyed by IP address.
@@ -44,9 +44,9 @@ pub struct RateLimiter {
 impl RateLimiter {
     /// Create a new rate limiter.
     ///
-    /// * `max_requests` — ceiling per IP within the window
-    /// * `window_secs`  — sliding window duration
-    /// * `max_entries`  — upper bound on tracked IPs (evicts LRU when exceeded)
+    /// * `max_requests`, ceiling per IP within the window
+    /// * `window_secs` , sliding window duration
+    /// * `max_entries` , upper bound on tracked IPs (evicts LRU when exceeded)
     pub fn new(max_requests: u32, window_secs: u64, max_entries: u64) -> Self {
         let cache = Cache::builder()
             .time_to_live(Duration::from_secs(window_secs))
@@ -73,7 +73,7 @@ impl RateLimiter {
         // the *existing* value when the key was already present, we must always
         // re-insert so the counter actually advances. The TTL of the **first**
         // insert still governs eviction because moka uses insert-time TTL.
-        // However, on re-insert moka resets the TTL — for rate limiting this
+        // However, on re-insert moka resets the TTL, for rate limiting this
         // is fine because it means the window "slides" forward on activity.
         self.cache.insert(ip.to_string(), count);
 
@@ -122,7 +122,7 @@ pub fn extract_client_ip_from_parts(
     });
 
     if trust_proxy {
-        // 1. X-Forwarded-For (first entry — closest to the client)
+        // 1. X-Forwarded-For (first entry, closest to the client)
         if let Some(xff) = headers.get("x-forwarded-for").and_then(|v| v.to_str().ok())
             && let Some(first) = xff.split(',').next()
         {
@@ -146,7 +146,7 @@ pub fn extract_client_ip_from_parts(
         return addr.ip().to_string();
     }
 
-    // Fallback — should never happen behind axum::serve
+    // Fallback, should never happen behind axum::serve
     "unknown".to_string()
 }
 

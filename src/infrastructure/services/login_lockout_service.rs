@@ -1,9 +1,9 @@
-//! Account lockout service — blocks login for an account after N consecutive
+//! Account lockout service, blocks login for an account after N consecutive
 //! failed attempts.
 //!
 //! Uses a `moka` TTL cache so that:
 //! * Failed-attempt counters automatically expire after the lockout window.
-//! * No database writes are needed — this is **in-memory** and therefore
+//! * No database writes are needed, this is **in-memory** and therefore
 //!   per-instance.  If OxiCloud is deployed behind a load balancer with
 //!   multiple replicas, a sticky-session or shared Redis store would be
 //!   needed for cross-instance coordination (out of scope for v1).
@@ -40,9 +40,9 @@ pub struct LoginLockoutService {
 impl LoginLockoutService {
     /// Create a new lockout service.
     ///
-    /// * `max_failures`  — e.g. `5` (lock after 5 bad passwords)
-    /// * `lockout_secs`  — e.g. `900` (15-minute lockout)
-    /// * `max_accounts`  — upper bound on tracked accounts (evicts LRU)
+    /// * `max_failures` , e.g. `5` (lock after 5 bad passwords)
+    /// * `lockout_secs` , e.g. `900` (15-minute lockout)
+    /// * `max_accounts` , upper bound on tracked accounts (evicts LRU)
     pub fn new(max_failures: u32, lockout_secs: u64, max_accounts: u64) -> Self {
         let cache = Cache::builder()
             .time_to_live(Duration::from_secs(lockout_secs))
@@ -60,8 +60,8 @@ impl LoginLockoutService {
     /// The IP is part of the key so that an attacker flooding bad passwords
     /// from one address cannot lock a legitimate user out of the same account
     /// from a different address (issue #323). When the caller cannot resolve
-    /// a real IP — e.g. `OXICLOUD_TRUST_PROXY_HEADERS=false` and the peer
-    /// address isn't available — `client_ip` should be a non-empty constant
+    /// a real IP, e.g. `OXICLOUD_TRUST_PROXY_HEADERS=false` and the peer
+    /// address isn't available, `client_ip` should be a non-empty constant
     /// like `"unknown"`; in that pathological case we fall back to
     /// account-scoped lockout, which is no worse than the previous
     /// behaviour.
@@ -106,7 +106,7 @@ impl LoginLockoutService {
         new_count
     }
 
-    /// Record a successful login — resets the failure counter for this
+    /// Record a successful login, resets the failure counter for this
     /// (account, IP) pair so the user isn't penalised for stray earlier
     /// failures from the same address.
     pub fn record_success(&self, username: &str, client_ip: &str) {
@@ -137,7 +137,7 @@ mod tests {
         assert!(svc.check("alice", IP1).is_ok());
         svc.record_failure("alice", IP1);
         svc.record_failure("alice", IP1);
-        // 2 failures — still under threshold
+        // 2 failures, still under threshold
         assert!(svc.check("alice", IP1).is_ok());
     }
 
@@ -156,7 +156,7 @@ mod tests {
         svc.record_failure("carol", IP1);
         svc.record_failure("carol", IP1);
         svc.record_success("carol", IP1);
-        // Counter reset — should be allowed again
+        // Counter reset, should be allowed again
         assert!(svc.check("carol", IP1).is_ok());
         svc.record_failure("carol", IP1); // starts over at 1
         assert!(svc.check("carol", IP1).is_ok());
@@ -189,11 +189,11 @@ mod tests {
         // A legitimate user coming from IP2 must still be allowed to try.
         assert!(
             svc.check("admin", IP2).is_ok(),
-            "second IP must not inherit the lockout — that's the #323 DOS"
+            "second IP must not inherit the lockout, that's the #323 DOS"
         );
     }
 
-    /// A successful login on one IP must clear *that* IP's counter only —
+    /// A successful login on one IP must clear *that* IP's counter only,
     /// it should NOT silently absolve a separate, ongoing brute-force from
     /// a different IP against the same account.
     #[test]

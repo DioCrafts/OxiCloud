@@ -19,7 +19,7 @@ use crate::interfaces::errors::AppError;
 use crate::interfaces::middleware::auth::CurrentUserId;
 use crate::interfaces::middleware::rate_limit::extract_client_ip_from_parts;
 
-/// Public auth routes — no authentication required.
+/// Public auth routes, no authentication required.
 pub fn auth_public_routes() -> Router<Arc<AppState>> {
     Router::new()
         .route("/status", get(get_system_status))
@@ -30,7 +30,7 @@ pub fn auth_public_routes() -> Router<Arc<AppState>> {
         .route("/oidc/exchange", post(oidc_exchange))
 }
 
-/// Protected auth routes — require authentication (auth + CSRF middleware
+/// Protected auth routes, require authentication (auth + CSRF middleware
 /// must be applied by the caller in main.rs).
 pub fn auth_protected_routes() -> Router<Arc<AppState>> {
     Router::new()
@@ -39,7 +39,7 @@ pub fn auth_protected_routes() -> Router<Arc<AppState>> {
         .route("/logout", post(logout))
 }
 
-/// Rate-limited auth routes — split out so main.rs can apply per-endpoint
+/// Rate-limited auth routes, split out so main.rs can apply per-endpoint
 /// rate limiting middleware independently.
 pub fn login_route() -> Router<Arc<AppState>> {
     Router::new().route("/login", post(login))
@@ -53,7 +53,7 @@ pub fn refresh_route() -> Router<Arc<AppState>> {
     Router::new().route("/refresh", post(refresh_token))
 }
 
-/// Public setup route — only active before the first admin is created.
+/// Public setup route, only active before the first admin is created.
 pub fn setup_route() -> Router<Arc<AppState>> {
     Router::new().route("/setup", post(setup_admin))
 }
@@ -157,7 +157,7 @@ async fn login(
             username = %dto.username,
             client_ip = %client_ip,
             lockout_secs = lockout_secs,
-            "Login rejected — account temporarily locked for this IP"
+            "Login rejected, account temporarily locked for this IP"
         );
         return Err(AppError::new(
             StatusCode::TOO_MANY_REQUESTS,
@@ -186,7 +186,7 @@ async fn login(
         .await
     {
         Ok(auth_response) => {
-            // ── Successful login — reset lockout counter ──
+            // ── Successful login, reset lockout counter ──
             auth_service
                 .login_lockout
                 .record_success(&dto.username, &client_ip);
@@ -218,7 +218,7 @@ async fn login(
             cookie_auth::append_csrf_cookie(response.headers_mut(), auth_response.expires_in);
 
             // Diagnostic: warn when Secure cookies are set but the request
-            // arrived over plain HTTP — the browser will reject them (#241).
+            // arrived over plain HTTP, the browser will reject them (#241).
             if cookie_auth::is_cookie_secure() {
                 let is_tls = headers
                     .get("x-forwarded-proto")
@@ -248,7 +248,7 @@ async fn login(
     }
 }
 
-/// Token refresh — accepts the refresh token from **either**:
+/// Token refresh, accepts the refresh token from **either**:
 /// 1. JSON body `{ "refresh_token": "..." }` (API clients, backward compat)
 /// 2. HttpOnly cookie `oxicloud_refresh` (browsers)
 async fn refresh_token(
@@ -385,7 +385,7 @@ async fn logout(
     Ok(response)
 }
 
-/// POST /api/setup — One-time endpoint to create the first admin user.
+/// POST /api/setup, One-time endpoint to create the first admin user.
 ///
 /// Available only when the system is not yet initialized (no admin exists).
 /// Once the admin is created, the system is marked as initialized and this
@@ -426,7 +426,7 @@ async fn setup_admin(
         ));
     }
 
-    // 4. ATOMIC: claim initialization — only one concurrent request can win.
+    // 4. ATOMIC: claim initialization, only one concurrent request can win.
     //    We use Uuid::nil() as a placeholder because the admin user
     //    doesn't exist yet. It will be updated to the real id below.
     let claimed = admin_svc
@@ -462,7 +462,7 @@ async fn setup_admin(
     // 5. Update the initialization record with the real admin user_id
     let real_user_id = Uuid::parse_str(&user.id).unwrap_or_default();
     if let Err(e) = admin_svc.mark_system_initialized(real_user_id).await {
-        // Not fatal — the claim already prevents concurrent re-initialization,
+        // Not fatal, the claim already prevents concurrent re-initialization,
         // and the "pending" marker is still "true" so the system stays locked.
         tracing::error!(
             "Created admin but failed to update initialized_by with real user id: {}",
@@ -532,7 +532,7 @@ async fn get_system_status(
 // OIDC Handlers
 // ============================================================================
 
-/// GET /api/auth/oidc/providers — Returns OIDC provider info for the UI
+/// GET /api/auth/oidc/providers, Returns OIDC provider info for the UI
 async fn oidc_providers(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
     let auth_service = state
         .auth_service
@@ -560,7 +560,7 @@ async fn oidc_providers(State(state): State<Arc<AppState>>) -> Result<impl IntoR
     }))
 }
 
-/// GET /api/auth/oidc/authorize — Redirects user to the OIDC provider
+/// GET /api/auth/oidc/authorize, Redirects user to the OIDC provider
 async fn oidc_authorize(State(state): State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
     let auth_service = state
         .auth_service
@@ -585,7 +585,7 @@ async fn oidc_authorize(State(state): State<Arc<AppState>>) -> Result<impl IntoR
     Ok(Redirect::temporary(&authorize_url))
 }
 
-/// GET /api/auth/oidc/callback?code=...&state=... — Handles OIDC callback
+/// GET /api/auth/oidc/callback?code=...&state=..., Handles OIDC callback
 async fn oidc_callback(
     State(state): State<Arc<AppState>>,
     Query(query): Query<OidcCallbackQueryDto>,
@@ -618,7 +618,7 @@ async fn oidc_callback(
 
     match result {
         OidcCallbackResult::WebLogin { exchange_code } => {
-            // Regular web login — redirect to frontend with exchange code
+            // Regular web login, redirect to frontend with exchange code
             let config = auth_app.oidc_config().unwrap();
             let frontend_url = config.frontend_url.trim_end_matches('/');
             let redirect_url = format!("{}/?oidc_code={}", frontend_url, exchange_code);
@@ -630,7 +630,7 @@ async fn oidc_callback(
             user_id,
             username,
         } => {
-            // Nextcloud Login Flow v2 — create app password and complete flow
+            // Nextcloud Login Flow v2, create app password and complete flow
             let nextcloud = state
                 .nextcloud
                 .as_ref()
@@ -674,7 +674,7 @@ async fn oidc_callback(
     }
 }
 
-/// POST /api/auth/oidc/exchange — Exchange one-time code for auth tokens
+/// POST /api/auth/oidc/exchange, Exchange one-time code for auth tokens
 /// Request body: { "code": "<one_time_code>" }
 async fn oidc_exchange(
     State(state): State<Arc<AppState>>,
