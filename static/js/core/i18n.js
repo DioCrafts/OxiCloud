@@ -5,17 +5,36 @@
  * It loads translations from the server and provides functions to translate keys.
  */
 
-// Current locale code (default to browser locale if available, fallback to English)
-let currentLocale = navigator.language?.substring(0, 2) || navigator.userLanguage?.substring(0, 2) || 'en';
-
 // Supported locales (languages that have locale files on the server)
-// When a locale file is not found, the system gracefully falls back to English
-const supportedLocales = ['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'nl', 'it', 'hi', 'ar', 'ru', 'ja', 'ko', 'pl'];
+// Keep in sync with AVAILABLE_LOCALES in core/languageSelector.js
+const supportedLocales = ['en', 'es', 'zh', 'zh-TW', 'fa', 'fr', 'de', 'pt', 'nl', 'it', 'hi', 'ar', 'ru', 'ja', 'ko', 'pl'];
 
-// Fallback to English if locale is not supported
-if (!supportedLocales.includes(currentLocale)) {
-    currentLocale = 'en';
+// Resolve the best supported locale from a browser language list.
+// Priority: exact full-tag (zh-TW) > Chinese script/region heuristics > primary subtag (zh)
+function resolveBrowserLocale() {
+    const browserLangs = navigator.languages || [navigator.language || 'en'];
+    const lowerSupported = supportedLocales.map((l) => l.toLowerCase());
+
+    for (const bl of browserLangs) {
+        const idx = lowerSupported.indexOf(bl.toLowerCase());
+        if (idx !== -1) return supportedLocales[idx];
+    }
+    for (const bl of browserLangs) {
+        const tag = bl.toLowerCase();
+        if (!tag.startsWith('zh')) continue;
+        const isTraditional = tag.includes('hant') || /\b(tw|hk|mo)\b/.test(tag);
+        const target = isTraditional ? 'zh-TW' : 'zh';
+        if (supportedLocales.includes(target)) return target;
+    }
+    for (const bl of browserLangs) {
+        const primary = bl.substring(0, 2).toLowerCase();
+        if (supportedLocales.includes(primary)) return primary;
+    }
+    return 'en';
 }
+
+// Current locale code (overridden by saved preference in initI18n)
+let currentLocale = resolveBrowserLocale();
 
 // Cache for translations
 /** @type {Record<string, Object>} */
@@ -86,82 +105,6 @@ function getNestedValue(obj, path) {
     }
 
     return typeof current === 'string' ? current : null;
-}
-
-/**
- * Translate a key to the current locale
- * @param {string} key - The translation key (dot notation, e.g., 'app.title')
- * @param {object} params - Parameters to replace in the translation (e.g., {name: 'John'})
- * @returns {string} - The translated string or the key itself if not found
- */
-
-// biome-ignore lint/correctness/noUnusedVariables: global function
-function t(key, params = {}) {
-    // Get translation from cache
-    const localeData = translations[currentLocale];
-    if (!localeData) {
-        // Translation not loaded yet, return key
-        console.warn(`Translations for ${currentLocale} not loaded yet`);
-        return key;
-    }
-
-    // Special handling for shared_ and share_ prefixed keys
-    if (key.startsWith('shared_') || key.startsWith('share_')) {
-        const unprefixedKey = key.replace(/^(shared|share)_/, '');
-        const prefixObj = key.startsWith('shared_') ? localeData.shared : localeData.share;
-
-        if (prefixObj && typeof prefixObj === 'object' && unprefixedKey in prefixObj) {
-            return interpolate(prefixObj[unprefixedKey], params);
-        }
-    }
-
-    // Get the translation value
-    let value = getNestedValue(localeData, key);
-
-    // Compatibility aliases for legacy share.* keys used in some views
-    if (!value) {
-        const aliasMap = {
-            'share.enablePassword': 'share.password',
-            'share.enableExpiration': 'share.expiration',
-            'share.notifyEmail': 'share.notifyEmailLabel',
-            'share.notifyMessage': 'share.notifyMessageLabel'
-        };
-        const aliasKey = aliasMap[key];
-        if (aliasKey) {
-            value = getNestedValue(localeData, aliasKey);
-        }
-    }
-
-    if (!value) {
-        // Try fallback to English
-        if (currentLocale !== 'en' && translations.en) {
-            let fallbackValue = getNestedValue(translations.en, key);
-
-            if (!fallbackValue) {
-                const aliasMap = {
-                    'share.enablePassword': 'share.password',
-                    'share.enableExpiration': 'share.expiration',
-                    'share.notifyEmail': 'share.notifyEmailLabel',
-                    'share.notifyMessage': 'share.notifyMessageLabel'
-                };
-                const aliasKey = aliasMap[key];
-                if (aliasKey) {
-                    fallbackValue = getNestedValue(translations.en, aliasKey);
-                }
-            }
-
-            if (fallbackValue) {
-                return interpolate(fallbackValue, params);
-            }
-        }
-
-        // Key not found, return key
-        console.warn(`Translation key not found: ${key}`);
-        return key;
-    }
-
-    // Replace parameters
-    return interpolate(value, params);
 }
 
 /**
@@ -259,12 +202,16 @@ function translateElement(root) {
 
     el.querySelectorAll('[data-i18n-placeholder]').forEach((element) => {
         const key = element.getAttribute('data-i18n-placeholder');
-        element.placeholder = resolve(key);
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+            element.placeholder = resolve(key);
+        }
     });
 
     el.querySelectorAll('[data-i18n-title]').forEach((element) => {
         const key = element.getAttribute('data-i18n-title');
-        element.title = resolve(key);
+        if (element instanceof HTMLElement) {
+            element.title = resolve(key);
+        }
     });
 }
 

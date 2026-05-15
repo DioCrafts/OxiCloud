@@ -19,6 +19,27 @@ const USER_DATA_KEY = 'oxicloud_user';
 const LOCALE_KEY = 'oxicloud-locale';
 const FIRST_RUN_KEY = 'oxicloud_first_run_completed';
 
+/**
+ * Narrow a thrown value (TS unknown) to a displayable message string.
+ * Returns '' for non-Error throws so callers can fall back via `errMessage(e) || fallback`.
+ * @param {unknown} e
+ * @returns {string}
+ */
+function errMessage(e) {
+    return e instanceof Error ? e.message : '';
+}
+
+/**
+ * Read the value of an <input>/<textarea> by ID. Returns '' if missing.
+ * Centralises the HTMLInputElement cast we'd otherwise repeat at every callsite.
+ * @param {string} id
+ * @returns {string}
+ */
+function inputVal(id) {
+    const el = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (document.getElementById(id));
+    return el?.value ?? '';
+}
+
 // Language selector texts (used before i18n is loaded)
 const LANGUAGE_TEXTS = {
     en: {
@@ -47,6 +68,15 @@ const LANGUAGE_TEXTS = {
         moreLanguages: '更多语言...',
         modalTitle: '选择语言',
         searchPlaceholder: '搜索语言...'
+    },
+    'zh-TW': {
+        title: '歡迎！',
+        subtitle: '選擇您的語言以繼續',
+        continue: '繼續',
+        autodetected: '我們偵測到您的語言',
+        moreLanguages: '更多語言...',
+        modalTitle: '選擇語言',
+        searchPlaceholder: '搜尋語言...'
     },
     fa: {
         title: '!خوش آمدید',
@@ -132,9 +162,16 @@ export const ALL_LANGUAGES = [
     },
     {
         code: 'zh',
-        name: 'Chinese',
-        nativeName: '中文',
+        name: 'Simplified Chinese',
+        nativeName: '简体中文',
         flag: '🇨🇳',
+        popular: true
+    },
+    {
+        code: 'zh-TW',
+        name: 'Traditional Chinese',
+        nativeName: '繁體中文',
+        flag: '🇹🇼',
         popular: true
     },
     {
@@ -368,13 +405,32 @@ async function checkSystemStatus() {
 }
 
 // Detect user's browser language and return the best matching language from ALL_LANGUAGES
+// Priority: exact full-tag (zh-TW) > Chinese script/region heuristics > primary subtag (zh)
 function detectBrowserLanguage() {
-    const browserLangs = navigator.languages || [navigator.language || navigator.userLanguage || 'en'];
+    const browserLangs = navigator.languages || [navigator.language || 'en'];
+
     for (const bl of browserLangs) {
-        const code = bl.substring(0, 2).toLowerCase();
-        const match = ALL_LANGUAGES.find((l) => l.code === code);
+        const tag = bl.toLowerCase();
+        const exact = ALL_LANGUAGES.find((l) => l.code.toLowerCase() === tag);
+        if (exact) return exact;
+    }
+
+    // Chrome on macOS/Linux may report "zh-Hant", "zh-Hant-TW", "zh-Hans" without a plain region tag
+    for (const bl of browserLangs) {
+        const tag = bl.toLowerCase();
+        if (!tag.startsWith('zh')) continue;
+        const isTraditional = tag.includes('hant') || /\b(tw|hk|mo)\b/.test(tag);
+        const target = isTraditional ? 'zh-TW' : 'zh';
+        const match = ALL_LANGUAGES.find((l) => l.code === target);
         if (match) return match;
     }
+
+    for (const bl of browserLangs) {
+        const primary = bl.substring(0, 2).toLowerCase();
+        const match = ALL_LANGUAGES.find((l) => l.code === primary);
+        if (match) return match;
+    }
+
     return ALL_LANGUAGES[0]; // fallback to English
 }
 
@@ -403,7 +459,7 @@ function initLanguageSelector() {
     const pickerList = document.getElementById('lang-picker-list');
     const pickerFlag = document.getElementById('lang-picker-flag');
     const pickerName = document.getElementById('lang-picker-name');
-    const searchInput = document.getElementById('lang-picker-search-input');
+    const searchInput = /** @type {HTMLInputElement | null} */ (document.getElementById('lang-picker-search-input'));
 
     if (!languagePanel || !picker || !pickerFlag || !pickerName || !pickerList) return;
 
@@ -500,7 +556,7 @@ function initLanguageSelector() {
 
     // Close when clicking outside
     document.addEventListener('click', (e) => {
-        if (!picker.contains(e.target)) closePicker();
+        if (e.target instanceof Node && !picker.contains(e.target)) closePicker();
     });
 
     // --- Continue button ---
@@ -546,7 +602,7 @@ function updateLanguagePanelTexts(lang) {
     const titleEl = document.getElementById('language-title');
     const subtitleEl = document.getElementById('language-subtitle');
     const continueBtn = document.getElementById('language-continue');
-    const searchInput = document.getElementById('lang-picker-search-input');
+    const searchInput = /** @type {HTMLInputElement | null} */ (document.getElementById('lang-picker-search-input'));
 
     if (titleEl) titleEl.textContent = texts.title;
     if (subtitleEl) subtitleEl.textContent = texts.subtitle;
@@ -657,9 +713,16 @@ async function configureOidcLoginUI() {
 }
 
 // DOM elements
-let loginPanel, registerPanel, adminSetupPanel;
-let loginForm, registerForm, adminSetupForm;
-let loginError, registerError, registerSuccess, adminSetupError;
+/** @type {HTMLElement | null} */ let loginPanel = null;
+/** @type {HTMLElement | null} */ let registerPanel = null;
+/** @type {HTMLElement | null} */ let adminSetupPanel = null;
+/** @type {HTMLFormElement | null} */ let loginForm = null;
+/** @type {HTMLFormElement | null} */ let registerForm = null;
+/** @type {HTMLFormElement | null} */ let adminSetupForm = null;
+/** @type {HTMLElement | null} */ let loginError = null;
+/** @type {HTMLElement | null} */ let registerError = null;
+/** @type {HTMLElement | null} */ let registerSuccess = null;
+/** @type {HTMLElement | null} */ let adminSetupError = null;
 
 // Initialize DOM elements only if we're on the login page
 function initLoginElements() {
@@ -673,9 +736,9 @@ function initLoginElements() {
     registerPanel = document.getElementById('register-panel');
     adminSetupPanel = document.getElementById('admin-setup-panel');
 
-    loginForm = document.getElementById('login-form');
-    registerForm = document.getElementById('register-form');
-    adminSetupForm = document.getElementById('admin-setup-form');
+    loginForm = /** @type {HTMLFormElement | null} */ (document.getElementById('login-form'));
+    registerForm = /** @type {HTMLFormElement | null} */ (document.getElementById('register-form'));
+    adminSetupForm = /** @type {HTMLFormElement | null} */ (document.getElementById('admin-setup-form'));
 
     loginError = document.getElementById('login-error');
     registerError = document.getElementById('register-error');
@@ -853,7 +916,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
             } catch (err) {
-                console.log('Session probe failed, showing login page:', err.message);
+                console.log('Session probe failed, showing login page:', errMessage(err));
             }
             // No valid session — stay on login page
             localStorage.removeItem(USER_DATA_KEY);
@@ -879,8 +942,8 @@ if (isLoginPage && loginForm) {
         // Clear previous errors
         loginError.style.display = 'none';
 
-        const username = document.getElementById('login-username').value;
-        const password = document.getElementById('login-password').value;
+        const username = inputVal('login-username');
+        const password = inputVal('login-password');
 
         try {
             const data = await login(username, password);
@@ -917,7 +980,7 @@ if (isLoginPage && loginForm) {
             }
             redirectToMainApp();
         } catch (error) {
-            loginError.textContent = error.message || 'Error logging in';
+            loginError.textContent = errMessage(error) || 'Error logging in';
             loginError.style.display = 'block';
         }
     });
@@ -932,10 +995,10 @@ if (isLoginPage && registerForm) {
         registerError.style.display = 'none';
         registerSuccess.style.display = 'none';
 
-        const username = document.getElementById('register-username').value;
-        const email = document.getElementById('register-email').value;
-        const password = document.getElementById('register-password').value;
-        const confirmPassword = document.getElementById('register-password-confirm').value;
+        const username = inputVal('register-username');
+        const email = inputVal('register-email');
+        const password = inputVal('register-password');
+        const confirmPassword = inputVal('register-password-confirm');
 
         // Validate passwords match
         if (password !== confirmPassword) {
@@ -959,7 +1022,7 @@ if (isLoginPage && registerForm) {
                 hidePanel(registerPanel);
             }, 2000);
         } catch (error) {
-            registerError.textContent = error.message || i18n.t('auth.admin_create_error');
+            registerError.textContent = errMessage(error) || i18n.t('auth.admin_create_error');
             registerError.style.display = 'block';
         }
     });
@@ -975,9 +1038,9 @@ if (isLoginPage && adminSetupForm) {
         const adminSetupSuccess = document.getElementById('admin-setup-success');
         if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
 
-        const email = document.getElementById('admin-email').value;
-        const password = document.getElementById('admin-password').value;
-        const confirmPassword = document.getElementById('admin-password-confirm').value;
+        const email = inputVal('admin-email');
+        const password = inputVal('admin-password');
+        const confirmPassword = inputVal('admin-password-confirm');
 
         // Validate passwords match
         if (password !== confirmPassword) {
@@ -1016,7 +1079,7 @@ if (isLoginPage && adminSetupForm) {
                 if (adminSetupSuccess) adminSetupSuccess.style.display = 'none';
             }, 2000);
         } catch (error) {
-            adminSetupError.textContent = error.message || i18n.t('auth.admin_create_error');
+            adminSetupError.textContent = errMessage(error) || i18n.t('auth.admin_create_error');
             adminSetupError.style.display = 'block';
         }
     });
@@ -1121,29 +1184,6 @@ async function register(username, email, password, role = 'user') {
 }
 
 /**
- * Fetch current user data — relies on HttpOnly cookie (auto-sent).
- */
-
-// biome-ignore lint/correctness/noUnusedVariables: global function
-async function fetchUserData() {
-    try {
-        const response = await fetch(ME_ENDPOINT, {
-            method: 'GET',
-            credentials: 'same-origin'
-        });
-
-        if (!response.ok) {
-            throw new Error('Error fetching user data');
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching user data:', error);
-        throw error;
-    }
-}
-
-/**
  * Refresh authentication token via the server's refresh endpoint.
  * The refresh-token cookie is sent automatically (HttpOnly, Path=/api/auth).
  * Returns true on success, false on failure.
@@ -1238,22 +1278,3 @@ function redirectToMainApp() {
     }
 }
 
-/**
- * Logout — tell the server to clear HttpOnly cookies, then redirect.
- */
-
-// biome-ignore lint/correctness/noUnusedVariables: global function
-async function logout() {
-    try {
-        await fetch('/api/auth/logout', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: getCsrfHeaders()
-        });
-    } catch (e) {
-        console.warn('Logout request failed:', e);
-    }
-    localStorage.removeItem(USER_DATA_KEY);
-    localStorage.removeItem('refresh_attempts');
-    window.location.href = '/login';
-}
