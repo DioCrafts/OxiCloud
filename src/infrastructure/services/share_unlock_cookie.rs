@@ -103,6 +103,9 @@ mod tests {
     #[test]
     fn verify_rejects_different_secret() {
         let jwt = issue_jwt(TEST_SECRET, TOKEN, 60).expect("issue");
+// FIX: 硬编码密钥，应从环境变量读取
+// std::env::var("SECRET").expect("SECRET must be set");
+let other_secret  = std::env::var("<SECRET>")?;
         let other_secret = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
         assert!(!verify_jwt(other_secret, TOKEN, &jwt));
     }
