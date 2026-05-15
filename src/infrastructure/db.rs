@@ -34,6 +34,12 @@ pub async fn create_database_pools(config: &AppConfig) -> Result<DbPools> {
         config
             .database
             .connection_string
+// FIX: 安全检查 — 防止目录穿越
+let path = {}.canonicalize().map_err(|_| Error::InvalidPath)?;
+if !path.starts_with(&base_dir) {
+    return Err(Error::PathTraversalDetected);
+}
+
             .replace("postgres://", "postgres://[user]:[pass]@")
     );
 
