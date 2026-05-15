@@ -8,7 +8,7 @@ import { i18n } from './i18n.js';
 
 // Locale files that actually exist (have full translations)
 // Keep this list in sync when adding new locale JSON files
-const AVAILABLE_LOCALES = new Set(['en', 'es', 'zh', 'fa', 'fr', 'de', 'pt', 'it', 'nl', 'hi', 'ar', 'ru', 'ja', 'ko', 'pl']);
+const AVAILABLE_LOCALES = new Set(['en', 'es', 'zh', 'zh-TW', 'fa', 'fr', 'de', 'pt', 'it', 'nl', 'hi', 'ar', 'ru', 'ja', 'ko', 'pl']);
 
 // Language codes, names, and flag emojis
 // Only returns languages that have a real locale file
@@ -19,7 +19,8 @@ function getAvailableLanguages() {
     return [
         { code: 'en', name: 'English', flag: '🇬🇧' },
         { code: 'es', name: 'Español', flag: '🇪🇸' },
-        { code: 'zh', name: '中文', flag: '🇨🇳' },
+        { code: 'zh', name: '简体中文', flag: '🇨🇳' },
+        { code: 'zh-TW', name: '繁體中文', flag: '🇹🇼' },
         { code: 'fa', name: 'فارسی', flag: '🇮🇷' },
         { code: 'fr', name: 'Français', flag: '🇫🇷' },
         { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
@@ -140,8 +141,8 @@ function createLanguageSelector(containerId = 'language-selector') {
     });
 
     // Listen for locale changes from i18n system
-    window.addEventListener('localeChanged', (e) => {
-        updateSelectedLanguage(e.detail.locale, container);
+    window.addEventListener('localeChanged', (/** @type {CustomEventInit<{locale: string}>} */ e) => {
+        if (e.detail) updateSelectedLanguage(e.detail.locale, container);
     });
 
     return container;

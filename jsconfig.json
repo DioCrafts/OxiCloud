@@ -9,7 +9,6 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "exactOptionalPropertyTypes": true,
     "lib": ["ES2022", "DOM"],
     // Treat all JS files as modules
     "moduleDetection": "force",
