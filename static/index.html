@@ -118,6 +118,14 @@
             <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle navigation menu">
                 <i class="fas fa-bars"></i>
             </button>
+            <!-- Mobile search icon (replaces full bar on small screens) -->
+            <button class="search-toggle-btn" id="search-toggle-btn" aria-label="Search">
+                <i class="fas fa-search"></i>
+            </button>
+            <!-- Back button shown when mobile search is expanded -->
+            <button class="search-back-btn" id="search-back-btn" aria-label="Close search">
+                <i class="fas fa-arrow-left"></i>
+            </button>
             <div class="search-container">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" id="search-input" data-i18n-placeholder="actions.search" placeholder="Search files, folders...">
@@ -127,8 +135,6 @@
             </div>
 
             <div class="user-controls">
-                <div id="language-selector"></div>
-
                 <!-- Notification Bell -->
                 <div class="notif-wrapper" id="notif-wrapper">
                     <button class="notif-bell-btn" id="notif-bell-btn" title="Notifications">
@@ -186,6 +192,7 @@
                             <span data-i18n="user_menu.profile">My profile</span>
                         </button>
                         <div class="user-menu-divider hidden" id="user-menu-admin-divider"></div>
+                        <div id="language-selector"></div>
                         <button class="user-menu-item" id="user-menu-theme">
                             <i class="fas fa-moon"></i>
                             <span data-i18n="user_menu.appearance">Appearance</span>

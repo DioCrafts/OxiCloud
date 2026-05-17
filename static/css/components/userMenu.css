@@ -48,6 +48,7 @@
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
+    left: auto;
     width: 300px;
     background: var(--color-bg-surface);
     border-radius: 16px;
@@ -61,6 +62,11 @@
 
 .user-menu-wrapper.open .user-menu {
     display: block;
+}
+
+[dir="rtl"] .user-menu {
+    right: auto;
+    left: 0;
 }
 
 @keyframes userMenuIn {

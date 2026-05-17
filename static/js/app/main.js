@@ -516,8 +516,32 @@ function setupEventListeners() {
         }
     });
 
+    // Mobile search toggle
+    const topBar = document.querySelector('.top-bar');
+    document.getElementById('search-toggle-btn')?.addEventListener('click', () => {
+        topBar?.classList.add('top-bar--search-active');
+        elements.searchInput?.focus();
+    });
+
+    const collapseSearch = () => {
+        topBar?.classList.remove('top-bar--search-active');
+        if (elements.searchInput) elements.searchInput.value = '';
+        if (app.isSearchMode) {
+            app.isSearchMode = false;
+            app.currentPath = '';
+            document.querySelector('.search-results-header')?.remove();
+            ui.updateBreadcrumb();
+            loadFiles();
+        }
+    };
+    document.getElementById('search-back-btn')?.addEventListener('click', collapseSearch);
+
     // Search input — Enter key
     elements.searchInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            collapseSearch();
+            return;
+        }
         if (e.key === 'Enter') {
             // Cancel any pending debounce
             if (searchDebounceTimer) clearTimeout(searchDebounceTimer);

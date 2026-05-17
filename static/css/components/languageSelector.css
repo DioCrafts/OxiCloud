@@ -1,7 +1,6 @@
 /* Language Selector - Custom Dropdown */
 .language-selector {
     position: relative;
-    margin-right: 15px;
 }
 
 .language-selector-toggle {
@@ -107,4 +106,72 @@
 
 .language-option.active .lang-check {
     opacity: 1;
+}
+
+/* ── Language selector inside user menu ── */
+.user-menu .language-selector {
+    width: 100%;
+}
+
+/* Match user-menu-item appearance exactly */
+.user-menu .language-selector-toggle {
+    width: 100%;
+    background: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    padding: 12px 20px;
+    gap: 12px;
+    color: var(--color-text-dark);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.user-menu .language-selector-toggle:hover,
+.user-menu .language-selector-toggle:focus {
+    background: var(--color-bg-hover) !important;
+    border: none !important;
+    outline: none !important;
+}
+
+.user-menu .language-selector-toggle i.fa-globe {
+    width: 20px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--color-text-subtle);
+}
+
+.user-menu .language-selector-toggle .lang-code {
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--color-text-dark);
+}
+
+/* Inline accordion — no floating */
+.user-menu .language-selector-dropdown {
+    position: static !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-top: 1px solid var(--color-border-light);
+    border-radius: 0 !important;
+    background: var(--color-bg-muted);
+    max-height: 0;
+    overflow: hidden;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    transition: max-height 0.25s ease;
+    z-index: auto !important;
+}
+
+.user-menu .language-selector.open .language-selector-dropdown {
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+/* Language options inside user menu — compact rows */
+.user-menu .language-option {
+    padding: 10px 20px 10px 28px;
+    font-size: 13.5px;
 }

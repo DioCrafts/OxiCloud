@@ -45,17 +45,45 @@
     font-size: 20px;
 }
 
-/* Mobile responsive styles for top bar */
-@media (max-width: 768px) {
-    .top-bar {
-        padding: 0 16px;
-    }
+/* Mobile search toggle button — hidden on desktop */
+.search-toggle-btn {
+    display: none;
+    background: none;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    border-radius: 8px;
+    font-size: 18px;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    flex-shrink: 0;
+}
 
-    .sidebar-toggle {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
+.search-toggle-btn:hover {
+    background-color: var(--color-border);
+}
+
+/* Back button inside expanded mobile search — hidden everywhere by default */
+.search-back-btn {
+    display: none;
+    background: none;
+    border: none;
+    padding: 10px;
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    border-radius: 8px;
+    font-size: 18px;
+    transition:
+        background-color 0.2s,
+        color 0.2s;
+    flex-shrink: 0;
+}
+
+.search-back-btn:hover {
+    background-color: var(--color-border);
+    color: var(--color-text-heading);
 }
 
 .search-container {
@@ -162,4 +190,58 @@
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+/* Mobile responsive styles for top bar */
+@media (max-width: 768px) {
+    .top-bar {
+        padding: 0 16px;
+    }
+
+    .sidebar-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Hide full search bar on mobile by default */
+    .search-container {
+        display: none;
+    }
+
+    /* Show icon-only search button; push it to the right before user-controls */
+    .search-toggle-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+    }
+
+    /* Expanded mobile search: full-width overlay of the top bar */
+    .top-bar--search-active .search-back-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .top-bar--search-active .search-container {
+        display: flex;
+        flex-grow: 1;
+        max-width: none;
+        margin: 0;
+    }
+
+    .top-bar--search-active .search-icon {
+        display: none;
+    }
+
+    .top-bar--search-active .search-container input {
+        padding-left: 16px;
+    }
+
+    .top-bar--search-active .sidebar-toggle,
+    .top-bar--search-active .search-toggle-btn,
+    .top-bar--search-active .user-controls {
+        display: none;
+    }
 }
