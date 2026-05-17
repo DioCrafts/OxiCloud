@@ -60,6 +60,9 @@ npm-debug.log
 .env.test.local
 .env.production.local
 
+# Docker Compose local overrides (e.g. dev-only bind mounts)
+docker-compose.override.yml
+
 # Log files
 *.log
 logs/
