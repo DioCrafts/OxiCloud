@@ -841,8 +841,8 @@ impl AppServiceFactory {
                 tracing::warn!("╔══════════════════════════════════════════════════════════╗");
                 tracing::warn!("║  SYSTEM NOT INITIALIZED — first admin setup required     ║");
                 tracing::warn!("║                                                          ║");
-                tracing::warn!("║  Open the web UI to create the first admin account.       ║");
-                tracing::warn!("║  The setup page is available until an admin is created.    ║");
+                tracing::warn!("║  Open the web UI to create the first admin account.      ║");
+                tracing::warn!("║  The setup page is available until an admin is created.  ║");
                 tracing::warn!("╚══════════════════════════════════════════════════════════╝");
             } else {
                 tracing::info!("System already initialized — setup endpoint disabled");
