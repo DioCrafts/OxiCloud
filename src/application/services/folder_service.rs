@@ -155,13 +155,7 @@ impl FolderUseCase for FolderService {
         let folder = self
             .folder_storage
             .create_folder(dto.name, dto.parent_id)
-            .await
-            .map_err(|e| {
-                DomainError::internal_error(
-                    "FolderStorage",
-                    format!("Failed to create folder: {}", e),
-                )
-            })?;
+            .await?;
 
         // Convert to DTO
         Ok(FolderDto::from(folder))
