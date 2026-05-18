@@ -17,6 +17,10 @@ function loadEnv(filePath: string): Record<string, string> {
 
 const commonEnv = loadEnv(path.join(__dirname, '../common/server.env'));
 
+console.log(`starting playwright with env BUILD_TARGET=${process.env.BUILD_TARGET ?? "debug"}`);
+
+const workspace=process.env.GITHUB_WORKSPACE ?? path.join(__dirname, '../..');
+
 export default defineConfig({
   testDir: './scenarios',
   fullyParallel: true,
@@ -49,7 +53,7 @@ export default defineConfig({
 
   webServer: {
     command: process.env.BUILD_TARGET
-      ? `${process.env.GITHUB_WORKSPACE}/target/${process.env.BUILD_TARGET}/oxicloud`
+      ? `${workspace}/target/${process.env.BUILD_TARGET}/oxicloud`
       : 'cargo run',
     url: 'http://localhost:8087',
     timeout: 600_000,

@@ -1277,4 +1277,3 @@ function redirectToMainApp() {
         window.location.href = '/login?error=redirect_failed';
     }
 }
-

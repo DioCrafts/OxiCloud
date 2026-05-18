@@ -30,8 +30,8 @@
 
 import { getCsrfHeaders } from './csrf.js';
 
-const REFRESH_ENDPOINT = '/api/auth/refresh';
-const USER_DATA_KEY = 'oxicloud_user';
+const WRAPPER_REFRESH_ENDPOINT = '/api/auth/refresh';
+const WRAPPER_USER_DATA_KEY = 'oxicloud_user';
 
 /** Captured before patching — the only safe fetch inside this module. */
 let _originalFetch = window.fetch.bind(window);
@@ -47,7 +47,7 @@ async function _refresh() {
     // Must use _originalFetch to avoid re-entering the interceptor.
     _refreshInFlight = (async () => {
         try {
-            const r = await _originalFetch(REFRESH_ENDPOINT, {
+            const r = await _originalFetch(WRAPPER_REFRESH_ENDPOINT, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json', ...getCsrfHeaders() },
@@ -95,7 +95,7 @@ function installFetchInterceptor() {
 
         const refreshed = await _refresh();
         if (!refreshed) {
-            localStorage.removeItem(USER_DATA_KEY);
+            localStorage.removeItem(WRAPPER_USER_DATA_KEY);
             window.location.href = '/login?source=session_expired';
             throw new Error('Session expired');
         }

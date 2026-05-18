@@ -128,6 +128,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     oxicloud::interfaces::middleware::trusted_proxy::log_config();
 
+    tracing::info!("OxiCloud v{}", env!("CARGO_PKG_VERSION"));
+
     // Load configuration from environment variables
     let config = common::config::AppConfig::from_env();
 
