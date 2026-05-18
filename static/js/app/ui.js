@@ -744,7 +744,11 @@ const ui = {
 
         const frag = document.createDocumentFragment();
         for (const folder of folders) {
-            frag.appendChild(this._createFolderItem(folder));
+            try {
+                frag.appendChild(this._createFolderItem(folder));
+            } catch (e) {
+                console.warn(`Error building folder item `, folder, `reason: `, e);
+            }
         }
         target.appendChild(frag);
     },
@@ -759,7 +763,11 @@ const ui = {
 
         const frag = document.createDocumentFragment();
         for (const file of files) {
-            frag.appendChild(this._createFileItem(file));
+            try {
+                frag.appendChild(this._createFileItem(file));
+            } catch (e) {
+                console.warn(`Error building file item `, file, `reason: `, e);
+            }
         }
         target.appendChild(frag);
     },

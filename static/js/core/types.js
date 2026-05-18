@@ -14,7 +14,7 @@
 //FIXME: rename into FolderItem
 /**
  * @typedef {Object} FolderItem
- * @property {string} category
+ * @property {string} category (folder)
  * @property {number} created_at - timestamp
  * @property {string} icon_class
  * @property {string} icon_special_class
@@ -98,6 +98,24 @@
  * @property {string|null} item_mime_type if file
  * @property {string|null} parent_id
  * @property {number|null} modified_at: Option<DateTime<Utc>>,
+ * @property {String} item_path Full human-readable path (e.g. "Documents/Work" for a folder, "Documents/Work/report.pdf" for a file)
+ * @property {String} icon_class
+ * @property {String} icon_special_class
+ * @property {String} category
+ * @property {String} size_formatted
+ */
+
+/**
+ * @typedef {Object} RecentItem
+ * @property {string} id
+ * @property {string} user_id
+ * @property {string} item_id /// ID of the favorited item (file or folder)
+ * @property {ItemTypeEnum} item_type
+ * @property {number} accessed_at
+ * @property {string|null} item_name: null if folder
+ * @property {number|null} item_size null if folder
+ * @property {string|null} item_mime_type if file
+ * @property {string|null} parent_id
  * @property {String} item_path Full human-readable path (e.g. "Documents/Work" for a folder, "Documents/Work/report.pdf" for a file)
  * @property {String} icon_class
  * @property {String} icon_special_class
