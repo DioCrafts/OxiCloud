@@ -1,4 +1,4 @@
-import { oxiIconsInit } from '../../core/icons';
+import { oxiIconsInit } from '../../core/icons.js';
 
 /**
  * publicShare.js — client-side logic for /s/{token}.
@@ -288,7 +288,21 @@ import { uiFileTypes } from '../../app/uiFileTypes.js';
 
         const backHtml = isSubfolder ? '<a class="gallery-back" href="#" data-action="back"><i class="fas fa-arrow-left"></i> Back to share root</a>' : '';
 
-        const headerHtml = `<header class="gallery-header"><h2 class="gallery-title">${escapeHtml(title)}</h2><div class="gallery-actions">${backHtml}<div class="gallery-view-toggle" role="group"><button type="button" data-view="grid" aria-pressed="${viewMode === 'grid'}"><i class="fas fa-th-large"></i></button><button type="button" data-view="list" aria-pressed="${viewMode === 'list'}"><i class="fas fa-bars"></i></button></div><a class="gallery-zip btn-primary" href="${escapeHtml(zipUrl(folderId))}" download><i class="fas fa-file-archive"></i> Download ZIP</a></div></header>`;
+        const headerHtml = `
+            <header class="gallery-header">
+                <h2 class="gallery-title">${escapeHtml(title)}</h2>
+                <div class="gallery-actions">
+                    ${backHtml}
+                    <div class="gallery-view-toggle" role="group">
+                        <button type="button" data-view="grid" aria-pressed="${viewMode === 'grid'}"><i class="fas fa-th"></i></button>
+                        <button type="button" data-view="list" aria-pressed="${viewMode === 'list'}"><i class="fas fa-bars"></i></button>
+                    </div>
+                    <a class="gallery-zip btn-primary" href="${escapeHtml(zipUrl(folderId))}" download>
+                        <i class="fas fa-file-archive"></i>
+                        Download ZIP
+                    </a>
+                </div>
+            </header>`;
 
         const foldersHtml =
             listing.folders && listing.folders.length > 0
