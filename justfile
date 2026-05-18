@@ -59,7 +59,10 @@ front-fmt:
 
 front-lint:
     biome lint static/
-    tsc -p jsconfig.json
+
+# test types (JSDOC), using typescript
+front-type:
+    tsc -p jsconfig.json --noEmit
 
 # check CSS rules
 front-rules:
