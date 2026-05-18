@@ -39,6 +39,7 @@ Most runtime variables use the `OXICLOUD_` prefix. A few build-time or allocator
 | `OXICLOUD_HASH_MEMORY_COST` | `65536` | Argon2id memory cost in KiB (64 MiB) |
 | `OXICLOUD_HASH_TIME_COST` | `3` | Argon2id iteration count |
 | `OXICLOUD_HASH_PARALLELISM` | `2` | Argon2id parallelism lanes |
+| `OXICLOUD_DISABLE_REGISTRATION` | false | Disable registration of new user accounts |
 
 ### Rate Limiting & Account Lockout
 
