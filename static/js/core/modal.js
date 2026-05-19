@@ -218,6 +218,8 @@ const Modal = {
     open() {
         if (!this.overlay) return;
 
+        this.confirmBtn.disabled = false;
+
         // Show overlay
         this.overlay.classList.remove('hidden');
 
