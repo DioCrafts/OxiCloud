@@ -11,8 +11,10 @@ body {
     color: var(--color-text-heading);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: safe center;
+    height: auto;
     min-height: 100vh;
+    overflow: auto;
     padding: 1rem;
 }
 
@@ -183,6 +185,11 @@ body.gallery-mode .share-logo {
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--color-bg-surface);
+    padding: 0.75rem 0;
 }
 .gallery-title {
     flex: 1 1 200px;
