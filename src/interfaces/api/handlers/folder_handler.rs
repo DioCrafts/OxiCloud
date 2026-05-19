@@ -21,8 +21,8 @@ use crate::application::ports::trash_ports::TrashUseCase;
 use crate::application::services::folder_service::FolderService;
 use crate::common::di::AppState as GlobalAppState;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 type AppState = Arc<FolderService>;
 
 /// Handler for folder-related API endpoints
@@ -458,7 +458,7 @@ impl FolderHandler {
     request_body(content = CreateFolderDto, content_type = "application/json", description = "Folder creation payload"),
     responses(
         (status = 201, description = "Folder created", body = FolderDto),
-        (status = 400, description = "Invalid request"),
+        (status = 400, description = "Invalid request", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -476,7 +476,7 @@ pub async fn create_folder(
     params(("id" = String, Path, description = "Folder ID")),
     responses(
         (status = 200, description = "Folder", body = FolderDto),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -509,7 +509,7 @@ pub async fn list_root_folders(
     params(("id" = String, Path, description = "Folder ID")),
     responses(
         (status = 200, description = "List of sub-folders", body = Vec<FolderDto>),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -547,7 +547,7 @@ pub async fn list_root_folders_paginated(
     ),
     responses(
         (status = 200, description = "Paginated list of sub-folders"),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -567,7 +567,7 @@ pub async fn list_folder_contents_paginated(
     responses(
         (status = 200, description = "Folder listing (sub-folders + files)", body = FolderListingDto),
         (status = 304, description = "Not modified"),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -587,7 +587,7 @@ pub async fn list_folder_listing(
     request_body(content = RenameFolderDto, content_type = "application/json", description = "Rename payload"),
     responses(
         (status = 200, description = "Renamed folder", body = FolderDto),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -607,7 +607,7 @@ pub async fn rename_folder(
     request_body(content = MoveFolderDto, content_type = "application/json", description = "Move payload"),
     responses(
         (status = 200, description = "Moved folder", body = FolderDto),
-        (status = 404, description = "Folder or destination not found"),
+        (status = 404, description = "Folder or destination not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -626,7 +626,7 @@ pub async fn move_folder(
     params(("id" = String, Path, description = "Folder ID")),
     responses(
         (status = 204, description = "Folder deleted"),
-        (status = 404, description = "Folder not found"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
     ),
     tag = "folders"
 )]
@@ -644,8 +644,8 @@ pub async fn delete_folder_with_trash(
     params(("id" = String, Path, description = "Folder ID")),
     responses(
         (status = 200, description = "ZIP archive stream (application/zip)"),
-        (status = 404, description = "Folder not found"),
-        (status = 501, description = "ZIP service not available"),
+        (status = 404, description = "Folder not found", body = ErrorResponse),
+        (status = 501, description = "ZIP service not available", body = ErrorResponse),
     ),
     tag = "folders"
 )]

@@ -6,22 +6,67 @@
 
 use std::path::PathBuf;
 
+use crate::domain::errors::DomainError;
+
+/// Structured error returned by [`validate_storage_name`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StorageNameError {
+    Empty,
+    ContainsSeparator,
+    ContainsNullByte,
+    Reserved,
+}
+
+impl StorageNameError {
+    /// Stable, machine-readable code for client-side i18n lookups.
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::Empty => "name_empty",
+            Self::ContainsSeparator => "name_contains_separator",
+            Self::ContainsNullByte => "name_null_byte",
+            Self::Reserved => "name_reserved",
+        }
+    }
+
+    /// English fallback message.
+    pub fn message(&self) -> &'static str {
+        match self {
+            Self::Empty => "name cannot be empty",
+            Self::ContainsSeparator => "name must not contain '/' or '\\'",
+            Self::ContainsNullByte => "name must not contain null bytes",
+            Self::Reserved => "'.' and '..' are not valid names",
+        }
+    }
+}
+
+impl std::fmt::Display for StorageNameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.message())
+    }
+}
+
+impl From<StorageNameError> for DomainError {
+    fn from(err: StorageNameError) -> Self {
+        DomainError::validation_error(err.message()).with_code(err.code())
+    }
+}
+
 /// Validates a single file or folder name component.
 ///
-/// Returns `Err` with a human-readable reason if the name is rejected.
-/// Callers should wrap the reason into their own error type.
-pub fn validate_storage_name(name: &str) -> Result<(), &'static str> {
+/// Returns `Err(StorageNameError)` if the name is rejected; the error carries
+/// both a stable `code()` for client i18n and a human-readable `message()`.
+pub fn validate_storage_name(name: &str) -> Result<(), StorageNameError> {
     if name.is_empty() {
-        return Err("name cannot be empty");
+        return Err(StorageNameError::Empty);
     }
     if name.contains('/') || name.contains('\\') {
-        return Err("name must not contain '/' or '\\'");
+        return Err(StorageNameError::ContainsSeparator);
     }
     if name.contains('\0') {
-        return Err("name must not contain null bytes");
+        return Err(StorageNameError::ContainsNullByte);
     }
     if name == "." || name == ".." {
-        return Err("'.' and '..' are not valid names");
+        return Err(StorageNameError::Reserved);
     }
     Ok(())
 }

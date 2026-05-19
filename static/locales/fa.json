@@ -329,7 +329,13 @@
         "move_error": "خطا در انتقال",
         "empty_name": "نام نمی‌تواند خالی باشد",
         "name_exists": "پرونده یا پوشه‌ای با این نام قبلا وجود دارد",
-        "generic_error": "خطایی رخ داده است"
+        "generic_error": "خطایی رخ داده است",
+        "invalid_input": {
+            "name_empty": "نام نمی‌تواند خالی باشد",
+            "name_contains_separator": "نام نباید شامل '/' یا '\\' باشد",
+            "name_null_byte": "نام نباید شامل بایت‌های تهی باشد",
+            "name_reserved": "'.' و '..' نام‌های معتبری نیستند"
+        }
     },
     "breadcrumb": {
         "home": "صفحه اصلی"

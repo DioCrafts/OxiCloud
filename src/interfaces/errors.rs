@@ -7,6 +7,7 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use utoipa::ToSchema;
 
 use crate::domain::errors::{DomainError, ErrorKind};
 
@@ -19,19 +20,17 @@ pub struct AppError {
     pub status_code: StatusCode,
     pub message: String,
     pub error_type: String,
+    pub error_code: Option<&'static str>,
 }
 
 /// JSON response structure for errors.
-///
-/// Both `error` and `message` carry the same content for backwards compatibility:
-/// - Legacy ad-hoc handlers returned `{"error": "..."}` (frontend reads `.error`)
-/// - AppError returned `{"message": "..."}` (admin panel reads `.message`)
-#[derive(Serialize)]
+#[derive(Serialize, ToSchema)]
 pub struct ErrorResponse {
     pub status: String,
     pub error: String,
-    pub message: String,
     pub error_type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<&'static str>,
 }
 
 impl AppError {
@@ -45,47 +44,52 @@ impl AppError {
             status_code,
             message: message.into(),
             error_type: error_type.into(),
+            error_code: None,
         }
     }
 
     /// Create a 400 Bad Request error.
     pub fn bad_request(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::BAD_REQUEST, message, "BadRequest")
+        Self::new(StatusCode::BAD_REQUEST, message, "bad_request")
     }
 
     /// Create a 401 Unauthorized error.
     pub fn unauthorized(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::UNAUTHORIZED, message, "Unauthorized")
+        Self::new(StatusCode::UNAUTHORIZED, message, "unauthorized")
     }
 
     /// Create a 403 Forbidden error.
     pub fn forbidden(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::FORBIDDEN, message, "Forbidden")
+        Self::new(StatusCode::FORBIDDEN, message, "forbidden")
     }
 
     /// Create a 404 Not Found error.
     pub fn not_found(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::NOT_FOUND, message, "NotFound")
+        Self::new(StatusCode::NOT_FOUND, message, "not_found")
     }
 
     /// Create a 500 Internal Server Error.
     pub fn internal_error(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::INTERNAL_SERVER_ERROR, message, "InternalError")
+        Self::new(StatusCode::INTERNAL_SERVER_ERROR, message, "internal_error")
     }
 
     /// Create a 405 Method Not Allowed error.
     pub fn method_not_allowed(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::METHOD_NOT_ALLOWED, message, "MethodNotAllowed")
+        Self::new(
+            StatusCode::METHOD_NOT_ALLOWED,
+            message,
+            "method_not_allowed",
+        )
     }
 
     /// Create a 409 Conflict error.
     pub fn conflict(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::CONFLICT, message, "Conflict")
+        Self::new(StatusCode::CONFLICT, message, "conflict")
     }
 
     /// Create a 423 Locked error (WebDAV).
     pub fn locked(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::LOCKED, message, "Locked")
+        Self::new(StatusCode::LOCKED, message, "locked")
     }
 
     /// Create a 415 Unsupported Media Type error.
@@ -93,7 +97,7 @@ impl AppError {
         Self::new(
             StatusCode::UNSUPPORTED_MEDIA_TYPE,
             message,
-            "UnsupportedMediaType",
+            "unsupported_media_type",
         )
     }
 
@@ -102,13 +106,13 @@ impl AppError {
         Self::new(
             StatusCode::PRECONDITION_FAILED,
             message,
-            "PreconditionFailed",
+            "precondition_failed",
         )
     }
 
     /// Create a 413 Payload Too Large error.
     pub fn payload_too_large(message: impl Into<String>) -> Self {
-        Self::new(StatusCode::PAYLOAD_TOO_LARGE, message, "PayloadTooLarge")
+        Self::new(StatusCode::PAYLOAD_TOO_LARGE, message, "payload_too_large")
     }
 }
 
@@ -131,6 +135,7 @@ impl From<DomainError> for AppError {
             status_code,
             message: err.message,
             error_type: err.kind.to_string(),
+            error_code: err.error_code,
         }
     }
 }
@@ -151,14 +156,17 @@ impl IntoResponse for AppError {
             );
             "An internal error occurred. Please try again later.".to_string()
         } else {
+            if status.is_client_error() {
+                tracing::warn!("{}", self.message);
+            }
             self.message
         };
 
         let error_response = ErrorResponse {
             status: status.to_string(),
-            error: client_message.clone(),
-            message: client_message,
+            error: client_message,
             error_type: self.error_type,
+            error_code: self.error_code,
         };
 
         let body = Json(error_response);

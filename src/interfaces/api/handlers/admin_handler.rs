@@ -15,6 +15,7 @@ use crate::application::dtos::settings_dto::{
 use crate::application::ports::auth_ports::TokenServicePort;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::errors::ErrorResponse;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -105,8 +106,8 @@ async fn admin_guard(state: &AppState, headers: &HeaderMap) -> Result<(Uuid, Str
     path = "/api/admin/settings/oidc",
     responses(
         (status = 200, description = "OIDC settings"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -135,8 +136,8 @@ pub async fn get_oidc_settings(
     path = "/api/admin/settings/oidc",
     responses(
         (status = 200, description = "OIDC settings saved"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -195,8 +196,8 @@ async fn test_oidc_connection(
     path = "/api/admin/settings/storage",
     responses(
         (status = 200, description = "Storage settings"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -225,8 +226,8 @@ pub async fn get_storage_settings(
     path = "/api/admin/settings/storage",
     responses(
         (status = 200, description = "Storage settings saved"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -285,8 +286,8 @@ async fn test_storage_connection(
     path = "/api/admin/storage/migration",
     responses(
         (status = 200, description = "Current migration status"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -305,9 +306,9 @@ pub async fn get_migration_status(
     path = "/api/admin/storage/migration/start",
     responses(
         (status = 200, description = "Migration started"),
-        (status = 400, description = "Migration already running"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Migration already running", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -382,9 +383,9 @@ pub async fn start_migration(
     path = "/api/admin/storage/migration/pause",
     responses(
         (status = 200, description = "Migration paused"),
-        (status = 400, description = "No running migration"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "No running migration", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -412,9 +413,9 @@ pub async fn pause_migration(
     path = "/api/admin/storage/migration/resume",
     responses(
         (status = 200, description = "Migration resumed"),
-        (status = 400, description = "No paused migration"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "No paused migration", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -443,9 +444,9 @@ pub async fn resume_migration(
     path = "/api/admin/storage/migration/complete",
     responses(
         (status = 200, description = "Migration finalized"),
-        (status = 400, description = "Migration not completed"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Migration not completed", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -482,9 +483,9 @@ pub async fn complete_migration(
     path = "/api/admin/storage/migration/verify",
     responses(
         (status = 200, description = "Verification result"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required"),
-        (status = 500, description = "Verification failed")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse),
+        (status = 500, description = "Verification failed", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -560,8 +561,8 @@ fn migration_state_to_dto(
     path = "/api/admin/settings/storage/generate-key",
     responses(
         (status = 200, description = "Generated AES-256 key"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -616,8 +617,8 @@ fn build_backend_from_config(
     path = "/api/admin/settings/general",
     responses(
         (status = 200, description = "General system settings"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -657,8 +658,8 @@ pub async fn get_general_settings(
     path = "/api/admin/dashboard",
     responses(
         (status = 200, description = "Dashboard statistics"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -747,8 +748,8 @@ pub async fn get_dashboard_stats(
     ),
     responses(
         (status = 200, description = "List of users"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -794,9 +795,9 @@ pub async fn list_users(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "User details"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required"),
-        (status = 404, description = "User not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse),
+        (status = 404, description = "User not found", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -830,9 +831,9 @@ pub async fn get_user(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "User deleted"),
-        (status = 400, description = "Cannot delete own account"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Cannot delete own account", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -879,9 +880,9 @@ pub async fn delete_user(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "Role updated"),
-        (status = 400, description = "Cannot change own role"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Cannot change own role", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -929,9 +930,9 @@ pub async fn update_user_role(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "User active status updated"),
-        (status = 400, description = "Cannot deactivate own account"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Cannot deactivate own account", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -984,8 +985,8 @@ pub async fn update_user_active(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "Quota updated"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -1028,9 +1029,9 @@ pub async fn update_user_quota(
     path = "/api/admin/users",
     responses(
         (status = 201, description = "User created"),
-        (status = 400, description = "Invalid user data"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Invalid user data", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -1068,9 +1069,9 @@ pub async fn create_user(
     params(("id" = String, Path, description = "User UUID")),
     responses(
         (status = 200, description = "Password reset"),
-        (status = 400, description = "Invalid password"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Invalid password", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -1118,8 +1119,8 @@ pub async fn reset_user_password(
     path = "/api/admin/settings/registration",
     responses(
         (status = 200, description = "Registration setting"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]
@@ -1147,9 +1148,9 @@ pub async fn get_registration_setting(
     path = "/api/admin/settings/registration",
     responses(
         (status = 200, description = "Registration setting updated"),
-        (status = 400, description = "Missing field"),
-        (status = 401, description = "Unauthorized"),
-        (status = 403, description = "Admin required")
+        (status = 400, description = "Missing field", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 403, description = "Admin required", body = ErrorResponse)
     ),
     tag = "admin"
 )]

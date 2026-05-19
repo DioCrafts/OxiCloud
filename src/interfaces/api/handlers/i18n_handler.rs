@@ -11,7 +11,7 @@ use crate::application::dtos::i18n_dto::{
 };
 use crate::application::services::i18n_application_service::I18nApplicationService;
 use crate::domain::services::i18n_service::{I18nError, Locale};
-
+use crate::interfaces::errors::ErrorResponse;
 type AppState = Arc<I18nApplicationService>;
 
 /// Handler for i18n-related API endpoints
@@ -159,7 +159,7 @@ pub async fn get_locales(state: State<AppState>) -> impl IntoResponse {
     responses(
         (status = 200, description = "Translation", body = TranslationResponseDto),
         (status = 400, description = "Unsupported locale", body = TranslationErrorDto),
-        (status = 404, description = "Key not found"),
+        (status = 404, description = "Key not found", body = ErrorResponse),
     ),
     tag = "i18n"
 )]
@@ -176,7 +176,7 @@ pub async fn translate(
     params(("locale_code" = String, Path, description = "Locale code, e.g. en, fr, de")),
     responses(
         (status = 200, description = "All translations for this locale"),
-        (status = 400, description = "Unsupported locale"),
+        (status = 400, description = "Unsupported locale", body = ErrorResponse),
     ),
     tag = "i18n"
 )]

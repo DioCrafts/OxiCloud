@@ -15,8 +15,8 @@ use crate::application::dtos::playlist_dto::{
 use crate::application::ports::music_ports::MusicUseCase;
 use crate::application::services::music_service::MusicService;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
     pub limit: Option<i64>,
@@ -28,8 +28,8 @@ pub struct PaginationQuery {
     path = "/api/playlists",
     responses(
         (status = 201, description = "Playlist created"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -50,8 +50,8 @@ pub async fn create_playlist(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 200, description = "Playlist details"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -71,7 +71,7 @@ pub async fn get_playlist(
     path = "/api/playlists",
     responses(
         (status = 200, description = "List of playlists"),
-        (status = 401, description = "Unauthorized")
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -98,8 +98,8 @@ pub struct IncludeSharedQuery {
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 200, description = "Playlist updated"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -124,8 +124,8 @@ pub async fn update_playlist(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 204, description = "Playlist deleted"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -149,8 +149,8 @@ pub async fn delete_playlist(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 201, description = "Tracks added"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -178,8 +178,8 @@ pub async fn add_tracks(
     ),
     responses(
         (status = 204, description = "Track removed"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist or track not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist or track not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -203,8 +203,8 @@ pub async fn remove_track(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 204, description = "Tracks reordered"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -229,8 +229,8 @@ pub async fn reorder_tracks(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 200, description = "List of playlist tracks"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -254,8 +254,8 @@ pub async fn list_playlist_tracks(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 204, description = "Playlist shared"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -283,8 +283,8 @@ pub async fn share_playlist(
     ),
     responses(
         (status = 204, description = "Share removed"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist or share not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist or share not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -308,8 +308,8 @@ pub async fn remove_share(
     params(("playlist_id" = String, Path, description = "Playlist ID")),
     responses(
         (status = 200, description = "List of playlist shares"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Playlist not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "Playlist not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]
@@ -333,8 +333,8 @@ pub async fn get_playlist_shares(
     params(("file_id" = String, Path, description = "Audio file ID")),
     responses(
         (status = 200, description = "Audio metadata"),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "File not found")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 404, description = "File not found", body = ErrorResponse)
     ),
     tag = "playlists"
 )]

@@ -136,12 +136,7 @@ impl FolderUseCase for FolderService {
     /// Creates a new folder
     async fn create_folder(&self, dto: CreateFolderDto) -> Result<FolderDto, DomainError> {
         // Input validation
-        if let Err(reason) = validate_storage_name(&dto.name) {
-            return Err(DomainError::validation_error(format!(
-                "Invalid folder name '{}': {reason}",
-                dto.name
-            )));
-        }
+        validate_storage_name(&dto.name).map_err(DomainError::from)?;
 
         // If a parent_id is provided, verify it exists
         if let Some(parent_id) = &dto.parent_id {
@@ -390,12 +385,7 @@ impl FolderUseCase for FolderService {
         caller_id: Uuid,
     ) -> Result<FolderDto, DomainError> {
         // Input validation
-        if let Err(reason) = validate_storage_name(&dto.name) {
-            return Err(DomainError::validation_error(format!(
-                "Invalid folder name '{}': {reason}",
-                dto.name
-            )));
-        }
+        validate_storage_name(&dto.name).map_err(DomainError::from)?;
 
         // Verify the folder exists and belongs to the caller
         let existing_folder = self.folder_storage.get_folder(id).await?;

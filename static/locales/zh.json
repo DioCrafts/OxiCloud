@@ -329,7 +329,13 @@
         "move_error": "移动时出错",
         "empty_name": "名称不能为空",
         "name_exists": "已存在同名文件或文件夹",
-        "generic_error": "发生错误"
+        "generic_error": "发生错误",
+        "invalid_input": {
+            "name_empty": "名称不能为空",
+            "name_contains_separator": "名称不能包含 '/' 或 '\\'",
+            "name_null_byte": "名称不能包含空字节",
+            "name_reserved": "'.' 和 '..' 不是有效的名称"
+        }
     },
     "breadcrumb": {
         "home": "主页"

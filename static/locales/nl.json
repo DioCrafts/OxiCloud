@@ -329,7 +329,13 @@
         "move_error": "Fout bij verplaatsen",
         "empty_name": "Naam mag niet leeg zijn",
         "name_exists": "Een bestand of map met deze naam bestaat al",
-        "generic_error": "Er is een fout opgetreden"
+        "generic_error": "Er is een fout opgetreden",
+        "invalid_input": {
+            "name_empty": "Naam mag niet leeg zijn",
+            "name_contains_separator": "Naam mag geen '/' of '\\' bevatten",
+            "name_null_byte": "Naam mag geen nul-bytes bevatten",
+            "name_reserved": "'.' en '..' zijn geen geldige namen"
+        }
     },
     "breadcrumb": {
         "home": "Start"

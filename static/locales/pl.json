@@ -329,7 +329,13 @@
         "move_error": "Błąd podczas przenoszenia",
         "empty_name": "Nazwa nie może być pusta",
         "name_exists": "Plik lub folder o tej nazwie już istnieje",
-        "generic_error": "Wystąpił błąd"
+        "generic_error": "Wystąpił błąd",
+        "invalid_input": {
+            "name_empty": "Nazwa nie może być pusta",
+            "name_contains_separator": "Nazwa nie może zawierać '/' ani '\\'",
+            "name_null_byte": "Nazwa nie może zawierać bajtów null",
+            "name_reserved": "'.' i '..' nie są prawidłowymi nazwami"
+        }
     },
     "breadcrumb": {
         "home": "Strona główna"

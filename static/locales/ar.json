@@ -329,7 +329,13 @@
         "move_error": "خطأ في النقل",
         "empty_name": "لا يمكن أن يكون الاسم فارغاً",
         "name_exists": "ملف أو مجلد بهذا الاسم موجود بالفعل",
-        "generic_error": "حدث خطأ"
+        "generic_error": "حدث خطأ",
+        "invalid_input": {
+            "name_empty": "لا يمكن أن يكون الاسم فارغاً",
+            "name_contains_separator": "يجب ألا يحتوي الاسم على '/' أو '\\'",
+            "name_null_byte": "يجب ألا يحتوي الاسم على بايتات فارغة",
+            "name_reserved": "'.' و '..' ليسا اسمين صالحين"
+        }
     },
     "breadcrumb": {
         "home": "الرئيسية"

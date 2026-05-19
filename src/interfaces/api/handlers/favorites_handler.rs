@@ -11,8 +11,8 @@ use utoipa::ToSchema;
 
 use crate::application::ports::favorites_ports::FavoritesUseCase;
 use crate::application::services::favorites_service::FavoritesService;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 /// Single item in a batch-add-favorites request.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct BatchFavoriteItem {
@@ -73,7 +73,7 @@ pub async fn get_favorites(
     ),
     responses(
         (status = 201, description = "Item added to favorites"),
-        (status = 400, description = "Invalid item type")
+        (status = 400, description = "Invalid item type", body = ErrorResponse)
     ),
     tag = "favorites"
 )]
@@ -129,7 +129,7 @@ pub async fn add_favorite(
     ),
     responses(
         (status = 200, description = "Item removed from favorites"),
-        (status = 404, description = "Item not in favorites")
+        (status = 404, description = "Item not in favorites", body = ErrorResponse)
     ),
     tag = "favorites"
 )]
@@ -182,7 +182,7 @@ pub async fn remove_favorite(
     path = "/api/favorites/batch",
     responses(
         (status = 200, description = "Batch add result", body = crate::application::dtos::favorites_dto::BatchFavoritesResult),
-        (status = 400, description = "Invalid request")
+        (status = 400, description = "Invalid request", body = ErrorResponse)
     ),
     tag = "favorites"
 )]

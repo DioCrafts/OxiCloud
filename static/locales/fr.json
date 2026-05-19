@@ -329,7 +329,13 @@
         "move_error": "Erreur lors du déplacement",
         "empty_name": "Le nom ne peut pas être vide",
         "name_exists": "Un fichier ou dossier portant ce nom existe déjà",
-        "generic_error": "Une erreur est survenue"
+        "generic_error": "Une erreur est survenue",
+        "invalid_input": {
+            "name_empty": "Le nom ne peut pas être vide",
+            "name_contains_separator": "Le nom ne doit pas contenir '/' ou '\\'",
+            "name_null_byte": "Le nom ne doit pas contenir de caractères nuls",
+            "name_reserved": "'.' et '..' ne sont pas des noms valides"
+        }
     },
     "breadcrumb": {
         "home": "Accueil"

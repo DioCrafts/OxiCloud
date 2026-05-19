@@ -329,7 +329,13 @@
         "move_error": "Fehler beim Verschieben",
         "empty_name": "Der Name darf nicht leer sein",
         "name_exists": "Eine Datei oder ein Ordner mit diesem Namen existiert bereits",
-        "generic_error": "Ein Fehler ist aufgetreten"
+        "generic_error": "Ein Fehler ist aufgetreten",
+        "invalid_input": {
+            "name_empty": "Name darf nicht leer sein",
+            "name_contains_separator": "Name darf '/' oder '\\' nicht enthalten",
+            "name_null_byte": "Name darf keine Null-Bytes enthalten",
+            "name_reserved": "'.' und '..' sind keine gültigen Namen"
+        }
     },
     "breadcrumb": {
         "home": "Startseite"

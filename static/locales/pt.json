@@ -329,7 +329,13 @@
         "move_error": "Erro ao mover",
         "empty_name": "O nome não pode estar vazio",
         "name_exists": "Já existe um arquivo ou pasta com esse nome",
-        "generic_error": "Ocorreu um erro"
+        "generic_error": "Ocorreu um erro",
+        "invalid_input": {
+            "name_empty": "O nome não pode estar vazio",
+            "name_contains_separator": "O nome não deve conter '/' ou '\\'",
+            "name_null_byte": "O nome não deve conter bytes nulos",
+            "name_reserved": "'.' e '..' não são nomes válidos"
+        }
     },
     "breadcrumb": {
         "home": "Início"
