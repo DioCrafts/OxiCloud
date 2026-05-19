@@ -5,7 +5,7 @@
 
 import { isTextViewable } from '../core/formatters.js';
 
-/** @import {FileInfo} from '../core/types.js' */
+/** @import {FileItem} from '../core/types.js' */
 
 /** @type {Record<string, string>} */
 const ICON_CLASS_MAP = {
@@ -158,7 +158,7 @@ const uiFileTypes = {
     // TODO: 'd better to use a canViw() method in inlineViewer
     /**
      *
-     * @param {FileInfo} file
+     * @param {FileItem} file
      * @returns {boolean}
      */
     isViewableFile(file) {

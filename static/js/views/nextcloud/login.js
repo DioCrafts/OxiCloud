@@ -6,7 +6,7 @@ if (!/^[0-9a-fA-F]+$/.test(token)) {
     document.body.innerHTML = '<p>Invalid session token.</p>';
     throw new Error('Invalid token format');
 }
-document.getElementById('login-flow-form').action = `/login/v2/flow/${token}`;
+/** @type {HTMLFormElement} */ (document.getElementById('login-flow-form')).action = `/login/v2/flow/${token}`;
 
 // Check if OIDC is available and configure SSO button
 (async () => {

@@ -8,6 +8,8 @@ import { app } from '../../app/state.js';
 import { isTextViewable } from '../../core/formatters.js';
 import { wopiEditor } from './wopiEditor.js';
 
+/** @import {FileItem} from '../../core/types.js' */
+
 class InlineViewer {
     constructor() {
         this.setupViewer();
@@ -93,6 +95,11 @@ class InlineViewer {
         console.log('Inline viewer initialized');
     }
 
+    /**
+     *
+     * @param {FileItem} file
+     * @returns
+     */
     async openFile(file) {
         console.log('Opening file:', file);
 
@@ -115,7 +122,7 @@ class InlineViewer {
 
         // Get container
         const modal = document.getElementById('inline-viewer-modal');
-        const container = modal.querySelector('.inline-viewer-container');
+        const container = /** @type {HTMLDivElement} */ (modal.querySelector('.inline-viewer-container'));
         const title = modal.querySelector('.inline-viewer-title');
 
         // Clear container
@@ -125,12 +132,12 @@ class InlineViewer {
         title.textContent = file.name;
 
         // Set controls visibility
-        const controls = modal.querySelector('.inline-viewer-controls');
+        const controls = /** @type {HTMLDivElement} */ (modal.querySelector('.inline-viewer-controls'));
 
         // Show viewer based on file type
         if (isImage) {
             // Show zoom controls
-            controls.style.display = 'flex';
+            controls.classList.remove('hidden');
 
             // Show loading indicator
             const loader = document.createElement('div');
@@ -142,7 +149,7 @@ class InlineViewer {
             this.createBlobUrlViewer(file, 'image', container, loader);
         } else if (file.mime_type && file.mime_type === 'application/pdf') {
             // Hide zoom controls for PDFs
-            controls.style.display = 'none';
+            controls.classList.add('hidden');
 
             // Show loading indicator
             const loader = document.createElement('div');
@@ -152,9 +159,9 @@ class InlineViewer {
 
             // Create PDF viewer using object tag with blob URL
             this.createBlobUrlViewer(file, 'pdf', container, loader);
-        } else if (file.mime_type && this.isTextViewable(file.mime_type)) {
+        } else if (file.mime_type && isTextViewable(file.mime_type)) {
             // Hide zoom controls for text files
-            controls.style.display = 'none';
+            controls.classList.add('hidden');
 
             // Show loading indicator
             const loader = document.createElement('div');
@@ -166,7 +173,7 @@ class InlineViewer {
             this.createTextViewer(file, container, loader);
         } else if (file.mime_type?.startsWith('audio/')) {
             // Hide zoom controls for audio
-            controls.style.display = 'none';
+            controls.classList.add('hidden');
 
             // Show loading indicator
             const loader = document.createElement('div');
@@ -178,7 +185,7 @@ class InlineViewer {
             this.createMediaViewer(file, 'audio', container, loader);
         } else if (file.mime_type?.startsWith('video/')) {
             // Hide zoom controls for video
-            controls.style.display = 'none';
+            controls.classList.add('hidden');
 
             // Show loading indicator
             const loader = document.createElement('div');
@@ -190,7 +197,7 @@ class InlineViewer {
             this.createMediaViewer(file, 'video', container, loader);
         } else {
             // Hide zoom controls for unsupported files
-            controls.style.display = 'none';
+            controls.classList.add('hidden');
 
             // Show unsupported file message
             const message = document.createElement('div');
@@ -209,12 +216,13 @@ class InlineViewer {
         modal.classList.add('active');
     }
 
-    // Check if a MIME type is text-viewable
-    isTextViewable(mimeType) {
-        return isTextViewable(mimeType);
-    }
-
     // Creates a text viewer using authenticated fetch
+    /**
+     *
+     * @param {FileItem} file
+     * @param {HTMLDivElement} container
+     * @param {*} loader
+     */
     async createTextViewer(file, container, loader) {
         try {
             console.log('Creating text viewer for:', file.name);
@@ -253,14 +261,20 @@ class InlineViewer {
         }
     }
 
-    // Creates a viewer using a Blob URL to avoid content-disposition header
-    async createBlobUrlViewer(file, type, container, loader) {
+    /**
+     * Creates a viewer using a Blob URL to avoid content-disposition header
+     * @param {FileItem} file
+     * @param {string} mediaType
+     * @param {HTMLDivElement} container
+     * @param {HTMLDivElement} loader
+     */
+    async createBlobUrlViewer(file, mediaType, container, loader) {
         try {
-            console.log('Creating blob URL viewer for:', file.name, 'type:', type);
+            console.log('Creating blob URL viewer for:', file.name, 'type:', mediaType);
 
             // Update loader to show progress bar for large files
-            let progressBar = null;
-            let progressText = null;
+            let progressBar = /** @type {HTMLElement|null} */ (null);
+            let progressText = /** @type {HTMLElement|null} */ (null);
             if (loader && file.size > 10 * 1024 * 1024) {
                 // Show progress for files > 10MB
                 loader.innerHTML = `
@@ -272,8 +286,8 @@ class InlineViewer {
             <div class="inline-viewer-progress-text">0%</div>
           </div>
         `;
-                progressBar = loader.querySelector('.inline-viewer-progress-fill');
-                progressText = loader.querySelector('.inline-viewer-progress-text');
+                progressBar = /** @type {HTMLElement|null} */ (loader.querySelector('.inline-viewer-progress-fill'));
+                progressText = /** @type {HTMLElement|null} */ (loader.querySelector('.inline-viewer-progress-text'));
             }
 
             // Use XMLHttpRequest instead of fetch to get better control over the response
@@ -322,7 +336,7 @@ class InlineViewer {
                 loader.parentNode.removeChild(loader);
             }
 
-            if (type === 'image') {
+            if (mediaType === 'image') {
                 console.log('Creating image viewer');
                 // Create image element
                 const img = document.createElement('img');
@@ -332,10 +346,10 @@ class InlineViewer {
                 container.appendChild(img);
 
                 // Add loading indicator until image loads
-                img.style.opacity = 0;
+                img.style.opacity = String(0);
                 img.onload = () => {
                     console.log('Image loaded successfully');
-                    img.style.opacity = 1;
+                    img.style.opacity = String(1);
                 };
 
                 img.onerror = () => {
@@ -343,7 +357,7 @@ class InlineViewer {
                     container.removeChild(img);
                     this.showErrorMessage(container);
                 };
-            } else if (type === 'pdf') {
+            } else if (mediaType === 'pdf') {
                 console.log('Creating PDF viewer');
 
                 // Create iframe for PDF (more reliable than object tag)
@@ -382,7 +396,13 @@ class InlineViewer {
         }
     }
 
-    // Creates an audio or video player using blob URL (authenticated fetch)
+    /**
+     * Creates an audio or video player using blob URL (authenticated fetch)
+     * @param {FileItem} file
+     * @param {string} mediaType
+     * @param {HTMLDivElement} container
+     * @param {HTMLDivElement} loader
+     */
     async createMediaViewer(file, mediaType, container, loader) {
         try {
             console.log(`Creating ${mediaType} player for:`, file.name);
@@ -485,7 +505,10 @@ class InlineViewer {
         }
     }
 
-    // Helper to show error message
+    /**
+     * Helper to show error message
+     * @param {HTMLDivElement} container
+     */
     showErrorMessage(container) {
         // Show error message
         const message = document.createElement('div');
@@ -505,7 +528,7 @@ class InlineViewer {
         const modal = document.getElementById('inline-viewer-modal');
 
         // stops audio/video before closing viewver
-        const media = modal.querySelector('audio, video');
+        const media = /** @type {HTMLMediaElement} */ (modal.querySelector('audio, video'));
         if (media && !media.paused) media.pause();
 
         // Hide modal
@@ -525,6 +548,10 @@ class InlineViewer {
         this.currentFile = null;
     }
 
+    /**
+     *
+     * @param {FileItem} file
+     */
     downloadFile(file) {
         fetch(`/api/files/${file.id}`, { credentials: 'same-origin' })
             .then((res) => {
@@ -544,9 +571,14 @@ class InlineViewer {
             .catch((err) => console.error('Download error:', err));
     }
 
+    /**
+     *
+     * @param {number} factor
+     * @returns
+     */
     zoomImage(factor) {
         const container = document.querySelector('.inline-viewer-container');
-        const img = container.querySelector('.inline-viewer-image');
+        const img = /** @type {HTMLDivElement} */ (container.querySelector('.inline-viewer-image'));
 
         if (!img) return;
 
@@ -560,7 +592,7 @@ class InlineViewer {
         scale = Math.max(0.1, Math.min(5.0, scale));
 
         // Save scale
-        img.dataset.scale = scale;
+        img.dataset.scale = String(scale);
 
         // Apply scale
         img.style.transform = `scale(${scale})`;
@@ -568,12 +600,12 @@ class InlineViewer {
 
     resetZoom() {
         const container = document.querySelector('.inline-viewer-container');
-        const img = container.querySelector('.inline-viewer-image');
+        const img = /** @type {HTMLDivElement} */ (container.querySelector('.inline-viewer-image'));
 
         if (!img) return;
 
         // Reset scale
-        img.dataset.scale = 1.0;
+        img.dataset.scale = String(1);
         img.style.transform = 'scale(1.0)';
     }
 }

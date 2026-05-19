@@ -3,39 +3,70 @@
  * Centralized mutable state for app and cached DOM references.
  */
 
-/** @import {FolderInfo} from '../core/types.js' */
+/** @import {FileItem, FolderItem, LightItem} from '../core/types.js' */
 
 export const app = {
     currentView: 'grid',
 
     /** @type {string | null} */
     currentPath: '',
+
+    /** @type {string | null} */
     currentFolder: null,
 
-    /** @type {FolderInfo | null} */
+    /** @type {FolderItem | null} */
     currentFolderInfo: null,
 
-    /** @type {Object | null} */
+    /** @type {FolderItem | null} */
     contextMenuTargetFolder: null,
 
-    /** @type {Object | null} */
+    /** @type {FileItem | null} */
     contextMenuTargetFile: null,
     selectedTargetFolderId: '',
     moveDialogMode: 'file',
 
+    /** @type {string | null} */
+    moveDialogItemId: null,
+
+    /** @type {'file' | 'folder' | null} */
+    moveDialogItemMode: null,
+
+    /** @type {string | null} */
+    moveDialogCurrentFolderId: null,
+
+    /** @type {Array<{id: string, name: string}>} */
+    moveDialogBreadcrumb: [],
+
+    /** @type {FileItem[] | null} */
+    playlistDialogFiles: null,
+
     /** @type {String | null} */
     currentSection: null, // will be defined on first call
     isSearchMode: false,
+
+    /** @type {FileItem | FolderItem | null} */
     shareDialogItem: null,
+
+    /** @type {'file' | 'folder' | null} */
     shareDialogItemType: null,
+
+    /** @type {String | null} */
     notificationShareUrl: null,
+
+    /** @type {string | null} */
     userHomeFolderId: null,
+
+    /** @type {string | null} */
     userHomeFolderName: null,
-    /** @type {Object[]} */
+
+    /** @type {Array<{id: string, name: string}>} */
     breadcrumbPath: [], // Array of {id, name} tracking folder navigation hierarchy
 
     /** @type {String | null} */
-    viewFile: null // current file in inline view
+    viewFile: null, // current file in inline view
+
+    /** @type {LightItem[] | null} */
+    batchMoveItems: null
 };
 
 export const appElements = {

@@ -25,10 +25,17 @@ import { app } from './state.js';
 import { uiFileTypes } from './uiFileTypes.js';
 import { uiNotifications } from './uiNotifications.js';
 
+/**
+ *  @import {FileItem, FolderItem} from '../core/types.js'
+ *  @import {BatchResult} from '../features/files/fileOperations.js'
+ */
+
 // UI Module
 const ui = {
-    /** @type {HTMLDListElement | null} */
-    //dragPreview,
+    /** @type {HTMLDivElement | null} */
+    dragPreview: null,
+    /** @type {HTMLDivElement | null} */
+    draggedItems: null,
 
     /**
      * Initialize context menus and dialogs
@@ -338,21 +345,31 @@ const ui = {
 
         const dropzone = document.getElementById('dropzone');
 
+        /**
+         *
+         * @param {DataTransfer} dataTransfer
+         * @returns {Promise<any[]|null>}
+         */
         const collectDroppedEntries = async (dataTransfer) => {
             const items = Array.from(dataTransfer?.items || []);
             const rootEntries = items.map((it) => (typeof it.webkitGetAsEntry === 'function' ? it.webkitGetAsEntry() : null)).filter(Boolean);
 
             if (rootEntries.length === 0) return null;
 
+            /** @type {Array<{file: File, relativePath: string}>} */
             const out = [];
 
+            /**
+             * @param {FileSystemEntry} entry
+             * @param {string} prefix
+             */
             const walkEntry = async (entry, prefix = '') => {
                 if (!entry) return;
 
                 if (entry.isFile) {
                     await new Promise((resolve) => {
-                        entry.file(
-                            (file) => {
+                        /** @type {FileSystemFileEntry} */ (entry).file(
+                            (/** @type {File} */ file) => {
                                 out.push({ file, relativePath: `${prefix}${file.name}` });
                                 resolve(undefined);
                             },
@@ -364,7 +381,7 @@ const ui = {
 
                 if (entry.isDirectory) {
                     const dirPrefix = `${prefix}${entry.name}/`;
-                    const reader = entry.createReader();
+                    const reader = /** @type {FileSystemDirectoryEntry} */ (entry).createReader();
 
                     while (true) {
                         const children = await new Promise((resolve) => {
@@ -636,7 +653,7 @@ const ui = {
 
     /**
      * Check if a file can be previewed in the viewer
-     * @param {Object} file - File object with mime_type property
+     * @param {FileItem} file
      * @returns {boolean}
      */
     isViewableFile(file) {
@@ -647,6 +664,7 @@ const ui = {
      * Get FontAwesome icon class for a filename based on its extension.
      * Used as fallback when the backend DTO doesn't include icon_class
      * (e.g. trash items).
+     * @param {string} fileName
      */
     getIconClass(fileName) {
         return uiFileTypes.getIconClass(fileName);
@@ -655,6 +673,7 @@ const ui = {
     /**
      * Get CSS special class for icon styling based on filename extension.
      * Used as fallback when the backend DTO doesn't include icon_special_class.
+     * @param {string} fileName
      */
     getIconSpecialClass(fileName) {
         return uiFileTypes.getIconSpecialClass(fileName);
@@ -695,13 +714,13 @@ const ui = {
      *  Data store + event delegation (replaces per-item listeners)
      * ================================================================ */
 
-    /** @type {Map<string, Object>} item data keyed by id */
+    /** @type {Map<string, FolderItem | FileItem>} item data keyed by id */
     _items: new Map(),
 
-    /** @type {Array<Object>} last rendered folder dataset */
+    /** @type {FolderItem[]} last rendered folder dataset */
     _lastFolders: [],
 
-    /** @type {Array<Object>} last rendered file dataset */
+    /** @type {FileItem[]} last rendered file dataset */
     _lastFiles: [],
 
     /** @type {boolean} */
@@ -716,9 +735,7 @@ const ui = {
     },
 
     /**
-     *
-     * @param {Object[]} folders
-     * @returns
+     * @param {FolderItem[]} folders
      */
     _renderFoldersToView(folders) {
         if (!Array.isArray(folders) || folders.length === 0) return;
@@ -727,15 +744,17 @@ const ui = {
 
         const frag = document.createDocumentFragment();
         for (const folder of folders) {
-            frag.appendChild(this._createFolderItem(folder));
+            try {
+                frag.appendChild(this._createFolderItem(folder));
+            } catch (e) {
+                console.warn(`Error building folder item `, folder, `reason: `, e);
+            }
         }
         target.appendChild(frag);
     },
 
     /**
-     *
-     * @param {Object[]} files
-     * @returns
+     * @param {FileItem[]} files
      */
     _renderFilesToView(files) {
         if (!Array.isArray(files) || files.length === 0) return;
@@ -744,11 +763,19 @@ const ui = {
 
         const frag = document.createDocumentFragment();
         for (const file of files) {
-            frag.appendChild(this._createFileItem(file));
+            try {
+                frag.appendChild(this._createFileItem(file));
+            } catch (e) {
+                console.warn(`Error building file item `, file, `reason: `, e);
+            }
         }
         target.appendChild(frag);
     },
 
+    /**
+     * @param {any[]} arr
+     * @param {any} item
+     */
     _upsertById(arr, item) {
         if (!Array.isArray(arr) || !item?.id) return;
         const idx = arr.findIndex((x) => x && x.id === item.id);
@@ -796,6 +823,7 @@ const ui = {
             await fileOps.moveFile(sourceId, targetFolderId);
         */
 
+        /** @type {BatchResult} */
         let result;
         switch (action) {
             case 'copy':
@@ -843,6 +871,7 @@ const ui = {
         this._delegationReady = true;
 
         // ── helpers ────────────────────────────────────────────────
+        /** @param {HTMLDivElement} card */
         const itemInfo = (card) => {
             if (!card) return null;
             const fileId = card.dataset.fileId;
@@ -864,6 +893,7 @@ const ui = {
             return null;
         };
 
+        /** @param {FileItem} file */
         const openFile = async (file) => {
             if (!file) return;
             if (recent) {
@@ -897,6 +927,7 @@ const ui = {
             }
         };
 
+        /** @param {HTMLElement} card */
         const navigateFolder = (card) => {
             const folderId = card.dataset.folderId;
             const folderName = card.dataset.folderName;
@@ -912,27 +943,31 @@ const ui = {
             loadFiles();
         };
 
+        /**
+         * @param {HTMLElement} card
+         * @param {{ type: string, id: string, name: string | undefined, data: FolderItem | FileItem | undefined }} info
+         */
         const setContextTarget = (card, info) => {
             if (info.type === 'folder') {
-                app.contextMenuTargetFolder = {
+                app.contextMenuTargetFolder = /** @type {FolderItem} */ ({
                     id: info.id,
                     name: card.dataset.folderName,
                     parent_id: card.dataset.parentId || ''
-                };
+                });
             } else {
-                const fileData = info.data || this._items.get(info.id);
-                app.contextMenuTargetFile = {
+                const fileData = /** @type {FileItem | undefined} */ (info.data || this._items.get(info.id));
+                app.contextMenuTargetFile = /** @type {FileItem} */ ({
                     id: info.id,
                     name: card.dataset.fileName,
                     folder_id: card.dataset.folderId || '',
                     mime_type: fileData?.mime_type || null
-                };
+                });
             }
         };
 
         // ──  click (open / navigate; select only via checkbox) ──
         filesList.addEventListener('click', (e) => {
-            const card = /** @type {HTMLElement} */ (e.target).closest('.file-item');
+            const card = /** @type {HTMLDivElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('.file-item'));
             if (!card) return;
 
             if (/** @type {HTMLElement} */ (e.target).closest('.file-actions')) {
@@ -975,7 +1010,7 @@ const ui = {
             if (info.type === 'folder') {
                 navigateFolder(card);
             } else {
-                openFile(info.data);
+                openFile(/** @type {FileItem} */ (info.data));
             }
         });
 
@@ -989,7 +1024,7 @@ const ui = {
         // ── shared events ──────────────────────
 
         filesList.addEventListener('contextmenu', (e) => {
-            const card = /** @type {HTMLElement} */ (e.target).closest('.file-item');
+            const card = /** @type {HTMLDivElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('.file-item'));
             if (!card) return;
             e.preventDefault();
             const info = itemInfo(card);
@@ -1008,7 +1043,7 @@ const ui = {
 
         // dragstart
         filesList.addEventListener('dragstart', (e) => {
-            const card = /** @type {HTMLElement} */ (e.target).closest('.file-item');
+            const card = /** @type {HTMLDivElement | null} */ (/** @type {HTMLElement} */ (e.target).closest('.file-item'));
             if (!card) {
                 e.preventDefault();
                 return;
@@ -1088,9 +1123,11 @@ const ui = {
                 // TODO better naming like ("selection in ${parent.name}") modulo i18n ? ...
                 const now = new Date().toISOString().replace(/T/, ' ').replace(/\.*/, '').replaceAll(/:/g, '-');
                 nameEncoded = `oxicloud ${now}.zip`;
+                /** @type {string[]} */
                 const folders = [];
+                /** @type {string[]} */
                 const files = [];
-                filesList.querySelectorAll(`div.selected`).forEach((e) => {
+                /** @type {NodeListOf<HTMLDivElement>} */ (filesList.querySelectorAll(`div.selected`)).forEach((e) => {
                     const item = itemInfo(e);
                     if (item.type === 'file') {
                         files.push(item.id);
@@ -1164,6 +1201,7 @@ const ui = {
      *  Favorite star helper – attaches a direct click handler to a
      *  star <button> so the event never bubbles to the card.
      * ================================================================ */
+    /** @param {HTMLElement} el */
     _bindStarClick(el) {
         const star = el.querySelector('.favorite-star');
         star?.addEventListener('click', (e) => {
@@ -1174,7 +1212,8 @@ const ui = {
             if (!favorites) return;
 
             // FIXME: make a function
-            const itemElement = shared?.closest('.file-item');
+            const itemElement = /** @type {HTMLElement | null} */ (shared?.closest('.file-item'));
+            if (!itemElement) return;
 
             const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
             const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
@@ -1187,7 +1226,7 @@ const ui = {
                 favorites.removeFromFavorites(itemId, itemType);
             } else {
                 this.setFavoriteVisualState(itemId, itemType, true);
-                favorites.addToFavorites(itemId, itemName, itemType);
+                favorites.addToFavorites(itemId, itemName, itemType, null);
             }
 
             // Keep context-menu label in sync if available
@@ -1201,26 +1240,30 @@ const ui = {
             e.preventDefault();
 
             // FIXME: make a function
-            const itemElement = shared?.closest('.file-item');
+            const itemElement = /** @type {HTMLElement | null} */ (shared?.closest('.file-item'));
+            if (!itemElement) return;
 
             const itemId = itemElement.dataset.fileId ? itemElement.dataset.fileId : itemElement.dataset.folderId;
             const itemType = itemElement.dataset.fileId ? 'file' : 'folder';
             const itemName = itemElement.dataset.fileId ? itemElement.dataset.fileName : itemElement.dataset.folderName;
 
             // TODO corrently dirty
-            const item = {
+            const item = /** @type {unknown} */ ({
                 id: itemId,
                 item_id: itemId,
                 item_type: itemType,
                 item_name: itemName
-            };
+            });
 
-            contextMenus.showShareDialog(item, itemType);
+            contextMenus.showShareDialog(/** @type {FileItem} */ (item), itemType);
         });
     },
 
     /**
      * Sync favorite visuals for a file/folder across grid and list views.
+     * @param {string} itemId
+     * @param {string} itemType
+     * @param {boolean} isFavorite
      */
     setFavoriteVisualState(itemId, itemType, isFavorite) {
         const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
@@ -1258,6 +1301,11 @@ const ui = {
         }
     },
 
+    /**
+     * @param {string} itemId
+     * @param {string} itemType
+     * @param {boolean} isShared
+     */
     setSharedVisualState(itemId, itemType, isShared) {
         console.log(`setSharedVisual call for ${itemId} ${itemType} to ${isShared}`);
         const selector = itemType === 'folder' ? `#files-list .file-item[data-folder-id="${itemId}"]` : `#files-list .file-item[data-file-id="${itemId}"]`;
@@ -1273,7 +1321,10 @@ const ui = {
      *  Element-creation helpers
      * ================================================================ */
 
-    /** Create a list row for a folder */
+    /**
+     * Create a list row for a folder
+     * @param {FolderItem} folder
+     */
     _createFolderItem(folder) {
         const el = document.createElement('div');
         el.className = 'file-item';
@@ -1314,7 +1365,10 @@ const ui = {
         return el;
     },
 
-    /** Create a grid card for a file */
+    /**
+     * Create a grid card for a file
+     * @param {FileItem} file
+     */
     _createFileItem(file) {
         const iconClass = file.icon_class || this.getIconClass(file.name);
         const iconSpecialClass = file.icon_special_class || this.getIconSpecialClass(file.name);
@@ -1425,7 +1479,7 @@ const ui = {
      * Render an array of folders into both grid and list views
      * using DocumentFragment for minimal reflows.
      *
-     * @param {FolderInfo[]} folders
+     * @param {FolderItem[]} folders
      */
     renderFolders(folders) {
         if (!this._delegationReady) this.initDelegation();
@@ -1442,6 +1496,7 @@ const ui = {
     /**
      * Render an array of files into both grid and list views
      * using DocumentFragment for minimal reflows.
+     * @param {FileItem[]} files
      */
     renderFiles(files) {
         if (!this._delegationReady) this.initDelegation();
@@ -1461,7 +1516,7 @@ const ui = {
 
     /**
      * Add a single folder to the active view.
-     * @param {Object} folder - Folder object
+     * @param {FolderItem} folder
      */
     addFolderToView(folder) {
         if (!this._delegationReady) this.initDelegation();
@@ -1472,6 +1527,7 @@ const ui = {
             return;
         }
 
+        this._clearEmptyState();
         this._items.set(folder.id, folder);
         this._upsertById(this._lastFolders, folder);
         this._renderFoldersToView([folder]);
@@ -1479,7 +1535,7 @@ const ui = {
 
     /**
      * Add a single file to the active view.
-     * @param {Object} file - File object
+     * @param {FileItem} file
      */
     addFileToView(file) {
         if (!this._delegationReady) this.initDelegation();
@@ -1490,9 +1546,23 @@ const ui = {
             return;
         }
 
+        this._clearEmptyState();
         this._items.set(file.id, file);
         this._upsertById(this._lastFiles, file);
         this._renderFilesToView([file]);
+    },
+
+    /**
+     * If the empty-state placeholder is showing, switch back to the file list.
+     * Called before adding any new item so the card is not appended to a hidden list.
+     */
+    _clearEmptyState() {
+        const filesList = document.getElementById('files-list');
+        const filesContainerError = document.getElementById('files-container-error');
+        if (filesList?.classList.contains('hidden')) {
+            filesList.classList.remove('hidden');
+            filesContainerError?.classList.add('hidden');
+        }
     }
 };
 
@@ -1501,6 +1571,8 @@ const ui = {
 /**
  * Toggle selection state of a file/folder card.
  * Routes through the multiSelect module so batch actions know about selected items.
+ * @param {HTMLDivElement} card
+ * @param {MouseEvent} event
  */
 function toggleCardSelection(card, event) {
     if (multiSelect) {
@@ -1512,6 +1584,8 @@ function toggleCardSelection(card, event) {
 
 /**
  * Show the context menu anchored next to a trigger element (the 3-dot button).
+ * @param {HTMLElement} triggerElement
+ * @param {string} menuId
  */
 function showContextMenuAtElement(triggerElement, menuId) {
     // Hide any open menus first
@@ -1542,8 +1616,6 @@ function showContextMenuAtElement(triggerElement, menuId) {
     menu.classList.remove('hidden');
 }
 
-let __rubberBandJustFinished = false;
-
 /**
  * Rubber band (lasso) selection — click + drag on empty grid area
  * to draw a rectangle and select all cards it touches.
@@ -1567,16 +1639,18 @@ function initRubberBandSelection() {
     if (!container) return;
 
     container.addEventListener('mousedown', (e) => {
+        if (!(e instanceof MouseEvent)) return;
         // Only start if clicking empty area (not on a card, button, menu, input…)
         if (e.button !== 0) return; // left click only
+        const target = /** @type {Element} */ (e.target);
         if (
-            e.target.closest('.file-item') ||
-            e.target.closest('.context-menu') ||
-            e.target.closest('.upload-dropdown') ||
-            e.target.closest('button') ||
-            e.target.closest('input') ||
-            e.target.closest('.breadcrumb') ||
-            e.target.closest('.list-header')
+            target.closest('.file-item') ||
+            target.closest('.context-menu') ||
+            target.closest('.upload-dropdown') ||
+            target.closest('button') ||
+            target.closest('input') ||
+            target.closest('.breadcrumb') ||
+            target.closest('.list-header')
         )
             return;
 
@@ -1627,14 +1701,14 @@ function initRubberBandSelection() {
 
                 // Sync with multiSelect module
                 if (multiSelect) {
-                    const info = multiSelect._extractInfo(card);
+                    const info = multiSelect._extractInfo(/** @type {HTMLDivElement} */ (card));
                     if (info) multiSelect.select(info.id, info.name, info.type, info.parentId);
                 }
             } else {
                 card.classList.remove('selected');
                 // Deselect from multiSelect module
                 if (multiSelect) {
-                    const info = multiSelect._extractInfo(card);
+                    const info = multiSelect._extractInfo(/** @type {HTMLDivElement} */ (card));
                     if (info) multiSelect.deselect(info.id);
                 }
             }
@@ -1651,10 +1725,7 @@ function initRubberBandSelection() {
         // Suppress the click event that follows mouseup so the global
         // deselect handler doesn't immediately clear the selection.
         if (hadSelection) {
-            __rubberBandJustFinished = true;
-            requestAnimationFrame(() => {
-                __rubberBandJustFinished = false;
-            });
+            requestAnimationFrame(() => {});
         }
     });
 }
@@ -1709,6 +1780,7 @@ function showConfirmDialog({ title, message, confirmText, cancelText, danger = t
             overlay.classList.add('active');
         });
 
+        /** @param {boolean} result */
         const cleanup = (result) => {
             overlay.classList.remove('active');
             setTimeout(() => overlay.remove(), 200);

@@ -15,6 +15,7 @@
 // All icons use viewBox="0 0 {width} 512" and fill="currentColor".
 // Keys use FA5 class names (without "fa-" prefix) for backward compatibility.
 
+/** @type {Record<String, Array<number | String>>} */
 const OxiIcons = {
     'arrow-left': [
         448,
@@ -503,7 +504,7 @@ function replaceIconsInElement(container) {
 
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         path.setAttribute('fill', 'currentColor');
-        path.setAttribute('d', d);
+        path.setAttribute('d', /** @type {string} */ (d));
         svg.appendChild(path);
 
         el.replaceWith(svg);

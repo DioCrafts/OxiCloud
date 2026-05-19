@@ -42,7 +42,7 @@ jobs:
               - 'tests/**'
 
   frontend-check:
-    name: Frontend — CSS and JS checks (format, lint, rules)
+    name: Frontend — CSS and JS checks (format, lint, css-rules, types)
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -61,15 +61,19 @@ jobs:
           node-version: 25
 
       # because we are not using package.json
-      - name: Install Stylelint and plugins
+      - name: Install Stylelint, TypeScript and plugins
         run: |
             npm install --global \
                 stylelint@17 \
                 postcss@8 \
-                stylelint-value-no-unknown-custom-properties@6
+                stylelint-value-no-unknown-custom-properties@6 \
+                typescript
 
       - name: Run Stylelint
         run: npx stylelint "static/css/**/*.{css,scss}"
+
+      - name: Run TypeScript check
+        run: tsc -p jsconfig.json --noEmit
 
   rust-fmt:
     name: Rustfmt

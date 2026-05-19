@@ -6,18 +6,18 @@
 import { switchToFilesSection } from '../../app/navigation.js';
 import { ui } from '../../app/ui.js';
 import { getCsrfHeaders } from '../../core/csrf.js';
-import { formatDateShort } from '../../core/formatters.js';
+import { formatDateShort, isEmailValid } from '../../core/formatters.js';
 import { i18n } from '../../core/i18n.js';
 import { fileSharing } from '../../features/sharing/fileSharing.js';
 
-/** @import {Share} from '../../core/types.js' */
+/** @import {ShareItem} from '../../core/types.js' */
 
 const TTL = 5 * 60 * 1000; // 5 min
 
 const sharedView = {
     // State
 
-    /** @type {Array<Share>} */
+    /** @type {Array<ShareItem>} */
     items: [],
 
     _expires: 0,
@@ -25,8 +25,10 @@ const sharedView = {
     /** @type {Map<string, boolean>} key = "file:<id>" | "folder:<id>" */
     _knownItemsId: new Map(),
 
-    /** @type {Array<Share>} */
+    /** @type {Array<ShareItem>} */
     filteredItems: [],
+
+    /** @type {ShareItem | null} */
     currentItem: null,
 
     /** Auth header helper — tokens are in HttpOnly cookies now */
@@ -238,6 +240,7 @@ const sharedView = {
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             document.querySelectorAll('.shared-custom-select.open').forEach((sel) => {
+                if (!(e.target instanceof Node)) return;
                 if (!sel.contains(e.target)) sel.classList.remove('open');
             });
         });
@@ -249,8 +252,8 @@ const sharedView = {
             if (closeBtn) closeBtn.addEventListener('click', () => this.closeShareDialog());
             const copyLinkBtn = document.getElementById('sv-copy-link-btn');
             if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => this.copyShareLink());
-            const enablePw = document.getElementById('sv-enable-password');
-            const pwField = document.getElementById('sv-share-password');
+            const enablePw = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-password'));
+            const pwField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-password'));
             if (enablePw)
                 enablePw.addEventListener('change', () => {
                     if (pwField) {
@@ -260,8 +263,8 @@ const sharedView = {
                 });
             const genPwBtn = document.getElementById('sv-generate-password');
             if (genPwBtn) genPwBtn.addEventListener('click', () => this.generatePassword());
-            const enableExp = document.getElementById('sv-enable-expiration');
-            const expField = document.getElementById('sv-share-expiration');
+            const enableExp = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-expiration'));
+            const expField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-expiration'));
             if (enableExp)
                 enableExp.addEventListener('change', () => {
                     if (expField) {
@@ -294,6 +297,13 @@ const sharedView = {
     },
 
     // Initialize a custom select dropdown
+    /**
+     *
+     * @param {string} wrapperId
+     * @param {string} toggleId
+     * @param {string} dropdownId
+     * @returns
+     */
     _initCustomSelect(wrapperId, toggleId, dropdownId) {
         const wrapper = document.getElementById(wrapperId);
         const toggle = document.getElementById(toggleId);
@@ -330,14 +340,14 @@ const sharedView = {
 
     // Filter and sort items
     filterAndSortItems() {
-        const filterTypeActive = document.querySelector('#filter-type-dropdown .shared-select-option.active');
-        const sortByActive = document.querySelector('#sort-by-dropdown .shared-select-option.active');
+        const filterTypeActive = /** @type {HTMLDivElement} */ (document.querySelector('#filter-type-dropdown .shared-select-option.active'));
+        const sortByActive = /** @type {HTMLDivElement} */ (document.querySelector('#sort-by-dropdown .shared-select-option.active'));
 
         const type = filterTypeActive ? filterTypeActive.dataset.value : 'all';
         const sort = sortByActive ? sortByActive.dataset.value : 'date';
 
         // Use the main top-bar search input
-        const searchInput = document.getElementById('search-input');
+        const searchInput = /** @type {HTMLInputElement} */ (document.getElementById('search-input'));
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
 
         this.filteredItems = this.items.filter((item) => {
@@ -396,23 +406,23 @@ const sharedView = {
             nameCell.appendChild(nameSpan);
 
             const typeCell = document.createElement('td');
-            typeCell.textContent = item.item_type === 'file' ? this.translate('shared_typeFile', 'File') : this.translate('shared_typeFolder', 'Folder');
+            typeCell.textContent = item.item_type === 'file' ? i18n.t('shared_typeFile', 'File') : i18n.t('shared_typeFolder', 'Folder');
 
             const dateCell = document.createElement('td');
-            dateCell.textContent = this.formatDate(item.created_at);
+            dateCell.textContent = formatDateShort(item.created_at);
 
             const expCell = document.createElement('td');
-            expCell.textContent = item.expires_at ? this.formatDate(item.expires_at) : this.translate('shared_noExpiration', 'No expiration');
+            expCell.textContent = item.expires_at ? formatDateShort(item.expires_at) : i18n.t('shared_noExpiration', 'No expiration');
 
             const permCell = document.createElement('td');
             const perms = [];
-            if (item.permissions?.read) perms.push(this.translate('share_permissionRead', 'Read'));
-            if (item.permissions?.write) perms.push(this.translate('share_permissionWrite', 'Write'));
-            if (item.permissions?.reshare) perms.push(this.translate('share_permissionReshare', 'Reshare'));
+            if (item.permissions?.read) perms.push(i18n.t('share_permissionRead', 'Read'));
+            if (item.permissions?.write) perms.push(i18n.t('share_permissionWrite', 'Write'));
+            if (item.permissions?.reshare) perms.push(i18n.t('share_permissionReshare', 'Reshare'));
             permCell.textContent = perms.join(', ') || 'Read';
 
             const pwCell = document.createElement('td');
-            pwCell.textContent = item.has_password ? this.translate('shared_hasPassword', 'Yes') : this.translate('shared_noPassword', 'No');
+            pwCell.textContent = item.has_password ? i18n.t('shared_hasPassword', 'Yes') : i18n.t('shared_noPassword', 'No');
 
             const actionsCell = document.createElement('td');
             actionsCell.className = 'shared-item-actions';
@@ -420,30 +430,30 @@ const sharedView = {
             const editBtn = document.createElement('button');
             editBtn.className = 'action-btn edit-btn';
             editBtn.innerHTML = '<span class="action-icon">✏️</span>';
-            editBtn.title = this.translate('shared_editShare', 'Edit Share');
+            editBtn.title = i18n.t('shared_editShare', 'Edit Share');
             editBtn.addEventListener('click', () => this.openShareDialog(item));
 
             const notifyBtn = document.createElement('button');
             notifyBtn.className = 'action-btn notify-btn';
             notifyBtn.innerHTML = '<span class="action-icon">📧</span>';
-            notifyBtn.title = this.translate('shared_notifyShare', 'Notify Someone');
+            notifyBtn.title = i18n.t('shared_notifyShare', 'Notify Someone');
             notifyBtn.addEventListener('click', () => this.openNotificationDialog(item));
 
             const copyBtn = document.createElement('button');
             copyBtn.className = 'action-btn copy-btn';
             copyBtn.innerHTML = '<span class="action-icon">📋</span>';
-            copyBtn.title = this.translate('shared_copyLink', 'Copy Link');
+            copyBtn.title = i18n.t('shared_copyLink', 'Copy Link');
             copyBtn.addEventListener('click', () => {
                 navigator.clipboard
                     .writeText(item.url)
-                    .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
-                    .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
+                    .then(() => ui.showNotification(i18n.t('shared_linkCopied', 'Link copied!'), 'success'))
+                    .catch(() => ui.showNotification(i18n.t('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
             });
 
             const rmBtn = document.createElement('button');
             rmBtn.className = 'action-btn remove-btn';
             rmBtn.innerHTML = '<span class="action-icon">🗑️</span>';
-            rmBtn.title = this.translate('shared_removeShare', 'Remove Share');
+            rmBtn.title = i18n.t('shared_removeShare', 'Remove Share');
             rmBtn.addEventListener('click', () => {
                 this.currentItem = item;
                 this.removeSharedItem();
@@ -456,6 +466,11 @@ const sharedView = {
     },
 
     // Open share dialog
+    /**
+     *
+     * @param {ShareItem} item
+     * @returns {void}
+     */
     openShareDialog(item) {
         this.currentItem = item;
         const shareDialog = document.getElementById('shared-view-edit-dialog');
@@ -463,14 +478,14 @@ const sharedView = {
 
         const iconEl = document.getElementById('sv-dialog-icon');
         const nameEl = document.getElementById('sv-dialog-name');
-        const urlEl = document.getElementById('sv-share-link-url');
-        const enablePw = document.getElementById('sv-enable-password');
-        const pwField = document.getElementById('sv-share-password');
-        const enableExp = document.getElementById('sv-enable-expiration');
-        const expField = document.getElementById('sv-share-expiration');
-        const permRead = document.getElementById('sv-permission-read');
-        const permWrite = document.getElementById('sv-permission-write');
-        const permReshare = document.getElementById('sv-permission-reshare');
+        const urlEl = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-link-url'));
+        const enablePw = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-password'));
+        const pwField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-password'));
+        const enableExp = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-expiration'));
+        const expField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-expiration'));
+        const permRead = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-read'));
+        const permWrite = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-write'));
+        const permReshare = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-reshare'));
 
         if (!shareDialog) return;
         if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
@@ -505,14 +520,19 @@ const sharedView = {
         this.currentItem = null;
     },
 
+    /**
+     *
+     * @param {ShareItem} item
+     * @returns {void}
+     */
     openNotificationDialog(item) {
         this.currentItem = item;
         const dn = item.item_name || item.item_id || 'Unknown';
         const d = document.getElementById('sv-notification-dialog');
         const iconEl = document.getElementById('sv-notify-dialog-icon');
         const nameEl = document.getElementById('sv-notify-dialog-name');
-        const emailEl = document.getElementById('sv-notification-email');
-        const msgEl = document.getElementById('sv-notification-message');
+        const emailEl = /** @type {HTMLInputElement} */ (document.getElementById('sv-notification-email'));
+        const msgEl = /** @type {HTMLInputElement} */ (document.getElementById('sv-notification-message'));
 
         if (!d) return;
         if (iconEl) iconEl.textContent = item.item_type === 'file' ? '📄' : '📁';
@@ -529,18 +549,18 @@ const sharedView = {
     },
 
     copyShareLink() {
-        const el = document.getElementById('sv-share-link-url');
+        const el = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-link-url'));
         if (!el) return;
         navigator.clipboard
             .writeText(el.value)
-            .then(() => this.showNotification(this.translate('shared_linkCopied', 'Link copied!')))
-            .catch(() => this.showNotification(this.translate('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
+            .then(() => ui.showNotification(i18n.t('shared_linkCopied', 'Link copied!'), 'success'))
+            .catch(() => ui.showNotification(i18n.t('shared_linkCopyFailed', 'Failed to copy link'), 'error'));
     },
 
     // Generate secure password with crypto API
     generatePassword() {
-        const pwField = document.getElementById('sv-share-password');
-        const enablePw = document.getElementById('sv-enable-password');
+        const pwField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-password'));
+        const enablePw = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-password'));
         if (!pwField || !enablePw) return;
 
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
@@ -559,13 +579,13 @@ const sharedView = {
     async updateSharedItem() {
         if (!this.currentItem) return;
 
-        const permRead = document.getElementById('sv-permission-read');
-        const permWrite = document.getElementById('sv-permission-write');
-        const permReshare = document.getElementById('sv-permission-reshare');
-        const enablePw = document.getElementById('sv-enable-password');
-        const pwField = document.getElementById('sv-share-password');
-        const enableExp = document.getElementById('sv-enable-expiration');
-        const expField = document.getElementById('sv-share-expiration');
+        const permRead = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-read'));
+        const permWrite = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-write'));
+        const permReshare = /** @type {HTMLInputElement} */ (document.getElementById('sv-permission-reshare'));
+        const enablePw = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-password'));
+        const pwField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-password'));
+        const enableExp = /** @type {HTMLInputElement} */ (document.getElementById('sv-enable-expiration'));
+        const expField = /** @type {HTMLInputElement} */ (document.getElementById('sv-share-expiration'));
 
         const body = {
             permissions: {
@@ -588,10 +608,10 @@ const sharedView = {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.error || `Server error ${res.status}`);
             }
-            this.showNotification(this.translate('shared_itemUpdated', 'Share settings updated'));
+            ui.showNotification(i18n.t('shared_itemUpdated', 'Share settings updated'), 'success');
         } catch (err) {
             console.error('Error updating share:', err);
-            this.showNotification(err.message || 'Error updating share', 'error');
+            ui.showNotification(/** @type {Error} */ (err).message || 'Error updating share', 'error');
         }
         // update UI
         ui.setSharedVisualState(this.currentItem.item_id, this.currentItem.item_type, true);
@@ -611,10 +631,10 @@ const sharedView = {
                 headers: this._headers()
             });
             if (!res.ok && res.status !== 204) throw new Error(`Server error ${res.status}`);
-            this.showNotification(this.translate('shared_itemRemoved', 'Share removed'));
+            ui.showNotification(i18n.t('shared_itemRemoved', 'Share removed'), 'success');
         } catch (err) {
             console.error('Error removing share:', err);
-            this.showNotification('Error removing share', 'error');
+            ui.showNotification('Error removing share', 'error');
         }
 
         this.closeShareDialog();
@@ -627,13 +647,13 @@ const sharedView = {
     // Send notification (stub)
     sendNotification() {
         if (!this.currentItem) return;
-        const emailEl = document.getElementById('sv-notification-email');
-        const msgEl = document.getElementById('sv-notification-message');
+        const emailEl = /** @type {HTMLInputElement} */ (document.getElementById('sv-notification-email'));
+        const msgEl = /** @type {HTMLInputElement} */ (document.getElementById('sv-notification-message'));
         const email = emailEl ? emailEl.value.trim() : '';
         const message = msgEl ? msgEl.value.trim() : '';
 
-        if (!email || !this.validateEmail(email)) {
-            this.showNotification(this.translate('shared_invalidEmail', 'Please enter a valid email address'), 'error');
+        if (!email || !isEmailValid(email)) {
+            ui.showNotification(i18n.t('shared_invalidEmail', 'Please enter a valid email address'), 'error');
             return;
         }
 
@@ -642,30 +662,10 @@ const sharedView = {
                 .sendShareNotification(this.currentItem.url, email, message)
                 .then(() => {
                     this.closeNotificationDialog();
-                    this.showNotification(this.translate('shared_notificationSent', 'Notification sent'));
+                    ui.showNotification(i18n.t('shared_notificationSent', 'Notification sent'), 'success');
                 })
-                .catch(() => this.showNotification(this.translate('shared_notificationFailed', 'Failed to send notification'), 'error'));
+                .catch(() => ui.showNotification(i18n.t('shared_notificationFailed', 'Failed to send notification'), 'error'));
         }
-    },
-
-    showNotification(message, type = 'success') {
-        if (ui?.showNotification) {
-            ui.showNotification(message, type);
-        } else {
-            alert(message);
-        }
-    },
-
-    validateEmail(email) {
-        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    },
-
-    formatDate(value) {
-        return formatDateShort(value);
-    },
-
-    translate(key, defaultText) {
-        return i18n.t(key, defaultText);
     }
 };
 

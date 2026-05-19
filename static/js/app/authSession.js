@@ -8,6 +8,14 @@ import { updateStorageUsageDisplay } from './main.js';
 import { app } from './state.js';
 import { ui } from './ui.js';
 
+/**
+ * @import {User} from '../core/types.js'
+ */
+
+/**
+ *
+ * @returns {Promise<User | null>}
+ */
 async function refreshUserData() {
     const USER_DATA_KEY = 'oxicloud_user';
 
@@ -25,6 +33,7 @@ async function refreshUserData() {
             return null;
         }
 
+        /** @type {User} */
         const userData = await response.json();
         console.log('Refreshed user data from server:', userData);
         console.log('Storage from server: used=', userData.storage_used_bytes, 'quota=', userData.storage_quota_bytes);
@@ -83,6 +92,7 @@ async function checkAuthentication() {
         // Check session validity by calling /api/auth/me (cookie auto-sent)
         console.log('Checking session via /api/auth/me...');
 
+        /** @type {User} */
         const userData = JSON.parse(localStorage.getItem(USER_DATA_KEY) || '{}');
         if (userData.username) {
             // We have cached user data — render immediately, refresh in background

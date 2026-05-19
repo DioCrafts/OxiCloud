@@ -18,6 +18,10 @@ function getCsrfToken() {
     return match ? match.split('=')[1] : '';
 }
 
+/**
+ * returns headers to add, this includes the X-CSRF-Token
+ * @returns {Record<String, String>}
+ */
 function getCsrfHeaders() {
     const token = getCsrfToken();
     return token ? { 'X-CSRF-Token': token } : {};

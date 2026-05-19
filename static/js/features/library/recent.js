@@ -12,6 +12,8 @@ import { i18n } from '../../core/i18n.js';
 import { multiSelect } from '../files/multiSelect.js';
 import * as pathTooltip from '../pathTooltip.js';
 
+/** @import {FileItem, FolderItem, ItemTypeEnum, RecentItem} from '../../core/types.js' */
+
 const recent = {
     /** Maximum items to request from the server */
     MAX_RECENT_FILES: 20,
@@ -38,8 +40,9 @@ const recent = {
      */
     setupEventListeners() {
         document.addEventListener('file-accessed', (event) => {
-            if (event.detail?.file) {
-                const file = event.detail.file;
+            const e = /** @type {CustomEvent} */ (event);
+            if (e.detail?.file) {
+                const file = e.detail.file;
                 const itemType = file.item_type || 'file';
                 this._recordAccess(file.id, itemType);
             }
@@ -48,6 +51,8 @@ const recent = {
 
     /**
      * Record an access event on the server.
+     * @param {string} itemId
+     * @param {ItemTypeEnum} itemType
      */
     async _recordAccess(itemId, itemType) {
         try {
@@ -90,7 +95,7 @@ const recent = {
                 throw new Error(`Server returned ${response.status}`);
             }
 
-            const recentItems = await response.json();
+            const recentItems = /** @type {RecentItem[]} */ (await response.json());
 
             ui.resetFilesList(); // ensure also list visible & error hidden
             const filesList = document.getElementById('files-list');
@@ -120,8 +125,12 @@ const recent = {
                 `);
             }
 
+            /** @type {FolderItem[]} */
             const folders = [];
+
+            /** @type {FileItem[]} */
             const files = [];
+
             for (const item of recentItems) {
                 const isFolder = item.item_type === 'folder';
                 if (isFolder) {
@@ -130,9 +139,20 @@ const recent = {
                         name: item.item_name || item.item_id,
                         parent_id: item.parent_id || '',
                         modified_at: item.accessed_at,
-                        path: item.item_path || ''
+                        path: item.item_path || '',
+                        category: 'folder',
+                        created_at: item.accessed_at, //Wrong information
+                        icon_class: item.icon_class,
+                        icon_special_class: item.icon_special_class,
+                        owner_id: '',
+                        is_root: false
                     });
                 } else {
+                    if (item.item_mime_type === undefined || item.item_mime_type === null) {
+                        // FIXME: this case should not be possible, is it an information badly cleaned up on server ?
+                        console.warn('Broken information for RecentItem: ', item);
+                        //continue;
+                    }
                     files.push({
                         id: item.item_id,
                         name: item.item_name || item.item_id,
@@ -144,7 +164,10 @@ const recent = {
                         size: item.item_size || 0,
                         size_formatted: item.size_formatted,
                         modified_at: item.accessed_at,
-                        path: item.item_path || ''
+                        path: item.item_path || '',
+                        owner_id: '',
+                        created_at: item.accessed_at, //wrong information
+                        sort_date: item.accessed_at
                     });
                 }
             }

@@ -35,6 +35,10 @@ import { loadTrashItems } from './trashView.js';
 import { ui } from './ui.js';
 import { setupUserMenu } from './userMenu.js';
 
+/**
+ * @import {User} from '../core/types.js'
+ */
+
 // Upload dropdown listener state (prevents accumulated listeners)
 /** @type {((e: MouseEvent) => void) | null} */
 let uploadDropdownDocumentClickHandler = null;
@@ -141,7 +145,7 @@ const ACTIONS_BAR_TEMPLATES = {
 
 /**
  *
- * @param {string} mode
+ * @param {'files' | 'trash' | 'favorites' | 'recent' | 'hidden'} mode
  * @param {boolean} [force=false]
  * @returns
  */
@@ -494,6 +498,7 @@ function setupEventListeners() {
     ui.setupDragAndDrop();
 
     // Debounce timer for live search
+    /** @type {ReturnType<typeof setTimeout>} */
     let searchDebounceTimer = null;
     const SEARCH_DEBOUNCE_MS = 300;
     const SEARCH_MIN_CHARS = 3;
@@ -726,7 +731,7 @@ export function selectFolder(id, name) {
 
 /**
  * Update the storage usage display with the user's actual storage usage
- * @param {Object} userData - The user data object
+ * @param {User} userData - The user data object
  */
 function updateStorageUsageDisplay(userData) {
     // Default values

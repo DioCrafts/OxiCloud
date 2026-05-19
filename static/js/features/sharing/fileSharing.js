@@ -9,6 +9,10 @@ import { ui } from '../../app/ui.js';
 import { getCsrfHeaders } from '../../core/csrf.js';
 import { formatDateTime } from '../../core/formatters.js';
 
+/**
+ * @import {CreateShare, ShareItem, UpdateShare} from '../../core/types.js'
+ */
+
 const fileSharing = {
     /** Auth header helper — tokens are in HttpOnly cookies now */
     _headers(json = true) {
@@ -21,16 +25,17 @@ const fileSharing = {
      * Create a shared link via backend API
      * @param {string} itemId - ID of the file or folder
      * @param {string} itemType - 'file' or 'folder'
-     * @param {Object} options - { name, password, expirationDate, permissions }
+     * @param {CreateShare} [options] -
      * @returns {Promise<Object>} ShareDto from backend
      */
-    async createSharedLink(itemId, itemType, options = {}) {
+    // FIXME unused ?? duplicate with createSharedLink() from contextMenu
+    async createSharedLink(itemId, itemType, options) {
         const body = {
             item_id: itemId,
-            item_name: options.name || null,
+            item_name: options.item_name || null,
             item_type: itemType,
             password: options.password || null,
-            expires_at: options.expirationDate ? Math.floor(new Date(options.expirationDate).getTime() / 1000) : null,
+            expires_at: options.expires_at ? Math.floor(new Date(options.expires_at).getTime() / 1000) : null,
             permissions: options.permissions || {
                 read: true,
                 write: false,
@@ -54,7 +59,7 @@ const fileSharing = {
 
     /**
      * Get all shared links for the current user
-     * @returns {Promise<Array>} Array of ShareDto
+     * @returns {Promise<ShareItem[]>} Array of ShareDto
      */
     async getSharedLinks() {
         try {
@@ -62,7 +67,7 @@ const fileSharing = {
                 headers: this._headers(false)
             });
             if (!res.ok) return [];
-            const data = await res.json();
+            const data = /** @type {ShareItem[]} */ await res.json();
             return data.items || [];
         } catch (error) {
             console.error('Error fetching shared links:', error);
@@ -74,7 +79,7 @@ const fileSharing = {
      * Get shared links for a specific item (server-side filtered)
      * @param {string} itemId
      * @param {string} itemType - 'file' or 'folder'
-     * @returns {Promise<Array>} Shares for this item
+     * @returns {Promise<ShareItem[]>} Shares for this item
      */
     async getSharedLinksForItem(itemId, itemType) {
         try {
@@ -96,6 +101,8 @@ const fileSharing = {
 
     /**
      * Check if an item has any shared links
+     * @param {string} itemId
+     * @param {string} itemType
      * @returns {Promise<boolean>}
      */
     async hasSharedLinks(itemId, itemType) {
@@ -106,7 +113,7 @@ const fileSharing = {
     /**
      * Update a shared link
      * @param {string} shareId
-     * @param {Object} updateData - { permissions, password, expires_at }
+     * @param {UpdateShare} updateData - { permissions, password, expires_at }
      * @returns {Promise<Object>} Updated ShareDto
      */
     async updateSharedLink(shareId, updateData) {

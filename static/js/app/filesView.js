@@ -9,14 +9,14 @@ import { app } from './state.js';
 import { ui } from './ui.js';
 import { uiNotifications } from './uiNotifications.js';
 
-/** @import {FileInfo, FolderInfo} from '../core/types.js' */
+/** @import {FileItem, FolderItem} from '../core/types.js' */
 
 let isLoadingFiles = false;
 
 /**
  * getFolder information
  * @param {string} id the id of the folder
- * @returns {Promise<FolderInfo>}
+ * @returns {Promise<FolderItem>}
  */
 async function getFolder(id) {
     /** @type {HeadersInit} */
@@ -47,7 +47,7 @@ async function getFolder(id) {
 async function rebuildBreadCrumb() {
     /**
      * Store the leaf (this is the current displayed folder)
-     * @type {FolderInfo | null}
+     * @type {FolderItem | null}
      */
     let currentFolderInfo = null;
 
@@ -172,7 +172,11 @@ async function loadFiles(options = { insertHistory: true }) {
 
         if (forceRefresh) {
             url += `&force_refresh=true`;
-            if (requestOptions.headers) requestOptions.headers['X-Force-Refresh'] = 'true';
+            if (requestOptions.headers) {
+                const headers = new Headers(requestOptions.headers);
+                headers.set('X-Force-Refresh', 'true');
+                requestOptions.headers = headers;
+            }
             console.log('Forcing complete refresh ignoring cache');
         }
 
@@ -202,10 +206,10 @@ async function loadFiles(options = { insertHistory: true }) {
             multiSelect.init(); // this will wire buttons & select-all-checkbox
         }
 
-        /** @type {FolderInfo[]} */
+        /** @type {FolderItem[]} */
         const folderList = Array.isArray(listing.folders) ? listing.folders : [];
 
-        /** @type {FileInfo[]} */
+        /** @type {FileItem[]} */
         const fileList = Array.isArray(listing.files) ? listing.files : [];
 
         if (folderList.length === 0 && fileList.length === 0) {

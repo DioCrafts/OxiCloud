@@ -8,9 +8,14 @@ import { app } from './state.js';
 import { ui } from './ui.js';
 
 /**
- * @param {string} query
- * @param {string} [sortBy]
+ * @import {SearchCriteria, SortByEnnum} from '../core/types.js'
  */
+
+/**
+ * @param {string} query
+ * @param {SortByEnnum} [sortBy]
+ */
+// FIXME: refactor with search.js ?
 async function performSearch(query, sortBy) {
     console.log(`Performing search for: "${query}" (sort: ${sortBy || 'relevance'})`);
 
@@ -20,9 +25,11 @@ async function performSearch(query, sortBy) {
 
         ui.showError(`<h3><i class="fas fa-spinner fa-spin search-spinner"></i> Searching for "${query}"...</h3>`);
 
+        /** @type {SearchCriteria} */
         const options = {
             recursive: true,
             limit: 100,
+            offset: 0,
             sort_by: sortBy || 'relevance'
         };
 
@@ -51,7 +58,8 @@ document.addEventListener('search-resort', (e) => {
     const event = /** @type {CustomEvent<{sort_by: string}>} */ (e);
     const searchInput = /** @type {HTMLInputElement} */ (document.querySelector('.search-container input'));
     if (searchInput?.value.trim()) {
-        performSearch(searchInput.value.trim(), event.detail.sort_by);
+        const sortBy = /** @type {SortByEnnum} */ (event.detail.sort_by);
+        performSearch(searchInput.value.trim(), sortBy);
     }
 });
 

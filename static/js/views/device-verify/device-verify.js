@@ -8,8 +8,10 @@ import { oxiIconsInit } from '../../core/icons.js';
     var deviceInfo = document.getElementById('device-info');
     var actionButtons = document.getElementById('action-buttons');
     var errorText = document.getElementById('error-text');
-    var btnApprove = document.getElementById('btn-approve');
-    var btnDeny = document.getElementById('btn-deny');
+    var btnApprove = /** @type {HTMLButtonElement} */ (document.getElementById('btn-approve'));
+    var btnDeny = /** @type {HTMLButtonElement} */ (document.getElementById('btn-deny'));
+
+    /** @type {ReturnType<typeof setTimeout>} */
     var debounceTimer = null;
     var currentCode = '';
 
@@ -24,12 +26,13 @@ import { oxiIconsInit } from '../../core/icons.js';
 
     // Auto-insert hyphen and lookup on input
     codeInput.addEventListener('input', (e) => {
-        var val = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        const target = /** @type {HTMLInputElement} */ (e.target);
+        var val = target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
         // Auto-insert hyphen after 4 chars
         if (val.length === 4 && val.indexOf('-') === -1) {
             val = `${val}-`;
         }
-        e.target.value = val;
+        target.value = val;
         errorText.classList.add('hidden');
 
         // Debounce lookup
@@ -52,6 +55,11 @@ import { oxiIconsInit } from '../../core/icons.js';
         handleAction('deny');
     });
 
+    /**
+     *
+     * @param {string} code
+     * @returns
+     */
     async function lookupCode(code) {
         try {
             const resp = await fetch(`${API_BASE}/api/auth/device/verify?code=${encodeURIComponent(code)}`, {
@@ -81,6 +89,10 @@ import { oxiIconsInit } from '../../core/icons.js';
         }
     }
 
+    /**
+     *
+     * @param {'approve' | 'deny'} action
+     */
     async function handleAction(action) {
         btnApprove.disabled = true;
         btnDeny.disabled = true;
@@ -109,10 +121,14 @@ import { oxiIconsInit } from '../../core/icons.js';
         } catch (err) {
             btnApprove.disabled = false;
             btnDeny.disabled = false;
-            showError(err.message || 'Failed to process action.');
+            showError(/** @type {Error} */ (err).message || 'Failed to process action.');
         }
     }
 
+    /**
+     *
+     * @param {string} msg
+     */
     function showError(msg) {
         errorText.textContent = msg;
         errorText.classList.remove('hidden');

@@ -27,6 +27,7 @@
 @import url("./components/search.css");
 @import url("./components/icons.css");
 @import url("./components/csp-utilities.css");
+@import url("./components/pathTooltip.css");
 
 /* Theme */
 @import url("./themes/dark.css");

@@ -1,6 +1,7 @@
 /**
  * OxiCloud - Shared format and escaping utilities
  * Centralized global helpers for date/size/text formatting and XSS-safe escaping.
+ * Contains also checkers
  */
 
 /**
@@ -97,4 +98,13 @@ function isTextViewable(mimeType) {
     return TEXT_TYPES.includes(mimeType);
 }
 
-export { escapeHtml, formatDateShort, formatDateTime, formatFileSize, formatQuotaSize, isTextViewable };
+/**
+ * Chekif an email is valid
+ * @param {string} email
+ * @returns boolean
+ */
+function isEmailValid(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+export { escapeHtml, formatDateShort, formatDateTime, formatFileSize, formatQuotaSize, isEmailValid, isTextViewable };

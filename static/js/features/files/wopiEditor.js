@@ -19,6 +19,7 @@ class WopiEditor {
     /**
      * Check if a file can be opened in a WOPI editor by extension.
      * Fetches supported extensions from the server (cached after first call).
+     * @param {string} filename
      */
     async canEdit(filename) {
         const ext = filename.split('.').pop().toLowerCase();
@@ -28,6 +29,9 @@ class WopiEditor {
 
     /**
      * Open file in a modal overlay (default mode).
+     * @param {string} fileId
+     * @param {string} fileName
+     * @param {string} [action]
      */
     async openInModal(fileId, fileName, action) {
         action = action || 'edit';
@@ -38,6 +42,9 @@ class WopiEditor {
 
     /**
      * Open file in a new browser tab.
+     * @param {string} fileId
+     * @param {string} fileName
+     * @param {string} [action]
      */
     async openInTab(fileId, fileName, action) {
         action = action || 'edit';
@@ -53,6 +60,8 @@ class WopiEditor {
 
     /**
      * Fetch editor URL and WOPI token from the backend.
+     * @param {string} fileId
+     * @param {string} action
      */
     async _getEditorUrl(fileId, action) {
         const response = await fetch(`/api/wopi/editor-url?file_id=${encodeURIComponent(fileId)}&action=${encodeURIComponent(action)}`, {
@@ -68,6 +77,9 @@ class WopiEditor {
     /**
      * Some WOPI file types, such as PDFs, are view-only.
      * If an edit request returns 422, retry once in view mode.
+     * @param {string} fileId
+     * @param {string} fileName
+     * @param {string} action
      */
     async _getEditorUrlWithFallback(fileId, fileName, action) {
         try {
@@ -81,6 +93,11 @@ class WopiEditor {
         }
     }
 
+    /**
+     * @param {string} fileName
+     * @param {string} action
+     * @param {any} error
+     */
     _shouldRetryInViewMode(fileName, action, error) {
         if (action !== 'edit' || !error || !error.message) {
             return false;
@@ -92,6 +109,8 @@ class WopiEditor {
 
     /**
      * Show the editor in a full-screen modal with iframe.
+     * @param {Record<string, any>} editorData
+     * @param {string} fileName
      */
     _showModal(editorData, fileName) {
         this.closeEditor();
@@ -160,13 +179,13 @@ class WopiEditor {
         document.body.appendChild(modal);
 
         // ESC key handler
-        this._escHandler = function (e) {
+        this._escHandler = (/** @type {KeyboardEvent} */ e) => {
             if (e.key === 'Escape') this.closeEditor();
-        }.bind(this);
+        };
         document.addEventListener('keydown', this._escHandler);
 
         // Fix 7: Listen for postMessage from the editor iframe
-        this._messageHandler = function (e) {
+        this._messageHandler = (/** @type {MessageEvent} */ e) => {
             var data;
             try {
                 data = JSON.parse(e.data);
@@ -183,7 +202,7 @@ class WopiEditor {
                     if (sp) sp.remove();
                 }
             }
-        }.bind(this);
+        };
         window.addEventListener('message', this._messageHandler);
 
         form.submit();

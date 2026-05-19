@@ -38,7 +38,13 @@ function _onLeave() {
     _tooltip?.classList.add('hidden');
 }
 
-/** @type {WeakMap<HTMLElement, {enter: Function, leave: Function}>} */
+/**
+ * @typedef {Object} EnterLeaveF
+ * @property {(e: MouseEvent) => void} enter
+ * @property {(e: MouseEvent) => void} leave
+ *
+
+/** @type {WeakMap<HTMLElement, EnterLeaveF>} */
 const _listeners = new WeakMap();
 
 /**
@@ -49,10 +55,15 @@ function init(container) {
     const items = container.querySelectorAll('.file-item[data-path]');
     items.forEach((item) => {
         const el = /** @type {HTMLElement} */ (item);
+
+        /** @type {(e: MouseEvent) => void} */
         const enter = (e) => _onEnter(e);
-        const leave = () => _onLeave();
         el.addEventListener('mouseenter', enter);
+
+        /** @type {(e: MouseEvent) => void} */
+        const leave = (_e) => _onLeave();
         el.addEventListener('mouseleave', leave);
+
         _listeners.set(el, { enter, leave });
     });
 }

@@ -43,7 +43,7 @@ test.describe('authenticated as admin', () => {
     await loginAsAdmin(page);
   });
 
-  test('home page shows files list', async ({ page }) => {
+  test('home page shows empty files list', async ({ page }) => {
     await expect(page.locator('.files-container')).toBeVisible();
     await expect(page.locator('#user-menu-wrapper')).toBeVisible();
     await expect(page).toHaveScreenshot('home-files.png', {
@@ -52,6 +52,8 @@ test.describe('authenticated as admin', () => {
       animations: 'disabled',
       mask: [page.locator('.storage-bar'), page.locator('.storage-info') ]
     });
+    await expect(page.locator('#files-container-error')).toBeVisible();
+    await expect(page.locator('#files-container-error')).toContainText("No files in this folder");
   });
 
   test('theme can be changed to dark', async ({ page }) => {

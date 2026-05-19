@@ -9,8 +9,6 @@
 // TODO: rename into selection-bar ?
 // TODO: merge with photo part
 
-// @ts-check
-
 import { loadFiles } from '../../app/filesView.js';
 import { app } from '../../app/state.js';
 import { showConfirmDialog, ui } from '../../app/ui.js';
@@ -19,8 +17,14 @@ import { favorites } from '../library/favorites.js';
 import { contextMenus } from './contextMenus.js';
 import { getAuthHeaders } from './fileOperations.js';
 
+/**
+ * @import {ItemTypeEnum, LightItem} from '../../core/types.js'
+ * @import {BatchResult} from './fileOperations.js'
+ */
+
 const multiSelect = {
-    /** Currently selected items: Map<id, { id, name, type, parentId }> */
+    /** @type {Map<String, LightItem>} items: Map<id, { id, name, type, parentId }> */
+
     _selected: new Map(),
 
     /** Last clicked index for Shift-range selection */
@@ -49,6 +53,12 @@ const multiSelect = {
 
     // ── Helpers for i18n ────────────────────────────────────
 
+    /**
+     *
+     * @param {string} key
+     * @param {any} vars
+     * @returns
+     */
     _t(key, vars) {
         const val = i18n.t(key, vars);
         return val !== key ? val : null;
@@ -56,6 +66,14 @@ const multiSelect = {
 
     // ── Selection state management ──────────────────────────
 
+    /**
+     *
+     * @param {string} id
+     * @param {string} name
+     * @param {ItemTypeEnum} type
+     * @param {string} parentId
+     * @returns
+     */
     toggle(id, name, type, parentId) {
         if (this._selected.has(id)) {
             this._selected.delete(id);
@@ -65,10 +83,22 @@ const multiSelect = {
         return true;
     },
 
+    /**
+     *
+     * @param {string} id
+     * @param {string} name
+     * @param {ItemTypeEnum} type
+     * @param {string} parentId
+     * @returns
+     */
     select(id, name, type, parentId) {
         this._selected.set(id, { id, name, type, parentId });
     },
 
+    /**
+     *
+     * @param {string} id
+     */
     deselect(id) {
         this._selected.delete(id);
     },
@@ -80,7 +110,7 @@ const multiSelect = {
             el.classList.remove('selected');
         });
         document.querySelectorAll('.item-checkbox').forEach((cb) => {
-            cb.checked = false;
+            /** @type {HTMLInputElement} */ (cb).checked = false;
         });
         this._syncUI();
     },
@@ -111,11 +141,13 @@ const multiSelect = {
      * @return {ItemSelection}
      */
     getSelection(targtFolderId) {
+        /** @type {Array<string>} */
         const fileIds = [];
+        /** @type {Array<string>} */
         const folderIds = [];
 
         // TODO optimize & check if _selected is a better use
-        document.querySelectorAll(`div.file-item.selected`).forEach((item) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (document.querySelectorAll(`div.file-item.selected`)).forEach((item) => {
             if (item.dataset.fileId) {
                 fileIds.push(item.dataset.fileId);
             } else {
@@ -152,6 +184,10 @@ const multiSelect = {
 
     // ── DOM helpers ─────────────────────────────────────────
 
+    /**
+     *
+     * @param {HTMLDivElement} el
+     */
     _selectElement(el) {
         const info = this._extractInfo(el);
         if (info) {
@@ -160,18 +196,32 @@ const multiSelect = {
         }
     },
 
+    /**
+     *
+     * @param {string} containerId
+     * @param {string} selector
+     * @returns {void}
+     */
     _selectAllInContainer(containerId, selector) {
-        const container = document.getElementById(containerId);
+        const container = /** @type {HTMLDivElement} */ (document.getElementById(containerId));
         if (!container) return;
-        container.querySelectorAll(selector).forEach((el) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (container.querySelectorAll(selector)).forEach((el) => {
             this._selectElement(el);
         });
     },
 
+    /**
+     *
+     * @returns {HTMLDivElement[]}
+     */
     _getAllVisibleItems() {
-        return [...document.querySelectorAll('.file-item')];
+        return /** @type {HTMLDivElement[]} */ ([...document.querySelectorAll('.file-item')]);
     },
 
+    /**
+     * @param {HTMLDivElement} el
+     * @returns {LightItem}
+     */
     _extractInfo(el) {
         if (el.dataset.folderId && el.dataset.folderName !== undefined) {
             return {
@@ -194,6 +244,10 @@ const multiSelect = {
 
     // ── Click handler (shared by grid + list) ───────────────
 
+    /**
+     * @param {HTMLDivElement} el
+     * @param {MouseEvent} event
+     */
     handleToggleItem(el, event) {
         const items = this._getAllVisibleItems();
         const index = items.indexOf(el);
@@ -210,7 +264,7 @@ const multiSelect = {
                     const sel = iInfo.type === 'folder' ? `[data-folder-id="${iInfo.id}"]` : `[data-file-id="${iInfo.id}"]`;
                     document.querySelectorAll(sel).forEach((e) => {
                         e.classList.add('selected');
-                        const checkbox = e.querySelector('input[type="checkbox"]');
+                        const checkbox = /** @type {HTMLInputElement} */ (e.querySelector('input[type="checkbox"]'));
                         if (checkbox) checkbox.checked = true;
                     });
                 }
@@ -218,7 +272,7 @@ const multiSelect = {
         } else {
             const nowSelected = this.toggle(info.id, info.name, info.type, info.parentId);
             el.classList.toggle('selected', nowSelected);
-            const checkbox = el.querySelector('input[type="checkbox"]');
+            const checkbox = /** @type {HTMLInputElement} */ (el.querySelector('input[type="checkbox"]'));
             if (checkbox) checkbox.checked = nowSelected;
         }
         this._lastClickedIndex = index;
@@ -271,13 +325,13 @@ const multiSelect = {
 
     _syncItemCheckboxes() {
         document.querySelectorAll('.file-item').forEach((el) => {
-            const cb = el.querySelector('.item-checkbox');
+            const cb = /** @type {HTMLInputElement} */ (el.querySelector('.item-checkbox'));
             if (cb) cb.checked = el.classList.contains('selected');
         });
     },
 
     _syncSelectAllCheckbox() {
-        const cb = document.getElementById('select-all-checkbox');
+        const cb = /** @type {HTMLInputElement} */ (document.getElementById('select-all-checkbox'));
         if (!cb) return;
         const all = this._getAllVisibleItems();
         if (all.length === 0) {
@@ -454,9 +508,10 @@ const multiSelect = {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (e.target.closest('input, textarea, [contenteditable], .rename-dialog, .share-dialog, .confirm-dialog')) return;
+            const target = /** @type {Element} */ (e.target);
+            if (target.closest('input, textarea, [contenteditable], .rename-dialog, .share-dialog, .confirm-dialog')) return;
 
-            const selectAllCheckbox = document.getElementById('select-all-checkbox');
+            const selectAllCheckbox = /** @type {HTMLInputElement} */ (document.getElementById('select-all-checkbox'));
             // ctrl+a cmd+a
             if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
                 if (selectAllCheckbox) selectAllCheckbox.checked = true;

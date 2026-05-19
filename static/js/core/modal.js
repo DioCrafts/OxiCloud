@@ -10,25 +10,25 @@ const Modal = {
     // Modal element references
     /** @private @type {HTMLElement | null} */
     overlay: null,
-    // FIXME: unused ?
-    container: null,
     /** @private @type {HTMLElement | null} */
     icon: null,
     /** @private @type {HTMLElement | null} */
     title: null,
     /** @private @type {HTMLElement | null} */
     label: null,
-    /** @private @type {HTMLElement | null} */
+    /** @private @type {HTMLInputElement | null} */
     input: null,
-    /** @private @type {HTMLElement | null} */
+    /** @private @type {HTMLButtonElement | null} */
     cancelBtn: null,
-    /** @private @type {HTMLElement | null} */
+    /** @private @type {HTMLButtonElement | null} */
     confirmBtn: null,
-    /** @private @type {HTMLElement | null} */
+    /** @private @type {HTMLButtonElement | null} */
     closeBtn: null,
 
     // Current callback
+    /** @private @type {Function | null} */
     onConfirm: null,
+    /** @private @type {Function | null} */
     onCancel: null,
 
     /** @private @type {((value: string) => Promise<void>) | null} */
@@ -53,10 +53,10 @@ const Modal = {
         this.icon = document.getElementById('modal-icon');
         this.title = document.getElementById('modal-title');
         this.label = document.getElementById('modal-label');
-        this.input = document.getElementById('modal-input');
-        this.cancelBtn = document.getElementById('modal-cancel-btn');
-        this.confirmBtn = document.getElementById('modal-confirm-btn');
-        this.closeBtn = document.getElementById('modal-close-btn');
+        this.input = /** @type {HTMLInputElement} */ (document.getElementById('modal-input'));
+        this.cancelBtn = /** @type {HTMLButtonElement} */ (document.getElementById('modal-cancel-btn'));
+        this.confirmBtn = /** @type {HTMLButtonElement} */ (document.getElementById('modal-confirm-btn'));
+        this.closeBtn = /** @type {HTMLButtonElement} */ (document.getElementById('modal-close-btn'));
 
         // Event listeners
         this.errorEl = document.getElementById('modal-error');
@@ -106,13 +106,13 @@ const Modal = {
     /**
      * Show input modal (replacement for prompt())
      * @param {Object} options - Modal configuration
-     * @param {string} options.title - Modal title
-     * @param {string} options.label - Input label
-     * @param {string} options.placeholder - Input placeholder
-     * @param {string} options.value - Initial input value
-     * @param {string} options.icon - Font Awesome icon class (e.g., 'fa-folder-plus')
-     * @param {string} options.confirmText - Confirm button text
-     * @param {string} options.cancelText - Cancel button text
+     * @param {string} [options.title] - Modal title
+     * @param {string} [options.label] - Input label
+     * @param {string} [options.placeholder] - Input placeholder
+     * @param {string} [options.value] - Initial input value
+     * @param {string} [options.icon] - Font Awesome icon class (e.g., 'fa-folder-plus')
+     * @param {string} [options.confirmText] - Confirm button text
+     * @param {string} [options.cancelText] - Cancel button text
      * @param {(value: string) => Promise<void>} [options.action] - Async action called on confirm.
      *   Throw an Error to keep the modal open and display the error message inline.
      *   When omitted the modal resolves immediately with the input value (legacy behaviour).
@@ -218,6 +218,8 @@ const Modal = {
     open() {
         if (!this.overlay) return;
 
+        this.confirmBtn.disabled = false;
+
         // Show overlay
         this.overlay.classList.remove('hidden');
 
@@ -292,7 +294,7 @@ const Modal = {
             if (this.onConfirm) this.onConfirm();
             this.close(true);
         } catch (e) {
-            this.showError(e.message || 'An error occurred');
+            this.showError(/** @type {Error} */ (e).message || 'An error occurred');
             this.confirmBtn.disabled = false;
             this.input.focus();
         }

@@ -12,8 +12,10 @@ import { i18n } from '../../core/i18n.js';
 import { multiSelect } from '../files/multiSelect.js';
 import * as pathTooltip from '../pathTooltip.js';
 
+/** @import {FavoriteItem, FileItem, FolderItem} from '../../core/types.js' */
+
 const favorites = {
-    /** @type {Map<string, object>} key = "file:<id>" | "folder:<id>" */
+    /** @type {Map<string, FavoriteItem>} key = "file:<id>" | "folder:<id>" */
     _cache: new Map(),
 
     /** Whether the initial fetch from the server has completed */
@@ -25,6 +27,10 @@ const favorites = {
         return { ...getCsrfHeaders() };
     },
 
+    /**
+     * @param {string} id
+     * @param {string} type
+     */
     _cacheKey(id, type) {
         return `${type}:${id}`;
     },
@@ -33,6 +39,7 @@ const favorites = {
      * Replace the entire in-memory cache from an array of FavoriteItemDto
      * objects (as returned by the batch endpoint). Avoids an extra
      * GET /api/favorites round-trip.
+     * @param {any[]} items
      */
     _replaceCacheFromResponse(items) {
         this._cache.clear();
@@ -68,6 +75,7 @@ const favorites = {
                 return;
             }
 
+            /** @type {FavoriteItem[]} */
             const items = await response.json();
             this._cache.clear();
             for (const item of items) {
@@ -85,6 +93,8 @@ const favorites = {
 
     /**
      * Synchronous check used by ui.js to paint star icons.
+     * @param {string} id
+     * @param {string} type
      */
     isFavorite(id, type) {
         return this._cache.has(this._cacheKey(id, type));
@@ -92,6 +102,10 @@ const favorites = {
 
     /**
      * Add an item to favourites (server-first).
+     * @param {string} id
+     * @param {string} name
+     * @param {string} type
+     * @param {string} _parentId
      */
     async addToFavorites(id, name, type, _parentId) {
         try {
@@ -121,6 +135,8 @@ const favorites = {
 
     /**
      * Remove an item from favourites (server-first).
+     * @param {string} id
+     * @param {string} type
      */
     async removeFromFavorites(id, type) {
         try {
@@ -178,31 +194,51 @@ const favorites = {
                 return;
             }
 
+            /** @type {FolderItem[]} */
             const folders = [];
+
+            /** @type {FileItem[]} */
             const files = [];
+
             for (const item of this._cache.values()) {
+                // TODO: cast objects, but for that need to review user_id vs owner_id...
                 if (item.item_type === 'folder') {
-                    folders.push({
-                        id: item.item_id,
-                        name: item.item_name || item.item_id,
-                        parent_id: item.parent_id || '',
-                        modified_at: item.modified_at || item.created_at,
-                        path: item.item_path || ''
-                    });
+                    folders.push(
+                        // FIXME: better to grab the real values
+                        /** @type {FolderItem} */ {
+                            id: item.item_id,
+                            name: item.item_name || item.item_id,
+                            parent_id: item.parent_id || '',
+                            modified_at: item.modified_at || item.created_at,
+                            path: item.item_path || '',
+                            category: 'folder',
+                            created_at: item.created_at,
+                            icon_class: item.icon_class,
+                            icon_special_class: item.icon_special_class,
+                            owner_id: item.user_id,
+                            is_root: false
+                        }
+                    );
                 } else {
-                    files.push({
-                        id: item.item_id,
-                        name: item.item_name || item.item_id,
-                        folder_id: item.parent_id || '',
-                        mime_type: item.item_mime_type,
-                        icon_class: item.icon_class,
-                        icon_special_class: item.icon_special_class,
-                        category: item.category,
-                        size: item.item_size || 0,
-                        size_formatted: item.size_formatted,
-                        modified_at: item.modified_at || item.created_at,
-                        path: item.item_path || ''
-                    });
+                    files.push(
+                        // FIXME: better to grab the real values
+                        /** @type {FileItem} */ {
+                            id: item.item_id,
+                            name: item.item_name || item.item_id,
+                            folder_id: item.parent_id || '',
+                            mime_type: item.item_mime_type,
+                            icon_class: item.icon_class,
+                            icon_special_class: item.icon_special_class,
+                            category: item.category,
+                            size: item.item_size || 0,
+                            size_formatted: item.size_formatted,
+                            modified_at: item.modified_at || item.created_at,
+                            path: item.item_path || '',
+                            owner_id: item.user_id,
+                            created_at: item.created_at,
+                            sort_date: item.created_at
+                        }
+                    );
                 }
             }
             if (folders.length) ui.renderFolders(folders);

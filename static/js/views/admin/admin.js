@@ -3,13 +3,20 @@ import { escapeHtml } from '../../core/formatters.js';
 import { i18n } from '../../core/i18n.js';
 import { oxiIconsInit } from '../../core/icons.js';
 
+/**
+ * @import {RoleEnum} from '../../core/types.js'
+ */
+
 const API = '/api';
 let currentAdminId = '';
 let usersPage = 0;
 const PAGE_SIZE = 50;
 let totalUsers = 0;
 
-/** Escape a string for safe embedding inside a JS string literal within an HTML attribute. */
+/**
+ * Escape a string for safe embedding inside a JS string literal within an HTML attribute.
+ * @param {string} s
+ */
 function _escJs(s) {
     if (typeof s !== 'string') return '';
     return s.replace(/[^\w .-]/g, (c) => {
@@ -17,6 +24,7 @@ function _escJs(s) {
     });
 }
 
+/** @param {string} id */
 function hideElement(id) {
     const element = document.getElementById(id);
     if (!element) return;
@@ -24,6 +32,10 @@ function hideElement(id) {
     element.classList.add('hidden');
 }
 
+/**
+ * @param {string} id
+ * @param {string} [mode]
+ */
 function showElement(id, mode = 'block') {
     const element = document.getElementById(id);
     if (!element) return;
@@ -39,6 +51,7 @@ function headers() {
     return { 'Content-Type': 'application/json', ...getCsrfHeaders() };
 }
 
+/** @param {number} bytes */
 function formatBytes(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024,
@@ -47,11 +60,12 @@ function formatBytes(bytes) {
     return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 }
 
+/** @param {string|null} dateStr */
 function timeAgo(dateStr) {
     if (!dateStr) return i18n.t('admin.never');
     const d = new Date(dateStr);
     const now = new Date();
-    const secs = Math.floor((now - d) / 1000);
+    const secs = Math.floor((now.getTime() - d.getTime()) / 1000);
     if (secs < 60) return i18n.t('admin.just_now');
     if (secs < 3600) return i18n.t('admin.minutes_ago', { n: Math.floor(secs / 60) });
     if (secs < 86400) return i18n.t('admin.hours_ago', { n: Math.floor(secs / 3600) });
@@ -60,6 +74,7 @@ function timeAgo(dateStr) {
 }
 
 /* ── Custom confirm modal ── */
+/** @param {string} message */
 function showConfirm(message) {
     return new Promise((resolve) => {
         const overlay = document.getElementById('confirm-modal');
@@ -70,6 +85,7 @@ function showConfirm(message) {
         overlay.classList.remove('hidden');
         overlay.classList.add('show-flex');
 
+        /** @param {any} result */
         function cleanup(result) {
             overlay.classList.remove('show-flex');
             overlay.classList.add('hidden');
@@ -84,6 +100,7 @@ function showConfirm(message) {
         function onNo() {
             cleanup(false);
         }
+        /** @param {Event} e */
         function onOverlay(e) {
             if (e.target === overlay) cleanup(false);
         }
@@ -96,6 +113,10 @@ function showConfirm(message) {
 /* ── Tab switching with fade animation ── */
 let activeTabName = 'dashboard';
 
+/**
+ * @param {string} name
+ * @param {Element|undefined} el
+ */
 function switchTab(name, el) {
     if (name === activeTabName) return;
     var oldTab = document.getElementById(`tab-${activeTabName}`);
@@ -158,7 +179,7 @@ async function loadDashboard() {
         document.getElementById('ds-quotas-flag').textContent = d.quotas_enabled ? i18n.t('admin.enabled') : i18n.t('admin.disabled');
 
         if (typeof d.registration_enabled !== 'undefined') {
-            document.getElementById('ds-registration').checked = d.registration_enabled;
+            /** @type {HTMLInputElement} */ (document.getElementById('ds-registration')).checked = d.registration_enabled;
             if (d.registration_enabled) hideElement('registration-warning');
             else showElement('registration-warning', 'flex');
         }
@@ -200,7 +221,7 @@ async function loadUsers() {
         }
 
         tbody.innerHTML = users
-            .map((u) => {
+            .map((/** @type {any} */ u) => {
                 const quotaPct = u.storage_quota_bytes > 0 ? (u.storage_used_bytes / u.storage_quota_bytes) * 100 : 0;
                 const quotaColor = quotaPct > 90 ? 'red' : quotaPct > 70 ? 'orange' : 'green';
                 const quotaText =
@@ -306,18 +327,18 @@ async function loadUsers() {
             .join('');
 
         // Set dynamic progress bar widths (CSP-safe via JS property)
-        document.querySelectorAll('.progress-fill[data-width]').forEach((el) => {
+        /** @type {NodeListOf<HTMLDivElement>} */ (document.querySelectorAll('.progress-fill[data-width]')).forEach((el) => {
             el.style.width = `${el.dataset.width}%`;
             el.removeAttribute('data-width');
         });
 
         // Wire up admin action buttons (replaces inline onclick handlers)
-        document.querySelectorAll('.admin-action-btn').forEach((btn) => {
+        /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll('.admin-action-btn')).forEach((btn) => {
             btn.addEventListener('click', () => {
                 const action = btn.dataset.action;
                 if (action === 'quota') openQuotaModal(btn.dataset.uid, btn.dataset.uname, Number(btn.dataset.quota));
                 else if (action === 'reset-pw') openResetPasswordModal(btn.dataset.uid, btn.dataset.uname);
-                else if (action === 'toggle-role') toggleRole(btn.dataset.uid, btn.dataset.role);
+                else if (action === 'toggle-role') toggleRole(btn.dataset.uid, /** @type {RoleEnum} */ (btn.dataset.role));
                 else if (action === 'toggle-active') toggleActive(btn.dataset.uid, btn.dataset.active === 'true');
                 else if (action === 'delete') deleteUser(btn.dataset.uid, btn.dataset.uname);
             });
@@ -326,12 +347,12 @@ async function loadUsers() {
         const from = usersPage * PAGE_SIZE + 1;
         const to = Math.min((usersPage + 1) * PAGE_SIZE, totalUsers);
         document.getElementById('users-info').textContent = i18n.t('admin.showing_users', { from: from, to: to, total: totalUsers });
-        document.getElementById('prev-btn').disabled = usersPage === 0;
-        document.getElementById('next-btn').disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
+        /** @type {HTMLButtonElement} */ (document.getElementById('prev-btn')).disabled = usersPage === 0;
+        /** @type {HTMLButtonElement} */ (document.getElementById('next-btn')).disabled = (usersPage + 1) * PAGE_SIZE >= totalUsers;
     } catch (e) {
         tbody.innerHTML =
             '<tr><td colspan="7" class="table-status-error"><i class="fas fa-exclamation-circle"></i> ' +
-            escapeHtml(i18n.t('admin.error_network', { message: e.message })) +
+            escapeHtml(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message })) +
             '</td></tr>';
     }
 }
@@ -349,6 +370,10 @@ function nextPage() {
     }
 }
 
+/**
+ * @param {string} userId
+ * @param {RoleEnum} currentRole
+ */
 async function toggleRole(userId, currentRole) {
     const newRole = currentRole === 'admin' ? 'user' : 'admin';
     const ok = await showConfirm(i18n.t('admin.confirm_role_change', { role: newRole }));
@@ -366,10 +391,14 @@ async function toggleRole(userId, currentRole) {
             alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(i18n.t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }));
     }
 }
 
+/**
+ * @param {string} userId
+ * @param {boolean} currentActive
+ */
 async function toggleActive(userId, currentActive) {
     const msg = currentActive ? i18n.t('admin.confirm_deactivate') : i18n.t('admin.confirm_activate');
     const ok = await showConfirm(msg);
@@ -387,10 +416,14 @@ async function toggleActive(userId, currentActive) {
             alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(i18n.t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }));
     }
 }
 
+/**
+ * @param {string} userId
+ * @param {string} username
+ */
 async function deleteUser(userId, username) {
     const ok = await showConfirm(i18n.t('admin.confirm_delete_user', { name: username }));
     if (!ok) return;
@@ -408,17 +441,22 @@ async function deleteUser(userId, username) {
             alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(i18n.t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }));
     }
 }
 
 let quotaUserId = '';
+/**
+ * @param {string} userId
+ * @param {string} username
+ * @param {number} currentQuota
+ */
 function openQuotaModal(userId, username, currentQuota) {
     quotaUserId = userId;
     document.getElementById('qm-username').textContent = username;
     const gb = currentQuota / 1073741824;
-    document.getElementById('qm-unit').value = '1073741824';
-    document.getElementById('qm-value').value = gb > 0 ? Math.round(gb * 10) / 10 : 0;
+    /** @type {HTMLInputElement} */ (document.getElementById('qm-unit')).value = '1073741824';
+    /** @type {HTMLInputElement} */ (document.getElementById('qm-value')).value = String(gb > 0 ? Math.round(gb * 10) / 10 : 0);
     showElement('quota-modal', 'flex');
 }
 function closeQuotaModal() {
@@ -426,8 +464,8 @@ function closeQuotaModal() {
 }
 
 async function saveQuota() {
-    const val = parseFloat(document.getElementById('qm-value').value) || 0;
-    const unit = parseInt(document.getElementById('qm-unit').value, 10);
+    const val = parseFloat(/** @type {HTMLInputElement} */ (document.getElementById('qm-value')).value) || 0;
+    const unit = parseInt(/** @type {HTMLInputElement} */ (document.getElementById('qm-unit')).value, 10);
     const bytes = Math.round(val * unit);
     try {
         const resp = await fetch(`${API}/admin/users/${quotaUserId}/quota`, {
@@ -445,33 +483,33 @@ async function saveQuota() {
             alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        alert(i18n.t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }));
     }
 }
 
 function openCreateUserModal() {
-    document.getElementById('cu-username').value = '';
-    document.getElementById('cu-password').value = '';
-    document.getElementById('cu-email').value = '';
-    document.getElementById('cu-role').value = 'user';
-    document.getElementById('cu-quota-value').value = '1';
-    document.getElementById('cu-quota-unit').value = '1073741824';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-username')).value = '';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-password')).value = '';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-email')).value = '';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-role')).value = 'user';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-quota-value')).value = '1';
+    /** @type {HTMLInputElement} */ (document.getElementById('cu-quota-unit')).value = '1073741824';
     document.getElementById('cu-error').className = 'alert';
     document.getElementById('cu-error').textContent = '';
     showElement('create-user-modal', 'flex');
-    setTimeout(() => document.getElementById('cu-username').focus(), 100);
+    setTimeout(() => /** @type {HTMLInputElement} */ (document.getElementById('cu-username')).focus(), 100);
 }
 function closeCreateUserModal() {
     hideElement('create-user-modal');
 }
 
 async function submitCreateUser() {
-    const username = document.getElementById('cu-username').value.trim();
-    const password = document.getElementById('cu-password').value;
-    const email = document.getElementById('cu-email').value.trim() || null;
-    const role = document.getElementById('cu-role').value;
-    const quotaVal = parseFloat(document.getElementById('cu-quota-value').value) || 0;
-    const quotaUnit = parseInt(document.getElementById('cu-quota-unit').value, 10);
+    const username = /** @type {HTMLInputElement} */ (document.getElementById('cu-username')).value.trim();
+    const password = /** @type {HTMLInputElement} */ (document.getElementById('cu-password')).value;
+    const email = /** @type {HTMLInputElement} */ (document.getElementById('cu-email')).value.trim() || null;
+    const role = /** @type {HTMLInputElement} */ (document.getElementById('cu-role')).value;
+    const quotaVal = parseFloat(/** @type {HTMLInputElement} */ (document.getElementById('cu-quota-value')).value) || 0;
+    const quotaUnit = parseInt(/** @type {HTMLInputElement} */ (document.getElementById('cu-quota-unit')).value, 10);
     const quotaBytes = Math.round(quotaVal * quotaUnit);
 
     const errorEl = document.getElementById('cu-error');
@@ -486,7 +524,7 @@ async function submitCreateUser() {
         return;
     }
 
-    const btn = document.getElementById('cu-submit');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('cu-submit'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.creating'))}`;
     try {
@@ -512,7 +550,7 @@ async function submitCreateUser() {
             errorEl.className = 'alert alert-error';
         }
     } catch (e) {
-        errorEl.textContent = i18n.t('admin.error_network', { message: e.message });
+        errorEl.textContent = i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message });
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
@@ -520,21 +558,25 @@ async function submitCreateUser() {
 }
 
 let resetPwUserId = '';
+/**
+ * @param {string} userId
+ * @param {string} username
+ */
 function openResetPasswordModal(userId, username) {
     resetPwUserId = userId;
     document.getElementById('rp-username').textContent = username;
-    document.getElementById('rp-password').value = '';
+    /** @type {HTMLInputElement} */ (document.getElementById('rp-password')).value = '';
     document.getElementById('rp-error').className = 'alert';
     document.getElementById('rp-error').textContent = '';
     showElement('reset-pw-modal', 'flex');
-    setTimeout(() => document.getElementById('rp-password').focus(), 100);
+    setTimeout(() => /** @type {HTMLInputElement} */ (document.getElementById('rp-password')).focus(), 100);
 }
 function closeResetPasswordModal() {
     hideElement('reset-pw-modal');
 }
 
 async function submitResetPassword() {
-    const password = document.getElementById('rp-password').value;
+    const password = /** @type {HTMLInputElement} */ (document.getElementById('rp-password')).value;
     const errorEl = document.getElementById('rp-error');
     if (password.length < 8) {
         errorEl.textContent = i18n.t('admin.error_password_short');
@@ -542,7 +584,7 @@ async function submitResetPassword() {
         return;
     }
 
-    const btn = document.getElementById('rp-submit');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('rp-submit'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.resetting'))}`;
     try {
@@ -560,13 +602,14 @@ async function submitResetPassword() {
             errorEl.className = 'alert alert-error';
         }
     } catch (e) {
-        errorEl.textContent = i18n.t('admin.error_network', { message: e.message });
+        errorEl.textContent = i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message });
         errorEl.className = 'alert alert-error';
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.reset_btn'))}`;
 }
 
+/** @param {boolean} enabled */
 async function toggleRegistration(enabled) {
     if (enabled) hideElement('registration-warning');
     else showElement('registration-warning', 'flex');
@@ -578,29 +621,33 @@ async function toggleRegistration(enabled) {
             body: JSON.stringify({ registration_enabled: enabled })
         });
         if (!resp.ok) {
-            document.getElementById('ds-registration').checked = !enabled;
+            /** @type {HTMLInputElement} */ (document.getElementById('ds-registration')).checked = !enabled;
             if (!enabled) showElement('registration-warning', 'flex');
             else hideElement('registration-warning');
             const e = await resp.json().catch(() => ({}));
             alert(e.message || i18n.t('admin.error_generic'));
         }
     } catch (e) {
-        document.getElementById('ds-registration').checked = !enabled;
+        /** @type {HTMLInputElement} */ (document.getElementById('ds-registration')).checked = !enabled;
         if (!enabled) showElement('registration-warning', 'flex');
         else hideElement('registration-warning');
-        alert(i18n.t('admin.error_network', { message: e.message }));
+        alert(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }));
     }
 }
 
 document.getElementById('oidc-enabled').addEventListener('change', function () {
-    if (this.checked) showElement('oidc-form');
+    if (/** @type {HTMLInputElement} */ (this).checked) showElement('oidc-form');
     else hideElement('oidc-form');
 });
 document.getElementById('disable-password').addEventListener('change', function () {
-    if (this.checked) showElement('password-warning', 'flex');
+    if (/** @type {HTMLInputElement} */ (this).checked) showElement('password-warning', 'flex');
     else hideElement('password-warning');
 });
 
+/**
+ * @param {string} msg
+ * @param {string} type
+ */
 function showOidcStatus(msg, type) {
     const el = document.getElementById('oidc-status');
     el.textContent = msg;
@@ -613,12 +660,12 @@ function copyCallback() {
 }
 
 async function testConnection() {
-    const url = document.getElementById('issuer-url').value.trim();
+    const url = /** @type {HTMLInputElement} */ (document.getElementById('issuer-url')).value.trim();
     if (!url) {
         showOidcStatus('Enter an Issuer URL first', 'error');
         return;
     }
-    const btn = document.getElementById('discover-btn');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('discover-btn'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.discovering'))}`;
     const resultDiv = document.getElementById('discovery-result');
@@ -639,32 +686,32 @@ async function testConnection() {
                 '</dd><dt>Auth Endpoint</dt><dd>' +
                 escapeHtml(r.authorization_endpoint || '—') +
                 '</dd></dl></div>';
-            if (!document.getElementById('provider-name').value && r.provider_name_suggestion)
-                document.getElementById('provider-name').value = r.provider_name_suggestion;
+            if (!(/** @type {HTMLInputElement} */ (document.getElementById('provider-name')).value) && r.provider_name_suggestion)
+                /** @type {HTMLInputElement} */ (document.getElementById('provider-name')).value = r.provider_name_suggestion;
         } else {
             resultDiv.innerHTML = `<div class="discovery-result fail"><strong><i class="fas fa-times-circle"></i> ${escapeHtml(r.message)}</strong></div>`;
         }
     } catch (e) {
-        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
+        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(/** @type {Error} */ (e).message)}</div>`;
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-search"></i> ${escapeHtml(i18n.t('admin.auto_discover'))}`;
 }
 
 async function saveOidcSettings() {
-    const btn = document.getElementById('save-btn');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('save-btn'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.saving'))}`;
     const body = {
-        enabled: document.getElementById('oidc-enabled').checked,
-        issuer_url: document.getElementById('issuer-url').value.trim(),
-        client_id: document.getElementById('client-id').value.trim(),
-        client_secret: document.getElementById('client-secret').value || null,
-        scopes: document.getElementById('scopes').value.trim() || null,
-        auto_provision: document.getElementById('auto-provision').checked,
-        admin_groups: document.getElementById('admin-groups').value.trim() || null,
-        disable_password_login: document.getElementById('disable-password').checked,
-        provider_name: document.getElementById('provider-name').value.trim() || null
+        enabled: /** @type {HTMLInputElement} */ (document.getElementById('oidc-enabled')).checked,
+        issuer_url: /** @type {HTMLInputElement} */ (document.getElementById('issuer-url')).value.trim(),
+        client_id: /** @type {HTMLInputElement} */ (document.getElementById('client-id')).value.trim(),
+        client_secret: /** @type {HTMLInputElement} */ (document.getElementById('client-secret')).value || null,
+        scopes: /** @type {HTMLInputElement} */ (document.getElementById('scopes')).value.trim() || null,
+        auto_provision: /** @type {HTMLInputElement} */ (document.getElementById('auto-provision')).checked,
+        admin_groups: /** @type {HTMLInputElement} */ (document.getElementById('admin-groups')).value.trim() || null,
+        disable_password_login: /** @type {HTMLInputElement} */ (document.getElementById('disable-password')).checked,
+        provider_name: /** @type {HTMLInputElement} */ (document.getElementById('provider-name')).value.trim() || null
     };
     try {
         const resp = await fetch(`${API}/admin/settings/oidc`, {
@@ -682,7 +729,7 @@ async function saveOidcSettings() {
             showOidcStatus(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showOidcStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showOidcStatus(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.save_btn'))}`;
@@ -701,20 +748,25 @@ const STORAGE_PRESETS = {
     'wasabi':        { endpoint: 'https://s3.{region}.wasabisys.com',            region: 'us-east-1',   pathStyle: false },
 };
 
+/** @param {boolean} visible */
 function toggleS3Form(visible) {
     if (visible) showElement('storage-s3-form');
     else hideElement('storage-s3-form');
 }
 
 function onStoragePresetChange() {
-    const preset = document.getElementById('storage-preset').value;
-    const p = STORAGE_PRESETS[preset];
+    const preset = /** @type {HTMLInputElement} */ (document.getElementById('storage-preset')).value;
+    const p = STORAGE_PRESETS[/** @type {keyof typeof STORAGE_PRESETS} */ (preset)];
     if (!p) return;
-    if (p.endpoint) document.getElementById('storage-endpoint-url').value = p.endpoint;
-    if (p.region) document.getElementById('storage-region').value = p.region;
-    document.getElementById('storage-path-style').checked = p.pathStyle;
+    if (p.endpoint) /** @type {HTMLInputElement} */ (document.getElementById('storage-endpoint-url')).value = p.endpoint;
+    if (p.region) /** @type {HTMLInputElement} */ (document.getElementById('storage-region')).value = p.region;
+    /** @type {HTMLInputElement} */ (document.getElementById('storage-path-style')).checked = p.pathStyle;
 }
 
+/**
+ * @param {string} msg
+ * @param {string} type
+ */
 function showStorageStatus(msg, type) {
     const el = document.getElementById('storage-status');
     el.textContent = msg;
@@ -732,21 +784,23 @@ async function loadStorage() {
 
         // Backend selector
         document.querySelectorAll('input[name="storage-backend"]').forEach((r) => {
-            r.checked = r.value === s.backend;
+            const input = /** @type {HTMLInputElement} */ (r);
+            input.checked = input.value === s.backend;
         });
         toggleS3Form(s.backend === 's3');
 
         // S3 fields
-        document.getElementById('storage-endpoint-url').value = s.s3_endpoint_url || '';
-        document.getElementById('storage-bucket').value = s.s3_bucket || '';
-        document.getElementById('storage-region').value = s.s3_region || '';
-        document.getElementById('storage-access-key').value = '';
-        document.getElementById('storage-secret-key').value = '';
-        document.getElementById('storage-path-style').checked = s.s3_force_path_style;
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-endpoint-url')).value = s.s3_endpoint_url || '';
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-bucket')).value = s.s3_bucket || '';
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-region')).value = s.s3_region || '';
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-access-key')).value = '';
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-secret-key')).value = '';
+        /** @type {HTMLInputElement} */ (document.getElementById('storage-path-style')).checked = s.s3_force_path_style;
 
         // Secret hints
         if (s.s3_access_key_set) {
-            document.getElementById('storage-access-key').placeholder = i18n.t('admin.storage_key_placeholder') || 'Leave empty to keep current value';
+            /** @type {HTMLInputElement} */ (document.getElementById('storage-access-key')).placeholder =
+                i18n.t('admin.storage_key_placeholder') || 'Leave empty to keep current value';
         }
         if (s.s3_secret_key_set) {
             showElement('storage-secret-hint');
@@ -755,7 +809,7 @@ async function loadStorage() {
         }
 
         // ENV badges
-        (s.env_overrides || []).forEach((field) => {
+        /** @type {string[]} */ (s.env_overrides || []).forEach((field) => {
             const badge = document.getElementById(`badge-${field}`);
             if (badge) badge.innerHTML = '<span class="badge badge-env">ENV</span>';
         });
@@ -766,7 +820,7 @@ async function loadStorage() {
         document.getElementById('storage-total-size').textContent = s.total_bytes_stored != null ? formatBytes(s.total_bytes_stored) : '—';
         document.getElementById('storage-dedup-ratio').textContent = s.dedup_ratio != null ? `${s.dedup_ratio.toFixed(2)}x` : '—';
     } catch (e) {
-        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
 
     // Also load migration status
@@ -774,19 +828,19 @@ async function loadStorage() {
 }
 
 async function saveStorageSettings() {
-    const btn = document.getElementById('btn-save-storage');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-save-storage'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.saving'))}`;
 
-    const backend = document.querySelector('input[name="storage-backend"]:checked').value;
+    const backend = /** @type {HTMLInputElement} */ (document.querySelector('input[name="storage-backend"]:checked')).value;
     const body = {
         backend,
-        s3_endpoint_url: document.getElementById('storage-endpoint-url').value.trim() || null,
-        s3_bucket: document.getElementById('storage-bucket').value.trim() || null,
-        s3_region: document.getElementById('storage-region').value.trim() || null,
-        s3_access_key: document.getElementById('storage-access-key').value || null,
-        s3_secret_key: document.getElementById('storage-secret-key').value || null,
-        s3_force_path_style: document.getElementById('storage-path-style').checked
+        s3_endpoint_url: /** @type {HTMLInputElement} */ (document.getElementById('storage-endpoint-url')).value.trim() || null,
+        s3_bucket: /** @type {HTMLInputElement} */ (document.getElementById('storage-bucket')).value.trim() || null,
+        s3_region: /** @type {HTMLInputElement} */ (document.getElementById('storage-region')).value.trim() || null,
+        s3_access_key: /** @type {HTMLInputElement} */ (document.getElementById('storage-access-key')).value || null,
+        s3_secret_key: /** @type {HTMLInputElement} */ (document.getElementById('storage-secret-key')).value || null,
+        s3_force_path_style: /** @type {HTMLInputElement} */ (document.getElementById('storage-path-style')).checked
     };
 
     try {
@@ -804,26 +858,26 @@ async function saveStorageSettings() {
             showStorageStatus(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-save"></i> ${escapeHtml(i18n.t('admin.storage_save') || 'Save')}`;
 }
 
 async function testStorageConnection() {
-    const btn = document.getElementById('btn-test-storage');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-test-storage'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.testing') || 'Testing...')}`;
 
-    const backend = document.querySelector('input[name="storage-backend"]:checked').value;
+    const backend = /** @type {HTMLInputElement} */ (document.querySelector('input[name="storage-backend"]:checked')).value;
     const body = {
         backend,
-        s3_endpoint_url: document.getElementById('storage-endpoint-url').value.trim() || null,
-        s3_bucket: document.getElementById('storage-bucket').value.trim() || null,
-        s3_region: document.getElementById('storage-region').value.trim() || null,
-        s3_access_key: document.getElementById('storage-access-key').value || null,
-        s3_secret_key: document.getElementById('storage-secret-key').value || null,
-        s3_force_path_style: document.getElementById('storage-path-style').checked
+        s3_endpoint_url: /** @type {HTMLInputElement} */ (document.getElementById('storage-endpoint-url')).value.trim() || null,
+        s3_bucket: /** @type {HTMLInputElement} */ (document.getElementById('storage-bucket')).value.trim() || null,
+        s3_region: /** @type {HTMLInputElement} */ (document.getElementById('storage-region')).value.trim() || null,
+        s3_access_key: /** @type {HTMLInputElement} */ (document.getElementById('storage-access-key')).value || null,
+        s3_secret_key: /** @type {HTMLInputElement} */ (document.getElementById('storage-secret-key')).value || null,
+        s3_force_path_style: /** @type {HTMLInputElement} */ (document.getElementById('storage-path-style')).checked
     };
 
     try {
@@ -842,7 +896,7 @@ async function testStorageConnection() {
             showStorageStatus(`${i18n.t('admin.storage_test_failure') || 'Connection failed'}: ${escapeHtml(r.message)}`, 'error');
         }
     } catch (e) {
-        showStorageStatus(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showStorageStatus(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-vial"></i> ${escapeHtml(i18n.t('admin.storage_test_connection') || 'Test Connection')}`;
@@ -850,8 +904,13 @@ async function testStorageConnection() {
 
 /* ── Migration ── */
 
+/** @type {ReturnType<typeof setInterval> | null} */
 let migrationPollTimer = null;
 
+/**
+ * @param {string} msg
+ * @param {string} type
+ */
 function showMigrationMsg(msg, type) {
     const el = document.getElementById('migration-status-msg');
     el.textContent = msg;
@@ -859,6 +918,7 @@ function showMigrationMsg(msg, type) {
     el.style.display = '';
 }
 
+/** @param {any} m */
 function updateMigrationUI(m) {
     // Status badge
     const badge = document.getElementById('migration-status-badge');
@@ -937,7 +997,7 @@ async function loadMigrationStatus() {
 }
 
 async function startMigration() {
-    const btn = document.getElementById('btn-start-migration');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-start-migration'));
     btn.disabled = true;
     try {
         const resp = await fetch(`${API}/admin/storage/migration/start`, {
@@ -954,7 +1014,7 @@ async function startMigration() {
             showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showMigrationMsg(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showMigrationMsg(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
     btn.disabled = false;
 }
@@ -992,7 +1052,7 @@ async function resumeMigration() {
 }
 
 async function verifyMigration() {
-    const btn = document.getElementById('btn-verify-migration');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-verify-migration'));
     btn.disabled = true;
     btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> ${escapeHtml(i18n.t('admin.migration_verifying') || 'Verifying...')}`;
     const resultDiv = document.getElementById('migration-verify-result');
@@ -1015,7 +1075,7 @@ async function verifyMigration() {
         }
     } catch (e) {
         resultDiv.style.display = '';
-        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(e.message)}</div>`;
+        resultDiv.innerHTML = `<div class="discovery-result fail"><i class="fas fa-times-circle"></i> Error: ${escapeHtml(/** @type {Error} */ (e).message)}</div>`;
     }
     btn.disabled = false;
     btn.innerHTML = `<i class="fas fa-check-double"></i> ${escapeHtml(i18n.t('admin.migration_verify') || 'Verify Integrity')}`;
@@ -1036,7 +1096,7 @@ async function completeMigration() {
             showMigrationMsg(`Error: ${e.message || resp.statusText}`, 'error');
         }
     } catch (e) {
-        showMigrationMsg(i18n.t('admin.error_network', { message: e.message }), 'error');
+        showMigrationMsg(i18n.t('admin.error_network', { message: /** @type {Error} */ (e).message }), 'error');
     }
 }
 
@@ -1064,21 +1124,21 @@ async function init() {
         });
         if (oidcResp.ok) {
             const s = await oidcResp.json();
-            document.getElementById('oidc-enabled').checked = s.enabled;
+            /** @type {HTMLInputElement} */ (document.getElementById('oidc-enabled')).checked = s.enabled;
             if (s.enabled) showElement('oidc-form');
             else hideElement('oidc-form');
-            document.getElementById('provider-name').value = s.provider_name || '';
-            document.getElementById('issuer-url').value = s.issuer_url || '';
-            document.getElementById('client-id').value = s.client_id || '';
-            document.getElementById('scopes').value = s.scopes || 'openid profile email';
-            document.getElementById('auto-provision').checked = s.auto_provision;
-            document.getElementById('admin-groups').value = s.admin_groups || '';
-            document.getElementById('disable-password').checked = s.disable_password_login;
+            /** @type {HTMLInputElement} */ (document.getElementById('provider-name')).value = s.provider_name || '';
+            /** @type {HTMLInputElement} */ (document.getElementById('issuer-url')).value = s.issuer_url || '';
+            /** @type {HTMLInputElement} */ (document.getElementById('client-id')).value = s.client_id || '';
+            /** @type {HTMLInputElement} */ (document.getElementById('scopes')).value = s.scopes || 'openid profile email';
+            /** @type {HTMLInputElement} */ (document.getElementById('auto-provision')).checked = s.auto_provision;
+            /** @type {HTMLInputElement} */ (document.getElementById('admin-groups')).value = s.admin_groups || '';
+            /** @type {HTMLInputElement} */ (document.getElementById('disable-password')).checked = s.disable_password_login;
             if (s.disable_password_login) showElement('password-warning', 'flex');
             else hideElement('password-warning');
             document.getElementById('callback-url').textContent = s.callback_url;
             if (s.client_secret_set) showElement('secret-hint');
-            (s.env_overrides || []).forEach((field) => {
+            /** @type {string[]} */ (s.env_overrides || []).forEach((field) => {
                 const badge = document.getElementById(`badge-${field}`);
                 if (badge) badge.innerHTML = '<span class="badge badge-env">ENV</span>';
             });
@@ -1128,7 +1188,7 @@ document.getElementById('tab-btn-storage').addEventListener('click', function ()
 });
 
 document.getElementById('ds-registration').addEventListener('change', function () {
-    toggleRegistration(this.checked);
+    toggleRegistration(/** @type {HTMLInputElement} */ (this).checked);
 });
 
 document.getElementById('btn-create-user').addEventListener('click', openCreateUserModal);
@@ -1151,8 +1211,8 @@ document.getElementById('rp-submit').addEventListener('click', submitResetPasswo
 
 /* ── Storage event listeners ── */
 document.querySelectorAll('input[name="storage-backend"]').forEach((r) => {
-    r.addEventListener('change', function () {
-        toggleS3Form(this.value === 's3');
+    r.addEventListener('change', () => {
+        toggleS3Form(/** @type {HTMLInputElement} */ (r).value === 's3');
     });
 });
 document.getElementById('storage-preset').addEventListener('change', onStoragePresetChange);

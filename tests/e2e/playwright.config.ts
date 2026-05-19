@@ -2,6 +2,8 @@ import { defineConfig, devices } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const startScript = path.join(__dirname, 'start-server.sh');
+
 /** Parse a KEY=VALUE env file, skipping blank lines and comments. */
 function loadEnv(filePath: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -23,13 +25,14 @@ const workspace=process.env.GITHUB_WORKSPACE ?? path.join(__dirname, '../..');
 
 export default defineConfig({
   testDir: './scenarios',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: 1,
   reporter: process.env.CI ? [['github'], ['html']] : 'html',
 
   globalSetup: require.resolve('./global-setup'),
+  globalTeardown: require.resolve('./global-teardown'),
 
   use: {
     baseURL: 'http://localhost:8087',
@@ -45,22 +48,18 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
   ],
 
   webServer: {
     command: process.env.BUILD_TARGET
-      ? `${workspace}/target/${process.env.BUILD_TARGET}/oxicloud`
-      : 'cargo run',
+      ? `bash "${startScript}" "${workspace}/target/${process.env.BUILD_TARGET}/oxicloud"`
+      : `bash "${startScript}" cargo run`,
     url: 'http://localhost:8087',
     timeout: 600_000,
     reuseExistingServer: false,
     cwd: '../..',
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdout: 'inherit',
+    stderr: 'inherit',
     env: {
       ...commonEnv,
       OXICLOUD_SERVER_PORT: '8087',

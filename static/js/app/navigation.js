@@ -136,12 +136,6 @@ export const SECTIONS_MAPPER = {
  */
 function setCurrentSection(section) {
     if (app.currentSection === section) return false;
-
-    // Set all view flags - true for active section, false for others
-    Object.entries(SECTIONS_MAPPER).forEach(([key, flag]) => {
-        app[flag] = key === section;
-    });
-
     app.currentSection = section;
 
     // Update nav item active classes by finding matching item from DOM
