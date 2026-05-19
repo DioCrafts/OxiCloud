@@ -173,6 +173,7 @@ fn resolve_css_imports(entry: &Path, css_dir: &Path) -> String {
             if let Some(rel) = extract_import_path(t) {
                 let resolved = css_dir.join(rel.trim_start_matches("./"));
                 if resolved.exists() {
+                    println!("cargo:warning=CSS importing: {}", resolved.display());
                     out.push_str(&fs::read_to_string(&resolved).unwrap_or_default());
                     out.push('\n');
                 } else {
@@ -238,6 +239,7 @@ fn minify_tree_css(dir: &Path) {
             if fname.starts_with("app.") || fname == "main.css" {
                 continue;
             }
+            println!("cargo:warning=CSS importing: {}", p.display());
             if let Ok(src) = fs::read_to_string(&p) {
                 let _ = fs::write(&p, css_minify_safe(&src));
             }
