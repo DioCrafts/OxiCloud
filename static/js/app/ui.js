@@ -1527,6 +1527,7 @@ const ui = {
             return;
         }
 
+        this._clearEmptyState();
         this._items.set(folder.id, folder);
         this._upsertById(this._lastFolders, folder);
         this._renderFoldersToView([folder]);
@@ -1545,9 +1546,23 @@ const ui = {
             return;
         }
 
+        this._clearEmptyState();
         this._items.set(file.id, file);
         this._upsertById(this._lastFiles, file);
         this._renderFilesToView([file]);
+    },
+
+    /**
+     * If the empty-state placeholder is showing, switch back to the file list.
+     * Called before adding any new item so the card is not appended to a hidden list.
+     */
+    _clearEmptyState() {
+        const filesList = document.getElementById('files-list');
+        const filesContainerError = document.getElementById('files-container-error');
+        if (filesList?.classList.contains('hidden')) {
+            filesList.classList.remove('hidden');
+            filesContainerError?.classList.add('hidden');
+        }
     }
 };
 
