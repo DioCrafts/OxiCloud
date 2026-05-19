@@ -21,6 +21,7 @@ use crate::application::ports::thumbnail_ports::ThumbnailPort;
 use crate::common::di::AppState;
 use crate::infrastructure::services::audio_metadata_service::AudioMetadataService;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
@@ -1116,8 +1117,8 @@ pub async fn list_files_query(
     request_body(content_type = "multipart/form-data", description = "File data + optional folder_id field"),
     responses(
         (status = 201, description = "File uploaded", body = FileDto),
-        (status = 400, description = "Invalid request"),
-        (status = 507, description = "Storage quota exceeded"),
+        (status = 400, description = "Invalid request", body = ErrorResponse),
+        (status = 507, description = "Storage quota exceeded", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1142,7 +1143,7 @@ pub async fn upload_file_with_thumbnails(
         (status = 200, description = "File content"),
         (status = 206, description = "Partial content (Range request)"),
         (status = 304, description = "Not modified"),
-        (status = 404, description = "File not found"),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1167,7 +1168,7 @@ pub async fn download_file(
         (status = 200, description = "Thumbnail image (image/jpeg or image/webp)"),
         (status = 204, description = "No thumbnail available for this file type"),
         (status = 304, description = "Not modified"),
-        (status = 404, description = "File not found"),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1190,8 +1191,8 @@ pub async fn get_thumbnail(
     request_body(content_type = "application/octet-stream", description = "Raw image bytes (max 512 KB)"),
     responses(
         (status = 201, description = "Thumbnail stored"),
-        (status = 400, description = "Invalid image or size too large"),
-        (status = 404, description = "File not found"),
+        (status = 400, description = "Invalid image or size too large", body = ErrorResponse),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1210,7 +1211,7 @@ pub async fn upload_thumbnail(
     params(("id" = String, Path, description = "File ID")),
     responses(
         (status = 200, description = "File metadata (EXIF, dimensions, duration, etc.)"),
-        (status = 404, description = "File not found"),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1228,7 +1229,7 @@ pub async fn get_file_metadata(
     params(("id" = String, Path, description = "File ID")),
     responses(
         (status = 204, description = "File deleted (moved to trash if enabled)"),
-        (status = 404, description = "File not found"),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1247,7 +1248,7 @@ pub async fn delete_file(
     request_body(content_type = "application/json", description = r#"{"name": "new-name.txt"}"#),
     responses(
         (status = 200, description = "Renamed file", body = FileDto),
-        (status = 404, description = "File not found"),
+        (status = 404, description = "File not found", body = ErrorResponse),
     ),
     tag = "files"
 )]
@@ -1267,7 +1268,7 @@ pub async fn rename_file(
     request_body(content = MoveFilePayload, content_type = "application/json", description = "MoveFilePayload"),
     responses(
         (status = 200, description = "Moved file", body = FileDto),
-        (status = 404, description = "File or destination not found"),
+        (status = 404, description = "File or destination not found", body = ErrorResponse),
     ),
     tag = "files"
 )]

@@ -10,8 +10,8 @@ use tracing::{error, info};
 
 use crate::application::dtos::file_dto::FileDto;
 use crate::common::di::AppState;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 /// Query parameters for the photos timeline endpoint.
 #[derive(Deserialize)]
 pub struct PhotosQueryParams {
@@ -35,8 +35,8 @@ pub struct PhotosQueryParams {
     ),
     responses(
         (status = 200, description = "List of media files sorted by capture date"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error")
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "Internal server error", body = ErrorResponse)
     ),
     tag = "photos"
 )]

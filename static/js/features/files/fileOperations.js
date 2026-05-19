@@ -35,12 +35,12 @@ function getAuthHeaders() {
  * @returns {string}
  */
 function extractApiError(body) {
-    if (body?.error_code) {
-        const key = `errors.validation.${body.error_code}`;
+    if (body?.error_type && body?.error_code) {
+        const key = `errors.${body.error_type}.${body.error_code}`;
         const translated = i18n.t(key);
         if (translated && translated !== key) return translated;
     }
-    return body?.error || body?.message || 'Unknown error';
+    return body?.error || 'Unknown error';
 }
 
 // File Operations Module
@@ -227,7 +227,7 @@ const fileOps = {
                     try {
                         const errBody = JSON.parse(xhr.responseText);
                         errorMsg = errBody.error || null;
-                        isQuotaError = errBody.error_type === 'QuotaExceeded' || xhr.status === 507;
+                        isQuotaError = errBody.error_type === 'quota_exceeded' || xhr.status === 507;
                     } catch (_) {}
                     finalize({ ok: false, errorMsg, isQuotaError });
                 }
@@ -319,7 +319,7 @@ const fileOps = {
             }
 
             const errorMsg = body && typeof body === 'object' ? body.error || null : rawText || null;
-            const isQuotaError = (body && typeof body === 'object' && body.error_type === 'QuotaExceeded') || response.status === 507;
+            const isQuotaError = (body && typeof body === 'object' && body.error_type === 'quota_exceeded') || response.status === 507;
             return { ok: false, errorMsg, isQuotaError };
         } catch (e) {
             const isTimeout = /** @type {Error} */ (e)?.name === 'AbortError';
@@ -766,10 +766,7 @@ const fileOps = {
     /**
      * Create a new folder
      * @param {string} name - Folder name
-     */
-    /**
-     * Create a new folder
-     * @param {string} name - Folder name
+     * @returns {Promise<void>}
      */
     async createFolder(name) {
         try {
@@ -800,14 +797,13 @@ const fileOps = {
 
                 ui.showNotification('Folder created', `"${name}" created successfully`);
             } else {
-                const errorText = await response.text();
-                console.error('Create folder error:', errorText);
-                let errorMessage = 'Unknown error';
+                let errorMessage = response.statusText;
                 try {
-                    const errorData = JSON.parse(errorText);
-                    errorMessage = errorData.error || response.statusText;
+                    const body = JSON.parse(await response.text());
+                    console.error('Create folder error:', body);
+                    errorMessage = extractApiError(body);
                 } catch (_e) {
-                    errorMessage = errorText || response.statusText;
+                    /* non-JSON body */
                 }
                 throw new Error(errorMessage);
             }
@@ -1095,17 +1091,15 @@ const fileOps = {
             if (response.ok) {
                 ui.showNotification(i18n.t('notifications.file_renamed'), i18n.t('notifications.file_renamed_to', { name: newName }));
             } else {
-                const errorText = await response.text();
-                console.error('Error response:', errorText);
+                let errorMessage = response.statusText;
                 try {
-                    const errorData = JSON.parse(errorText);
-                    throw new Error(errorData.error || response.statusText);
-                } catch (parseError) {
-                    if (parseError instanceof SyntaxError) {
-                        throw new Error(errorText || response.statusText);
-                    }
-                    throw parseError;
+                    const body = JSON.parse(await response.text());
+                    console.error('Error response:', body);
+                    errorMessage = extractApiError(body);
+                } catch (_e) {
+                    /* non-JSON body */
                 }
+                throw new Error(errorMessage);
             }
         } catch (error) {
             console.error('Error renaming file:', error);
@@ -1117,6 +1111,7 @@ const fileOps = {
      * Rename a folder
      * @param {string} folderId - Folder ID
      * @param {string} newName - New folder name
+     * @returns {Promise<void>}
      */
     async renameFolder(folderId, newName) {
         try {
@@ -1136,18 +1131,15 @@ const fileOps = {
             if (response.ok) {
                 ui.showNotification('Folder renamed', `Folder renamed to "${newName}"`);
             } else {
-                const errorText = await response.text();
-                console.error('Error response:', errorText);
+                let errorMessage = response.statusText;
                 try {
-                    // Try to parse as JSON
-                    const errorData = JSON.parse(errorText);
-                    throw new Error(errorData.error || response.statusText);
-                } catch (parseError) {
-                    if (parseError instanceof SyntaxError) {
-                        throw new Error(errorText || response.statusText);
-                    }
-                    throw parseError;
+                    const body = JSON.parse(await response.text());
+                    console.error('Error response:', body);
+                    errorMessage = extractApiError(body);
+                } catch (_e) {
+                    /* non-JSON body */
                 }
+                throw new Error(errorMessage);
             }
         } catch (error) {
             console.error('Error renaming folder:', error);

@@ -38,16 +38,16 @@ pub enum ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
-            ErrorKind::NotFound => write!(f, "Not Found"),
-            ErrorKind::AlreadyExists => write!(f, "Already Exists"),
-            ErrorKind::InvalidInput => write!(f, "Invalid Input"),
-            ErrorKind::AccessDenied => write!(f, "Access Denied"),
-            ErrorKind::Timeout => write!(f, "Timeout"),
-            ErrorKind::InternalError => write!(f, "Internal Error"),
-            ErrorKind::NotImplemented => write!(f, "Not Implemented"),
-            ErrorKind::UnsupportedOperation => write!(f, "Unsupported Operation"),
-            ErrorKind::DatabaseError => write!(f, "Database Error"),
-            ErrorKind::QuotaExceeded => write!(f, "Quota Exceeded"),
+            ErrorKind::NotFound => write!(f, "not_found"),
+            ErrorKind::AlreadyExists => write!(f, "already_exists"),
+            ErrorKind::InvalidInput => write!(f, "invalid_input"),
+            ErrorKind::AccessDenied => write!(f, "access_denied"),
+            ErrorKind::Timeout => write!(f, "timeout"),
+            ErrorKind::InternalError => write!(f, "internal_error"),
+            ErrorKind::NotImplemented => write!(f, "not_implemented"),
+            ErrorKind::UnsupportedOperation => write!(f, "unsupported_operation"),
+            ErrorKind::DatabaseError => write!(f, "database_error"),
+            ErrorKind::QuotaExceeded => write!(f, "quota_exceeded"),
         }
     }
 }

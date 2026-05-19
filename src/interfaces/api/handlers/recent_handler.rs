@@ -10,8 +10,8 @@ use tracing::{error, info};
 
 use crate::application::ports::recent_ports::RecentItemsUseCase;
 use crate::application::services::recent_service::RecentService;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 /// Query parameters for getting recent items
 #[derive(Deserialize)]
 pub struct GetRecentParams {
@@ -63,7 +63,7 @@ pub async fn get_recent_items(
     ),
     responses(
         (status = 200, description = "Access recorded"),
-        (status = 400, description = "Invalid item type")
+        (status = 400, description = "Invalid item type", body = ErrorResponse)
     ),
     tag = "recent"
 )]
@@ -122,7 +122,7 @@ pub async fn record_item_access(
     ),
     responses(
         (status = 200, description = "Item removed from recents"),
-        (status = 404, description = "Item not in recents")
+        (status = 404, description = "Item not in recents", body = ErrorResponse)
     ),
     tag = "recent"
 )]

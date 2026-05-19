@@ -15,8 +15,8 @@ use crate::application::services::batch_operations::{
 };
 use crate::interfaces::api::deserializer;
 use crate::interfaces::api::handlers::ApiResult;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 /// Maximum number of items allowed in a single batch request.
 /// Prevents fan-out amplification attacks and database connection exhaustion.
 const MAX_BATCH_SIZE: usize = 1_000;
@@ -141,8 +141,8 @@ where
     responses(
         (status = 200, description = "All files moved"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -208,8 +208,8 @@ pub async fn move_files_batch(
     responses(
         (status = 200, description = "All files copied"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -275,8 +275,8 @@ pub async fn copy_files_batch(
     responses(
         (status = 200, description = "All files deleted"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -350,8 +350,8 @@ pub async fn delete_files_batch(
     responses(
         (status = 200, description = "All folders deleted"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -425,8 +425,8 @@ pub async fn delete_folders_batch(
     responses(
         (status = 201, description = "All folders created"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -499,8 +499,8 @@ pub async fn create_folders_batch(
     responses(
         (status = 200, description = "Batch file details"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -566,8 +566,8 @@ pub async fn get_files_batch(
     responses(
         (status = 200, description = "Batch folder details"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -673,8 +673,8 @@ impl From<BatchDownloadQuery> for BatchDownloadRequest {
     responses(
         (status = 200, description = "All items trashed"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -796,8 +796,8 @@ pub async fn trash_batch(
     responses(
         (status = 200, description = "All folders moved"),
         (status = 206, description = "Partial success"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -946,9 +946,9 @@ pub async fn copy_folders_batch(
     ),
     responses(
         (status = 200, description = "ZIP archive stream"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "ZIP creation failed")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "ZIP creation failed", body = ErrorResponse)
     ),
     tag = "batch"
 )]
@@ -968,9 +968,9 @@ pub async fn download_batch_querystring(
     path = "/api/batch/download",
     responses(
         (status = 200, description = "ZIP archive stream"),
-        (status = 400, description = "Bad request"),
-        (status = 401, description = "Unauthorized"),
-        (status = 500, description = "ZIP creation failed")
+        (status = 400, description = "Bad request", body = ErrorResponse),
+        (status = 401, description = "Unauthorized", body = ErrorResponse),
+        (status = 500, description = "ZIP creation failed", body = ErrorResponse)
     ),
     tag = "batch"
 )]

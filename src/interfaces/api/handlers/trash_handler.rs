@@ -6,6 +6,7 @@ use tracing::{debug, error, instrument, warn};
 
 use crate::application::ports::trash_ports::TrashUseCase;
 use crate::common::di::AppState;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
@@ -15,7 +16,7 @@ use std::sync::Arc;
     path = "/api/trash",
     responses(
         (status = 200, description = "List of trashed items"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]
@@ -69,7 +70,7 @@ pub async fn get_trash_items(
     params(("id" = String, Path, description = "File ID")),
     responses(
         (status = 200, description = "File moved to trash"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]
@@ -130,7 +131,7 @@ pub async fn move_file_to_trash(
     params(("id" = String, Path, description = "Folder ID")),
     responses(
         (status = 200, description = "Folder moved to trash"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]
@@ -193,7 +194,7 @@ pub async fn move_folder_to_trash(
     params(("id" = String, Path, description = "Trash item ID")),
     responses(
         (status = 200, description = "Item restored from trash"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]
@@ -264,7 +265,7 @@ pub async fn restore_from_trash(
     params(("id" = String, Path, description = "Trash item ID")),
     responses(
         (status = 200, description = "Item permanently deleted"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]
@@ -336,7 +337,7 @@ pub async fn delete_permanently(
     path = "/api/trash/empty",
     responses(
         (status = 200, description = "Trash emptied successfully"),
-        (status = 501, description = "Trash feature not enabled")
+        (status = 501, description = "Trash feature not enabled", body = ErrorResponse)
     ),
     tag = "trash"
 )]

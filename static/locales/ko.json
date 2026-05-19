@@ -329,7 +329,13 @@
         "move_error": "이동 오류",
         "empty_name": "이름은 비워둘 수 없습니다",
         "name_exists": "같은 이름의 파일 또는 폴더가 이미 존재합니다",
-        "generic_error": "오류가 발생했습니다"
+        "generic_error": "오류가 발생했습니다",
+        "invalid_input": {
+            "name_empty": "이름은 비울 수 없습니다",
+            "name_contains_separator": "이름에 '/' 또는 '\\'를 포함할 수 없습니다",
+            "name_null_byte": "이름에 null 바이트를 포함할 수 없습니다",
+            "name_reserved": "'.' 과 '..' 은 유효한 이름이 아닙니다"
+        }
     },
     "breadcrumb": {
         "home": "홈"

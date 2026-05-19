@@ -329,7 +329,13 @@
         "move_error": "ले जाने में त्रुटि",
         "empty_name": "नाम खाली नहीं हो सकता",
         "name_exists": "इस नाम की फ़ाइल या फ़ोल्डर पहले से मौजूद है",
-        "generic_error": "एक त्रुटि हुई है"
+        "generic_error": "एक त्रुटि हुई है",
+        "invalid_input": {
+            "name_empty": "नाम खाली नहीं हो सकता",
+            "name_contains_separator": "नाम में '/' या '\\' नहीं होना चाहिए",
+            "name_null_byte": "नाम में शून्य बाइट्स नहीं होने चाहिए",
+            "name_reserved": "'.' और '..' मान्य नाम नहीं हैं"
+        }
     },
     "breadcrumb": {
         "home": "होम"

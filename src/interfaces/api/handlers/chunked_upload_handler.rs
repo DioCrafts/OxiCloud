@@ -24,8 +24,8 @@ use crate::application::ports::file_ports::FileUploadUseCase;
 use crate::application::ports::storage_ports::StorageUsagePort;
 use crate::common::di::AppState;
 use crate::interfaces::errors::AppError;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
-
 /// Request body for creating an upload session
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateUploadRequest {
@@ -378,8 +378,8 @@ impl ChunkedUploadHandler {
     request_body(content = CreateUploadRequest, content_type = "application/json", description = "Upload session parameters"),
     responses(
         (status = 201, description = "Upload session created", body = crate::application::ports::chunked_upload_ports::CreateUploadResponseDto),
-        (status = 400, description = "Invalid request (empty filename, zero size, chunk too small)"),
-        (status = 507, description = "Storage quota exceeded"),
+        (status = 400, description = "Invalid request (empty filename, zero size, chunk too small)", body = ErrorResponse),
+        (status = 507, description = "Storage quota exceeded", body = ErrorResponse),
     ),
     tag = "uploads",
     security(("bearerAuth" = []))
@@ -403,8 +403,8 @@ pub async fn create_upload(
     request_body(content_type = "application/octet-stream", description = "Raw chunk bytes"),
     responses(
         (status = 200, description = "Chunk received", body = crate::application::ports::chunked_upload_ports::ChunkUploadResponseDto),
-        (status = 400, description = "Invalid chunk or checksum mismatch"),
-        (status = 404, description = "Upload session not found"),
+        (status = 400, description = "Invalid chunk or checksum mismatch", body = ErrorResponse),
+        (status = 404, description = "Upload session not found", body = ErrorResponse),
     ),
     tag = "uploads",
     security(("bearerAuth" = []))
@@ -431,7 +431,7 @@ pub async fn upload_chunk(
     ),
     responses(
         (status = 200, description = "Upload status in response headers and body", body = crate::application::ports::chunked_upload_ports::UploadStatusResponseDto),
-        (status = 404, description = "Upload session not found"),
+        (status = 404, description = "Upload session not found", body = ErrorResponse),
     ),
     tag = "uploads",
     security(("bearerAuth" = []))
@@ -452,8 +452,8 @@ pub async fn get_upload_status(
     ),
     responses(
         (status = 201, description = "File assembled and created", body = CompleteUploadResponse),
-        (status = 404, description = "Upload session not found"),
-        (status = 500, description = "Assembly or file creation failed"),
+        (status = 404, description = "Upload session not found", body = ErrorResponse),
+        (status = 500, description = "Assembly or file creation failed", body = ErrorResponse),
     ),
     tag = "uploads",
     security(("bearerAuth" = []))
@@ -474,7 +474,7 @@ pub async fn complete_upload(
     ),
     responses(
         (status = 204, description = "Upload cancelled and temp files cleaned up"),
-        (status = 500, description = "Cancel failed"),
+        (status = 500, description = "Cancel failed", body = ErrorResponse),
     ),
     tag = "uploads",
     security(("bearerAuth" = []))

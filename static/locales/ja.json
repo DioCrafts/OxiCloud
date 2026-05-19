@@ -329,7 +329,13 @@
         "move_error": "移動エラー",
         "empty_name": "名前を空にすることはできません",
         "name_exists": "同じ名前のファイルまたはフォルダが既に存在します",
-        "generic_error": "エラーが発生しました"
+        "generic_error": "エラーが発生しました",
+        "invalid_input": {
+            "name_empty": "名前は空にできません",
+            "name_contains_separator": "名前に '/' または '\\' を含めることはできません",
+            "name_null_byte": "名前にヌルバイトを含めることはできません",
+            "name_reserved": "'.' および '..' は有効な名前ではありません"
+        }
     },
     "breadcrumb": {
         "home": "ホーム"

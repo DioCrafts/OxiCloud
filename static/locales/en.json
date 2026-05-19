@@ -329,7 +329,13 @@
         "move_error": "Error moving",
         "empty_name": "Name cannot be empty",
         "name_exists": "A file or folder with that name already exists",
-        "generic_error": "An error has occurred"
+        "generic_error": "An error has occurred",
+        "invalid_input": {
+            "name_empty": "Name cannot be empty",
+            "name_contains_separator": "Name must not contain '/' or '\\'",
+            "name_null_byte": "Name must not contain null bytes",
+            "name_reserved": "'.' and '..' are not valid names"
+        }
     },
     "breadcrumb": {
         "home": "Home"

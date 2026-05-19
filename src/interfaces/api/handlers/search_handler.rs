@@ -11,6 +11,7 @@ use crate::application::dtos::search_dto::{
 };
 use crate::application::ports::inbound::SearchUseCase;
 use crate::common::di::AppState;
+use crate::interfaces::errors::ErrorResponse;
 use crate::interfaces::middleware::auth::AuthUser;
 use std::sync::Arc;
 
@@ -297,7 +298,7 @@ pub struct SuggestParams {
     ),
     responses(
         (status = 200, description = "Search results", body = SearchResultsDto),
-        (status = 503, description = "Search service unavailable"),
+        (status = 503, description = "Search service unavailable", body = ErrorResponse),
     ),
     tag = "search"
 )]
@@ -315,7 +316,7 @@ pub async fn search_files_get(
     request_body(content = SearchCriteriaDto, content_type = "application/json", description = "Search criteria"),
     responses(
         (status = 200, description = "Search results", body = SearchResultsDto),
-        (status = 503, description = "Search service unavailable"),
+        (status = 503, description = "Search service unavailable", body = ErrorResponse),
     ),
     tag = "search"
 )]
@@ -337,7 +338,7 @@ pub async fn search_files_post(
     ),
     responses(
         (status = 200, description = "Suggestions", body = SearchSuggestionsDto),
-        (status = 503, description = "Search service unavailable"),
+        (status = 503, description = "Search service unavailable", body = ErrorResponse),
     ),
     tag = "search"
 )]
@@ -353,7 +354,7 @@ pub async fn suggest_files(
     path = "/api/search/cache",
     responses(
         (status = 200, description = "Cache cleared"),
-        (status = 503, description = "Search service unavailable"),
+        (status = 503, description = "Search service unavailable", body = ErrorResponse),
     ),
     tag = "search"
 )]

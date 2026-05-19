@@ -329,7 +329,13 @@
         "move_error": "Errore durante lo spostamento",
         "empty_name": "Il nome non può essere vuoto",
         "name_exists": "Un file o una cartella con quel nome esiste già",
-        "generic_error": "Si è verificato un errore"
+        "generic_error": "Si è verificato un errore",
+        "invalid_input": {
+            "name_empty": "Il nome non può essere vuoto",
+            "name_contains_separator": "Il nome non deve contenere '/' o '\\'",
+            "name_null_byte": "Il nome non deve contenere byte nulli",
+            "name_reserved": "'.' e '..' non sono nomi validi"
+        }
     },
     "breadcrumb": {
         "home": "Home"
