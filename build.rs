@@ -284,12 +284,23 @@ fn build_js_module_bundle(entry_scripts: &[String], static_dir: &Path) -> String
         collect_module_deps(&path, &mut order, &mut seen);
     }
 
+    println!(
+        "cargo:warning=bundle: {} files in dependency order:",
+        order.len()
+    );
     let mut bundle = String::with_capacity(2 * 1024 * 1024);
     bundle.push_str("(function(){\n\"use strict\";\n");
-    for file in &order {
+    let mut declared_namespaces = std::collections::HashSet::new();
+    for (i, file) in order.iter().enumerate() {
+        println!(
+            "cargo:warning=bundle [{:>3}/{}] {}",
+            i + 1,
+            order.len(),
+            file.display()
+        );
         match fs::read_to_string(file) {
             Ok(src) => {
-                bundle.push_str(&strip_esm_syntax(&src));
+                bundle.push_str(&strip_esm_syntax(&src, file, &mut declared_namespaces));
                 bundle.push('\n');
             }
             Err(e) => eprintln!("cargo:warning=bundle: cannot read {}: {e}", file.display()),
@@ -326,7 +337,11 @@ fn collect_module_deps(
             // Skip vendor bundles: they may use top-level await or other ESM
             // patterns that are incompatible with IIFE wrapping. They must be
             // loaded via dynamic import() at runtime instead.
-            if !target.components().any(|c| c.as_os_str() == "vendors") {
+            // Skip also workers path
+            if !target
+                .components()
+                .any(|c| c.as_os_str() == "vendors" || c.as_os_str() == "workers")
+            {
                 collect_module_deps(&target, order, seen);
             }
         }
@@ -381,20 +396,82 @@ fn extract_from_clause(s: &str) -> Option<String> {
     Some(rest[1..end].to_string())
 }
 
+/// Extract all names that a JS module source exports.
+///
+/// Handles:
+/// - `export { X, Y };`  and  `export { X as Z };`
+/// - `export function f`, `export async function f`, `export class C`
+/// - `export const X`, `export let X`, `export var X`
+///
+/// Does NOT follow `export { X } from '...'` re-exports.
+fn extract_exported_names(source: &str) -> Vec<String> {
+    let mut names = Vec::new();
+
+    for line in source.lines() {
+        let t = line.trim();
+
+        // export { X, Y } — skip re-exports from other modules
+        if (t.starts_with("export {") || t.starts_with("export{")) && !t.contains(" from ") {
+            if let (Some(start), Some(end)) = (t.find('{'), t.find('}')) {
+                for binding in t[start + 1..end].split(',') {
+                    let b = binding.trim();
+                    let exported = if let Some(pos) = b.find(" as ") {
+                        b[pos + 4..].trim()
+                    } else {
+                        b
+                    };
+                    if !exported.is_empty() {
+                        names.push(exported.to_string());
+                    }
+                }
+            }
+            continue;
+        }
+
+        const DECL_PREFIXES: &[&str] = &[
+            "export async function ",
+            "export function ",
+            "export class ",
+            "export const ",
+            "export let ",
+            "export var ",
+        ];
+        for prefix in DECL_PREFIXES {
+            if let Some(rest) = t.strip_prefix(prefix) {
+                let name: String = rest
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '_' || *c == '$')
+                    .collect();
+                if !name.is_empty() {
+                    names.push(name);
+                }
+                break;
+            }
+        }
+    }
+
+    names
+}
+
 /// Strip ES-module syntax from a single file so it can be inlined into an IIFE.
 ///
-/// | Input                                    | Output                       |
-/// |------------------------------------------|------------------------------|
-/// | `import { X } from './y.js';`            | *(empty line)*               |
-/// | `import { X as Y } from './y.js';`       | `const Y = X;`               |
-/// | `export { X, Y };`                       | *(empty line)*               |
-/// | `export { X } from './y.js';`            | *(empty line)*               |
-/// | `export const X = …`                     | `const X = …`                |
-/// | `export function f() {…}`               | `function f() {…}`           |
-/// | `export async function f() {…}`         | `async function f() {…}`     |
-/// | `export class C {…}`                    | `class C {…}`                |
-/// | `export default expr;`                   | `const _default = expr;`     |
-fn strip_esm_syntax(source: &str) -> String {
+/// | Input                                    | Output                                      |
+/// |------------------------------------------|---------------------------------------------|
+/// | `import { X } from './y.js';`            | *(empty line)*                              |
+/// | `import { X as Y } from './y.js';`       | `const Y = X;`                              |
+/// | `import * as ns from './y.js';`          | `const ns = { export1, export2, … };`       |
+/// | `export { X, Y };`                       | *(empty line)*                              |
+/// | `export { X } from './y.js';`            | *(empty line)*                              |
+/// | `export const X = …`                     | `const X = …`                               |
+/// | `export function f() {…}`               | `function f() {…}`                          |
+/// | `export async function f() {…}`         | `async function f() {…}`                    |
+/// | `export class C {…}`                    | `class C {…}`                               |
+/// | `export default expr;`                   | `const _default = expr;`                    |
+fn strip_esm_syntax(
+    source: &str,
+    file: &Path,
+    declared_namespaces: &mut std::collections::HashSet<String>,
+) -> String {
     let mut out = String::with_capacity(source.len());
     // True while we are inside a multi-line import/export-list that has not yet
     // seen its terminating `;`.
@@ -409,6 +486,66 @@ fn strip_esm_syntax(source: &str) -> String {
                 skipping = false;
             }
             out.push('\n'); // preserve line count for source maps / debugging
+            continue;
+        }
+
+        // ── import * as ns from './path.js' ───────────────────────────────────
+        // Build a synthetic namespace object from the module's exports so that
+        // `ns.foo()` calls resolve correctly inside the IIFE scope.
+        // If multiple files import the same namespace name, only the first
+        // declaration is emitted — subsequent ones become empty lines to avoid
+        // `SyntaxError: Identifier already declared`.
+        if t.starts_with("import * as ") {
+            let stmt = (|| -> Option<String> {
+                // Extract the namespace identifier
+                let after_as = t.strip_prefix("import * as ")?;
+                let name_end = after_as.find(' ')?;
+                let ns_name = &after_as[..name_end];
+
+                // Already declared earlier in the bundle — skip re-declaration.
+                if declared_namespaces.contains(ns_name) {
+                    return Some(String::new());
+                }
+
+                // Extract the module path from the `from '…'` clause
+                let module_path = extract_from_clause(t)?;
+                if !module_path.starts_with('.') {
+                    return None; // bare specifier — not bundled
+                }
+
+                // Skip vendor/worker bundles (dynamically loaded at runtime)
+                let base = file.parent().unwrap_or(Path::new("."));
+                let target = base.join(&module_path);
+                if target
+                    .components()
+                    .any(|c| c.as_os_str() == "vendors" || c.as_os_str() == "workers")
+                {
+                    return None;
+                }
+
+                let module_src = fs::read_to_string(&target).ok()?;
+                let exports = extract_exported_names(&module_src);
+                if exports.is_empty() {
+                    return None;
+                }
+
+                declared_namespaces.insert(ns_name.to_string());
+                let indent = &line[..line.len() - line.trim_start().len()];
+                Some(format!(
+                    "{}const {} = {{ {} }};",
+                    indent,
+                    ns_name,
+                    exports.join(", ")
+                ))
+            })();
+
+            match stmt {
+                Some(s) => out.push_str(&s),
+                None => {
+                    println!("cargo:warning=bundle: could not resolve namespace import: {t}");
+                }
+            }
+            out.push('\n');
             continue;
         }
 
@@ -600,6 +737,7 @@ fn minify_tree_js(dir: &Path) {
                 continue;
             }
             if let Ok(src) = fs::read_to_string(&p) {
+                println!("cargo:warning=minify-js: {}", p.display());
                 let _ = fs::write(&p, js_minify_safe(&src));
             }
         }
