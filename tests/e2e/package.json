@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "pretest": "bash ../common/spawn-db.sh",
-    "test": "npx playwright test",
+    "test": "npx playwright test --reporter=line,github --trace=on-first-retry scenarios/01-home-and-login.spec.ts scenarios/02-folder-management.spec.ts",
     "posttest": "bash ../common/stop-db.sh"
   },
   "keywords": [],
